@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useListUniversities, useCreateUniversity, getListUniversitiesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Building2 } from "lucide-react";
+import { Plus, Search, Building2, MapPin, Globe, ChevronRight } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -24,18 +24,13 @@ export default function Universities() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
-  
+
   const { data, isLoading } = useListUniversities({ search: search || undefined });
   const createUniversity = useCreateUniversity();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      country: "",
-      city: "",
-      website: "",
-    },
+    defaultValues: { name: "", country: "", city: "", website: "" },
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
@@ -48,16 +43,18 @@ export default function Universities() {
     });
   };
 
+  const universities = data?.data ?? [];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Universities</h1>
-          <p className="text-muted-foreground">Manage partner universities and institutions.</p>
+          <p className="text-muted-foreground text-sm">Manage partner universities and institutions.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Add University</Button>
+            <Button size="sm"><Plus className="mr-2 h-4 w-4" /> Add University</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -88,52 +85,89 @@ export default function Universities() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center space-x-2">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search universities..." 
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <Input
+              placeholder="Search universities..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm border-0 focus-visible:ring-0 px-0 h-8"
+              className="border-0 focus-visible:ring-0 px-0 h-8"
             />
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Website</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-              ) : data?.data?.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No universities found</TableCell></TableRow>
-              ) : (
-                data?.data?.map((uni) => (
-                  <TableRow key={uni.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/universities/${uni.id}`} className="hover:underline flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        {uni.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{uni.city}, {uni.country}</TableCell>
-                    <TableCell>{uni.website ? <a href={uni.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{uni.website}</a> : "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/universities/${uni.id}`}>
-                        <Button variant="ghost" size="sm">View</Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">Loading...</div>
+          ) : universities.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No universities found</div>
+          ) : (
+            <>
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y">
+                {universities.map((uni) => (
+                  <Link key={uni.id} href={`/universities/${uni.id}`}>
+                    <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 active:bg-muted transition-colors">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Building2 className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{uni.name}</p>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{uni.city}, {uni.country}</span>
+                        </div>
+                        {uni.website && (
+                          <div className="flex items-center gap-1 text-xs text-blue-600 mt-0.5">
+                            <Globe className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{uni.website.replace(/^https?:\/\//, "")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Website</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {universities.map((uni) => (
+                      <TableRow key={uni.id}>
+                        <TableCell className="font-medium">
+                          <Link href={`/universities/${uni.id}`} className="hover:underline flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            {uni.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{uni.city}, {uni.country}</TableCell>
+                        <TableCell>
+                          {uni.website
+                            ? <a href={uni.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{uni.website}</a>
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/universities/${uni.id}`}>
+                            <Button variant="ghost" size="sm">View</Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

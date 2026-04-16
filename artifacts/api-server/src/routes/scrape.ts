@@ -317,6 +317,7 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   const text = $("body").text();
   const data: Partial<CourseData> = { courseName: name, courseWebsite: url, language: "English" };
 
+  // Duration: year → month → week → semester → trimester
   const durMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:full[- ]?time)?/i);
   if (durMatch) { data.duration = parseFloat(durMatch[1]); data.durationTerm = "Year"; }
   else {
@@ -325,6 +326,14 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
     else {
       const wMatch = text.match(/(\d+)\s*weeks?\s*(?:full[- ]?time)?/i);
       if (wMatch) { data.duration = parseInt(wMatch[1]); data.durationTerm = "Week"; }
+      else {
+        const semMatch = text.match(/(\d+)\s*trimesters?/i);
+        if (semMatch) { data.duration = parseInt(semMatch[1]); data.durationTerm = "Trimester"; }
+        else {
+          const sem2Match = text.match(/(\d+)\s*semesters?/i);
+          if (sem2Match) { data.duration = parseInt(sem2Match[1]); data.durationTerm = "Semester"; }
+        }
+      }
     }
   }
 
@@ -332,10 +341,11 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   else if (/full[- ]?time/i.test(text)) data.studyLoad = "Full Time";
   else if (/part[- ]?time/i.test(text)) data.studyLoad = "Part Time";
 
-  if (/on[- ]?campus\s*(and|or|\/)\s*online/i.test(text)) data.studyMode = "Blended";
-  else if (/blended|hybrid/i.test(text)) data.studyMode = "Blended";
-  else if (/online\s*(only|delivery)/i.test(text)) data.studyMode = "Online";
-  else if (/on[- ]?campus/i.test(text)) data.studyMode = "On Campus";
+  // Study mode — order matters: blended first, then online, then campus
+  if (/on[- ]?campus\s*(and|or|\/)\s*online|online\s*(and|or|\/)\s*on[- ]?campus/i.test(text)) data.studyMode = "Blended";
+  else if (/blended|hybrid|both\s*(?:on[- ]?campus\s*and\s*online|online\s*and\s*on[- ]?campus)/i.test(text)) data.studyMode = "Blended";
+  else if (/online\s*(only|delivery)|distance\s*(?:learning|education)|external\s*(?:study|delivery)|fully\s*online/i.test(text)) data.studyMode = "Online";
+  else if (/on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face/i.test(text)) data.studyMode = "On Campus";
 
   const lower = name.toLowerCase();
   if (/\bphd\b|doctor of philosophy/i.test(lower)) data.degreeLevel = "PhD";
@@ -363,22 +373,44 @@ function detectFeeTerm(context: string): string {
   return "Annual";
 }
 
+function detectCurrencyFromContext(ctx: string): string {
+  if (/NZ\$|NZD/i.test(ctx)) return "NZD";
+  if (/CA\$|C\$|CAD/i.test(ctx)) return "CAD";
+  if (/S\$|SGD/i.test(ctx)) return "SGD";
+  if (/US\$|USD/i.test(ctx)) return "USD";
+  if (/£|GBP/i.test(ctx)) return "GBP";
+  if (/€|EUR/i.test(ctx)) return "EUR";
+  if (/A\$|AUD/i.test(ctx)) return "AUD";
+  return "AUD";
+}
+
 function extractInternationalFees(text: string, data: Partial<CourseData>) {
-  const intlSection = text.match(/international[^]*?(?:fee|tuition|cost)[^]*?[\$A]\s*([\d,]+)/i);
+  const CURRENCY_SYM = /(?:AUD|NZD|CAD|USD|GBP|SGD|EUR|A\$|NZ\$|CA\$|US\$|S\$|£|€|\$)/;
+
+  // Priority 1: explicit international section with currency
+  const intlSection = text.match(
+    new RegExp(`international[^]*?(?:fee|tuition|cost)[^]*?${CURRENCY_SYM.source}\\s*([\\d,]+)`, "i")
+  );
   if (intlSection) {
     const fee = parseInt(intlSection[1].replace(/,/g, ""));
     if (fee > 1000 && fee < 200000) {
       data.internationalFee = fee;
-      data.currency = "AUD";
+      data.currency = detectCurrencyFromContext(intlSection[0]);
       data.feeTerm = detectFeeTerm(intlSection[0]);
       return;
     }
   }
 
+  // Priority 2: explicit international/overseas/non-resident label patterns
   const feePatterns = [
-    /(?:international|overseas)\s*(?:student\s*)?(?:fee|tuition|cost)[:\s]*\$?([\d,]+)/i,
-    /(?:international|overseas)[^.]*?\$\s*([\d,]+)/i,
-    /(?:international|overseas)[^.]*?(?:AUD|A\$)\s*([\d,]+)/i,
+    // "International student fee: $42,000"
+    new RegExp(`(?:international|overseas|non-?resident)\\s*(?:student\\s*)?(?:fee|tuition|cost)[:\\s]*${CURRENCY_SYM.source}?\\s*([\\d,]+)`, "i"),
+    // "International students: AUD $38,000"
+    new RegExp(`(?:international|overseas|non-?resident)[^.]*?${CURRENCY_SYM.source}\\s*([\\d,]+)`, "i"),
+    // HTML table: <td>International</td><td>$42,000</td>
+    /<td[^>]*>\s*(?:International|Overseas)\s*<\/td>\s*<td[^>]*>\s*(?:AUD|NZD|CAD|USD|GBP|SGD|€|\$|£|A\$)?\s*([\d,]+)/i,
+    // "Fee: $38,000 per year (international)"
+    new RegExp(`${CURRENCY_SYM.source}\\s*([\\d,]+)[^.]*?(?:international|overseas)`, "i"),
   ];
   for (const fp of feePatterns) {
     const fm = text.match(fp);
@@ -386,19 +418,22 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
       const fee = parseInt(fm[1].replace(/,/g, ""));
       if (fee > 1000 && fee < 200000) {
         data.internationalFee = fee;
-        data.currency = "AUD";
+        data.currency = detectCurrencyFromContext(fm[0]);
         data.feeTerm = detectFeeTerm(fm[0]);
         return;
       }
     }
   }
 
-  const genericFee = text.match(/(?:tuition|fee|cost)[:\s]*(?:AUD|A\$|\$)\s*([\d,]+)/i);
-  if (genericFee && !/domestic/i.test(genericFee[0])) {
+  // Priority 3: generic fee not explicitly domestic
+  const genericFee = text.match(
+    new RegExp(`(?:tuition|fee|cost)[:\\s]*${CURRENCY_SYM.source}\\s*([\\d,]+)`, "i")
+  );
+  if (genericFee && !/domestic|resident|local/i.test(genericFee[0])) {
     const fee = parseInt(genericFee[1].replace(/,/g, ""));
     if (fee > 5000 && fee < 200000) {
       data.internationalFee = fee;
-      data.currency = "AUD";
+      data.currency = detectCurrencyFromContext(genericFee[0]);
       data.feeTerm = detectFeeTerm(genericFee[0]);
     }
   }
@@ -578,31 +613,83 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   }
 }
 
-function extractIntakeMonths(text: string, data: Partial<CourseData>) {
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const intakeMonths: string[] = [];
+function normalizeMonth(m: string): string {
+  const abbrevMap: Record<string, string> = {
+    jan: "January", feb: "February", mar: "March", apr: "April",
+    may: "May", jun: "June", jul: "July", aug: "August",
+    sep: "September", oct: "October", nov: "November", dec: "December",
+  };
+  const key = m.toLowerCase().slice(0, 3);
+  return abbrevMap[key] || m;
+}
 
-  const intakeSections = text.match(/(?:intake|start\s*date|commencement|commence|entry\s*point|intake\s*option)[^]*?(?:\n\n|See\s|$)/gi);
-  if (intakeSections) {
+function extractIntakeMonths(text: string, data: Partial<CourseData>) {
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const MONTH_RE = /January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/;
+
+  const intakeMonths: string[] = [];
+  const intakeDays: number[] = [];
+
+  // Pass 1: Look for full "day Month" date patterns — "15 February 2025", "20 Jul"
+  const fullDatePattern = new RegExp(`\\b(\\d{1,2})\\s+(${MONTH_RE.source})\\b`, "gi");
+  let dateMatch: RegExpExecArray | null;
+  while ((dateMatch = fullDatePattern.exec(text)) !== null) {
+    const day = parseInt(dateMatch[1]);
+    const month = normalizeMonth(dateMatch[2]);
+    if (day >= 1 && day <= 31 && MONTHS.includes(month)) {
+      if (!intakeDays.includes(day)) intakeDays.push(day);
+      if (!intakeMonths.includes(month)) intakeMonths.push(month);
+    }
+  }
+
+  // Pass 2: Context-scoped intake sections
+  if (intakeMonths.length === 0) {
+    const intakeSections = text.match(/(?:intake|start\s*date|commencement|commence|entry\s*point|intake\s*option)[^]*?(?:\n\n|See\s|$)/gi) ?? [];
     for (const section of intakeSections) {
-      for (const m of months) {
-        if (section.toLowerCase().includes(m.toLowerCase()) && !intakeMonths.includes(m)) intakeMonths.push(m);
+      for (const m of MONTHS) {
+        if (new RegExp(`\\b${m}\\b`, "i").test(section) && !intakeMonths.includes(m)) intakeMonths.push(m);
       }
     }
   }
 
+  // Pass 3: Inline list pattern — "Intake: February, July, November"
   if (intakeMonths.length === 0) {
-    const monthListPattern = text.match(/(?:intake|start|commencement)[^.]{0,100}?((?:(?:January|February|March|April|May|June|July|August|September|October|November|December)[\s,/and]*)+)/gi);
-    if (monthListPattern) {
-      for (const section of monthListPattern) {
+    const monthNames = MONTHS.join("|");
+    const abbrevs = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+    const listRe = new RegExp(
+      `(?:intake|start|commencement)[^.]{0,100}?((?:(?:${monthNames}|${abbrevs})[\\s,/and]*)+)`,
+      "gi",
+    );
+    let listMatch: RegExpExecArray | null;
+    while ((listMatch = listRe.exec(text)) !== null) {
+      const found = listMatch[1].match(new RegExp(`\\b(${monthNames}|${abbrevs})\\b`, "gi")) ?? [];
+      for (const raw of found) {
+        const m = normalizeMonth(raw);
+        if (MONTHS.includes(m) && !intakeMonths.includes(m)) intakeMonths.push(m);
+      }
+    }
+  }
+
+  // Pass 4: Semester / Trimester fallback — map to representative months
+  if (intakeMonths.length === 0) {
+    const semesterMap: [RegExp, string[]][] = [
+      [/trimester\s*1/i, ["January", "February"]],
+      [/trimester\s*2/i, ["May", "June"]],
+      [/trimester\s*3/i, ["September", "October"]],
+      [/semester\s*1/i, ["February", "March"]],
+      [/semester\s*2/i, ["July", "August"]],
+    ];
+    for (const [re, months] of semesterMap) {
+      if (re.test(text)) {
         for (const m of months) {
-          if (section.toLowerCase().includes(m.toLowerCase()) && !intakeMonths.includes(m)) intakeMonths.push(m);
+          if (!intakeMonths.includes(m)) intakeMonths.push(m);
         }
       }
     }
   }
 
   if (intakeMonths.length > 0) data.intakeMonths = intakeMonths;
+  if (intakeDays.length > 0) data.intakeDays = intakeDays[0]; // store first start day
 }
 
 async function analyzeImageWithGemini(imageUrl: string, context: string): Promise<Partial<CourseData>> {
@@ -840,6 +927,44 @@ Return JSON:
   "scholarship": "<scholarship info>"
 }
 IMPORTANT: Only include INTERNATIONAL student fees. Exclude all domestic/local fees. Use null for missing fields.`;
+
+/**
+ * Pre-filters compact text content to sections relevant to a specific data field.
+ * Reduces AI token consumption by sending only relevant paragraphs.
+ */
+function extractRelevantSection(content: string, field: "fees" | "requirements" | "intakes" | "duration" | "campus" | "all"): string {
+  if (field === "all") return content.slice(0, 8000);
+
+  const sectionKeywords: Record<string, string[]> = {
+    fees: ["fee", "tuition", "cost", "price", "payment", "international", "AUD", "GBP"],
+    requirements: ["requirement", "entry", "admission", "IELTS", "TOEFL", "PTE", "academic", "english"],
+    intakes: ["intake", "start", "commence", "entry", "semester", "trimester", "month"],
+    duration: ["duration", "length", "time", "year", "month", "full-time", "part-time"],
+    campus: ["location", "campus", "where", "city", "site", "online"],
+  };
+
+  const keywords = sectionKeywords[field] ?? [];
+  const lines = content.split("\n");
+  const relevantLines: string[] = [];
+  let lastRelevant = -10;
+
+  lines.forEach((line, i) => {
+    const isRelevant = keywords.some((kw) => new RegExp(kw, "i").test(line));
+    if (isRelevant) {
+      // Include 2 lines of context around each relevant line
+      for (let j = Math.max(0, lastRelevant + 1); j < i; j++) {
+        if (i - j <= 2) relevantLines.push(lines[j]);
+      }
+      relevantLines.push(line);
+      lastRelevant = i;
+    } else if (i - lastRelevant <= 2) {
+      relevantLines.push(line); // trailing context
+    }
+  });
+
+  const result = relevantLines.join("\n").trim();
+  return result.length > 200 ? result.slice(0, 4000) : content.slice(0, 4000);
+}
 
 async function extractCourseFromPage(content: string, courseName: string): Promise<CourseData | null> {
   try {
@@ -1216,11 +1341,30 @@ async function researchAndValidateCourseLinks(
 
 function isCourseUrl(urlStr: string): boolean {
   const lower = urlStr.toLowerCase();
+
+  // Explicit exclusions — these are never course pages
+  const excludePatterns = [
+    "/accommodation", "/student-life", "/campus-life", "/campus-map", "/campus-tour",
+    "/apply", "/application", "/contact", "/about-us", "/about/", "/news/", "/events/",
+    "/search", "/category/", "/tag/", "/blog/", "/staff/", "/faculty-profile",
+    "/research/", "/library/", "/scholarships", "/support/", "/services/",
+    "/node/", "/page/", "/generic/", "/media/", "/documents/", "/resources/",
+    "/student-support", "/international-students/visa", "/fees-scholarships",
+  ];
+  if (excludePatterns.some((p) => lower.includes(p))) return false;
+
   return (
-    lower.includes("/course") || lower.includes("/program") || lower.includes("/bachelor") ||
-    lower.includes("/master") || lower.includes("/diploma") || lower.includes("/study/") ||
-    lower.includes("/graduate-diploma") || lower.includes("/certificate") || lower.includes("/degree") ||
-    lower.includes("/phd") || lower.includes("/mba")
+    lower.includes("/course") || lower.includes("/program") ||
+    lower.includes("/bachelor") || lower.includes("/master") ||
+    lower.includes("/diploma") || lower.includes("/study/") ||
+    lower.includes("/graduate-certificate") || lower.includes("/graduate-diploma") ||
+    lower.includes("/certificate") || lower.includes("/degree") ||
+    lower.includes("/phd") || lower.includes("/mba") ||
+    lower.includes("/doctorate") || lower.includes("/doctoral") ||
+    lower.includes("/undergraduate") || lower.includes("/postgraduate") ||
+    lower.includes("/associate-degree") || lower.includes("/double-degree") ||
+    lower.includes("/dual-degree") || lower.includes("/juris-doctor") ||
+    lower.includes("/honours") || lower.includes("/pathway")
   );
 }
 
@@ -1809,26 +1953,27 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
   for (const namePart of nameParts) {
     // Escape special regex characters in course name
     const escapedName = namePart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const nameRegex = new RegExp(`${escapedName}[^\\n]{0,300}?(?:A\\$|\\$|£|€|AUD\\s*)([\\d,]+)`, "i");
+    const CURR_PAT = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
+    const nameRegex = new RegExp(`${escapedName}[^\\n]{0,300}?(?:${CURR_PAT.source})\\s*([\\d,]+)`, "i");
     const m = searchText.match(nameRegex);
     if (m) {
       const fee = parseInt(m[1].replace(/,/g, ""));
       if (fee > 1000 && fee < 200000) {
         courseData.internationalFee = fee;
-        courseData.currency = /£/.test(m[0]) ? "GBP" : /€/.test(m[0]) ? "EUR" : "AUD";
+        courseData.currency = detectCurrencyFromContext(m[0]);
         courseData.feeTerm = getFeeTerm(m[0]);
         return;
       }
     }
 
-    // Try reverse: find $ then look back for course name
-    const feeRegex = new RegExp(`${escapedName}[^\\n\\r]{0,50}\\n?[^\\n\\r]{0,50}(?:A\\$|\\$|£|€)([\\d,]+)`, "i");
+    // Try reverse: currency then course name on nearby line
+    const feeRegex = new RegExp(`${escapedName}[^\\n\\r]{0,50}\\n?[^\\n\\r]{0,50}(?:${CURR_PAT.source})([\\d,]+)`, "i");
     const m2 = searchText.match(feeRegex);
     if (m2) {
       const fee = parseInt(m2[1].replace(/,/g, ""));
       if (fee > 1000 && fee < 200000) {
         courseData.internationalFee = fee;
-        courseData.currency = /£/.test(m2[0]) ? "GBP" : /€/.test(m2[0]) ? "EUR" : "AUD";
+        courseData.currency = detectCurrencyFromContext(m2[0]);
         courseData.feeTerm = getFeeTerm(m2[0]);
         return;
       }
@@ -1837,14 +1982,15 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
 
   // Word-by-word fallback (significant unique words in course name near a fee)
   const significantWords = courseName.split(/\s+/).filter(w => w.length > 4 && !/^(major|bachelor|master|graduate|diploma|certificate|engineering|studies|arts|science)$/i.test(w));
+  const CURR_PAT2 = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
   for (const word of significantWords.slice(0, 3)) {
-    const regex = new RegExp(`${word}[^\\n]{0,200}?(?:A\\$|\\$|£|€)([\\d,]+)`, "i");
+    const regex = new RegExp(`${word}[^\\n]{0,200}?(?:${CURR_PAT2.source})([\\d,]+)`, "i");
     const m = searchText.match(regex);
     if (m) {
       const fee = parseInt(m[1].replace(/,/g, ""));
       if (fee > 1000 && fee < 200000) {
         courseData.internationalFee = fee;
-        courseData.currency = /£/.test(m[0]) ? "GBP" : /€/.test(m[0]) ? "EUR" : "AUD";
+        courseData.currency = detectCurrencyFromContext(m[0]);
         courseData.feeTerm = getFeeTerm(m[0]);
         return;
       }
