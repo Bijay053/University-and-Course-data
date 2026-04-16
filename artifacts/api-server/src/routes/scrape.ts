@@ -1280,7 +1280,11 @@ function urlLastSegmentHasDegreeQualifier(url: string): boolean {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
     const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
-    return DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q);
+    if (!DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q)) return false;
+    // Reject degree-qualified URLs that are clearly info/category pages, not actual course detail pages
+    // e.g. phd-scholarships, phd-jobs-and-internships, integrated-masters (category), master-classes
+    if (/(scholarships?|jobs?|internships?|employment|career|life|accommodation|sport|news|event|blog|faq|help|support|overview|guide|information|handbook|tips|process|pathway|pathways?|class(?:es)?|fair|expo|hub|community|connect|network)$/.test(lastSeg)) return false;
+    return true;
   } catch { return false; }
 }
 
@@ -1323,28 +1327,27 @@ async function researchAndValidateCourseLinks(
   const urlFiltered = candidates.filter((c) => urlLastSegmentHasDegreeQualifier(c.url));
   const urlFilterRatio = urlFiltered.length / candidates.length;
 
-  if (urlFilterRatio > 0.4 && urlFiltered.length >= 5) {
-    const removed = candidates.length - urlFiltered.length;
-    if (removed > 0) {
-      addLog(job, "status", {
-        message: `URL analysis: ${urlFiltered.length} course pages identified, filtered out ${removed} non-course pages (categories, accommodation, sports, etc.)`,
-        phase: "discover",
-      });
-    }
-    return { links: urlFiltered, validSamples: 0, rejectedSamples: 0, validExamples: urlFiltered.slice(0, 3).map(c => c.name), rejectedExamples: [] };
+  // Decide which list to sample from — use URL-filtered when confident, otherwise all candidates
+  const workingList = (urlFilterRatio > 0.4 && urlFiltered.length >= 5) ? urlFiltered : candidates;
+  const removedByUrl = candidates.length - workingList.length;
+  if (removedByUrl > 0) {
+    addLog(job, "status", {
+      message: `URL analysis: ${workingList.length} candidate course pages identified, filtered out ${removedByUrl} non-course URLs`,
+      phase: "discover",
+    });
   }
 
-  // Phase 2: Content sampling (fetch sample pages, validate with page content)
-  const sampleSize = Math.min(12, candidates.length);
-  const step = Math.max(1, Math.floor(candidates.length / sampleSize));
+  // Phase 2: Content sampling — always sample to validate and show real counts to the user
+  const sampleSize = Math.min(12, workingList.length);
+  const step = Math.max(1, Math.floor(workingList.length / sampleSize));
   const sample: { url: string; name: string }[] = [];
-  for (let i = 0; i < candidates.length; i += step) {
+  for (let i = 0; i < workingList.length; i += step) {
     if (sample.length >= sampleSize) break;
-    sample.push(candidates[i]);
+    sample.push(workingList[i]);
   }
 
   addLog(job, "status", {
-    message: `Researching ${candidates.length} candidate URLs — sampling ${sample.length} pages in parallel...`,
+    message: `Phase 2: Researching ${workingList.length} candidates — sampling ${sample.length} pages to confirm genuine course pages...`,
     phase: "discover",
   });
 
@@ -1388,18 +1391,18 @@ async function researchAndValidateCourseLinks(
   });
 
   if (confirmedCourses === 0) {
-    addLog(job, "status", { message: "Could not confirm any course pages from samples. Using all candidates.", phase: "discover" });
-    return { links: candidates, validSamples: 0, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
+    addLog(job, "status", { message: "Could not confirm any course pages from samples. Using URL-filtered candidates.", phase: "discover" });
+    return { links: workingList, validSamples: 0, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
   }
 
-  if (validUrlDepths.length === 0) return { links: candidates, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
+  if (validUrlDepths.length === 0) return { links: workingList, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 
   const avgDepth = Math.round(validUrlDepths.reduce((a, b) => a + b, 0) / validUrlDepths.length);
   const prefixCounts = new Map<string, number>();
   for (const p of validUrlPrefixes) prefixCounts.set(p, (prefixCounts.get(p) || 0) + 1);
   const bestPrefix = [...prefixCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
 
-  const filtered = candidates.filter((c) => {
+  const filtered = workingList.filter((c) => {
     try {
       const pathParts = new URL(c.url).pathname.split("/").filter(Boolean);
       if (Math.abs(pathParts.length - avgDepth) > 1) return false;
@@ -1408,7 +1411,7 @@ async function researchAndValidateCourseLinks(
     } catch { return false; }
   });
 
-  const removedCount = candidates.length - filtered.length;
+  const removedCount = workingList.length - filtered.length;
   if (removedCount > 0) {
     addLog(job, "status", {
       message: `Filtered out ${removedCount} non-course pages. Will fetch ${filtered.length} validated course pages.`,
@@ -1416,7 +1419,7 @@ async function researchAndValidateCourseLinks(
     });
   }
 
-  const finalLinks = filtered.length >= 3 ? filtered : candidates;
+  const finalLinks = filtered.length >= 3 ? filtered : workingList;
   return { links: finalLinks, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 }
 
@@ -1433,6 +1436,10 @@ function isCourseUrl(urlStr: string): boolean {
     "/student-support", "/international-students/visa", "/fees-scholarships",
   ];
   if (excludePatterns.some((p) => lower.includes(p))) return false;
+  // Exclude URLs whose last path segment ends with known junk suffixes
+  // e.g. /study/phd-scholarships, /study/phd-jobs-and-internships, /integrated-masters (category)
+  const lastSeg = lower.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+  if (/(scholarships?|jobs?(-and-internships?)?|internships?|employment|student-life|community|connect|network|hub|fair|expo|overview|handbook|tips|guide|pathway|pathways?|classes?)$/.test(lastSeg)) return false;
 
   return (
     lower.includes("/course") || lower.includes("/program") ||
