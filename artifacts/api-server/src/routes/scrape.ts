@@ -6,7 +6,10 @@ import { eq } from "drizzle-orm";
 const router: IRouter = Router();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
+function geminiUrl(model: string) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+}
 
 interface CourseData {
   courseName: string;
@@ -61,45 +64,65 @@ function sendSSE(res: Response, event: string, data: unknown) {
   res.write(`data: ${JSON.stringify({ event, ...data as object })}\n\n`);
 }
 
-async function geminiChat(systemPrompt: string, userContent: string, retries = 3): Promise<string> {
+async function geminiChat(systemPrompt: string, userContent: string): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const resp = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userContent }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          maxOutputTokens: 8192,
-        },
-      }),
-    });
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ parts: [{ text: userContent }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 8192,
+    },
+  });
 
-    if (resp.status === 429) {
-      if (attempt < retries - 1) {
-        const wait = (attempt + 1) * 15;
-        console.log(`Gemini rate limited, retrying in ${wait}s (attempt ${attempt + 1}/${retries})`);
-        await new Promise((r) => setTimeout(r, wait * 1000));
-        continue;
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const resp = await fetch(geminiUrl(model), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+
+        if (resp.status === 429 || resp.status === 503) {
+          console.log(`Gemini ${model} returned ${resp.status}, ${attempt === 0 ? "retrying..." : "trying next model..."}`);
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, 5000));
+            continue;
+          }
+          break;
+        }
+
+        if (resp.status === 404) {
+          console.log(`Gemini model ${model} not available, trying next...`);
+          break;
+        }
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const data = await resp.json() as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (!text) {
+          console.log(`Empty response from ${model}, trying next...`);
+          break;
+        }
+        console.log(`Gemini response OK from ${model}`);
+        return text;
+      } catch (err) {
+        if ((err as Error).message.includes("Gemini API error")) throw err;
+        console.log(`Gemini ${model} attempt ${attempt + 1} failed: ${(err as Error).message}`);
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 3000));
+        }
       }
-      throw new Error("Gemini API rate limit exceeded. The free-tier quota has been reached. Please wait a minute and try again.");
     }
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const data = await resp.json() as any;
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    if (!text) throw new Error("Empty response from Gemini API");
-    return text;
   }
 
-  throw new Error("Gemini API failed after all retries");
+  throw new Error("All Gemini models are currently unavailable. Please try again in a minute.");
 }
 
 async function fetchPage(url: string): Promise<string> {
