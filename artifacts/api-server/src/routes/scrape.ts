@@ -1869,7 +1869,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
       const href = $(el).attr("href") || "";
       const text = $(el).text().trim().toLowerCase();
       try {
-        const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
+        const rawUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
+        // Strip hash fragments — servers ignore them, so #FeeInformation → homepage HTML
+        const fullUrl = rawUrl.split("#")[0];
+        if (!fullUrl || fullUrl === origin || fullUrl === origin + "/") return;
         if (!fullUrl.startsWith(origin)) return;
         if (visited.has(fullUrl)) return;
         visited.add(fullUrl);
@@ -1906,7 +1909,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
       const href = $listing(el).attr("href") || "";
       const text = $listing(el).text().trim().toLowerCase();
       try {
-        const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
+        const rawUrl2 = href.startsWith("http") ? href : new URL(href, origin).toString();
+        // Strip hash fragments — servers ignore them
+        const fullUrl = rawUrl2.split("#")[0];
+        if (!fullUrl || fullUrl === origin || fullUrl === origin + "/") return;
         if (!fullUrl.startsWith(origin)) return;
         const isDrupalNode = /\/node\/\d+$/.test(fullUrl);
 
@@ -1981,7 +1987,10 @@ async function getUniversityFeePageText(feePage: string, cache: UniversityFeeCac
   if (cache.fetched) return cache.text || "";
   cache.fetched = true;
   try {
-    const html = await fetchPage(feePage);
+    // Strip hash fragments — servers return the same page regardless of anchor
+    const cleanUrl = feePage.split("#")[0];
+    if (!cleanUrl) return "";
+    const html = await fetchPage(cleanUrl);
     cache.html = html;
     cache.text = cheerio.load(html)("body").text();
     return cache.text;
@@ -2434,6 +2443,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const aiData = await extractCourseFromPage(compactContent, cheerioData.courseName || "course");
 
       if (aiData) {
+        // Merge cheerioData into aiData — Cheerio wins for any field it filled
         for (const [key, val] of Object.entries(cheerioData)) {
           if (val !== undefined && val !== null && !(aiData as any)[key]) {
             (aiData as any)[key] = val;
@@ -2444,6 +2454,15 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
         addLog(job, "course", { name: aiData.courseName, status: saved ? "staged" : "skipped (duplicate)" });
+        addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
+      } else if (cheerioData.courseName) {
+        // AI failed but Cheerio extracted data — use it directly rather than losing the course
+        addLog(job, "status", { message: "AI extraction failed; saving Cheerio-extracted data as fallback.", phase: "extract" });
+        cheerioData.courseWebsite = cheerioData.courseWebsite || resolvedUrl;
+        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId);
+        job.totalFound = 1;
+        if (saved) job.imported = 1; else job.skipped = 1;
+        addLog(job, "course", { name: cheerioData.courseName, status: saved ? "staged (partial)" : "skipped (duplicate)" });
         addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
       } else {
         addLog(job, "error", { message: "Could not extract course data from this page." });
