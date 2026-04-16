@@ -1080,7 +1080,7 @@ async function researchAndValidateCourseLinks(
   }
 
   addLog(job, "status", {
-    message: `Researching ${candidates.length} candidate URLs — sampling ${sample.length} pages to identify genuine course pages...`,
+    message: `Researching ${candidates.length} candidate URLs — sampling ${sample.length} pages in parallel...`,
     phase: "discover",
   });
 
@@ -1089,27 +1089,30 @@ async function researchAndValidateCourseLinks(
   let confirmedCourses = 0;
   let confirmedNonCourses = 0;
 
-  for (const candidate of sample) {
-    try {
-      const pageHtml = await fetchPage(candidate.url);
-      const bodyText = cheerio.load(pageHtml)("body").text();
-      const isRealCourse = pageContentLooksLikeCourse(bodyText);
+  // Fetch all samples in parallel (up to 8 concurrent)
+  const sampleSem = makeSemaphore(8);
+  await Promise.all(sample.map((candidate) =>
+    sampleSem(async () => {
+      try {
+        const pageHtml = await fetchPage(candidate.url);
+        const bodyText = cheerio.load(pageHtml)("body").text();
+        const isRealCourse = pageContentLooksLikeCourse(bodyText);
 
-      if (isRealCourse) {
-        confirmedCourses++;
-        const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
-        validUrlDepths.push(pathParts.length);
-        if (pathParts.length > 1) {
-          validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
+        if (isRealCourse) {
+          confirmedCourses++;
+          const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
+          validUrlDepths.push(pathParts.length);
+          if (pathParts.length > 1) {
+            validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
+          }
+          addLog(job, "status", { message: `✓ Confirmed course: "${candidate.name}"`, phase: "discover" });
+        } else {
+          confirmedNonCourses++;
+          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — filtering similar URLs`, phase: "discover" });
         }
-        addLog(job, "status", { message: `✓ Confirmed course: "${candidate.name}"`, phase: "discover" });
-      } else {
-        confirmedNonCourses++;
-        addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — will filter similar URLs`, phase: "discover" });
-      }
-    } catch {}
-    await new Promise((r) => setTimeout(r, 150));
-  }
+      } catch {}
+    })
+  ));
 
   addLog(job, "status", {
     message: `Research complete: ${confirmedCourses}/${sample.length} sampled pages are genuine course pages`,
@@ -1768,6 +1771,23 @@ function cheerioToCourseData(cheerioData: Partial<CourseData>, name: string, url
   };
 }
 
+function makeSemaphore(concurrency: number) {
+  let running = 0;
+  const queue: (() => void)[] = [];
+  return async function<T>(fn: () => Promise<T>): Promise<T> {
+    await new Promise<void>((resolve) => {
+      if (running < concurrency) { running++; resolve(); }
+      else { queue.push(resolve); }
+    });
+    try { return await fn(); }
+    finally {
+      running--;
+      const next = queue.shift();
+      if (next) { running++; next(); }
+    }
+  };
+}
+
 async function scrapeCourseBatch(
   courseLinks: { url: string; name: string }[],
   uniId: number,
@@ -1779,9 +1799,9 @@ async function scrapeCourseBatch(
   const max = Math.min(courseLinks.length, maxCourses);
   job.totalFound = courseLinks.length;
 
+  // Pre-fetch shared data ONCE (parallel)
   const feeCache: UniversityFeeCache = { fetched: false };
   let uniReqsText: string | null = null;
-
   if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
       const reqUrl = uniPages.entryPage || uniPages.requirementsPage!;
@@ -1790,120 +1810,132 @@ async function scrapeCourseBatch(
     } catch {}
   }
 
-  const batchSize = 10;
-  let classifyBatch: { index: number; name: string; existing: Partial<CourseData> }[] = [];
-  let pendingCourses: { index: number; data: CourseData }[] = [];
+  // Queues filled by parallel workers, flushed after all done
+  const classifyQueue: { index: number; name: string; existing: Partial<CourseData>; data: CourseData }[] = [];
+  const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio> }[] = [];
+  let completed = 0;
 
-  for (let i = 0; i < max; i++) {
-    if (job.stopped) {
-      addLog(job, "status", { message: `Stopped after ${i} courses (${job.imported} staged)` });
-      break;
-    }
-    const link = courseLinks[i];
-    job.current = i + 1;
-    addLog(job, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
+  const CONCURRENCY = 25;
+  const sem = makeSemaphore(CONCURRENCY);
 
-    try {
-      const cHtml = await fetchPage(link.url);
-      const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+  const tasks = courseLinks.slice(0, max).map((link, i) =>
+    sem(async () => {
+      if (job.stopped) return;
+      const num = ++completed;
+      addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
-      const relatedPages = findRelatedPages(cHtml, link.url);
-      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
-        addLog(job, "status", { message: `Checking related pages/PDFs for ${link.name}...`, phase: "enrich" });
-        await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
-      } else if (!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) || !cheerioData.internationalFee) {
-        const images = findImageUrls(cHtml, link.url);
-        if (images.length > 0) {
-          addLog(job, "status", { message: `Analyzing images for data in ${link.name}...`, phase: "enrich" });
-          await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
-        }
-      }
+      try {
+        const cHtml = await fetchPage(link.url);
+        const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
 
-      if (!cheerioData.internationalFee && uniPages?.feePage) {
-        await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache);
-      }
-      if (!cheerioData.internationalFee && uniPages?.feesPdf) {
-        try {
-          const pdfData = await extractFeesFromPdf(uniPages.feesPdf, link.name);
-          if (pdfData.internationalFee) {
-            cheerioData.internationalFee = pdfData.internationalFee;
-            cheerioData.currency = pdfData.currency || "AUD";
-            cheerioData.feeTerm = pdfData.feeTerm || "Annual";
-            cheerioData.feeYear = pdfData.feeYear || undefined;
+        // Only enrich if cheerio is missing critical fields (avoids extra network round-trips for most courses)
+        const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
+        if (needsEnrich) {
+          const relatedPages = findRelatedPages(cHtml, link.url);
+          if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+            await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
           }
-        } catch {}
+        }
+
+        if (!cheerioData.internationalFee && uniPages?.feePage) {
+          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache);
+        }
+        if (!cheerioData.internationalFee && uniPages?.feesPdf) {
+          try {
+            const pdfData = await extractFeesFromPdf(uniPages.feesPdf, link.name);
+            if (pdfData.internationalFee) {
+              cheerioData.internationalFee = pdfData.internationalFee;
+              cheerioData.currency = pdfData.currency || "AUD";
+              cheerioData.feeTerm = pdfData.feeTerm || "Annual";
+              cheerioData.feeYear = pdfData.feeYear || undefined;
+            }
+          } catch {}
+        }
+
+        if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+          extractEnglishRequirements(uniReqsText, cheerioData);
+        }
+
+        const hasFees = !!cheerioData.internationalFee;
+        const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
+        const hasDuration = !!cheerioData.duration;
+
+        if (hasFees || hasEnglish || hasDuration) {
+          // Cheerio got useful data — queue for batch AI classification (cheap)
+          const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
+          classifyQueue.push({ index: i, name: link.name, existing: courseData, data: courseData });
+        } else {
+          // Cheerio got nothing — queue for full AI extraction (deferred)
+          fullAIQueue.push({ index: i, name: link.name, html: cHtml, cheerioData });
+        }
+      } catch (err) {
+        job.errors++;
+        addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
       }
+    })
+  );
 
-      if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-        extractEnglishRequirements(uniReqsText, cheerioData);
+  // Run all parallel fetches
+  await Promise.all(tasks);
+
+  if (job.stopped) {
+    addLog(job, "status", { message: `Stopped. ${completed} fetched, processing queued data...` });
+  }
+
+  // ── Phase A: Batch-classify courses that have cheerio data (15 per AI call) ──
+  if (classifyQueue.length > 0) {
+    addLog(job, "status", { message: `Classifying ${classifyQueue.length} courses with AI (batched)...`, phase: "classify" });
+    const CLASSIFY_BATCH = 15;
+    for (let b = 0; b < classifyQueue.length; b += CLASSIFY_BATCH) {
+      const batch = classifyQueue.slice(b, b + CLASSIFY_BATCH);
+      const classifications = await batchClassify(batch.map((c) => ({ index: c.index, name: c.name, existing: c.existing })));
+      for (const item of batch) {
+        const extra = classifications.get(item.index);
+        if (extra) {
+          if (extra.category && !item.data.category) item.data.category = extra.category;
+          if (extra.subCategory && !item.data.subCategory) item.data.subCategory = extra.subCategory;
+          if (extra.degreeLevel && !item.data.degreeLevel) item.data.degreeLevel = extra.degreeLevel;
+          if (extra.description && !item.data.description) item.data.description = extra.description;
+        }
+        const saved = await stageCourse(item.data, uniId, jobId);
+        if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
+        else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
       }
+    }
+  }
 
-      const hasFees = !!cheerioData.internationalFee;
-      const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
-      const hasDuration = !!cheerioData.duration;
-
-      if (hasFees || hasEnglish || hasDuration) {
-        const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
-
-        classifyBatch.push({ index: i, name: link.name, existing: courseData });
-        pendingCourses.push({ index: i, data: courseData });
-      } else {
+  // ── Phase B: Full AI extraction for courses where cheerio got nothing (parallel, up to 10 concurrent) ──
+  if (fullAIQueue.length > 0) {
+    addLog(job, "status", { message: `Running full AI extraction on ${fullAIQueue.length} courses that need it...`, phase: "extract" });
+    const aiSem = makeSemaphore(10);
+    await Promise.all(fullAIQueue.map((item) =>
+      aiSem(async () => {
+        if (job.stopped) return;
         let cData: CourseData | null = null;
         try {
-          const compactContent = extractCompactContent(cHtml, link.url);
-          cData = await extractCourseFromPage(compactContent, link.name);
-        } catch (aiErr) {
-          console.log(`AI extraction failed for ${link.name}: ${(aiErr as Error).message}`);
-        }
+          const compactContent = extractCompactContent(item.html, courseLinks[item.index].url);
+          cData = await extractCourseFromPage(compactContent, item.name);
+        } catch {}
 
         if (cData) {
-          for (const [key, val] of Object.entries(cheerioData)) {
-            if (val !== undefined && val !== null && !(cData as any)[key]) {
-              (cData as any)[key] = val;
-            }
+          for (const [key, val] of Object.entries(item.cheerioData)) {
+            if (val !== undefined && val !== null && !(cData as any)[key]) (cData as any)[key] = val;
           }
-          cData.courseWebsite = cData.courseWebsite || link.url;
+          cData.courseWebsite = cData.courseWebsite || courseLinks[item.index].url;
           const saved = await stageCourse(cData, uniId, jobId);
-          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: i + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
-        } else if (cheerioData.courseName || link.name) {
-          const fallbackData = cheerioToCourseData(cheerioData, link.name, link.url);
+          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: item.index + 1 }); }
+        } else if (item.cheerioData.courseName || item.name) {
+          const fallbackData = cheerioToCourseData(item.cheerioData, item.name, courseLinks[item.index].url);
           const saved = await stageCourse(fallbackData, uniId, jobId);
-          if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: i + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: i + 1 }); }
+          if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: item.index + 1 }); }
         } else {
           job.errors++;
-          addLog(job, "course", { name: link.name, status: "error", message: "Could not extract data", index: i + 1 });
+          addLog(job, "course", { name: item.name, status: "error", message: "No extractable data", index: item.index + 1 });
         }
-      }
-    } catch (err) {
-      job.errors++;
-      addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
-    }
-
-    if (classifyBatch.length >= batchSize || (i === max - 1 && classifyBatch.length > 0)) {
-      addLog(job, "status", { message: `Classifying batch of ${classifyBatch.length} courses with AI...`, phase: "classify" });
-      const classifications = await batchClassify(classifyBatch);
-
-      for (const pending of pendingCourses) {
-        const extra = classifications.get(pending.index);
-        if (extra) {
-          if (extra.category && !pending.data.category) pending.data.category = extra.category;
-          if (extra.subCategory && !pending.data.subCategory) pending.data.subCategory = extra.subCategory;
-          if (extra.degreeLevel && !pending.data.degreeLevel) pending.data.degreeLevel = extra.degreeLevel;
-          if (extra.description && !pending.data.description) pending.data.description = extra.description;
-        }
-
-        const saved = await stageCourse(pending.data, uniId, jobId);
-        if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "staged", index: pending.index + 1 }); }
-        else { job.skipped++; addLog(job, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
-      }
-
-      classifyBatch = [];
-      pendingCourses = [];
-    }
-
-    if (i % 3 === 2) await new Promise((r) => setTimeout(r, 200));
+      })
+    ));
   }
 }
 
@@ -2276,76 +2308,62 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
 
     const max = config.courseLinks.length;
     job.totalFound = max;
-    const batchSize = 10;
-    let classifyBatch: { index: number; name: string; existing: Partial<CourseData> }[] = [];
-    let pendingCourses: { index: number; data: CourseData }[] = [];
+    const stagedCourses: { index: number; data: CourseData }[] = [];
+    let completed = 0;
 
-    for (let i = 0; i < max; i++) {
-      if (job.stopped) {
-        addLog(job, "status", { message: `Stopped after ${i} courses (${job.imported} staged)` });
-        break;
-      }
-      const link = config.courseLinks[i];
-      job.current = i + 1;
-      addLog(job, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
+    const CONCURRENCY = 25;
+    const sem = makeSemaphore(CONCURRENCY);
 
-      try {
-        const cHtml = await fetchPage(link.url);
-        const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+    await Promise.all(config.courseLinks.slice(0, max).map((link, i) =>
+      sem(async () => {
+        if (job.stopped) return;
+        const num = ++completed;
+        addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
-        const relatedPages = findRelatedPages(cHtml, link.url);
-        const noAiRelated = { fees: relatedPages.fees, requirements: relatedPages.requirements, entry: relatedPages.entry };
-        if (noAiRelated.fees || noAiRelated.requirements || noAiRelated.entry) {
-          for (const page of [
-            noAiRelated.fees && { url: noAiRelated.fees, type: "fees" as const },
-            noAiRelated.entry && { url: noAiRelated.entry, type: "english" as const },
-            noAiRelated.requirements && { url: noAiRelated.requirements, type: "requirements" as const },
-          ].filter(Boolean) as { url: string; type: string }[]) {
-            try {
-              const pHtml = await fetchPage(page.url);
-              const text = cheerio.load(pHtml)("body").text();
-              if (page.type === "fees" || page.type === "requirements") {
-                if (!cheerioData.internationalFee) extractInternationalFees(text, cheerioData);
-              }
-              if (page.type === "english" || page.type === "requirements") {
-                extractEnglishRequirements(text, cheerioData);
-              }
-              if (!cheerioData.intakeMonths?.length) extractIntakeMonths(text, cheerioData);
-            } catch {}
+        try {
+          const cHtml = await fetchPage(link.url);
+          const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+
+          const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
+          if (needsEnrich) {
+            const relatedPages = findRelatedPages(cHtml, link.url);
+            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
+              await Promise.all([
+                relatedPages.fees && fetchPage(relatedPages.fees).then(h => {
+                  const t = cheerio.load(h)("body").text();
+                  if (!cheerioData.internationalFee) extractInternationalFees(t, cheerioData);
+                  if (!cheerioData.intakeMonths?.length) extractIntakeMonths(t, cheerioData);
+                }).catch(() => {}),
+                (relatedPages.entry || relatedPages.requirements) && fetchPage((relatedPages.entry || relatedPages.requirements)!).then(h => {
+                  const t = cheerio.load(h)("body").text();
+                  extractEnglishRequirements(t, cheerioData);
+                  if (!cheerioData.internationalFee) extractInternationalFees(t, cheerioData);
+                }).catch(() => {}),
+              ].filter(Boolean));
+            }
           }
+
+          if (!cheerioData.internationalFee && uniPages?.feePage) {
+            await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true);
+          }
+          if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+            extractEnglishRequirements(uniReqsText, cheerioData);
+          }
+
+          stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url) });
+        } catch (err) {
+          job.errors++;
+          addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
         }
+      })
+    ));
 
-        if (!cheerioData.internationalFee && uniPages?.feePage) {
-          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true);
-        }
-
-        if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-          extractEnglishRequirements(uniReqsText, cheerioData);
-        }
-
-        const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
-
-        classifyBatch.push({ index: i, name: link.name, existing: courseData });
-        pendingCourses.push({ index: i, data: courseData });
-      } catch (err) {
-        job.errors++;
-        addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
-      }
-
-      if (classifyBatch.length >= batchSize || (i === max - 1 && classifyBatch.length > 0)) {
-        addLog(job, "status", { message: `Staging batch of ${pendingCourses.length} courses (no AI classification)...`, phase: "stage" });
-
-        for (const pending of pendingCourses) {
-          const saved = await stageCourse(pending.data, uniId, jobId);
-          if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "staged", index: pending.index + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
-        }
-
-        classifyBatch = [];
-        pendingCourses = [];
-      }
-
-      if (i % 3 === 2) await new Promise((r) => setTimeout(r, 200));
+    // Stage all collected courses
+    addLog(job, "status", { message: `Staging ${stagedCourses.length} courses...`, phase: "stage" });
+    for (const item of stagedCourses.sort((a, b) => a.index - b.index)) {
+      const saved = await stageCourse(item.data, uniId, jobId);
+      if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
+      else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
     }
 
     addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
