@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as cheerio from "cheerio";
-import { pool, db, universitiesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { pool, db, universitiesTable, scrapedCoursesTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -63,6 +63,8 @@ interface ScrapeJob {
   current: number;
   startedAt: number;
   completedAt?: number;
+  universityId?: number;
+  universityName?: string;
 }
 
 const scrapeJobs = new Map<string, ScrapeJob>();
@@ -484,64 +486,49 @@ async function analyzePage(content: string): Promise<{ pageType: string; courseL
   }
 }
 
-async function saveCourse(courseData: CourseData, uniId: number): Promise<boolean> {
+async function stageCourse(courseData: CourseData, uniId: number, jobId: string): Promise<boolean> {
   if (!courseData.courseName) return false;
 
   const dup = await pool.query(
-    "SELECT id FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1",
-    [uniId, courseData.courseName],
+    "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND course_name=$2 LIMIT 1",
+    [jobId, courseData.courseName],
   );
   if (dup.rows.length > 0) return false;
 
-  const cRes = await pool.query(
-    `INSERT INTO courses (university_id, name, category, sub_category, course_website, duration, duration_term, study_mode, degree_level, study_load, language, description, other_requirement, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active') RETURNING id`,
-    [
-      uniId, courseData.courseName, courseData.category || null, courseData.subCategory || null,
-      courseData.courseWebsite || null, courseData.duration || null, courseData.durationTerm || null,
-      courseData.studyMode || null, courseData.degreeLevel || null, courseData.studyLoad || null,
-      courseData.language || null, courseData.description || null, courseData.otherRequirement || null,
-    ],
-  );
-  const courseId = cRes.rows[0].id;
-
-  if (courseData.intakeMonths?.length) {
-    for (const m of courseData.intakeMonths) {
-      await pool.query("INSERT INTO intakes (course_id, intake_month, intake_day) VALUES ($1,$2,$3)", [courseId, m, courseData.intakeDays || null]);
-    }
-  }
-
-  if (courseData.internationalFee) {
-    await pool.query(
-      "INSERT INTO fees (course_id, international_fee, fee_term, fee_year, currency) VALUES ($1,$2,$3,$4,$5)",
-      [courseId, courseData.internationalFee, courseData.feeTerm || null, courseData.feeYear || null, courseData.currency || null],
-    );
-  }
-
-  for (const test of ["ielts", "pte", "toefl"] as const) {
-    const overall = (courseData as any)[`${test}Overall`] as number | undefined;
-    const listening = (courseData as any)[`${test}Listening`] as number | undefined;
-    const speaking = (courseData as any)[`${test}Speaking`] as number | undefined;
-    const writing = (courseData as any)[`${test}Writing`] as number | undefined;
-    const reading = (courseData as any)[`${test}Reading`] as number | undefined;
-    if (overall || listening || speaking || writing || reading) {
-      await pool.query(
-        "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-        [courseId, test.toUpperCase(), listening || null, speaking || null, writing || null, reading || null, overall || null],
-      );
-    }
-  }
-
-  if (courseData.academicLevel || courseData.academicScore || courseData.academicCountry) {
-    await pool.query(
-      "INSERT INTO academic_requirements (course_id, academic_level, academic_score, score_type, academic_country) VALUES ($1,$2,$3,$4,$5)",
-      [courseId, courseData.academicLevel || null, courseData.academicScore || null, courseData.scoreType || null, courseData.academicCountry || null],
-    );
-  }
-
-  if (courseData.scholarship) {
-    await pool.query("INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)", [courseId, "Scholarship", courseData.scholarship]);
-  }
+  await db.insert(scrapedCoursesTable).values({
+    scrapeJobId: jobId,
+    universityId: uniId,
+    courseName: courseData.courseName,
+    category: courseData.category || null,
+    subCategory: courseData.subCategory || null,
+    courseWebsite: courseData.courseWebsite || null,
+    duration: courseData.duration || null,
+    durationTerm: courseData.durationTerm || null,
+    studyMode: courseData.studyMode || null,
+    degreeLevel: courseData.degreeLevel || null,
+    studyLoad: courseData.studyLoad || null,
+    language: courseData.language || null,
+    description: courseData.description || null,
+    otherRequirement: courseData.otherRequirement || null,
+    internationalFee: courseData.internationalFee || null,
+    feeTerm: courseData.feeTerm || null,
+    feeYear: courseData.feeYear || null,
+    currency: courseData.currency || null,
+    ieltsOverall: courseData.ieltsOverall || null,
+    ieltsListening: courseData.ieltsListening || null,
+    ieltsSpeaking: courseData.ieltsSpeaking || null,
+    ieltsWriting: courseData.ieltsWriting || null,
+    ieltsReading: courseData.ieltsReading || null,
+    pteOverall: courseData.pteOverall || null,
+    toeflOverall: courseData.toeflOverall || null,
+    intakeMonths: courseData.intakeMonths || null,
+    academicLevel: courseData.academicLevel || null,
+    academicScore: courseData.academicScore || null,
+    scoreType: courseData.scoreType || null,
+    academicCountry: courseData.academicCountry || null,
+    scholarship: courseData.scholarship || null,
+    status: "pending",
+  });
 
   return true;
 }
@@ -667,6 +654,7 @@ async function scrapeCourseBatch(
   uniId: number,
   job: ScrapeJob,
   maxCourses: number,
+  jobId: string,
 ) {
   const max = Math.min(courseLinks.length, maxCourses);
   job.totalFound = courseLinks.length;
@@ -725,8 +713,8 @@ async function scrapeCourseBatch(
         const cData = await extractCourseFromPage(compactContent, link.name);
         if (cData) {
           cData.courseWebsite = cData.courseWebsite || link.url;
-          const saved = await saveCourse(cData, uniId);
-          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "imported", index: i + 1 }); }
+          const saved = await stageCourse(cData, uniId, jobId);
+          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: i + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
         } else {
           job.errors++;
@@ -751,8 +739,8 @@ async function scrapeCourseBatch(
           if (extra.description && !pending.data.description) pending.data.description = extra.description;
         }
 
-        const saved = await saveCourse(pending.data, uniId);
-        if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "imported", index: pending.index + 1 }); }
+        const saved = await stageCourse(pending.data, uniId, jobId);
+        if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "staged", index: pending.index + 1 }); }
         else { job.skipped++; addLog(job, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
       }
 
@@ -764,7 +752,7 @@ async function scrapeCourseBatch(
   }
 }
 
-async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
+async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: string) {
   try {
     addLog(job, "status", { message: `Fetching ${url}...`, phase: "fetch" });
 
@@ -792,7 +780,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
           phase: "extract",
           totalCourses: apiCourses.length,
         });
-        await scrapeCourseBatch(apiCourses, uniId, job, 300);
+        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -823,7 +811,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
 
       if (courseLinks.length > 0) {
         addLog(job, "status", { message: `Found ${courseLinks.length} course links. Extracting...`, phase: "extract", totalCourses: courseLinks.length });
-        await scrapeCourseBatch(courseLinks, uniId, job, 100);
+        await scrapeCourseBatch(courseLinks, uniId, job, 100, jobId);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -856,10 +844,10 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
           }
         }
         aiData.courseWebsite = aiData.courseWebsite || url;
-        const saved = await saveCourse(aiData, uniId);
+        const saved = await stageCourse(aiData, uniId, jobId);
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
-        addLog(job, "course", { name: aiData.courseName, status: saved ? "imported" : "skipped (duplicate)" });
+        addLog(job, "course", { name: aiData.courseName, status: saved ? "staged" : "skipped (duplicate)" });
         addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
       } else {
         addLog(job, "error", { message: "Could not extract course data from this page." });
@@ -872,7 +860,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
     if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
       const courseLinks = analysis.courseLinks.filter((l) => l.url && l.name);
       addLog(job, "status", { message: `Found ${courseLinks.length} courses. Extracting...`, phase: "extract", totalCourses: courseLinks.length });
-      await scrapeCourseBatch(courseLinks, uniId, job, 200);
+      await scrapeCourseBatch(courseLinks, uniId, job, 200, jobId);
       addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
       job.status = "completed";
       job.completedAt = Date.now();
@@ -939,10 +927,12 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
       startedAt: Date.now(),
     };
 
+    job.universityId = uniId;
+    job.universityName = uniName;
     scrapeJobs.set(jobId, job);
     addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})` });
 
-    runScrapeJob(job, url, uniId).catch((err) => {
+    runScrapeJob(job, url, uniId, jobId).catch((err) => {
       addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
       job.status = "failed";
       job.completedAt = Date.now();
@@ -971,6 +961,8 @@ router.get("/scrape/status/:jobId", (req: Request, res: Response): void => {
     current: job.current,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+    universityId: job.universityId,
+    universityName: job.universityName,
     logs: newLogs,
     logIndex: job.logs.length,
   });
@@ -992,6 +984,213 @@ router.get("/scrape/jobs", (_req: Request, res: Response): void => {
       completedAt: j.completedAt,
     }));
   res.json(jobs);
+});
+
+router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { jobId } = req.params;
+    const courses = await db.select().from(scrapedCoursesTable)
+      .where(eq(scrapedCoursesTable.scrapeJobId, jobId));
+    res.json(courses);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/scrape/staged", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(`
+      SELECT sc.*, u.name as university_name 
+      FROM scraped_courses sc 
+      JOIN universities u ON sc.university_id = u.id 
+      WHERE sc.status = 'pending' 
+      ORDER BY sc.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.put("/scrape/staged/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    const body = req.body;
+    const allowedFields = [
+      "courseName", "category", "subCategory", "courseWebsite", "duration", "durationTerm",
+      "studyMode", "degreeLevel", "studyLoad", "language", "description", "otherRequirement",
+      "internationalFee", "feeTerm", "feeYear", "currency",
+      "ieltsOverall", "ieltsListening", "ieltsSpeaking", "ieltsWriting", "ieltsReading",
+      "pteOverall", "toeflOverall", "intakeMonths",
+      "academicLevel", "academicScore", "scoreType", "academicCountry", "scholarship",
+    ] as const;
+    const updates: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key];
+    }
+
+    const [existing] = await db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    if (!existing || existing.status !== "pending") {
+      res.status(400).json({ error: "Can only edit pending courses" });
+      return;
+    }
+
+    await db.update(scrapedCoursesTable)
+      .set(updates)
+      .where(eq(scrapedCoursesTable.id, id));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.delete("/scrape/staged/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSelect): Promise<{ success: boolean; courseId?: number; error?: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const dup = await client.query(
+      "SELECT id FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1",
+      [course.universityId, course.courseName],
+    );
+
+    let courseId: number;
+    if (dup.rows.length > 0) {
+      courseId = dup.rows[0].id;
+      await client.query(
+        `UPDATE courses SET category=$2, sub_category=$3, course_website=$4, duration=$5, duration_term=$6, 
+         study_mode=$7, degree_level=$8, study_load=$9, language=$10, description=$11, other_requirement=$12, updated_at=NOW()
+         WHERE id=$1`,
+        [courseId, course.category, course.subCategory, course.courseWebsite, course.duration, course.durationTerm,
+         course.studyMode, course.degreeLevel, course.studyLoad, course.language, course.description, course.otherRequirement],
+      );
+      await client.query("DELETE FROM fees WHERE course_id=$1", [courseId]);
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1", [courseId]);
+      await client.query("DELETE FROM intakes WHERE course_id=$1", [courseId]);
+      await client.query("DELETE FROM academic_requirements WHERE course_id=$1", [courseId]);
+      await client.query("DELETE FROM scholarships WHERE course_id=$1", [courseId]);
+    } else {
+      const cRes = await client.query(
+        `INSERT INTO courses (university_id, name, category, sub_category, course_website, duration, duration_term, 
+         study_mode, degree_level, study_load, language, description, other_requirement, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active') RETURNING id`,
+        [course.universityId, course.courseName, course.category, course.subCategory, course.courseWebsite,
+         course.duration, course.durationTerm, course.studyMode, course.degreeLevel, course.studyLoad,
+         course.language, course.description, course.otherRequirement],
+      );
+      courseId = cRes.rows[0].id;
+    }
+
+    if (course.intakeMonths && Array.isArray(course.intakeMonths) && course.intakeMonths.length > 0) {
+      for (const m of course.intakeMonths) {
+        await client.query("INSERT INTO intakes (course_id, intake_month) VALUES ($1,$2)", [courseId, m]);
+      }
+    }
+
+    if (course.internationalFee) {
+      await client.query(
+        "INSERT INTO fees (course_id, international_fee, fee_term, fee_year, currency) VALUES ($1,$2,$3,$4,$5)",
+        [courseId, course.internationalFee, course.feeTerm, course.feeYear, course.currency],
+      );
+    }
+
+    if (course.ieltsOverall) {
+      await client.query(
+        "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        [courseId, "IELTS", course.ieltsListening, course.ieltsSpeaking, course.ieltsWriting, course.ieltsReading, course.ieltsOverall],
+      );
+    }
+    if (course.pteOverall) {
+      await client.query(
+        "INSERT INTO english_requirements (course_id, test_type, overall) VALUES ($1,$2,$3)",
+        [courseId, "PTE", course.pteOverall],
+      );
+    }
+    if (course.toeflOverall) {
+      await client.query(
+        "INSERT INTO english_requirements (course_id, test_type, overall) VALUES ($1,$2,$3)",
+        [courseId, "TOEFL", course.toeflOverall],
+      );
+    }
+
+    if (course.academicLevel || course.academicScore) {
+      await client.query(
+        "INSERT INTO academic_requirements (course_id, academic_level, academic_score, score_type, academic_country) VALUES ($1,$2,$3,$4,$5)",
+        [courseId, course.academicLevel, course.academicScore, course.scoreType, course.academicCountry],
+      );
+    }
+
+    if (course.scholarship) {
+      await client.query("INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)", [courseId, "Scholarship", course.scholarship]);
+    }
+
+    await client.query("UPDATE scraped_courses SET status='approved' WHERE id=$1", [course.id]);
+    await client.query("COMMIT");
+    return { success: true, courseId };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    return { success: false, error: (err as Error).message };
+  } finally {
+    client.release();
+  }
+}
+
+router.post("/scrape/staged/:id/approve", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    const [course] = await db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    if (!course) { res.status(404).json({ error: "Not found" }); return; }
+
+    const result = await approveSingleCourse(course);
+    if (result.success) {
+      res.json({ success: true, courseId: result.courseId });
+    } else {
+      res.status(500).json({ error: result.error });
+    }
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/scrape/staged/approve-all", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { jobId } = req.body as { jobId: string };
+    const courses = await db.select().from(scrapedCoursesTable)
+      .where(and(eq(scrapedCoursesTable.scrapeJobId, jobId), eq(scrapedCoursesTable.status, "pending")));
+
+    let approved = 0;
+    let failed = 0;
+    for (const course of courses) {
+      const result = await approveSingleCourse(course);
+      if (result.success) approved++; else failed++;
+    }
+
+    res.json({ approved, failed, total: courses.length });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/scrape/staged/reject-all", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { jobId } = req.body as { jobId: string };
+    await db.delete(scrapedCoursesTable)
+      .where(and(eq(scrapedCoursesTable.scrapeJobId, jobId), eq(scrapedCoursesTable.status, "pending")));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 router.post("/scrape/preview", async (req: Request, res: Response): Promise<void> => {

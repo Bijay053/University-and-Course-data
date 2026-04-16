@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
+  Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -46,6 +49,43 @@ type ScrapeLog = {
   phase?: string;
 };
 
+type StagedCourse = {
+  id: number;
+  scrapeJobId: string;
+  universityId: number;
+  courseName: string;
+  category: string | null;
+  subCategory: string | null;
+  courseWebsite: string | null;
+  duration: number | null;
+  durationTerm: string | null;
+  studyMode: string | null;
+  degreeLevel: string | null;
+  studyLoad: string | null;
+  language: string | null;
+  description: string | null;
+  otherRequirement: string | null;
+  internationalFee: number | null;
+  feeTerm: string | null;
+  feeYear: number | null;
+  currency: string | null;
+  ieltsOverall: number | null;
+  ieltsListening: number | null;
+  ieltsSpeaking: number | null;
+  ieltsWriting: number | null;
+  ieltsReading: number | null;
+  pteOverall: number | null;
+  toeflOverall: number | null;
+  intakeMonths: string[] | null;
+  academicLevel: string | null;
+  academicScore: number | null;
+  scoreType: string | null;
+  academicCountry: string | null;
+  scholarship: string | null;
+  status: string;
+  createdAt: string;
+};
+
 const ALL = "__new__";
 
 function statusBadge(status: string) {
@@ -77,6 +117,14 @@ export default function Scraping() {
   const logRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
+  const [showReview, setShowReview] = useState(false);
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
   const { data: uniData } = useListUniversities({ limit: 100 });
 
   const fetchJobs = async () => {
@@ -106,14 +154,35 @@ export default function Scraping() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [scrapeLogs]);
 
+  const loadStagedCourses = useCallback(async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/scrape/staged/${jobId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStagedCourses(data.filter((c: StagedCourse) => c.status === "pending"));
+        setReviewJobId(jobId);
+        setShowReview(true);
+        setSelectedIds(new Set(data.filter((c: StagedCourse) => c.status === "pending").map((c: StagedCourse) => c.id)));
+      }
+    } catch {}
+  }, []);
+
   const pollJobStatus = useCallback((jobId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     logIndexRef.current = 0;
-    
+
     const poll = async () => {
       try {
         const res = await fetch(`/api/scrape/status/${jobId}?since=${logIndexRef.current}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 404) {
+            setScraping(false);
+            setActiveJobId(null);
+            sessionStorage.removeItem("activeScrapeJob");
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          }
+          return;
+        }
         const data = await res.json();
 
         if (data.logs && data.logs.length > 0) {
@@ -126,15 +195,17 @@ export default function Scraping() {
 
         if (data.status !== "running") {
           setScraping(false);
-          setActiveJobId(null);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          if (data.status === "completed" && data.imported > 0) {
+            loadStagedCourses(jobId);
+          }
         }
       } catch {}
     };
 
     poll();
     pollRef.current = setInterval(poll, 1500);
-  }, []);
+  }, [loadStagedCourses]);
 
   useEffect(() => {
     return () => {
@@ -158,6 +229,8 @@ export default function Scraping() {
     setScraping(true);
     setScrapeLogs([]);
     setScrapeResult(null);
+    setShowReview(false);
+    setStagedCourses([]);
 
     const body: Record<string, unknown> = { url: scrapeUrl };
     if (selectedUni && selectedUni !== ALL) {
@@ -200,8 +273,97 @@ export default function Scraping() {
     }
   }, [scraping, activeJobId]);
 
+  const handleApproveSelected = async () => {
+    if (!reviewJobId || selectedIds.size === 0) return;
+    setApproving(true);
+    const succeededIds = new Set<number>();
+    const failedIds = new Set<number>();
+
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
+        if (res.ok) succeededIds.add(id); else failedIds.add(id);
+      } catch { failedIds.add(id); }
+    }
+
+    setStagedCourses((prev) => prev.filter((c) => !succeededIds.has(c.id)));
+    setSelectedIds(failedIds);
+    setApproving(false);
+    fetchJobs();
+    if (uniData?.data) {
+      Promise.all(
+        uniData.data.map(async (u) => {
+          const res = await fetch(`/api/courses?universityId=${u.id}&limit=1`);
+          const d = await res.json();
+          return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d.total ?? 0 };
+        })
+      ).then(setUniStats);
+    }
+  };
+
+  const handleRejectSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const succeededIds = new Set<number>();
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/scrape/staged/${id}`, { method: "DELETE" });
+        if (res.ok) succeededIds.add(id);
+      } catch {}
+    }
+    setStagedCourses((prev) => prev.filter((c) => succeededIds.has(c.id) ? false : true));
+    setSelectedIds((prev) => { const n = new Set<number>(); for (const id of prev) { if (!succeededIds.has(id)) n.add(id); } return n; });
+  };
+
+  const handleApproveSingle = async (id: number) => {
+    setApprovingId(id);
+    try {
+      const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
+      if (res.ok) {
+        setStagedCourses((prev) => prev.filter((c) => c.id !== id));
+        setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      }
+    } catch {}
+    setApprovingId(null);
+  };
+
+  const handleRejectSingle = async (id: number) => {
+    try {
+      await fetch(`/api/scrape/staged/${id}`, { method: "DELETE" });
+      setStagedCourses((prev) => prev.filter((c) => c.id !== id));
+      setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    } catch {}
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCourse) return;
+    try {
+      await fetch(`/api/scrape/staged/${editingCourse.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingCourse),
+      });
+      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? editingCourse : c));
+      setEditingCourse(null);
+    } catch {}
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === stagedCourses.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(stagedCourses.map((c) => c.id)));
+    }
+  };
+
   const progressLog = scrapeLogs.findLast((l) => l.event === "progress");
-  const courseLogs = scrapeLogs.filter((l) => l.event === "course");
 
   return (
     <div className="space-y-8">
@@ -232,7 +394,7 @@ export default function Scraping() {
             )}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Paste a university course listing URL and AI will automatically extract all course data — international fees, IELTS/PTE/TOEFL requirements, intakes, and more. Scraping continues even if you navigate away.
+            Paste a university course listing URL and AI will automatically extract all course data. Scraped courses go to a staging area for your review before saving.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -324,7 +486,7 @@ export default function Scraping() {
                 {scrapeLogs.map((log, i) => (
                   <div key={i} className={
                     log.event === "error" ? "text-red-400" :
-                    log.event === "course" && log.status === "imported" ? "text-green-400" :
+                    log.event === "course" && log.status === "staged" ? "text-green-400" :
                     log.event === "course" && log.status === "skipped" ? "text-yellow-400" :
                     log.event === "done" ? "text-cyan-400 font-bold" :
                     "text-gray-300"
@@ -335,7 +497,7 @@ export default function Scraping() {
                     {log.event === "error" && <span>[ERROR] {log.message}</span>}
                     {log.event === "done" && (
                       <span>
-                        === COMPLETE === Found: {log.totalFound} | Imported: {log.imported} | Skipped: {log.skipped} | Errors: {log.errors}
+                        === COMPLETE === Found: {log.totalFound} | Staged: {log.imported} | Skipped: {log.skipped} | Errors: {log.errors}
                       </span>
                     )}
                   </div>
@@ -354,9 +516,9 @@ export default function Scraping() {
                     <div className="text-2xl font-bold text-gray-800">{scrapeResult.totalFound}</div>
                     <div className="text-xs text-gray-400">Found</div>
                   </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-green-600">{scrapeResult.imported}</div>
-                    <div className="text-xs text-green-500">Imported</div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-600">{scrapeResult.imported}</div>
+                    <div className="text-xs text-blue-500">Staged for Review</div>
                   </div>
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-amber-600">{scrapeResult.skipped}</div>
@@ -368,10 +530,344 @@ export default function Scraping() {
                   </div>
                 </div>
               )}
+
+              {scrapeResult && !showReview && activeJobId && (
+                <Button onClick={() => loadStagedCourses(activeJobId)} className="w-full bg-green-600 hover:bg-green-700">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Review Scraped Courses
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {showReview && stagedCourses.length > 0 && (
+        <Card className="border-2 border-green-100">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Eye className="w-5 h-5 text-green-600" />
+                Review Scraped Courses
+                <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={handleRejectSelected}
+                  disabled={selectedIds.size === 0 || approving}
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Reject ({selectedIds.size})
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleApproveSelected}
+                  disabled={selectedIds.size === 0 || approving}
+                >
+                  {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCheck className="w-4 h-4 mr-1" />}
+                  Approve ({selectedIds.size})
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Review each course below. Edit any details, then approve to save to the database or reject to discard. Existing courses with the same name will be updated.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="p-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.size === stagedCourses.length && stagedCourses.length > 0}
+                          onChange={toggleAll}
+                          className="rounded border-gray-300"
+                        />
+                      </th>
+                      <th className="text-left p-2 font-medium text-gray-600 min-w-[200px]">Course Name</th>
+                      <th className="text-left p-2 font-medium text-gray-600">Level</th>
+                      <th className="text-left p-2 font-medium text-gray-600">Duration</th>
+                      <th className="text-right p-2 font-medium text-gray-600">Intl. Fee</th>
+                      <th className="text-center p-2 font-medium text-gray-600">IELTS</th>
+                      <th className="text-left p-2 font-medium text-gray-600">Intakes</th>
+                      <th className="text-left p-2 font-medium text-gray-600">Mode</th>
+                      <th className="text-center p-2 font-medium text-gray-600 w-[120px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {stagedCourses.map((course) => (
+                      <tr key={course.id} className={`hover:bg-gray-50 ${selectedIds.has(course.id) ? "bg-blue-50/50" : ""}`}>
+                        <td className="p-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(course.id)}
+                            onChange={() => toggleSelect(course.id)}
+                            className="rounded border-gray-300"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <div className="font-medium text-gray-800 truncate max-w-[250px]" title={course.courseName}>
+                            {course.courseName}
+                          </div>
+                          {course.category && (
+                            <div className="text-xs text-gray-400 truncate">{course.category}</div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {course.degreeLevel ? (
+                            <Badge variant="outline" className="text-xs">{course.degreeLevel}</Badge>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-gray-600 whitespace-nowrap">
+                          {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-right font-medium whitespace-nowrap">
+                          {course.internationalFee ? (
+                            <span className="text-green-700">
+                              {course.currency === "GBP" ? "\u00A3" : course.currency === "USD" ? "$" : "A$"}
+                              {course.internationalFee.toLocaleString()}
+                              <span className="text-xs text-gray-400 ml-1">/{course.feeTerm || "yr"}</span>
+                            </span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.ieltsOverall ? (
+                            <span className="text-blue-700 font-medium">{course.ieltsOverall}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-xs text-gray-600">
+                          {course.intakeMonths?.length ? course.intakeMonths.map(m => m.slice(0, 3)).join(", ") : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-xs text-gray-600">
+                          {course.studyMode || <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2">
+                          <div className="flex gap-1 justify-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-blue-600 hover:bg-blue-50"
+                              onClick={() => setEditingCourse({ ...course })}
+                              title="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-green-600 hover:bg-green-50"
+                              onClick={() => handleApproveSingle(course.id)}
+                              disabled={approvingId === course.id}
+                              title="Approve"
+                            >
+                              {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-red-600 hover:bg-red-50"
+                              onClick={() => handleRejectSingle(course.id)}
+                              title="Reject"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {showReview && stagedCourses.length === 0 && (
+        <Card className="border-2 border-green-100">
+          <CardContent className="p-10 text-center">
+            <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
+            <h3 className="font-semibold text-lg">All courses reviewed</h3>
+            <p className="text-muted-foreground text-sm mt-1">All scraped courses have been approved or rejected.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) setEditingCourse(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Scraped Course</DialogTitle>
+          </DialogHeader>
+          {editingCourse && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Course Name</label>
+                <Input value={editingCourse.courseName} onChange={(e) => setEditingCourse({ ...editingCourse, courseName: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Category</label>
+                <Input value={editingCourse.category || ""} onChange={(e) => setEditingCourse({ ...editingCourse, category: e.target.value || null })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Sub Category</label>
+                <Input value={editingCourse.subCategory || ""} onChange={(e) => setEditingCourse({ ...editingCourse, subCategory: e.target.value || null })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Degree Level</label>
+                <Select value={editingCourse.degreeLevel || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, degreeLevel: v || null })}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bachelor">Bachelor</SelectItem>
+                    <SelectItem value="Master">Master</SelectItem>
+                    <SelectItem value="PhD">PhD</SelectItem>
+                    <SelectItem value="Certificate & Diploma">Certificate & Diploma</SelectItem>
+                    <SelectItem value="Graduate Certificate & Diploma">Graduate Certificate & Diploma</SelectItem>
+                    <SelectItem value="Associate Degree">Associate Degree</SelectItem>
+                    <SelectItem value="Equivalent">Equivalent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Study Mode</label>
+                <Select value={editingCourse.studyMode || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, studyMode: v || null })}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="On Campus">On Campus</SelectItem>
+                    <SelectItem value="Online">Online</SelectItem>
+                    <SelectItem value="Blended">Blended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Duration</label>
+                <div className="flex gap-2">
+                  <Input type="number" value={editingCourse.duration ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, duration: e.target.value ? parseFloat(e.target.value) : null })} className="w-24" />
+                  <Select value={editingCourse.durationTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, durationTerm: v || null })}>
+                    <SelectTrigger className="w-28"><SelectValue placeholder="Term" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Year">Year</SelectItem>
+                      <SelectItem value="Month">Month</SelectItem>
+                      <SelectItem value="Week">Week</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Study Load</label>
+                <Select value={editingCourse.studyLoad || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, studyLoad: v || null })}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Full Time">Full Time</SelectItem>
+                    <SelectItem value="Part Time">Part Time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">International Fees</h4>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Amount</label>
+                <Input type="number" value={editingCourse.internationalFee ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, internationalFee: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Currency</label>
+                  <Select value={editingCourse.currency || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, currency: v || null })}>
+                    <SelectTrigger><SelectValue placeholder="Currency" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Term</label>
+                  <Select value={editingCourse.feeTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, feeTerm: v || null })}>
+                    <SelectTrigger><SelectValue placeholder="Term" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Annual">Annual</SelectItem>
+                      <SelectItem value="Total">Total</SelectItem>
+                      <SelectItem value="Semester">Semester</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">English Requirements</h4>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">IELTS Overall</label>
+                <Input type="number" step="0.5" value={editingCourse.ieltsOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsOverall: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">L</label>
+                  <Input type="number" step="0.5" value={editingCourse.ieltsListening ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsListening: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">R</label>
+                  <Input type="number" step="0.5" value={editingCourse.ieltsReading ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsReading: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">W</label>
+                  <Input type="number" step="0.5" value={editingCourse.ieltsWriting ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsWriting: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">S</label>
+                  <Input type="number" step="0.5" value={editingCourse.ieltsSpeaking ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsSpeaking: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">PTE Overall</label>
+                <Input type="number" value={editingCourse.pteOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteOverall: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">TOEFL Overall</label>
+                <Input type="number" value={editingCourse.toeflOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflOverall: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Other</h4>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Intake Months (comma-separated)</label>
+                <Input
+                  value={editingCourse.intakeMonths?.join(", ") || ""}
+                  onChange={(e) => setEditingCourse({ ...editingCourse, intakeMonths: e.target.value ? e.target.value.split(",").map(s => s.trim()).filter(Boolean) : null })}
+                  placeholder="January, March, July"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Course Website</label>
+                <Input value={editingCourse.courseWebsite || ""} onChange={(e) => setEditingCourse({ ...editingCourse, courseWebsite: e.target.value || null })} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Description</label>
+                <Textarea rows={3} value={editingCourse.description || ""} onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value || null })} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Other Requirements</label>
+                <Textarea rows={2} value={editingCourse.otherRequirement || ""} onChange={(e) => setEditingCourse({ ...editingCourse, otherRequirement: e.target.value || null })} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">
+              <Save className="w-4 h-4 mr-1" />
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div>
         <h2 className="text-lg font-semibold mb-3">University Coverage</h2>
@@ -438,12 +934,12 @@ export default function Scraping() {
                     <td className="p-3 text-center">
                       {job.importedRows != null ? (
                         <span className="font-semibold text-green-600">{job.importedRows}</span>
-                      ) : "—"}
+                      ) : "\u2014"}
                     </td>
                     <td className="p-3 text-center">
                       {job.skippedRows != null ? (
                         <span className="text-amber-600">{job.skippedRows}</span>
-                      ) : "—"}
+                      ) : "\u2014"}
                     </td>
                     <td className="p-3 text-gray-400 text-xs whitespace-nowrap">{fmtDate(job.createdAt)}</td>
                   </tr>

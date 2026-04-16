@@ -35,7 +35,7 @@ A centralized admin portal for managing university course data including courses
 
 ## Database Schema
 
-Tables: `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`
+Tables: `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging table for scraped data review), `import_jobs`
 
 ## Key Commands
 
@@ -72,12 +72,21 @@ All routes served at `/api/...`:
 - `POST /bulk/courses/upload` — CSV upload
 - `POST /import/excel` — Excel file import with auto-mapping
 - `GET /import/history` — import job history
-- `POST /scrape/start` — AI-powered web scraper (SSE streaming)
+- `POST /scrape/start` — AI-powered web scraper (background job, returns jobId)
+- `GET /scrape/status/:jobId` — poll scrape job status + logs
+- `GET /scrape/jobs` — list recent scrape jobs
+- `GET /scrape/staged/:jobId` — get staged courses for review
+- `GET /scrape/staged` — get all pending staged courses
+- `PUT /scrape/staged/:id` — edit a staged course (whitelist-validated fields)
+- `DELETE /scrape/staged/:id` — reject/delete a staged course
+- `POST /scrape/staged/:id/approve` — approve single course (transactional)
+- `POST /scrape/staged/approve-all` — approve all pending for a job
+- `POST /scrape/staged/reject-all` — reject all pending for a job
 - `POST /scrape/preview` — preview page analysis before scraping
 
 ## AI Integration
 
-- **OpenAI** via Replit AI Integrations proxy (no API key needed)
-- Used by AI web scraper to parse HTML and extract structured course data
-- Package: `@workspace/integrations-openai-ai-server` in `lib/`
-- Model: `gpt-5-mini` for cost-effective extraction
+- **Gemini API** via `GEMINI_API_KEY` secret
+- Model chain: `gemini-2.5-flash` -> `gemini-2.0-flash-001` -> `gemini-2.0-flash-lite-001` (auto-fallback on 429/503/404)
+- Used by AI web scraper: cheerio extracts data first (zero AI cost), AI used as fallback
+- Scraper saves to `scraped_courses` staging table for review before approval to live `courses` table

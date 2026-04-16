@@ -1,0 +1,41 @@
+import { pgTable, text, serial, timestamp, integer, real, jsonb } from "drizzle-orm/pg-core";
+import { universitiesTable } from "./universities";
+
+export const scrapedCoursesTable = pgTable("scraped_courses", {
+  id: serial("id").primaryKey(),
+  scrapeJobId: text("scrape_job_id").notNull(),
+  universityId: integer("university_id").notNull().references(() => universitiesTable.id, { onDelete: "cascade" }),
+  courseName: text("course_name").notNull(),
+  category: text("category"),
+  subCategory: text("sub_category"),
+  courseWebsite: text("course_website"),
+  duration: real("duration"),
+  durationTerm: text("duration_term"),
+  studyMode: text("study_mode"),
+  degreeLevel: text("degree_level"),
+  studyLoad: text("study_load"),
+  language: text("language"),
+  description: text("description"),
+  otherRequirement: text("other_requirement"),
+  internationalFee: real("international_fee"),
+  feeTerm: text("fee_term"),
+  feeYear: integer("fee_year"),
+  currency: text("currency"),
+  ieltsOverall: real("ielts_overall"),
+  ieltsListening: real("ielts_listening"),
+  ieltsSpeaking: real("ielts_speaking"),
+  ieltsWriting: real("ielts_writing"),
+  ieltsReading: real("ielts_reading"),
+  pteOverall: real("pte_overall"),
+  toeflOverall: real("toefl_overall"),
+  intakeMonths: jsonb("intake_months").$type<string[]>(),
+  academicLevel: text("academic_level"),
+  academicScore: real("academic_score"),
+  scoreType: text("score_type"),
+  academicCountry: text("academic_country"),
+  scholarship: text("scholarship"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ScrapedCourse = typeof scrapedCoursesTable.$inferSelect;
