@@ -45,6 +45,8 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   academicCountry: text("academic_country"),
   scholarship: text("scholarship"),
   status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  completeness: integer("completeness"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

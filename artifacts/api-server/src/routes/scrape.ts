@@ -312,7 +312,7 @@ function findImageUrls(html: string, courseUrl: string): string[] {
   return images;
 }
 
-function extractWithCheerio(html: string, url: string, name: string): Partial<CourseData> {
+function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
   const $ = cheerio.load(html);
   const text = $("body").text();
   const data: Partial<CourseData> = { courseName: name, courseWebsite: url, language: "English" };
@@ -343,7 +343,7 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
 
   // Study mode — order matters: blended first, then online, then campus
   if (/on[- ]?campus\s*(and|or|\/)\s*online|online\s*(and|or|\/)\s*on[- ]?campus/i.test(text)) data.studyMode = "Blended";
-  else if (/blended|hybrid|both\s*(?:on[- ]?campus\s*and\s*online|online\s*and\s*on[- ]?campus)/i.test(text)) data.studyMode = "Blended";
+  else if (/blended|hybrid|mixed[- ]?mode|both\s*(?:on[- ]?campus\s*and\s*online|online\s*and\s*on[- ]?campus)/i.test(text)) data.studyMode = "Blended";
   else if (/online\s*(only|delivery)|distance\s*(?:learning|education)|external\s*(?:study|delivery)|fully\s*online/i.test(text)) data.studyMode = "Online";
   else if (/on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face/i.test(text)) data.studyMode = "On Campus";
 
@@ -355,7 +355,7 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   else if (/\b(certificate|diploma)\b/i.test(lower)) data.degreeLevel = "Certificate & Diploma";
   else if (/\bassociate\s*degree/i.test(lower)) data.degreeLevel = "Associate Degree";
 
-  extractInternationalFees(text, data);
+  extractInternationalFees(text, data, countryFallback);
   extractEnglishRequirements(text, data);
   extractIntakeMonths(text, data);
 
@@ -365,15 +365,39 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   return data;
 }
 
-function detectFeeTerm(context: string): string {
-  if (/per\s*trimester|trimester/i.test(context)) return "Trimester";
-  if (/per\s*semester|semester/i.test(context)) return "Semester";
+function normalizeFeeTerm(context: string): string {
+  if (/per\s*trimester|per\s*trim\b/i.test(context)) return "Trimester";
+  if (/per\s*semester/i.test(context)) return "Semester";
+  if (/per\s*term\b/i.test(context)) return "Term";
+  if (/per\s*session\b/i.test(context)) return "Session";
   if (/per\s*(credit\s*)?unit|per\s*point|per\s*credit/i.test(context)) return "Per Unit";
-  if (/total|full\s*course|complete\s*program/i.test(context)) return "Total";
+  if (/total\s*(?:course|program|tuition)|full\s*course|complete\s*(?:course|program)/i.test(context)) return "Full Course";
+  if (/trimester/i.test(context)) return "Trimester";
+  if (/semester/i.test(context)) return "Semester";
+  if (/per\s*year|per\s*annum|p\.a\.|annual|yearly/i.test(context)) return "Annual";
   return "Annual";
 }
 
-function detectCurrencyFromContext(ctx: string): string {
+function detectFeeTerm(context: string): string { return normalizeFeeTerm(context); }
+
+function extractFeeYear(context: string): number | undefined {
+  const currentYear = new Date().getFullYear();
+  const m = context.match(/\b(20\d{2})\b/g);
+  if (!m) return undefined;
+  for (const y of m) {
+    const yr = parseInt(y);
+    if (yr >= currentYear - 1 && yr <= currentYear + 3) return yr;
+  }
+  return undefined;
+}
+
+const COUNTRY_CURRENCY_MAP: Record<string, string> = {
+  "australia": "AUD", "new zealand": "NZD", "canada": "CAD",
+  "united states": "USD", "usa": "USD", "united kingdom": "GBP",
+  "uk": "GBP", "england": "GBP", "singapore": "SGD",
+};
+
+function detectCurrencyFromContext(ctx: string, countryFallback?: string): string {
   if (/NZ\$|NZD/i.test(ctx)) return "NZD";
   if (/CA\$|C\$|CAD/i.test(ctx)) return "CAD";
   if (/S\$|SGD/i.test(ctx)) return "SGD";
@@ -381,25 +405,31 @@ function detectCurrencyFromContext(ctx: string): string {
   if (/£|GBP/i.test(ctx)) return "GBP";
   if (/€|EUR/i.test(ctx)) return "EUR";
   if (/A\$|AUD/i.test(ctx)) return "AUD";
+  if (countryFallback) {
+    const mapped = COUNTRY_CURRENCY_MAP[countryFallback.toLowerCase()];
+    if (mapped) return mapped;
+  }
   return "AUD";
 }
 
-function extractInternationalFees(text: string, data: Partial<CourseData>) {
+function extractInternationalFees(text: string, data: Partial<CourseData>, countryFallback?: string) {
   const CURRENCY_SYM = /(?:AUD|NZD|CAD|USD|GBP|SGD|EUR|A\$|NZ\$|CA\$|US\$|S\$|£|€|\$)/;
+
+  function applyFee(matchStr: string, feeStr: string) {
+    const fee = parseInt(feeStr.replace(/,/g, ""));
+    if (fee <= 1000 || fee >= 200000) return false;
+    data.internationalFee = fee;
+    data.currency = detectCurrencyFromContext(matchStr, countryFallback);
+    data.feeTerm = normalizeFeeTerm(matchStr);
+    if (!data.feeYear) data.feeYear = extractFeeYear(matchStr);
+    return true;
+  }
 
   // Priority 1: explicit international section with currency
   const intlSection = text.match(
     new RegExp(`international[^]*?(?:fee|tuition|cost)[^]*?${CURRENCY_SYM.source}\\s*([\\d,]+)`, "i")
   );
-  if (intlSection) {
-    const fee = parseInt(intlSection[1].replace(/,/g, ""));
-    if (fee > 1000 && fee < 200000) {
-      data.internationalFee = fee;
-      data.currency = detectCurrencyFromContext(intlSection[0]);
-      data.feeTerm = detectFeeTerm(intlSection[0]);
-      return;
-    }
-  }
+  if (intlSection && applyFee(intlSection[0], intlSection[1])) return;
 
   // Priority 2: explicit international/overseas/non-resident label patterns
   const feePatterns = [
@@ -414,15 +444,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
   ];
   for (const fp of feePatterns) {
     const fm = text.match(fp);
-    if (fm) {
-      const fee = parseInt(fm[1].replace(/,/g, ""));
-      if (fee > 1000 && fee < 200000) {
-        data.internationalFee = fee;
-        data.currency = detectCurrencyFromContext(fm[0]);
-        data.feeTerm = detectFeeTerm(fm[0]);
-        return;
-      }
-    }
+    if (fm && applyFee(fm[0], fm[1])) return;
   }
 
   // Priority 3: generic fee not explicitly domestic
@@ -432,9 +454,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
   if (genericFee && !/domestic|resident|local/i.test(genericFee[0])) {
     const fee = parseInt(genericFee[1].replace(/,/g, ""));
     if (fee > 5000 && fee < 200000) {
-      data.internationalFee = fee;
-      data.currency = detectCurrencyFromContext(genericFee[0]);
-      data.feeTerm = detectFeeTerm(genericFee[0]);
+      applyFee(genericFee[0], genericFee[1]);
     }
   }
 }
@@ -527,13 +547,35 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
     }
   }
 
-  if (data.toeflOverall && toeflText && !data.toeflListening) {
-    const minScoreMatch = toeflText.match(/minimum\s*scores?[:\s]*Reading\s*(\d+)[,\s]*Listening\s*(\d+)[,\s]*Speaking\s*(\d+)[,\s]*Writing\s*(\d+)/i);
-    if (minScoreMatch) {
-      data.toeflReading = parseInt(minScoreMatch[1]);
-      data.toeflListening = parseInt(minScoreMatch[2]);
-      data.toeflSpeaking = parseInt(minScoreMatch[3]);
-      data.toeflWriting = parseInt(minScoreMatch[4]);
+  if (data.toeflOverall && toeflText) {
+    if (!data.toeflListening) {
+      const minScoreMatch = toeflText.match(/minimum\s*scores?[:\s]*Reading\s*(\d+)[,\s]*Listening\s*(\d+)[,\s]*Speaking\s*(\d+)[,\s]*Writing\s*(\d+)/i);
+      if (minScoreMatch) {
+        data.toeflReading = parseInt(minScoreMatch[1]);
+        data.toeflListening = parseInt(minScoreMatch[2]);
+        data.toeflSpeaking = parseInt(minScoreMatch[3]);
+        data.toeflWriting = parseInt(minScoreMatch[4]);
+      }
+    }
+    if (!data.toeflListening) {
+      const noBandPatterns = [
+        /no\s*(?:section|band|component|skill)[^.]*?(?:below|less\s*than|lower\s*than|under)\s*(\d+)/i,
+        /(?:minimum|min)\s*(?:score|band)\s*(?:of\s*)?(\d+)\s*(?:in\s*each|per\s*section)/i,
+        /(?:each|all)\s*(?:section|component)[^.]*?(?:minimum|at\s*least)\s*(\d+)/i,
+      ];
+      for (const p of noBandPatterns) {
+        const m = toeflText.match(p);
+        if (m) {
+          const min = parseInt(m[1]);
+          if (min >= 0 && min <= 30) {
+            if (!data.toeflListening) data.toeflListening = min;
+            if (!data.toeflSpeaking) data.toeflSpeaking = min;
+            if (!data.toeflWriting) data.toeflWriting = min;
+            if (!data.toeflReading) data.toeflReading = min;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -706,7 +748,7 @@ async function analyzeImageWithGemini(imageUrl: string, context: string): Promis
 
     const prompt = `Extract ALL English language requirements and/or fees from this image. ${context}
 Return JSON with ONLY the fields you find:
-{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Total|Semester|Per Unit>"}
+{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>"}
 Extract ALL test types: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C1 Advanced, Duolingo. Use null for missing fields. Only include INTERNATIONAL student fees.`;
 
     const body = JSON.stringify({
@@ -753,7 +795,7 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string): Promise<P
     const base64 = Buffer.from(buffer).toString("base64");
 
     const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
-Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Total|Semester|Per Unit>","feeYear":<year>}
+Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>","feeYear":<year>}
 Use null for missing fields. Only include INTERNATIONAL fees.`;
 
     const body = JSON.stringify({
@@ -914,7 +956,7 @@ Return JSON:
   "degreeLevel": "<Bachelor|Master|PhD|Certificate & Diploma|Graduate Certificate & Diploma|Associate Degree|Equivalent>",
   "studyLoad": "<Full Time|Part Time>",
   "internationalFee": <INTERNATIONAL fee number only|null>,
-  "feeTerm": "<Annual|Trimester|Total|Semester|Per Unit>",
+  "feeTerm": "<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>",
   "currency": "<AUD|GBP|USD>",
   "ieltsOverall": <number|null>, "ieltsListening": <number|null>, "ieltsSpeaking": <number|null>, "ieltsWriting": <number|null>, "ieltsReading": <number|null>,
   "pteOverall": <number|null>, "pteListening": <number|null>, "pteSpeaking": <number|null>, "pteWriting": <number|null>, "pteReading": <number|null>,
@@ -994,6 +1036,32 @@ async function analyzePage(content: string): Promise<{ pageType: string; courseL
   }
 }
 
+const CRITICAL_FIELDS: (keyof CourseData)[] = [
+  "courseName", "degreeLevel", "duration", "studyMode",
+  "internationalFee", "ieltsOverall", "intakeMonths",
+];
+const IMPORTANT_FIELDS: (keyof CourseData)[] = [
+  "category", "durationTerm", "feeTerm", "currency",
+  "pteOverall", "toeflOverall", "description",
+];
+
+function computeCompleteness(d: CourseData): { score: number; missing: string[] } {
+  const missing: string[] = [];
+  let filled = 0;
+  for (const f of CRITICAL_FIELDS) {
+    const v = (d as any)[f];
+    const ok = v !== null && v !== undefined && v !== "" && (!Array.isArray(v) || v.length > 0);
+    if (ok) filled += 2; else missing.push(f);
+  }
+  for (const f of IMPORTANT_FIELDS) {
+    const v = (d as any)[f];
+    const ok = v !== null && v !== undefined && v !== "" && (!Array.isArray(v) || v.length > 0);
+    if (ok) filled += 1;
+  }
+  const maxScore = CRITICAL_FIELDS.length * 2 + IMPORTANT_FIELDS.length;
+  return { score: Math.round((filled / maxScore) * 100), missing };
+}
+
 async function stageCourse(courseData: CourseData, uniId: number, jobId: string): Promise<boolean> {
   if (!courseData.courseName) return false;
 
@@ -1002,6 +1070,8 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
     [jobId, courseData.courseName],
   );
   if (dup.rows.length > 0) return false;
+
+  const { score: completeness, missing } = computeCompleteness(courseData);
 
   await db.insert(scrapedCoursesTable).values({
     scrapeJobId: jobId,
@@ -1046,6 +1116,8 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
     academicCountry: courseData.academicCountry || null,
     scholarship: courseData.scholarship || null,
     status: "pending",
+    completeness,
+    notes: missing.length > 0 ? `Missing: ${missing.join(", ")}` : null,
   });
 
   return true;
@@ -1213,15 +1285,24 @@ function urlLastSegmentHasDegreeQualifier(url: string): boolean {
 }
 
 function pageContentLooksLikeCourse(text: string): boolean {
-  const lower = text.slice(0, 6000).toLowerCase();
+  const lower = text.slice(0, 8000).toLowerCase();
   const indicators = [
     /\b(ielts|toefl|pte|english proficiency|duolingo|cambridge|language requirement)\b/,
-    /\b(tuition fee|annual fee|per year|international fee|course fee|total fee)\b/,
-    /\b(duration|years? full.time|years? part.time|credit points?|credit hours?|units? of study)\b/,
-    /\b(entry requirements?|admission requirements?|academic requirements?|prerequisite)\b/,
-    /\b(bachelor of|master of|doctor of|graduate certificate|graduate diploma|honours degree)\b/,
+    /\b(tuition fee|annual fee|per year|international fee|course fee|total fee|indicative fee|estimated fee)\b/,
+    /\b(duration|years? full.time|years? part.time|credit points?|credit hours?|units? of study|course length)\b/,
+    /\b(entry requirements?|admission requirements?|academic requirements?|prerequisite|minimum gpa|minimum grade)\b/,
+    /\b(bachelor of|master of|doctor of|graduate certificate|graduate diploma|honours degree|associate degree|diploma of)\b/,
+    /\b(course structure|course overview|what you.ll study|learning outcomes|career outcomes|graduate outcomes)\b/,
+    /\b(intakes?|start dates?|commence|enrolment|apply now|how to apply|application deadline)\b/,
+    /\b(on campus|online|blended|distance learning|study mode|delivery mode)\b/,
   ];
-  return indicators.filter((r) => r.test(lower)).length >= 2;
+  const matches = indicators.filter((r) => r.test(lower)).length;
+  if (matches >= 3) return true;
+  if (matches >= 2) {
+    const hasTitle = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|mba|msc|bed|bsc|ba|bbus|llb|lld|jd|mphil)\b/.test(lower);
+    return hasTitle;
+  }
+  return false;
 }
 
 interface ResearchResult {
@@ -1909,14 +1990,7 @@ async function getUniversityFeePageText(feePage: string, cache: UniversityFeeCac
   }
 }
 
-function getFeeTerm(context: string): string {
-  if (/per\s*trimester|trimester/i.test(context)) return "Trimester";
-  if (/per\s*semester|semester/i.test(context)) return "Semester";
-  if (/per\s*(credit\s*)?unit|per\s*point|per\s*credit/i.test(context)) return "Per Unit";
-  if (/per\s*year|p\.a\.|per\s*annum|annual/i.test(context)) return "Annual";
-  if (/total|full\s*course|complete/i.test(context)) return "Total";
-  return "Annual";
-}
+function getFeeTerm(context: string): string { return normalizeFeeTerm(context); }
 
 function extractInternationalSection(text: string): string {
   // Try multiple patterns to isolate the international fee section
@@ -2001,7 +2075,7 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
     try {
       const prompt = `From this university INTERNATIONAL fee schedule, find the tuition fee for the course "${courseName}".
 This may show fees per trimester, semester, or year. Return ONLY the international/overseas student fee amount.
-Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Trimester|Semester|Per Unit|Total>"}
+Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>"}
 Use null if not found.`;
       const trimmedText = searchText.slice(0, 6000);
       const result = await geminiChat(prompt, trimmedText, 256);
@@ -2076,6 +2150,7 @@ async function scrapeCourseBatch(
   maxCourses: number,
   jobId: string,
   uniPages?: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string },
+  universityCountry?: string,
 ) {
   const max = Math.min(courseLinks.length, maxCourses);
   job.totalFound = courseLinks.length;
@@ -2107,7 +2182,7 @@ async function scrapeCourseBatch(
 
       try {
         const cHtml = await fetchPage(link.url);
-        const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+        const cheerioData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
 
         // Only enrich if cheerio is missing critical fields (avoids extra network round-trips for most courses)
         const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
@@ -2245,8 +2320,14 @@ async function tryAlternativeUrls(url: string, job: ScrapeJob): Promise<{ html: 
   return null;
 }
 
-async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: string) {
+async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: string, universityCountry?: string) {
   try {
+    if (!universityCountry) {
+      try {
+        const uniRows = await db.select({ country: universitiesTable.country }).from(universitiesTable).where(eq(universitiesTable.id, uniId));
+        if (uniRows[0]?.country && uniRows[0].country !== "Unknown") universityCountry = uniRows[0].country;
+      } catch {}
+    }
     addLog(job, "status", { message: `Fetching ${url}...`, phase: "fetch" });
     const origin = new URL(url).origin;
 
@@ -2287,7 +2368,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const sitemapCourses = await discoverCourseLinksFromSitemap(origin, job);
       if (sitemapCourses.length > 0) {
         addLog(job, "status", { message: `Found ${sitemapCourses.length} courses from sitemap. Extracting...`, phase: "extract", totalCourses: sitemapCourses.length });
-        await scrapeCourseBatch(sitemapCourses, uniId, job, 300, jobId, uniPages);
+        await scrapeCourseBatch(sitemapCourses, uniId, job, 300, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -2298,7 +2379,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const crawled = await crawlForCourseLinks(origin, origin, job, 2);
       if (crawled.length > 0) {
         addLog(job, "status", { message: `Found ${crawled.length} courses by crawling. Extracting...`, phase: "extract", totalCourses: crawled.length });
-        await scrapeCourseBatch(crawled, uniId, job, 300, jobId, uniPages);
+        await scrapeCourseBatch(crawled, uniId, job, 300, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -2388,7 +2469,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           phase: "extract",
           totalCourses: apiCourses.length,
         });
-        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
+        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         if (job.imported > 0) {
           const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
@@ -2490,7 +2571,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         phase: "extract",
         totalCourses: courseLinks.length,
       });
-      await scrapeCourseBatch(courseLinks, uniId, job, 300, jobId, uniPages);
+      await scrapeCourseBatch(courseLinks, uniId, job, 300, jobId, uniPages, universityCountry);
       addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
 
       if (job.imported > 0) {
@@ -2578,7 +2659,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
-    runScrapeJob(job, url, uniId, jobId).catch((err) => {
+    runScrapeJob(job, url, uniId, jobId, universityCountry).catch((err) => {
       addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
       job.status = "failed";
       job.completedAt = Date.now();

@@ -113,6 +113,8 @@ type StagedCourse = {
   academicCountry: string | null;
   scholarship: string | null;
   status: string;
+  completeness: number | null;
+  notes: string | null;
   createdAt: string;
 };
 
@@ -873,6 +875,7 @@ export default function Scraping() {
                         />
                       </th>
                       <th className="text-left p-2 font-medium text-gray-600 min-w-[200px]">Course Name</th>
+                      <th className="text-center p-2 font-medium text-gray-600 w-16">Score</th>
                       <th className="text-left p-2 font-medium text-gray-600">Level</th>
                       <th className="text-left p-2 font-medium text-gray-600">Duration</th>
                       <th className="text-right p-2 font-medium text-gray-600">Intl. Fee</th>
@@ -904,6 +907,18 @@ export default function Scraping() {
                           {course.category && (
                             <div className="text-xs text-gray-400 truncate">{course.category}</div>
                           )}
+                          {course.notes && (
+                            <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
+                          )}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.completeness != null ? (
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${
+                              course.completeness >= 80 ? "bg-green-100 text-green-700" :
+                              course.completeness >= 50 ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }`}>{course.completeness}%</span>
+                          ) : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2">
                           {course.degreeLevel ? (
