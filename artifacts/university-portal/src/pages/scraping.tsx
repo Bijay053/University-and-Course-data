@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
-  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle,
+  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -164,6 +164,9 @@ export default function Scraping() {
   const [stopping, setStopping] = useState(false);
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalSummary | null>(null);
   const [approvalLoading, setApprovalLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [feePageUrl, setFeePageUrl] = useState("");
+  const [requirementsPageUrl, setRequirementsPageUrl] = useState("");
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -374,6 +377,8 @@ export default function Scraping() {
       uniBody.universityCity = newUniCity;
       setScrapeUniName(newUniName);
     }
+    if (feePageUrl.trim()) uniBody.feePage = feePageUrl.trim();
+    if (requirementsPageUrl.trim()) uniBody.requirementsPage = requirementsPageUrl.trim();
     uniBodyRef.current = uniBody;
 
     // Queue remaining URLs (all except the first)
@@ -396,7 +401,7 @@ export default function Scraping() {
       setScrapeLogs([{ event: "error", message: (err as Error).message }]);
       setScraping(false);
     }
-  }, [scrapeUrls, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
+  }, [scrapeUrls, feePageUrl, requirementsPageUrl, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
 
   useEffect(() => {
     if (!scraping && activeJobId) {
@@ -568,6 +573,47 @@ export default function Scraping() {
               <PlusCircle className="w-4 h-4" />
               Add another URL
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              disabled={scraping}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-40 transition-colors"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              {showAdvanced ? "Hide advanced options" : "Advanced: specify fee & requirements pages"}
+            </button>
+
+            {showAdvanced && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Fee Schedule Page URL
+                    <span className="ml-1 text-gray-400 font-normal">(optional — overrides auto-discovery)</span>
+                  </label>
+                  <Input
+                    placeholder="https://university.edu/fees"
+                    value={feePageUrl}
+                    onChange={(e) => setFeePageUrl(e.target.value)}
+                    className="bg-white h-9 text-sm"
+                    disabled={scraping}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Entry Requirements Page URL
+                    <span className="ml-1 text-gray-400 font-normal">(optional — overrides auto-discovery)</span>
+                  </label>
+                  <Input
+                    placeholder="https://university.edu/entry-requirements"
+                    value={requirementsPageUrl}
+                    onChange={(e) => setRequirementsPageUrl(e.target.value)}
+                    className="bg-white h-9 text-sm"
+                    disabled={scraping}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

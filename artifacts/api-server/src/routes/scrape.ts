@@ -2336,7 +2336,7 @@ async function tryAlternativeUrls(url: string, job: ScrapeJob): Promise<{ html: 
   return null;
 }
 
-async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: string, universityCountry?: string) {
+async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: string, universityCountry?: string, manualPages?: { feePage?: string; requirementsPage?: string; entryPage?: string }) {
   try {
     if (!universityCountry) {
       try {
@@ -2378,6 +2378,10 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
     addLog(job, "status", { message: "Discovering university-level fee & requirements pages...", phase: "discover" });
     const uniPages = await discoverUniversityPages(resolvedUrl, job);
+    // Apply manually-provided pages — they override auto-discovered ones
+    if (manualPages?.feePage) { uniPages.feePage = manualPages.feePage; addLog(job, "status", { message: `Using provided fee page: ${manualPages.feePage}`, phase: "discover" }); }
+    if (manualPages?.requirementsPage) { uniPages.requirementsPage = manualPages.requirementsPage; addLog(job, "status", { message: `Using provided requirements page: ${manualPages.requirementsPage}`, phase: "discover" }); }
+    if (manualPages?.entryPage) { uniPages.entryPage = manualPages.entryPage; }
 
     if (!html) {
       addLog(job, "status", { message: "No direct page available. Scanning sitemap for course URLs...", phase: "discover" });
@@ -2628,12 +2632,14 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 }
 
 router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
-  const { url, universityId, universityName, universityCountry, universityCity } = req.body as {
+  const { url, universityId, universityName, universityCountry, universityCity, feePage, requirementsPage } = req.body as {
     url: string;
     universityId?: number;
     universityName?: string;
     universityCountry?: string;
     universityCity?: string;
+    feePage?: string;
+    requirementsPage?: string;
   };
 
   if (!url) { res.status(400).json({ error: "URL is required" }); return; }
@@ -2685,7 +2691,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
-    runScrapeJob(job, url, uniId, jobId, universityCountry).catch((err) => {
+    const manualPages = (feePage || requirementsPage) ? { feePage: feePage || undefined, requirementsPage: requirementsPage || undefined } : undefined;
+    runScrapeJob(job, url, uniId, jobId, universityCountry, manualPages).catch((err) => {
       addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
       job.status = "failed";
       job.completedAt = Date.now();
