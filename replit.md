@@ -30,8 +30,8 @@ A centralized admin portal for managing university course data including courses
 - `/courses` — Searchable/filterable course list
 - `/courses/:id` — Course detail with tabs: Overview, Intakes, Fees, English Requirements, Academic Requirements, Scholarships
 - `/courses/new` — Create new course
-- `/scraping` — Scraping jobs and change detection (approve/reject)
-- `/bulk` — Bulk CSV upload and download
+- `/scraping` — AI-powered web scraper + university coverage + import history
+- `/bulk` — Bulk Excel upload for importing course data
 
 ## Database Schema
 
@@ -70,3 +70,14 @@ All routes served at `/api/...`:
 - `GET /dashboard/stats|recent-changes|courses-by-level|upcoming-intakes` — dashboard data
 - `GET /bulk/courses/download` — CSV download
 - `POST /bulk/courses/upload` — CSV upload
+- `POST /import/excel` — Excel file import with auto-mapping
+- `GET /import/history` — import job history
+- `POST /scrape/start` — AI-powered web scraper (SSE streaming)
+- `POST /scrape/preview` — preview page analysis before scraping
+
+## AI Integration
+
+- **OpenAI** via Replit AI Integrations proxy (no API key needed)
+- Used by AI web scraper to parse HTML and extract structured course data
+- Package: `@workspace/integrations-openai-ai-server` in `lib/`
+- Model: `gpt-5-mini` for cost-effective extraction

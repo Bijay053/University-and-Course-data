@@ -1,8 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useListUniversities } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
+  Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
+} from "lucide-react";
 import { Link } from "wouter";
 
 type ImportJob = {
@@ -26,6 +32,22 @@ type UniStat = {
   courseCount: number;
 };
 
+type ScrapeLog = {
+  event: string;
+  message?: string;
+  name?: string;
+  status?: string;
+  current?: number;
+  total?: number;
+  totalFound?: number;
+  imported?: number;
+  skipped?: number;
+  errors?: number;
+  phase?: string;
+};
+
+const ALL = "__new__";
+
 function statusBadge(status: string) {
   if (status === "completed") return <Badge className="bg-green-100 text-green-700 border-green-200">Completed</Badge>;
   if (status === "completed_with_errors") return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Completed (Errors)</Badge>;
@@ -41,6 +63,17 @@ export default function Scraping() {
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
+
+  // AI Scraper state
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [selectedUni, setSelectedUni] = useState("");
+  const [newUniName, setNewUniName] = useState("");
+  const [newUniCountry, setNewUniCountry] = useState("");
+  const [newUniCity, setNewUniCity] = useState("");
+  const [scraping, setScraping] = useState(false);
+  const [scrapeLogs, setScrapeLogs] = useState<ScrapeLog[]>([]);
+  const [scrapeResult, setScrapeResult] = useState<ScrapeLog | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -67,20 +100,243 @@ export default function Scraping() {
     ).then(setUniStats);
   }, [uniData]);
 
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [scrapeLogs]);
+
+  const startScraping = useCallback(async () => {
+    if (!scrapeUrl) return;
+    setScraping(true);
+    setScrapeLogs([]);
+    setScrapeResult(null);
+
+    const body: Record<string, unknown> = { url: scrapeUrl };
+    if (selectedUni && selectedUni !== ALL) {
+      body.universityId = parseInt(selectedUni);
+    } else {
+      body.universityName = newUniName;
+      body.universityCountry = newUniCountry;
+      body.universityCity = newUniCity;
+    }
+
+    try {
+      const resp = await fetch("/api/scrape/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok || !resp.body) {
+        setScrapeLogs([{ event: "error", message: "Failed to start scraping" }]);
+        setScraping(false);
+        return;
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6)) as ScrapeLog;
+              if (data.event === "done") {
+                setScrapeResult(data);
+              }
+              setScrapeLogs((prev) => [...prev, data]);
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      setScrapeLogs((prev) => [...prev, { event: "error", message: (err as Error).message }]);
+    } finally {
+      setScraping(false);
+    }
+  }, [scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity]);
+
+  const progressLog = scrapeLogs.findLast((l) => l.event === "progress");
+  const courseLogs = scrapeLogs.filter((l) => l.event === "course");
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Scraping Overview</h1>
-          <p className="text-muted-foreground">Monitor data imports and university coverage.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Scraping & Import</h1>
+          <p className="text-muted-foreground">Scrape university websites with AI or import from Excel files.</p>
         </div>
         <Link href="/bulk">
-          <Button>
+          <Button variant="outline">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Upload Excel File
           </Button>
         </Link>
       </div>
+
+      {/* AI Scraper Card */}
+      <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50/50 to-purple-50/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            AI-Powered Web Scraper
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Paste a university course listing URL and AI will automatically extract all course data — fees, requirements, intakes, and more.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* URL Input */}
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="https://www.university.edu/courses"
+                value={scrapeUrl}
+                onChange={(e) => setScrapeUrl(e.target.value)}
+                className="pl-9 h-11 bg-white"
+                disabled={scraping}
+              />
+            </div>
+          </div>
+
+          {/* University Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="text-xs font-medium text-gray-500 mb-1 block">University</label>
+              <Select value={selectedUni} onValueChange={setSelectedUni} disabled={scraping}>
+                <SelectTrigger className="bg-white h-9">
+                  <SelectValue placeholder="Select university..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>+ Create New University</SelectItem>
+                  {uniData?.data?.map((u) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(!selectedUni || selectedUni === ALL) && (
+              <>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">University Name</label>
+                  <Input placeholder="University of Example" value={newUniName} onChange={(e) => setNewUniName(e.target.value)} className="bg-white h-9" disabled={scraping} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Country</label>
+                  <Input placeholder="United Kingdom" value={newUniCountry} onChange={(e) => setNewUniCountry(e.target.value)} className="bg-white h-9" disabled={scraping} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">City</label>
+                  <Input placeholder="London" value={newUniCity} onChange={(e) => setNewUniCity(e.target.value)} className="bg-white h-9" disabled={scraping} />
+                </div>
+              </>
+            )}
+          </div>
+
+          <Button
+            onClick={startScraping}
+            disabled={scraping || !scrapeUrl || (!selectedUni && !newUniName)}
+            className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
+            size="lg"
+          >
+            {scraping ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Scraping...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" />
+                Start AI Scraping
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </>
+            )}
+          </Button>
+
+          {/* Scraping Progress */}
+          {scrapeLogs.length > 0 && (
+            <div className="space-y-3">
+              {/* Progress bar */}
+              {progressLog && progressLog.total && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Scraping courses...</span>
+                    <span>{progressLog.current}/{progressLog.total}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                      style={{ width: `${((progressLog.current ?? 0) / progressLog.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Log feed */}
+              <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-auto font-mono text-xs space-y-1">
+                {scrapeLogs.map((log, i) => (
+                  <div key={i} className={
+                    log.event === "error" ? "text-red-400" :
+                    log.event === "course" && log.status === "imported" ? "text-green-400" :
+                    log.event === "course" && log.status === "skipped" ? "text-yellow-400" :
+                    log.event === "done" ? "text-cyan-400 font-bold" :
+                    "text-gray-300"
+                  }>
+                    {log.event === "status" && <span>[INFO] {log.message}</span>}
+                    {log.event === "progress" && <span>[{log.current}/{log.total}] {log.message}</span>}
+                    {log.event === "course" && <span>[{log.status?.toUpperCase()}] {log.name}</span>}
+                    {log.event === "error" && <span>[ERROR] {log.message}</span>}
+                    {log.event === "done" && (
+                      <span>
+                        === COMPLETE === Found: {log.totalFound} | Imported: {log.imported} | Skipped: {log.skipped} | Errors: {log.errors}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {scraping && (
+                  <div className="text-blue-400 animate-pulse">
+                    <Loader2 className="inline w-3 h-3 animate-spin mr-1" />
+                    Processing...
+                  </div>
+                )}
+              </div>
+
+              {/* Result Summary */}
+              {scrapeResult && (
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="bg-white border rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-gray-800">{scrapeResult.totalFound}</div>
+                    <div className="text-xs text-gray-400">Found</div>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-600">{scrapeResult.imported}</div>
+                    <div className="text-xs text-green-500">Imported</div>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-amber-600">{scrapeResult.skipped}</div>
+                    <div className="text-xs text-amber-500">Skipped</div>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-red-600">{scrapeResult.errors}</div>
+                    <div className="text-xs text-red-500">Errors</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* University Coverage */}
       <div>
@@ -125,7 +381,7 @@ export default function Scraping() {
           <div className="border rounded-xl p-10 text-center text-gray-400">
             <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p>No import jobs yet.</p>
-            <p className="text-sm mt-1">Use <Link href="/bulk" className="text-blue-500 underline">Bulk Upload</Link> to import course data.</p>
+            <p className="text-sm mt-1">Use <Link href="/bulk" className="text-blue-500 underline">Bulk Upload</Link> or the AI Scraper above.</p>
           </div>
         ) : (
           <div className="border rounded-xl overflow-hidden">
@@ -163,36 +419,6 @@ export default function Scraping() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* Spider Reference */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Available Scrapy Spiders</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {[
-            "Torrens University", "London Metropolitan", "University of Plymouth",
-            "University of Hull", "Swinburne University", "Griffith University",
-            "James Cook University", "Murdoch University", "Bond University",
-            "University of New England", "TAFE NSW", "Victoria University",
-            "Charles Sturt", "University of Stirling", "West London",
-            "University of Westminster", "London South Bank", "Roehampton",
-            "University of Chester", "University of Portsmouth", "Massey University",
-            "University of Waikato", "Vancouver Island University", "Fleming College",
-          ].map((name) => {
-            const imported = uniStats.some((u) => u.name.toLowerCase().includes(name.toLowerCase().split(" ")[0]));
-            return (
-              <div
-                key={name}
-                className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm ${
-                  imported ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200 text-gray-500"
-                }`}
-              >
-                {imported ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 opacity-40" />}
-                <span className="truncate">{name}</span>
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
