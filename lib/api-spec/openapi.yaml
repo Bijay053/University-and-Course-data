@@ -173,6 +173,10 @@ paths:
           in: query
           schema:
             type: ["string", "null"]
+        - name: subCategory
+          in: query
+          schema:
+            type: ["string", "null"]
         - name: degreeLevel
           in: query
           schema:

@@ -123,6 +123,7 @@ export const ListCoursesQueryParams = zod.object({
   search: zod.coerce.string().nullish(),
   universityId: zod.coerce.number().nullish(),
   category: zod.coerce.string().nullish(),
+  subCategory: zod.coerce.string().nullish(),
   degreeLevel: zod.coerce.string().nullish(),
   studyMode: zod.coerce.string().nullish(),
   country: zod.coerce.string().nullish(),

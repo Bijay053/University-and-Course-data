@@ -478,6 +478,10 @@ export type ListCoursesParams = {
   /**
    * @nullable
    */
+  subCategory?: string | null;
+  /**
+   * @nullable
+   */
   degreeLevel?: string | null;
   /**
    * @nullable

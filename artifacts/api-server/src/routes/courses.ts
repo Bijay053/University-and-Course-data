@@ -18,11 +18,12 @@ router.get("/courses", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const { search, universityId, category, degreeLevel, studyMode, page = 1, limit = 20 } = query.data;
+  const { search, universityId, category, subCategory, degreeLevel, studyMode, page = 1, limit = 20 } = query.data;
   const conditions: SQL[] = [];
   if (search) conditions.push(ilike(coursesTable.name, `%${search}%`));
   if (universityId) conditions.push(eq(coursesTable.universityId, universityId));
   if (category) conditions.push(ilike(coursesTable.category, `%${category}%`));
+  if (subCategory) conditions.push(ilike(coursesTable.subCategory, `%${subCategory}%`));
   if (degreeLevel) conditions.push(eq(coursesTable.degreeLevel, degreeLevel));
   if (studyMode) conditions.push(eq(coursesTable.studyMode, studyMode));
 
