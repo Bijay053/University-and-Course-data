@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
-  Square, StopCircle,
+  Square, StopCircle, Play, ShieldCheck, Info,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -36,6 +36,16 @@ type UniStat = {
   courseCount: number;
 };
 
+type ApprovalSummary = {
+  totalCourses: number;
+  validSamples: number;
+  rejectedSamples: number;
+  sampleTotal: number;
+  validExamples: string[];
+  rejectedExamples: string[];
+  estimatedMinutes: number;
+};
+
 type ScrapeLog = {
   event: string;
   message?: string;
@@ -48,6 +58,15 @@ type ScrapeLog = {
   skipped?: number;
   errors?: number;
   phase?: string;
+  sampleResult?: "valid" | "rejected";
+  // approval_required fields
+  totalCourses?: number;
+  validSamples?: number;
+  rejectedSamples?: number;
+  sampleTotal?: number;
+  validExamples?: string[];
+  rejectedExamples?: string[];
+  estimatedMinutes?: number;
 };
 
 type StagedCourse = {
@@ -138,6 +157,8 @@ export default function Scraping() {
   const [scrapeUniName, setScrapeUniName] = useState("");
   const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
   const [stopping, setStopping] = useState(false);
+  const [awaitingApproval, setAwaitingApproval] = useState<ApprovalSummary | null>(null);
+  const [approvalLoading, setApprovalLoading] = useState(false);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -208,11 +229,30 @@ export default function Scraping() {
 
           const doneLog = data.logs.find((l: ScrapeLog) => l.event === "done");
           if (doneLog) setScrapeResult(doneLog);
+
+          const approvalLog = data.logs.find((l: ScrapeLog) => l.event === "approval_required");
+          if (approvalLog) {
+            setAwaitingApproval({
+              totalCourses: approvalLog.totalCourses ?? 0,
+              validSamples: approvalLog.validSamples ?? 0,
+              rejectedSamples: approvalLog.rejectedSamples ?? 0,
+              sampleTotal: approvalLog.sampleTotal ?? 0,
+              validExamples: approvalLog.validExamples ?? [],
+              rejectedExamples: approvalLog.rejectedExamples ?? [],
+              estimatedMinutes: approvalLog.estimatedMinutes ?? 1,
+            });
+          }
         }
 
-        if (data.status !== "running") {
+        // Also sync approval state from status response directly
+        if (data.awaitingApproval && !awaitingApproval) {
+          setAwaitingApproval(data.awaitingApproval);
+        }
+
+        if (data.status !== "running" && data.status !== "awaiting_approval") {
           setScraping(false);
           setStopping(false);
+          setAwaitingApproval(null);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
           if ((data.status === "completed" || data.status === "stopped") && data.imported > 0) {
             loadStagedCourses(jobId);
@@ -245,9 +285,28 @@ export default function Scraping() {
   const stopScraping = useCallback(async () => {
     if (!activeJobId) return;
     setStopping(true);
+    setAwaitingApproval(null);
     try {
       await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" });
     } catch {}
+  }, [activeJobId]);
+
+  const handleApproval = useCallback(async (proceed: boolean) => {
+    if (!activeJobId) return;
+    setApprovalLoading(true);
+    try {
+      await fetch(`/api/scrape/approve/${activeJobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proceed }),
+      });
+      if (!proceed) {
+        setScraping(false);
+        setStopping(false);
+      }
+      setAwaitingApproval(null);
+    } catch {}
+    setApprovalLoading(false);
   }, [activeJobId]);
 
   const startScraping = useCallback(async () => {
@@ -259,6 +318,7 @@ export default function Scraping() {
     setStagedCourses([]);
     setScrapeTargetUrl(scrapeUrl);
     setStopping(false);
+    setAwaitingApproval(null);
 
     const body: Record<string, unknown> = { url: scrapeUrl };
     if (selectedUni && selectedUni !== ALL) {
@@ -608,10 +668,89 @@ export default function Scraping() {
                 </div>
               )}
 
-              {scraping && !progressLog && (
+              {scraping && !progressLog && !awaitingApproval && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
+                </div>
+              )}
+
+              {awaitingApproval && (
+                <div className="border-2 border-amber-300 bg-amber-50 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-amber-600" />
+                    <span className="font-semibold text-amber-900">Research Complete — Confirm Bulk Fetch</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-white border border-amber-200 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-gray-800">{awaitingApproval.totalCourses}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Courses Found</div>
+                    </div>
+                    <div className="bg-white border border-green-200 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-green-700">{awaitingApproval.validSamples}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Samples Valid</div>
+                    </div>
+                    <div className="bg-white border border-red-200 rounded-lg p-3">
+                      <div className="text-2xl font-bold text-red-600">{awaitingApproval.rejectedSamples}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Samples Rejected</div>
+                    </div>
+                  </div>
+
+                  {awaitingApproval.validExamples.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Valid Course Samples</div>
+                      <div className="space-y-1">
+                        {awaitingApproval.validExamples.map((name, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-sm text-green-700">
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {awaitingApproval.rejectedExamples.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Rejected Samples</div>
+                      <div className="space-y-1">
+                        {awaitingApproval.rejectedExamples.map((name, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-sm text-red-600">
+                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Estimated time: ~{awaitingApproval.estimatedMinutes} minute{awaitingApproval.estimatedMinutes !== 1 ? "s" : ""} to fetch all {awaitingApproval.totalCourses} course pages in parallel.</span>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleApproval(true)}
+                      disabled={approvalLoading}
+                      className="flex-1 bg-green-600 hover:bg-green-700 h-11"
+                      size="lg"
+                    >
+                      {approvalLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                      Proceed — Fetch {awaitingApproval.totalCourses} Courses
+                    </Button>
+                    <Button
+                      onClick={() => handleApproval(false)}
+                      disabled={approvalLoading}
+                      variant="outline"
+                      className="border-red-300 text-red-600 hover:bg-red-50 h-11 px-6"
+                      size="lg"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -619,12 +758,16 @@ export default function Scraping() {
                 {scrapeLogs.map((log, i) => (
                   <div key={i} className={
                     log.event === "error" ? "text-red-400" :
+                    log.event === "approval_required" ? "text-amber-400 font-semibold" :
                     log.event === "course" && (log.status === "staged" || log.status === "staged (cheerio only)") ? "text-green-400" :
                     log.event === "course" && log.status === "skipped" ? "text-yellow-400" :
                     log.event === "done" ? "text-cyan-400 font-bold" :
+                    log.event === "status" && log.sampleResult === "valid" ? "text-green-300" :
+                    log.event === "status" && log.sampleResult === "rejected" ? "text-red-300" :
                     "text-gray-300"
                   }>
                     {log.event === "status" && <span>[INFO] {log.message}</span>}
+                    {log.event === "approval_required" && <span>[WAITING] {log.message}</span>}
                     {log.event === "progress" && <span>[{log.current}/{log.total}] {log.message}</span>}
                     {log.event === "course" && <span>[{log.status?.toUpperCase()}] {log.name}</span>}
                     {log.event === "error" && <span>[ERROR] {log.message}</span>}
@@ -635,10 +778,15 @@ export default function Scraping() {
                     )}
                   </div>
                 ))}
-                {scraping && (
+                {scraping && !awaitingApproval && (
                   <div className="text-blue-400 animate-pulse">
                     <Loader2 className="inline w-3 h-3 animate-spin mr-1" />
                     Processing in background...
+                  </div>
+                )}
+                {awaitingApproval && (
+                  <div className="text-amber-400 animate-pulse">
+                    Waiting for your confirmation above...
                   </div>
                 )}
               </div>

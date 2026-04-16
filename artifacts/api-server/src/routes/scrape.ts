@@ -61,9 +61,19 @@ interface ScrapeConfig {
   lastScrapedAt: string;
 }
 
+interface ApprovalSummary {
+  totalCourses: number;
+  validSamples: number;
+  rejectedSamples: number;
+  sampleTotal: number;
+  validExamples: string[];
+  rejectedExamples: string[];
+  estimatedMinutes: number;
+}
+
 interface ScrapeJob {
   id: string;
-  status: "running" | "completed" | "failed" | "stopped";
+  status: "running" | "completed" | "failed" | "stopped" | "awaiting_approval";
   logs: { event: string; [key: string]: unknown }[];
   imported: number;
   skipped: number;
@@ -77,6 +87,7 @@ interface ScrapeJob {
   url?: string;
   stopped?: boolean;
   discoveredConfig?: ScrapeConfig;
+  awaitingApproval?: { resolve: (proceed: boolean) => void; summary: ApprovalSummary };
 }
 
 const scrapeJobs = new Map<string, ScrapeJob>();
@@ -84,6 +95,18 @@ const scrapeJobs = new Map<string, ScrapeJob>();
 function addLog(job: ScrapeJob, event: string, data: Record<string, unknown> = {}) {
   job.logs.push({ event, ...data });
   if (job.logs.length > 2000) job.logs = job.logs.slice(-1500);
+}
+
+function waitForApproval(job: ScrapeJob, summary: ApprovalSummary): Promise<boolean> {
+  return new Promise((resolve) => {
+    job.awaitingApproval = { resolve, summary };
+    job.status = "awaiting_approval";
+    addLog(job, "approval_required", {
+      ...summary,
+      message: `Research complete. Found ${summary.totalCourses} course pages to fetch. Please review and confirm.`,
+      phase: "awaiting_approval",
+    });
+  });
 }
 
 async function geminiChat(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
@@ -332,6 +355,14 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   return data;
 }
 
+function detectFeeTerm(context: string): string {
+  if (/per\s*trimester|trimester/i.test(context)) return "Trimester";
+  if (/per\s*semester|semester/i.test(context)) return "Semester";
+  if (/per\s*(credit\s*)?unit|per\s*point|per\s*credit/i.test(context)) return "Per Unit";
+  if (/total|full\s*course|complete\s*program/i.test(context)) return "Total";
+  return "Annual";
+}
+
 function extractInternationalFees(text: string, data: Partial<CourseData>) {
   const intlSection = text.match(/international[^]*?(?:fee|tuition|cost)[^]*?[\$A]\s*([\d,]+)/i);
   if (intlSection) {
@@ -339,7 +370,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
     if (fee > 1000 && fee < 200000) {
       data.internationalFee = fee;
       data.currency = "AUD";
-      data.feeTerm = /semester/i.test(intlSection[0]) ? "Semester" : /total/i.test(intlSection[0]) ? "Total" : "Annual";
+      data.feeTerm = detectFeeTerm(intlSection[0]);
       return;
     }
   }
@@ -356,7 +387,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
       if (fee > 1000 && fee < 200000) {
         data.internationalFee = fee;
         data.currency = "AUD";
-        data.feeTerm = /semester/i.test(fm[0]) ? "Semester" : /total/i.test(fm[0]) ? "Total" : "Annual";
+        data.feeTerm = detectFeeTerm(fm[0]);
         return;
       }
     }
@@ -368,7 +399,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>) {
     if (fee > 5000 && fee < 200000) {
       data.internationalFee = fee;
       data.currency = "AUD";
-      data.feeTerm = /semester/i.test(genericFee[0]) ? "Semester" : /total/i.test(genericFee[0]) ? "Total" : "Annual";
+      data.feeTerm = detectFeeTerm(genericFee[0]);
     }
   }
 }
@@ -488,7 +519,9 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const pteSection = text.match(/PTE\s*(?:Academic|academic)?[^]*?(?=(?:TOEF|Cambridge|CAE|Duolingo|Pathway|Credit|Recognition|IELTS|\n\s*\n))/i);
   const pteText = pteSection ? pteSection[0] : "";
   if (data.pteOverall && pteText) {
-    const noPteBelow = pteText.match(/no\s*(?:score|band|component)[^.]*?(?:below|less\s*than|lower\s*than)\s*(\d+)/i);
+    const noPteBelow = pteText.match(/no\s*(?:score|band|component|communicative\s*skill)[^.]*?(?:below|less\s*than|lower\s*than|under)\s*(\d+)/i)
+      || pteText.match(/(?:each|all)\s*(?:communicative\s*)?skill[^.]*?(?:minimum|at\s*least)\s*(\d+)/i)
+      || pteText.match(/(?:minimum|min)[^.]*?(?:in\s+each|per\s+section|per\s+skill)[^.]*?(\d+)/i);
     if (noPteBelow) {
       const min = parseInt(noPteBelow[1]);
       if (min >= 30 && min <= 90) {
@@ -496,6 +529,23 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
         if (!data.pteSpeaking) data.pteSpeaking = min;
         if (!data.pteWriting) data.pteWriting = min;
         if (!data.pteReading) data.pteReading = min;
+      }
+    }
+
+    // Also try extracting individual PTE skill scores
+    if (!data.pteListening || !data.pteSpeaking || !data.pteWriting || !data.pteReading) {
+      const pteSubPatterns: { key: keyof CourseData; pattern: RegExp }[] = [
+        { key: "pteListening", pattern: /listening[:\s]*(\d+)/i },
+        { key: "pteSpeaking", pattern: /speaking[:\s]*(\d+)/i },
+        { key: "pteWriting", pattern: /writing[:\s]*(\d+)/i },
+        { key: "pteReading", pattern: /reading[:\s]*(\d+)/i },
+      ];
+      for (const { key, pattern } of pteSubPatterns) {
+        const m = pteText.match(pattern);
+        if (m && !(data as any)[key]) {
+          const v = parseInt(m[1]);
+          if (v >= 30 && v <= 90) (data as any)[key] = v;
+        }
       }
     }
   }
@@ -569,7 +619,7 @@ async function analyzeImageWithGemini(imageUrl: string, context: string): Promis
 
     const prompt = `Extract ALL English language requirements and/or fees from this image. ${context}
 Return JSON with ONLY the fields you find:
-{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Total|Semester|Per Unit>"}
+{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Total|Semester|Per Unit>"}
 Extract ALL test types: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C1 Advanced, Duolingo. Use null for missing fields. Only include INTERNATIONAL student fees.`;
 
     const body = JSON.stringify({
@@ -616,7 +666,7 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string): Promise<P
     const base64 = Buffer.from(buffer).toString("base64");
 
     const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
-Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Total|Semester|Per Unit>","feeYear":<year>}
+Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Total|Semester|Per Unit>","feeYear":<year>}
 Use null for missing fields. Only include INTERNATIONAL fees.`;
 
     const body = JSON.stringify({
@@ -777,7 +827,7 @@ Return JSON:
   "degreeLevel": "<Bachelor|Master|PhD|Certificate & Diploma|Graduate Certificate & Diploma|Associate Degree|Equivalent>",
   "studyLoad": "<Full Time|Part Time>",
   "internationalFee": <INTERNATIONAL fee number only|null>,
-  "feeTerm": "<Annual|Total|Semester|Per Unit>",
+  "feeTerm": "<Annual|Trimester|Total|Semester|Per Unit>",
   "currency": "<AUD|GBP|USD>",
   "ieltsOverall": <number|null>, "ieltsListening": <number|null>, "ieltsSpeaking": <number|null>, "ieltsWriting": <number|null>, "ieltsReading": <number|null>,
   "pteOverall": <number|null>, "pteListening": <number|null>, "pteSpeaking": <number|null>, "pteWriting": <number|null>, "pteReading": <number|null>,
@@ -1049,11 +1099,19 @@ function pageContentLooksLikeCourse(text: string): boolean {
   return indicators.filter((r) => r.test(lower)).length >= 2;
 }
 
+interface ResearchResult {
+  links: { url: string; name: string }[];
+  validSamples: number;
+  rejectedSamples: number;
+  validExamples: string[];
+  rejectedExamples: string[];
+}
+
 async function researchAndValidateCourseLinks(
   candidates: { url: string; name: string }[],
   job: ScrapeJob
-): Promise<{ url: string; name: string }[]> {
-  if (candidates.length === 0) return [];
+): Promise<ResearchResult> {
+  if (candidates.length === 0) return { links: [], validSamples: 0, rejectedSamples: 0, validExamples: [], rejectedExamples: [] };
 
   // Phase 1: URL-based pre-filter (instant, zero cost)
   const urlFiltered = candidates.filter((c) => urlLastSegmentHasDegreeQualifier(c.url));
@@ -1067,7 +1125,7 @@ async function researchAndValidateCourseLinks(
         phase: "discover",
       });
     }
-    return urlFiltered;
+    return { links: urlFiltered, validSamples: 0, rejectedSamples: 0, validExamples: urlFiltered.slice(0, 3).map(c => c.name), rejectedExamples: [] };
   }
 
   // Phase 2: Content sampling (fetch sample pages, validate with page content)
@@ -1086,6 +1144,8 @@ async function researchAndValidateCourseLinks(
 
   const validUrlPrefixes: string[] = [];
   const validUrlDepths: number[] = [];
+  const validExamples: string[] = [];
+  const rejectedExamples: string[] = [];
   let confirmedCourses = 0;
   let confirmedNonCourses = 0;
 
@@ -1100,15 +1160,17 @@ async function researchAndValidateCourseLinks(
 
         if (isRealCourse) {
           confirmedCourses++;
+          if (validExamples.length < 4) validExamples.push(candidate.name);
           const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
           validUrlDepths.push(pathParts.length);
           if (pathParts.length > 1) {
             validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
           }
-          addLog(job, "status", { message: `✓ Confirmed course: "${candidate.name}"`, phase: "discover" });
+          addLog(job, "status", { message: `✓ Confirmed course: "${candidate.name}"`, phase: "discover", sampleResult: "valid" });
         } else {
           confirmedNonCourses++;
-          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — filtering similar URLs`, phase: "discover" });
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — filtering similar URLs`, phase: "discover", sampleResult: "rejected" });
         }
       } catch {}
     })
@@ -1121,10 +1183,10 @@ async function researchAndValidateCourseLinks(
 
   if (confirmedCourses === 0) {
     addLog(job, "status", { message: "Could not confirm any course pages from samples. Using all candidates.", phase: "discover" });
-    return candidates;
+    return { links: candidates, validSamples: 0, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
   }
 
-  if (validUrlDepths.length === 0) return candidates;
+  if (validUrlDepths.length === 0) return { links: candidates, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 
   const avgDepth = Math.round(validUrlDepths.reduce((a, b) => a + b, 0) / validUrlDepths.length);
   const prefixCounts = new Map<string, number>();
@@ -1148,7 +1210,8 @@ async function researchAndValidateCourseLinks(
     });
   }
 
-  return filtered.length >= 3 ? filtered : candidates;
+  const finalLinks = filtered.length >= 3 ? filtered : candidates;
+  return { links: finalLinks, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 }
 
 function isCourseUrl(urlStr: string): boolean {
@@ -2245,15 +2308,37 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     // --- Phase 2: Research & Validate — do NOT fetch everything blindly ---
     // Sample pages to confirm which candidates are genuine course pages
     let courseLinks: { url: string; name: string }[] = [];
+    let researchStats = { validSamples: 0, rejectedSamples: 0, validExamples: [] as string[], rejectedExamples: [] as string[] };
     if (rawCandidates.length > 0) {
       addLog(job, "status", {
         message: `Phase 2: Researching ${rawCandidates.length} candidates — comparing pages to find genuine course pages before fetching...`,
         phase: "discover",
       });
-      courseLinks = await researchAndValidateCourseLinks(rawCandidates, job);
+      const result = await researchAndValidateCourseLinks(rawCandidates, job);
+      courseLinks = result.links;
+      researchStats = { validSamples: result.validSamples, rejectedSamples: result.rejectedSamples, validExamples: result.validExamples, rejectedExamples: result.rejectedExamples };
     }
 
     if (courseLinks.length > 0) {
+      // --- Approval Gate: pause and ask user to confirm before bulk fetching ---
+      const estMinutes = Math.max(1, Math.ceil(courseLinks.length / 25 * 4 / 60));
+      const approvalSummary: ApprovalSummary = {
+        totalCourses: courseLinks.length,
+        validSamples: researchStats.validSamples,
+        rejectedSamples: researchStats.rejectedSamples,
+        sampleTotal: researchStats.validSamples + researchStats.rejectedSamples,
+        validExamples: researchStats.validExamples,
+        rejectedExamples: researchStats.rejectedExamples,
+        estimatedMinutes: estMinutes,
+      };
+      const proceed = await waitForApproval(job, approvalSummary);
+      if (!proceed || job.stopped) {
+        addLog(job, "status", { message: "Bulk fetch cancelled by user.", phase: "done" });
+        job.status = "stopped";
+        job.completedAt = Date.now();
+        return;
+      }
+
       addLog(job, "status", {
         message: `Phase 3: Fetching ${courseLinks.length} validated course pages...`,
         phase: "extract",
@@ -2514,13 +2599,20 @@ router.get("/scrape/status/:jobId", (req: Request, res: Response): void => {
     url: job.url,
     logs: newLogs,
     logIndex: job.logs.length,
+    awaitingApproval: job.awaitingApproval ? job.awaitingApproval.summary : undefined,
   });
 });
 
 router.post("/scrape/stop/:jobId", (req: Request, res: Response): void => {
   const job = scrapeJobs.get(req.params.jobId);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
-  if (job.status !== "running") { res.status(400).json({ error: "Job is not running" }); return; }
+  if (job.status !== "running" && job.status !== "awaiting_approval") { res.status(400).json({ error: "Job is not running" }); return; }
+
+  // If job is waiting for approval, resolve the promise with false (cancel)
+  if (job.awaitingApproval) {
+    job.awaitingApproval.resolve(false);
+    job.awaitingApproval = undefined;
+  }
 
   job.stopped = true;
   job.status = "stopped";
@@ -2529,6 +2621,23 @@ router.post("/scrape/stop/:jobId", (req: Request, res: Response): void => {
   addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
 
   res.json({ message: "Scraping stopped", imported: job.imported });
+});
+
+router.post("/scrape/approve/:jobId", (req: Request, res: Response): void => {
+  const job = scrapeJobs.get(req.params.jobId);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  if (!job.awaitingApproval) { res.status(400).json({ error: "Job is not awaiting approval" }); return; }
+
+  const { proceed } = req.body as { proceed: boolean };
+  job.awaitingApproval.resolve(!!proceed);
+  job.awaitingApproval = undefined;
+  job.status = "running";
+  addLog(job, "status", {
+    message: proceed ? "User confirmed — starting bulk course fetch..." : "User cancelled bulk fetch.",
+    phase: proceed ? "extract" : "done",
+  });
+
+  res.json({ ok: true, proceed: !!proceed });
 });
 
 router.get("/scrape/jobs", (_req: Request, res: Response): void => {
