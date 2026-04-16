@@ -436,7 +436,69 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     const analysis = await analyzePage(pageContent);
 
     if (analysis.pageType === "unknown") {
-      sendSSE(res, "error", { message: "Could not identify course data on this page. Try a course listing or individual course page URL." });
+      sendSSE(res, "status", { message: "No courses found on main page. Trying to discover course pages from the site...", phase: "discover" });
+
+      const $ = cheerio.load(html);
+      const courseLinks: { url: string; name: string }[] = [];
+      const seen = new Set<string>();
+      $("a[href]").each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const text = $(el).text().trim();
+        try {
+          const fullUrl = new URL(href, new URL(url).origin).toString();
+          const lower = fullUrl.toLowerCase();
+          if (
+            text.length > 5 && text.length < 200 && !seen.has(fullUrl) &&
+            (lower.includes("/course") || lower.includes("/program") || lower.includes("/bachelor") ||
+             lower.includes("/master") || lower.includes("/diploma") || lower.includes("/study/") ||
+             /\b(ba|bsc|ma|msc|mba|phd|bed|beng|llb)\b/i.test(text) ||
+             /\b(bachelor|master|graduate|diploma|certificate)\b/i.test(text))
+          ) {
+            seen.add(fullUrl);
+            courseLinks.push({ url: fullUrl, name: text.replace(/\s+/g, " ") });
+          }
+        } catch {}
+      });
+
+      if (courseLinks.length > 0) {
+        sendSSE(res, "status", {
+          message: `Found ${courseLinks.length} potential course links. Extracting data...`,
+          phase: "extract",
+          totalCourses: courseLinks.length,
+        });
+
+        let imported = 0, skipped = 0, errors = 0;
+        const max = Math.min(courseLinks.length, 100);
+
+        for (let i = 0; i < max; i++) {
+          const link = courseLinks[i];
+          sendSSE(res, "progress", { current: i + 1, total: max, courseName: link.name, message: `Scraping ${i + 1}/${max}: ${link.name}` });
+          try {
+            const cHtml = await fetchPage(link.url);
+            const cContent = extractPageContent(cHtml, link.url);
+            const cData = await extractCourseFromPage(cContent, link.name);
+            if (cData) {
+              cData.courseWebsite = cData.courseWebsite || link.url;
+              const saved = await saveCourse(cData, uniId);
+              if (saved) { imported++; sendSSE(res, "course", { name: cData.courseName, status: "imported", index: i + 1 }); }
+              else { skipped++; sendSSE(res, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
+            } else {
+              errors++;
+              sendSSE(res, "course", { name: link.name, status: "error", message: "Not a course page", index: i + 1 });
+            }
+          } catch (err) {
+            errors++;
+            sendSSE(res, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
+          }
+          await new Promise((r) => setTimeout(r, 300));
+        }
+
+        sendSSE(res, "done", { totalFound: courseLinks.length, imported, skipped, errors });
+        res.end();
+        return;
+      }
+
+      sendSSE(res, "error", { message: "This page uses JavaScript to load courses dynamically. Try pasting a direct course page URL instead (e.g. https://university.edu/study/course/bachelor-of-business)." });
       res.end();
       return;
     }
