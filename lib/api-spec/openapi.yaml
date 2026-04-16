@@ -1022,6 +1022,8 @@ components:
           type: integer
         universityName:
           type: ["string", "null"]
+        city:
+          type: ["string", "null"]
         name:
           type: string
         category:
@@ -1056,6 +1058,72 @@ components:
           type: ["string", "null"]
         status:
           type: string
+        intakeMonths:
+          type: ["string", "null"]
+        intakeDays:
+          type: ["string", "null"]
+        internationalFee:
+          type: ["number", "null"]
+        feeTerm:
+          type: ["string", "null"]
+        feeYear:
+          type: ["integer", "null"]
+        currency:
+          type: ["string", "null"]
+        ieltsListening:
+          type: ["number", "null"]
+        ieltsSpeaking:
+          type: ["number", "null"]
+        ieltsWriting:
+          type: ["number", "null"]
+        ieltsReading:
+          type: ["number", "null"]
+        ieltsOverall:
+          type: ["number", "null"]
+        pteListening:
+          type: ["number", "null"]
+        pteSpeaking:
+          type: ["number", "null"]
+        pteWriting:
+          type: ["number", "null"]
+        pteReading:
+          type: ["number", "null"]
+        pteOverall:
+          type: ["number", "null"]
+        toeflListening:
+          type: ["number", "null"]
+        toeflSpeaking:
+          type: ["number", "null"]
+        toeflWriting:
+          type: ["number", "null"]
+        toeflReading:
+          type: ["number", "null"]
+        toeflOverall:
+          type: ["number", "null"]
+        otherEnglishTestName:
+          type: ["string", "null"]
+        otherEnglishReading:
+          type: ["number", "null"]
+        otherEnglishListening:
+          type: ["number", "null"]
+        otherEnglishSpeaking:
+          type: ["number", "null"]
+        otherEnglishWriting:
+          type: ["number", "null"]
+        otherEnglishOverall:
+          type: ["number", "null"]
+        academicLevel:
+          type: ["string", "null"]
+        academicScore:
+          type: ["number", "null"]
+        scoreType:
+          type: ["string", "null"]
+        academicCountry:
+          type: ["string", "null"]
+        scholarshipDetails:
+          type: ["string", "null"]
+        scholarshipEligibility:
+          type: ["string", "null"]
         createdAt:
           type: string
         updatedAt:

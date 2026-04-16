@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, type SQL } from "drizzle-orm";
-import { db, coursesTable, universitiesTable, intakesTable, feesTable, englishRequirementsTable, academicRequirementsTable, scholarshipsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, pool, coursesTable, universitiesTable, intakesTable, feesTable, englishRequirementsTable, academicRequirementsTable, scholarshipsTable } from "@workspace/db";
 import {
   ListCoursesQueryParams,
   CreateCourseBody,
@@ -19,49 +19,84 @@ router.get("/courses", async (req, res): Promise<void> => {
     return;
   }
   const { search, universityId, category, subCategory, degreeLevel, studyMode, page = 1, limit = 20 } = query.data;
-  const conditions: SQL[] = [];
-  if (search) conditions.push(ilike(coursesTable.name, `%${search}%`));
-  if (universityId) conditions.push(eq(coursesTable.universityId, universityId));
-  if (category) conditions.push(ilike(coursesTable.category, `%${category}%`));
-  if (subCategory) conditions.push(ilike(coursesTable.subCategory, `%${subCategory}%`));
-  if (degreeLevel) conditions.push(eq(coursesTable.degreeLevel, degreeLevel));
-  if (studyMode) conditions.push(eq(coursesTable.studyMode, studyMode));
+  const pageNum = page ?? 1;
+  const limitNum = limit ?? 20;
+  const offset = (pageNum - 1) * limitNum;
 
-  const offset = ((page ?? 1) - 1) * (limit ?? 20);
-  const [rows, countRows] = await Promise.all([
-    db
-      .select({
-        id: coursesTable.id,
-        universityId: coursesTable.universityId,
-        universityName: universitiesTable.name,
-        name: coursesTable.name,
-        category: coursesTable.category,
-        subCategory: coursesTable.subCategory,
-        courseWebsite: coursesTable.courseWebsite,
-        duration: coursesTable.duration,
-        durationTerm: coursesTable.durationTerm,
-        studyMode: coursesTable.studyMode,
-        degreeLevel: coursesTable.degreeLevel,
-        studyLoad: coursesTable.studyLoad,
-        language: coursesTable.language,
-        description: coursesTable.description,
-        courseStructure: coursesTable.courseStructure,
-        careerOutcomes: coursesTable.careerOutcomes,
-        otherTest: coursesTable.otherTest,
-        otherTestScore: coursesTable.otherTestScore,
-        otherRequirement: coursesTable.otherRequirement,
-        status: coursesTable.status,
-        createdAt: coursesTable.createdAt,
-        updatedAt: coursesTable.updatedAt,
-      })
-      .from(coursesTable)
-      .leftJoin(universitiesTable, eq(coursesTable.universityId, universitiesTable.id))
-      .where(conditions.length ? and(...conditions) : undefined)
-      .limit(limit ?? 20)
-      .offset(offset),
-    db.select({ id: coursesTable.id }).from(coursesTable).where(conditions.length ? and(...conditions) : undefined),
+  const whereClauses: string[] = [];
+  const params: unknown[] = [];
+  let pIdx = 1;
+
+  if (search) { whereClauses.push(`c.name ILIKE $${pIdx++}`); params.push(`%${search}%`); }
+  if (universityId) { whereClauses.push(`c.university_id = $${pIdx++}`); params.push(universityId); }
+  if (category) { whereClauses.push(`c.category ILIKE $${pIdx++}`); params.push(`%${category}%`); }
+  if (subCategory) { whereClauses.push(`c.sub_category ILIKE $${pIdx++}`); params.push(`%${subCategory}%`); }
+  if (degreeLevel) { whereClauses.push(`c.degree_level = $${pIdx++}`); params.push(degreeLevel); }
+  if (studyMode) { whereClauses.push(`c.study_mode = $${pIdx++}`); params.push(studyMode); }
+
+  const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+  const dataQuery = `
+    SELECT
+      c.id, c.university_id AS "universityId", u.name AS "universityName", u.city,
+      c.name, c.category, c.sub_category AS "subCategory", c.course_website AS "courseWebsite",
+      c.duration, c.duration_term AS "durationTerm", c.study_mode AS "studyMode",
+      c.degree_level AS "degreeLevel", c.study_load AS "studyLoad", c.language,
+      c.description, c.course_structure AS "courseStructure", c.career_outcomes AS "careerOutcomes",
+      c.other_test AS "otherTest", c.other_test_score AS "otherTestScore",
+      c.other_requirement AS "otherRequirement", c.status, c.created_at AS "createdAt", c.updated_at AS "updatedAt",
+      (SELECT string_agg(DISTINCT i.intake_month, ', ' ORDER BY i.intake_month) FROM intakes i WHERE i.course_id = c.id) AS "intakeMonths",
+      (SELECT string_agg(DISTINCT i.intake_day::text, ', ') FROM intakes i WHERE i.course_id = c.id AND i.intake_day IS NOT NULL) AS "intakeDays",
+      (SELECT f.international_fee FROM fees f WHERE f.course_id = c.id LIMIT 1) AS "internationalFee",
+      (SELECT f.fee_term FROM fees f WHERE f.course_id = c.id LIMIT 1) AS "feeTerm",
+      (SELECT f.fee_year FROM fees f WHERE f.course_id = c.id LIMIT 1) AS "feeYear",
+      (SELECT f.currency FROM fees f WHERE f.course_id = c.id LIMIT 1) AS "currency",
+      (SELECT er.listening FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'IELTS' LIMIT 1) AS "ieltsListening",
+      (SELECT er.speaking FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'IELTS' LIMIT 1) AS "ieltsSpeaking",
+      (SELECT er.writing FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'IELTS' LIMIT 1) AS "ieltsWriting",
+      (SELECT er.reading FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'IELTS' LIMIT 1) AS "ieltsReading",
+      (SELECT er.overall FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'IELTS' LIMIT 1) AS "ieltsOverall",
+      (SELECT er.listening FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'PTE' LIMIT 1) AS "pteListening",
+      (SELECT er.speaking FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'PTE' LIMIT 1) AS "pteSpeaking",
+      (SELECT er.writing FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'PTE' LIMIT 1) AS "pteWriting",
+      (SELECT er.reading FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'PTE' LIMIT 1) AS "pteReading",
+      (SELECT er.overall FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'PTE' LIMIT 1) AS "pteOverall",
+      (SELECT er.listening FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'TOEFL' LIMIT 1) AS "toeflListening",
+      (SELECT er.speaking FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'TOEFL' LIMIT 1) AS "toeflSpeaking",
+      (SELECT er.writing FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'TOEFL' LIMIT 1) AS "toeflWriting",
+      (SELECT er.reading FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'TOEFL' LIMIT 1) AS "toeflReading",
+      (SELECT er.overall FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'TOEFL' LIMIT 1) AS "toeflOverall",
+      (SELECT er.test_name FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishTestName",
+      (SELECT er.reading FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishReading",
+      (SELECT er.listening FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishListening",
+      (SELECT er.speaking FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishSpeaking",
+      (SELECT er.writing FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishWriting",
+      (SELECT er.overall FROM english_requirements er WHERE er.course_id = c.id AND er.test_type = 'Other' LIMIT 1) AS "otherEnglishOverall",
+      (SELECT ar.academic_level FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "academicLevel",
+      (SELECT ar.academic_score FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "academicScore",
+      (SELECT ar.score_type FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "scoreType",
+      (SELECT ar.academic_country FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "academicCountry",
+      (SELECT s.details FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipDetails",
+      (SELECT s.eligibility_criteria FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipEligibility"
+    FROM courses c
+    LEFT JOIN universities u ON c.university_id = u.id
+    ${whereSQL}
+    ORDER BY c.id
+    LIMIT $${pIdx++} OFFSET $${pIdx++}
+  `;
+  const countQuerySQL = `SELECT COUNT(*) FROM courses c LEFT JOIN universities u ON c.university_id = u.id ${whereSQL}`;
+
+  const [dataRows, countRow] = await Promise.all([
+    pool.query(dataQuery, [...params, limitNum, offset]),
+    pool.query(countQuerySQL, params),
   ]);
-  res.json({ data: rows, total: countRows.length, page: page ?? 1, limit: limit ?? 20 });
+
+  res.json({
+    data: dataRows.rows,
+    total: parseInt(countRow.rows[0].count, 10),
+    page: pageNum,
+    limit: limitNum,
+  });
 });
 
 router.post("/courses", async (req, res): Promise<void> => {

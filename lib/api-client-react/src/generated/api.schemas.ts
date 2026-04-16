@@ -69,6 +69,8 @@ export interface Course {
   universityId: number;
   /** @nullable */
   universityName?: string | null;
+  /** @nullable */
+  city?: string | null;
   name: string;
   /** @nullable */
   category?: string | null;
@@ -101,6 +103,72 @@ export interface Course {
   /** @nullable */
   otherRequirement?: string | null;
   status: string;
+  /** @nullable */
+  intakeMonths?: string | null;
+  /** @nullable */
+  intakeDays?: string | null;
+  /** @nullable */
+  internationalFee?: number | null;
+  /** @nullable */
+  feeTerm?: string | null;
+  /** @nullable */
+  feeYear?: number | null;
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  ieltsListening?: number | null;
+  /** @nullable */
+  ieltsSpeaking?: number | null;
+  /** @nullable */
+  ieltsWriting?: number | null;
+  /** @nullable */
+  ieltsReading?: number | null;
+  /** @nullable */
+  ieltsOverall?: number | null;
+  /** @nullable */
+  pteListening?: number | null;
+  /** @nullable */
+  pteSpeaking?: number | null;
+  /** @nullable */
+  pteWriting?: number | null;
+  /** @nullable */
+  pteReading?: number | null;
+  /** @nullable */
+  pteOverall?: number | null;
+  /** @nullable */
+  toeflListening?: number | null;
+  /** @nullable */
+  toeflSpeaking?: number | null;
+  /** @nullable */
+  toeflWriting?: number | null;
+  /** @nullable */
+  toeflReading?: number | null;
+  /** @nullable */
+  toeflOverall?: number | null;
+  /** @nullable */
+  otherEnglishTestName?: string | null;
+  /** @nullable */
+  otherEnglishReading?: number | null;
+  /** @nullable */
+  otherEnglishListening?: number | null;
+  /** @nullable */
+  otherEnglishSpeaking?: number | null;
+  /** @nullable */
+  otherEnglishWriting?: number | null;
+  /** @nullable */
+  otherEnglishOverall?: number | null;
+  /** @nullable */
+  academicLevel?: string | null;
+  /** @nullable */
+  academicScore?: number | null;
+  /** @nullable */
+  scoreType?: string | null;
+  /** @nullable */
+  academicCountry?: string | null;
+  /** @nullable */
+  scholarshipDetails?: string | null;
+  /** @nullable */
+  scholarshipEligibility?: string | null;
   createdAt: string;
   updatedAt: string;
 }
