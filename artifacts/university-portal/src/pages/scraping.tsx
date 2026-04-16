@@ -76,7 +76,17 @@ type StagedCourse = {
   ieltsWriting: number | null;
   ieltsReading: number | null;
   pteOverall: number | null;
+  pteListening: number | null;
+  pteSpeaking: number | null;
+  pteWriting: number | null;
+  pteReading: number | null;
   toeflOverall: number | null;
+  toeflListening: number | null;
+  toeflSpeaking: number | null;
+  toeflWriting: number | null;
+  toeflReading: number | null;
+  cambridgeOverall: number | null;
+  duolingoOverall: number | null;
   intakeMonths: string[] | null;
   academicLevel: string | null;
   academicScore: number | null;
@@ -666,7 +676,11 @@ export default function Scraping() {
                       <th className="text-left p-2 font-medium text-gray-600">Level</th>
                       <th className="text-left p-2 font-medium text-gray-600">Duration</th>
                       <th className="text-right p-2 font-medium text-gray-600">Intl. Fee</th>
-                      <th className="text-center p-2 font-medium text-gray-600">IELTS</th>
+                      <th className="text-center p-2 font-medium text-purple-600">IELTS</th>
+                      <th className="text-center p-2 font-medium text-orange-600">PTE</th>
+                      <th className="text-center p-2 font-medium text-rose-600">TOEFL</th>
+                      <th className="text-center p-2 font-medium text-teal-600">CAE</th>
+                      <th className="text-center p-2 font-medium text-emerald-600">DET</th>
                       <th className="text-left p-2 font-medium text-gray-600">Intakes</th>
                       <th className="text-left p-2 font-medium text-gray-600">Mode</th>
                       <th className="text-center p-2 font-medium text-gray-600 w-[120px]">Actions</th>
@@ -710,7 +724,27 @@ export default function Scraping() {
                         </td>
                         <td className="p-2 text-center">
                           {course.ieltsOverall ? (
-                            <span className="text-blue-700 font-medium">{course.ieltsOverall}</span>
+                            <span className="text-purple-700 font-medium">{course.ieltsOverall}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.pteOverall ? (
+                            <span className="text-orange-600 font-medium">{course.pteOverall}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.toeflOverall ? (
+                            <span className="text-rose-600 font-medium">{course.toeflOverall}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.cambridgeOverall ? (
+                            <span className="text-teal-600 font-medium">{course.cambridgeOverall}</span>
+                          ) : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-center">
+                          {course.duolingoOverall ? (
+                            <span className="text-emerald-600 font-medium">{course.duolingoOverall}</span>
                           ) : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
@@ -897,13 +931,66 @@ export default function Scraping() {
                   <Input type="number" step="0.5" value={editingCourse.ieltsSpeaking ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, ieltsSpeaking: e.target.value ? parseFloat(e.target.value) : null })} />
                 </div>
               </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-orange-600 mb-2">PTE Academic</h4>
+              </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">PTE Overall</label>
                 <Input type="number" value={editingCourse.pteOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteOverall: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">L</label>
+                  <Input type="number" value={editingCourse.pteListening ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteListening: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">R</label>
+                  <Input type="number" value={editingCourse.pteReading ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteReading: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">W</label>
+                  <Input type="number" value={editingCourse.pteWriting ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteWriting: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">S</label>
+                  <Input type="number" value={editingCourse.pteSpeaking ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, pteSpeaking: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+              </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-rose-600 mb-2">TOEFL iBT</h4>
+              </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">TOEFL Overall</label>
                 <Input type="number" value={editingCourse.toeflOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflOverall: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">L</label>
+                  <Input type="number" value={editingCourse.toeflListening ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflListening: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">R</label>
+                  <Input type="number" value={editingCourse.toeflReading ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflReading: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">W</label>
+                  <Input type="number" value={editingCourse.toeflWriting ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflWriting: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">S</label>
+                  <Input type="number" value={editingCourse.toeflSpeaking ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, toeflSpeaking: e.target.value ? parseFloat(e.target.value) : null })} />
+                </div>
+              </div>
+              <div className="col-span-2 border-t pt-3">
+                <h4 className="text-sm font-semibold text-teal-600 mb-2">Cambridge & Duolingo</h4>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Cambridge CAE Overall</label>
+                <Input type="number" value={editingCourse.cambridgeOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, cambridgeOverall: e.target.value ? parseFloat(e.target.value) : null })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Duolingo Overall</label>
+                <Input type="number" value={editingCourse.duolingoOverall ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, duolingoOverall: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="col-span-2 border-t pt-3">
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Other</h4>
