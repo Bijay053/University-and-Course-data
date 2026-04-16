@@ -90,3 +90,13 @@ All routes served at `/api/...`:
 - Model chain: `gemini-2.5-flash` -> `gemini-2.0-flash-001` -> `gemini-2.0-flash-lite-001` (auto-fallback on 429/503/404)
 - Used by AI web scraper: cheerio extracts data first (zero AI cost), AI used as fallback
 - Scraper saves to `scraped_courses` staging table for review before approval to live `courses` table
+
+## Scraper Capabilities
+
+- **Link discovery**: AI analysis + HTML/cheerio fallback merged together (finds all courses even if AI misses some)
+- **Tab content preservation**: Does not remove hidden tab panes (Webflow w-tab-pane etc.), captures all course page tabs
+- **PDF fee extraction**: Detects fee schedule PDF links and uses Gemini multimodal to extract international fees from PDFs
+- **Image analysis**: Detects images with IELTS/fee data in filenames, downloads and sends to Gemini multimodal for extraction
+- **Graceful degradation**: If AI analysis fails (rate limit), falls back to cheerio-only HTML link scanning
+- **Related page enrichment**: Follows fee, requirements, and entry links to gather missing data
+- **International fees only**: All fee extraction (cheerio, AI, PDF) enforces international-student-only rule

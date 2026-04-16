@@ -142,11 +142,11 @@ async function fetchPage(url: string): Promise<string> {
 
 function extractCompactContent(html: string, url: string): string {
   const $ = cheerio.load(html);
-  $("script, style, noscript, iframe, svg, nav, footer, header, .cookie, .chat, .popup").remove();
-  $("[style*='display:none'], [style*='display: none'], .hidden, [aria-hidden='true']").remove();
+  $("script, style, noscript, iframe, svg, .cookie, .chat, .popup").remove();
+  $(".hidden:not(.w-tab-pane):not([class*='tab']), [aria-hidden='true']:not([class*='tab'])").remove();
 
   const sections: string[] = [];
-  const mainContent = $("main, [role='main'], .content, .course-detail, .course-info, article").first();
+  const mainContent = $("main, [role='main'], .content, .course-detail, .course-info, article, .w-tab-content, .tab-content").first();
   const target = mainContent.length ? mainContent : $("body");
 
   target.find("h1, h2, h3, h4").each((_, el) => {
@@ -177,10 +177,29 @@ function extractCompactContent(html: string, url: string): string {
 
   let result = sections.join("\n\n");
   if (result.length < 200) {
-    result = target.text().replace(/\s+/g, " ").trim().slice(0, 4000);
+    result = target.text().replace(/\s+/g, " ").trim().slice(0, 8000);
   }
 
-  return `URL: ${url}\n\n${result.slice(0, 5000)}`;
+  const imgNotes: string[] = [];
+  $("img[src]").each((_, el) => {
+    const src = $(el).attr("src") || "";
+    if (/fee|ielts|english|requirement|tuition/i.test(src)) {
+      imgNotes.push(`[IMAGE: ${src}]`);
+    }
+  });
+
+  const pdfNotes: string[] = [];
+  $("a[href*='.pdf']").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const text = $(el).text().trim();
+    if (/fee|tuition|international|price/i.test(href + " " + text)) {
+      pdfNotes.push(`[PDF LINK: ${text} -> ${href}]`);
+    }
+  });
+
+  const extra = [...imgNotes, ...pdfNotes].join("\n");
+
+  return `URL: ${url}\n\n${result.slice(0, 8000)}${extra ? "\n\nNOTES:\n" + extra : ""}`;
 }
 
 function extractFullPageContent(html: string, url: string): string {
@@ -205,21 +224,25 @@ function extractFullPageContent(html: string, url: string): string {
   return `URL: ${url}\n\nPAGE TEXT:\n${bodyText.slice(0, 12000)}\n\nLINKS ON PAGE:\n${links.slice(0, 150).join("\n")}`;
 }
 
-function findRelatedPages(html: string, courseUrl: string): { fees?: string; requirements?: string; entry?: string } {
+function findRelatedPages(html: string, courseUrl: string): { fees?: string; requirements?: string; entry?: string; feesPdf?: string } {
   const $ = cheerio.load(html);
   const origin = new URL(courseUrl).origin;
-  const result: { fees?: string; requirements?: string; entry?: string } = {};
+  const result: { fees?: string; requirements?: string; entry?: string; feesPdf?: string } = {};
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href") || "";
     const text = $(el).text().trim().toLowerCase();
     try {
-      const fullUrl = new URL(href, origin).toString();
+      const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
       if (!fullUrl.startsWith("http")) return;
+
+      if (!result.feesPdf && /\.pdf/i.test(fullUrl) && /fee|tuition|international/i.test(fullUrl + " " + text)) {
+        result.feesPdf = fullUrl;
+      }
 
       if (!result.fees && (
         /\b(international|overseas)\s*(fee|tuition|cost)/i.test(text) ||
-        (/\b(fee|tuition|cost)/i.test(text) && !/domestic/i.test(text))
+        (/\b(fee|tuition|cost|pricing)/i.test(text) && !/domestic/i.test(text))
       )) {
         result.fees = fullUrl;
       }
@@ -233,6 +256,25 @@ function findRelatedPages(html: string, courseUrl: string): { fees?: string; req
   });
 
   return result;
+}
+
+function findImageUrls(html: string, courseUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const origin = new URL(courseUrl).origin;
+  const images: string[] = [];
+
+  $("img[src]").each((_, el) => {
+    const src = $(el).attr("src") || "";
+    const alt = ($(el).attr("alt") || "").toLowerCase();
+    try {
+      const fullUrl = src.startsWith("http") ? src : new URL(src, origin).toString();
+      if (/fee|ielts|english|requirement|tuition|pte|toefl/i.test(fullUrl + " " + alt)) {
+        images.push(fullUrl);
+      }
+    } catch {}
+  });
+
+  return images;
 }
 
 function extractWithCheerio(html: string, url: string, name: string): Partial<CourseData> {
@@ -353,18 +395,123 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
 function extractIntakeMonths(text: string, data: Partial<CourseData>) {
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const intakeMonths: string[] = [];
-  const intakeSection = text.match(/(?:intake|start|commencement|commence|entry)[^.]*?(January|February|March|April|May|June|July|August|September|October|November|December)/gi);
-  if (intakeSection) {
-    for (const section of intakeSection) {
+
+  const intakeSections = text.match(/(?:intake|start\s*date|commencement|commence|entry\s*point|intake\s*option)[^]*?(?:\n\n|See\s|$)/gi);
+  if (intakeSections) {
+    for (const section of intakeSections) {
       for (const m of months) {
         if (section.toLowerCase().includes(m.toLowerCase()) && !intakeMonths.includes(m)) intakeMonths.push(m);
       }
     }
   }
+
+  if (intakeMonths.length === 0) {
+    const monthListPattern = text.match(/(?:intake|start|commencement)[^.]{0,100}?((?:(?:January|February|March|April|May|June|July|August|September|October|November|December)[\s,/and]*)+)/gi);
+    if (monthListPattern) {
+      for (const section of monthListPattern) {
+        for (const m of months) {
+          if (section.toLowerCase().includes(m.toLowerCase()) && !intakeMonths.includes(m)) intakeMonths.push(m);
+        }
+      }
+    }
+  }
+
   if (intakeMonths.length > 0) data.intakeMonths = intakeMonths;
 }
 
-async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPages: { fees?: string; requirements?: string; entry?: string }) {
+async function analyzeImageWithGemini(imageUrl: string, context: string): Promise<Partial<CourseData>> {
+  if (!GEMINI_API_KEY) return {};
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const resp = await fetch(imageUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return {};
+    const buffer = await resp.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const mimeType = resp.headers.get("content-type") || "image/png";
+
+    const prompt = `Extract English language requirements and/or fees from this image. ${context}
+Return JSON with ONLY the fields you find:
+{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"toeflOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Total|Semester|Per Unit>"}
+Use null for missing fields. Only include INTERNATIONAL student fees.`;
+
+    const body = JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64 } },
+        ],
+      }],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
+    });
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const apiResp = await fetch(geminiUrl(model), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
+        if (!apiResp.ok) continue;
+        const data = await apiResp.json() as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return JSON.parse(text) as Partial<CourseData>;
+      } catch { continue; }
+    }
+  } catch {}
+  return {};
+}
+
+async function extractFeesFromPdf(pdfUrl: string, courseName: string): Promise<Partial<CourseData>> {
+  if (!GEMINI_API_KEY) return {};
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(pdfUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return {};
+    const ct = resp.headers.get("content-type") || "";
+    if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return {};
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > 5 * 1024 * 1024) return {};
+    const base64 = Buffer.from(buffer).toString("base64");
+
+    const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
+Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Total|Semester|Per Unit>","feeYear":<year>}
+Use null for missing fields. Only include INTERNATIONAL fees.`;
+
+    const body = JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: "application/pdf", data: base64 } },
+        ],
+      }],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
+    });
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const apiResp = await fetch(geminiUrl(model), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
+        if (!apiResp.ok) continue;
+        const data = await apiResp.json() as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return JSON.parse(text) as Partial<CourseData>;
+      } catch { continue; }
+    }
+  } catch {}
+  return {};
+}
+
+async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPages: { fees?: string; requirements?: string; entry?: string; feesPdf?: string }, html?: string, courseUrl?: string) {
   const needsFees = !courseData.internationalFee;
   const needsEnglish = !courseData.ieltsOverall;
 
@@ -376,8 +523,8 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
 
   for (const page of pagesToFetch) {
     try {
-      const html = await fetchPage(page.url);
-      const text = cheerio.load(html)("body").text();
+      const pHtml = await fetchPage(page.url);
+      const text = cheerio.load(pHtml)("body").text();
 
       if (page.type === "fees" || page.type === "requirements") {
         if (!courseData.internationalFee) extractInternationalFees(text, courseData);
@@ -387,6 +534,47 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
       }
       if (!courseData.intakeMonths?.length) extractIntakeMonths(text, courseData);
     } catch {}
+  }
+
+  if (needsFees && relatedPages.feesPdf && !courseData.internationalFee) {
+    try {
+      const pdfData = await extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "");
+      if (pdfData.internationalFee) {
+        courseData.internationalFee = pdfData.internationalFee;
+        courseData.currency = pdfData.currency || "AUD";
+        courseData.feeTerm = pdfData.feeTerm || "Annual";
+        courseData.feeYear = pdfData.feeYear || undefined;
+      }
+    } catch {}
+  }
+
+  if (needsEnglish && !courseData.ieltsOverall && html && courseUrl) {
+    const images = findImageUrls(html, courseUrl);
+    for (const imgUrl of images.slice(0, 3)) {
+      try {
+        const imgData = await analyzeImageWithGemini(imgUrl, `Course: ${courseData.courseName}`);
+        let foundAnything = false;
+        if (imgData.ieltsOverall && typeof imgData.ieltsOverall === "number" && imgData.ieltsOverall >= 4 && imgData.ieltsOverall <= 9) {
+          courseData.ieltsOverall = imgData.ieltsOverall;
+          foundAnything = true;
+        }
+        const numFields = ["ieltsListening", "ieltsSpeaking", "ieltsWriting", "ieltsReading", "pteOverall", "toeflOverall"] as const;
+        for (const f of numFields) {
+          const v = imgData[f];
+          if (v && typeof v === "number" && v > 0) {
+            (courseData as any)[f] = v;
+            foundAnything = true;
+          }
+        }
+        if (imgData.internationalFee && typeof imgData.internationalFee === "number" && imgData.internationalFee > 1000 && !courseData.internationalFee) {
+          courseData.internationalFee = imgData.internationalFee;
+          courseData.currency = imgData.currency || "AUD";
+          courseData.feeTerm = imgData.feeTerm || "Annual";
+          foundAnything = true;
+        }
+        if (foundAnything) break;
+      } catch {}
+    }
   }
 }
 
@@ -433,7 +621,12 @@ async function batchClassify(courses: { index: number; name: string; existing: P
   return result;
 }
 
-const SINGLE_EXTRACT_PROMPT = `Extract course data from this page. ONLY extract INTERNATIONAL student fees, NEVER domestic fees. If only domestic fees are shown, set internationalFee to null.
+const SINGLE_EXTRACT_PROMPT = `Extract course data from this university course page. IMPORTANT RULES:
+1. ONLY extract INTERNATIONAL student fees, NEVER domestic/local fees. If only domestic fees shown, set internationalFee to null.
+2. Look for ALL tab sections (Course Overview, Entry Requirements, Fees, Course Structure etc.) - data may be spread across tabs.
+3. Look for fee links (PDFs, fee schedule links) - if you see a link to a fee schedule, note the URL.
+4. Look for intake months (January, February, etc.), duration, study mode, and location.
+5. Extract English requirements (IELTS, PTE, TOEFL scores) if visible in text - they may be in images which you cannot read.
 
 Return JSON:
 {
@@ -447,7 +640,7 @@ Return JSON:
   "degreeLevel": "<Bachelor|Master|PhD|Certificate & Diploma|Graduate Certificate & Diploma|Associate Degree|Equivalent>",
   "studyLoad": "<Full Time|Part Time>",
   "internationalFee": <INTERNATIONAL fee number only|null>,
-  "feeTerm": "<Annual|Total|Semester>",
+  "feeTerm": "<Annual|Total|Semester|Per Unit>",
   "currency": "<AUD|GBP|USD>",
   "ieltsOverall": <number|null>, "ieltsListening": <number|null>, "ieltsSpeaking": <number|null>, "ieltsWriting": <number|null>, "ieltsReading": <number|null>,
   "pteOverall": <number|null>, "toeflOverall": <number|null>,
@@ -673,9 +866,15 @@ async function scrapeCourseBatch(
       const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
 
       const relatedPages = findRelatedPages(cHtml, link.url);
-      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
-        addLog(job, "status", { message: `Checking related pages for ${link.name}...`, phase: "enrich" });
-        await enrichFromRelatedPages(cheerioData, relatedPages);
+      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+        addLog(job, "status", { message: `Checking related pages/PDFs for ${link.name}...`, phase: "enrich" });
+        await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
+      } else if (!cheerioData.ieltsOverall || !cheerioData.internationalFee) {
+        const images = findImageUrls(cHtml, link.url);
+        if (images.length > 0) {
+          addLog(job, "status", { message: `Analyzing images for data in ${link.name}...`, phase: "enrich" });
+          await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
+        }
       }
 
       const hasFees = !!cheerioData.internationalFee;
@@ -709,13 +908,50 @@ async function scrapeCourseBatch(
         classifyBatch.push({ index: i, name: link.name, existing: courseData });
         pendingCourses.push({ index: i, data: courseData });
       } else {
-        const compactContent = extractCompactContent(cHtml, link.url);
-        const cData = await extractCourseFromPage(compactContent, link.name);
+        let cData: CourseData | null = null;
+        try {
+          const compactContent = extractCompactContent(cHtml, link.url);
+          cData = await extractCourseFromPage(compactContent, link.name);
+        } catch (aiErr) {
+          console.log(`AI extraction failed for ${link.name}: ${(aiErr as Error).message}`);
+        }
+
         if (cData) {
+          for (const [key, val] of Object.entries(cheerioData)) {
+            if (val !== undefined && val !== null && !(cData as any)[key]) {
+              (cData as any)[key] = val;
+            }
+          }
           cData.courseWebsite = cData.courseWebsite || link.url;
           const saved = await stageCourse(cData, uniId, jobId);
           if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: i + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
+        } else if (cheerioData.courseName || link.name) {
+          const fallbackData: CourseData = {
+            courseName: cheerioData.courseName || link.name,
+            courseWebsite: link.url,
+            duration: cheerioData.duration,
+            durationTerm: cheerioData.durationTerm,
+            studyMode: cheerioData.studyMode,
+            degreeLevel: cheerioData.degreeLevel,
+            studyLoad: cheerioData.studyLoad,
+            language: cheerioData.language || "English",
+            description: cheerioData.description,
+            internationalFee: cheerioData.internationalFee,
+            feeTerm: cheerioData.feeTerm,
+            currency: cheerioData.currency,
+            ieltsOverall: cheerioData.ieltsOverall,
+            ieltsListening: cheerioData.ieltsListening,
+            ieltsSpeaking: cheerioData.ieltsSpeaking,
+            ieltsWriting: cheerioData.ieltsWriting,
+            ieltsReading: cheerioData.ieltsReading,
+            pteOverall: cheerioData.pteOverall,
+            toeflOverall: cheerioData.toeflOverall,
+            intakeMonths: cheerioData.intakeMonths,
+          };
+          const saved = await stageCourse(fallbackData, uniId, jobId);
+          if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: i + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: i + 1 }); }
         } else {
           job.errors++;
           addLog(job, "course", { name: link.name, status: "error", message: "Could not extract data", index: i + 1 });
@@ -768,7 +1004,13 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
     addLog(job, "status", { message: "Analyzing page with AI (1 call)...", phase: "analyze" });
     const pageContent = extractFullPageContent(html, url);
-    const analysis = await analyzePage(pageContent);
+    let analysis: { pageType: string; courseLinks?: { url: string; name: string }[] };
+    try {
+      analysis = await analyzePage(pageContent);
+    } catch (err) {
+      addLog(job, "status", { message: `AI analysis failed (${(err as Error).message}). Falling back to HTML scan...`, phase: "fallback" });
+      analysis = { pageType: "unknown" };
+    }
 
     if (analysis.pageType === "unknown") {
       addLog(job, "status", { message: "No course data in static HTML. Discovering hidden API endpoints...", phase: "discover" });
@@ -829,9 +1071,12 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const cheerioData = extractWithCheerio(html, url, "");
 
       const relatedPages = findRelatedPages(html, url);
-      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
-        addLog(job, "status", { message: "Checking related pages for fees/requirements...", phase: "enrich" });
-        await enrichFromRelatedPages(cheerioData, relatedPages);
+      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+        addLog(job, "status", { message: "Checking related pages/PDFs for fees/requirements...", phase: "enrich" });
+        await enrichFromRelatedPages(cheerioData, relatedPages, html, url);
+      } else if (!cheerioData.ieltsOverall || !cheerioData.internationalFee) {
+        addLog(job, "status", { message: "Analyzing images for data...", phase: "enrich" });
+        await enrichFromRelatedPages(cheerioData, relatedPages, html, url);
       }
 
       const compactContent = extractCompactContent(html, url);
@@ -858,9 +1103,32 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     }
 
     if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
-      const courseLinks = analysis.courseLinks.filter((l) => l.url && l.name);
-      addLog(job, "status", { message: `Found ${courseLinks.length} courses. Extracting...`, phase: "extract", totalCourses: courseLinks.length });
-      await scrapeCourseBatch(courseLinks, uniId, job, 200, jobId);
+      const aiLinks = analysis.courseLinks.filter((l) => l.url && l.name);
+      const seen = new Set(aiLinks.map((l) => l.url));
+
+      const $ = cheerio.load(html);
+      $("a[href]").each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const text = $(el).text().trim();
+        try {
+          const fullUrl = new URL(href, new URL(url).origin).toString();
+          const lower = fullUrl.toLowerCase();
+          if (
+            text.length > 5 && text.length < 200 && !seen.has(fullUrl) &&
+            (lower.includes("/course") || lower.includes("/program") || lower.includes("/bachelor") ||
+             lower.includes("/master") || lower.includes("/diploma") || lower.includes("/study/") ||
+             lower.includes("/graduate") || lower.includes("/certificate") || lower.includes("/degree") ||
+             /\b(ba|bsc|ma|msc|mba|phd|bed|beng|llb)\b/i.test(text) ||
+             /\b(bachelor|master|graduate|diploma|certificate)\b/i.test(text))
+          ) {
+            seen.add(fullUrl);
+            aiLinks.push({ url: fullUrl, name: text.replace(/\s+/g, " ") });
+          }
+        } catch {}
+      });
+
+      addLog(job, "status", { message: `Found ${aiLinks.length} courses (AI + HTML scan). Extracting...`, phase: "extract", totalCourses: aiLinks.length });
+      await scrapeCourseBatch(aiLinks, uniId, job, 200, jobId);
       addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
       job.status = "completed";
       job.completedAt = Date.now();
