@@ -1031,47 +1031,98 @@ function isCourseText(text: string): boolean {
     /\b(ba|bsc|ma|msc|mba|bed|beng|llb|med)\b/i.test(text);
 }
 
+function sitemapLocToCourseName(loc: string): string {
+  const pathParts = new URL(loc).pathname.split("/").filter(Boolean);
+  return pathParts[pathParts.length - 1]
+    .replace(/\?.*$/, "")
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+function isNestedSitemapLoc(loc: string): boolean {
+  return /sitemap/i.test(loc) || loc.endsWith(".xml");
+}
+
+function normalizeSitemapUrl(loc: string): string {
+  try {
+    const u = new URL(loc);
+    const DROP_PARAMS = ["students", "audience", "mode", "view", "tab", "ref"];
+    DROP_PARAMS.forEach((p) => u.searchParams.delete(p));
+    if (!u.search) u.search = "";
+    return u.toString();
+  } catch {
+    return loc;
+  }
+}
+
+async function fetchAndParseSitemapForCourses(sitemapUrl: string, seen: Set<string>): Promise<{ url: string; name: string }[]> {
+  const courses: { url: string; name: string }[] = [];
+  try {
+    const content = await fetchPage(sitemapUrl);
+    if (!content.includes("<urlset") && !content.includes("<sitemapindex")) return courses;
+    const locs = [...content.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1].trim());
+    for (const rawLoc of locs) {
+      const loc = normalizeSitemapUrl(rawLoc);
+      if (seen.has(loc)) continue;
+      if (isNestedSitemapLoc(loc)) continue;
+      if (isCourseUrl(loc)) {
+        seen.add(loc);
+        const name = sitemapLocToCourseName(loc);
+        if (!isJunkCourseName(name)) {
+          courses.push({ url: loc, name });
+        }
+      }
+    }
+  } catch {}
+  return courses;
+}
+
 async function discoverCourseLinksFromSitemap(origin: string, job: ScrapeJob): Promise<{ url: string; name: string }[]> {
   const courses: { url: string; name: string }[] = [];
   const seen = new Set<string>();
 
-  try {
-    const sitemapUrls = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
+  const sitemapIndexUrls = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
 
-    for (const smUrl of sitemapUrls) {
-      try {
-        const xml = await fetchPage(smUrl);
+  for (const smUrl of sitemapIndexUrls) {
+    try {
+      const xml = await fetchPage(smUrl);
+      if (!xml.includes("<")) continue;
 
-        const nestedSitemaps = [...xml.matchAll(/<loc>([^<]+\.xml[^<]*)<\/loc>/gi)].map(m => m[1]);
-        const allXmls = nestedSitemaps.length > 0 ? nestedSitemaps : [smUrl];
+      const allLocs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1].trim());
 
-        for (const sitemapFile of allXmls) {
-          try {
-            const content = sitemapFile === smUrl ? xml : await fetchPage(sitemapFile);
-            const locs = [...content.matchAll(/<loc>([^<]+)<\/loc>/gi)].map(m => m[1]);
+      const nestedSitemaps = allLocs.filter((loc) => isNestedSitemapLoc(loc));
 
-            for (const loc of locs) {
-              if (seen.has(loc)) continue;
-              if (isCourseUrl(loc)) {
-                seen.add(loc);
-                const pathParts = new URL(loc).pathname.split("/").filter(Boolean);
-                const rawName = pathParts[pathParts.length - 1]
-                  .replace(/[-_]/g, " ")
-                  .replace(/\b\w/g, c => c.toUpperCase());
-                if (!isJunkCourseName(rawName)) {
-                  courses.push({ url: loc, name: rawName });
-                }
-              }
-            }
-          } catch {}
+      if (nestedSitemaps.length > 0) {
+        addLog(job, "status", { message: `Sitemap index: checking ${nestedSitemaps.length} sub-sitemaps...`, phase: "discover" });
+        for (const nestedUrl of nestedSitemaps) {
+          if (seen.has(nestedUrl)) continue;
+          seen.add(nestedUrl);
+          const found = await fetchAndParseSitemapForCourses(nestedUrl, seen);
+          if (found.length > 0) {
+            addLog(job, "status", { message: `Sub-sitemap ${nestedUrl.split("/").slice(-2).join("/")} → ${found.length} courses`, phase: "discover" });
+            courses.push(...found);
+          }
         }
-        if (courses.length > 0) break;
-      } catch {}
-    }
-  } catch {}
+      }
+
+      for (const loc of allLocs) {
+        if (seen.has(loc) || isNestedSitemapLoc(loc)) continue;
+        if (isCourseUrl(loc)) {
+          seen.add(loc);
+          const name = sitemapLocToCourseName(loc);
+          if (!isJunkCourseName(name)) {
+            courses.push({ url: loc, name });
+          }
+        }
+      }
+
+      if (courses.length > 0) break;
+    } catch {}
+  }
 
   if (courses.length > 0) {
-    addLog(job, "status", { message: `Sitemap: found ${courses.length} course URLs`, phase: "discover" });
+    addLog(job, "status", { message: `Sitemap: found ${courses.length} course URLs total`, phase: "discover" });
   }
   return courses;
 }
@@ -1188,6 +1239,203 @@ async function discoverAllCourseLinks(
   }
 
   return allCourses;
+}
+
+async function followPaginatedListing(
+  listingUrl: string,
+  firstPageHtml: string,
+  job: ScrapeJob,
+  initialLinks: { url: string; name: string }[]
+): Promise<{ url: string; name: string }[]> {
+  const origin = new URL(listingUrl).origin;
+  const seen = new Set<string>(initialLinks.map((l) => l.url));
+  const allCourses: { url: string; name: string }[] = [...initialLinks];
+
+  const $ = cheerio.load(firstPageHtml);
+
+  const totalText = $("body").text().match(/showing\s+[\d,]+\s*[-–]\s*[\d,]+\s+of\s+([\d,]+)/i);
+  const totalCount = totalText ? parseInt(totalText[1].replace(/,/g, "")) : 0;
+
+  const nextLinks: Set<string> = new Set();
+
+  $("a[href], link[rel='next']").each((_, el) => {
+    const rel = $(el).attr("rel") || "";
+    const href = $(el).attr("href") || "";
+    if (rel === "next" && href) {
+      try { nextLinks.add(new URL(href, origin).toString()); } catch {}
+    }
+  });
+
+  if (nextLinks.size === 0) {
+    const base = new URL(listingUrl);
+    const pageParam = base.searchParams.get("page") || base.searchParams.get("pg") ||
+      base.searchParams.get("p") || base.searchParams.get("offset");
+    const perPage = initialLinks.length || 10;
+
+    if (totalCount > perPage) {
+      const totalPages = Math.ceil(totalCount / perPage);
+      const limitPages = Math.min(totalPages, 100);
+      addLog(job, "status", { message: `Detected ${totalCount} total courses across ~${totalPages} pages. Following pagination...`, phase: "discover" });
+
+      for (let p = 2; p <= limitPages; p++) {
+        if (job.stopped) break;
+
+        let pageUrl = "";
+        const pathPageMatch = listingUrl.match(/(.+\/page\/)(\d+)(\/?.*)$/);
+        if (pathPageMatch) {
+          pageUrl = `${pathPageMatch[1]}${p}${pathPageMatch[3]}`;
+        } else if (base.searchParams.has("page")) {
+          const u = new URL(listingUrl);
+          u.searchParams.set("page", String(p));
+          pageUrl = u.toString();
+        } else if (base.searchParams.has("pg")) {
+          const u = new URL(listingUrl);
+          u.searchParams.set("pg", String(p));
+          pageUrl = u.toString();
+        } else if (base.searchParams.has("start") || base.searchParams.has("offset")) {
+          const u = new URL(listingUrl);
+          const param = base.searchParams.has("start") ? "start" : "offset";
+          u.searchParams.set(param, String((p - 1) * perPage));
+          pageUrl = u.toString();
+        } else {
+          const u = new URL(listingUrl);
+          u.searchParams.set("page", String(p));
+          pageUrl = u.toString();
+        }
+
+        try {
+          addLog(job, "status", { message: `Fetching listing page ${p}/${limitPages}... (${allCourses.length} courses so far)`, phase: "discover" });
+          const pHtml = await fetchPage(pageUrl);
+          const $p = cheerio.load(pHtml);
+
+          $p("a[href]").each((_, el) => {
+            const href = $p(el).attr("href") || "";
+            const text = $p(el).text().trim().replace(/\s+/g, " ");
+            try {
+              const fullUrl = new URL(href, origin).toString();
+              if (!fullUrl.startsWith(origin) || seen.has(fullUrl)) return;
+              if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+                seen.add(fullUrl);
+                allCourses.push({ url: fullUrl, name: text });
+              }
+            } catch {}
+          });
+
+          const $link = $p("a[rel='next']");
+          if (!$link.length) {
+            const pageLinks = $p("a[href]").filter((_, el) => /page[=\/](\d+)/i.test($p(el).attr("href") || ""));
+            const pageNums = pageLinks.map((_, el) => {
+              const m = ($p(el).attr("href") || "").match(/\d+/g);
+              return m ? parseInt(m[m.length - 1]) : 0;
+            }).get();
+            const maxFoundPage = Math.max(...pageNums, 0);
+            if (maxFoundPage < p) break;
+          }
+        } catch { break; }
+
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+  } else {
+    const paginationQueue = [...nextLinks];
+    const visitedPages = new Set([listingUrl]);
+    addLog(job, "status", { message: `Following pagination links...`, phase: "discover" });
+
+    while (paginationQueue.length > 0 && !job.stopped) {
+      const pageUrl = paginationQueue.shift()!;
+      if (visitedPages.has(pageUrl)) continue;
+      visitedPages.add(pageUrl);
+
+      try {
+        const pHtml = await fetchPage(pageUrl);
+        const $p = cheerio.load(pHtml);
+
+        $p("a[href]").each((_, el) => {
+          const href = $p(el).attr("href") || "";
+          const text = $p(el).text().trim().replace(/\s+/g, " ");
+          try {
+            const fullUrl = new URL(href, origin).toString();
+            if (!fullUrl.startsWith(origin) || seen.has(fullUrl)) return;
+            if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+              seen.add(fullUrl);
+              allCourses.push({ url: fullUrl, name: text });
+            }
+            if (href && $p(el).attr("rel") === "next") {
+              paginationQueue.push(fullUrl);
+            }
+          } catch {}
+        });
+      } catch { break; }
+
+      await new Promise((r) => setTimeout(r, 300));
+      if (visitedPages.size > 100) break;
+    }
+  }
+
+  return allCourses;
+}
+
+async function detectCourseListingPage(homeUrl: string, html: string, job: ScrapeJob): Promise<string | null> {
+  const origin = new URL(homeUrl).origin;
+  const $ = cheerio.load(html);
+
+  const strongUrlPatterns = [
+    /\/study\/courses\b/i, /\/courses\/$/i, /\/courses\b/i,
+    /\/programs\b/i, /\/programmes\b/i,
+    /\/find-a-course/i, /\/search.*course/i, /\/course-search/i,
+    /\/undergraduate-courses/i, /\/postgraduate-courses/i,
+    /\/our-courses/i, /\/all-courses/i, /\/browse-courses/i,
+  ];
+
+  const candidates: { url: string; score: number }[] = [];
+
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const text = $(el).text().trim().toLowerCase();
+    try {
+      const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
+      if (!fullUrl.startsWith(origin)) return;
+      const urlLower = fullUrl.toLowerCase();
+
+      let score = 0;
+      if (strongUrlPatterns.some((p) => p.test(urlLower))) score += 3;
+      if (/\b(courses?|programmes?|degrees?)\b/i.test(text)) score += 2;
+      if (/\b(all|search|find|browse|explore|view)\b/i.test(text)) score += 1;
+      if (/\b(study|study with us|our courses)\b/i.test(text)) score += 1;
+
+      if (score >= 3) {
+        candidates.push({ url: fullUrl, score });
+      }
+    } catch {}
+  });
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0].url;
+    addLog(job, "status", { message: `Home page detected → course listing found at ${best}`, phase: "discover" });
+    return best;
+  }
+
+  const commonCoursePaths = [
+    "/study/courses", "/courses", "/programs", "/programmes",
+    "/study/programs", "/undergraduate-courses", "/postgraduate-courses",
+    "/our-courses", "/find-a-course", "/course-search",
+    "/study/undergraduate", "/study/postgraduate", "/academics/programs",
+    "/academics/courses", "/future-students/courses",
+  ];
+
+  for (const path of commonCoursePaths) {
+    try {
+      const testUrl = `${origin}${path}`;
+      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+      if (resp.ok) {
+        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl}`, phase: "discover" });
+        return testUrl;
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise<{ feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string }> {
@@ -1576,6 +1824,21 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
     }
 
+    const urlPath = new URL(resolvedUrl).pathname;
+    const isHomePage = !urlPath || urlPath === "/" || urlPath === "/index.html";
+    if (isHomePage && html) {
+      addLog(job, "status", { message: "Home page detected. Searching for course listing page...", phase: "discover" });
+      const courseListingUrl = await detectCourseListingPage(resolvedUrl, html, job);
+      if (courseListingUrl) {
+        try {
+          const listingHtml = await fetchPage(courseListingUrl);
+          html = listingHtml;
+          resolvedUrl = courseListingUrl;
+          addLog(job, "status", { message: `Switched to course listing: ${courseListingUrl}`, phase: "fetch" });
+        } catch {}
+      }
+    }
+
     addLog(job, "status", { message: "Discovering university-level fee & requirements pages...", phase: "discover" });
     const uniPages = await discoverUniversityPages(resolvedUrl, job);
 
@@ -1673,32 +1936,57 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
     let courseLinks: { url: string; name: string }[] = [];
 
-    if (analysis.pageType === "unknown") {
-      const apiCourses = await tryDiscoverApiEndpoints(html, resolvedUrl, job);
-      if (apiCourses && apiCourses.length > 0) {
-        addLog(job, "status", {
-          message: `Found ${apiCourses.length} courses via hidden API. Extracting details...`,
-          phase: "extract",
-          totalCourses: apiCourses.length,
-        });
-        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
-        addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+    const sitemapCoursesFull = await discoverCourseLinksFromSitemap(origin, job);
+    if (sitemapCoursesFull.length >= 10) {
+      addLog(job, "status", { message: `Using ${sitemapCoursesFull.length} courses from sitemap (comprehensive source).`, phase: "discover" });
+      courseLinks = sitemapCoursesFull;
+    } else {
+      if (analysis.pageType === "unknown") {
+        const apiCourses = await tryDiscoverApiEndpoints(html, resolvedUrl, job);
+        if (apiCourses && apiCourses.length > 0) {
+          addLog(job, "status", {
+            message: `Found ${apiCourses.length} courses via hidden API. Extracting details...`,
+            phase: "extract",
+            totalCourses: apiCourses.length,
+          });
+          await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
+          addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
 
-        if (job.imported > 0) {
-          const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
-          job.discoveredConfig = config;
-          await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+          if (job.imported > 0) {
+            const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
+            job.discoveredConfig = config;
+            await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+          }
+
+          job.status = "completed";
+          job.completedAt = Date.now();
+          return;
         }
 
-        job.status = "completed";
-        job.completedAt = Date.now();
-        return;
+        courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, []);
+      } else if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
+        const aiLinks = analysis.courseLinks.filter((l) => l.url && l.name);
+        courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, aiLinks);
       }
 
-      courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, []);
-    } else if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
-      const aiLinks = analysis.courseLinks.filter((l) => l.url && l.name);
-      courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, aiLinks);
+      if (courseLinks.length > 0) {
+        const listingBodyText = cheerio.load(html)("body").text();
+        const hasPagination = /showing\s+[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/i.test(listingBodyText) ||
+          cheerio.load(html)("a[rel='next'], [class*='pagination'] a, [class*='pager'] a, [aria-label*='next'], [aria-label*='Next']").length > 0;
+
+        if (hasPagination) {
+          addLog(job, "status", { message: `Listing page is paginated. Following all pages to get complete course list...`, phase: "discover" });
+          courseLinks = await followPaginatedListing(resolvedUrl, html, job, courseLinks);
+          addLog(job, "status", { message: `Pagination complete: ${courseLinks.length} total course links found`, phase: "discover" });
+        }
+      }
+
+      if (sitemapCoursesFull.length > 0) {
+        const seen = new Set(courseLinks.map((l) => l.url));
+        for (const c of sitemapCoursesFull) {
+          if (!seen.has(c.url)) { seen.add(c.url); courseLinks.push(c); }
+        }
+      }
     }
 
     if (courseLinks.length > 0) {
