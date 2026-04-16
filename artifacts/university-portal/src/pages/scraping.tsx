@@ -64,7 +64,6 @@ export default function Scraping() {
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
 
-  // AI Scraper state
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [selectedUni, setSelectedUni] = useState("");
   const [newUniName, setNewUniName] = useState("");
@@ -73,7 +72,10 @@ export default function Scraping() {
   const [scraping, setScraping] = useState(false);
   const [scrapeLogs, setScrapeLogs] = useState<ScrapeLog[]>([]);
   const [scrapeResult, setScrapeResult] = useState<ScrapeLog | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const logIndexRef = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -104,6 +106,53 @@ export default function Scraping() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [scrapeLogs]);
 
+  const pollJobStatus = useCallback((jobId: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    logIndexRef.current = 0;
+    
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/scrape/status/${jobId}?since=${logIndexRef.current}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.logs && data.logs.length > 0) {
+          setScrapeLogs((prev) => [...prev, ...data.logs]);
+          logIndexRef.current = data.logIndex;
+
+          const doneLog = data.logs.find((l: ScrapeLog) => l.event === "done");
+          if (doneLog) setScrapeResult(doneLog);
+        }
+
+        if (data.status !== "running") {
+          setScraping(false);
+          setActiveJobId(null);
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        }
+      } catch {}
+    };
+
+    poll();
+    pollRef.current = setInterval(poll, 1500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const savedJobId = sessionStorage.getItem("activeScrapeJob");
+    if (savedJobId) {
+      setActiveJobId(savedJobId);
+      setScraping(true);
+      setScrapeLogs([]);
+      setScrapeResult(null);
+      pollJobStatus(savedJobId);
+    }
+  }, [pollJobStatus]);
+
   const startScraping = useCallback(async () => {
     if (!scrapeUrl) return;
     setScraping(true);
@@ -126,42 +175,30 @@ export default function Scraping() {
         body: JSON.stringify(body),
       });
 
-      if (!resp.ok || !resp.body) {
-        setScrapeLogs([{ event: "error", message: "Failed to start scraping" }]);
+      if (!resp.ok) {
+        const err = await resp.json();
+        setScrapeLogs([{ event: "error", message: err.error || "Failed to start scraping" }]);
         setScraping(false);
         return;
       }
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6)) as ScrapeLog;
-              if (data.event === "done") {
-                setScrapeResult(data);
-              }
-              setScrapeLogs((prev) => [...prev, data]);
-            } catch {}
-          }
-        }
-      }
+      const data = await resp.json();
+      const jobId = data.jobId;
+      setActiveJobId(jobId);
+      sessionStorage.setItem("activeScrapeJob", jobId);
+      setScrapeLogs([{ event: "status", message: "Scraping started in background..." }]);
+      pollJobStatus(jobId);
     } catch (err) {
-      setScrapeLogs((prev) => [...prev, { event: "error", message: (err as Error).message }]);
-    } finally {
+      setScrapeLogs([{ event: "error", message: (err as Error).message }]);
       setScraping(false);
     }
-  }, [scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity]);
+  }, [scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, pollJobStatus]);
+
+  useEffect(() => {
+    if (!scraping && activeJobId) {
+      sessionStorage.removeItem("activeScrapeJob");
+    }
+  }, [scraping, activeJobId]);
 
   const progressLog = scrapeLogs.findLast((l) => l.event === "progress");
   const courseLogs = scrapeLogs.filter((l) => l.event === "course");
@@ -181,7 +218,6 @@ export default function Scraping() {
         </Link>
       </div>
 
-      {/* AI Scraper Card */}
       <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50/50 to-purple-50/30">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -189,13 +225,17 @@ export default function Scraping() {
               <Bot className="w-5 h-5 text-white" />
             </div>
             AI-Powered Web Scraper
+            {scraping && (
+              <Badge className="ml-2 bg-blue-100 text-blue-700 border-blue-200 animate-pulse">
+                Running in Background
+              </Badge>
+            )}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Paste a university course listing URL and AI will automatically extract all course data — fees, requirements, intakes, and more.
+            Paste a university course listing URL and AI will automatically extract all course data — international fees, IELTS/PTE/TOEFL requirements, intakes, and more. Scraping continues even if you navigate away.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* URL Input */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
@@ -209,7 +249,6 @@ export default function Scraping() {
             </div>
           </div>
 
-          {/* University Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="text-xs font-medium text-gray-500 mb-1 block">University</label>
@@ -253,7 +292,7 @@ export default function Scraping() {
             {scraping ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Scraping...
+                Scraping in Background...
               </>
             ) : (
               <>
@@ -264,10 +303,8 @@ export default function Scraping() {
             )}
           </Button>
 
-          {/* Scraping Progress */}
           {scrapeLogs.length > 0 && (
             <div className="space-y-3">
-              {/* Progress bar */}
               {progressLog && progressLog.total && (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
@@ -283,7 +320,6 @@ export default function Scraping() {
                 </div>
               )}
 
-              {/* Log feed */}
               <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-auto font-mono text-xs space-y-1">
                 {scrapeLogs.map((log, i) => (
                   <div key={i} className={
@@ -307,12 +343,11 @@ export default function Scraping() {
                 {scraping && (
                   <div className="text-blue-400 animate-pulse">
                     <Loader2 className="inline w-3 h-3 animate-spin mr-1" />
-                    Processing...
+                    Processing in background...
                   </div>
                 )}
               </div>
 
-              {/* Result Summary */}
               {scrapeResult && (
                 <div className="grid grid-cols-4 gap-3">
                   <div className="bg-white border rounded-lg p-3 text-center">
@@ -338,7 +373,6 @@ export default function Scraping() {
         </CardContent>
       </Card>
 
-      {/* University Coverage */}
       <div>
         <h2 className="text-lg font-semibold mb-3">University Coverage</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -367,7 +401,6 @@ export default function Scraping() {
         </div>
       </div>
 
-      {/* Import History */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Import History</h2>

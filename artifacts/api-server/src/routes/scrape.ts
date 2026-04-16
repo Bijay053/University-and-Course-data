@@ -52,16 +52,24 @@ interface CourseData {
   scholarship?: string;
 }
 
-interface PageAnalysis {
-  pageType: "listing" | "detail" | "unknown";
-  courseLinks?: { url: string; name: string }[];
-  courseData?: CourseData;
-  totalCoursesFound?: number;
-  paginationLinks?: string[];
+interface ScrapeJob {
+  id: string;
+  status: "running" | "completed" | "failed";
+  logs: { event: string; [key: string]: unknown }[];
+  imported: number;
+  skipped: number;
+  errors: number;
+  totalFound: number;
+  current: number;
+  startedAt: number;
+  completedAt?: number;
 }
 
-function sendSSE(res: Response, event: string, data: unknown) {
-  res.write(`data: ${JSON.stringify({ event, ...data as object })}\n\n`);
+const scrapeJobs = new Map<string, ScrapeJob>();
+
+function addLog(job: ScrapeJob, event: string, data: Record<string, unknown> = {}) {
+  job.logs.push({ event, ...data });
+  if (job.logs.length > 2000) job.logs = job.logs.slice(-1500);
 }
 
 async function geminiChat(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
@@ -136,7 +144,6 @@ function extractCompactContent(html: string, url: string): string {
   $("[style*='display:none'], [style*='display: none'], .hidden, [aria-hidden='true']").remove();
 
   const sections: string[] = [];
-
   const mainContent = $("main, [role='main'], .content, .course-detail, .course-info, article").first();
   const target = mainContent.length ? mainContent : $("body");
 
@@ -196,6 +203,36 @@ function extractFullPageContent(html: string, url: string): string {
   return `URL: ${url}\n\nPAGE TEXT:\n${bodyText.slice(0, 12000)}\n\nLINKS ON PAGE:\n${links.slice(0, 150).join("\n")}`;
 }
 
+function findRelatedPages(html: string, courseUrl: string): { fees?: string; requirements?: string; entry?: string } {
+  const $ = cheerio.load(html);
+  const origin = new URL(courseUrl).origin;
+  const result: { fees?: string; requirements?: string; entry?: string } = {};
+
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const text = $(el).text().trim().toLowerCase();
+    try {
+      const fullUrl = new URL(href, origin).toString();
+      if (!fullUrl.startsWith("http")) return;
+
+      if (!result.fees && (
+        /\b(international|overseas)\s*(fee|tuition|cost)/i.test(text) ||
+        (/\b(fee|tuition|cost)/i.test(text) && !/domestic/i.test(text))
+      )) {
+        result.fees = fullUrl;
+      }
+      if (!result.requirements && /\b(entry|admission|requirement|eligib|how\s*to\s*apply)/i.test(text)) {
+        result.requirements = fullUrl;
+      }
+      if (!result.entry && /\b(english|language|ielts|pte|toefl)/i.test(text)) {
+        result.entry = fullUrl;
+      }
+    } catch {}
+  });
+
+  return result;
+}
+
 function extractWithCheerio(html: string, url: string, name: string): Partial<CourseData> {
   const $ = cheerio.load(html);
   const text = $("body").text();
@@ -229,11 +266,32 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
   else if (/\b(certificate|diploma)\b/i.test(lower)) data.degreeLevel = "Certificate & Diploma";
   else if (/\bassociate\s*degree/i.test(lower)) data.degreeLevel = "Associate Degree";
 
+  extractInternationalFees(text, data);
+  extractEnglishRequirements(text, data);
+  extractIntakeMonths(text, data);
+
+  const desc = $("meta[name='description']").attr("content") || $("meta[property='og:description']").attr("content") || "";
+  if (desc) data.description = desc.slice(0, 500);
+
+  return data;
+}
+
+function extractInternationalFees(text: string, data: Partial<CourseData>) {
+  const intlSection = text.match(/international[^]*?(?:fee|tuition|cost)[^]*?[\$A]\s*([\d,]+)/i);
+  if (intlSection) {
+    const fee = parseInt(intlSection[1].replace(/,/g, ""));
+    if (fee > 1000 && fee < 200000) {
+      data.internationalFee = fee;
+      data.currency = "AUD";
+      data.feeTerm = /semester/i.test(intlSection[0]) ? "Semester" : /total/i.test(intlSection[0]) ? "Total" : "Annual";
+      return;
+    }
+  }
+
   const feePatterns = [
     /(?:international|overseas)\s*(?:student\s*)?(?:fee|tuition|cost)[:\s]*\$?([\d,]+)/i,
-    /\$\s*([\d,]+)\s*(?:per\s*(?:year|annum|semester))/i,
-    /(?:tuition|fee|cost)[:\s]*(?:AUD|A\$|\$)\s*([\d,]+)/i,
-    /(?:AUD|A\$)\s*([\d,]+)/i,
+    /(?:international|overseas)[^.]*?\$\s*([\d,]+)/i,
+    /(?:international|overseas)[^.]*?(?:AUD|A\$)\s*([\d,]+)/i,
   ];
   for (const fp of feePatterns) {
     const fm = text.match(fp);
@@ -243,21 +301,33 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
         data.internationalFee = fee;
         data.currency = "AUD";
         data.feeTerm = /semester/i.test(fm[0]) ? "Semester" : /total/i.test(fm[0]) ? "Total" : "Annual";
-        break;
+        return;
       }
     }
   }
 
+  const genericFee = text.match(/(?:tuition|fee|cost)[:\s]*(?:AUD|A\$|\$)\s*([\d,]+)/i);
+  if (genericFee && !/domestic/i.test(genericFee[0])) {
+    const fee = parseInt(genericFee[1].replace(/,/g, ""));
+    if (fee > 5000 && fee < 200000) {
+      data.internationalFee = fee;
+      data.currency = "AUD";
+      data.feeTerm = /semester/i.test(genericFee[0]) ? "Semester" : /total/i.test(genericFee[0]) ? "Total" : "Annual";
+    }
+  }
+}
+
+function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const ieltsMatch = text.match(/IELTS[:\s]*(?:overall\s*)?(\d+(?:\.\d+)?)/i);
   if (ieltsMatch) data.ieltsOverall = parseFloat(ieltsMatch[1]);
 
-  const ieltsSubPatterns = [
-    { key: "ieltsListening", pattern: /IELTS.*?listening[:\s]*(\d+(?:\.\d+)?)/i },
-    { key: "ieltsSpeaking", pattern: /IELTS.*?speaking[:\s]*(\d+(?:\.\d+)?)/i },
-    { key: "ieltsWriting", pattern: /IELTS.*?writing[:\s]*(\d+(?:\.\d+)?)/i },
-    { key: "ieltsReading", pattern: /IELTS.*?reading[:\s]*(\d+(?:\.\d+)?)/i },
+  const subPatterns: { key: string; pattern: RegExp }[] = [
+    { key: "ieltsListening", pattern: /(?:listening)[:\s]*(\d+(?:\.\d+)?)/i },
+    { key: "ieltsSpeaking", pattern: /(?:speaking)[:\s]*(\d+(?:\.\d+)?)/i },
+    { key: "ieltsWriting", pattern: /(?:writing)[:\s]*(\d+(?:\.\d+)?)/i },
+    { key: "ieltsReading", pattern: /(?:reading)[:\s]*(\d+(?:\.\d+)?)/i },
   ];
-  for (const { key, pattern } of ieltsSubPatterns) {
+  for (const { key, pattern } of subPatterns) {
     const m = text.match(pattern);
     if (m) (data as any)[key] = parseFloat(m[1]);
   }
@@ -276,7 +346,9 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
 
   const toeflMatch = text.match(/TOEFL[:\s]*(?:iBT[:\s]*)?(?:overall\s*)?(\d+)/i);
   if (toeflMatch) data.toeflOverall = parseInt(toeflMatch[1]);
+}
 
+function extractIntakeMonths(text: string, data: Partial<CourseData>) {
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const intakeMonths: string[] = [];
   const intakeSection = text.match(/(?:intake|start|commencement|commence|entry)[^.]*?(January|February|March|April|May|June|July|August|September|October|November|December)/gi);
@@ -288,11 +360,32 @@ function extractWithCheerio(html: string, url: string, name: string): Partial<Co
     }
   }
   if (intakeMonths.length > 0) data.intakeMonths = intakeMonths;
+}
 
-  const desc = $("meta[name='description']").attr("content") || $("meta[property='og:description']").attr("content") || "";
-  if (desc) data.description = desc.slice(0, 500);
+async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPages: { fees?: string; requirements?: string; entry?: string }) {
+  const needsFees = !courseData.internationalFee;
+  const needsEnglish = !courseData.ieltsOverall;
 
-  return data;
+  const pagesToFetch: { url: string; type: string }[] = [];
+
+  if (needsFees && relatedPages.fees) pagesToFetch.push({ url: relatedPages.fees, type: "fees" });
+  if (needsEnglish && relatedPages.entry) pagesToFetch.push({ url: relatedPages.entry, type: "english" });
+  if ((needsFees || needsEnglish) && relatedPages.requirements) pagesToFetch.push({ url: relatedPages.requirements, type: "requirements" });
+
+  for (const page of pagesToFetch) {
+    try {
+      const html = await fetchPage(page.url);
+      const text = cheerio.load(html)("body").text();
+
+      if (page.type === "fees" || page.type === "requirements") {
+        if (!courseData.internationalFee) extractInternationalFees(text, courseData);
+      }
+      if (page.type === "english" || page.type === "requirements") {
+        if (!courseData.ieltsOverall) extractEnglishRequirements(text, courseData);
+      }
+      if (!courseData.intakeMonths?.length) extractIntakeMonths(text, courseData);
+    } catch {}
+  }
 }
 
 const BATCH_CLASSIFY_PROMPT = `You are a university course classifier. Given a list of courses with their names and any extracted data, fill in ONLY the missing fields.
@@ -338,7 +431,9 @@ async function batchClassify(courses: { index: number; name: string; existing: P
   return result;
 }
 
-const SINGLE_EXTRACT_PROMPT = `Extract course data from this page content. Return JSON:
+const SINGLE_EXTRACT_PROMPT = `Extract course data from this page. ONLY extract INTERNATIONAL student fees, NEVER domestic fees. If only domestic fees are shown, set internationalFee to null.
+
+Return JSON:
 {
   "courseName": "<name>",
   "category": "<Business & Management|Engineering & Technology|Computer Science & IT|Medicine & Health|Arts, Humanities & Social Sciences|Education & Social Work|Architecture, Building & Design|Media & Communications|Law & Legal Studies|Hospitality, Tourism & Events|Science & Mathematics|Agriculture & Environmental Science>",
@@ -349,7 +444,7 @@ const SINGLE_EXTRACT_PROMPT = `Extract course data from this page content. Retur
   "studyMode": "<On Campus|Online|Blended>",
   "degreeLevel": "<Bachelor|Master|PhD|Certificate & Diploma|Graduate Certificate & Diploma|Associate Degree|Equivalent>",
   "studyLoad": "<Full Time|Part Time>",
-  "internationalFee": <number|null>,
+  "internationalFee": <INTERNATIONAL fee number only|null>,
   "feeTerm": "<Annual|Total|Semester>",
   "currency": "<AUD|GBP|USD>",
   "ieltsOverall": <number|null>, "ieltsListening": <number|null>, "ieltsSpeaking": <number|null>, "ieltsWriting": <number|null>, "ieltsReading": <number|null>,
@@ -359,7 +454,7 @@ const SINGLE_EXTRACT_PROMPT = `Extract course data from this page content. Retur
   "otherRequirement": "<other reqs>",
   "scholarship": "<scholarship info>"
 }
-Use null for missing fields. Be concise.`;
+IMPORTANT: Only include INTERNATIONAL student fees. Exclude all domestic/local fees. Use null for missing fields.`;
 
 async function extractCourseFromPage(content: string, courseName: string): Promise<CourseData | null> {
   try {
@@ -380,10 +475,10 @@ For UNKNOWN: {"pageType":"unknown"}
 
 Be concise. Only include course links with full URLs.`;
 
-async function analyzePage(content: string): Promise<PageAnalysis> {
+async function analyzePage(content: string): Promise<{ pageType: string; courseLinks?: { url: string; name: string }[]; paginationLinks?: string[] }> {
   const text = await geminiChat(ANALYZE_PROMPT, content, 4096);
   try {
-    return JSON.parse(text) as PageAnalysis;
+    return JSON.parse(text);
   } catch {
     return { pageType: "unknown" };
   }
@@ -402,29 +497,17 @@ async function saveCourse(courseData: CourseData, uniId: number): Promise<boolea
     `INSERT INTO courses (university_id, name, category, sub_category, course_website, duration, duration_term, study_mode, degree_level, study_load, language, description, other_requirement, status)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active') RETURNING id`,
     [
-      uniId,
-      courseData.courseName,
-      courseData.category || null,
-      courseData.subCategory || null,
-      courseData.courseWebsite || null,
-      courseData.duration || null,
-      courseData.durationTerm || null,
-      courseData.studyMode || null,
-      courseData.degreeLevel || null,
-      courseData.studyLoad || null,
-      courseData.language || null,
-      courseData.description || null,
-      courseData.otherRequirement || null,
+      uniId, courseData.courseName, courseData.category || null, courseData.subCategory || null,
+      courseData.courseWebsite || null, courseData.duration || null, courseData.durationTerm || null,
+      courseData.studyMode || null, courseData.degreeLevel || null, courseData.studyLoad || null,
+      courseData.language || null, courseData.description || null, courseData.otherRequirement || null,
     ],
   );
   const courseId = cRes.rows[0].id;
 
   if (courseData.intakeMonths?.length) {
     for (const m of courseData.intakeMonths) {
-      await pool.query(
-        "INSERT INTO intakes (course_id, intake_month, intake_day) VALUES ($1,$2,$3)",
-        [courseId, m, courseData.intakeDays || null],
-      );
+      await pool.query("INSERT INTO intakes (course_id, intake_month, intake_day) VALUES ($1,$2,$3)", [courseId, m, courseData.intakeDays || null]);
     }
   }
 
@@ -457,16 +540,13 @@ async function saveCourse(courseData: CourseData, uniId: number): Promise<boolea
   }
 
   if (courseData.scholarship) {
-    await pool.query(
-      "INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)",
-      [courseId, "Scholarship", courseData.scholarship],
-    );
+    await pool.query("INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)", [courseId, "Scholarship", courseData.scholarship]);
   }
 
   return true;
 }
 
-async function tryDiscoverApiEndpoints(html: string, pageUrl: string, res: Response): Promise<{ url: string; name: string }[] | null> {
+async function tryDiscoverApiEndpoints(html: string, pageUrl: string, job: ScrapeJob): Promise<{ url: string; name: string }[] | null> {
   const origin = new URL(pageUrl).origin;
   const apiPatterns = html.match(/["'](\/api\/[^"']+(?:course|program|search)[^"']*)["']/gi) || [];
   const queryParams = new URL(pageUrl).search;
@@ -483,7 +563,7 @@ async function tryDiscoverApiEndpoints(html: string, pageUrl: string, res: Respo
 
     for (const tryUrl of tryUrls) {
       try {
-        sendSSE(res, "status", { message: `Trying hidden API: ${apiPath}...`, phase: "discover" });
+        addLog(job, "status", { message: `Trying hidden API: ${apiPath}...`, phase: "discover" });
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000);
         const resp = await fetch(tryUrl, {
@@ -505,7 +585,7 @@ async function tryDiscoverApiEndpoints(html: string, pageUrl: string, res: Respo
         const courses = extractCoursesFromApiResponse(data, origin);
 
         if (courses.length > 0) {
-          sendSSE(res, "status", { message: `API returned ${courses.length} courses. Checking for more pages...`, phase: "discover" });
+          addLog(job, "status", { message: `API returned ${courses.length} courses. Checking for more pages...`, phase: "discover" });
 
           const totalPages = data?.result?.totalPage ?? data?.totalPage ?? data?.totalPages ?? 1;
 
@@ -528,9 +608,8 @@ async function tryDiscoverApiEndpoints(html: string, pageUrl: string, res: Respo
                 });
                 if (pResp.ok) {
                   const pData = await pResp.json() as any;
-                  const moreCourses = extractCoursesFromApiResponse(pData, origin);
-                  courses.push(...moreCourses);
-                  sendSSE(res, "status", { message: `Fetched page ${page + 1}/${totalPages} (${courses.length} total courses)`, phase: "discover" });
+                  courses.push(...extractCoursesFromApiResponse(pData, origin));
+                  addLog(job, "status", { message: `Fetched page ${page + 1}/${totalPages} (${courses.length} total courses)`, phase: "discover" });
                 }
               } catch {}
               await new Promise((r) => setTimeout(r, 300));
@@ -586,24 +665,30 @@ function extractCoursesFromApiResponse(data: any, origin: string): { url: string
 async function scrapeCourseBatch(
   courseLinks: { url: string; name: string }[],
   uniId: number,
-  res: Response,
+  job: ScrapeJob,
   maxCourses: number,
-): Promise<{ imported: number; skipped: number; errors: number }> {
-  let imported = 0, skipped = 0, errors = 0;
+) {
   const max = Math.min(courseLinks.length, maxCourses);
+  job.totalFound = courseLinks.length;
 
   const batchSize = 10;
-  const classifyBatch: { index: number; name: string; existing: Partial<CourseData> }[] = [];
-  const pendingCourses: { index: number; data: CourseData }[] = [];
+  let classifyBatch: { index: number; name: string; existing: Partial<CourseData> }[] = [];
+  let pendingCourses: { index: number; data: CourseData }[] = [];
 
   for (let i = 0; i < max; i++) {
     const link = courseLinks[i];
-    sendSSE(res, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
+    job.current = i + 1;
+    addLog(job, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
 
     try {
       const cHtml = await fetchPage(link.url);
-
       const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+
+      const relatedPages = findRelatedPages(cHtml, link.url);
+      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
+        addLog(job, "status", { message: `Checking related pages for ${link.name}...`, phase: "enrich" });
+        await enrichFromRelatedPages(cheerioData, relatedPages);
+      }
 
       const hasFees = !!cheerioData.internationalFee;
       const hasIelts = !!cheerioData.ieltsOverall;
@@ -641,20 +726,20 @@ async function scrapeCourseBatch(
         if (cData) {
           cData.courseWebsite = cData.courseWebsite || link.url;
           const saved = await saveCourse(cData, uniId);
-          if (saved) { imported++; sendSSE(res, "course", { name: cData.courseName, status: "imported", index: i + 1 }); }
-          else { skipped++; sendSSE(res, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
+          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "imported", index: i + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
         } else {
-          errors++;
-          sendSSE(res, "course", { name: link.name, status: "error", message: "Could not extract data", index: i + 1 });
+          job.errors++;
+          addLog(job, "course", { name: link.name, status: "error", message: "Could not extract data", index: i + 1 });
         }
       }
     } catch (err) {
-      errors++;
-      sendSSE(res, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
+      job.errors++;
+      addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
     }
 
     if (classifyBatch.length >= batchSize || (i === max - 1 && classifyBatch.length > 0)) {
-      sendSSE(res, "status", { message: `Classifying batch of ${classifyBatch.length} courses with AI...`, phase: "classify" });
+      addLog(job, "status", { message: `Classifying batch of ${classifyBatch.length} courses with AI...`, phase: "classify" });
       const classifications = await batchClassify(classifyBatch);
 
       for (const pending of pendingCourses) {
@@ -667,92 +752,50 @@ async function scrapeCourseBatch(
         }
 
         const saved = await saveCourse(pending.data, uniId);
-        if (saved) { imported++; sendSSE(res, "course", { name: pending.data.courseName, status: "imported", index: pending.index + 1 }); }
-        else { skipped++; sendSSE(res, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
+        if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "imported", index: pending.index + 1 }); }
+        else { job.skipped++; addLog(job, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
       }
 
-      classifyBatch.length = 0;
-      pendingCourses.length = 0;
+      classifyBatch = [];
+      pendingCourses = [];
     }
 
     if (i % 3 === 2) await new Promise((r) => setTimeout(r, 200));
   }
-
-  return { imported, skipped, errors };
 }
 
-router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
-  const { url, universityId, universityName, universityCountry, universityCity } = req.body as {
-    url: string;
-    universityId?: number;
-    universityName?: string;
-    universityCountry?: string;
-    universityCity?: string;
-  };
-
-  if (!url) { res.status(400).json({ error: "URL is required" }); return; }
-  if (!GEMINI_API_KEY) { res.status(500).json({ error: "GEMINI_API_KEY not configured" }); return; }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
-
+async function runScrapeJob(job: ScrapeJob, url: string, uniId: number) {
   try {
-    let uniId: number;
-    if (universityId) {
-      const u = await db.select().from(universitiesTable).where(eq(universitiesTable.id, universityId));
-      if (!u[0]) { sendSSE(res, "error", { message: "University not found" }); res.end(); return; }
-      uniId = u[0].id;
-      sendSSE(res, "status", { message: `Using existing university: ${u[0].name}` });
-    } else if (universityName) {
-      const existing = await db.select().from(universitiesTable).where(eq(universitiesTable.name, universityName));
-      if (existing[0]) {
-        uniId = existing[0].id;
-      } else {
-        const [created] = await db.insert(universitiesTable).values({
-          name: universityName,
-          country: universityCountry || "Unknown",
-          city: universityCity || "Unknown",
-        }).returning();
-        uniId = created.id;
-      }
-      sendSSE(res, "status", { message: `University: ${universityName} (ID: ${uniId})` });
-    } else {
-      sendSSE(res, "error", { message: "University ID or name is required" });
-      res.end();
-      return;
-    }
-
-    sendSSE(res, "status", { message: `Fetching ${url}...`, phase: "fetch" });
+    addLog(job, "status", { message: `Fetching ${url}...`, phase: "fetch" });
 
     let html: string;
     try {
       html = await fetchPage(url);
     } catch (err) {
-      sendSSE(res, "error", { message: `Failed to fetch URL: ${(err as Error).message}` });
-      res.end();
+      addLog(job, "error", { message: `Failed to fetch URL: ${(err as Error).message}` });
+      job.status = "failed";
+      job.completedAt = Date.now();
       return;
     }
 
-    sendSSE(res, "status", { message: "Analyzing page with AI (1 call)...", phase: "analyze" });
+    addLog(job, "status", { message: "Analyzing page with AI (1 call)...", phase: "analyze" });
     const pageContent = extractFullPageContent(html, url);
     const analysis = await analyzePage(pageContent);
 
     if (analysis.pageType === "unknown") {
-      sendSSE(res, "status", { message: "No course data in static HTML. Discovering hidden API endpoints...", phase: "discover" });
+      addLog(job, "status", { message: "No course data in static HTML. Discovering hidden API endpoints...", phase: "discover" });
 
-      const apiCourses = await tryDiscoverApiEndpoints(html, url, res);
+      const apiCourses = await tryDiscoverApiEndpoints(html, url, job);
       if (apiCourses && apiCourses.length > 0) {
-        sendSSE(res, "status", {
-          message: `Found ${apiCourses.length} courses via hidden API. Extracting details (cheerio + batch AI)...`,
+        addLog(job, "status", {
+          message: `Found ${apiCourses.length} courses via hidden API. Extracting details...`,
           phase: "extract",
           totalCourses: apiCourses.length,
         });
-
-        const result = await scrapeCourseBatch(apiCourses, uniId, res, 300);
-        sendSSE(res, "done", { totalFound: apiCourses.length, ...result });
-        res.end();
+        await scrapeCourseBatch(apiCourses, uniId, job, 300);
+        addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+        job.status = "completed";
+        job.completedAt = Date.now();
         return;
       }
 
@@ -779,26 +822,30 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
       });
 
       if (courseLinks.length > 0) {
-        sendSSE(res, "status", {
-          message: `Found ${courseLinks.length} course links. Extracting with cheerio + batch AI...`,
-          phase: "extract",
-          totalCourses: courseLinks.length,
-        });
-
-        const result = await scrapeCourseBatch(courseLinks, uniId, res, 100);
-        sendSSE(res, "done", { totalFound: courseLinks.length, ...result });
-        res.end();
+        addLog(job, "status", { message: `Found ${courseLinks.length} course links. Extracting...`, phase: "extract", totalCourses: courseLinks.length });
+        await scrapeCourseBatch(courseLinks, uniId, job, 100);
+        addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+        job.status = "completed";
+        job.completedAt = Date.now();
         return;
       }
 
-      sendSSE(res, "error", { message: "This page uses JavaScript to load courses dynamically. Try pasting a direct course page URL instead." });
-      res.end();
+      addLog(job, "error", { message: "This page uses JavaScript to load courses dynamically. Try pasting a direct course page URL instead." });
+      job.status = "failed";
+      job.completedAt = Date.now();
       return;
     }
 
     if (analysis.pageType === "detail") {
-      sendSSE(res, "status", { message: "Found single course page. Extracting with cheerio + AI...", phase: "extract" });
+      addLog(job, "status", { message: "Found single course page. Extracting...", phase: "extract" });
       const cheerioData = extractWithCheerio(html, url, "");
+
+      const relatedPages = findRelatedPages(html, url);
+      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
+        addLog(job, "status", { message: "Checking related pages for fees/requirements...", phase: "enrich" });
+        await enrichFromRelatedPages(cheerioData, relatedPages);
+      }
+
       const compactContent = extractCompactContent(html, url);
       const aiData = await extractCourseFromPage(compactContent, cheerioData.courseName || "course");
 
@@ -810,35 +857,141 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
         }
         aiData.courseWebsite = aiData.courseWebsite || url;
         const saved = await saveCourse(aiData, uniId);
-        sendSSE(res, "course", { name: aiData.courseName, status: saved ? "imported" : "skipped (duplicate)" });
-        sendSSE(res, "done", { totalFound: 1, imported: saved ? 1 : 0, skipped: saved ? 0 : 1, errors: 0 });
+        job.totalFound = 1;
+        if (saved) job.imported = 1; else job.skipped = 1;
+        addLog(job, "course", { name: aiData.courseName, status: saved ? "imported" : "skipped (duplicate)" });
+        addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
       } else {
-        sendSSE(res, "error", { message: "Could not extract course data from this page." });
+        addLog(job, "error", { message: "Could not extract course data from this page." });
       }
-      res.end();
+      job.status = "completed";
+      job.completedAt = Date.now();
       return;
     }
 
     if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
       const courseLinks = analysis.courseLinks.filter((l) => l.url && l.name);
-      sendSSE(res, "status", {
-        message: `Found ${courseLinks.length} courses. Extracting with cheerio + batch AI...`,
-        phase: "extract",
-        totalCourses: courseLinks.length,
-      });
-
-      const result = await scrapeCourseBatch(courseLinks, uniId, res, 200);
-      sendSSE(res, "done", { totalFound: courseLinks.length, ...result });
-      res.end();
+      addLog(job, "status", { message: `Found ${courseLinks.length} courses. Extracting...`, phase: "extract", totalCourses: courseLinks.length });
+      await scrapeCourseBatch(courseLinks, uniId, job, 200);
+      addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+      job.status = "completed";
+      job.completedAt = Date.now();
       return;
     }
 
-    sendSSE(res, "error", { message: "Could not extract any course data from this page." });
-    res.end();
+    addLog(job, "error", { message: "Could not extract any course data from this page." });
+    job.status = "failed";
+    job.completedAt = Date.now();
   } catch (err) {
-    sendSSE(res, "error", { message: `Scraping failed: ${(err as Error).message}` });
-    res.end();
+    addLog(job, "error", { message: `Scraping failed: ${(err as Error).message}` });
+    job.status = "failed";
+    job.completedAt = Date.now();
   }
+}
+
+router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
+  const { url, universityId, universityName, universityCountry, universityCity } = req.body as {
+    url: string;
+    universityId?: number;
+    universityName?: string;
+    universityCountry?: string;
+    universityCity?: string;
+  };
+
+  if (!url) { res.status(400).json({ error: "URL is required" }); return; }
+  if (!GEMINI_API_KEY) { res.status(500).json({ error: "GEMINI_API_KEY not configured" }); return; }
+
+  try {
+    let uniId: number;
+    let uniName = universityName || "";
+    if (universityId) {
+      const u = await db.select().from(universitiesTable).where(eq(universitiesTable.id, universityId));
+      if (!u[0]) { res.status(404).json({ error: "University not found" }); return; }
+      uniId = u[0].id;
+      uniName = u[0].name;
+    } else if (universityName) {
+      const existing = await db.select().from(universitiesTable).where(eq(universitiesTable.name, universityName));
+      if (existing[0]) {
+        uniId = existing[0].id;
+      } else {
+        const [created] = await db.insert(universitiesTable).values({
+          name: universityName,
+          country: universityCountry || "Unknown",
+          city: universityCity || "Unknown",
+        }).returning();
+        uniId = created.id;
+      }
+    } else {
+      res.status(400).json({ error: "University ID or name is required" });
+      return;
+    }
+
+    const jobId = `scrape_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const job: ScrapeJob = {
+      id: jobId,
+      status: "running",
+      logs: [],
+      imported: 0,
+      skipped: 0,
+      errors: 0,
+      totalFound: 0,
+      current: 0,
+      startedAt: Date.now(),
+    };
+
+    scrapeJobs.set(jobId, job);
+    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})` });
+
+    runScrapeJob(job, url, uniId).catch((err) => {
+      addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
+      job.status = "failed";
+      job.completedAt = Date.now();
+    });
+
+    res.json({ jobId, message: "Scraping started in background" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/scrape/status/:jobId", (req: Request, res: Response): void => {
+  const job = scrapeJobs.get(req.params.jobId);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+  const sinceIndex = parseInt(req.query.since as string) || 0;
+  const newLogs = job.logs.slice(sinceIndex);
+
+  res.json({
+    id: job.id,
+    status: job.status,
+    imported: job.imported,
+    skipped: job.skipped,
+    errors: job.errors,
+    totalFound: job.totalFound,
+    current: job.current,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    logs: newLogs,
+    logIndex: job.logs.length,
+  });
+});
+
+router.get("/scrape/jobs", (_req: Request, res: Response): void => {
+  const jobs = Array.from(scrapeJobs.values())
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .slice(0, 20)
+    .map(j => ({
+      id: j.id,
+      status: j.status,
+      imported: j.imported,
+      skipped: j.skipped,
+      errors: j.errors,
+      totalFound: j.totalFound,
+      current: j.current,
+      startedAt: j.startedAt,
+      completedAt: j.completedAt,
+    }));
+  res.json(jobs);
 });
 
 router.post("/scrape/preview", async (req: Request, res: Response): Promise<void> => {
