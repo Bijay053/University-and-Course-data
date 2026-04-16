@@ -1003,6 +1003,12 @@ const JUNK_LINK_NAMES = new Set([
   "events", "blog", "faq", "help", "support", "privacy", "terms",
   "cookie", "sitemap", "login", "sign in", "register",
   "coursework", "orientation", "handbook", "timetable", "calendar",
+  "accommodation", "scholarships", "fees", "tuition", "pathways",
+  "about us", "campus", "library", "online", "apply now",
+  "student life", "career", "careers", "exchange", "study abroad",
+  "research centres", "institutes", "faculty", "school", "department",
+  "moving to", "high school", "non-school", "sport", "sports",
+  "favourites", "my list", "compare",
 ]);
 
 function isJunkCourseName(name: string): boolean {
@@ -1013,7 +1019,133 @@ function isJunkCourseName(name: string): boolean {
   if (/^(all|view|see|find|browse|search|show)\s/i.test(lower)) return true;
   if (/^(our|the|a)\s+(course|program|degree)/i.test(lower)) return true;
   if (!/[a-z]/i.test(lower)) return true;
+  if (/^(accommodation|sport|scholarships?|fees?|pathways?|exchange|library|campus|career|alumni|research|faculty|department|school|international students?|domestic students?|high school|non.school|postgraduate students?|indigenous|disability|fees? and |student life|moving to|uow \w+)$/i.test(lower)) return true;
   return false;
+}
+
+const DEGREE_QUALIFIERS = [
+  "bachelor", "master", "doctor", "graduate", "diploma", "certificate",
+  "phd", "mba", "associate", "honours", "juris", "combined", "double",
+  "integrated", "coursework",
+];
+
+function urlLastSegmentHasDegreeQualifier(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+    return DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q);
+  } catch { return false; }
+}
+
+function pageContentLooksLikeCourse(text: string): boolean {
+  const lower = text.slice(0, 6000).toLowerCase();
+  const indicators = [
+    /\b(ielts|toefl|pte|english proficiency|duolingo|cambridge|language requirement)\b/,
+    /\b(tuition fee|annual fee|per year|international fee|course fee|total fee)\b/,
+    /\b(duration|years? full.time|years? part.time|credit points?|credit hours?|units? of study)\b/,
+    /\b(entry requirements?|admission requirements?|academic requirements?|prerequisite)\b/,
+    /\b(bachelor of|master of|doctor of|graduate certificate|graduate diploma|honours degree)\b/,
+  ];
+  return indicators.filter((r) => r.test(lower)).length >= 2;
+}
+
+async function researchAndValidateCourseLinks(
+  candidates: { url: string; name: string }[],
+  job: ScrapeJob
+): Promise<{ url: string; name: string }[]> {
+  if (candidates.length === 0) return [];
+
+  // Phase 1: URL-based pre-filter (instant, zero cost)
+  const urlFiltered = candidates.filter((c) => urlLastSegmentHasDegreeQualifier(c.url));
+  const urlFilterRatio = urlFiltered.length / candidates.length;
+
+  if (urlFilterRatio > 0.4 && urlFiltered.length >= 5) {
+    const removed = candidates.length - urlFiltered.length;
+    if (removed > 0) {
+      addLog(job, "status", {
+        message: `URL analysis: ${urlFiltered.length} course pages identified, filtered out ${removed} non-course pages (categories, accommodation, sports, etc.)`,
+        phase: "discover",
+      });
+    }
+    return urlFiltered;
+  }
+
+  // Phase 2: Content sampling (fetch sample pages, validate with page content)
+  const sampleSize = Math.min(12, candidates.length);
+  const step = Math.max(1, Math.floor(candidates.length / sampleSize));
+  const sample: { url: string; name: string }[] = [];
+  for (let i = 0; i < candidates.length; i += step) {
+    if (sample.length >= sampleSize) break;
+    sample.push(candidates[i]);
+  }
+
+  addLog(job, "status", {
+    message: `Researching ${candidates.length} candidate URLs — sampling ${sample.length} pages to identify genuine course pages...`,
+    phase: "discover",
+  });
+
+  const validUrlPrefixes: string[] = [];
+  const validUrlDepths: number[] = [];
+  let confirmedCourses = 0;
+  let confirmedNonCourses = 0;
+
+  for (const candidate of sample) {
+    try {
+      const pageHtml = await fetchPage(candidate.url);
+      const bodyText = cheerio.load(pageHtml)("body").text();
+      const isRealCourse = pageContentLooksLikeCourse(bodyText);
+
+      if (isRealCourse) {
+        confirmedCourses++;
+        const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
+        validUrlDepths.push(pathParts.length);
+        if (pathParts.length > 1) {
+          validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
+        }
+        addLog(job, "status", { message: `✓ Confirmed course: "${candidate.name}"`, phase: "discover" });
+      } else {
+        confirmedNonCourses++;
+        addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — will filter similar URLs`, phase: "discover" });
+      }
+    } catch {}
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  addLog(job, "status", {
+    message: `Research complete: ${confirmedCourses}/${sample.length} sampled pages are genuine course pages`,
+    phase: "discover",
+  });
+
+  if (confirmedCourses === 0) {
+    addLog(job, "status", { message: "Could not confirm any course pages from samples. Using all candidates.", phase: "discover" });
+    return candidates;
+  }
+
+  if (validUrlDepths.length === 0) return candidates;
+
+  const avgDepth = Math.round(validUrlDepths.reduce((a, b) => a + b, 0) / validUrlDepths.length);
+  const prefixCounts = new Map<string, number>();
+  for (const p of validUrlPrefixes) prefixCounts.set(p, (prefixCounts.get(p) || 0) + 1);
+  const bestPrefix = [...prefixCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+
+  const filtered = candidates.filter((c) => {
+    try {
+      const pathParts = new URL(c.url).pathname.split("/").filter(Boolean);
+      if (Math.abs(pathParts.length - avgDepth) > 1) return false;
+      if (bestPrefix && !c.url.includes(bestPrefix.slice(0, -1))) return false;
+      return true;
+    } catch { return false; }
+  });
+
+  const removedCount = candidates.length - filtered.length;
+  if (removedCount > 0) {
+    addLog(job, "status", {
+      message: `Filtered out ${removedCount} non-course pages. Will fetch ${filtered.length} validated course pages.`,
+      phase: "discover",
+    });
+  }
+
+  return filtered.length >= 3 ? filtered : candidates;
 }
 
 function isCourseUrl(urlStr: string): boolean {
@@ -1219,13 +1351,8 @@ async function discoverAllCourseLinks(
     });
   }
 
-  const sitemapCourses = await discoverCourseLinksFromSitemap(origin, job);
-  for (const c of sitemapCourses) {
-    if (!seen.has(c.url)) {
-      seen.add(c.url);
-      allCourses.push(c);
-    }
-  }
+  // NOTE: Sitemap is now handled in the main flow (researchAndValidateCourseLinks)
+  // Do not call discoverCourseLinksFromSitemap here to avoid duplicate work
 
   if (allCourses.length < 5 && html) {
     addLog(job, "status", { message: "Few courses found, crawling sub-pages for more...", phase: "discover" });
@@ -1932,66 +2059,99 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       return;
     }
 
-    addLog(job, "status", { message: "Searching all sources for course links (page + sitemap + sub-pages)...", phase: "discover" });
+    addLog(job, "status", { message: "Phase 1: Discovering candidate course URLs from all sources...", phase: "discover" });
 
-    let courseLinks: { url: string; name: string }[] = [];
+    let rawCandidates: { url: string; name: string }[] = [];
 
-    const sitemapCoursesFull = await discoverCourseLinksFromSitemap(origin, job);
-    if (sitemapCoursesFull.length >= 10) {
-      addLog(job, "status", { message: `Using ${sitemapCoursesFull.length} courses from sitemap (comprehensive source).`, phase: "discover" });
-      courseLinks = sitemapCoursesFull;
+    // --- Source A: Sitemap (most comprehensive for large universities) ---
+    const sitemapCandidates = await discoverCourseLinksFromSitemap(origin, job);
+
+    // --- Source B: Listing page HTML + hidden API (fallback or supplement) ---
+    if (analysis.pageType === "unknown") {
+      const apiCourses = await tryDiscoverApiEndpoints(html, resolvedUrl, job);
+      if (apiCourses && apiCourses.length > 0) {
+        addLog(job, "status", {
+          message: `Found ${apiCourses.length} courses via API endpoint. Validating...`,
+          phase: "extract",
+          totalCourses: apiCourses.length,
+        });
+        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
+        addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+        if (job.imported > 0) {
+          const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
+          job.discoveredConfig = config;
+          await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+        }
+        job.status = "completed";
+        job.completedAt = Date.now();
+        return;
+      }
+    }
+
+    if (sitemapCandidates.length >= 10) {
+      // Sitemap is the best source — use it exclusively to avoid listing page navigation pollution
+      addLog(job, "status", {
+        message: `Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
+        phase: "discover",
+      });
+      rawCandidates = sitemapCandidates;
     } else {
-      if (analysis.pageType === "unknown") {
-        const apiCourses = await tryDiscoverApiEndpoints(html, resolvedUrl, job);
-        if (apiCourses && apiCourses.length > 0) {
-          addLog(job, "status", {
-            message: `Found ${apiCourses.length} courses via hidden API. Extracting details...`,
-            phase: "extract",
-            totalCourses: apiCourses.length,
-          });
-          await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
-          addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
-
-          if (job.imported > 0) {
-            const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
-            job.discoveredConfig = config;
-            await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+      // Fallback: extract links from listing page HTML (AI-identified + HTML scraping)
+      let listingLinks: { url: string; name: string }[] = [];
+      if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
+        listingLinks = analysis.courseLinks.filter((l) => l.url && l.name && !isJunkCourseName(l.name));
+      }
+      // Only add HTML-parsed links if sitemap gave very few results
+      const $ = cheerio.load(html);
+      $("a[href]").each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const text = $(el).text().trim().replace(/\s+/g, " ");
+        try {
+          const fullUrl = new URL(href, origin).toString();
+          if (!fullUrl.startsWith(origin)) return;
+          if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+            if (!listingLinks.find((l) => l.url === fullUrl)) {
+              listingLinks.push({ url: fullUrl, name: text });
+            }
           }
+        } catch {}
+      });
 
-          job.status = "completed";
-          job.completedAt = Date.now();
-          return;
-        }
-
-        courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, []);
-      } else if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
-        const aiLinks = analysis.courseLinks.filter((l) => l.url && l.name);
-        courseLinks = await discoverAllCourseLinks(resolvedUrl, html, job, aiLinks);
-      }
-
-      if (courseLinks.length > 0) {
-        const listingBodyText = cheerio.load(html)("body").text();
+      // Follow pagination if the listing page has multiple pages
+      if (listingLinks.length > 0) {
+        const listingBodyText = $.root().text();
         const hasPagination = /showing\s+[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/i.test(listingBodyText) ||
-          cheerio.load(html)("a[rel='next'], [class*='pagination'] a, [class*='pager'] a, [aria-label*='next'], [aria-label*='Next']").length > 0;
-
+          $("a[rel='next'], [class*='pagination'] a, [class*='pager'] a, [aria-label*='next'], [aria-label*='Next']").length > 0;
         if (hasPagination) {
-          addLog(job, "status", { message: `Listing page is paginated. Following all pages to get complete course list...`, phase: "discover" });
-          courseLinks = await followPaginatedListing(resolvedUrl, html, job, courseLinks);
-          addLog(job, "status", { message: `Pagination complete: ${courseLinks.length} total course links found`, phase: "discover" });
+          addLog(job, "status", { message: `Listing page is paginated — following all pages for complete course list...`, phase: "discover" });
+          listingLinks = await followPaginatedListing(resolvedUrl, html, job, listingLinks);
         }
       }
 
-      if (sitemapCoursesFull.length > 0) {
-        const seen = new Set(courseLinks.map((l) => l.url));
-        for (const c of sitemapCoursesFull) {
-          if (!seen.has(c.url)) { seen.add(c.url); courseLinks.push(c); }
+      rawCandidates = listingLinks;
+      // Supplement with sitemap if available
+      if (sitemapCandidates.length > 0) {
+        const seen = new Set(rawCandidates.map((l) => l.url));
+        for (const c of sitemapCandidates) {
+          if (!seen.has(c.url)) { seen.add(c.url); rawCandidates.push(c); }
         }
       }
     }
 
+    // --- Phase 2: Research & Validate — do NOT fetch everything blindly ---
+    // Sample pages to confirm which candidates are genuine course pages
+    let courseLinks: { url: string; name: string }[] = [];
+    if (rawCandidates.length > 0) {
+      addLog(job, "status", {
+        message: `Phase 2: Researching ${rawCandidates.length} candidates — comparing pages to find genuine course pages before fetching...`,
+        phase: "discover",
+      });
+      courseLinks = await researchAndValidateCourseLinks(rawCandidates, job);
+    }
+
     if (courseLinks.length > 0) {
       addLog(job, "status", {
-        message: `Found ${courseLinks.length} total course links. Extracting details...`,
+        message: `Phase 3: Fetching ${courseLinks.length} validated course pages...`,
         phase: "extract",
         totalCourses: courseLinks.length,
       });
