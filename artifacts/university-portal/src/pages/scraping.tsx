@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
-  Square, StopCircle, Play, ShieldCheck, Info,
+  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -136,7 +136,7 @@ export default function Scraping() {
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
 
-  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapeUrls, setScrapeUrls] = useState<string[]>([""]);
   const [selectedUni, setSelectedUni] = useState("");
   const [newUniName, setNewUniName] = useState("");
   const [newUniCountry, setNewUniCountry] = useState("");
@@ -145,6 +145,9 @@ export default function Scraping() {
   const [scrapeLogs, setScrapeLogs] = useState<ScrapeLog[]>([]);
   const [scrapeResult, setScrapeResult] = useState<ScrapeLog | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [urlQueueProgress, setUrlQueueProgress] = useState<{ current: number; total: number } | null>(null);
+  const urlQueueRef = useRef<string[]>([]);
+  const uniBodyRef = useRef<Record<string, unknown>>({});
   const logIndexRef = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -204,6 +207,26 @@ export default function Scraping() {
     } catch {}
   }, []);
 
+  const startSingleJob = useCallback(async (url: string): Promise<boolean> => {
+    const body: Record<string, unknown> = { url, ...uniBodyRef.current };
+    const resp = await fetch("/api/scrape/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setScrapeLogs((prev) => [...prev, { event: "error", message: err.error || "Failed to start scraping" }]);
+      return false;
+    }
+    const data = await resp.json();
+    setActiveJobId(data.jobId);
+    setScrapeTargetUrl(url);
+    sessionStorage.setItem("activeScrapeJob", data.jobId);
+    setScrapeLogs((prev) => [...prev, { event: "status", message: `Scraping ${url}...` }]);
+    return data.jobId;
+  }, []);
+
   const pollJobStatus = useCallback((jobId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     logIndexRef.current = 0;
@@ -215,6 +238,7 @@ export default function Scraping() {
           if (res.status === 404) {
             setScraping(false);
             setActiveJobId(null);
+            setUrlQueueProgress(null);
             sessionStorage.removeItem("activeScrapeJob");
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
           }
@@ -252,12 +276,28 @@ export default function Scraping() {
         }
 
         if (data.status !== "running" && data.status !== "awaiting_approval") {
-          setScraping(false);
           setStopping(false);
           setAwaitingApproval(null);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
           if ((data.status === "completed" || data.status === "stopped") && data.imported > 0) {
             loadStagedCourses(jobId);
+          }
+
+          // Process next URL in queue
+          const nextUrl = urlQueueRef.current.shift();
+          if (nextUrl) {
+            setUrlQueueProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
+            setScrapeLogs((prev) => [...prev, { event: "status", message: `── Starting next URL (${nextUrl}) ──` }]);
+            const nextJobId = await startSingleJob(nextUrl);
+            if (nextJobId) {
+              pollJobStatus(nextJobId as string);
+            } else {
+              setScraping(false);
+              setUrlQueueProgress(null);
+            }
+          } else {
+            setScraping(false);
+            setUrlQueueProgress(null);
           }
         }
       } catch {}
@@ -265,7 +305,7 @@ export default function Scraping() {
 
     poll();
     pollRef.current = setInterval(poll, 1500);
-  }, [loadStagedCourses]);
+  }, [loadStagedCourses, startSingleJob]);
 
   useEffect(() => {
     return () => {
@@ -312,53 +352,51 @@ export default function Scraping() {
   }, [activeJobId]);
 
   const startScraping = useCallback(async () => {
-    if (!scrapeUrl) return;
+    const validUrls = scrapeUrls.map((u) => u.trim()).filter(Boolean);
+    if (validUrls.length === 0) return;
+
     setScraping(true);
     setScrapeLogs([]);
     setScrapeResult(null);
     setShowReview(false);
     setStagedCourses([]);
-    setScrapeTargetUrl(scrapeUrl);
     setStopping(false);
     setAwaitingApproval(null);
 
-    const body: Record<string, unknown> = { url: scrapeUrl };
+    const uniBody: Record<string, unknown> = {};
     if (selectedUni && selectedUni !== ALL) {
-      body.universityId = parseInt(selectedUni);
+      uniBody.universityId = parseInt(selectedUni);
       const uni = uniData?.data?.find((u) => String(u.id) === selectedUni);
       if (uni) setScrapeUniName(uni.name);
     } else {
-      body.universityName = newUniName;
-      body.universityCountry = newUniCountry;
-      body.universityCity = newUniCity;
+      uniBody.universityName = newUniName;
+      uniBody.universityCountry = newUniCountry;
+      uniBody.universityCity = newUniCity;
       setScrapeUniName(newUniName);
+    }
+    uniBodyRef.current = uniBody;
+
+    // Queue remaining URLs (all except the first)
+    urlQueueRef.current = validUrls.slice(1);
+    if (validUrls.length > 1) {
+      setUrlQueueProgress({ current: 1, total: validUrls.length });
+    } else {
+      setUrlQueueProgress(null);
     }
 
     try {
-      const resp = await fetch("/api/scrape/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json();
-        setScrapeLogs([{ event: "error", message: err.error || "Failed to start scraping" }]);
-        setScraping(false);
-        return;
-      }
-
-      const data = await resp.json();
-      const jobId = data.jobId;
-      setActiveJobId(jobId);
-      sessionStorage.setItem("activeScrapeJob", jobId);
       setScrapeLogs([{ event: "status", message: "Scraping started in background..." }]);
-      pollJobStatus(jobId);
+      const jobId = await startSingleJob(validUrls[0]);
+      if (jobId) {
+        pollJobStatus(jobId as string);
+      } else {
+        setScraping(false);
+      }
     } catch (err) {
       setScrapeLogs([{ event: "error", message: (err as Error).message }]);
       setScraping(false);
     }
-  }, [scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, pollJobStatus]);
+  }, [scrapeUrls, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
 
   useEffect(() => {
     if (!scraping && activeJobId) {
@@ -491,17 +529,45 @@ export default function Scraping() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="https://www.university.edu/courses"
-                value={scrapeUrl}
-                onChange={(e) => setScrapeUrl(e.target.value)}
-                className="pl-9 h-11 bg-white"
-                disabled={scraping}
-              />
-            </div>
+          <div className="space-y-2">
+            {scrapeUrls.map((url, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <div className="flex-1 relative">
+                  <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="https://www.university.edu/courses"
+                    value={url}
+                    onChange={(e) => {
+                      const next = [...scrapeUrls];
+                      next[idx] = e.target.value;
+                      setScrapeUrls(next);
+                    }}
+                    className="pl-9 h-11 bg-white"
+                    disabled={scraping}
+                  />
+                </div>
+                {scrapeUrls.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setScrapeUrls(scrapeUrls.filter((_, i) => i !== idx))}
+                    disabled={scraping}
+                    className="text-gray-400 hover:text-red-500 disabled:opacity-40 transition-colors"
+                    title="Remove URL"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setScrapeUrls([...scrapeUrls, ""])}
+              disabled={scraping}
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 disabled:opacity-40 transition-colors"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add another URL
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -511,7 +577,7 @@ export default function Scraping() {
                 setSelectedUni(val);
                 if (val && val !== ALL) {
                   const uni = uniData?.data?.find((u) => String(u.id) === val);
-                  if (uni?.scrapeUrl) setScrapeUrl(uni.scrapeUrl);
+                  if (uni?.scrapeUrl) setScrapeUrls([uni.scrapeUrl]);
                 }
               }} disabled={scraping}>
                 <SelectTrigger className="bg-white h-9">
@@ -547,10 +613,10 @@ export default function Scraping() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap">
             <Button
               onClick={startScraping}
-              disabled={scraping || !scrapeUrl || (!selectedUni && !newUniName)}
+              disabled={scraping || scrapeUrls.every((u) => !u.trim()) || (!selectedUni && !newUniName)}
               className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
               size="lg"
             >
@@ -562,11 +628,18 @@ export default function Scraping() {
               ) : (
                 <>
                   <Zap className="w-4 h-4 mr-2" />
-                  Start AI Scraping
+                  {scrapeUrls.filter((u) => u.trim()).length > 1
+                    ? `Start AI Scraping (${scrapeUrls.filter((u) => u.trim()).length} URLs)`
+                    : "Start AI Scraping"}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
             </Button>
+            {urlQueueProgress && urlQueueProgress.total > 1 && (
+              <span className="text-sm text-gray-500 font-medium">
+                URL {urlQueueProgress.current} of {urlQueueProgress.total}
+              </span>
+            )}
             {selectedUni && selectedUni !== ALL && uniData?.data?.find((u) => String(u.id) === selectedUni)?.scrapeConfig && (
               <Button
                 onClick={async () => {
