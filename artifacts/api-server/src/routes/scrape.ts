@@ -54,7 +54,7 @@ interface CourseData {
 
 interface ScrapeJob {
   id: string;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "stopped";
   logs: { event: string; [key: string]: unknown }[];
   imported: number;
   skipped: number;
@@ -65,6 +65,8 @@ interface ScrapeJob {
   completedAt?: number;
   universityId?: number;
   universityName?: string;
+  url?: string;
+  stopped?: boolean;
 }
 
 const scrapeJobs = new Map<string, ScrapeJob>();
@@ -857,6 +859,10 @@ async function scrapeCourseBatch(
   let pendingCourses: { index: number; data: CourseData }[] = [];
 
   for (let i = 0; i < max; i++) {
+    if (job.stopped) {
+      addLog(job, "status", { message: `Stopped after ${i} courses (${job.imported} staged)` });
+      break;
+    }
     const link = courseLinks[i];
     job.current = i + 1;
     addLog(job, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
@@ -1197,6 +1203,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
 
     job.universityId = uniId;
     job.universityName = uniName;
+    job.url = url;
     scrapeJobs.set(jobId, job);
     addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})` });
 
@@ -1231,9 +1238,24 @@ router.get("/scrape/status/:jobId", (req: Request, res: Response): void => {
     completedAt: job.completedAt,
     universityId: job.universityId,
     universityName: job.universityName,
+    url: job.url,
     logs: newLogs,
     logIndex: job.logs.length,
   });
+});
+
+router.post("/scrape/stop/:jobId", (req: Request, res: Response): void => {
+  const job = scrapeJobs.get(req.params.jobId);
+  if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+  if (job.status !== "running") { res.status(400).json({ error: "Job is not running" }); return; }
+
+  job.stopped = true;
+  job.status = "stopped";
+  job.completedAt = Date.now();
+  addLog(job, "status", { message: "Scraping stopped by user" });
+  addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+
+  res.json({ message: "Scraping stopped", imported: job.imported });
 });
 
 router.get("/scrape/jobs", (_req: Request, res: Response): void => {

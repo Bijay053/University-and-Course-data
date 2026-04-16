@@ -11,6 +11,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
+  Square, StopCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -124,6 +125,9 @@ export default function Scraping() {
   const [approving, setApproving] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [scrapeUniName, setScrapeUniName] = useState("");
+  const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
+  const [stopping, setStopping] = useState(false);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -185,6 +189,9 @@ export default function Scraping() {
         }
         const data = await res.json();
 
+        if (data.universityName) setScrapeUniName(data.universityName);
+        if (data.url) setScrapeTargetUrl(data.url);
+
         if (data.logs && data.logs.length > 0) {
           setScrapeLogs((prev) => [...prev, ...data.logs]);
           logIndexRef.current = data.logIndex;
@@ -195,8 +202,9 @@ export default function Scraping() {
 
         if (data.status !== "running") {
           setScraping(false);
+          setStopping(false);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-          if (data.status === "completed" && data.imported > 0) {
+          if ((data.status === "completed" || data.status === "stopped") && data.imported > 0) {
             loadStagedCourses(jobId);
           }
         }
@@ -224,6 +232,14 @@ export default function Scraping() {
     }
   }, [pollJobStatus]);
 
+  const stopScraping = useCallback(async () => {
+    if (!activeJobId) return;
+    setStopping(true);
+    try {
+      await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" });
+    } catch {}
+  }, [activeJobId]);
+
   const startScraping = useCallback(async () => {
     if (!scrapeUrl) return;
     setScraping(true);
@@ -231,14 +247,19 @@ export default function Scraping() {
     setScrapeResult(null);
     setShowReview(false);
     setStagedCourses([]);
+    setScrapeTargetUrl(scrapeUrl);
+    setStopping(false);
 
     const body: Record<string, unknown> = { url: scrapeUrl };
     if (selectedUni && selectedUni !== ALL) {
       body.universityId = parseInt(selectedUni);
+      const uni = uniData?.data?.find((u) => String(u.id) === selectedUni);
+      if (uni) setScrapeUniName(uni.name);
     } else {
       body.universityName = newUniName;
       body.universityCountry = newUniCountry;
       body.universityCity = newUniCity;
+      setScrapeUniName(newUniName);
     }
 
     try {
@@ -445,32 +466,75 @@ export default function Scraping() {
             )}
           </div>
 
-          <Button
-            onClick={startScraping}
-            disabled={scraping || !scrapeUrl || (!selectedUni && !newUniName)}
-            className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
-            size="lg"
-          >
-            {scraping ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Scraping in Background...
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4 mr-2" />
-                Start AI Scraping
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </>
+          <div className="flex gap-2">
+            <Button
+              onClick={startScraping}
+              disabled={scraping || !scrapeUrl || (!selectedUni && !newUniName)}
+              className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
+              size="lg"
+            >
+              {scraping ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Scraping in Background...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Start AI Scraping
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+            {scraping && (
+              <Button
+                onClick={stopScraping}
+                disabled={stopping}
+                variant="destructive"
+                className="h-11 px-6"
+                size="lg"
+              >
+                {stopping ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Stopping...
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-4 h-4 mr-2" />
+                    Stop Scraping
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
 
-          {scrapeLogs.length > 0 && (
+          {(scraping || scrapeLogs.length > 0) && (
             <div className="space-y-3">
+              {(scrapeUniName || scrapeTargetUrl) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
+                  {scrapeUniName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-blue-800">University:</span>
+                      <span className="text-blue-700">{scrapeUniName}</span>
+                    </div>
+                  )}
+                  {scrapeTargetUrl && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <a href={scrapeTargetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                        {scrapeTargetUrl}
+                      </a>
+                      <ExternalLink className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {progressLog && progressLog.total && (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Scraping courses...</span>
+                    <span>{progressLog.message || "Scraping courses..."}</span>
                     <span>{progressLog.current}/{progressLog.total}</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -482,11 +546,18 @@ export default function Scraping() {
                 </div>
               )}
 
+              {scraping && !progressLog && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
+                </div>
+              )}
+
               <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-auto font-mono text-xs space-y-1">
                 {scrapeLogs.map((log, i) => (
                   <div key={i} className={
                     log.event === "error" ? "text-red-400" :
-                    log.event === "course" && log.status === "staged" ? "text-green-400" :
+                    log.event === "course" && (log.status === "staged" || log.status === "staged (cheerio only)") ? "text-green-400" :
                     log.event === "course" && log.status === "skipped" ? "text-yellow-400" :
                     log.event === "done" ? "text-cyan-400 font-bold" :
                     "text-gray-300"
