@@ -371,6 +371,137 @@ async function saveCourse(courseData: CourseData, uniId: number): Promise<boolea
   return true;
 }
 
+async function tryDiscoverApiEndpoints(html: string, pageUrl: string, res: Response): Promise<{ url: string; name: string }[] | null> {
+  const origin = new URL(pageUrl).origin;
+
+  const apiPatterns = html.match(/["'](\/api\/[^"']+(?:course|program|search)[^"']*)["']/gi) || [];
+  const queryParams = new URL(pageUrl).search;
+
+  for (const match of apiPatterns) {
+    const apiPath = match.replace(/["']/g, "");
+    if (apiPath.includes("autocomplete")) continue;
+
+    const tryUrls = [
+      `${origin}${apiPath}${queryParams}`,
+      `${origin}${apiPath}?page=0&pageSize=500`,
+      `${origin}${apiPath}`,
+    ];
+
+    for (const tryUrl of tryUrls) {
+      try {
+        sendSSE(res, "status", { message: `Trying hidden API: ${apiPath}...`, phase: "discover" });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const resp = await fetch(tryUrl, {
+          signal: controller.signal,
+          headers: {
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": pageUrl,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          },
+        });
+        clearTimeout(timeout);
+
+        if (!resp.ok) continue;
+
+        const contentType = resp.headers.get("content-type") || "";
+        if (!contentType.includes("json")) continue;
+
+        const data = await resp.json() as any;
+        const courses = extractCoursesFromApiResponse(data, origin);
+
+        if (courses.length > 0) {
+          sendSSE(res, "status", { message: `API returned ${courses.length} courses on first page. Checking for more...`, phase: "discover" });
+
+          const totalPages = data?.result?.totalPage ?? data?.totalPage ?? data?.totalPages ?? 1;
+          const pageSize = data?.result?.pageSize ?? data?.pageSize ?? 20;
+
+          if (totalPages > 1) {
+            for (let page = 1; page < totalPages; page++) {
+              try {
+                const pageUrlObj = new URL(tryUrl);
+                pageUrlObj.searchParams.set("pageQ", String(page));
+                if (!pageUrlObj.searchParams.has("PageId")) {
+                  const origParams = new URL(pageUrl).searchParams;
+                  const pageId = origParams.get("PageId");
+                  if (pageId) pageUrlObj.searchParams.set("PageId", pageId);
+                }
+
+                const pResp = await fetch(pageUrlObj.toString(), {
+                  headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": pageUrl,
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                  },
+                });
+                if (pResp.ok) {
+                  const pData = await pResp.json() as any;
+                  const moreCourses = extractCoursesFromApiResponse(pData, origin);
+                  courses.push(...moreCourses);
+                  sendSSE(res, "status", { message: `Fetched page ${page + 1}/${totalPages} (${courses.length} total courses)`, phase: "discover" });
+                }
+              } catch {}
+              await new Promise((r) => setTimeout(r, 300));
+            }
+          }
+
+          return courses;
+        }
+      } catch {}
+    }
+  }
+
+  return null;
+}
+
+function extractCoursesFromApiResponse(data: any, origin: string): { url: string; name: string }[] {
+  const courses: { url: string; name: string }[] = [];
+  const seen = new Set<string>();
+
+  function findItems(obj: any): any[] {
+    if (!obj || typeof obj !== "object") return [];
+    if (Array.isArray(obj)) {
+      if (obj.length > 0 && obj[0]?.header && obj[0]?.link) return obj;
+      if (obj.length > 0 && (obj[0]?.name || obj[0]?.title || obj[0]?.courseName)) return obj;
+      for (const item of obj) {
+        const found = findItems(item);
+        if (found.length > 0) return found;
+      }
+      return [];
+    }
+    for (const key of Object.keys(obj)) {
+      if (key === "facets" || key === "filters") continue;
+      const found = findItems(obj[key]);
+      if (found.length > 0) return found;
+    }
+    return [];
+  }
+
+  const items = findItems(data);
+  for (const item of items) {
+    const name = item.header || item.name || item.title || item.courseName || "";
+    let url = "";
+    if (item.link?.href) url = item.link.href;
+    else if (item.url) url = item.url;
+    else if (item.href) url = item.href;
+    else if (item.link?.url) url = item.link.url;
+
+    if (name && url) {
+      try {
+        const fullUrl = url.startsWith("http") ? url : new URL(url, origin).toString();
+        if (!seen.has(fullUrl)) {
+          seen.add(fullUrl);
+          courses.push({ url: fullUrl, name: name.replace(/<[^>]*>/g, "").trim() });
+        }
+      } catch {}
+    }
+  }
+
+  return courses;
+}
+
 router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
   const { url, universityId, universityName, universityCountry, universityCity } = req.body as {
     url: string;
@@ -436,7 +567,46 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     const analysis = await analyzePage(pageContent);
 
     if (analysis.pageType === "unknown") {
-      sendSSE(res, "status", { message: "No courses found on main page. Trying to discover course pages from the site...", phase: "discover" });
+      sendSSE(res, "status", { message: "No course data in static HTML. Trying to discover hidden API endpoints...", phase: "discover" });
+
+      const apiCourses = await tryDiscoverApiEndpoints(html, url, res);
+      if (apiCourses && apiCourses.length > 0) {
+        sendSSE(res, "status", {
+          message: `Found ${apiCourses.length} courses via hidden API. Extracting details...`,
+          phase: "extract",
+          totalCourses: apiCourses.length,
+        });
+
+        let imported = 0, skipped = 0, errors = 0;
+        const max = Math.min(apiCourses.length, 300);
+
+        for (let i = 0; i < max; i++) {
+          const link = apiCourses[i];
+          sendSSE(res, "progress", { current: i + 1, total: max, courseName: link.name, message: `Scraping ${i + 1}/${max}: ${link.name}` });
+          try {
+            const cHtml = await fetchPage(link.url);
+            const cContent = extractPageContent(cHtml, link.url);
+            const cData = await extractCourseFromPage(cContent, link.name);
+            if (cData) {
+              cData.courseWebsite = cData.courseWebsite || link.url;
+              const saved = await saveCourse(cData, uniId);
+              if (saved) { imported++; sendSSE(res, "course", { name: cData.courseName, status: "imported", index: i + 1 }); }
+              else { skipped++; sendSSE(res, "course", { name: cData.courseName, status: "skipped", index: i + 1 }); }
+            } else {
+              errors++;
+              sendSSE(res, "course", { name: link.name, status: "error", message: "Could not extract course details", index: i + 1 });
+            }
+          } catch (err) {
+            errors++;
+            sendSSE(res, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
+          }
+          if (i % 5 === 4) await new Promise((r) => setTimeout(r, 500));
+        }
+
+        sendSSE(res, "done", { totalFound: apiCourses.length, imported, skipped, errors });
+        res.end();
+        return;
+      }
 
       const $ = cheerio.load(html);
       const courseLinks: { url: string; name: string }[] = [];
