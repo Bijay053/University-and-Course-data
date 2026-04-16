@@ -445,14 +445,23 @@ export default function Scraping() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="text-xs font-medium text-gray-500 mb-1 block">University</label>
-              <Select value={selectedUni} onValueChange={setSelectedUni} disabled={scraping}>
+              <Select value={selectedUni} onValueChange={(val) => {
+                setSelectedUni(val);
+                if (val && val !== ALL) {
+                  const uni = uniData?.data?.find((u) => String(u.id) === val);
+                  if (uni?.scrapeUrl) setScrapeUrl(uni.scrapeUrl);
+                }
+              }} disabled={scraping}>
                 <SelectTrigger className="bg-white h-9">
                   <SelectValue placeholder="Select university..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>+ Create New University</SelectItem>
                   {uniData?.data?.map((u) => (
-                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                    <SelectItem key={u.id} value={String(u.id)}>
+                      {u.name}
+                      {u.scrapeUrl && <span className="ml-1 text-green-500 text-xs">(saved)</span>}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -496,6 +505,49 @@ export default function Scraping() {
                 </>
               )}
             </Button>
+            {selectedUni && selectedUni !== ALL && uniData?.data?.find((u) => String(u.id) === selectedUni)?.scrapeConfig && (
+              <Button
+                onClick={async () => {
+                  setScraping(true);
+                  setScrapeLogs([]);
+                  setScrapeResult(null);
+                  setShowReview(false);
+                  setStagedCourses([]);
+                  setStopping(false);
+                  const uni = uniData?.data?.find((u) => String(u.id) === selectedUni);
+                  if (uni) setScrapeUniName(uni.name);
+                  setScrapeTargetUrl(uni?.scrapeUrl || "");
+                  try {
+                    const resp = await fetch("/api/scrape/rescrape", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ universityId: parseInt(selectedUni) }),
+                    });
+                    if (!resp.ok) {
+                      const err = await resp.json();
+                      setScrapeLogs([{ event: "error", message: err.error || "Failed to start re-scraping" }]);
+                      setScraping(false);
+                      return;
+                    }
+                    const data = await resp.json();
+                    setActiveJobId(data.jobId);
+                    sessionStorage.setItem("activeScrapeJob", data.jobId);
+                    setScrapeLogs([{ event: "status", message: "Re-scraping started (no AI, zero cost)..." }]);
+                    pollJobStatus(data.jobId);
+                  } catch (err) {
+                    setScrapeLogs([{ event: "error", message: (err as Error).message }]);
+                    setScraping(false);
+                  }
+                }}
+                disabled={scraping}
+                variant="outline"
+                className="h-11 px-4 border-green-300 text-green-700 hover:bg-green-50"
+                size="lg"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Re-scrape (No AI)
+              </Button>
+            )}
             {scraping && (
               <Button
                 onClick={stopScraping}

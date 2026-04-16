@@ -83,6 +83,8 @@ All routes served at `/api/...`:
 - `POST /scrape/staged/approve-all` — approve all pending for a job
 - `POST /scrape/staged/reject-all` — reject all pending for a job
 - `POST /scrape/preview` — preview page analysis before scraping
+- `POST /scrape/rescrape` — re-scrape using saved config (no AI, zero cost)
+- `POST /scrape/stop/:jobId` — stop a running scrape job
 
 ## AI Integration
 
@@ -100,3 +102,6 @@ All routes served at `/api/...`:
 - **Graceful degradation**: If AI analysis fails (rate limit), falls back to cheerio-only HTML link scanning
 - **Related page enrichment**: Follows fee, requirements, and entry links to gather missing data
 - **International fees only**: All fee extraction (cheerio, AI, PDF) enforces international-student-only rule
+- **Re-scrape (No AI)**: After initial AI scrape, saved `scrapeConfig` (course links + uni pages) enables zero-cost re-scraping using only HTML/regex extraction
+- **Scrape config persistence**: `scrapeConfig` JSONB saved on universities table with courseLinks, uniPages, resolvedUrl, lastScrapedAt
+- **Auto-fill URL**: Frontend auto-fills scrape URL when a university is selected from dropdown (uses saved `scrapeUrl`)

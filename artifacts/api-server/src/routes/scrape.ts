@@ -54,6 +54,13 @@ interface CourseData {
   scholarship?: string;
 }
 
+interface ScrapeConfig {
+  courseLinks: { url: string; name: string }[];
+  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string };
+  resolvedUrl: string;
+  lastScrapedAt: string;
+}
+
 interface ScrapeJob {
   id: string;
   status: "running" | "completed" | "failed" | "stopped";
@@ -69,6 +76,7 @@ interface ScrapeJob {
   universityName?: string;
   url?: string;
   stopped?: boolean;
+  discoveredConfig?: ScrapeConfig;
 }
 
 const scrapeJobs = new Map<string, ScrapeJob>();
@@ -1305,7 +1313,7 @@ async function getUniversityFeePageText(feePage: string, cache: UniversityFeeCac
   }
 }
 
-async function extractFeeFromUniversityPage(feePage: string, courseName: string, courseData: Partial<CourseData>, cache: UniversityFeeCache): Promise<void> {
+async function extractFeeFromUniversityPage(feePage: string, courseName: string, courseData: Partial<CourseData>, cache: UniversityFeeCache, noAi = false): Promise<void> {
   if (courseData.internationalFee) return;
 
   const text = await getUniversityFeePageText(feePage, cache);
@@ -1331,7 +1339,7 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
     }
   }
 
-  if (!courseData.internationalFee && GEMINI_API_KEY) {
+  if (!noAi && !courseData.internationalFee && GEMINI_API_KEY) {
     try {
       const prompt = `From this fee schedule page text, find the INTERNATIONAL student tuition fee for the course "${courseName}".
 Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Total|Semester|Per Unit>"}
@@ -1675,6 +1683,13 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         });
         await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+
+        if (job.imported > 0) {
+          const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
+          job.discoveredConfig = config;
+          await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+        }
+
         job.status = "completed";
         job.completedAt = Date.now();
         return;
@@ -1694,6 +1709,19 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       });
       await scrapeCourseBatch(courseLinks, uniId, job, 300, jobId, uniPages);
       addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+
+      if (job.imported > 0) {
+        const config: ScrapeConfig = {
+          courseLinks,
+          uniPages,
+          resolvedUrl,
+          lastScrapedAt: new Date().toISOString(),
+        };
+        job.discoveredConfig = config;
+        await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+        addLog(job, "status", { message: `Saved scraping config (${courseLinks.length} links) for future no-AI re-scrapes` });
+      }
+
       job.status = "completed";
       job.completedAt = Date.now();
       return;
@@ -1765,6 +1793,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     scrapeJobs.set(jobId, job);
     addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})` });
 
+    await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
+
     runScrapeJob(job, url, uniId, jobId).catch((err) => {
       addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
       job.status = "failed";
@@ -1772,6 +1802,153 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     });
 
     res.json({ jobId, message: "Scraping started in background" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: number, jobId: string) {
+  try {
+    addLog(job, "status", { message: `Re-scraping with saved config (${config.courseLinks.length} course links, no AI)...`, phase: "fetch" });
+
+    const uniPages = config.uniPages;
+    const found = Object.entries(uniPages).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(", ");
+    if (found) addLog(job, "status", { message: `Using saved university pages: ${found}`, phase: "discover" });
+
+    const feeCache: UniversityFeeCache = { fetched: false };
+    let uniReqsText: string | null = null;
+
+    if (uniPages?.requirementsPage || uniPages?.entryPage) {
+      try {
+        const reqUrl = uniPages.entryPage || uniPages.requirementsPage!;
+        const reqHtml = await fetchPage(reqUrl);
+        uniReqsText = cheerio.load(reqHtml)("body").text();
+      } catch {}
+    }
+
+    const max = config.courseLinks.length;
+    job.totalFound = max;
+    const batchSize = 10;
+    let classifyBatch: { index: number; name: string; existing: Partial<CourseData> }[] = [];
+    let pendingCourses: { index: number; data: CourseData }[] = [];
+
+    for (let i = 0; i < max; i++) {
+      if (job.stopped) {
+        addLog(job, "status", { message: `Stopped after ${i} courses (${job.imported} staged)` });
+        break;
+      }
+      const link = config.courseLinks[i];
+      job.current = i + 1;
+      addLog(job, "progress", { current: i + 1, total: max, courseName: link.name, message: `Fetching ${i + 1}/${max}: ${link.name}` });
+
+      try {
+        const cHtml = await fetchPage(link.url);
+        const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+
+        const relatedPages = findRelatedPages(cHtml, link.url);
+        const noAiRelated = { fees: relatedPages.fees, requirements: relatedPages.requirements, entry: relatedPages.entry };
+        if (noAiRelated.fees || noAiRelated.requirements || noAiRelated.entry) {
+          for (const page of [
+            noAiRelated.fees && { url: noAiRelated.fees, type: "fees" as const },
+            noAiRelated.entry && { url: noAiRelated.entry, type: "english" as const },
+            noAiRelated.requirements && { url: noAiRelated.requirements, type: "requirements" as const },
+          ].filter(Boolean) as { url: string; type: string }[]) {
+            try {
+              const pHtml = await fetchPage(page.url);
+              const text = cheerio.load(pHtml)("body").text();
+              if (page.type === "fees" || page.type === "requirements") {
+                if (!cheerioData.internationalFee) extractInternationalFees(text, cheerioData);
+              }
+              if (page.type === "english" || page.type === "requirements") {
+                extractEnglishRequirements(text, cheerioData);
+              }
+              if (!cheerioData.intakeMonths?.length) extractIntakeMonths(text, cheerioData);
+            } catch {}
+          }
+        }
+
+        if (!cheerioData.internationalFee && uniPages?.feePage) {
+          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true);
+        }
+
+        if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+          extractEnglishRequirements(uniReqsText, cheerioData);
+        }
+
+        const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
+
+        classifyBatch.push({ index: i, name: link.name, existing: courseData });
+        pendingCourses.push({ index: i, data: courseData });
+      } catch (err) {
+        job.errors++;
+        addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
+      }
+
+      if (classifyBatch.length >= batchSize || (i === max - 1 && classifyBatch.length > 0)) {
+        addLog(job, "status", { message: `Staging batch of ${pendingCourses.length} courses (no AI classification)...`, phase: "stage" });
+
+        for (const pending of pendingCourses) {
+          const saved = await stageCourse(pending.data, uniId, jobId);
+          if (saved) { job.imported++; addLog(job, "course", { name: pending.data.courseName, status: "staged", index: pending.index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: pending.data.courseName, status: "skipped", index: pending.index + 1 }); }
+        }
+
+        classifyBatch = [];
+        pendingCourses = [];
+      }
+
+      if (i % 3 === 2) await new Promise((r) => setTimeout(r, 200));
+    }
+
+    addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+    if (job.status !== "stopped") {
+      job.status = "completed";
+    }
+    job.completedAt = Date.now();
+  } catch (err) {
+    addLog(job, "error", { message: `Re-scraping failed: ${(err as Error).message}` });
+    job.status = "failed";
+    job.completedAt = Date.now();
+  }
+}
+
+router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<void> => {
+  const { universityId } = req.body as { universityId: number };
+  if (!universityId) { res.status(400).json({ error: "University ID is required" }); return; }
+
+  try {
+    const [uni] = await db.select().from(universitiesTable).where(eq(universitiesTable.id, universityId));
+    if (!uni) { res.status(404).json({ error: "University not found" }); return; }
+    if (!uni.scrapeConfig) { res.status(400).json({ error: "No saved scraping config for this university. Run a full AI scrape first." }); return; }
+
+    const config = uni.scrapeConfig as ScrapeConfig;
+
+    const jobId = `scrape_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const job: ScrapeJob = {
+      id: jobId,
+      status: "running",
+      logs: [],
+      imported: 0,
+      skipped: 0,
+      errors: 0,
+      totalFound: 0,
+      current: 0,
+      startedAt: Date.now(),
+    };
+
+    job.universityId = uni.id;
+    job.universityName = uni.name;
+    job.url = uni.scrapeUrl || config.resolvedUrl;
+    scrapeJobs.set(jobId, job);
+    addLog(job, "status", { message: `Re-scraping ${uni.name} using saved config (NO AI, zero cost)` });
+
+    runNoAiScrapeJob(job, config, uni.id, jobId).catch((err) => {
+      addLog(job, "error", { message: `Fatal error: ${(err as Error).message}` });
+      job.status = "failed";
+      job.completedAt = Date.now();
+    });
+
+    res.json({ jobId, message: "Re-scraping started (no AI)" });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
