@@ -1,10 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as cheerio from "cheerio";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { pool, db, universitiesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 interface CourseData {
   courseName: string;
@@ -59,6 +61,47 @@ function sendSSE(res: Response, event: string, data: unknown) {
   res.write(`data: ${JSON.stringify({ event, ...data as object })}\n\n`);
 }
 
+async function geminiChat(systemPrompt: string, userContent: string, retries = 3): Promise<string> {
+  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const resp = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userContent }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 8192,
+        },
+      }),
+    });
+
+    if (resp.status === 429) {
+      if (attempt < retries - 1) {
+        const wait = (attempt + 1) * 15;
+        console.log(`Gemini rate limited, retrying in ${wait}s (attempt ${attempt + 1}/${retries})`);
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        continue;
+      }
+      throw new Error("Gemini API rate limit exceeded. The free-tier quota has been reached. Please wait a minute and try again.");
+    }
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const data = await resp.json() as any;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    if (!text) throw new Error("Empty response from Gemini API");
+    return text;
+  }
+
+  throw new Error("Gemini API failed after all retries");
+}
+
 async function fetchPage(url: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -99,21 +142,13 @@ function extractPageContent(html: string, url: string): string {
   });
 
   const bodyText = $("body").text().replace(/\s+/g, " ").trim();
-  const truncatedBody = bodyText.slice(0, 12000);
-  const truncatedLinks = links.slice(0, 100).join("\n");
+  const truncatedBody = bodyText.slice(0, 15000);
+  const truncatedLinks = links.slice(0, 150).join("\n");
 
   return `URL: ${url}\n\nPAGE TEXT:\n${truncatedBody}\n\nLINKS ON PAGE:\n${truncatedLinks}`;
 }
 
-async function analyzePage(content: string): Promise<PageAnalysis> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    max_completion_tokens: 4096,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `You are a university course data extractor. Analyze the webpage content and determine:
+const ANALYZE_PROMPT = `You are a university course data extractor. Analyze the webpage content and determine:
 
 1. If it's a LISTING page (shows multiple courses with links), extract the course links.
 2. If it's a DETAIL page (shows one course in detail), extract all available course data.
@@ -137,16 +172,16 @@ For DETAIL pages:
     "subCategory": "<specific sub-category>",
     "courseWebsite": "<course page URL>",
     "duration": <number or null>,
-    "durationTerm": "<'Year' or 'Month' or 'Week'>",
-    "studyMode": "<'On Campus' or 'Online' or 'Blended'>",
-    "degreeLevel": "<'Bachelor' or 'Master' or 'PhD' or 'Certificate & Diploma' or 'Graduate Certificate & Diploma' or 'Associate Degree or Equivalent'>",
-    "studyLoad": "<'Full Time' or 'Part Time'>",
+    "durationTerm": "<Year or Month or Week>",
+    "studyMode": "<On Campus or Online or Blended>",
+    "degreeLevel": "<Bachelor or Master or PhD or Certificate & Diploma or Graduate Certificate & Diploma or Associate Degree or Equivalent>",
+    "studyLoad": "<Full Time or Part Time>",
     "language": "<language of instruction>",
     "description": "<brief course description>",
-    "intakeMonths": ["January", "March", ...],
+    "intakeMonths": ["January", "March"],
     "internationalFee": <number or null>,
-    "feeTerm": "<'Annual' or 'Total' or 'Semester'>",
-    "currency": "<'AUD' or 'GBP' or 'USD' etc>",
+    "feeTerm": "<Annual or Total or Semester>",
+    "currency": "<AUD or GBP or USD etc>",
     "ieltsOverall": <number or null>,
     "ieltsListening": <number or null>,
     "ieltsSpeaking": <number or null>,
@@ -171,46 +206,26 @@ For DETAIL pages:
 
 If the page is neither, return: {"pageType": "unknown"}
 Extract ONLY data that is clearly present on the page. Use null for missing fields.
-For course links, include the FULL URL (not relative paths).`,
-      },
-      { role: "user", content },
-    ],
-  });
+For course links, include the FULL URL (not relative paths).`;
 
-  const text = response.choices[0]?.message?.content ?? "{}";
-  try {
-    return JSON.parse(text) as PageAnalysis;
-  } catch {
-    return { pageType: "unknown" };
-  }
-}
-
-async function extractCourseFromPage(content: string, courseName: string): Promise<CourseData | null> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    max_completion_tokens: 4096,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `You are a university course data extractor. Extract ALL available course information from this webpage for the course "${courseName}".
+const EXTRACT_PROMPT = (courseName: string) => `You are a university course data extractor. Extract ALL available course information from this webpage for the course "${courseName}".
 
 Return JSON with these fields (use null for any field not found on the page):
 {
   "courseName": "<exact course name>",
-  "category": "<broad category: 'Business & Management', 'Engineering & Technology', 'Computer Science & IT', 'Medicine & Health', 'Arts, Humanities & Social Sciences', 'Education & Social Work', 'Architecture, Building & Design', 'Media & Communications', 'Law & Legal Studies', 'Hospitality, Tourism & Events', 'Science & Mathematics', 'Agriculture & Environmental Science'>",
+  "category": "<broad category: Business & Management, Engineering & Technology, Computer Science & IT, Medicine & Health, Arts Humanities & Social Sciences, Education & Social Work, Architecture Building & Design, Media & Communications, Law & Legal Studies, Hospitality Tourism & Events, Science & Mathematics, Agriculture & Environmental Science>",
   "subCategory": "<specific sub-category>",
   "courseWebsite": "<URL of this page>",
   "duration": <number or null>,
-  "durationTerm": "<'Year' or 'Month' or 'Week'>",
-  "studyMode": "<'On Campus' or 'Online' or 'Blended'>",
-  "degreeLevel": "<'Bachelor' or 'Master' or 'PhD' or 'Certificate & Diploma' or 'Graduate Certificate & Diploma' or 'Associate Degree or Equivalent'>",
-  "studyLoad": "<'Full Time' or 'Part Time'>",
+  "durationTerm": "<Year or Month or Week>",
+  "studyMode": "<On Campus or Online or Blended>",
+  "degreeLevel": "<Bachelor or Master or PhD or Certificate & Diploma or Graduate Certificate & Diploma or Associate Degree or Equivalent>",
+  "studyLoad": "<Full Time or Part Time>",
   "language": "<language>",
   "description": "<brief description max 500 chars>",
   "intakeMonths": ["January", "September"],
   "internationalFee": <number or null>,
-  "feeTerm": "<'Annual' or 'Total' or 'Semester'>",
+  "feeTerm": "<Annual or Total or Semester>",
   "feeYear": <year number or null>,
   "currency": "<AUD/GBP/USD/etc>",
   "ieltsOverall": <number or null>,
@@ -234,14 +249,20 @@ Return JSON with these fields (use null for any field not found on the page):
   "academicCountry": "<country>",
   "otherRequirement": "<other requirements>",
   "scholarship": "<scholarship info>"
-}`,
-      },
-      { role: "user", content },
-    ],
-  });
+}`;
 
-  const text = response.choices[0]?.message?.content ?? "{}";
+async function analyzePage(content: string): Promise<PageAnalysis> {
+  const text = await geminiChat(ANALYZE_PROMPT, content);
   try {
+    return JSON.parse(text) as PageAnalysis;
+  } catch {
+    return { pageType: "unknown" };
+  }
+}
+
+async function extractCourseFromPage(content: string, courseName: string): Promise<CourseData | null> {
+  try {
+    const text = await geminiChat(EXTRACT_PROMPT(courseName), content);
     const data = JSON.parse(text) as CourseData;
     return data.courseName ? data : null;
   } catch {
@@ -340,6 +361,10 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     res.status(400).json({ error: "URL is required" });
     return;
   }
+  if (!GEMINI_API_KEY) {
+    res.status(500).json({ error: "GEMINI_API_KEY not configured" });
+    return;
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -383,7 +408,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    sendSSE(res, "status", { message: "Analyzing page with AI...", phase: "analyze" });
+    sendSSE(res, "status", { message: "Analyzing page with Gemini AI...", phase: "analyze" });
     const pageContent = extractPageContent(html, url);
     const analysis = await analyzePage(pageContent);
 
@@ -452,7 +477,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
           sendSSE(res, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
         }
 
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 300));
       }
 
       sendSSE(res, "done", { totalFound: courseLinks.length, imported, skipped, errors });
@@ -471,6 +496,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
 router.post("/scrape/preview", async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url: string };
   if (!url) { res.status(400).json({ error: "URL is required" }); return; }
+  if (!GEMINI_API_KEY) { res.status(500).json({ error: "GEMINI_API_KEY not configured" }); return; }
 
   try {
     const html = await fetchPage(url);
