@@ -1586,14 +1586,22 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
         if (visited.has(fullUrl)) return;
         visited.add(fullUrl);
 
+        const isDrupalNodeUrl = /\/node\/\d+$/.test(fullUrl);
+
         if (!result.feesPdf && /\.pdf/i.test(fullUrl) && /fee|tuition/i.test(fullUrl + " " + text)) {
           result.feesPdf = fullUrl;
         }
-        if (!result.feePage && /\b(tuition|fee)\b/i.test(text) && /\b(international|overseas|student|schedule)\b/i.test(text + " " + fullUrl) && !/fee.?help|scholarship|refund|payment.?plan/i.test(fullUrl + " " + text)) {
-          result.feePage = fullUrl;
-        }
-        if (!result.feePage && /\b(tuition.?fee|fee.?schedule|international.?fee)\b/i.test(fullUrl) && !/fee.?help|scholarship|refund/i.test(fullUrl)) {
-          result.feePage = fullUrl;
+        // Strongly prefer URLs that have "tuition" explicitly in the path (not just link text)
+        if (!isDrupalNodeUrl) {
+          if (!result.feePage && /tuition/i.test(fullUrl) && !/fee.?help|scholarship|refund|domestic/i.test(fullUrl + " " + text)) {
+            result.feePage = fullUrl;
+          }
+          if (!result.feePage && /\b(tuition|fee)\b/i.test(text) && /\b(international|overseas)\b/i.test(text + " " + fullUrl) && !/fee.?help|scholarship|refund|payment.?plan|domestic/i.test(fullUrl + " " + text)) {
+            result.feePage = fullUrl;
+          }
+          if (!result.feePage && /\b(tuition.?fee|fee.?schedule|international.?fee)\b/i.test(fullUrl) && !/fee.?help|scholarship|refund/i.test(fullUrl)) {
+            result.feePage = fullUrl;
+          }
         }
         if (!result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
           result.requirementsPage = fullUrl;
@@ -1612,12 +1620,15 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
       try {
         const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
         if (!fullUrl.startsWith(origin)) return;
+        const isDrupalNode = /\/node\/\d+$/.test(fullUrl);
 
         if (!result.feesPdf && /\.pdf/i.test(fullUrl) && /fee|tuition/i.test(fullUrl + " " + text)) {
           result.feesPdf = fullUrl;
         }
-        if (!result.feePage && (/\b(tuition|fee)\b/i.test(text) || /tuition.?fee|fee.?schedule/i.test(fullUrl))) {
-          result.feePage = fullUrl;
+        if (!isDrupalNode) {
+          if (!result.feePage && (/\b(tuition|fee)\b/i.test(text) || /tuition.?fee|fee.?schedule/i.test(fullUrl)) && !/fee.?help|scholarship|refund|domestic/i.test(fullUrl + " " + text)) {
+            result.feePage = fullUrl;
+          }
         }
         if (!result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
           result.requirementsPage = fullUrl;
@@ -1691,27 +1702,87 @@ async function getUniversityFeePageText(feePage: string, cache: UniversityFeeCac
   }
 }
 
+function getFeeTerm(context: string): string {
+  if (/per\s*trimester|trimester/i.test(context)) return "Trimester";
+  if (/per\s*semester|semester/i.test(context)) return "Semester";
+  if (/per\s*(credit\s*)?unit|per\s*point|per\s*credit/i.test(context)) return "Per Unit";
+  if (/per\s*year|p\.a\.|per\s*annum|annual/i.test(context)) return "Annual";
+  if (/total|full\s*course|complete/i.test(context)) return "Total";
+  return "Annual";
+}
+
+function extractInternationalSection(text: string): string {
+  // Try multiple patterns to isolate the international fee section
+  const patterns = [
+    /course\s*fees?\s*[-–]?\s*international[\s\S]*?(?=course\s*fees?\s*[-–]?\s*domestic|domestic\s*tuition|domestic\s*fee|$)/i,
+    /international\s*(?:student\s*)?(?:tuition\s*)?fees?[\s\S]*?(?=domestic\s*(?:student\s*)?fees?|$)/i,
+    /(?:fees?\s+for\s+international)[\s\S]*?(?=fees?\s+for\s+domestic|$)/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m && m[0].length > 100) return m[0];
+  }
+  // Fallback: find "international" block
+  const idx = text.search(/\binternational\b.*\bfee\b|\bfee\b.*\binternational\b/i);
+  return idx >= 0 ? text.slice(idx) : text;
+}
+
 async function extractFeeFromUniversityPage(feePage: string, courseName: string, courseData: Partial<CourseData>, cache: UniversityFeeCache, noAi = false): Promise<void> {
   if (courseData.internationalFee) return;
 
   const text = await getUniversityFeePageText(feePage, cache);
   if (!text) return;
 
-  const courseNameLower = courseName.toLowerCase().replace(/\s+/g, "\\s*");
-  const courseWords = courseName.split(/\s+/).filter(w => w.length > 3);
+  // Always search in the international section first, to avoid picking up domestic fees
+  const intlSection = extractInternationalSection(text);
+  const searchText = intlSection.length > 200 ? intlSection : text;
 
-  const intlSectionMatch = text.match(/international[^]*?(?=domestic|$)/i);
-  const searchText = intlSectionMatch ? intlSectionMatch[0] : text;
+  // Try to find the fee by course name proximity (try progressively smaller matches)
+  const nameParts = [
+    courseName,  // full name
+    courseName.replace(/,?\s*(major|specialisation|stream|pathway)\s+in\s+.*/i, "").trim(), // base degree name
+  ];
 
-  for (const word of courseWords) {
-    const regex = new RegExp(`${word}[^]*?(?:A\\$|\\$|£|€)\\s*([\\d,]+)`, "i");
+  for (const namePart of nameParts) {
+    // Escape special regex characters in course name
+    const escapedName = namePart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameRegex = new RegExp(`${escapedName}[^\\n]{0,300}?(?:A\\$|\\$|£|€|AUD\\s*)([\\d,]+)`, "i");
+    const m = searchText.match(nameRegex);
+    if (m) {
+      const fee = parseInt(m[1].replace(/,/g, ""));
+      if (fee > 1000 && fee < 200000) {
+        courseData.internationalFee = fee;
+        courseData.currency = /£/.test(m[0]) ? "GBP" : /€/.test(m[0]) ? "EUR" : "AUD";
+        courseData.feeTerm = getFeeTerm(m[0]);
+        return;
+      }
+    }
+
+    // Try reverse: find $ then look back for course name
+    const feeRegex = new RegExp(`${escapedName}[^\\n\\r]{0,50}\\n?[^\\n\\r]{0,50}(?:A\\$|\\$|£|€)([\\d,]+)`, "i");
+    const m2 = searchText.match(feeRegex);
+    if (m2) {
+      const fee = parseInt(m2[1].replace(/,/g, ""));
+      if (fee > 1000 && fee < 200000) {
+        courseData.internationalFee = fee;
+        courseData.currency = /£/.test(m2[0]) ? "GBP" : /€/.test(m2[0]) ? "EUR" : "AUD";
+        courseData.feeTerm = getFeeTerm(m2[0]);
+        return;
+      }
+    }
+  }
+
+  // Word-by-word fallback (significant unique words in course name near a fee)
+  const significantWords = courseName.split(/\s+/).filter(w => w.length > 4 && !/^(major|bachelor|master|graduate|diploma|certificate|engineering|studies|arts|science)$/i.test(w));
+  for (const word of significantWords.slice(0, 3)) {
+    const regex = new RegExp(`${word}[^\\n]{0,200}?(?:A\\$|\\$|£|€)([\\d,]+)`, "i");
     const m = searchText.match(regex);
     if (m) {
       const fee = parseInt(m[1].replace(/,/g, ""));
       if (fee > 1000 && fee < 200000) {
         courseData.internationalFee = fee;
         courseData.currency = /£/.test(m[0]) ? "GBP" : /€/.test(m[0]) ? "EUR" : "AUD";
-        courseData.feeTerm = /semester/i.test(m[0]) ? "Semester" : /per\s*unit/i.test(m[0]) ? "Per Unit" : "Annual";
+        courseData.feeTerm = getFeeTerm(m[0]);
         return;
       }
     }
@@ -1719,13 +1790,14 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
 
   if (!noAi && !courseData.internationalFee && GEMINI_API_KEY) {
     try {
-      const prompt = `From this fee schedule page text, find the INTERNATIONAL student tuition fee for the course "${courseName}".
-Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Total|Semester|Per Unit>"}
-Use null if not found. ONLY international fees.`;
-      const trimmedText = searchText.slice(0, 8000);
+      const prompt = `From this university INTERNATIONAL fee schedule, find the tuition fee for the course "${courseName}".
+This may show fees per trimester, semester, or year. Return ONLY the international/overseas student fee amount.
+Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Trimester|Semester|Per Unit|Total>"}
+Use null if not found.`;
+      const trimmedText = searchText.slice(0, 6000);
       const result = await geminiChat(prompt, trimmedText, 256);
       const parsed = JSON.parse(result);
-      if (parsed.internationalFee && parsed.internationalFee > 1000) {
+      if (parsed.internationalFee && parsed.internationalFee > 500) {
         courseData.internationalFee = parsed.internationalFee;
         courseData.currency = parsed.currency || "AUD";
         courseData.feeTerm = parsed.feeTerm || "Annual";

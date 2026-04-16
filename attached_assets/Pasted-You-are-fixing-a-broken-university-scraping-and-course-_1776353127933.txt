@@ -1,0 +1,222 @@
+You are fixing a broken university scraping and course data extraction system for a production portal.
+
+Project stack:
+Backend: Python
+Frontend: React
+
+Main goal:
+Build a smart, production ready university course scraping engine that extracts complete and accurate course data in a ready to use structured format for a university search portal, course search engine, and agent application portal.
+
+Current problem:
+The existing scraper is wrong and unreliable. It fetches incomplete data, misses many courses, scrapes non course pages, fails on dynamic websites, uses too much AI token cost, and saves bad results. Examples from current logs include:
+- invalid Gemini model usage
+- dynamic page extraction failures
+- only scraping partial course counts from pages that clearly list hundreds of courses
+- missing fees, IELTS, academic requirements, scholarships, and course details
+- scraping navigation or unrelated pages instead of real course pages
+- no proper approval workflow before replacing live data :contentReference[oaicite:0]{index=0}
+
+You must fully redesign and fix the scraping system.
+
+Required solution:
+
+1. Research first before scraping
+Do not start bulk scraping immediately after a URL is entered.
+First perform a research phase like a smart human would:
+- identify whether the given URL is a home page, course search page, faculty page, sitemap, or individual course page
+- discover the best course listing page automatically if only home page is given
+- inspect multiple candidate pages and compare them
+- estimate expected number of courses before extraction
+- confirm which links are real course pages and which are navigation, blog, accommodation, scholarship, or support pages
+- only continue if confidence is high
+
+2. Course page discovery logic
+Do not blindly fetch all sitemap URLs.
+Only identify and keep real course pages using validation rules such as:
+- page has real course title
+- page has degree keywords like bachelor, master, diploma, certificate, phd
+- page contains course related fields such as duration, fees, entry requirements, intakes, structure, careers
+- reject non course pages like accommodation, support, agent pages, news, events, student life, scholarships overview, contact, visa, or blog pages
+
+3. Handle pagination properly
+If the university course listing has multiple pages such as page 1, 2, 3 or shows total counts like 1 to 10 of 612 courses:
+- detect total course count
+- detect total page count
+- follow all pages intelligently
+- deduplicate results
+- do not stop at page 1
+
+4. Handle dynamic JavaScript websites
+Many university websites load course data with JavaScript.
+Implement browser based scraping using Playwright or equivalent when needed.
+The system must support:
+- dynamic course listing pages
+- lazy loaded content
+- API based data loading
+- JS rendered filters and pagination
+
+5. Multi page data extraction per course
+Do not assume all course data is on one page.
+For each course, intelligently search and merge data from:
+- main course page
+- fee page
+- international tuition page
+- entry requirement page
+- English language requirement page
+- scholarship page
+- downloadable PDFs if relevant
+- linked tabs or related subpages
+
+Important:
+- always prioritize international fee
+- always exclude domestic fee unless explicitly stored separately
+- gather all available English test types, not just IELTS
+- if multiple requirement pages exist, merge properly
+
+6. Reduce AI cost
+Do not use AI for everything.
+AI should only be used where needed for:
+- mapping messy text to required structured fields
+- cleaning extracted data
+- classifying uncertain pages when rule based logic is not enough
+
+Do not use AI for:
+- basic crawling
+- link discovery
+- pagination following
+- detecting obvious course pages
+- scraping known site structures repeatedly
+
+7. Save reusable scraping logic
+When a university is successfully scraped:
+- store scraping patterns, selectors, rules, pagination logic, fee page rules, and field mappings
+- on future runs, reuse saved extraction logic first before calling AI
+- allow fallback to AI only when site structure changes
+
+8. Validation before saving
+Before saving any scraped data:
+- compare scraped course count with expected course count
+- mark incomplete courses
+- flag missing critical fields such as course name, degree level, duration, intake, fee, requirements
+- show extraction confidence
+- do not auto push incomplete or suspicious data into live university records
+
+9. Approval workflow
+Create a proper staging and approval flow:
+- scraped data must go into a staging area first
+- show university name and source URL clearly
+- show progress live while scraping
+- allow stop button during scraping
+- allow manual editing of scraped data before approval
+- allow approve all, approve selected, reject, re scrape, and comment based re scrape
+- only after approval should data replace or update live course data
+
+10. Data fields required
+The final structured output must support these fields:
+- University Name
+- Course Name
+- Category
+- Sub Category
+- Course Website
+- Duration
+- Duration Term
+- Study Mode
+- Degree Level
+- Intake Day
+- Intake Month
+- City
+- International Fee
+- Fee Term
+- Fee Year
+- Currency
+- Study Load
+- Language
+- IELTS Listening
+- IELTS Speaking
+- IELTS Writing
+- IELTS Reading
+- IELTS Overall
+- PTE Listening
+- PTE Speaking
+- PTE Writing
+- PTE Reading
+- PTE Overall
+- TOEFL Listening
+- TOEFL Speaking
+- TOEFL Writing
+- TOEFL Reading
+- TOEFL Overall
+- English Test
+- English Test Reading
+- English Test Listening
+- English Test Speaking
+- English Test Writing
+- English Test Overall
+- Academic Level
+- Academic Score
+- Score Type
+- Academic Country
+- Other Test
+- Score
+- Other Requirement
+- Course Description
+- Course Structure
+- Career
+- Scholarship
+
+11. UI and workflow requirements
+Inside the university page, create proper tabs:
+- Course
+- Country Academic Requirement
+- English Proficiency Test
+- Scholarship
+
+In scraping UI:
+- show university name
+- show original input URL and keep it stored for future extraction
+- show what the scraper is currently doing step by step
+- show research phase before fetch phase
+- show how many candidate pages were checked
+- show why a page was accepted or rejected
+- show expected course count versus discovered course count
+- show stop scraping button
+- allow editing before approval
+
+12. Important behaviour rules
+- do not scrape blindly
+- do not trust sitemap without validation
+- do not trust listing links without classification
+- do not scrape unrelated pages
+- do not save incomplete data to production
+- do not replace existing live data without review
+- do not use expensive AI calls when rule based extraction can do the job
+- think and act like a smart human researcher first, then extractor second
+
+13. Deliverables
+Implement:
+- improved backend scraping engine
+- dynamic site support
+- research first validation layer
+- reusable site extraction rules
+- approval workflow with staging
+- frontend progress tracking and editing UI
+- safe merge or replace logic for approved records
+
+14. Output expected from you
+Provide:
+- root cause summary of existing scraper problems
+- new architecture plan
+- backend implementation changes
+- frontend implementation changes
+- data model changes if needed
+- exact code updates
+- explanation of how cost is reduced
+- explanation of how accuracy is improved
+- explanation of how approval flow works
+
+Important:
+This is not a small bug fix.
+This is a full redesign of the scraping workflow to make it accurate, scalable, low cost, and production ready.
+Do not give a shallow patch.
+Do not only fix one university.
+Build it so it works across many university websites with smart research first logic.

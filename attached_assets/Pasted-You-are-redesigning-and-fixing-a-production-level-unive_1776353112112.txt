@@ -1,0 +1,727 @@
+You are redesigning and fixing a production level university course scraping and data extraction system.
+
+Project stack:
+Backend Python
+Frontend React
+
+Main goal:
+Build a smart, low cost, highly accurate university data scraping engine that can discover, extract, validate, and stage complete course data for a university portal, course search engine, and agent application portal.
+
+This is not a simple scraper.
+This must behave like a smart human researcher first, then a structured extractor.
+
+==================================================
+CORE PRINCIPLE
+==================================================
+
+Do not scrape blindly.
+
+Before extracting any data, do a research phase:
+1. Identify whether the given URL is home page, course search page, course list page, sitemap, faculty page, scholarship page, fee page, entry requirement page, or a single course page
+2. Discover the best course listing page automatically if the user only gives the home page
+3. Compare multiple candidate pages before deciding where to scrape
+4. Estimate expected course count before starting large extraction
+5. Confirm which pages are real course pages
+6. Reject navigation pages, blog pages, support pages, accommodation pages, visa pages, news pages, event pages, generic marketing pages, and student life pages
+7. Only continue if confidence is high
+
+Build a research first architecture, not just a fetch and hope system.
+
+==================================================
+REQUIRED DISCOVERY MODULES
+==================================================
+
+You must implement advanced discovery logic for all of the following:
+
+1. Course discovery logic
+2. Fee discovery logic
+3. IELTS PTE TOEFL discovery logic
+4. Academic requirement by country discovery logic
+5. Intake discovery logic
+6. Course location and campus discovery logic
+7. Scholarship discovery logic
+8. Duration discovery logic
+9. Term discovery logic
+10. Study mode discovery logic
+11. Fee term discovery logic
+12. Fee year discovery logic
+13. Currency discovery logic
+
+==================================================
+1. ADVANCED COURSE DISCOVERY LOGIC
+==================================================
+
+Goal:
+Identify real course pages only and avoid junk pages.
+
+Research logic:
+1. Search candidate sources in this order:
+   a. dedicated course listing page
+   b. sitemap or course sitemap
+   c. faculty or school pages containing course links
+   d. internal search results pages
+   e. structured API or JSON data if site exposes it
+2. Score each candidate page using content signals
+3. Compare candidates and pick the best source of truth
+
+A page is likely a real course page if it contains several of these:
+- course title
+- degree keywords such as Bachelor, Master, Diploma, Graduate Certificate, Graduate Diploma, PhD, Doctor of Philosophy, Associate Degree, Certificate
+- duration
+- campus or location
+- study mode
+- intake information
+- entry requirements
+- tuition fee
+- English language requirements
+- how to apply
+- course structure
+- career outcomes
+
+Reject a page if it looks like:
+- accommodation
+- student life
+- scholarships overview
+- events
+- news
+- visas
+- support
+- contact us
+- why choose us
+- blog
+- pathway overview without specific course data
+- landing page with no real course data
+
+Listing page logic:
+- detect total course count if shown
+- detect pagination or load more
+- follow all pages only after validation
+- deduplicate URLs
+- normalize URLs
+- remove domestic and international parameter duplicates unless needed for comparison
+
+Do not assume every page under /courses/ is a course.
+Validate by content before accepting.
+
+==================================================
+2. ADVANCED FEE DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract only the correct international tuition fee for the course.
+
+Search logic:
+For each course, search for fee from:
+1. main course page
+2. fee section on same page
+3. linked tuition fee page
+4. international fees page
+5. fee table page
+6. downloadable PDF if relevant
+7. faculty fee page
+8. handbook or course guide if official
+
+Important rules:
+- always prioritize international fee
+- always exclude domestic fee from the main extracted value
+- if domestic and international are both present, choose international only
+- if multiple fee values are present, link them to the right course and location where possible
+- if fee varies by year, campus, or intake, store the current valid value and also keep source evidence
+- if fee is listed by subject or credit points only, calculate only if the formula is clearly reliable, otherwise mark manual review
+- if a fee page is generic and not course specific, link only if degree or faculty mapping is confident
+
+Recognize fee phrases such as:
+- Tuition fee
+- International tuition fee
+- Annual tuition fee
+- Estimated annual fee
+- Total tuition fee
+- Full course fee
+- Fee per semester
+- Fee per trimester
+- Fee per term
+- Indicative annual fee
+
+Exclude phrases such as:
+- domestic fee
+- local student fee
+- commonwealth supported
+- government subsidized
+- FEE HELP
+- student services fee unless separately stored
+
+Confidence rules:
+- high confidence if the course page directly states international fee
+- medium confidence if fee is found on official linked fee page and clearly matches course or level
+- low confidence if inferred from generic faculty table
+
+==================================================
+3. ADVANCED IELTS PTE TOEFL DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract full English proficiency requirements accurately, including minimum band logic.
+
+Search sources:
+1. main course page
+2. entry requirement page
+3. English language requirement page
+4. international student requirement page
+5. PDF entry guide if official
+
+Must support:
+- IELTS
+- PTE
+- TOEFL
+- other accepted tests where available
+
+Logic rules:
+If the page says:
+- IELTS Overall 6.0 with no band less than 5.5
+Then save as:
+- IELTS Overall = 6.0
+- IELTS Listening = 5.5
+- IELTS Reading = 5.5
+- IELTS Writing = 5.5
+- IELTS Speaking = 5.5
+
+Apply the same rule for PTE and TOEFL when wording follows similar pattern:
+- PTE Overall 50 with no communicative skill below 42
+Then save:
+- PTE Overall = 50
+- PTE Listening = 42
+- PTE Reading = 42
+- PTE Writing = 42
+- PTE Speaking = 42
+
+- TOEFL Overall 60 with no band less than 18
+Then save:
+- TOEFL Overall = 60
+- TOEFL Listening = 18
+- TOEFL Reading = 18
+- TOEFL Writing = 18
+- TOEFL Speaking = 18
+
+Support these wording patterns:
+- no band less than
+- no skill below
+- minimum of X in each component
+- minimum score of X in writing and Y in other bands
+- overall X with subscores of Y
+- total score X with section minimum Y
+
+If test scores differ by program type or specialization:
+- map to the specific course where possible
+- if multiple score sets exist and cannot be confidently mapped, mark for manual review
+
+If only overall is listed and no subscore is mentioned:
+- save overall only
+- leave L R W S null
+- do not guess
+
+If multiple English tests are accepted:
+- extract all
+
+==================================================
+4. ADVANCED ACADEMIC REQUIREMENT BY COUNTRY DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract academic entry requirements by country in a structured format.
+
+This is critical and must be country aware.
+
+Search sources:
+1. main course page
+2. entry requirements section
+3. country specific entry requirements page
+4. international student pages
+5. PDF admission guide
+6. region specific requirement tables
+
+Required output structure must support:
+- Academic Country
+- Academic Level
+- Academic Score
+- Score Type
+- Other Requirement
+
+Examples:
+- Nepal, Grade 12, 2.8 GPA out of 4
+- Nepal, Grade 12, 3.0 GPA out of 5
+- Bangladesh, Higher Secondary Certificate, GPA 4.0 out of 5
+- India, Standard 12, 65 percent
+- Sri Lanka, GCE A Level, CCC
+- Pakistan, Higher Secondary School Certificate, 60 percent
+
+Logic rules:
+1. Detect country specific tables and parse each row
+2. Normalize academic level wording:
+   - Grade 12
+   - Year 12
+   - Higher Secondary
+   - HSC
+   - A Level
+   - IB
+   - Bachelor degree for postgraduate entry
+3. Normalize score type:
+   - GPA
+   - Percentage
+   - Division
+   - Grade
+   - Letter result
+4. Save one record per country if needed
+5. If a page says:
+   - Nepal Year 12 with GPA 2.8 out of 4
+   store:
+   - Academic Country = Nepal
+   - Academic Level = Year 12
+   - Academic Score = 2.8
+   - Score Type = GPA out of 4
+6. If score is percentage, save exact percentage wording
+7. If requirement says recognized bachelor degree or equivalent for postgraduate courses, capture that in academic level and other requirement
+8. If specific subject prerequisites exist such as mathematics or science, capture in Other Requirement
+9. If no country split exists, save general academic requirement with country blank or Global
+10. If requirements differ by country and course, course level mapping must be preserved
+
+Important:
+Do not flatten all countries into one rule.
+Store country based requirement rows properly.
+
+==================================================
+5. ADVANCED INTAKE DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract actual available intakes for each course.
+
+Search sources:
+1. course page
+2. apply page
+3. course availability page
+4. timetable or calendar links if course specific
+5. course search listing data
+6. API or JSON data if rendered dynamically
+
+Recognize intake patterns such as:
+- February, July, November
+- Jan, May, Sep
+- Trimester 1, Trimester 2, Trimester 3
+- Semester 1, Semester 2
+- multiple start dates
+- open all year
+- monthly start dates
+- block intake
+
+Required fields:
+- Intake Month
+- Intake Day if clearly given
+
+Rules:
+- If only month is given, save month and leave day blank
+- If exact date is given, save both
+- If intake is listed as Semester 1 or Term 1, map to known month only if page explicitly links them
+- Do not guess intake month from national academic calendar without source evidence
+- If intake differs by campus or study mode, map carefully
+
+==================================================
+6. ADVANCED COURSE LOCATION AND CAMPUS DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract correct city or campus for each course.
+
+Search sources:
+1. course page
+2. course facts panel
+3. location or campus section
+4. delivery location section
+5. listing card if official and specific
+6. apply page if campus listed there
+
+Rules:
+- extract all campuses if multiple are offered
+- map city and campus separately if possible
+- if a course is online only, city may be blank
+- if the page says available in Sydney, Melbourne, Brisbane, save all or create multi campus structure
+- if campus differs by intake or mode, preserve mapping
+
+Reject generic campus pages not clearly tied to the course.
+
+==================================================
+7. ADVANCED SCHOLARSHIP DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract scholarships relevant to the course or university for international students.
+
+Search sources:
+1. course page
+2. scholarship section on course page
+3. university scholarship page
+4. international scholarship page
+5. automatic merit scholarship page
+6. scholarship PDF if official
+
+Rules:
+- prioritize scholarships clearly applicable to international students
+- map scholarship to course if specifically stated
+- if scholarship is university wide and clearly applies to all eligible students, still capture it
+- extract scholarship name, amount or percentage, eligibility notes, and source
+- avoid generic marketing lines like scholarships available without detail
+- if scholarship depends on nationality, course level, or intake, keep those notes in eligibility
+
+==================================================
+8. ADVANCED DURATION DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract the study duration accurately.
+
+Recognize patterns such as:
+- 2 years
+- 18 months
+- 3 year full time
+- 1.5 years equivalent full time
+- 104 weeks
+- 6 trimesters
+- 4 semesters
+
+Rules:
+- save numeric duration value where possible
+- save duration term separately
+- if both years and semesters are present, prefer the clearest primary published duration
+- if full time and part time durations differ, prefer full time unless business rule says otherwise
+- if duration differs by pathway or credit exemption, capture main standard duration and note others if needed
+
+==================================================
+9. ADVANCED TERM DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract the duration unit or academic structure term correctly.
+
+Recognize:
+- year
+- years
+- month
+- months
+- week
+- weeks
+- semester
+- semesters
+- trimester
+- trimesters
+- term
+- terms
+
+Rules:
+- Duration = 2 and Duration Term = years
+- Duration = 6 and Duration Term = trimesters
+- if the page says 1.5 years full time, store Duration 1.5 and Duration Term years
+- if the page says 4 semesters, store Duration 4 and Duration Term semesters
+
+==================================================
+10. ADVANCED STUDY MODE DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract the correct study mode.
+
+Recognize patterns such as:
+- on campus
+- online
+- blended
+- hybrid
+- mixed mode
+- face to face
+- distance
+- online and on campus
+
+Normalization rules:
+- on campus = On Campus
+- online = Online
+- blended = Blended
+- hybrid = Blended
+- online and on campus = Blended
+- both online and on campus = Blended
+
+Important:
+The user requirement says both means blended online and on campus.
+Follow that normalization.
+
+If mode differs by campus or intake, preserve mapping when possible.
+
+==================================================
+11. ADVANCED FEE TERM DISCOVERY LOGIC
+==================================================
+
+Goal:
+Determine what the fee amount represents.
+
+Recognize patterns such as:
+- per semester
+- per trimester
+- per term
+- annual fee
+- per year
+- yearly
+- full course fee
+- total course fee
+- per session
+
+Normalization rules:
+- per semester = Semester
+- per trimester = Trimester
+- per term = Term
+- annual fee = Annual
+- per year = Annual
+- yearly = Annual
+- full course fee = Full Course
+- total course fee = Full Course
+
+Examples:
+- 10000 per semester => Fee Term = Semester
+- 50000 full course => Fee Term = Full Course
+- 25000 annually => Fee Term = Annual
+- 15000 per trimester => Fee Term = Trimester
+
+If no fee term is explicitly stated:
+- infer only if the nearby text clearly indicates annual or total tuition
+- otherwise mark for manual review
+
+==================================================
+12. ADVANCED FEE YEAR DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract the year the fee applies to.
+
+Recognize:
+- 2026 fees
+- fee for 2025
+- indicative annual fee 2026
+- tuition fee 2027
+- fees are reviewed annually
+
+Rules:
+- if a clear year is mentioned near the fee, store that as Fee Year
+- if multiple years appear, select the one directly tied to the extracted fee
+- if no fee year is stated, leave blank
+- do not invent the year from page publication date unless clearly indicated as fee year
+
+Example:
+- 2026 annual tuition fee AUD 25000
+Store:
+- International Fee = 25000
+- Fee Year = 2026
+
+==================================================
+13. ADVANCED CURRENCY DISCOVERY LOGIC
+==================================================
+
+Goal:
+Extract or infer the correct currency safely.
+
+Priority order:
+1. explicit currency symbol and code near fee
+2. official page text
+3. university country based fallback if explicit currency is missing
+
+Currency mapping fallback:
+- Australia = AUD
+- New Zealand = NZD
+- Canada = CAD
+- USA = USD
+- UK = GBP
+
+Normalization rules:
+- AUD or A$ = AUD
+- NZD or NZ$ = NZD
+- CAD or C$ = CAD
+- USD or US$ = USD
+- GBP or £ = GBP
+
+If explicit currency conflicts with country fallback:
+- use explicit currency from page
+- flag for review if strange
+
+==================================================
+MULTI PAGE COURSE EXTRACTION LOGIC
+==================================================
+
+For every course, do not assume all data is on one page.
+
+For each course, intelligently gather and merge data from:
+1. main course page
+2. fee page
+3. international fee page
+4. entry requirement page
+5. English requirement page
+6. country specific entry requirement page
+7. scholarship page
+8. related PDF documents if official and useful
+
+Use deterministic crawling first.
+Use AI only for field mapping or resolving complex text when rules are not enough.
+
+==================================================
+AI USAGE RULES
+==================================================
+
+Minimize cost.
+
+Do not use AI for:
+- simple crawling
+- URL discovery
+- pagination handling
+- obvious course page detection
+- sitemap traversal
+- simple regex parsing
+- direct table extraction
+
+Use AI only for:
+- mapping messy paragraphs to structured fields
+- classifying uncertain pages
+- extracting complicated country requirement tables when rule based parsing fails
+- cleaning normalized output
+
+Always prefer reusable scraping rules over repeated AI calls.
+
+==================================================
+SAVE REUSABLE SITE LOGIC
+==================================================
+
+When a university scrape succeeds:
+- save selectors
+- save page patterns
+- save fee discovery rules
+- save requirement page rules
+- save course page indicators
+- save pagination logic
+- save language test patterns
+- save country requirement table patterns
+
+On future runs:
+- use saved extraction logic first
+- only fall back to AI if site structure changed
+
+==================================================
+VALIDATION LOGIC BEFORE SAVING
+==================================================
+
+Before saving scraped data:
+1. compare expected course count against discovered course count
+2. compare discovered course count against extracted course count
+3. mark incomplete courses
+4. detect missing critical fields:
+   - Course Name
+   - Degree Level
+   - Duration
+   - Intake
+   - International Fee
+   - Study Mode
+   - English requirement or entry requirement when expected
+5. show extraction confidence
+6. stage results for approval only
+7. do not push incomplete data directly into production
+
+==================================================
+STAGING AND APPROVAL FLOW
+==================================================
+
+All scraped data must go to staging first.
+
+Required workflow:
+- show university name
+- show original source URL
+- keep original URL stored for future extraction
+- show research phase logs
+- show candidate pages checked
+- show why each page was accepted or rejected
+- show expected course count versus discovered course count
+- show live progress while scraping
+- show stop button
+- allow editing scraped data before approval
+- allow comments and re scrape
+- allow approve selected or approve all
+- only then save to live university records
+
+==================================================
+REQUIRED OUTPUT FIELDS
+==================================================
+
+The final system must support these fields:
+- University Name
+- Course Name
+- Category
+- Sub Category
+- Course Website
+- Duration
+- Duration Term
+- Study Mode
+- Degree Level
+- Intake Day
+- Intake Month
+- City
+- International Fee
+- Fee Term
+- Fee Year
+- Currency
+- Study Load
+- Language
+- IELTS Listening
+- IELTS Speaking
+- IELTS Writing
+- IELTS Reading
+- IELTS Overall
+- PTE Listening
+- PTE Speaking
+- PTE Writing
+- PTE Reading
+- PTE Overall
+- TOEFL Listening
+- TOEFL Speaking
+- TOEFL Writing
+- TOEFL Reading
+- TOEFL Overall
+- English Test
+- English Test Reading
+- English Test Listening
+- English Test Speaking
+- English Test Writing
+- English Test Overall
+- Academic Level
+- Academic Score
+- Score Type
+- Academic Country
+- Other Test
+- Score
+- Other Requirement
+- Course Description
+- Course Structure
+- Career
+- Scholarship
+
+==================================================
+EXPECTED DELIVERABLES
+==================================================
+
+Provide all of the following:
+1. root cause summary of the current scraper failure
+2. new architecture design
+3. backend implementation plan
+4. frontend implementation plan
+5. staging and approval workflow
+6. exact discovery logic for each field group
+7. validation logic before save
+8. reusable extraction rule storage design
+9. explanation of how AI cost is reduced
+10. explanation of how scraping accuracy is improved
+11. exact code changes needed
+12. production ready approach, not a shallow patch
+
+Important:
+Do not make a small fix.
+Do not patch only one university.
+Build a reusable, scalable, smart university scraping engine that thinks like a human researcher, extracts like a structured parser, and saves only validated data.

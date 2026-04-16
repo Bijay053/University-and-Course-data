@@ -1,0 +1,157 @@
+You are fixing a web scraper that extracts university course data. The current system wastes API calls and time by fetching wrong pages. Implement a smart, human-like "research first" validation system.
+Current Problems to Fix:
+
+Blindly fetches sitemap URLs without validating they're actual course pages
+Ignores paginated listing pages that show "612 courses" and fetches junk instead
+No pre-validation - doesn't sample URLs before bulk processing
+Wastes API quota on navigation pages, info pages, accommodation pages
+No intelligent decision-making about which page to scrape
+
+Required Solution - Research-First Validation Flow:
+STEP 1: Smart URL Analysis (Before Any Fetching)
+When given a URL, determine its type:
+
+Home page (e.g., https://www.uow.edu.au/) → Auto-find course listing page
+Course listing page (e.g., /study/courses/) → Use this directly
+Filtered search (e.g., ?students=international) → Use this, ignore sitemap
+Single course page → Extract just this course
+
+STEP 2: Discovery & Sampling (Research Phase)
+1. If listing page detected:
+   - Check for pagination ("Showing 1-10 of 612 courses")
+   - Extract 3-5 sample course URLs from page 1
+   
+2. If sitemap found:
+   - Fetch sitemap XML
+   - Extract ALL course URLs
+   - Take random sample of 5 URLs
+   
+3. Validate samples:
+   - Fetch the 3-5 sample URLs
+   - Check if they contain:
+     ✓ Course name
+     ✓ Fee information
+     ✓ Duration/study mode
+     ✓ Requirements (IELTS/academic)
+   - Count how many samples pass (need 80%+ success)
+STEP 3: Pattern Recognition
+From successful samples, identify:
+- Common URL pattern (e.g., /courses/bachelor-*)
+- Required data fields present
+- Page structure markers
+- Fee location (same page vs separate fees page)
+- Requirements location (inline vs separate page)
+
+From failed samples, identify:
+- Wrong URL patterns (e.g., /info/, /accommodation/)
+- Navigation/sidebar links
+- Non-course content
+STEP 4: Smart Filtering Before Bulk Fetch
+Filter the full URL list:
+✓ INCLUDE: URLs matching successful pattern
+✓ INCLUDE: URLs with course-related keywords (bachelor, master, diploma, certificate)
+✗ EXCLUDE: URLs matching failed pattern
+✗ EXCLUDE: Navigation pages, info pages, accommodation, student services
+✗ EXCLUDE: Duplicate URLs (strip ?students=domestic variants)
+STEP 5: Progress Decision Point
+Before bulk fetching, show user:
+- ✅ X sample URLs validated successfully
+- ❌ Y sample URLs rejected (show examples)
+- 📊 Estimated total: Z courses to fetch
+- 💰 Estimated API cost: $X (based on token usage)
+- ⏱️ Estimated time: Y minutes
+
+Ask: "Proceed with bulk scraping?" [Yes/No/Adjust]
+STEP 6: Smart Multi-Page Data Collection
+Some universities split data across pages:
+If course page missing fee data:
+  → Check for /fees, /tuition-fees, /costs links
+  → Fetch and merge data
+
+If course page missing requirements:
+  → Check for /entry-requirements, /admissions, /apply links
+  → Fetch and merge data
+
+Track visited URLs to avoid duplicates
+STEP 7: International vs Domestic Fee Filtering
+CRITICAL RULE: Only extract international student fees
+- If page shows both domestic and international → take international only
+- If URL has ?students=domestic → skip or convert to ?students=international
+- If fee table has "Domestic" and "International" columns → extract International column
+- Common patterns to detect international fees:
+  - "International students: $X"
+  - "Overseas students: $X"
+  - Higher fee amounts (usually 2-4x domestic)
+Implementation Requirements:
+Backend (scraping-service.ts):
+typescriptasync function runSmartScrape(universityUrl: string, universityName: string) {
+  // PHASE 1: URL Analysis
+  const urlType = analyzeUrlType(universityUrl);
+  
+  // PHASE 2: Discovery
+  const discoveredUrls = await discoverCourseUrls(universityUrl, urlType);
+  
+  // PHASE 3: Sampling & Validation (3-5 URLs only)
+  const samples = getRandomSamples(discoveredUrls, 5);
+  const validationResults = await validateSamples(samples);
+  
+  // PHASE 4: Pattern Recognition
+  const patterns = identifyPatterns(validationResults);
+  
+  // PHASE 5: Smart Filtering
+  const filteredUrls = applySmartFilter(discoveredUrls, patterns);
+  
+  // PHASE 6: User Confirmation
+  const approval = await requestUserApproval({
+    samplesValid: validationResults.successCount,
+    samplesInvalid: validationResults.failCount,
+    estimatedTotal: filteredUrls.length,
+    estimatedCost: calculateCost(filteredUrls.length),
+    exampleValid: validationResults.validExamples,
+    exampleInvalid: validationResults.invalidExamples
+  });
+  
+  if (!approval) return;
+  
+  // PHASE 7: Bulk Fetch (with progress tracking)
+  for (const url of filteredUrls) {
+    await scrapeCourseWithMultiPageSupport(url);
+    updateProgress(url, universityName); // Show in UI
+  }
+}
+Frontend UI Requirements:
+During scraping, show real-time status:
+┌─────────────────────────────────────────┐
+│ 🔍 Scraping: University of Wollongong   │
+│ 📍 https://www.uow.edu.au/study/courses │
+│                                          │
+│ Phase: Validating samples (3/5)         │
+│ ✅ Bachelor of Engineering - Valid      │
+│ ✅ Master of Business - Valid           │
+│ ❌ Accommodation Info - Rejected        │
+│                                          │
+│ [●●●●●○○○○○] 50% - 306/612 courses     │
+│ Current: Bachelor of Computer Science   │
+│ Est. remaining: 12 minutes              │
+│                                          │
+│ [STOP SCRAPING] button visible          │
+└─────────────────────────────────────────┘
+Success Criteria:
+✅ No fetching until validation complete
+✅ 80%+ sample success rate before proceeding
+✅ User sees cost/time estimate before bulk fetch
+✅ Only international fees extracted
+✅ Progress shown with university name + URL visible
+✅ Stop button works during background scraping
+✅ Multi-page data merging works (fees from separate page)
+✅ All 4 English tests extracted (IELTS, PTE, TOEFL, Other)
+✅ No duplicate courses
+✅ No navigation/info pages scraped
+Token Optimization:
+To save API costs:
+
+Cache scraping code - After successful scrape, save the extraction pattern
+Reuse patterns - For same university, try cached pattern first before AI
+Batch validation - Send 3 sample pages in one AI call instead of 3 separate calls
+Structured prompts - Ask AI for JSON only, no explanations
+Incremental scraping - Don't re-scrape unchanged courses
