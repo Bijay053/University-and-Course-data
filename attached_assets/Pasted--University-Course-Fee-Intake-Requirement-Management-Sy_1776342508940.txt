@@ -1,0 +1,137 @@
+🎓 University Course, Fee, Intake & Requirement Management System
+
+We aim to develop a centralized portal to manage university data, including courses, fees, intakes, scholarships, and admission requirements. The system should support variations based on different countries and student profiles.
+
+🌍 Core Objective
+
+Build a smart university data management platform that:
+
+Collects data automatically via web scraping
+Allows manual editing and validation
+Supports bulk upload and download
+Tracks changes from university websites
+Manages country-specific admission requirements
+⚙️ Key Features
+1. 🔎 Automated Web Scraping System
+Scrape university websites for:
+Courses
+Fees
+Intakes
+Requirements
+Scholarships
+Normalize and convert scraped data into structured format
+Handle different website formats (HTML, PDF, tables)
+2. ✏️ Data Editing & Validation
+Admin users can:
+Edit scraped data
+Approve or reject updates
+Maintain version history (audit log)
+Override incorrect or outdated scraped data
+3. 📊 Bulk Upload & Download
+Upload data via Excel/CSV
+Download filtered datasets
+Support bulk updates for:
+Courses
+Fees
+Requirements
+Scholarships
+4. 🔁 Auto Monitoring & Change Detection
+Schedule scraping at defined intervals (daily, weekly)
+Detect changes in university websites
+Notify users when:
+Fees change
+New intake is added
+Requirements are updated
+5. 🌐 Country-Based Requirement Logic
+Admission requirements vary by student country:
+Different English test requirements
+Different academic criteria
+System should map:
+Course → Country → Requirement
+🧾 Data Fields Structure
+
+The system should store the following structured data:
+
+🏫 Course & University Information
+University Name
+Course Name
+Category
+Sub Category
+Course Website
+Duration
+Duration Term
+Study Mode
+Degree Level
+City
+📅 Intake Information
+Intake Day
+Intake Month
+💰 Fee Structure
+International Fee
+Fee Term (per semester/year)
+Fee Year
+Currency
+📚 Study Details
+Study Load
+Language
+🧪 English Requirements
+IELTS
+Listening
+Speaking
+Writing
+Reading
+Overall
+PTE
+Listening
+Speaking
+Writing
+Reading
+Overall
+TOEFL
+Listening
+Speaking
+Writing
+Reading
+Overall
+Other English Tests
+Test Name
+Reading
+Listening
+Speaking
+Writing
+Overall
+🎓 Academic Requirements
+Academic Level
+Academic Score
+Score Type (GPA / Percentage)
+Academic Country
+📌 Additional Requirements
+Other Test
+Score
+Other Requirement
+📖 Course Content
+Course Description
+Course Structure
+Career Outcomes
+🎁 Scholarship
+Scholarship Details
+Eligibility Criteria
+🧠 Advanced Capabilities (Recommended)
+AI-based data cleaning and formatting
+Duplicate detection and merging
+Multi-provider course linking
+Role-based access (admin, manager, staff)
+API integration with external providers
+Dashboard with filters:
+Country
+Intake
+University
+Course level
+🎯 Expected Outcome
+
+A powerful, automated, and flexible system that:
+
+Reduces manual work
+Keeps university data always up-to-date
+Supports global admission variations
+Improves efficiency for counsellors and agents

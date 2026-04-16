@@ -1,15 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: University Course, Fee, Intake & Requirement Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: universities
+    description: University management
+  - name: courses
+    description: Course management
+  - name: intakes
+    description: Intake management
+  - name: fees
+    description: Fee management
+  - name: english-requirements
+    description: English language requirement management
+  - name: academic-requirements
+    description: Academic requirement management
+  - name: scholarships
+    description: Scholarship management
+  - name: scraping
+    description: Web scraping and change detection
+  - name: dashboard
+    description: Dashboard and analytics
+  - name: bulk
+    description: Bulk upload/download
+
 paths:
   /healthz:
     get:
@@ -24,6 +44,871 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /universities:
+    get:
+      operationId: listUniversities
+      tags: [universities]
+      summary: List all universities
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: country
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: city
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of universities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniversityListResponse"
+    post:
+      operationId: createUniversity
+      tags: [universities]
+      summary: Create a university
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUniversityBody"
+      responses:
+        "201":
+          description: Created university
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/University"
+
+  /universities/{id}:
+    get:
+      operationId: getUniversity
+      tags: [universities]
+      summary: Get a university by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: University
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/University"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateUniversity
+      tags: [universities]
+      summary: Update a university
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUniversityBody"
+      responses:
+        "200":
+          description: Updated university
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/University"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteUniversity
+      tags: [universities]
+      summary: Delete a university
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List courses
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: universityId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: degreeLevel
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: studyMode
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: country
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: intakeMonth
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseListResponse"
+    post:
+      operationId: createCourse
+      tags: [courses]
+      summary: Create a course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseBody"
+      responses:
+        "201":
+          description: Created course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  /courses/{id}:
+    get:
+      operationId: getCourse
+      tags: [courses]
+      summary: Get a course by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course with full details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCourse
+      tags: [courses]
+      summary: Update a course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseBody"
+      responses:
+        "200":
+          description: Updated course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteCourse
+      tags: [courses]
+      summary: Delete a course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses/{courseId}/intakes:
+    get:
+      operationId: listCourseIntakes
+      tags: [intakes]
+      summary: List intakes for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of intakes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Intake"
+    post:
+      operationId: createCourseIntake
+      tags: [intakes]
+      summary: Add an intake to a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIntakeBody"
+      responses:
+        "201":
+          description: Created intake
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intake"
+
+  /intakes/{id}:
+    patch:
+      operationId: updateIntake
+      tags: [intakes]
+      summary: Update an intake
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIntakeBody"
+      responses:
+        "200":
+          description: Updated intake
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Intake"
+    delete:
+      operationId: deleteIntake
+      tags: [intakes]
+      summary: Delete an intake
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses/{courseId}/fees:
+    get:
+      operationId: listCourseFees
+      tags: [fees]
+      summary: List fees for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of fees
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fee"
+    post:
+      operationId: createCourseFee
+      tags: [fees]
+      summary: Add a fee to a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeeBody"
+      responses:
+        "201":
+          description: Created fee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fee"
+
+  /fees/{id}:
+    patch:
+      operationId: updateFee
+      tags: [fees]
+      summary: Update a fee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeeBody"
+      responses:
+        "200":
+          description: Updated fee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fee"
+    delete:
+      operationId: deleteFee
+      tags: [fees]
+      summary: Delete a fee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses/{courseId}/english-requirements:
+    get:
+      operationId: listCourseEnglishRequirements
+      tags: [english-requirements]
+      summary: List English requirements for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of English requirements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EnglishRequirement"
+    post:
+      operationId: createCourseEnglishRequirement
+      tags: [english-requirements]
+      summary: Add English requirement to a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnglishRequirementBody"
+      responses:
+        "201":
+          description: Created English requirement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnglishRequirement"
+
+  /english-requirements/{id}:
+    patch:
+      operationId: updateEnglishRequirement
+      tags: [english-requirements]
+      summary: Update an English requirement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnglishRequirementBody"
+      responses:
+        "200":
+          description: Updated English requirement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnglishRequirement"
+    delete:
+      operationId: deleteEnglishRequirement
+      tags: [english-requirements]
+      summary: Delete an English requirement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses/{courseId}/academic-requirements:
+    get:
+      operationId: listCourseAcademicRequirements
+      tags: [academic-requirements]
+      summary: List academic requirements for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of academic requirements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AcademicRequirement"
+    post:
+      operationId: createCourseAcademicRequirement
+      tags: [academic-requirements]
+      summary: Add academic requirement to a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAcademicRequirementBody"
+      responses:
+        "201":
+          description: Created academic requirement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcademicRequirement"
+
+  /academic-requirements/{id}:
+    patch:
+      operationId: updateAcademicRequirement
+      tags: [academic-requirements]
+      summary: Update an academic requirement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAcademicRequirementBody"
+      responses:
+        "200":
+          description: Updated academic requirement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcademicRequirement"
+    delete:
+      operationId: deleteAcademicRequirement
+      tags: [academic-requirements]
+      summary: Delete an academic requirement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /courses/{courseId}/scholarships:
+    get:
+      operationId: listCourseScholarships
+      tags: [scholarships]
+      summary: List scholarships for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of scholarships
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Scholarship"
+    post:
+      operationId: createCourseScholarship
+      tags: [scholarships]
+      summary: Add scholarship to a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScholarshipBody"
+      responses:
+        "201":
+          description: Created scholarship
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scholarship"
+
+  /scholarships/{id}:
+    patch:
+      operationId: updateScholarship
+      tags: [scholarships]
+      summary: Update a scholarship
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScholarshipBody"
+      responses:
+        "200":
+          description: Updated scholarship
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scholarship"
+    delete:
+      operationId: deleteScholarship
+      tags: [scholarships]
+      summary: Delete a scholarship
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /scraping/jobs:
+    get:
+      operationId: listScrapingJobs
+      tags: [scraping]
+      summary: List scraping jobs
+      responses:
+        "200":
+          description: List of scraping jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScrapingJob"
+    post:
+      operationId: createScrapingJob
+      tags: [scraping]
+      summary: Create a scraping job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScrapingJobBody"
+      responses:
+        "201":
+          description: Created scraping job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScrapingJob"
+
+  /scraping/jobs/{id}/run:
+    post:
+      operationId: runScrapingJob
+      tags: [scraping]
+      summary: Trigger a scraping job run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScrapingJob"
+        "404":
+          description: Not found
+
+  /scraping/changes:
+    get:
+      operationId: listScrapingChanges
+      tags: [scraping]
+      summary: List detected changes from scraping
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of detected changes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScrapingChange"
+
+  /scraping/changes/{id}/approve:
+    post:
+      operationId: approveScrapingChange
+      tags: [scraping]
+      summary: Approve a detected change
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Approved change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScrapingChange"
+
+  /scraping/changes/{id}/reject:
+    post:
+      operationId: rejectScrapingChange
+      tags: [scraping]
+      summary: Reject a detected change
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScrapingChange"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/recent-changes:
+    get:
+      operationId: getRecentChanges
+      tags: [dashboard]
+      summary: Get recent changes/activity
+      responses:
+        "200":
+          description: Recent changes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScrapingChange"
+
+  /dashboard/courses-by-level:
+    get:
+      operationId: getCoursesByLevel
+      tags: [dashboard]
+      summary: Get course count grouped by degree level
+      responses:
+        "200":
+          description: Courses by level breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CountByLabel"
+
+  /dashboard/upcoming-intakes:
+    get:
+      operationId: getUpcomingIntakes
+      tags: [dashboard]
+      summary: Get upcoming intake dates
+      responses:
+        "200":
+          description: List of upcoming intakes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UpcomingIntake"
+
+  /bulk/courses/download:
+    get:
+      operationId: downloadCourses
+      tags: [bulk]
+      summary: Download all courses as CSV
+      parameters:
+        - name: universityId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: degreeLevel
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /bulk/courses/upload:
+    post:
+      operationId: uploadCourses
+      tags: [bulk]
+      summary: Upload courses via CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUploadBody"
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkUploadResult"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +919,672 @@ components:
       required:
         - status
 
+    University:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        country:
+          type: string
+        city:
+          type: string
+        website:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        scrapeUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - country
+        - city
+        - createdAt
+        - updatedAt
+
+    UniversityListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/University"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    CreateUniversityBody:
+      type: object
+      properties:
+        name:
+          type: string
+        country:
+          type: string
+        city:
+          type: string
+        website:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        scrapeUrl:
+          type: ["string", "null"]
+      required:
+        - name
+        - country
+        - city
+
+    UpdateUniversityBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        scrapeUrl:
+          type: ["string", "null"]
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: integer
+        universityId:
+          type: integer
+        universityName:
+          type: ["string", "null"]
+        name:
+          type: string
+        category:
+          type: ["string", "null"]
+        subCategory:
+          type: ["string", "null"]
+        courseWebsite:
+          type: ["string", "null"]
+        duration:
+          type: ["number", "null"]
+        durationTerm:
+          type: ["string", "null"]
+        studyMode:
+          type: ["string", "null"]
+        degreeLevel:
+          type: ["string", "null"]
+        studyLoad:
+          type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        courseStructure:
+          type: ["string", "null"]
+        careerOutcomes:
+          type: ["string", "null"]
+        otherTest:
+          type: ["string", "null"]
+        otherTestScore:
+          type: ["string", "null"]
+        otherRequirement:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - universityId
+        - name
+        - status
+        - createdAt
+        - updatedAt
+
+    CourseDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        universityId:
+          type: integer
+        universityName:
+          type: ["string", "null"]
+        name:
+          type: string
+        category:
+          type: ["string", "null"]
+        subCategory:
+          type: ["string", "null"]
+        courseWebsite:
+          type: ["string", "null"]
+        duration:
+          type: ["number", "null"]
+        durationTerm:
+          type: ["string", "null"]
+        studyMode:
+          type: ["string", "null"]
+        degreeLevel:
+          type: ["string", "null"]
+        studyLoad:
+          type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        courseStructure:
+          type: ["string", "null"]
+        careerOutcomes:
+          type: ["string", "null"]
+        otherTest:
+          type: ["string", "null"]
+        otherTestScore:
+          type: ["string", "null"]
+        otherRequirement:
+          type: ["string", "null"]
+        status:
+          type: string
+        intakes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Intake"
+        fees:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fee"
+        englishRequirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnglishRequirement"
+        academicRequirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcademicRequirement"
+        scholarships:
+          type: array
+          items:
+            $ref: "#/components/schemas/Scholarship"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - universityId
+        - name
+        - status
+        - intakes
+        - fees
+        - englishRequirements
+        - academicRequirements
+        - scholarships
+        - createdAt
+        - updatedAt
+
+    CourseListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    CreateCourseBody:
+      type: object
+      properties:
+        universityId:
+          type: integer
+        name:
+          type: string
+        category:
+          type: ["string", "null"]
+        subCategory:
+          type: ["string", "null"]
+        courseWebsite:
+          type: ["string", "null"]
+        duration:
+          type: ["number", "null"]
+        durationTerm:
+          type: ["string", "null"]
+        studyMode:
+          type: ["string", "null"]
+        degreeLevel:
+          type: ["string", "null"]
+        studyLoad:
+          type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        courseStructure:
+          type: ["string", "null"]
+        careerOutcomes:
+          type: ["string", "null"]
+        otherTest:
+          type: ["string", "null"]
+        otherTestScore:
+          type: ["string", "null"]
+        otherRequirement:
+          type: ["string", "null"]
+      required:
+        - universityId
+        - name
+
+    UpdateCourseBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        subCategory:
+          type: ["string", "null"]
+        courseWebsite:
+          type: ["string", "null"]
+        duration:
+          type: ["number", "null"]
+        durationTerm:
+          type: ["string", "null"]
+        studyMode:
+          type: ["string", "null"]
+        degreeLevel:
+          type: ["string", "null"]
+        studyLoad:
+          type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        courseStructure:
+          type: ["string", "null"]
+        careerOutcomes:
+          type: ["string", "null"]
+        otherTest:
+          type: ["string", "null"]
+        otherTestScore:
+          type: ["string", "null"]
+        otherRequirement:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+
+    Intake:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        intakeMonth:
+          type: string
+        intakeDay:
+          type: ["integer", "null"]
+        intakeYear:
+          type: ["integer", "null"]
+        isOpen:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - courseId
+        - intakeMonth
+        - isOpen
+        - createdAt
+
+    CreateIntakeBody:
+      type: object
+      properties:
+        intakeMonth:
+          type: string
+        intakeDay:
+          type: ["integer", "null"]
+        intakeYear:
+          type: ["integer", "null"]
+        isOpen:
+          type: boolean
+      required:
+        - intakeMonth
+        - isOpen
+
+    Fee:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        internationalFee:
+          type: ["number", "null"]
+        feeTerm:
+          type: ["string", "null"]
+        feeYear:
+          type: ["integer", "null"]
+        currency:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - courseId
+        - createdAt
+
+    CreateFeeBody:
+      type: object
+      properties:
+        internationalFee:
+          type: ["number", "null"]
+        feeTerm:
+          type: ["string", "null"]
+        feeYear:
+          type: ["integer", "null"]
+        currency:
+          type: ["string", "null"]
+
+    EnglishRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        testType:
+          type: string
+        listening:
+          type: ["number", "null"]
+        speaking:
+          type: ["number", "null"]
+        writing:
+          type: ["number", "null"]
+        reading:
+          type: ["number", "null"]
+        overall:
+          type: ["number", "null"]
+        testName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - courseId
+        - testType
+        - createdAt
+
+    CreateEnglishRequirementBody:
+      type: object
+      properties:
+        testType:
+          type: string
+        listening:
+          type: ["number", "null"]
+        speaking:
+          type: ["number", "null"]
+        writing:
+          type: ["number", "null"]
+        reading:
+          type: ["number", "null"]
+        overall:
+          type: ["number", "null"]
+        testName:
+          type: ["string", "null"]
+      required:
+        - testType
+
+    AcademicRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        academicLevel:
+          type: ["string", "null"]
+        academicScore:
+          type: ["number", "null"]
+        scoreType:
+          type: ["string", "null"]
+        academicCountry:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - courseId
+        - createdAt
+
+    CreateAcademicRequirementBody:
+      type: object
+      properties:
+        academicLevel:
+          type: ["string", "null"]
+        academicScore:
+          type: ["number", "null"]
+        scoreType:
+          type: ["string", "null"]
+        academicCountry:
+          type: ["string", "null"]
+
+    Scholarship:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        name:
+          type: string
+        details:
+          type: ["string", "null"]
+        eligibilityCriteria:
+          type: ["string", "null"]
+        amount:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - courseId
+        - name
+        - createdAt
+
+    CreateScholarshipBody:
+      type: object
+      properties:
+        name:
+          type: string
+        details:
+          type: ["string", "null"]
+        eligibilityCriteria:
+          type: ["string", "null"]
+        amount:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+      required:
+        - name
+
+    ScrapingJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        universityId:
+          type: ["integer", "null"]
+        universityName:
+          type: ["string", "null"]
+        url:
+          type: string
+        frequency:
+          type: string
+        status:
+          type: string
+        lastRun:
+          type: ["string", "null"]
+        nextRun:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - url
+        - frequency
+        - status
+        - createdAt
+
+    CreateScrapingJobBody:
+      type: object
+      properties:
+        universityId:
+          type: ["integer", "null"]
+        url:
+          type: string
+        frequency:
+          type: string
+      required:
+        - url
+        - frequency
+
+    ScrapingChange:
+      type: object
+      properties:
+        id:
+          type: integer
+        scrapingJobId:
+          type: ["integer", "null"]
+        universityName:
+          type: ["string", "null"]
+        courseName:
+          type: ["string", "null"]
+        fieldChanged:
+          type: string
+        oldValue:
+          type: ["string", "null"]
+        newValue:
+          type: ["string", "null"]
+        status:
+          type: string
+        detectedAt:
+          type: string
+        reviewedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - fieldChanged
+        - status
+        - detectedAt
+
+    DashboardStats:
+      type: object
+      properties:
+        totalUniversities:
+          type: integer
+        totalCourses:
+          type: integer
+        totalScholarships:
+          type: integer
+        pendingChanges:
+          type: integer
+        activeScrapingJobs:
+          type: integer
+        coursesThisMonth:
+          type: integer
+      required:
+        - totalUniversities
+        - totalCourses
+        - totalScholarships
+        - pendingChanges
+        - activeScrapingJobs
+        - coursesThisMonth
+
+    CountByLabel:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+      required:
+        - label
+        - count
+
+    UpcomingIntake:
+      type: object
+      properties:
+        courseId:
+          type: integer
+        courseName:
+          type: string
+        universityName:
+          type: string
+        intakeMonth:
+          type: string
+        intakeYear:
+          type: ["integer", "null"]
+        isOpen:
+          type: boolean
+      required:
+        - courseId
+        - courseName
+        - universityName
+        - intakeMonth
+        - isOpen
+
+    BulkUploadBody:
+      type: object
+      properties:
+        csvData:
+          type: string
+      required:
+        - csvData
+
+    BulkUploadResult:
+      type: object
+      properties:
+        inserted:
+          type: integer
+        updated:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+        - inserted
+        - updated
+        - errors
