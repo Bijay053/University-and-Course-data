@@ -10,6 +10,7 @@ import scholarshipsRouter from "./scholarships";
 import scrapingRouter from "./scraping";
 import dashboardRouter from "./dashboard";
 import bulkRouter from "./bulk";
+import importRouter from "./import";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(scholarshipsRouter);
 router.use(scrapingRouter);
 router.use(dashboardRouter);
 router.use(bulkRouter);
+router.use(importRouter);
 
 export default router;
