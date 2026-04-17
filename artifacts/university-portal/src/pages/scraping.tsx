@@ -167,6 +167,7 @@ export default function Scraping() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [feePageUrl, setFeePageUrl] = useState("");
   const [requirementsPageUrl, setRequirementsPageUrl] = useState("");
+  const [fastMode, setFastMode] = useState(false);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
 
@@ -379,6 +380,7 @@ export default function Scraping() {
     }
     if (feePageUrl.trim()) uniBody.feePage = feePageUrl.trim();
     if (requirementsPageUrl.trim()) uniBody.requirementsPage = requirementsPageUrl.trim();
+    if (fastMode) uniBody.fastMode = true;
     uniBodyRef.current = uniBody;
 
     // Queue remaining URLs (all except the first)
@@ -401,7 +403,7 @@ export default function Scraping() {
       setScrapeLogs([{ event: "error", message: (err as Error).message }]);
       setScraping(false);
     }
-  }, [scrapeUrls, feePageUrl, requirementsPageUrl, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
+  }, [scrapeUrls, feePageUrl, requirementsPageUrl, fastMode, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
 
   useEffect(() => {
     if (!scraping && activeJobId) {
@@ -573,6 +575,22 @@ export default function Scraping() {
               <PlusCircle className="w-4 h-4" />
               Add another URL
             </button>
+
+            <label className="flex items-start gap-2 mt-1 p-2.5 rounded-md border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors">
+              <input
+                type="checkbox"
+                checked={fastMode}
+                onChange={(e) => setFastMode(e.target.checked)}
+                disabled={scraping}
+                className="mt-0.5 w-4 h-4 accent-amber-600"
+              />
+              <div className="flex-1 text-xs">
+                <div className="font-medium text-amber-900">Fast Mode (skip browser automation)</div>
+                <div className="text-amber-700 mt-0.5">
+                  5–10× faster (~1 min for 1000 pages). May miss JS-rendered fields on sites like VIT, Newcastle, UEL, RMIT (International toggle, expandable Entry Requirements). Recommended for static-HTML sites.
+                </div>
+              </div>
+            </label>
 
             <button
               type="button"

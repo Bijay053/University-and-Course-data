@@ -87,6 +87,7 @@ interface ScrapeJob {
   universityName?: string;
   url?: string;
   stopped?: boolean;
+  fastMode?: boolean;
   discoveredConfig?: ScrapeConfig;
   awaitingApproval?: { resolve: (proceed: boolean) => void; summary: ApprovalSummary };
 }
@@ -3318,9 +3319,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
 
-  // Determine once whether this batch of courses needs browser automation
-  const batchNeedsBrowser = courseLinks.length > 0 && siteNeedsBrowser(courseLinks[0].url);
-  if (batchNeedsBrowser) {
+  // Determine once whether this batch of courses needs browser automation.
+  // Fast mode disables browser entirely (5–10× faster, may miss JS-rendered fields).
+  const batchNeedsBrowser = !job.fastMode && courseLinks.length > 0 && siteNeedsBrowser(courseLinks[0].url);
+  if (job.fastMode) {
+    addLog(job, "status", { message: "FAST MODE — browser automation disabled, using HTTP fetch only", phase: "fetch" });
+  } else if (batchNeedsBrowser) {
     addLog(job, "status", { message: "JS-heavy site detected — using browser automation (International toggle + Entry Requirements tab)", phase: "fetch" });
   }
 
@@ -3336,7 +3340,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         let cHtml: string;
         let browserReqsHtml: string | null = null;  // per-course requirements HTML from browser
 
-        if (batchNeedsBrowser || siteNeedsBrowser(link.url)) {
+        if (!job.fastMode && (batchNeedsBrowser || siteNeedsBrowser(link.url))) {
           const browserResult = await browserSem(() =>
             fetchPageWithBrowser(link.url, {
               clickInternational: true,
@@ -3843,7 +3847,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 }
 
 router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
-  const { url, universityId, universityName, universityCountry, universityCity, feePage, requirementsPage } = req.body as {
+  const { url, universityId, universityName, universityCountry, universityCity, feePage, requirementsPage, fastMode } = req.body as {
     url: string;
     universityId?: number;
     universityName?: string;
@@ -3851,6 +3855,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     universityCity?: string;
     feePage?: string;
     requirementsPage?: string;
+    fastMode?: boolean;
   };
 
   if (!url) { res.status(400).json({ error: "URL is required" }); return; }
@@ -3897,8 +3902,9 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     job.universityId = uniId;
     job.universityName = uniName;
     job.url = url;
+    job.fastMode = !!fastMode;
     scrapeJobs.set(jobId, job);
-    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})` });
+    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (browser disabled)" : ""}` });
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
