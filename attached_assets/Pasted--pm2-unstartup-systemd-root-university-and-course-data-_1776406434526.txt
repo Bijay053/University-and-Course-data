@@ -1,0 +1,22 @@
+$ pm2 unstartup systemd
+root@university-and-course-data:/opt/app# printf 'server {\n  listen 80;\n  server_name _;\n  root /opt/app/artifacts/university-portal/dist/public;\n  index index.html;\n  location / { try_files $uri $uri/ /index.html; }\n  location /api/ {\n    proxy_pass http://localhost:8080;\n    proxy_http_version 1.1;\n    proxy_set_header Host $host;\n    proxy_read_timeout 300s;\n    proxy_send_timeout 300s;\n    client_max_body_size 50M;\n  }\n}\n' > /etc/nginx/sites-available/uniportal && ln -sf /etc/nginx/sites-available/uniportal /etc/nginx/sites-enabled/ && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl restart nginx && echo "DONE - visit http://159.65.152.72"
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+DONE - visit http://159.65.152.72
+root@university-and-course-data:/opt/app# printf 'server {\n  listen 80;\n  server_name _;\n  root /opt/app/artifacts/university-portal/dist/public;\n  index index.html;\n  location / { try_files $uri $uri/ /index.html; }\n  location /api/ {\n    proxy_pass http://localhost:8080;\n    proxy_http_version 1.1;\n    proxy_set_header Host $host;\n    proxy_read_timeout 300s;\n    proxy_send_timeout 300s;\n    client_max_body_size 50M;\n  }\n}\n' > /etc/nginx/sites-available/uniportal && ln -sf /etc/nginx/sites-available/uniportal /etc/nginx/sites-enabled/ && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl restart nginx && echo "DONE"
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+DONE
+root@university-and-course-data:/opt/app# git -C /opt/app fetch origin && git -C /opt/app checkout patch/fast-scraper-tuning-20260417 && git -C /opt/app pull
+branch 'patch/fast-scraper-tuning-20260417' set up to track 'origin/patch/fast-scraper-tuning-20260417'.
+Switched to a new branch 'patch/fast-scraper-tuning-20260417'
+Already up to date.
+root@university-and-course-data:/opt/app# printf 'server {\n  listen 80;\n  server_name _;\n  root /opt/app/artifacts/university-portal/dist/public;\n  index index.html;\n  location / { try_files $uri $uri/ /index.html; }\n  location /api/ {\n    proxy_pass http://localhost:8080;\n    proxy_http_version 1.1;\n    proxy_set_header Host $host;\n    proxy_read_timeout 300s;\n    proxy_send_timeout 300s;\n    client_max_body_size 50M;\n  }\n}\n' > /etc/nginx/sites-available/uniportal && ln -sf /etc/nginx/sites-available/uniportal /etc/nginx/sites-enabled/ && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl restart nginx && echo "DONE"
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+DONE
+root@university-and-course-data:/opt/app# git -C /opt/app config user.email "you@example.com" && git -C /opt/app config user.name "Bijay" && git -C /opt/app remote set-url origin https://Bijay053:YOUR_GITHUB_TOKEN@github.com/Bijay053/University-and-Course-data.git
+root@university-and-course-data:/opt/app# git -C /opt/app push origin HEAD:patch/fast-scraper-tuning-20260417 --force
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/Bijay053/University-and-Course-data.git/'
+root@university-and-course-data:/opt/app# 
