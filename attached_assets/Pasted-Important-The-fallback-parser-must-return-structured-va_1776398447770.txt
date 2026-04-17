@@ -1,0 +1,539 @@
+Important:
+The fallback parser must return structured values, not just a boolean hit.
+
+==================================================
+STEP 5 — ENSURE FALLBACK RESULT IS ASSIGNED
+
+Find the code where fallback is called.
+Make sure result is actually assigned into the course object.
+
+Required pattern:
+
+let ielts = extractIeltsFromText(staticCourseText);
+
+if (!ielts.overall && browserRenderedText) {
+  const browserIelts = extractIeltsFromText(browserRenderedText);
+  if (browserIelts.overall) {
+    ielts = browserIelts;
+  }
+}
+
+if (!ielts.overall && sharedRequirementsText) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+  }
+}
+
+Then map immediately:
+
+course.ieltsOverall = ielts.overall;
+course.ieltsListening = ielts.listening;
+course.ieltsReading = ielts.reading;
+course.ieltsWriting = ielts.writing;
+course.ieltsSpeaking = ielts.speaking;
+
+Do not leave fallback result in a local variable that never gets assigned to course.
+
+==================================================
+STEP 6 — CHECK FOR OVERWRITE BUG
+
+After assigning IELTS values, search the file for later code that may overwrite them with null, undefined, empty string, or default values.
+
+Look for patterns like:
+
+object spread order issues
+later normalization resetting missing fields
+AI classification result replacing course object
+save payload created from old object instead of updated object
+
+Example bug to fix:
+
+const finalCourse = {
+  ...extractedCourse,
+  ...classifiedCourse
+}
+
+If classifiedCourse has ieltsOverall undefined or null, it may wipe out the extracted value.
+
+Fix object merge order carefully so extracted IELTS is preserved.
+
+==================================================
+STEP 7 — VERIFY DB FIELD NAMES
+
+Open:
+lib/db/src/schema/scraped_courses.ts
+
+Check the actual column names for IELTS.
+
+Then check the insert payload in scrape.ts.
+Make sure backend field names match DB column names exactly.
+
+Possible issue:
+
+backend uses ielts_overall in one place
+UI/API expects ieltsOverall
+or backend saves englishOverall instead of ieltsOverall
+
+Fix all naming mismatches.
+
+==================================================
+STEP 8 — VERIFY API RESPONSE SHAPE
+
+Find the route that returns staged scraped courses to the review page.
+Check the response object shape.
+
+Make sure it includes:
+
+ieltsOverall
+ieltsListening
+ieltsReading
+ieltsWriting
+ieltsSpeaking
+
+If DB returns snake_case and UI expects camelCase, transform correctly before sending response.
+
+==================================================
+STEP 9 — VERIFY FRONTEND COLUMN BINDING
+
+In:
+artifacts/university-portal/src/pages/scraping.tsx
+
+Find the IELTS column and the missing fields warning logic.
+
+Check what field it reads.
+It must read the same property the API returns.
+
+Examples to verify:
+
+row.ieltsOverall
+row.ielts_overall
+row.englishTests?.ielts?.overall
+
+Make them consistent.
+
+Also fix the warning logic so:
+if ieltsOverall exists, it should not still show Missing: ieltsOverall
+
+==================================================
+STEP 10 — ADD A SAFE FINAL NORMALIZER
+
+Before saving staged course rows, normalize IELTS once:
+
+function applyIeltsToCourse(course: any, ielts: IeltsResult) {
+  if (!ielts?.overall) return course;
+
+  return {
+    ...course,
+    ieltsOverall: ielts.overall,
+    ieltsListening: ielts.listening,
+    ieltsReading: ielts.reading,
+    ieltsWriting: ielts.writing,
+    ieltsSpeaking: ielts.speaking,
+  };
+}
+
+Use this consistently for static, browser, and shared fallback result to avoid partial mapping bugs.
+
+==================================================
+STEP 11 — VERIFY WITH ASA
+
+Run the ASA scrape again.
+
+Expected:
+Courses that currently show fallback hit in logs should now either:
+
+display IELTS values in the review table
+or
+show explicit debug log proving parser found nothing in the fallback text
+
+At minimum, after this fix we should know exactly whether the issue is:
+
+parser no match
+mapping bug
+save bug
+UI binding bug
+==================================================
+STEP 12 — CLEAN REPORT
+
+When done, tell me:
+
+files changed
+exact root cause found
+whether issue was parser, mapping, overwrite, DB, API, or UI
+sample debug for one failing course and one working course
+one final staged row example showing correct IELTS fields
+any remaining limitation
+
+---
+
+## My direct read of your current issue
+
+Most likely one of these two:
+
+### 1. Merge overwrite bug
+Shared fallback is called, but later another object merge wipes IELTS back to empty.
+
+### 2. Field name mismatch
+The fallback result is saved in one naming style, but the review table is reading another.
+
+Because if the parser itself were completely broken, I would expect **none** to work. But one course works, which means the pipeline is partly fine.
+
+If you want, I can also write you a **very strict debugging patch block** that tells Replit exactly what `console.log` lines to insert and where.
+yes
+
+Paste this into Replit exactly as a debugging patch instruction:
+
+Apply a strict debugging patch for the IELTS blank issue in my existing project.
+
+Important:
+Do not redesign the scraper now.
+Do not only explain.
+Add the exact debug logs below into the real files, run the scrape, inspect the output, then fix the bug based on what the logs prove.
+
+Main goal:
+Trace IELTS end to end for one working course and one failing course so we can prove exactly where the value is being lost.
+
+Use these two example courses from ASA:
+- working example: Bachelor Of Professional Accounting
+- failing example: Bachelor Of Business
+
+==================================================
+STEP 1 — OPEN THESE FILES
+==================================================
+
+Open:
+1. artifacts/api-server/src/routes/scrape.ts
+2. lib/db/src/schema/scraped_courses.ts
+3. artifacts/university-portal/src/pages/scraping.tsx
+4. artifacts/api-server/src/routes/scraping.ts
+
+Main debugging file:
+artifacts/api-server/src/routes/scrape.ts
+
+==================================================
+STEP 2 — ADD A SMALL DEBUG FILTER
+==================================================
+
+At the top of scrape.ts add this helper so logs are only shown for the two target courses.
+
+```ts
+function shouldDebugIelts(courseName?: string | null) {
+  if (!courseName) return false;
+  const name = courseName.toLowerCase();
+  return (
+    name.includes("bachelor of professional accounting") ||
+    name.includes("bachelor of business")
+  );
+}
+
+function debugIelts(courseName: string | undefined | null, stage: string, payload: any) {
+  if (!shouldDebugIelts(courseName)) return;
+  try {
+    console.log(`[IELTS-DEBUG] ${stage} :: ${courseName} ::`, JSON.stringify(payload, null, 2));
+  } catch {
+    console.log(`[IELTS-DEBUG] ${stage} :: ${courseName} ::`, payload);
+  }
+}
+==================================================
+STEP 3 — LOG THE SOURCE TEXT SNIPPETS
+
+Wherever you are doing IELTS extraction from:
+
+static course page
+browser rendered course page
+shared requirements page
+
+log a small snippet around IELTS before parsing.
+
+Add a helper:
+
+function snippetAroundIelts(rawText: string): string {
+  const text = rawText || "";
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf("ielts");
+  if (idx === -1) return "";
+  const start = Math.max(0, idx - 120);
+  const end = Math.min(text.length, idx + 350);
+  return text.slice(start, end).replace(/\s+/g, " ").trim();
+}
+
+Then log like this:
+
+debugIelts(courseName, "static-text-snippet", {
+  snippet: snippetAroundIelts(staticCourseText)
+});
+
+debugIelts(courseName, "browser-text-snippet", {
+  snippet: snippetAroundIelts(browserRenderedText)
+});
+
+debugIelts(courseName, "shared-text-snippet", {
+  snippet: snippetAroundIelts(sharedRequirementsText)
+});
+==================================================
+STEP 4 — LOG PARSER RESULTS IMMEDIATELY
+
+Immediately after each parser call, add logs like this:
+
+const staticIelts = extractIeltsFromText(staticCourseText);
+debugIelts(courseName, "static-parser-result", staticIelts);
+
+const browserIelts = extractIeltsFromText(browserRenderedText);
+debugIelts(courseName, "browser-parser-result", browserIelts);
+
+const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+debugIelts(courseName, "shared-parser-result", sharedIelts);
+
+This will prove whether the parser is actually finding values.
+
+==================================================
+STEP 5 — LOG THE FINAL IELTS CHOICE
+
+After your extraction priority logic chooses the final IELTS source, log exactly which source won.
+
+Example target logic:
+
+let ielts = extractIeltsFromText(staticCourseText);
+let ieltsSource = "static";
+
+if (!ielts.overall && browserRenderedText) {
+  const browserIelts = extractIeltsFromText(browserRenderedText);
+  if (browserIelts.overall) {
+    ielts = browserIelts;
+    ieltsSource = "browser";
+  }
+}
+
+if (!ielts.overall && sharedRequirementsText) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+    ieltsSource = "shared";
+  }
+}
+
+debugIelts(courseName, "final-selected-ielts", {
+  source: ieltsSource,
+  ielts,
+});
+
+This will prove if fallback is actually producing a usable result.
+
+==================================================
+STEP 6 — LOG BEFORE COURSE OBJECT ASSIGNMENT
+
+Immediately before assigning IELTS into the course object, log both the course object and the chosen IELTS result.
+
+debugIelts(courseName, "before-course-assignment", {
+  existingCourseValues: {
+    ieltsOverall: course?.ieltsOverall,
+    ieltsListening: course?.ieltsListening,
+    ieltsReading: course?.ieltsReading,
+    ieltsWriting: course?.ieltsWriting,
+    ieltsSpeaking: course?.ieltsSpeaking,
+  },
+  chosenIelts: ielts,
+});
+
+Then assign with a single helper:
+
+function applyIeltsToCourse(course: any, ielts: any) {
+  return {
+    ...course,
+    ieltsOverall: ielts?.overall ?? course?.ieltsOverall ?? null,
+    ieltsListening: ielts?.listening ?? course?.ieltsListening ?? null,
+    ieltsReading: ielts?.reading ?? course?.ieltsReading ?? null,
+    ieltsWriting: ielts?.writing ?? course?.ieltsWriting ?? null,
+    ieltsSpeaking: ielts?.speaking ?? course?.ieltsSpeaking ?? null,
+  };
+}
+
+Then:
+
+course = applyIeltsToCourse(course, ielts);
+
+debugIelts(courseName, "after-course-assignment", {
+  ieltsOverall: course?.ieltsOverall,
+  ieltsListening: course?.ieltsListening,
+  ieltsReading: course?.ieltsReading,
+  ieltsWriting: course?.ieltsWriting,
+  ieltsSpeaking: course?.ieltsSpeaking,
+});
+==================================================
+STEP 7 — LOG FOR OVERWRITE BUGS
+
+Search scrape.ts for all later places where the course object is rebuilt or merged.
+
+Before every later merge or transformation, log current IELTS values:
+
+debugIelts(courseName, "before-late-merge", {
+  ieltsOverall: course?.ieltsOverall,
+  ieltsListening: course?.ieltsListening,
+  ieltsReading: course?.ieltsReading,
+  ieltsWriting: course?.ieltsWriting,
+  ieltsSpeaking: course?.ieltsSpeaking,
+});
+
+After the merge:
+
+debugIelts(courseName, "after-late-merge", {
+  ieltsOverall: finalCourse?.ieltsOverall,
+  ieltsListening: finalCourse?.ieltsListening,
+  ieltsReading: finalCourse?.ieltsReading,
+  ieltsWriting: finalCourse?.ieltsWriting,
+  ieltsSpeaking: finalCourse?.ieltsSpeaking,
+});
+
+This will prove whether values are getting wiped out later.
+
+Especially inspect object spread order like:
+
+{ ...course, ...classified }
+{ ...classified, ...course }
+
+If classified object contains null or undefined IELTS fields, it may wipe out extracted values.
+
+Fix merge order so extracted values win.
+
+==================================================
+STEP 8 — LOG THE DB INSERT PAYLOAD
+
+Right before inserting into staged scraped courses table, log the exact IELTS fields in the insert payload.
+
+debugIelts(courseName, "db-insert-payload", {
+  ieltsOverall: insertPayload?.ieltsOverall ?? insertPayload?.ielts_overall,
+  ieltsListening: insertPayload?.ieltsListening ?? insertPayload?.ielts_listening,
+  ieltsReading: insertPayload?.ieltsReading ?? insertPayload?.ielts_reading,
+  ieltsWriting: insertPayload?.ieltsWriting ?? insertPayload?.ielts_writing,
+  ieltsSpeaking: insertPayload?.ieltsSpeaking ?? insertPayload?.ielts_speaking,
+});
+
+If you use snake_case in DB layer, log both snake_case and camelCase.
+
+==================================================
+STEP 9 — LOG THE DB RESULT AFTER SAVE
+
+After the staged row is inserted or returned, log the saved row values.
+
+debugIelts(courseName, "db-saved-row", {
+  ieltsOverall: savedRow?.ieltsOverall ?? savedRow?.ielts_overall,
+  ieltsListening: savedRow?.ieltsListening ?? savedRow?.ielts_listening,
+  ieltsReading: savedRow?.ieltsReading ?? savedRow?.ielts_reading,
+  ieltsWriting: savedRow?.ieltsWriting ?? savedRow?.ielts_writing,
+  ieltsSpeaking: savedRow?.ieltsSpeaking ?? savedRow?.ielts_speaking,
+});
+
+This proves whether DB save is dropping values.
+
+==================================================
+STEP 10 — LOG API RESPONSE TO REVIEW UI
+
+Find the endpoint that returns staged scraped courses to the review screen.
+Log the outgoing response row for the same target courses.
+
+debugIelts(courseName, "api-response-row", {
+  ieltsOverall: row?.ieltsOverall ?? row?.ielts_overall,
+  ieltsListening: row?.ieltsListening ?? row?.ielts_listening,
+  ieltsReading: row?.ieltsReading ?? row?.ielts_reading,
+  ieltsWriting: row?.ieltsWriting ?? row?.ielts_writing,
+  ieltsSpeaking: row?.ieltsSpeaking ?? row?.ielts_speaking,
+});
+
+If backend returns snake_case but UI expects camelCase, fix that mapping.
+
+==================================================
+STEP 11 — LOG FRONTEND ROW BINDING
+
+In artifacts/university-portal/src/pages/scraping.tsx, temporarily log the row values used by the review table for those two courses.
+
+Use a targeted console log in the component render or mapping code:
+
+if (
+  row.courseName?.toLowerCase().includes("bachelor of professional accounting") ||
+  row.courseName?.toLowerCase().includes("bachelor of business")
+) {
+  console.log("[IELTS-DEBUG][UI ROW]", {
+    courseName: row.courseName,
+    ieltsOverall: row.ieltsOverall,
+    ieltsListening: row.ieltsListening,
+    ieltsReading: row.ieltsReading,
+    ieltsWriting: row.ieltsWriting,
+    ieltsSpeaking: row.ieltsSpeaking,
+    missingFields: row.missingFields,
+  });
+}
+
+This will prove whether UI is receiving the values and whether missingFields is stale or wrong.
+
+==================================================
+STEP 12 — CHECK MISSING FIELDS CALCULATION
+
+Find where Missing: ieltsOverall is calculated.
+
+Log the data used for that calculation:
+
+debugIelts(courseName, "missing-fields-check", {
+  ieltsOverall: row?.ieltsOverall,
+  missingFields: row?.missingFields,
+});
+
+If missingFields was computed before IELTS was assigned, recompute it after all enrichment is done.
+
+Required fix:
+missing field calculation must happen only after:
+
+static extraction
+browser extraction
+shared fallback
+AI fallback
+final field assignment
+==================================================
+STEP 13 — EXPECTED DECISION TREE
+
+After running this debug patch, determine which of these is true:
+
+A. parser returned null on shared fallback text
+B. parser returned value but course assignment failed
+C. course assignment worked but later merge overwrote it
+D. DB insert payload lost it
+E. DB saved it but API response shape lost it
+F. API returned it but UI binding or missingFields logic is wrong
+
+Then fix the exact root cause.
+Do not guess.
+Use the logs.
+
+==================================================
+STEP 14 — AFTER ROOT CAUSE IS PROVEN, CLEAN FIX
+
+Once logs prove root cause, implement the real fix and then reduce debug noise.
+Keep only one useful log such as:
+[IELTS] source=shared overall=6.0 course=Bachelor Of Business
+
+==================================================
+STEP 15 — REPORT BACK
+
+When done, tell me:
+
+exact root cause
+file and line area where the value was lost
+fix applied
+before and after example for:
+Bachelor Of Professional Accounting
+Bachelor Of Business
+whether the issue was parser, overwrite, DB, API, UI, or missingFields timing
+
+## My strongest guess before logs
+The most likely bug is one of these:
+
+### Merge overwrite
+IELTS gets assigned, then another later object merge wipes it out.
+
+### Missing fields timing
+The value exists, but `missingFields` was computed earlier and never refreshed, so UI still shows missing.
+
+### Case mismatch
+Saved in one shape, rendered from another.
+
+The debugging patch above will prove exactly which one it is.

@@ -1,0 +1,162 @@
+STEP 5 — ENSURE FALLBACK RESULT IS ASSIGNED
+
+Find the code where fallback is called.
+Make sure result is actually assigned into the course object.
+
+Required pattern:
+
+let ielts = extractIeltsFromText(staticCourseText);
+
+if (!ielts.overall && browserRenderedText) {
+  const browserIelts = extractIeltsFromText(browserRenderedText);
+  if (browserIelts.overall) {
+    ielts = browserIelts;
+  }
+}
+
+if (!ielts.overall && sharedRequirementsText) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+  }
+}
+
+Then map immediately:
+
+course.ieltsOverall = ielts.overall;
+course.ieltsListening = ielts.listening;
+course.ieltsReading = ielts.reading;
+course.ieltsWriting = ielts.writing;
+course.ieltsSpeaking = ielts.speaking;
+
+Do not leave fallback result in a local variable that never gets assigned to course.
+
+==================================================
+STEP 6 — CHECK FOR OVERWRITE BUG
+
+After assigning IELTS values, search the file for later code that may overwrite them with null, undefined, empty string, or default values.
+
+Look for patterns like:
+
+object spread order issues
+later normalization resetting missing fields
+AI classification result replacing course object
+save payload created from old object instead of updated object
+
+Example bug to fix:
+
+const finalCourse = {
+  ...extractedCourse,
+  ...classifiedCourse
+}
+
+If classifiedCourse has ieltsOverall undefined or null, it may wipe out the extracted value.
+
+Fix object merge order carefully so extracted IELTS is preserved.
+
+==================================================
+STEP 7 — VERIFY DB FIELD NAMES
+
+Open:
+lib/db/src/schema/scraped_courses.ts
+
+Check the actual column names for IELTS.
+
+Then check the insert payload in scrape.ts.
+Make sure backend field names match DB column names exactly.
+
+Possible issue:
+
+backend uses ielts_overall in one place
+UI/API expects ieltsOverall
+or backend saves englishOverall instead of ieltsOverall
+
+Fix all naming mismatches.
+
+==================================================
+STEP 8 — VERIFY API RESPONSE SHAPE
+
+Find the route that returns staged scraped courses to the review page.
+Check the response object shape.
+
+Make sure it includes:
+
+ieltsOverall
+ieltsListening
+ieltsReading
+ieltsWriting
+ieltsSpeaking
+
+If DB returns snake_case and UI expects camelCase, transform correctly before sending response.
+
+==================================================
+STEP 9 — VERIFY FRONTEND COLUMN BINDING
+
+In:
+artifacts/university-portal/src/pages/scraping.tsx
+
+Find the IELTS column and the missing fields warning logic.
+
+Check what field it reads.
+It must read the same property the API returns.
+
+Examples to verify:
+
+row.ieltsOverall
+row.ielts_overall
+row.englishTests?.ielts?.overall
+
+Make them consistent.
+
+Also fix the warning logic so:
+if ieltsOverall exists, it should not still show Missing: ieltsOverall
+
+==================================================
+STEP 10 — ADD A SAFE FINAL NORMALIZER
+
+Before saving staged course rows, normalize IELTS once:
+
+function applyIeltsToCourse(course: any, ielts: IeltsResult) {
+  if (!ielts?.overall) return course;
+
+  return {
+    ...course,
+    ieltsOverall: ielts.overall,
+    ieltsListening: ielts.listening,
+    ieltsReading: ielts.reading,
+    ieltsWriting: ielts.writing,
+    ieltsSpeaking: ielts.speaking,
+  };
+}
+
+Use this consistently for static, browser, and shared fallback result to avoid partial mapping bugs.
+
+==================================================
+STEP 11 — VERIFY WITH ASA
+
+Run the ASA scrape again.
+
+Expected:
+Courses that currently show fallback hit in logs should now either:
+
+display IELTS values in the review table
+or
+show explicit debug log proving parser found nothing in the fallback text
+
+At minimum, after this fix we should know exactly whether the issue is:
+
+parser no match
+mapping bug
+save bug
+UI binding bug
+==================================================
+STEP 12 — CLEAN REPORT
+
+When done, tell me:
+
+files changed
+exact root cause found
+whether issue was parser, mapping, overwrite, DB, API, or UI
+sample debug for one failing course and one working course
+one final staged row example showing correct IELTS fields
+any remaining limitation
