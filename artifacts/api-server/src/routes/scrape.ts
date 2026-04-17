@@ -312,6 +312,52 @@ function findImageUrls(html: string, courseUrl: string): string[] {
   return images;
 }
 
+/**
+ * DOM-aware study mode detection.
+ * Tracks hasOnline and hasOnCampus independently, combining them to "Blended".
+ * Handles "Location: Sydney, Online" + "Delivery: Face to Face" → Blended.
+ */
+function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): string {
+  let hasOnline = false;
+  let hasOnCampus = false;
+
+  // Check explicit blended/hybrid keywords first
+  if (/blended|hybrid|mixed[- ]?mode/i.test(fullText)) return "Blended";
+  if (/on[- ]?campus\s*(?:and|or|\/)\s*online|online\s*(?:and|or|\/)\s*on[- ]?campus/i.test(fullText)) return "Blended";
+  if (/both\b[^.]{0,60}\b(?:online|on[- ]?campus)/i.test(fullText)) return "Blended";
+
+  // DOM inspection: find Location / Delivery / Mode field containers
+  const fieldSelectors = [
+    "[class*='location'i]", "[class*='delivery'i]", "[class*='mode'i]",
+    "[class*='study-mode'i]", "[class*='campus'i]",
+    "dt", "td", "th", "li",
+  ];
+  for (const sel of fieldSelectors) {
+    $(sel).each((_, el) => {
+      const label = $(el).text().trim().toLowerCase();
+      // Find sibling or next element value
+      const value = ($(el).next().text() + " " + $(el).parent().text()).toLowerCase();
+      const combined = label + " " + value;
+
+      if (/\blocation\b|\bdelivery\b|\bmode\b|\bstudy\s*mode\b/.test(label)) {
+        if (/online/.test(combined)) hasOnline = true;
+        if (/on[- ]?campus|face[- ]?to[- ]?face|in[- ]?person|sydney|melbourne|brisbane|perth|adelaide|campus/.test(combined)) hasOnCampus = true;
+      }
+    });
+    if (hasOnline && hasOnCampus) break;
+  }
+
+  // General text scan (catches any remaining patterns)
+  if (/\bon[- ]?campus\b|\bface[- ]?to[- ]?face\b|\bin[- ]?person\b/.test(fullText)) hasOnCampus = true;
+  if (/\bonline\b|\bdistance\b|\bremote\b|\bexternal\b/.test(fullText)) hasOnline = true;
+
+  if (hasOnline && hasOnCampus) return "Blended";
+  if (/online\s*(?:only|delivery)|fully\s*online|distance\s*(?:learning|education)/i.test(fullText)) return "Online";
+  if (hasOnline) return "Online";
+  if (hasOnCampus) return "On Campus";
+  return "On Campus"; // default
+}
+
 function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
   const $ = cheerio.load(html);
   const text = $("body").text();
@@ -357,11 +403,8 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
   else if (/full[- ]?time/i.test(text)) data.studyLoad = "Full Time";
   else if (/part[- ]?time/i.test(text)) data.studyLoad = "Part Time";
 
-  // Study mode — order matters: blended first, then online, then campus
-  if (/on[- ]?campus\s*(and|or|\/)\s*online|online\s*(and|or|\/)\s*on[- ]?campus/i.test(text)) data.studyMode = "Blended";
-  else if (/blended|hybrid|mixed[- ]?mode|both\s*(?:on[- ]?campus\s*and\s*online|online\s*and\s*on[- ]?campus)/i.test(text)) data.studyMode = "Blended";
-  else if (/online\s*(only|delivery)|distance\s*(?:learning|education)|external\s*(?:study|delivery)|fully\s*online/i.test(text)) data.studyMode = "Online";
-  else if (/on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face/i.test(text)) data.studyMode = "On Campus";
+  // Study mode — DOM-aware detection, checks Location and Delivery fields independently
+  data.studyMode = detectStudyMode($, text);
 
   const lower = name.toLowerCase();
   if (/\bphd\b|doctor of philosophy/i.test(lower)) data.degreeLevel = "PhD";
@@ -2469,6 +2512,30 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     } catch {}
   }
 
+  // Probe common university-level requirements paths (like the fee page probe above)
+  if (!result.requirementsPage && !result.entryPage) {
+    const commonRequirementsPaths = [
+      "/minimum-entry-requirement", "/minimum-entry-requirements",
+      "/entry-requirements", "/entry-requirement",
+      "/international/requirements", "/international/entry-requirements",
+      "/admissions/requirements", "/admissions/entry-requirements",
+      "/requirements", "/apply/requirements",
+      "/study/entry-requirements", "/courses/entry-requirements",
+      "/international-students/requirements",
+    ];
+    for (const path of commonRequirementsPaths) {
+      try {
+        const testUrl = `${origin}${path}`;
+        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+          result.requirementsPage = testUrl;
+          addLog(job, "status", { message: `Found university requirements page via probe: ${testUrl}`, phase: "discover" });
+          break;
+        }
+      } catch {}
+    }
+  }
+
   const found = Object.entries(result).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(", ");
   if (found) addLog(job, "status", { message: `Discovered university-level pages: ${found}`, phase: "discover" });
 
@@ -2693,11 +2760,13 @@ async function scrapeCourseBatch(
   // Pre-fetch shared data ONCE (parallel)
   const feeCache: UniversityFeeCache = { fetched: false };
   let uniReqsText: string | null = null;
+  let uniReqsHtml: string | null = null;
   if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
-      const reqUrl = uniPages.entryPage || uniPages.requirementsPage!;
-      const reqHtml = await fetchPage(reqUrl);
-      uniReqsText = cheerio.load(reqHtml)("body").text();
+      const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
+      uniReqsHtml = await fetchPage(reqUrl);
+      uniReqsText = cheerio.load(uniReqsHtml)("body").text();
+      addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
     } catch {}
   }
 
@@ -2743,7 +2812,12 @@ async function scrapeCourseBatch(
           } catch {}
         }
 
+        if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+          // Use HTML-based extraction on the university requirements page (table-aware)
+          extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
+        }
         if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+          // Fallback: plain text
           extractEnglishRequirements(uniReqsText, cheerioData);
         }
         if (uniReqsText && !cheerioData.intakeMonths?.length) {
@@ -3236,12 +3310,14 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
 
     const feeCache: UniversityFeeCache = { fetched: false };
     let uniReqsText: string | null = null;
+    let uniReqsHtml: string | null = null;
 
     if (uniPages?.requirementsPage || uniPages?.entryPage) {
       try {
-        const reqUrl = uniPages.entryPage || uniPages.requirementsPage!;
-        const reqHtml = await fetchPage(reqUrl);
-        uniReqsText = cheerio.load(reqHtml)("body").text();
+        const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
+        uniReqsHtml = await fetchPage(reqUrl);
+        uniReqsText = cheerio.load(uniReqsHtml)("body").text();
+        addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
       } catch {}
     }
 
@@ -3285,8 +3361,14 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
           if (!cheerioData.internationalFee && uniPages?.feePage) {
             await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true);
           }
+          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+            extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
+          }
           if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
             extractEnglishRequirements(uniReqsText, cheerioData);
+          }
+          if (uniReqsText && !cheerioData.intakeMonths?.length) {
+            extractIntakeMonths(uniReqsText, cheerioData);
           }
 
           stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url) });
