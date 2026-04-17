@@ -1126,6 +1126,86 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
   extractEnglishRequirements($("body").text(), data);
 }
 
+// ── Stronger IELTS parser ────────────────────────────────────────────────────
+// Four-pattern parser that handles more VIT/AU formats than the regex fallbacks
+// inside extractEnglishRequirements. Called explicitly on browser-rendered text.
+
+type IeltsResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractIeltsFromText(rawText: string): IeltsResult {
+  const text = rawText.replace(/\s+/g, " ").trim();
+  const empty: IeltsResult = { overall: null, listening: null, reading: null, writing: null, speaking: null };
+
+  // Pattern 1: "IELTS overall 6.0 with no band below 5.5" / "no score less than"
+  let m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const min = Number(m[2]);
+    if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9)
+      return { overall, listening: min, reading: min, writing: min, speaking: min };
+  }
+
+  // Pattern 2: "IELTS 6.5 overall, with 6.0 in each band"
+  m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const each = Number(m[2]);
+    if (overall >= 4 && overall <= 9 && each >= 4 && each <= 9)
+      return { overall, listening: each, reading: each, writing: each, speaking: each };
+  }
+
+  // Pattern 3: explicit subscores in order "overall X listening Y reading Z writing W speaking V"
+  m = text.match(
+    /ielts(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]), listening: Number(m[2]),
+      reading: Number(m[3]), writing: Number(m[4]), speaking: Number(m[5]),
+    };
+  }
+
+  // Pattern 4: overall anywhere near "ielts", plus individual band matches elsewhere
+  const overallM  = text.match(/ielts(?:\s+academic)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const listenM   = text.match(/listening\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const readM     = text.match(/reading\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const writeM    = text.match(/writing\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const speakM    = text.match(/speaking\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (overallM && (listenM || readM || writeM || speakM)) {
+    const overall = Number(overallM[1]);
+    if (overall >= 4 && overall <= 9)
+      return {
+        overall,
+        listening: listenM ? Number(listenM[1]) : null,
+        reading:   readM   ? Number(readM[1])   : null,
+        writing:   writeM  ? Number(writeM[1])  : null,
+        speaking:  speakM  ? Number(speakM[1])  : null,
+      };
+  }
+
+  return empty;
+}
+
+/** Map an IeltsResult onto a CourseData object (only fills missing slots). */
+function applyIeltsResult(data: Partial<CourseData>, r: IeltsResult): void {
+  if (!r.overall) return;
+  if (!data.ieltsOverall)   data.ieltsOverall   = r.overall;
+  if (!data.ieltsListening && r.listening != null) data.ieltsListening = r.listening;
+  if (!data.ieltsReading   && r.reading   != null) data.ieltsReading   = r.reading;
+  if (!data.ieltsWriting   && r.writing   != null) data.ieltsWriting   = r.writing;
+  if (!data.ieltsSpeaking  && r.speaking  != null) data.ieltsSpeaking  = r.speaking;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const ieltsSection = text.match(/IELTS\s*(?:Academic|academic)?[^]*?(?=(?:TOEF|TOFL|TOFEL|PTE|Cambridge|CAE|Duolingo|Pathway|Credit|Recognition|\n\s*\n))/i);
   const ieltsText = ieltsSection ? ieltsSection[0] : text;
@@ -3527,7 +3607,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         //                  extraction is missing most critical fields.
         // ─────────────────────────────────────────────────────────────────────
         let cHtml: string;
-        let browserReqsHtml: string | null = null;
+        let wasBrowserFetch = false;
 
         const runBrowser = async () =>
           browserSem(() =>
@@ -3545,10 +3625,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           // Known JS-heavy domain — skip static fetch, go straight to browser.
           const browserResult = await runBrowser();
           if (browserResult) {
-            cHtml = browserResult.mainHtml;
-            if (browserResult.requirementsHtml !== browserResult.mainHtml) {
-              browserReqsHtml = browserResult.requirementsHtml;
-            }
+            // ALWAYS use requirementsHtml (captured AFTER International toggle +
+            // Entry Requirements tab click + accordion expansion). mainHtml only
+            // has the toggle state — the IELTS block lives under the requirements tab.
+            cHtml = browserResult.requirementsHtml;
+            wasBrowserFetch = true;
             addLog(job, "status", {
               message: `[browser ✓] ${link.name.slice(0, 60)} (${browserResult.clicksPerformed.join(", ") || "no clicks"})`,
               phase: "extract",
@@ -3566,11 +3647,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           const quickData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
           if (needsBrowserFallback(quickData)) {
             const browserResult = await runBrowser();
-            if (browserResult?.mainHtml) {
-              cHtml = browserResult.mainHtml;
-              if (browserResult.requirementsHtml !== browserResult.mainHtml) {
-                browserReqsHtml = browserResult.requirementsHtml;
-              }
+            if (browserResult?.requirementsHtml) {
+              cHtml = browserResult.requirementsHtml;
+              wasBrowserFetch = true;
               addLog(job, "status", {
                 message: `[browser fallback ✓] ${link.name.slice(0, 60)}`,
                 phase: "fallback",
@@ -3590,14 +3669,23 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }
         }
 
-        // When browser gave us per-course requirements HTML (after opening the
-        // Entry Requirements tab and expanding accordions), use it to extract
-        // IELTS — this beats the university-level requirements page for accuracy.
-        if (browserReqsHtml && !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall)) {
-          extractEnglishFromHtml(cheerio.load(browserReqsHtml), cheerioData);
-          if (!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall)) {
-            extractEnglishRequirements(cheerio.load(browserReqsHtml)("body").text(), cheerioData);
+        // ── IELTS extraction waterfall ────────────────────────────────────────
+        // Tier 1: extractWithCheerio(cHtml) above already ran extractEnglishFromHtml
+        //         on the browser-rendered page (requirementsHtml after all clicks).
+        // Tier 2: If still missing, run the stronger 4-pattern parser on the same HTML.
+        if (!cheerioData.ieltsOverall && wasBrowserFetch) {
+          const bodyText = cheerio.load(cHtml)("body").text();
+          const ieltsResult = extractIeltsFromText(bodyText);
+          if (ieltsResult.overall) {
+            applyIeltsResult(cheerioData, ieltsResult);
+            addLog(job, "status", {
+              message: `[IELTS] browser page hit: overall=${ieltsResult.overall}${ieltsResult.listening != null ? ` min=${ieltsResult.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+              phase: "extract",
+            });
           }
+        }
+        if (cheerioData.ieltsOverall && !wasBrowserFetch) {
+          addLog(job, "status", { message: `[IELTS] static page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
         }
 
         // If the university fee page is explicitly an international fees page, always
@@ -3618,13 +3706,27 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           } catch {}
         }
 
+        // Tier 3: University-level requirements page (shared fallback).
+        // Only used when course-page extraction (static + browser) found nothing.
+        if (!cheerioData.ieltsOverall) {
+          addLog(job, "status", { message: `[IELTS] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
+        }
         if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-          // Use HTML-based extraction on the university requirements page (table-aware)
           extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
         }
         if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-          // Fallback: plain text
           extractEnglishRequirements(uniReqsText, cheerioData);
+        }
+        // Also run the stronger parser on the shared requirements text
+        if (!cheerioData.ieltsOverall && uniReqsText) {
+          const r = extractIeltsFromText(uniReqsText);
+          if (r.overall) {
+            applyIeltsResult(cheerioData, r);
+            addLog(job, "status", {
+              message: `[IELTS] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`,
+              phase: "extract",
+            });
+          }
         }
         if (uniReqsText && !cheerioData.intakeMonths?.length) {
           extractIntakeMonths(uniReqsText, cheerioData);
