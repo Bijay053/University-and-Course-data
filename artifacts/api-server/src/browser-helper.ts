@@ -195,6 +195,9 @@ export async function fetchPageWithBrowser(
 const JS_HEAVY_DOMAINS = [
   "vit.edu.au",
   "victorianinstitute.edu.au",
+  "newcastle.edu.au",
+  "rmit.edu.au",
+  "uts.edu.au",
 ];
 
 export function siteNeedsBrowser(url: string): boolean {

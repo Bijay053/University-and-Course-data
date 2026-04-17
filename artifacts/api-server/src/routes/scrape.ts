@@ -157,23 +157,76 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
   throw new Error("All Gemini models are currently unavailable. Please try again in a minute.");
 }
 
+// ── Stealth browser profiles (rotate on 403 to bypass WAF fingerprinting) ────
+const STEALTH_PROFILES = [
+  {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "sec-ch-ua-platform": '"Windows"',
+  },
+  {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124"',
+    "sec-ch-ua-platform": '"macOS"',
+  },
+  {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "sec-ch-ua": '"Firefox";v="125"',
+    "sec-ch-ua-platform": '"Windows"',
+  },
+];
+const STEALTH_COMMON_HEADERS: Record<string, string> = {
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Referer": "https://www.google.com/",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "cross-site",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "Cache-Control": "max-age=0",
+  "sec-ch-ua-mobile": "?0",
+};
+
 async function fetchPage(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  try {
-    const resp = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-    return await resp.text();
-  } finally {
-    clearTimeout(timeout);
+  let lastStatus = 0;
+  // Try each stealth profile in turn
+  for (let i = 0; i < STEALTH_PROFILES.length; i++) {
+    try {
+      const resp = await fetch(url, {
+        headers: { ...STEALTH_PROFILES[i], ...STEALTH_COMMON_HEADERS },
+        signal: AbortSignal.timeout(18000),
+      });
+      if (resp.ok) return await resp.text();
+      lastStatus = resp.status;
+      // Only retry on 403/429; fail fast on 404, 5xx etc.
+      if (resp.status !== 403 && resp.status !== 429) throw new Error(`HTTP ${resp.status} for ${url}`);
+      if (i < STEALTH_PROFILES.length - 1) await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg.startsWith("HTTP ") && !msg.includes("403") && !msg.includes("429")) throw err;
+      if (i === STEALTH_PROFILES.length - 1 && lastStatus !== 403 && lastStatus !== 429) throw err;
+    }
   }
+  // Stealth profiles exhausted — try headless browser
+  try {
+    const browserResult = await fetchPageWithBrowser(url, {});
+    if (browserResult?.mainHtml) return browserResult.mainHtml;
+  } catch {}
+  // Last resort: Google cache
+  try {
+    const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
+    const resp = await fetch(cacheUrl, {
+      headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (resp.ok) {
+      const html = await resp.text();
+      if (html.length > 1000) return html;
+    }
+  } catch {}
+  throw new Error(`HTTP 403 for ${url} (all fallbacks failed)`);
 }
 
 function extractCompactContent(html: string, url: string): string {
@@ -1842,7 +1895,7 @@ async function tryDiscoverApiEndpoints(html: string, pageUrl: string, job: Scrap
             "Accept": "application/json",
             "X-Requested-With": "XMLHttpRequest",
             "Referer": pageUrl,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": STEALTH_PROFILES[0]["User-Agent"],
           },
         });
         clearTimeout(timeout);
@@ -1873,7 +1926,7 @@ async function tryDiscoverApiEndpoints(html: string, pageUrl: string, job: Scrap
                     "Accept": "application/json",
                     "X-Requested-With": "XMLHttpRequest",
                     "Referer": pageUrl,
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "User-Agent": STEALTH_PROFILES[0]["User-Agent"],
                   },
                 });
                 if (pResp.ok) {
@@ -2652,7 +2705,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   for (const path of highPriorityPaths) {
     try {
       const testUrl = `${origin}${path}`;
-      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
         addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (high-priority probe)`, phase: "discover" });
         return testUrl;
@@ -2711,7 +2764,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   for (const path of commonCoursePaths) {
     try {
       const testUrl = `${origin}${path}`;
-      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
         addLog(job, "status", { message: `Home page detected → course listing at ${testUrl}`, phase: "discover" });
         return testUrl;
@@ -2745,7 +2798,7 @@ async function expandCourseListWithCategories(listingUrl: string, existingCandid
     ];
     for (const variantUrl of variants) {
       try {
-        const resp = await fetch(variantUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(4000) });
+        const resp = await fetch(variantUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(4000) });
         if (!resp.ok) continue;
         const html = await fetchPage(variantUrl);
         const $ = cheerio.load(html);
@@ -2858,7 +2911,7 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     for (const path of commonFeePaths) {
       try {
         const testUrl = `${origin}${path}`;
-        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
         if (resp.ok) {
           result.feePage = testUrl;
           break;
@@ -2900,7 +2953,7 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     for (const path of commonRequirementsPaths) {
       try {
         const testUrl = `${origin}${path}`;
-        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
         if (resp.ok) {
           result.requirementsPage = testUrl;
           addLog(job, "status", { message: `Found university requirements page via probe: ${testUrl}`, phase: "discover" });
@@ -3381,8 +3434,12 @@ async function tryAlternativeUrls(url: string, job: ScrapeJob): Promise<{ html: 
   const alternatives = [
     parentPath !== "/" ? `${origin}${parentPath}` : null,
     `${origin}/courses`,
+    `${origin}/degrees`,
     `${origin}/programs`,
     `${origin}/study`,
+    `${origin}/study/postgraduate`,
+    `${origin}/study/undergraduate`,
+    `${origin}/study/international`,
     `${origin}/study-with-us`,
     `${origin}/academics`,
     origin,
