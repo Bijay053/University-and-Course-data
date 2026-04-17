@@ -56,6 +56,7 @@ interface CourseData {
   studyMode?: string;
   degreeLevel?: string;
   studyLoad?: string;
+  studentAudience?: string;
   language?: string;
   description?: string;
   intakeMonths?: string[];
@@ -129,8 +130,12 @@ interface ScrapeJob {
 
 const scrapeJobs = new Map<string, ScrapeJob>();
 
-const FAST_MODE_MAX_COURSES = 40;
-const STANDARD_MODE_MAX_COURSES = 120;
+const FAST_MODE_MAX_COURSES = 25;
+const STANDARD_MODE_MAX_COURSES = 45;
+const MAX_BROWSER_FALLBACKS_FAST = 0;
+const MAX_BROWSER_FALLBACKS_STANDARD = 6;
+const MAX_FULL_AI_FAST = 0;
+const MAX_FULL_AI_STANDARD = 8;
 const GENERIC_CATEGORY_TITLES = new Set([
   "design",
   "health",
@@ -593,6 +598,70 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
   return "On Campus";
 }
 
+function detectStudentAudience($: ReturnType<typeof cheerio.load>, fullText: string): string | undefined {
+  const text = (fullText || "").replace(/\s+/g, " ").trim();
+  const lowered = text.toLowerCase();
+
+  const explicitBoth = [
+    /\bstudent(?:\s+type)?\b[^\n]{0,80}\bdomestic\b[^\n]{0,30}\binternational\b/i,
+    /\bstudent(?:\s+type)?\b[^\n]{0,80}\binternational\b[^\n]{0,30}\bdomestic\b/i,
+    /\bfor\s+(?:domestic\s+and\s+international|international\s+and\s+domestic)\s+students\b/i,
+  ];
+  if (explicitBoth.some((r) => r.test(text))) return "Domestic & International";
+
+  const domesticOnlyPatterns = [
+    /\bstudent(?:\s+type)?\b[^\n]{0,60}\bdomestic\b(?![^\n]{0,30}\binternational\b)/i,
+    /\bdomestic\s+students?\s+only\b/i,
+    /\bonly\s+available\s+to\s+domestic\s+students?\b/i,
+    /\bavailable\s+to\s+domestic\s+students?\s+only\b/i,
+    /\bnot\s+available\s+to\s+international\s+students?\b/i,
+  ];
+  if (domesticOnlyPatterns.some((r) => r.test(text))) return "Domestic Only";
+
+  const internationalOnlyPatterns = [
+    /\bstudent(?:\s+type)?\b[^\n]{0,60}\binternational\b(?![^\n]{0,30}\bdomestic\b)/i,
+    /\binternational\s+students?\s+only\b/i,
+  ];
+  if (internationalOnlyPatterns.some((r) => r.test(text))) return "International Only";
+
+  let labelValue = "";
+  $("body *").each((_, el) => {
+    if (labelValue) return false as any;
+    const nodeText = $(el).text().replace(/\s+/g, " ").trim();
+    if (!nodeText) return;
+    if (/^(student|students|student type)$/i.test(nodeText)) {
+      const sibling = $(el).next();
+      let candidate = sibling.text().replace(/\s+/g, " ").trim();
+      if (!candidate || candidate.length > 100) {
+        const parentText = $(el).parent().text().replace(/\s+/g, " ").trim();
+        const idx = parentText.toLowerCase().indexOf(nodeText.toLowerCase());
+        if (idx >= 0) candidate = parentText.slice(idx + nodeText.length).slice(0, 100).trim();
+      }
+      if (candidate) labelValue = candidate;
+    }
+  });
+
+  if (labelValue) {
+    const lv = labelValue.toLowerCase();
+    if (lv.includes("domestic") && lv.includes("international")) return "Domestic & International";
+    if (lv.includes("domestic")) return "Domestic Only";
+    if (lv.includes("international")) return "International Only";
+  }
+
+  if (lowered.includes("international student")) return "International Only";
+  if (lowered.includes("domestic student")) return "Domestic Only";
+  return undefined;
+}
+
+function isDomesticOnlyShortCourseUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    return pathname.includes('/studying-with-us/study-options/short-courses/');
+  } catch {
+    return false;
+  }
+}
+
 function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
   const $ = cheerio.load(html);
   const text = $("body").text();
@@ -640,6 +709,10 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
 
   // Study mode — DOM-aware detection, checks Location and Delivery fields independently
   data.studyMode = detectStudyMode($, text);
+  data.studentAudience = detectStudentAudience($, text);
+  if (data.studentAudience === "Domestic Only") {
+    data.otherRequirement = `${data.otherRequirement ? data.otherRequirement + " | " : ""}__DOMESTIC_ONLY__`;
+  }
 
   const lower = name.toLowerCase();
   if (/\bphd\b|doctor of philosophy/i.test(lower)) data.degreeLevel = "PhD";
@@ -2219,6 +2292,38 @@ async function extractCourseFromPage(content: string, courseName: string): Promi
   }
 }
 
+function isSamePageFilterLink(baseUrl: string, candidateUrl: string): boolean {
+  try {
+    const base = new URL(baseUrl);
+    const cand = new URL(candidateUrl, baseUrl);
+    const samePath = cand.origin === base.origin && cand.pathname.replace(/\/+$/, "") === base.pathname.replace(/\/+$/, "");
+    if (!samePath) return false;
+    if (cand.hash) return true;
+    if (cand.search) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeSpecificCourseLink(name: string, targetUrl: string): boolean {
+  const lower = name.trim().toLowerCase();
+  if (isJunkCourseName(lower)) return false;
+  try {
+    const pathname = new URL(targetUrl).pathname.toLowerCase();
+    if (isGenericCourseCategoryPath(pathname)) return false;
+    if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) return true;
+  } catch {}
+  if (isCourseText(name)) return true;
+  try {
+    const pathname = new URL(targetUrl).pathname.toLowerCase();
+    const segs = pathname.split("/").filter(Boolean);
+    const last = segs[segs.length - 1] || "";
+    if (/^(bachelor|master|doctor|phd|graduate-certificate|graduate-diploma|associate-degree|diploma|certificate|honours|mba|juris-doctor)(-|$)/.test(last)) return true;
+  } catch {}
+  return false;
+}
+
 // ── Rule-based page classifier (zero AI, zero network) ───────────────────────
 // Replaces the Gemini analyzePage call for the common case.
 // Returns same shape as analyzePage so downstream code is unchanged.
@@ -2240,8 +2345,9 @@ function classifyPageByRules(
     try {
       const fullUrl = new URL(href, url).toString();
       if (!fullUrl.startsWith(origin)) return;
+      if (isSamePageFilterLink(url, fullUrl)) return;
       if (seenUrls.has(fullUrl)) return;
-      if (isCourseUrl(fullUrl) && !isJunkCourseName(text)) {
+      if (isCourseUrl(fullUrl) && looksLikeSpecificCourseLink(text, fullUrl)) {
         seenUrls.add(fullUrl);
         courseLinks.push({ url: fullUrl, name: text });
       }
@@ -2269,17 +2375,23 @@ function classifyPageByRules(
   if (hasCourseContent && courseLinks.length < 3) {
     return { pageType: "detail", courseLinks: [], reason: `Course content present, only ${courseLinks.length} outbound links` };
   }
-  // LISTING: many course links found
-  if (courseLinks.length >= 5) {
-    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links found` };
+  const strongCourseLinks = courseLinks.filter((l) => looksLikeSpecificCourseLink(l.name, l.url));
+
+  // LISTING: many strong course links found
+  if (strongCourseLinks.length >= 5) {
+    return { pageType: "listing", courseLinks: strongCourseLinks, reason: `${strongCourseLinks.length} strong course links found` };
   }
-  // LISTING: has even a few course links and a listing-like title
-  if (courseLinks.length > 0 && /\b(courses?|programs?|degrees?|study|undergraduate|postgraduate)\b/i.test(h1 + " " + titleEl)) {
-    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links + listing title` };
+  // LISTING: has even a few strong course links and a listing-like title
+  if (strongCourseLinks.length > 0 && /\b(courses?|programs?|degrees?|study|undergraduate|postgraduate)\b/i.test(h1 + " " + titleEl)) {
+    return { pageType: "listing", courseLinks: strongCourseLinks, reason: `${strongCourseLinks.length} strong course links + listing title` };
   }
-  // Has some course links — treat as listing
-  if (courseLinks.length > 0) {
-    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links found` };
+  // Only generic links found on a listing shell page — force deeper discovery instead of accepting junk
+  if (courseLinks.length > 0 && strongCourseLinks.length === 0) {
+    return { pageType: "unknown", courseLinks: [], reason: `only generic or same-page filter links found (${courseLinks.length})` };
+  }
+  // Has some strong course links — treat as listing
+  if (strongCourseLinks.length > 0) {
+    return { pageType: "listing", courseLinks: strongCourseLinks, reason: `${strongCourseLinks.length} strong course links found` };
   }
   return { pageType: "unknown", courseLinks: [], reason: "no course links or degree content detected" };
 }
@@ -2385,6 +2497,20 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
   if (isJunkCourseName(courseData.courseName)) {
     if (job) addLog(job, "status", { message: `Skipped (junk name): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping non-course page: "${courseData.courseName}"`);
+    return false;
+  }
+
+  // Reject domestic-only pages — user only wants courses offered to international students
+  if (courseData.otherRequirement?.includes("__DOMESTIC_ONLY__") || courseData.studentAudience === "Domestic Only") {
+    if (job) addLog(job, "status", { message: `Skipped (domestic only): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[AUDIENCE] Skipping domestic-only course: "${courseData.courseName}"`);
+    return false;
+  }
+
+  // Reject known short-course / study-options pages that are not international award courses
+  if (courseData.courseWebsite && isDomesticOnlyShortCourseUrl(courseData.courseWebsite)) {
+    if (job) addLog(job, "status", { message: `Skipped (short course / non-international page): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping short-course/non-international page: "${courseData.courseName}"`);
     return false;
   }
 
@@ -2625,6 +2751,13 @@ const JUNK_LINK_NAMES = new Set([
   // Standalone category / program-family names (not individual course names)
   "vocational", "elicos", "bits", "mits", "bbus", "course list",
   "english", "english language", "english courses",
+  // Accessibility / utility / filter controls that often appear on SPA course pages
+  "skip to main content", "reset filters", "live chat", "current students",
+  "future students", "domestic students", "international students",
+  "microcredentials", "single subjects", "interior design and decoration",
+  "on demand short courses", "digital badges", "challenging ageism", "sport for good",
+  "short courses", "filter", "filters", "clear filters",
+  "course year", "study mode", "student type", "location", "livechat",
 ]);
 
 const DEGREE_QUALIFIERS = [
@@ -2680,6 +2813,19 @@ function isJunkCourseName(name: string): boolean {
     /\binformation\s+(session|night|event)\b/,
     /^double\s+degrees?$/,
     /^dual\s+degrees?$/,
+    /^design$/,
+    /^health$/,
+    /^business$/,
+    /^technology$/,
+    /^education$/,
+    /^higher\s+degrees\s+by\s+research$/,
+    /^hospitality$/,
+    /^interior\s+design\s+and\s+decoration$/,
+    /^on\s+demand\s+short\s+courses?$/,
+    /^digital\s+badges?$/,
+    /^challenging\s+ageism$/,
+    /^sport\s+for\s+good$/,
+    /^single\s+subjects?$/,
     /^graduate\s+certificates?$/,
     /^postgraduate\s+courses?$/,
     /^undergraduate\s+courses?$/,
@@ -2924,14 +3070,44 @@ async function researchAndValidateCourseLinks(
 // Full-path patterns that strongly indicate a single course detail page
 // e.g. torrens.edu.au/courses/bachelor-of-cybersecurity
 const VALID_COURSE_PATH_PATTERNS = [
-  /\/courses?\/[a-z0-9][a-z0-9-]+\/?$/,
-  /\/study\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/courses?\/[a-z0-9][a-z0-9-]+\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/study\/[a-z0-9][a-z0-9-]+\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/programs?\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/degrees?\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/[a-z]+-courses?\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/postgraduate\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/undergraduate\/[a-z0-9][a-z0-9-]+\/?$/,
 ];
+
+const GENERIC_COURSE_CATEGORY_SEGMENTS = new Set([
+  "design",
+  "health",
+  "business",
+  "technology",
+  "education",
+  "higher-degrees-by-research",
+  "hospitality",
+  "research",
+  "nursing",
+  "psychology",
+  "it",
+  "information-technology",
+  "cybersecurity",
+]);
+
+function isGenericCourseCategoryPath(pathname: string): boolean {
+  const segs = pathname.toLowerCase().split("/").filter(Boolean);
+  if (segs.length < 2) return false;
+
+  for (let i = 0; i < segs.length - 1; i++) {
+    const seg = segs[i];
+    const next = segs[i + 1];
+    if ((seg === "course" || seg === "courses" || seg === "study") && GENERIC_COURSE_CATEGORY_SEGMENTS.has(next)) {
+      return segs.length === i + 2;
+    }
+  }
+  return false;
+}
 
 function isCourseUrl(urlStr: string): boolean {
   const lower = urlStr.toLowerCase();
@@ -2950,6 +3126,7 @@ function isCourseUrl(urlStr: string): boolean {
     "/courses-list", "/courses-listview", "/courses-grid", "/courses-tile",
     "/programs-list", "/program-list", "/course-list", "/course-finder",
     "/find-a-course", "/all-courses", "/browse-courses", "/explore-courses",
+    "/studying-with-us/study-options/short-courses/",
   ];
   if (excludePatterns.some((p) => lower.includes(p))) return false;
   // Exclude URLs whose last path segment ends with known junk suffixes
@@ -2962,22 +3139,29 @@ function isCourseUrl(urlStr: string): boolean {
   // Strong positive: full-path matches a known course detail URL structure
   try {
     const pathname = new URL(urlStr).pathname.toLowerCase();
+    if (isGenericCourseCategoryPath(pathname)) return false;
     if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) return true;
   } catch {}
 
-  return (
-    lower.includes("/course") || lower.includes("/program") ||
-    lower.includes("/bachelor") || lower.includes("/master") ||
-    lower.includes("/diploma") || lower.includes("/study/") ||
-    lower.includes("/graduate-certificate") || lower.includes("/graduate-diploma") ||
-    lower.includes("/certificate") || lower.includes("/degree") ||
-    lower.includes("/phd") || lower.includes("/mba") ||
-    lower.includes("/doctorate") || lower.includes("/doctoral") ||
-    lower.includes("/undergraduate") || lower.includes("/postgraduate") ||
-    lower.includes("/associate-degree") || lower.includes("/double-degree") ||
-    lower.includes("/dual-degree") || lower.includes("/juris-doctor") ||
-    lower.includes("/honours") || lower.includes("/pathway")
-  );
+  try {
+    const pathname = new URL(urlStr).pathname.toLowerCase();
+    if (isGenericCourseCategoryPath(pathname)) return false;
+    return (
+      pathname.includes("/course") || pathname.includes("/program") ||
+      pathname.includes("/bachelor") || pathname.includes("/master") ||
+      pathname.includes("/diploma") ||
+      pathname.includes("/graduate-certificate") || pathname.includes("/graduate-diploma") ||
+      pathname.includes("/certificate") || pathname.includes("/degree") ||
+      pathname.includes("/phd") || pathname.includes("/mba") ||
+      pathname.includes("/doctorate") || pathname.includes("/doctoral") ||
+      pathname.includes("/undergraduate") || pathname.includes("/postgraduate") ||
+      pathname.includes("/associate-degree") || pathname.includes("/double-degree") ||
+      pathname.includes("/dual-degree") || pathname.includes("/juris-doctor") ||
+      pathname.includes("/honours") || pathname.includes("/pathway")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isCourseText(text: string): boolean {
@@ -4068,12 +4252,15 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // so we cap separately.
   // 30 concurrent HTTP fetches is the sweet spot: fast enough for static sites,
   // but won't overwhelm servers that start dropping connections above ~50 rps.
-  const CONCURRENCY = 30;
-  const BROWSER_CONCURRENCY = 8;
+  const CONCURRENCY = job.fastMode ? 40 : 30;
+  const BROWSER_CONCURRENCY = job.fastMode ? 1 : 4;
+  const MAX_BROWSER_FALLBACKS = job.fastMode ? MAX_BROWSER_FALLBACKS_FAST : MAX_BROWSER_FALLBACKS_STANDARD;
+  const MAX_FULL_AI = job.fastMode ? MAX_FULL_AI_FAST : MAX_FULL_AI_STANDARD;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Courses that time out on the first pass are retried here.
   const retryQueue: { url: string; name: string; index: number }[] = [];
+  let browserFallbacksUsed = 0;
 
   // Fast mode log — browser-fallback message is deferred to per-URL decision below.
   if (job.fastMode) {
@@ -4145,14 +4332,22 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           // the page may be JS-rendered — try browser once as a fallback.
           const quickData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
           if (needsBrowserFallback(quickData)) {
-            const browserResult = await runBrowser();
-            if (browserResult?.requirementsHtml) {
-              cHtml = browserResult.requirementsHtml;
-              wasBrowserFetch = true;
+            if (browserFallbacksUsed >= MAX_BROWSER_FALLBACKS) {
               addLog(job, "status", {
-                message: `[browser fallback ✓] ${link.name.slice(0, 60)}`,
+                message: `[browser fallback skipped: limit reached] ${link.name.slice(0, 60)}`,
                 phase: "fallback",
               });
+            } else {
+              const browserResult = await runBrowser();
+              if (browserResult?.requirementsHtml) {
+                cHtml = browserResult.requirementsHtml;
+                wasBrowserFetch = true;
+                browserFallbacksUsed++;
+                addLog(job, "status", {
+                  message: `[browser fallback ✓] ${link.name.slice(0, 60)}`,
+                  phase: "fallback",
+                });
+              }
             }
           }
         }
@@ -4488,11 +4683,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     }
   }
 
-  // ── Phase B: Full AI extraction for courses where cheerio got nothing (parallel, up to 10 concurrent) ──
+  // ── Phase B: Full AI extraction for courses where cheerio got nothing (parallel, capped for speed) ──
   if (fullAIQueue.length > 0) {
-    addLog(job, "status", { message: `Running full AI extraction on ${fullAIQueue.length} courses that need it...`, phase: "extract" });
-    const aiSem = makeSemaphore(10);
-    await Promise.all(fullAIQueue.map((item) =>
+    const aiBatch = MAX_FULL_AI > 0 ? fullAIQueue.slice(0, MAX_FULL_AI) : [];
+    const skippedAi = fullAIQueue.length - aiBatch.length;
+    if (skippedAi > 0) {
+      addLog(job, "status", { message: `[FAST] Skipping full AI extraction for ${skippedAi} low confidence pages to stay within runtime target.`, phase: "extract" });
+    }
+    if (aiBatch.length > 0) addLog(job, "status", { message: `Running full AI extraction on ${aiBatch.length} courses that need it...`, phase: "extract" });
+    const aiSem = makeSemaphore(job.fastMode ? 12 : 10);
+    await Promise.all(aiBatch.map((item) =>
       aiSem(async () => {
         if (job.stopped) return;
         let cData: CourseData | null = null;
@@ -4900,6 +5100,17 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         });
       }
       courseLinks = finalValidated.links;
+
+      const discoverLimit = job.fastMode ? FAST_MODE_MAX_COURSES : STANDARD_MODE_MAX_COURSES;
+      if (courseLinks.length > discoverLimit) {
+        addLog(job, "status", {
+          message: job.fastMode
+            ? `[FAST] Trimming validated course list from ${courseLinks.length} to ${discoverLimit} highest confidence pages to stay under runtime target.`
+            : `Trimming validated course list from ${courseLinks.length} to ${discoverLimit} pages for runtime control.`,
+          phase: "discover",
+        });
+        courseLinks = courseLinks.slice(0, discoverLimit);
+      }
 
       if (highConfidence) {
         addLog(job, "status", {
