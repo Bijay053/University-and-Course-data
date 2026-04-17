@@ -922,8 +922,9 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   // Pattern -1 (highest priority): VIT/common format
   // "IELTS Academic: Overall 6.0, with no individual band below 5.5."
   // "IELTS: Overall 7.0, with no band below 6.5"
+  // "IELTS Academic: Overall score 6.5, with no band below 6.0"  ← VIT actual format
   if (!data.ieltsOverall) {
-    const vitM = ieltsText.match(/IELTS[^:]*:\s*Overall\s+([\d.]+)[^.]*?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:less\s+than|lower\s+than|below)\s+([\d.]+)/i);
+    const vitM = ieltsText.match(/IELTS[^:]*:\s*Overall\s+(?:score\s+)?([\d.]+)[^.]*?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:less\s+than|lower\s+than|below)\s+([\d.]+)/i);
     if (vitM) {
       const overall = parseFloat(vitM[1]);
       const min = parseFloat(vitM[2]);
