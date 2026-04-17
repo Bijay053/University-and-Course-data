@@ -1,0 +1,208 @@
+You are working inside my existing Course Intake Manager Replit project.
+
+Your job is to make the scraper work like a smart human researcher and extractor, not like a blind crawler.
+
+Very important:
+Do not give me a high level summary only.
+Do not make partial fixes.
+Do not stop after small changes.
+Inspect the current codebase, identify the exact scraper flow, then modify the real implementation files and wire everything into the existing API and UI.
+
+Main goal:
+Fix the university scraper so it discovers real course pages correctly, scrapes faster, uses less AI, uses browser only when required, stages results for approval, and fills the required course fields used in this portal. The required fields include university, course, category, sub category, website, duration, duration term, study mode, degree level, city, intake day, intake month, international fee, fee term, fee year, currency, study load, language, IELTS, PTE, TOEFL, academic requirements by country, other requirements, course description, course structure, career, and scholarship. :contentReference[oaicite:0]{index=0}
+
+Project constraints:
+Use the existing monorepo and existing backend and frontend architecture.
+Keep the current staging and approval flow.
+Keep scrape background job support.
+Keep stop scraping support.
+Keep logs visible in the UI.
+Do not rewrite the whole product from scratch.
+Do not break existing CRUD, import, bulk upload, or approval features.
+
+Current problems to fix first:
+1. The scraper is too slow because it does AI analysis too early during discovery. :contentReference[oaicite:1]{index=1}
+2. It uses browser automation on too many pages instead of only as fallback. 
+3. It adds waiting and confirmation phases that slow automation. :contentReference[oaicite:3]{index=3}
+4. It is still over relying on sitemap and extra phases even for sites where homepage or course list is enough. :contentReference[oaicite:4]{index=4}
+5. It must do research first and compare candidate pages before bulk fetching. 
+
+Required behavior:
+A. Research first
+Before fetching all courses, inspect the provided URL and classify it:
+- home page
+- course list page
+- search results page
+- sitemap
+- single course page
+- fee page
+- requirement page
+- scholarship page
+
+B. Discovery order
+Use this order:
+1. Provided page if it is already a valid course list page
+2. Homepage navigation and in page course blocks
+3. Internal course list pages
+4. Search result pages
+5. Sitemap only if needed
+Do not trust sitemap blindly.
+Do not trust every URL under /course or /courses.
+Validate by content.
+
+C. Page scoring
+Create rule based scoring before AI.
+A page is likely a real course page if it has several of:
+- degree title words like bachelor, master, diploma, certificate, graduate diploma, graduate certificate, phd
+- duration
+- intake
+- fee
+- entry requirements
+- IELTS or PTE or TOEFL
+- course structure
+- career outcomes
+- campus or study mode
+
+Reject pages like:
+- accommodation
+- student life
+- support
+- blog
+- event
+- visa
+- contact
+- scholarship overview only
+- generic faculty or marketing pages with no real course data
+
+D. Fast mode first
+Use requests and cheerio style parsing first.
+Do not launch browser for all pages.
+Browser automation should be fallback only when:
+- page is JS rendered
+- key content is hidden behind tabs or toggles
+- required fields are still missing after static extraction
+
+E. AI usage
+AI must be last fallback only.
+Do not use AI in normal discovery.
+Do not use AI to find basic links.
+Do not use AI for every page.
+Use AI only when:
+- rule based extraction fails
+- complex requirement table parsing fails
+- noisy content needs structured cleanup
+
+F. Parallel processing
+Add parallel fetching for validated course pages with a safe limit such as 4 to 6 concurrent workers.
+Do not fetch pages one by one if they are already validated.
+
+G. Shared page caching
+If a site has one university level requirements page or fee page, fetch it once, cache it, and reuse it across all courses.
+Do not re-fetch the same shared page for every course.
+
+H. No blocking wait step
+Do not stop at a waiting confirmation step in the middle of scraping.
+Instead:
+- auto continue if discovery confidence is high
+- send staged output to approval after scraping
+The approval should happen on staged data, not before bulk fetch.
+
+I. Staging and approval
+Keep scraped data in staging first.
+Allow:
+- edit staged data
+- approve one
+- approve all
+- reject
+- stop scrape
+- rescrape later using saved config without AI when possible
+
+J. Save reusable scrape config
+After successful scrape, store reusable scrape config on the university:
+- resolved listing page
+- validated course links
+- fee page
+- requirement page
+- scholarship page
+- extraction hints
+- selectors if discovered
+On future rescrape, use saved config first with no AI.
+
+K. International fee only
+Always prefer international fee.
+Never save domestic fee as the main fee.
+If both are present, classify and select international.
+If fee term is present such as semester, trimester, annual, full course, capture it.
+If fee year such as 2026 is present, capture it.
+Currency rules:
+- Australia AUD
+- New Zealand NZD
+- Canada CAD
+- USA USD
+- UK GBP
+Use explicit page currency if present, otherwise use country fallback.
+
+L. English requirement logic
+If page says IELTS Overall 6.0 with no band less than 5.5 then save:
+- overall 6.0
+- listening 5.5
+- reading 5.5
+- writing 5.5
+- speaking 5.5
+Apply the same logic pattern for PTE and TOEFL when the page gives overall plus minimum section score.
+
+M. Study mode logic
+Normalize:
+- on campus = On Campus
+- online = Online
+- blended or hybrid = Blended
+- online and on campus = Blended
+
+N. Output logs
+The UI must show:
+- university name
+- provided source URL
+- resolved listing URL
+- discovery steps
+- why pages were accepted or rejected
+- expected course count
+- discovered course count
+- current page being fetched
+- whether requests mode, browser mode, or AI fallback was used
+Make logs useful, short, and specific.
+
+Implementation tasks:
+1. Inspect the existing scrape start, scrape status, scrape staged, rescrape, and stop endpoints and the background job runner.
+2. Find the current discovery, page analysis, sitemap handling, AI analysis, browser automation, and staged save logic.
+3. Refactor the discovery pipeline into:
+   - classifyInputUrl
+   - discoverCandidatePages
+   - scoreCandidatePages
+   - validateCoursePages
+   - scrapeCoursePagesParallel
+   - enrichFromSharedPages
+   - saveToStaging
+4. Add safe concurrency to course page fetches.
+5. Add shared page caching.
+6. Move AI behind rule based and browser fallback logic.
+7. Keep all changes wired into the existing frontend and API.
+8. Keep type safety and existing schema patterns.
+9. Add comments only where helpful.
+10. After coding, run typecheck and fix errors.
+
+Success criteria:
+- Faster scraping on VIT and similar sites because browser is not used for every course page and AI is not used during normal discovery. 
+- Discovery behaves like research first, not blind sitemap crawl. 
+- Staged results still support review and approval.
+- International fee only is preserved.
+- Logs clearly explain what the scraper is doing.
+
+Important working style:
+Do not ask me broad questions if the answer is in the code.
+Inspect the real project files and implement directly.
+When done, show:
+1. files changed
+2. what was wrong
+3. what was fixed
+4. any remaining limitation
+5. exact commands to run

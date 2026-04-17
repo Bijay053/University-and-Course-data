@@ -89,6 +89,7 @@ interface ScrapeJob {
   stopped?: boolean;
   fastMode?: boolean;
   discoveredConfig?: ScrapeConfig;
+  approvalSummary?: ApprovalSummary;
   awaitingApproval?: { resolve: (proceed: boolean) => void; summary: ApprovalSummary };
 }
 
@@ -1743,6 +1744,71 @@ async function extractCourseFromPage(content: string, courseName: string): Promi
   } catch {
     return null;
   }
+}
+
+// ── Rule-based page classifier (zero AI, zero network) ───────────────────────
+// Replaces the Gemini analyzePage call for the common case.
+// Returns same shape as analyzePage so downstream code is unchanged.
+function classifyPageByRules(
+  html: string,
+  url: string
+): { pageType: "listing" | "detail" | "unknown"; courseLinks: { url: string; name: string }[]; reason: string } {
+  const $ = cheerio.load(html);
+  let origin = "";
+  try { origin = new URL(url).origin; } catch {}
+
+  // Collect course links from this page
+  const seenUrls = new Set<string>();
+  const courseLinks: { url: string; name: string }[] = [];
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const text = $(el).text().trim().replace(/\s+/g, " ");
+    if (!text || text.length < 5 || text.length > 180) return;
+    try {
+      const fullUrl = new URL(href, url).toString();
+      if (!fullUrl.startsWith(origin)) return;
+      if (seenUrls.has(fullUrl)) return;
+      if (isCourseUrl(fullUrl) && !isJunkCourseName(text)) {
+        seenUrls.add(fullUrl);
+        courseLinks.push({ url: fullUrl, name: text });
+      }
+    } catch {}
+  });
+
+  // Signals for "detail" (single course page)
+  const h1 = $("h1").first().text().trim();
+  const titleEl = $("title").text().trim();
+  const hasDegreeH1 = /\b(bachelor|master|doctor|phd|graduate certificate|graduate diploma|diploma of|certificate [iivx]+|honours|mba|msc|bed|bsc|beng|llb|jd)\b/i.test(h1);
+  let urlLooksLikeDetail = false;
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    urlLooksLikeDetail = VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname)) && pathname.split("/").filter(Boolean).length >= 2;
+  } catch {}
+
+  const bodyText = $("body").text().toLowerCase().slice(0, 12000);
+  const hasCourseContent = pageContentLooksLikeCourse(bodyText, h1 || titleEl);
+
+  // DETAIL: degree H1 + URL pattern + limited outbound course links
+  if (hasDegreeH1 && urlLooksLikeDetail && courseLinks.length < 6) {
+    return { pageType: "detail", courseLinks: [], reason: `H1="${h1.slice(0, 60)}", URL matches course detail pattern` };
+  }
+  // DETAIL: strong course content + very few outbound course links (user pasted a single course URL)
+  if (hasCourseContent && courseLinks.length < 3) {
+    return { pageType: "detail", courseLinks: [], reason: `Course content present, only ${courseLinks.length} outbound links` };
+  }
+  // LISTING: many course links found
+  if (courseLinks.length >= 5) {
+    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links found` };
+  }
+  // LISTING: has even a few course links and a listing-like title
+  if (courseLinks.length > 0 && /\b(courses?|programs?|degrees?|study|undergraduate|postgraduate)\b/i.test(h1 + " " + titleEl)) {
+    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links + listing title` };
+  }
+  // Has some course links — treat as listing
+  if (courseLinks.length > 0) {
+    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} course links found` };
+  }
+  return { pageType: "unknown", courseLinks: [], reason: "no course links or degree content detected" };
 }
 
 const ANALYZE_PROMPT = `Analyze this webpage. Is it a course LISTING page (multiple courses with links), a DETAIL page (single course), or UNKNOWN?
@@ -3677,15 +3743,14 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       return;
     }
 
-    addLog(job, "status", { message: "Analyzing page with AI (1 call)...", phase: "analyze" });
-    const pageContent = extractFullPageContent(html, resolvedUrl);
-    let analysis: { pageType: string; courseLinks?: { url: string; name: string }[] };
-    try {
-      analysis = await analyzePage(pageContent);
-    } catch (err) {
-      addLog(job, "status", { message: `AI analysis failed (${(err as Error).message}). Falling back to HTML scan...`, phase: "fallback" });
-      analysis = { pageType: "unknown" };
-    }
+    // Fast rule-based page classifier — no AI, no network cost.
+    // AI analyzePage is preserved below as a fallback only when rules say "unknown" AND sitemap is empty.
+    const rulesResult = classifyPageByRules(html, resolvedUrl);
+    addLog(job, "status", {
+      message: `Page type: ${rulesResult.pageType} — ${rulesResult.reason}`,
+      phase: "analyze",
+    });
+    let analysis: { pageType: string; courseLinks?: { url: string; name: string }[] } = rulesResult;
 
     if (analysis.pageType === "detail") {
       addLog(job, "status", { message: "Found single course page. Extracting...", phase: "extract" });
@@ -3757,6 +3822,22 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
     // --- Source A: Sitemap (most comprehensive for large universities) ---
     const sitemapCandidates = await discoverCourseLinksFromSitemap(origin, job);
+
+    // AI fallback: only when rules returned "unknown" AND sitemap is empty.
+    // This is rare (JS-rendered listing pages with no static links and no sitemap).
+    if (analysis.pageType === "unknown" && sitemapCandidates.length === 0) {
+      addLog(job, "status", { message: "Rules uncertain + no sitemap — trying AI page analysis (1 call)...", phase: "analyze" });
+      try {
+        const pageContent = extractFullPageContent(html, resolvedUrl);
+        const aiResult = await analyzePage(pageContent);
+        if (aiResult.pageType !== "unknown") {
+          analysis = aiResult;
+          addLog(job, "status", { message: `AI classified page as: ${aiResult.pageType}`, phase: "analyze" });
+        }
+      } catch (aiErr) {
+        addLog(job, "status", { message: `AI fallback failed (${(aiErr as Error).message}) — continuing with HTML links`, phase: "analyze" });
+      }
+    }
 
     // --- Source B: Listing page HTML + hidden API (fallback or supplement) ---
     if (analysis.pageType === "unknown") {
@@ -3856,23 +3937,39 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     }
 
     if (courseLinks.length > 0) {
-      // --- Approval Gate: pause and ask user to confirm before bulk fetching ---
+      // --- Approval Gate: auto-proceed when confidence is high, else ask user ---
+      const sampleTotal = researchStats.validSamples + researchStats.rejectedSamples;
+      const confidenceRatio = sampleTotal > 0 ? researchStats.validSamples / sampleTotal : 0;
+      // High confidence: >= 75% of sampled pages confirmed + at least 2 valid samples
+      const highConfidence = researchStats.validSamples >= 2 && (researchStats.rejectedSamples === 0 || confidenceRatio >= 0.75);
       const estMinutes = Math.max(1, Math.ceil(courseLinks.length / 25 * 4 / 60));
       const approvalSummary: ApprovalSummary = {
         totalCourses: courseLinks.length,
         validSamples: researchStats.validSamples,
         rejectedSamples: researchStats.rejectedSamples,
-        sampleTotal: researchStats.validSamples + researchStats.rejectedSamples,
+        sampleTotal,
         validExamples: researchStats.validExamples,
         rejectedExamples: researchStats.rejectedExamples,
         estimatedMinutes: estMinutes,
       };
-      const proceed = await waitForApproval(job, approvalSummary);
-      if (!proceed || job.stopped) {
-        addLog(job, "status", { message: "Bulk fetch cancelled by user.", phase: "done" });
-        job.status = "stopped";
-        job.completedAt = Date.now();
-        return;
+
+      if (highConfidence) {
+        addLog(job, "status", {
+          message: `High confidence: ${researchStats.validSamples}/${sampleTotal} samples valid (${Math.round(confidenceRatio * 100)}%). Auto-proceeding with ${courseLinks.length} courses (~${estMinutes} min).`,
+          phase: "discover",
+          totalCourses: courseLinks.length,
+        });
+        // Notify the UI about what was found (informational, not blocking)
+        job.approvalSummary = approvalSummary;
+      } else {
+        // Low confidence — ask user before committing
+        const proceed = await waitForApproval(job, approvalSummary);
+        if (!proceed || job.stopped) {
+          addLog(job, "status", { message: "Bulk fetch cancelled by user.", phase: "done" });
+          job.status = "stopped";
+          job.completedAt = Date.now();
+          return;
+        }
       }
 
       addLog(job, "status", {

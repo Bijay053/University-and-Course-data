@@ -1,0 +1,382 @@
+Work inside my existing Replit project only.
+
+Do not rebuild from scratch.
+Do not create a separate demo scraper.
+Do not give me a summary first.
+Do not stop after partial fixes.
+Do not ask broad questions when the answer is already in the codebase.
+Inspect the real project files, find the current scraping flow, and directly improve the existing implementation.
+
+Main objective:
+Make the university scraping system production ready, highly accurate, and fast.
+It must discover real course data from university websites and save it into staging for approval before live save.
+
+Critical instruction:
+Do not behave like a blind crawler.
+Behave like a smart researcher first, then extractor, then validator.
+
+Non negotiable rules:
+1. Do not trust sitemap blindly
+2. Do not trust every URL under /course or /courses
+3. Do not use AI during normal discovery
+4. Do not use browser automation for every page
+5. Do not save domestic fee as the main fee
+6. Do not push scraped data directly to live records
+7. Do not stop in the middle for manual confirmation if confidence is high
+8. Do not mark a page as a course page without validating content
+9. Do not return incomplete or fake structured data just to finish the task
+10. Do not say done until the current scraper flow, staging flow, and UI logs are actually updated in code
+
+Required result:
+Every university scrape must follow a strict research first pipeline so the system can find real data with the highest possible accuracy.
+You must improve the current project so it works robustly across different university websites.
+
+Be honest:
+Do not claim zero error risk.
+Instead, build strong validation, confidence scoring, staging, and fallback logic so bad data is blocked before approval.
+
+================================
+PHASE 1. INSPECT THE CURRENT PROJECT
+================================
+
+Open the actual files currently used for:
+- scrape start
+- scrape status
+- background scraper job
+- discovery logic
+- sitemap handling
+- AI analysis
+- browser automation
+- staged save
+- approval flow
+- stop scraping
+- university page scrape UI logs
+
+Find the real current flow first.
+Do not guess.
+Do not create duplicate logic in new unused files.
+
+================================
+PHASE 2. REPLACE THE SCRAPER FLOW
+================================
+
+Refactor the scraper into this exact flow:
+
+1. classifyInputUrl
+2. discoverCandidatePages
+3. scoreCandidatePages
+4. validateRealCoursePages
+5. discoverSharedSupportPages
+6. scrapeValidatedCoursePagesInParallel
+7. enrichMissingFieldsFromSharedPages
+8. runBrowserFallbackOnlyForMissingFields
+9. runAIFallbackOnlyIfStillNeeded
+10. validateResults
+11. saveToStaging
+12. keep approval for live update
+
+This must be implemented in the actual project code.
+
+================================
+PHASE 3. RESEARCH FIRST DISCOVERY LOGIC
+================================
+
+When user gives a URL, first classify whether it is:
+- homepage
+- course list page
+- search results page
+- single course page
+- sitemap
+- fee page
+- requirement page
+- scholarship page
+- other
+
+Discovery order:
+1. If provided URL is already a valid course list page, use it
+2. Otherwise inspect homepage navigation and visible course blocks
+3. Then inspect internal course list pages
+4. Then inspect search result pages
+5. Use sitemap only if needed
+
+Important:
+Do not start bulk fetch until candidate pages are compared and validated.
+
+================================
+PHASE 4. REAL COURSE PAGE VALIDATION
+================================
+
+A page is a real course page only if it has multiple strong signals such as:
+- course title
+- degree words like bachelor, master, diploma, certificate, graduate diploma, graduate certificate, phd
+- duration
+- intake
+- fee or tuition
+- entry requirements
+- IELTS, PTE, or TOEFL
+- study mode
+- course structure
+- career outcomes
+- campus or location
+
+Reject pages such as:
+- accommodation
+- blog
+- events
+- news
+- support
+- student life
+- contact
+- generic scholarship pages
+- marketing pages
+- visa pages
+- generic faculty pages without course specific data
+
+Do not accept course pages by URL pattern only.
+Validate by actual page content.
+
+================================
+PHASE 5. FAST SCRAPING RULES
+================================
+
+Use requests and HTML parsing first.
+Do not launch browser first.
+
+Browser automation is allowed only when:
+- page is JS rendered
+- content is hidden behind tabs or toggles
+- required fields are missing after static extraction
+
+AI is allowed only when:
+- rule based extraction fails
+- complex country requirement tables cannot be parsed normally
+- text cleanup or structured mapping is still needed after deterministic extraction
+
+AI must never be first choice for discovery.
+
+================================
+PHASE 6. PARALLEL SCRAPING
+================================
+
+After course pages are validated, scrape them in parallel with safe concurrency.
+Use a limit such as 4 to 6 workers.
+Do not scrape one by one unless required for browser fallback.
+
+Cache shared university level pages such as:
+- fee page
+- requirement page
+- scholarship page
+
+Fetch each shared page once and reuse it.
+Do not fetch the same shared page for every course.
+
+================================
+PHASE 7. FIELD DISCOVERY LOGIC
+================================
+
+Implement accurate extraction logic for these fields:
+
+A. Course discovery
+Extract real course title and course URL only from validated course pages.
+
+B. Fee discovery
+Always prefer international fee.
+Never save domestic fee as the main fee.
+If both are present, classify and select international only.
+Support fee phrases such as:
+- per semester
+- per trimester
+- per term
+- annual fee
+- per year
+- yearly
+- full course fee
+- total course fee
+
+Normalize Fee Term:
+- semester = Semester
+- trimester = Trimester
+- term = Term
+- annual, per year, yearly = Annual
+- full course, total course = Full Course
+
+C. Fee Year discovery
+Extract year when fee is clearly tied to that year, such as 2026 or 2027.
+Do not guess year from page publish date.
+
+D. Currency discovery
+Use explicit currency on page first.
+If not shown, use fallback by country:
+- Australia = AUD
+- New Zealand = NZD
+- Canada = CAD
+- USA = USD
+- UK = GBP
+
+E. IELTS PTE TOEFL discovery
+If page says IELTS Overall 6.0 with no band below 5.5, save:
+- Overall 6.0
+- Listening 5.5
+- Reading 5.5
+- Writing 5.5
+- Speaking 5.5
+
+Apply same rule pattern for PTE and TOEFL when section minimum is given.
+If only overall is shown and no section minimum is given, save only overall.
+Do not invent missing section scores.
+
+F. Academic requirement discovery by country
+Support country based rows like:
+- Nepal Grade 12 GPA requirement
+- Bangladesh HSC GPA requirement
+- India percentage requirement
+- Sri Lanka A Level requirement
+
+Store separately:
+- Academic Country
+- Academic Level
+- Academic Score
+- Score Type
+- Other Requirement
+
+Do not flatten all countries into one rule.
+Keep country based requirements separate.
+
+G. Intake discovery
+Extract intake month and intake day when available.
+If only month is shown, save month only.
+Do not guess date.
+
+H. Course location and campus discovery
+Extract city or campus from course page or official shared campus page if clearly linked.
+
+I. Scholarship discovery
+Extract course specific scholarship first.
+If only university level scholarship exists and it clearly applies to international students, store that as fallback.
+
+J. Duration discovery
+Extract numeric duration plus duration term separately.
+
+K. Study mode discovery
+Normalize:
+- on campus = On Campus
+- online = Online
+- blended or hybrid = Blended
+- online and on campus = Blended
+
+================================
+PHASE 8. VALIDATION BEFORE STAGING
+================================
+
+Before saving any scraped record:
+- compare expected course count with discovered course count
+- compare discovered course count with extracted course count
+- mark incomplete records
+- flag missing critical fields
+
+Critical fields include:
+- Course Name
+- Course Website
+- Degree Level when applicable
+- Duration
+- Study Mode when available
+- International Fee when expected
+- Intake when available
+- English requirements or entry requirements when expected
+
+Do not move suspicious or low confidence data into live records.
+Save only to staging.
+
+================================
+PHASE 9. STAGING AND APPROVAL
+================================
+
+Keep the current staging and approval architecture, but improve it.
+
+Requirements:
+- scraped data goes to staging first
+- allow edit before approval
+- allow approve one
+- allow approve selected
+- allow approve all
+- allow reject
+- allow stop scrape
+- allow re scrape later
+- keep reusable scrape config for each university so future scrapes can run faster with less AI
+
+Save reusable scrape config such as:
+- resolved listing page
+- shared fee page
+- shared requirement page
+- shared scholarship page
+- known selectors if stable
+- previous validated course page patterns
+
+================================
+PHASE 10. UI LOGS
+================================
+
+Improve scrape progress logs in the UI.
+
+Must show:
+- university name
+- input URL
+- resolved listing page
+- number of candidate pages found
+- number of validated course pages
+- why pages were accepted or rejected
+- current page being fetched
+- whether requests mode, browser fallback, or AI fallback was used
+- expected course count
+- discovered course count
+- extracted course count
+- stop button status
+
+Logs must be short, clear, and useful.
+
+================================
+PHASE 11. PERFORMANCE
+================================
+
+Main speed improvements required:
+- remove AI from normal discovery
+- avoid browser for all pages
+- use browser only for missing fields or JS rendering
+- parallelize course page fetches
+- cache shared pages
+- remove blocking wait step in the middle when confidence is high
+
+================================
+PHASE 12. WORKING STYLE
+================================
+
+Do not just explain what should be done.
+Actually modify the project.
+Use the real current files.
+Keep existing endpoints and UI wiring working.
+Run the project checks after changes.
+Fix errors you introduced.
+Do not leave half done code.
+
+================================
+PHASE 13. DONE CRITERIA
+================================
+
+You are not done until all of the below are true:
+1. actual scraper flow in the project is updated
+2. discovery is research first and rule based
+3. AI is fallback only
+4. browser is fallback only
+5. validated course pages are scraped in parallel
+6. shared pages are cached
+7. staging and approval still work
+8. logs are improved
+9. international fee is prioritized
+10. code runs without new errors
+
+At the end give me:
+- exact files changed
+- what was wrong before
+- what was fixed
+- any remaining limitation
+- what command to run to test
