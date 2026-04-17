@@ -1,0 +1,115 @@
+#!/bin/bash
+set -e
+
+echo "=== 1. System update ==="
+apt-get update -y && apt-get upgrade -y
+apt-get install -y curl git nginx unzip
+
+echo "=== 2. Node.js 24 ==="
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+apt-get install -y nodejs
+
+echo "=== 3. pnpm ==="
+npm install -g pnpm@10
+
+echo "=== 4. PostgreSQL ==="
+apt-get install -y postgresql postgresql-contrib
+systemctl start postgresql
+systemctl enable postgresql
+
+# Create DB and user
+sudo -u postgres psql <<SQL
+CREATE USER uniportal WITH PASSWORD 'yourpassword123';
+CREATE DATABASE university_portal OWNER uniportal;
+GRANT ALL PRIVILEGES ON DATABASE university_portal TO uniportal;
+SQL
+
+echo "=== 5. Playwright/Chromium dependencies ==="
+apt-get install -y \
+  libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+  libxrandr2 libgbm1 libasound2 libpango-1.0-0 libpangocairo-1.0-0 \
+  libcairo2 libatspi2.0-0 libgtk-3-0 libgdk-pixbuf2.0-0 fonts-liberation
+
+echo "=== 6. Clone repo ==="
+cd /opt
+git clone https://github.com/Bijay053/University-and-Course-data.git app
+cd /opt/app
+
+echo "=== 7. Environment variables ==="
+cat > /opt/app/.env <<ENV
+DATABASE_URL=postgresql://uniportal:yourpassword123@localhost:5432/university_portal
+GEMINI_API_KEY=your_gemini_api_key_here
+SESSION_SECRET=change_this_to_a_random_secret_string
+PORT=8080
+NODE_ENV=production
+ENV
+
+echo "=== 8. Install dependencies ==="
+cd /opt/app
+pnpm install
+
+echo "=== 9. Install Playwright Chromium ==="
+cd /opt/app
+npx playwright install chromium
+
+echo "=== 10. Run DB migration ==="
+cd /opt/app
+export $(cat .env | xargs)
+pnpm --filter @workspace/db run push
+
+echo "=== 11. Build API server ==="
+pnpm --filter @workspace/api-server run build
+
+echo "=== 12. Build frontend ==="
+pnpm --filter @workspace/university-portal run build
+
+echo "=== 13. PM2 process manager ==="
+npm install -g pm2
+
+pm2 start /opt/app/artifacts/api-server/dist/index.mjs \
+  --name "api-server" \
+  --node-args="--enable-source-maps" \
+  --env production
+
+pm2 save
+pm2 startup
+
+echo "=== 14. Nginx config ==="
+cat > /etc/nginx/sites-available/uniportal <<NGINX
+server {
+    listen 80;
+    server_name _;
+
+    # Frontend (built static files)
+    root /opt/app/artifacts/university-portal/dist;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # API proxy
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+NGINX
+
+ln -sf /etc/nginx/sites-available/uniportal /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl restart nginx
+systemctl enable nginx
+
+echo ""
+echo "=== DONE ==="
+echo "App is running at http://YOUR_DROPLET_IP"
+echo "API server: pm2 logs api-server"
+echo "Restart API: pm2 restart api-server"

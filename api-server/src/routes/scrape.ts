@@ -12,6 +12,11 @@ import {
   hasEnglishTestKeyword,
   type EnglishRequirementResult,
 } from "../lib/english-requirements.js";
+import {
+  parseAcademicRequirementsFromText,
+  mergeAcademicRequirementResults,
+  pickPrimaryAcademicRequirement,
+} from "../lib/academic-requirements.js";
 
 const router: IRouter = Router();
 
@@ -3761,8 +3766,10 @@ function shouldUseFastStaticScraper(params: {
   const linkCount = params.listingLinks.length;
   if (linkCount === 0 || linkCount > FAST_ENGINE_MAX_LINKS) return false;
   if (!looksStaticFriendly(params.listingUrl, params.listingHtml)) return false;
-  // At least 60 % of sampled pages yielded useful data statically
-  if (params.sampleCount > 0 && params.successCount < Math.max(1, Math.floor(params.sampleCount * 0.6))) return false;
+  // At least 50 % of sampled pages should yield useful data statically.
+  // This keeps the fast engine available for small mostly static sites
+  // where one sampled page may be thinner than the others.
+  if (params.sampleCount > 0 && params.successCount < Math.max(1, Math.ceil(params.sampleCount * 0.5))) return false;
   return true;
 }
 
@@ -3786,23 +3793,31 @@ async function runFastStaticScrape(
 
   job.totalFound = directLinks.length;
 
-  // Approval gate — always ask for fast scrapes so user can verify the link count
-  const approvalSummary: ApprovalSummary = {
-    totalCourses: directLinks.length,
-    validSamples: directLinks.length,
-    rejectedSamples: 0,
-    sampleTotal: directLinks.length,
-    validExamples: directLinks.slice(0, 3).map((l) => l.name),
-    rejectedExamples: [],
-    estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
-  };
+  // Approval gate — auto proceed for small high confidence static sites.
+  const highConfidenceFast = directLinks.length > 0 && directLinks.length <= 20;
+  if (!highConfidenceFast) {
+    const approvalSummary: ApprovalSummary = {
+      totalCourses: directLinks.length,
+      validSamples: directLinks.length,
+      rejectedSamples: 0,
+      sampleTotal: directLinks.length,
+      validExamples: directLinks.slice(0, 3).map((l) => l.name),
+      rejectedExamples: [],
+      estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
+    };
 
-  const proceed = await waitForApproval(job, approvalSummary);
-  if (!proceed || job.stopped) {
-    addLog(job, "status", { message: "[FAST] Bulk fetch cancelled by user.", phase: "done" });
-    job.status = "stopped";
-    job.completedAt = Date.now();
-    return;
+    const proceed = await waitForApproval(job, approvalSummary);
+    if (!proceed || job.stopped) {
+      addLog(job, "status", { message: "[FAST] Bulk fetch cancelled by user.", phase: "done" });
+      job.status = "stopped";
+      job.completedAt = Date.now();
+      return;
+    }
+  } else {
+    addLog(job, "status", {
+      message: `[FAST] High confidence simple site — auto proceeding with ${directLinks.length} direct course links`,
+      phase: "discover",
+    });
   }
 
   addLog(job, "status", {
@@ -3848,17 +3863,15 @@ function makeSemaphore(concurrency: number) {
  * Used for per-URL browser escalation on sites NOT in the JS_HEAVY_DOMAINS list.
  */
 function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): boolean {
-  // No course name at all → likely fully JS-rendered, worth trying browser.
-  if (!data.courseName) return true;
-  const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
-  // If no English test found at all, ALWAYS try browser — the requirement block is
-  // almost certainly behind a JS-rendered tab / accordion (e.g. ASA, VU, UEL).
-  if (!hasEnglish) return true;
-  const hasFee      = !!data.internationalFee;
+  const hasName = !!data.courseName;
+  const hasDegree = !!data.degreeLevel;
   const hasDuration = !!data.duration;
-  const hasDegree   = !!data.degreeLevel;
-  // Two or more key fields found → static extraction is working; no browser needed.
-  return [hasFee, hasEnglish, hasDuration, hasDegree].filter(Boolean).length < 2;
+  const hasFee = !!data.internationalFee;
+  const hasEnglish = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
+
+  if (!hasName) return true;
+  if (!hasDegree && !hasDuration && !hasFee && !hasEnglish) return true;
+  return false;
 }
 
 async function scrapeCourseBatch(
@@ -3948,7 +3961,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
   // Fast mode log — browser-fallback message is deferred to per-URL decision below.
   if (job.fastMode) {
-    addLog(job, "status", { message: "FAST MODE — browser automation disabled, using HTTP fetch only", phase: "fetch" });
+    addLog(job, "status", { message: "FAST MODE — static only HTTP scraping enabled. Browser rendering is skipped unless you turn Fast Mode off.", phase: "fetch" });
   }
 
   const tasks = courseLinks.slice(0, max).map((link, i) =>
@@ -4592,7 +4605,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           return;
         }
         addLog(job, "status", {
-          message: `[ENGINE] Fast engine declined — too many links (${directLinks.length}) or site not static-friendly enough. Switching to Advanced Smart Scraper.`,
+          message: `[ENGINE] Fast Static Scraper declined — ${directLinks.length > FAST_ENGINE_MAX_LINKS ? `too many links (${directLinks.length})` : "sampled pages were not static-friendly enough"}. Switching to Advanced Smart Scraper.`,
           phase: "discover",
         });
       }
@@ -4848,7 +4861,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     job.url = url;
     job.fastMode = !!fastMode;
     scrapeJobs.set(jobId, job);
-    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (browser disabled)" : ""}` });
+    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (static only)" : ""}` });
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
