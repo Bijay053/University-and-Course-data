@@ -3320,10 +3320,14 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // Throughput tuning. HTTP fetches are cheap (~150KB+1socket each), so we run
   // many in parallel. Browser launches are heavy (~150 MB RAM per Chromium),
   // so we cap separately.
-  const CONCURRENCY = 60;
+  // 30 concurrent HTTP fetches is the sweet spot: fast enough for static sites,
+  // but won't overwhelm servers that start dropping connections above ~50 rps.
+  const CONCURRENCY = 30;
   const BROWSER_CONCURRENCY = 8;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
+  // Courses that time out on the first pass are retried here.
+  const retryQueue: { url: string; name: string; index: number }[] = [];
 
   // Determine once whether this batch of courses needs browser automation.
   // Fast mode disables browser entirely (5–10× faster, may miss JS-rendered fields).
@@ -3444,14 +3448,68 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           fullAIQueue.push({ index: i, name: link.name, html: cHtml, cheerioData });
         }
       } catch (err) {
-        job.errors++;
-        addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
+        const msg = (err as Error).message || "";
+        const isTimeout = /timeout|aborted|abort/i.test(msg);
+        if (isTimeout) {
+          // Don't count as a permanent error — will retry with lower concurrency
+          retryQueue.push({ url: link.url, name: link.name, index: i });
+          addLog(job, "status", { message: `[timeout → will retry] ${link.name}`, phase: "fetch" });
+        } else {
+          job.errors++;
+          addLog(job, "course", { name: link.name, status: "error", message: msg, index: i + 1 });
+        }
       }
     })
   );
 
   // Run all parallel fetches
   await Promise.all(tasks);
+
+  // ── Retry timed-out courses with reduced concurrency (10) ──────────────────
+  if (retryQueue.length > 0 && !job.stopped) {
+    addLog(job, "status", { message: `Retrying ${retryQueue.length} timed-out courses at reduced concurrency (10)...`, phase: "fetch" });
+    await new Promise((r) => setTimeout(r, 2000)); // brief pause before retry
+    const retrySem = makeSemaphore(10);
+    let retryDone = 0;
+    await Promise.all(retryQueue.map(({ url, name, index }) =>
+      retrySem(async () => {
+        if (job.stopped) return;
+        retryDone++;
+        addLog(job, "status", { message: `[retry ${retryDone}/${retryQueue.length}] ${name}`, phase: "fetch" });
+        try {
+          const cHtml = await fetchPage(url);
+          const cheerioData = extractWithCheerio(cHtml, url, name, universityCountry);
+          const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
+          if (needsEnrich) {
+            const relatedPages = findRelatedPages(cHtml, url);
+            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+              await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, url);
+            }
+          }
+          if (uniPages?.feePage && !cheerioData.internationalFee) {
+            const feePageIsInternational = /international/i.test(uniPages.feePage);
+            await extractFeeFromUniversityPage(uniPages.feePage, name, cheerioData, feeCache, false, feePageIsInternational);
+          }
+          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall)) {
+            extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
+            if (cachedEnglishReqs) {
+              if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
+              if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+              if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            }
+          }
+          const courseData = cheerioToCourseData(cheerioData, name, url);
+          const saved = await stageCourse(courseData, uniId, jobId);
+          if (saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name, status: "skipped", index: index + 1 }); }
+        } catch (retryErr) {
+          job.errors++;
+          addLog(job, "course", { name, status: "error", message: `[retry failed] ${(retryErr as Error).message}`, index: index + 1 });
+        }
+      })
+    ));
+    addLog(job, "status", { message: `Retry complete — ${retryQueue.length - retryQueue.filter((_, ri) => ri < retryDone).length + retryDone} attempted`, phase: "fetch" });
+  }
 
   if (job.stopped) {
     addLog(job, "status", { message: `Stopped. ${completed} fetched, processing queued data...` });
@@ -3595,7 +3653,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const sitemapCourses = await discoverCourseLinksFromSitemap(origin, job);
       if (sitemapCourses.length > 0) {
         addLog(job, "status", { message: `Found ${sitemapCourses.length} courses from sitemap. Extracting...`, phase: "extract", totalCourses: sitemapCourses.length });
-        await scrapeCourseBatch(sitemapCourses, uniId, job, 300, jobId, uniPages, universityCountry);
+        await scrapeCourseBatch(sitemapCourses, uniId, job, sitemapCourses.length, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -3606,7 +3664,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const crawled = await crawlForCourseLinks(origin, origin, job, 2);
       if (crawled.length > 0) {
         addLog(job, "status", { message: `Found ${crawled.length} courses by crawling. Extracting...`, phase: "extract", totalCourses: crawled.length });
-        await scrapeCourseBatch(crawled, uniId, job, 300, jobId, uniPages, universityCountry);
+        await scrapeCourseBatch(crawled, uniId, job, crawled.length, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         job.status = "completed";
         job.completedAt = Date.now();
@@ -3709,7 +3767,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           phase: "extract",
           totalCourses: apiCourses.length,
         });
-        await scrapeCourseBatch(apiCourses, uniId, job, 300, jobId, uniPages, universityCountry);
+        await scrapeCourseBatch(apiCourses, uniId, job, apiCourses.length, jobId, uniPages, universityCountry);
         addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
         if (job.imported > 0) {
           const config: ScrapeConfig = { courseLinks: apiCourses, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
@@ -3822,7 +3880,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         phase: "extract",
         totalCourses: courseLinks.length,
       });
-      await scrapeCourseBatch(courseLinks, uniId, job, 300, jobId, uniPages, universityCountry);
+      await scrapeCourseBatch(courseLinks, uniId, job, courseLinks.length, jobId, uniPages, universityCountry);
       addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
 
       if (job.imported > 0) {
