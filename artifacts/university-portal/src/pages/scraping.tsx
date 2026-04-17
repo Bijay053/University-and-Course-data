@@ -1020,8 +1020,22 @@ export default function Scraping() {
                           />
                         </td>
                         <td className="p-2">
-                          <div className="font-medium text-gray-800 truncate max-w-[250px]" title={course.courseName}>
-                            {course.courseName}
+                          <div className="flex items-center gap-1 max-w-[260px]">
+                            <span className="font-medium text-gray-800 truncate" title={course.courseName}>
+                              {course.courseName}
+                            </span>
+                            {course.courseWebsite && (
+                              <a
+                                href={course.courseWebsite}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Verify: ${course.courseWebsite}`}
+                                className="flex-shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                           </div>
                           {course.category && (
                             <div className="text-xs text-gray-400 truncate">{course.category}</div>
