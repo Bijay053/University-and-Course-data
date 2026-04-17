@@ -401,12 +401,17 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
     if (hasOnline && hasOnCampus) break;
   }
 
-  // General text scan (catches any remaining patterns)
-  if (/\bon[- ]?campus\b|\bface[- ]?to[- ]?face\b|\bin[- ]?person\b/.test(fullText)) hasOnCampus = true;
-  if (/\bonline\b|\bdistance\b|\bremote\b|\bexternal\b/.test(fullText)) hasOnline = true;
+  // General text scan — only count mentions in an explicit study-mode CONTEXT,
+  // never raw "online" (which appears in nav/footer "apply online" etc.).
+  if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) hasOnCampus = true;
+  if (/\bdelivered\s+(?:online|remotely|by\s+distance)\b/i.test(fullText)) hasOnline = true;
+  if (/\b(?:study|learn|delivery|attendance)\s+mode[^.]{0,40}\bon[- ]?campus\b/i.test(fullText)) hasOnCampus = true;
+  if (/\b(?:study|learn|delivery|attendance)\s+mode[^.]{0,40}\bonline\b/i.test(fullText)) hasOnline = true;
+  if (/\bonline\s+(?:study|delivery|learning|course|mode|program|programme|degree)\b/i.test(fullText)) hasOnline = true;
+  if (/\b(?:on[- ]?campus|face[- ]?to[- ]?face|in[- ]?person)\s+(?:study|delivery|learning|course|mode|program|programme|degree|classes|teaching)\b/i.test(fullText)) hasOnCampus = true;
 
   if (hasOnline && hasOnCampus) return "Blended";
-  if (/online\s*(?:only|delivery)|fully\s*online|distance\s*(?:learning|education)/i.test(fullText)) return "Online";
+  if (/fully\s*online|online[- ]?only|distance\s*(?:learning|education)\s+only/i.test(fullText)) return "Online";
   if (hasOnline) return "Online";
   if (hasOnCampus) return "On Campus";
   return "On Campus"; // default
@@ -871,6 +876,16 @@ function parseEnglishTestCell(testType: string, reqText: string, data: Partial<C
  *   2. Fall back to full-page text extraction
  */
 function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partial<CourseData>) {
+  // ── Strategy 0: Run high-priority body text scan first (catches VIT format) ──
+  // Pattern -1 inside extractEnglishRequirements handles "IELTS Academic: Overall score 6.5,
+  // with no band below 6.0" — common across many AU universities. Running this first
+  // ensures it isn't blocked by an earlier section-based pattern that finds nothing useful.
+  if (!data.ieltsOverall) {
+    const bodyText = $("body").text();
+    extractEnglishRequirements(bodyText, data);
+    if (data.ieltsOverall && data.pteOverall && data.toeflOverall) return;
+  }
+
   // ── Strategy 1: Find entry requirements section ──────────────────────────
   const reqSelectors = [
     "[id*='entry'i][id*='requirement'i]",
@@ -3237,7 +3252,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
   // Browser automation is rate-limited to avoid exhausting OS resources
   const CONCURRENCY = 25;
-  const BROWSER_CONCURRENCY = 5;
+  const BROWSER_CONCURRENCY = 3;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
 
@@ -3265,7 +3280,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               clickInternational: true,
               clickRequirementsTab: true,
               expandAccordions: true,
-              timeoutMs: 35_000,
+              timeoutMs: 45_000,
             })
           );
           if (browserResult) {
@@ -3274,8 +3289,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (browserResult.requirementsHtml !== browserResult.mainHtml) {
               browserReqsHtml = browserResult.requirementsHtml;
             }
+            addLog(job, "status", { message: `[browser ✓] ${link.name} (clicks: ${browserResult.clicksPerformed.join(", ") || "none"})`, phase: "fetch" });
           } else {
-            // Browser failed — fall back to plain HTTP fetch
+            addLog(job, "status", { message: `[browser ✗ → static] ${link.name}`, phase: "fetch" });
             cHtml = await fetchPage(link.url);
           }
         } else {
