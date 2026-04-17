@@ -529,6 +529,7 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
   if (!data.internationalFee) extractFeeFromHtmlTables($, data, countryFallback);
   if (!data.internationalFee) extractFeeFromDomToggle($, data, countryFallback);
   extractEnglishFromHtml($, data);
+  extractCountryAcademicRequirements($, data);
   extractIntakeMonths(text, data);
 
   const desc = $("meta[name='description']").attr("content") || $("meta[property='og:description']").attr("content") || "";
@@ -918,6 +919,96 @@ function parseEnglishTestCell(testType: string, reqText: string, data: Partial<C
       const v = parseInt(m[1]);
       if (v >= 50 && v <= 160 && !data.duolingoOverall) data.duolingoOverall = v;
     }
+  }
+}
+
+// ── Country-based academic requirement table parser ────────────────────────────
+// Finds tables with a "Country" header and extracts per-country qualification
+// requirements (Nepal GPA, Bangladesh HSC, India %, etc.).
+// Primary row → academicCountry / academicLevel / academicScore / scoreType.
+// All rows (when >1) → stored as pipe-separated summary in otherRequirement.
+const KNOWN_COUNTRIES = new Set([
+  "nepal","bangladesh","india","pakistan","sri lanka","nigeria","china","indonesia",
+  "philippines","vietnam","kenya","ghana","zimbabwe","cameroon","malaysia","thailand",
+  "myanmar","cambodia","laos","mauritius","tanzania","uganda","ethiopia","zambia",
+  "south korea","hong kong","taiwan","saudi arabia","uae","qatar","oman","jordan",
+  "egypt","iran","iraq","morocco","algeria","germany","france","italy","russia",
+  "ukraine","poland","turkey","brazil","colombia","peru","mexico","argentina",
+  "south africa","botswana","namibia","malawi","rwanda","senegal","côte d'ivoire",
+  "cote d'ivoire","ivory coast","eritrea","somalia","sudan","south sudan",
+  "new zealand","australia","usa","canada","united states","united kingdom","uk",
+]);
+
+function extractCountryAcademicRequirements(
+  $: ReturnType<typeof cheerio.load>,
+  data: Partial<CourseData>
+): void {
+  if (data.academicCountry && data.academicScore) return;
+
+  const countryRows: { country: string; level: string; score?: number; scoreType?: string }[] = [];
+
+  $("table").each((_, table) => {
+    const $table = $(table);
+    const rawHeaders = $table.find("thead tr th, tr:first-child th, tr:first-child td")
+      .map((_, el) => $(el).text().trim().toLowerCase()).get();
+
+    const countryColIdx = rawHeaders.findIndex(h => /\bcountry\b|\bnation\b/.test(h));
+    if (countryColIdx === -1) return;
+
+    const qualColIdx = rawHeaders.findIndex(h => /qualif|level|education|study|school|subject/.test(h));
+    const gradeColIdx = rawHeaders.findIndex(h => /grade|gpa|score|requirement|mark|result|point/.test(h));
+
+    $table.find("tbody tr, tr").each((rowIdx, row) => {
+      if (rowIdx === 0 && countryColIdx < rawHeaders.length) return; // header row
+      const cells = $(row).find("td").map((_, td) => $(td).text().trim().replace(/\s+/g, " ")).get();
+      if (cells.length < 2) return;
+
+      const rawCountry = (cells[countryColIdx] || "").toLowerCase();
+      if (!rawCountry) return;
+
+      const isKnown = KNOWN_COUNTRIES.has(rawCountry) ||
+        Array.from(KNOWN_COUNTRIES).some(c => rawCountry.startsWith(c) || rawCountry.includes(c));
+      if (!isKnown) return;
+
+      const country = cells[countryColIdx] || "";
+      const level = qualColIdx >= 0 ? (cells[qualColIdx] || "") : "";
+      const gradeText = gradeColIdx >= 0 ? (cells[gradeColIdx] || "") : (cells[cells.length - 1] || "");
+
+      let score: number | undefined;
+      let scoreType: string | undefined;
+
+      const gpaM = gradeText.match(/gpa\s*(?:of\s*|:)?\s*(\d+(?:\.\d+)?)/i);
+      const percM = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
+      const outOfM = gradeText.match(/(\d+(?:\.\d+)?)\s*out\s*of\s*(\d+(?:\.\d+)?)/i);
+      const cgpaM = gradeText.match(/cgpa\s*(?:of\s*|:)?\s*(\d+(?:\.\d+)?)/i);
+
+      if (cgpaM) { score = parseFloat(cgpaM[1]); scoreType = "CGPA"; }
+      else if (gpaM) { score = parseFloat(gpaM[1]); scoreType = "GPA"; }
+      else if (percM) { score = parseFloat(percM[1]); scoreType = "Percentage"; }
+      else if (outOfM) { score = parseFloat(outOfM[1]); scoreType = `Score (/${outOfM[2]})`; }
+
+      if (!score) {
+        const numM = gradeText.match(/(\d+(?:\.\d+)?)/);
+        if (numM) { score = parseFloat(numM[1]); scoreType = "Score"; }
+      }
+
+      countryRows.push({ country, level, score, scoreType });
+    });
+  });
+
+  if (countryRows.length === 0) return;
+
+  const primary = countryRows[0];
+  if (!data.academicCountry) data.academicCountry = primary.country;
+  if (!data.academicLevel && primary.level) data.academicLevel = primary.level;
+  if (primary.score && !data.academicScore) data.academicScore = primary.score;
+  if (primary.scoreType && !data.scoreType) data.scoreType = primary.scoreType;
+
+  if (countryRows.length > 1 && !data.otherRequirement) {
+    const summary = countryRows
+      .map(r => `${r.country}: ${r.level}${r.score ? ` (${r.scoreType ?? "Score"} ${r.score})` : ""}`)
+      .join(" | ");
+    data.otherRequirement = summary;
   }
 }
 
@@ -1905,12 +1996,13 @@ function validateAndSanitizeCourseData(courseData: CourseData): string[] {
   return warnings;
 }
 
-async function stageCourse(courseData: CourseData, uniId: number, jobId: string): Promise<boolean> {
+async function stageCourse(courseData: CourseData, uniId: number, jobId: string, job?: ScrapeJob): Promise<boolean> {
   if (!courseData.courseName) return false;
 
   // Last-resort junk filter — catch event/category/news pages the link collector missed
   if (isJunkCourseName(courseData.courseName)) {
-    console.log(`[JUNK] Skipping non-course page: "${courseData.courseName}"`);
+    if (job) addLog(job, "status", { message: `Skipped (junk name): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping non-course page: "${courseData.courseName}"`);
     return false;
   }
 
@@ -1919,7 +2011,8 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
   const hasDuration = !!courseData.duration;
   const hasFee = !!courseData.internationalFee;
   if (!hasDegreeLevel && !hasDuration && !hasFee) {
-    console.log(`[JUNK] Skipping empty page (no degree/duration/fee): "${courseData.courseName}"`);
+    if (job) addLog(job, "status", { message: `Skipped (empty: no degree/duration/fee): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping empty page (no degree/duration/fee): "${courseData.courseName}"`);
     return false;
   }
 
@@ -1939,7 +2032,9 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
   const validationWarnings = validateAndSanitizeCourseData(courseData);
   if (validationWarnings.length > 0) {
     for (const w of validationWarnings) {
-      console.log(`[VALIDATE] ${courseData.courseName}: ${w}`);
+      const msg = `[${courseData.courseName.slice(0, 40)}] ${w}`;
+      if (job) addLog(job, "status", { message: msg, phase: "validate" });
+      else console.log(`[VALIDATE] ${msg}`);
     }
   }
 
@@ -3565,7 +3660,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             }
           }
           const courseData = cheerioToCourseData(cheerioData, name, url);
-          const saved = await stageCourse(courseData, uniId, jobId);
+          const saved = await stageCourse(courseData, uniId, jobId, job);
           if (saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name, status: "skipped", index: index + 1 }); }
         } catch (retryErr) {
@@ -3596,7 +3691,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (extra.degreeLevel && !item.data.degreeLevel) item.data.degreeLevel = extra.degreeLevel;
           if (extra.description && !item.data.description) item.data.description = extra.description;
         }
-        const saved = await stageCourse(item.data, uniId, jobId);
+        const saved = await stageCourse(item.data, uniId, jobId, job);
         if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
         else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
       }
@@ -3621,12 +3716,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (val !== undefined && val !== null && !(cData as any)[key]) (cData as any)[key] = val;
           }
           cData.courseWebsite = cData.courseWebsite || courseLinks[item.index].url;
-          const saved = await stageCourse(cData, uniId, jobId);
+          const saved = await stageCourse(cData, uniId, jobId, job);
           if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: item.index + 1 }); }
         } else if (item.cheerioData.courseName || item.name) {
           const fallbackData = cheerioToCourseData(item.cheerioData, item.name, courseLinks[item.index].url);
-          const saved = await stageCourse(fallbackData, uniId, jobId);
+          const saved = await stageCourse(fallbackData, uniId, jobId, job);
           if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: item.index + 1 }); }
         } else {
@@ -3794,7 +3889,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           }
         }
         aiData.courseWebsite = aiData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(aiData, uniId, jobId);
+        const saved = await stageCourse(aiData, uniId, jobId, job);
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
         addLog(job, "course", { name: aiData.courseName, status: saved ? "staged" : "skipped (duplicate)" });
@@ -3803,7 +3898,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         // AI failed but Cheerio extracted data — use it directly rather than losing the course
         addLog(job, "status", { message: "AI extraction failed; saving Cheerio-extracted data as fallback.", phase: "extract" });
         cheerioData.courseWebsite = cheerioData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId);
+        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId, job);
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
         addLog(job, "course", { name: cheerioData.courseName, status: saved ? "staged (partial)" : "skipped (duplicate)" });
@@ -4165,7 +4260,7 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
     // Stage all collected courses
     addLog(job, "status", { message: `Staging ${stagedCourses.length} courses...`, phase: "stage" });
     for (const item of stagedCourses.sort((a, b) => a.index - b.index)) {
-      const saved = await stageCourse(item.data, uniId, jobId);
+      const saved = await stageCourse(item.data, uniId, jobId, job);
       if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
       else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
     }

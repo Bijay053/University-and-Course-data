@@ -1,0 +1,401 @@
+Work inside my existing Replit project only. Do not rebuild from scratch.
+
+You must inspect and modify the real files below.
+
+Main objective:
+Make the scraper fast, research first, low AI cost, browser only as fallback, parallel on validated course pages, and keep staging plus approval flow working exactly in this project.
+
+Very important:
+- Do not stop with analysis only
+- Do not give generic advice
+- Change the actual files
+- Run the app and verify type and runtime errors
+- Keep existing routes and UI working
+
+==================================================
+STEP 1 — BACKEND ENTRY FILES TO OPEN FIRST
+==================================================
+
+Open these files first and understand the current flow:
+
+1. artifacts/api-server/src/routes/scrape.ts
+This is the main scraper engine.
+It already contains:
+- scrape job state in memory
+- logs
+- Gemini calls
+- fetchPage logic
+- discovery logic
+- browser fallback
+- staging save
+- stop and approval endpoints
+
+This is the main file to refactor.
+
+2. artifacts/api-server/src/browser-helper.ts
+This controls browser based fetching.
+You need to keep it, but make sure browser is only used as fallback, not default for many pages.
+
+3. artifacts/api-server/src/routes/scraping.ts
+This handles scraping jobs and scraping changes.
+Do not break these endpoints.
+If needed, align status values and job metadata with improved scraper flow.
+
+4. lib/db/src/schema/scraped_courses.ts
+This is the staging table structure.
+Use this for pending scraped course data.
+Do not remove existing fields.
+If new fields are needed, add them carefully and update usage.
+
+5. lib/db/src/schema/scraping.ts
+This stores scraping jobs and scraping changes.
+Keep compatibility.
+
+==================================================
+STEP 2 — FRONTEND FILES TO OPEN FIRST
+==================================================
+
+Open these files:
+
+1. artifacts/university-portal/src/pages/scraping.tsx
+This is the scraping UI.
+It already has:
+- start scrape
+- polling
+- staged course review
+- approve selected
+- approve all
+- stop scrape
+- approval modal
+You must keep this page working and improve logs if needed.
+
+2. artifacts/university-portal/src/pages/university-detail.tsx
+This page shows the university course tab table and related tabs.
+Do not break existing course display and filtering.
+
+==================================================
+STEP 3 — MAIN BACKEND REFACTOR IN scrape.ts
+==================================================
+
+Inside artifacts/api-server/src/routes/scrape.ts do the following.
+
+A. Split the scraper flow into clear functions
+Refactor the big flow into these functions inside the same file first, or move to helper files only if safe:
+
+- classifyInputUrl(url)
+- discoverCandidatePages(url, job)
+- scoreCandidatePage(url, html)
+- validateCourseCandidate(url, html)
+- discoverSharedPages(url, job)
+- scrapeCourseStatic(url, sharedPages, job)
+- scrapeCourseWithBrowser(url, sharedPages, job)
+- scrapeCourseWithAiFallback(url, sharedPages, job)
+- scrapeCoursesParallel(courseUrls, sharedPages, job)
+- saveCoursesToStaging(courses, job)
+
+B. Replace the current heavy discovery flow
+Current problem:
+The scraper does too many phases, AI too early, and waits for approval before useful work.
+
+New rule:
+1. classify input url
+2. discover candidate course links using rules first
+3. validate a sample
+4. if confidence is high, continue automatically
+5. stage results after scrape
+6. approval happens on staged records, not before bulk fetch
+
+C. Remove AI from normal discovery
+Find all places where Gemini is used during page discovery or early analysis.
+Move Gemini behind this rule:
+
+Use AI only if:
+- static extraction failed
+- browser extraction failed
+- page still has missing critical fields
+- complex academic requirement table cannot be parsed rule based
+
+Do not use AI for:
+- finding links
+- first pass course discovery
+- sitemap inspection
+- simple page classification
+- normal pagination following
+
+D. Browser must be fallback only
+In scrape.ts, wherever browser mode is triggered broadly, change logic to:
+
+1. fetch using normal request first
+2. extract fields
+3. if required fields are missing or page is proven JS only, then call browser helper
+
+Required fields for deciding browser fallback:
+- course name
+- degree level
+- duration or study mode
+- fee or requirements
+
+Do not run browser for every course page by default.
+
+E. Add safe concurrency
+Find the current sequential loop that fetches validated course pages one by one.
+Replace it with concurrency limited processing, around 4 to 6 at a time.
+
+Use a safe promise pool pattern.
+Example target:
+- max 5 concurrent course fetches
+
+Keep logs correct with current index and total count.
+
+F. Cache shared pages
+When a university level page is found such as:
+- fees
+- entry requirements
+- English language requirements
+- scholarship page
+
+Fetch each shared page once and cache the HTML and parsed result.
+Reuse it for all courses.
+
+Do not refetch shared pages for every course.
+
+G. Skip sitemap when homepage or course list is already good
+Discovery priority must be:
+1. user provided course list page
+2. homepage navigation and visible course blocks
+3. internal course list page
+4. search page results
+5. sitemap only if needed
+
+Do not start with sitemap for sites like VIT if homepage already exposes course links.
+
+H. Keep stop and approval working
+Preserve these endpoints and behavior:
+- /scrape/status/:jobId
+- /scrape/stop/:jobId
+- /scrape/approve/:jobId
+- staged approve one
+- staged approve all
+
+But remove the mid scrape waiting confirmation gate.
+If research confidence is high, continue automatically.
+Only review staged courses after scraping.
+
+==================================================
+STEP 4 — DISCOVERY LOGIC TO IMPLEMENT IN scrape.ts
+==================================================
+
+Implement rule based page scoring.
+
+A page is likely a real course page if it has several of:
+- bachelor
+- master
+- diploma
+- certificate
+- graduate diploma
+- graduate certificate
+- phd
+- duration
+- intake
+- tuition fee
+- entry requirements
+- IELTS, PTE, TOEFL
+- course structure
+- career outcomes
+- study mode
+- campus
+
+Reject if it matches:
+- accommodation
+- blog
+- event
+- news
+- student life
+- support
+- contact
+- generic scholarship landing page
+- visa
+- about us
+- faculty marketing page without course details
+
+Add a confidence score for each candidate.
+Only bulk fetch candidates above threshold.
+
+==================================================
+STEP 5 — EXTRACTION LOGIC TO IMPROVE IN scrape.ts
+==================================================
+
+Implement or fix these parsers:
+
+1. Currency logic
+If explicit currency exists, use it.
+Otherwise use country fallback:
+- Australia AUD
+- New Zealand NZD
+- Canada CAD
+- USA USD
+- UK GBP
+
+2. Fee logic
+Always prefer international fee.
+Never save domestic fee as the main fee.
+If both exist, classify by nearby labels and select international.
+Extract:
+- internationalFee
+- feeTerm
+- feeYear
+- currency
+
+3. Fee term normalization
+Normalize:
+- per semester = Semester
+- per trimester = Trimester
+- per term = Term
+- annual, annually, per year, yearly = Annual
+- full course, total course fee = Full Course
+
+4. Fee year logic
+Extract year only if directly tied to fee text such as 2026 fee or fees for 2026 academic year.
+
+5. Study mode normalization
+Normalize:
+- on campus = On Campus
+- online = Online
+- blended = Blended
+- hybrid = Blended
+- online and on campus = Blended
+
+6. IELTS logic
+If text says overall 6.0 with no band below 5.5 then save:
+- overall 6.0
+- listening 5.5
+- reading 5.5
+- writing 5.5
+- speaking 5.5
+
+Apply same pattern to PTE and TOEFL when wording gives overall plus minimum component score.
+
+7. Duration and duration term
+Split numeric duration from unit:
+- 2 years
+- 18 months
+- 6 semesters
+- 4 trimesters
+
+8. Intake parsing
+Split intake month and intake day where exact dates exist.
+If only month exists, save month and leave day blank.
+
+9. Academic requirement by country
+If a course or shared page shows different country rows, preserve:
+- academicCountry
+- academicLevel
+- academicScore
+- scoreType
+- otherRequirement
+
+If this parsing is complex, only then use AI fallback.
+
+==================================================
+STEP 6 — STAGING FLOW
+==================================================
+
+Use lib/db/src/schema/scraped_courses.ts as the staging table.
+Do not save directly into live courses during scrape.
+
+Every scraped course must first save as pending with:
+- scrapeJobId
+- universityId
+- completeness
+- notes if missing fields
+- status pending
+
+Approval routes should continue using the existing staged approval flow.
+
+If useful, improve completeness scoring based on:
+- courseName
+- degreeLevel
+- duration
+- studyMode
+- fee
+- requirement fields
+- intake
+
+==================================================
+STEP 7 — FRONTEND CHANGES IN scraping.tsx
+==================================================
+
+In artifacts/university-portal/src/pages/scraping.tsx make these improvements without breaking current UI:
+
+1. Keep current polling and staged review logic
+2. Improve log presentation so logs clearly show:
+- source url
+- resolved listing url
+- how many candidate links found
+- how many validated
+- when browser fallback is used
+- when AI fallback is used
+- current page number out of total
+3. Keep stop button working
+4. Keep review modal and approve selected working
+5. Do not add a manual confirmation checkpoint before bulk fetch
+6. If backend sends confidence and discovery stats, show them neatly
+
+==================================================
+STEP 8 — OPTIONAL DB IMPROVEMENT
+==================================================
+
+If needed, add reusable scrape config support.
+
+Best place:
+either add JSON config fields to university or scraping job related storage.
+
+Store things like:
+- resolved listing page
+- shared fee page
+- shared requirement page
+- extraction hints
+- saved selectors
+- last successful strategy
+
+Then future rescrapes should try saved config first before AI.
+
+Only do this if it can be added safely without breaking current project.
+
+==================================================
+STEP 9 — TESTING REQUIRED
+==================================================
+
+After changes:
+
+1. Run typecheck
+2. Run the backend
+3. Run the frontend
+4. Test a scrape on a known site like VIT
+5. Confirm:
+- scraper starts
+- no mid scrape waiting gate
+- progress logs stream
+- staged courses are created
+- review modal opens
+- approve selected still works
+- stop still works
+
+==================================================
+STEP 10 — OUTPUT FORMAT WHEN DONE
+==================================================
+
+When finished, report:
+1. files changed
+2. exact scraper problems found
+3. exact fixes made
+4. whether AI usage was reduced
+5. whether browser usage was reduced
+6. whether concurrency was added
+7. whether staging and approval still work
+8. any remaining limitation
+9. exact commands to run
+
+Important:
+Do not stop after reading files.
+Implement the changes directly in this project.

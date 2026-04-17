@@ -893,35 +893,67 @@ export default function Scraping() {
                 </div>
               )}
 
-              <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-auto font-mono text-xs space-y-1">
-                {scrapeLogs.map((log, i) => (
-                  <div key={i} className={
+              <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-80 overflow-auto font-mono text-xs space-y-0.5">
+                {scrapeLogs.map((log, i) => {
+                  const phasePrefix = (phase?: string, sampleResult?: string) => {
+                    if (sampleResult === "valid") return "[SAMPLE✓]";
+                    if (sampleResult === "rejected") return "[SAMPLE✗]";
+                    switch (phase) {
+                      case "analyze":   return "[CLASSIFY]";
+                      case "discover":  return "[DISCOVER]";
+                      case "validate":  return "[VALIDATE]";
+                      case "extract":   return "[EXTRACT ]";
+                      case "fallback":  return "[FALLBACK]";
+                      case "stage":     return "[STAGE   ]";
+                      default:          return "[INFO    ]";
+                    }
+                  };
+                  const logColor =
                     log.event === "error" ? "text-red-400" :
                     log.event === "approval_required" ? "text-amber-400 font-semibold" :
-                    log.event === "course" && (log.status === "staged" || log.status === "staged (cheerio only)") ? "text-green-400" :
-                    log.event === "course" && log.status === "skipped" ? "text-yellow-400" :
+                    log.event === "course" && (log.status === "staged" || log.status?.startsWith("staged")) ? "text-green-400" :
+                    log.event === "course" && log.status === "skipped" ? "text-yellow-500" :
+                    log.event === "course" && log.status === "error" ? "text-red-400" :
                     log.event === "done" ? "text-cyan-400 font-bold" :
                     log.event === "status" && log.sampleResult === "valid" ? "text-green-300" :
                     log.event === "status" && log.sampleResult === "rejected" ? "text-red-300" :
-                    "text-gray-300"
-                  }>
-                    {log.event === "status" && <span>[INFO] {log.message}</span>}
-                    {log.event === "approval_required" && <span>[WAITING] {log.message}</span>}
-                    {log.event === "progress" && <span>[{log.current}/{log.total}] {log.message}</span>}
-                    {log.event === "course" && (
-                      <span>
-                        [{log.status?.toUpperCase()}] {log.name}
-                        {log.status === "error" && log.message ? ` — ${log.message}` : ""}
-                      </span>
-                    )}
-                    {log.event === "error" && <span>[ERROR] {log.message}</span>}
-                    {log.event === "done" && (
-                      <span>
-                        === COMPLETE === Found: {log.totalFound} | Staged: {log.imported} | Skipped: {log.skipped} | Errors: {log.errors}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                    log.event === "status" && log.phase === "discover" ? "text-blue-300" :
+                    log.event === "status" && log.phase === "validate" ? "text-purple-300" :
+                    log.event === "status" && log.phase === "extract" ? "text-orange-300" :
+                    log.event === "status" && log.phase === "fallback" ? "text-yellow-300" :
+                    log.event === "status" && log.phase === "analyze" ? "text-sky-300" :
+                    "text-gray-300";
+                  return (
+                    <div key={i} className={logColor}>
+                      {log.event === "status" && (
+                        <span>
+                          {phasePrefix(log.phase, log.sampleResult)} {log.message}
+                          {log.totalCourses ? ` (${log.totalCourses} courses)` : ""}
+                        </span>
+                      )}
+                      {log.event === "approval_required" && <span>[WAITING ] {log.message}</span>}
+                      {log.event === "progress" && (
+                        <span>[{String(log.current).padStart(4, " ")}/{log.total}] {log.message}</span>
+                      )}
+                      {log.event === "course" && (
+                        <span>
+                          {log.status === "staged" || log.status?.startsWith("staged") ? "  ✓" :
+                           log.status === "skipped" ? "  –" :
+                           log.status === "error" ? "  ✗" : "   "}{" "}
+                          {log.name}
+                          {log.status === "error" && log.message ? ` — ${log.message}` : ""}
+                          {log.status && log.status !== "staged" && log.status !== "error" ? ` [${log.status}]` : ""}
+                        </span>
+                      )}
+                      {log.event === "error" && <span>[ERROR   ] {log.message}</span>}
+                      {log.event === "done" && (
+                        <span>
+                          ══ DONE ══ Found:{log.totalFound} | Staged:{log.imported} | Skipped:{log.skipped} | Errors:{log.errors}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
                 {scraping && !awaitingApproval && (
                   <div className="text-blue-400 animate-pulse">
                     <Loader2 className="inline w-3 h-3 animate-spin mr-1" />
