@@ -1918,7 +1918,7 @@ function urlLastSegmentHasDegreeQualifier(url: string): boolean {
     if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) {
       // Still reject known junk suffixes
       const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
-      if (/(scholarships?|info-night|open-day|event|news|fair|expo|community|hub)$/.test(lastSeg)) return false;
+      if (/(scholarships?|info-night|open-day|event|news|fair|expo|community|hub|keydates?|key-dates?)$/.test(lastSeg)) return false;
       return true;
     }
 
@@ -1926,7 +1926,7 @@ function urlLastSegmentHasDegreeQualifier(url: string): boolean {
     if (!DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q)) return false;
     // Reject degree-qualified URLs that are clearly info/category pages, not actual course detail pages
     // e.g. phd-scholarships, phd-jobs-and-internships, integrated-masters (category), master-classes
-    if (/(scholarships?|jobs?|internships?|employment|career|life|accommodation|sport|news|event|blog|faq|help|support|overview|guide|information|handbook|tips|process|pathway|pathways?|class(?:es)?|fair|expo|hub|community|connect|network|info-night|open-day)$/.test(lastSeg)) return false;
+    if (/(scholarships?|jobs?|internships?|employment|career|life|accommodation|sport|news|event|blog|faq|help|support|overview|guide|information|handbook|tips|process|pathway|pathways?|class(?:es)?|fair|expo|hub|community|connect|network|info-night|open-day|keydates?|key-dates?)$/.test(lastSeg)) return false;
     return true;
   } catch { return false; }
 }
@@ -1969,6 +1969,12 @@ function isJunkCourseName(name: string): boolean {
     /^apply\s+now$/,
     /\bnews\b.*\barticle\b/,
     /\bpress\s+release\b/,
+    // Key dates / intake dates pages — not actual courses
+    /\bkey[\s_-]?dates?\b/,
+    /\bkeydates?\b/,
+    /\bdomestic[\s_-]keydates?\b/,
+    /\bint(?:ernational)?[\s_-]keydates?\b/,
+    /\bintake[\s_-]dates?\b/,
   ];
   return junkPatterns.some((p) => p.test(lower));
 }
@@ -2136,15 +2142,33 @@ async function researchAndValidateCourseLinks(
   if (validUrlDepths.length === 0) return { links: workingList, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 
   const avgDepth = Math.round(validUrlDepths.reduce((a, b) => a + b, 0) / validUrlDepths.length);
-  const prefixCounts = new Map<string, number>();
-  for (const p of validUrlPrefixes) prefixCounts.set(p, (prefixCounts.get(p) || 0) + 1);
-  const bestPrefix = [...prefixCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
 
+  // Collect ALL confirmed prefixes (not just the most common one).
+  // Using the most common prefix kills diversity — e.g. if 7/9 confirmed are /mba/ and
+  // 2/9 are /bbus/, using /mba/ as bestPrefix would silently drop all bachelor courses.
+  const prefixSet = new Set(validUrlPrefixes);
+
+  // When ALL sampled pages passed (100% success rate), trust the research completely —
+  // skip depth/prefix filtering entirely, since all variation is real.
+  if (successRate >= 1.0) {
+    addLog(job, "status", {
+      message: `All ${sample.length} sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (${workingList.length} total).`,
+      phase: "discover",
+    });
+    return { links: workingList, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
+  }
+
+  // Partial success: filter, but accept a URL if it matches ANY confirmed prefix (not just the most popular one)
   const filtered = workingList.filter((c) => {
     try {
       const pathParts = new URL(c.url).pathname.split("/").filter(Boolean);
       if (Math.abs(pathParts.length - avgDepth) > 1) return false;
-      if (bestPrefix && !c.url.includes(bestPrefix.slice(0, -1))) return false;
+      // Accept if URL matches any confirmed prefix, or no prefixes were detected
+      if (prefixSet.size > 0) {
+        const urlLower = c.url.toLowerCase();
+        const matchesAnyPrefix = [...prefixSet].some((p) => urlLower.includes(p.slice(0, -1)));
+        if (!matchesAnyPrefix) return false;
+      }
       return true;
     } catch { return false; }
   });
@@ -2185,6 +2209,7 @@ function isCourseUrl(urlStr: string): boolean {
     "/node/", "/page/", "/generic/", "/media/", "/documents/", "/resources/",
     "/student-support", "/international-students/visa", "/fees-scholarships",
     "/why-choose", "/info-night", "/open-day", "/virtual-info",
+    "/keydates", "/key-dates", "domestic-keydates", "int-keydates",
   ];
   if (excludePatterns.some((p) => lower.includes(p))) return false;
   // Exclude URLs whose last path segment ends with known junk suffixes
@@ -2567,6 +2592,25 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   const origin = new URL(homeUrl).origin;
   const $ = cheerio.load(html);
 
+  // ── STEP 1: HEAD-probe high-priority specific paths first ────────────────────
+  // These are preferred over generic "/courses" found via link scanning, because
+  // sites like VIT use /course-list for their real listing while /courses just redirects.
+  const highPriorityPaths = [
+    "/course-list", "/course-finder", "/course-guide",
+    "/study/courses", "/courses/undergraduate", "/courses/postgraduate",
+  ];
+  for (const path of highPriorityPaths) {
+    try {
+      const testUrl = `${origin}${path}`;
+      const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(5000) });
+      if (resp.ok) {
+        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (high-priority probe)`, phase: "discover" });
+        return testUrl;
+      }
+    } catch {}
+  }
+
+  // ── STEP 2: Link scanning — find the best-linked course listing page ─────────
   const strongUrlPatterns = [
     /\/study\/courses\b/i, /\/courses\/$/i, /\/courses\b/i,
     /\/programs\b/i, /\/programmes\b/i,
@@ -2605,13 +2649,13 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
     return best;
   }
 
+  // ── STEP 3: Broad HEAD-probe fallback ────────────────────────────────────────
   const commonCoursePaths = [
-    "/study/courses", "/courses", "/programs", "/programmes",
+    "/courses", "/programs", "/programmes",
     "/study/programs", "/undergraduate-courses", "/postgraduate-courses",
     "/our-courses", "/find-a-course", "/course-search",
     "/study/undergraduate", "/study/postgraduate", "/academics/programs",
-    "/academics/courses", "/future-students/courses",
-    "/course-list", "/course-finder", "/course-guide", "/all-courses",
+    "/academics/courses", "/future-students/courses", "/all-courses",
   ];
 
   for (const path of commonCoursePaths) {
