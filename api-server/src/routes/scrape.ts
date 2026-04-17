@@ -656,10 +656,29 @@ function detectStudentAudience($: ReturnType<typeof cheerio.load>, fullText: str
 function isDomesticOnlyShortCourseUrl(url: string): boolean {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
-    return pathname.includes('/studying-with-us/study-options/short-courses/');
+    return pathname.includes('/studying-with-us/study-options/short-courses/') ||
+      pathname.includes('/short-courses/') ||
+      pathname.includes('/single-subjects') ||
+      pathname.includes('/digital-badges');
   } catch {
     return false;
   }
+}
+
+function hasAwardCourseKeyword(name: string): boolean {
+  const lower = (name || '').toLowerCase().trim();
+  return [
+    'bachelor',
+    'master',
+    'diploma',
+    'graduate certificate',
+    'graduate diploma',
+    'associate degree',
+    'doctor',
+    'phd',
+    'certificate iv',
+    'certificate iii'
+  ].some((kw) => lower.includes(kw));
 }
 
 function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
@@ -2511,6 +2530,14 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
   if (courseData.courseWebsite && isDomesticOnlyShortCourseUrl(courseData.courseWebsite)) {
     if (job) addLog(job, "status", { message: `Skipped (short course / non-international page): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping short-course/non-international page: "${courseData.courseName}"`);
+    return false;
+  }
+
+  // Only keep real award-course titles. This is a hard final guard so category pages,
+  // short courses and marketing pages can never be staged even if earlier discovery missed them.
+  if (!hasAwardCourseKeyword(courseData.courseName)) {
+    if (job) addLog(job, "status", { message: `Skipped (non-award title): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping non-award title: "${courseData.courseName}"`);
     return false;
   }
 
