@@ -3711,11 +3711,19 @@ function makeSemaphore(concurrency: number) {
  * signalling the page likely renders content via JavaScript.
  * Used for per-URL browser escalation on sites NOT in the JS_HEAVY_DOMAINS list.
  */
+function hasEnglishTestKeyword(text?: string | null): boolean {
+  if (!text) return false;
+  return /ielts|pte|toefl/i.test(text);
+}
+
 function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): boolean {
   // No course name at all → likely fully JS-rendered, worth trying browser.
   if (!data.courseName) return true;
-  const hasFee      = !!data.internationalFee;
   const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
+  // If no English test found at all, ALWAYS try browser — the requirement block is
+  // almost certainly behind a JS-rendered tab / accordion (e.g. ASA, VU, UEL).
+  if (!hasEnglish) return true;
+  const hasFee      = !!data.internationalFee;
   const hasDuration = !!data.duration;
   const hasDegree   = !!data.degreeLevel;
   // Two or more key fields found → static extraction is working; no browser needed.
@@ -3901,21 +3909,24 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // ── English test extraction waterfall (IELTS + PTE + TOEFL) ─────────────
         // Tier 1: extractWithCheerio(cHtml) above already ran extractEnglishFromHtml
         //         on the full browser-rendered page (requirementsHtml after all clicks).
-        // Tier 2: If still missing, run the stronger parsers on the same body text.
-        if (wasBrowserFetch) {
+        // Tier 2: Run stronger regex parsers on raw body text — fires for BOTH browser
+        //         AND static fetches. Catches formats the structured extractors miss
+        //         (e.g. "IELTS minimum 6.0", plain "IELTS 6.0 overall", etc.).
+        {
           const bodyText = cheerio.load(cHtml)("body").text();
+          const fetchType = wasBrowserFetch ? "browser" : "static";
 
           if (!cheerioData.ieltsOverall) {
             const r = extractIeltsFromText(bodyText);
             if (r.overall) {
               applyIeltsResult(cheerioData, r);
               addLog(job, "status", {
-                message: `[IELTS] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                message: `[IELTS] ${fetchType} page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
                 phase: "extract",
               });
             }
           } else {
-            addLog(job, "status", { message: `[IELTS] browser page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            addLog(job, "status", { message: `[IELTS] ${fetchType} page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
 
           if (!cheerioData.pteOverall) {
@@ -3923,12 +3934,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (r.overall) {
               applyPteResult(cheerioData, r);
               addLog(job, "status", {
-                message: `[PTE] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                message: `[PTE] ${fetchType} page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
                 phase: "extract",
               });
             }
           } else {
-            addLog(job, "status", { message: `[PTE] browser page hit: overall=${cheerioData.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            addLog(job, "status", { message: `[PTE] ${fetchType} page hit: overall=${cheerioData.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
 
           if (!cheerioData.toeflOverall) {
@@ -3936,18 +3947,13 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (r.overall) {
               applyToeflResult(cheerioData, r);
               addLog(job, "status", {
-                message: `[TOEFL] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                message: `[TOEFL] ${fetchType} page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
                 phase: "extract",
               });
             }
           } else {
-            addLog(job, "status", { message: `[TOEFL] browser page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            addLog(job, "status", { message: `[TOEFL] ${fetchType} page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
-        } else {
-          // Static fetch — log which tests were found
-          if (cheerioData.ieltsOverall) addLog(job, "status", { message: `[IELTS] static page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
-          if (cheerioData.pteOverall)   addLog(job, "status", { message: `[PTE] static page hit: overall=${cheerioData.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
-          if (cheerioData.toeflOverall) addLog(job, "status", { message: `[TOEFL] static page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
         }
 
         // PROBE-B: after Tier-1/2 — what do we have before shared fallback?
@@ -3972,37 +3978,43 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         }
 
         // Tier 3: University-level requirements page (shared fallback).
-        // Only consulted when course-page extraction (static + browser tiers) found nothing.
-        const needsSharedFallback = !cheerioData.ieltsOverall || !cheerioData.pteOverall || !cheerioData.toeflOverall;
-        if (needsSharedFallback) {
-          if (!cheerioData.ieltsOverall) addLog(job, "status", { message: `[IELTS] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
-          if (!cheerioData.pteOverall)   addLog(job, "status", { message: `[PTE] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
-          if (!cheerioData.toeflOverall) addLog(job, "status", { message: `[TOEFL] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
+        // ONLY consulted when (a) the shared page actually contains an English test keyword
+        // and (b) the course-page extraction tiers above still found nothing.
+        // Skipping when the keyword is absent prevents fake "fallback" log spam and avoids
+        // running expensive parsers on pages that will never yield a result.
+        const sharedHasKeyword = hasEnglishTestKeyword(uniReqsText);
+        if (!sharedHasKeyword && uniReqsText) {
+          // Shared page exists but has no IELTS/PTE/TOEFL — log once so it's clear
+          if (!cheerioData.ieltsOverall || !cheerioData.pteOverall || !cheerioData.toeflOverall) {
+            addLog(job, "status", { message: `[English] shared requirements page has no IELTS/PTE/TOEFL keyword — skipping for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
         }
-        if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-          extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
-        }
-        if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
-          extractEnglishRequirements(uniReqsText, cheerioData);
-        }
-        // Run all three stronger parsers on the shared requirements text
-        if (uniReqsText) {
+        if (sharedHasKeyword) {
+          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+            extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
+          }
+          if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+            extractEnglishRequirements(uniReqsText, cheerioData);
+          }
+          // Run all three stronger parsers on the shared requirements text
           if (!cheerioData.ieltsOverall) {
-            const r = extractIeltsFromText(uniReqsText);
+            const r = extractIeltsFromText(uniReqsText!);
             if (r.overall) {
               applyIeltsResult(cheerioData, r);
               addLog(job, "status", { message: `[IELTS] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            } else {
+              addLog(job, "status", { message: `[IELTS] shared requirements attempted but no value parsed for "${link.name.slice(0, 40)}"`, phase: "extract" });
             }
           }
           if (!cheerioData.pteOverall) {
-            const r = extractPteFromText(uniReqsText);
+            const r = extractPteFromText(uniReqsText!);
             if (r.overall) {
               applyPteResult(cheerioData, r);
               addLog(job, "status", { message: `[PTE] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
             }
           }
           if (!cheerioData.toeflOverall) {
-            const r = extractToeflFromText(uniReqsText);
+            const r = extractToeflFromText(uniReqsText!);
             if (r.overall) {
               applyToeflResult(cheerioData, r);
               addLog(job, "status", { message: `[TOEFL] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });

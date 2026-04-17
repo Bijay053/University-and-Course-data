@@ -1,0 +1,189 @@
+Current flow
+Static course page → sometimes works ✅
+Browser fallback → sometimes works ✅
+Shared requirements page → ALWAYS used for most courses ❌
+
+BUT:
+
+👉 The shared page does NOT contain IELTS at all
+
+So:
+
+Parser runs on empty content
+Returns null
+You assign nothing
+UI shows Missing: ieltsOverall
+❌ Why your current logic fails
+
+You are doing this:
+
+if (!ielts.overall && sharedRequirementsText) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+  }
+}
+
+BUT:
+
+👉 sharedRequirementsText = no IELTS content at all
+
+So:
+
+parser returns { overall: null }
+nothing assigned
+but logs still say “fallback used” → misleading
+🚨 Bigger Problem
+
+You are skipping browser extraction for most courses
+
+Look at logs:
+
+ONLY a few:
+
+[IELTS] static page hit
+
+MANY:
+
+[IELTS] shared requirements fallback
+
+👉 Means:
+
+❌ Browser extraction is not running properly
+❌ Or it runs but result is ignored
+
+✅ What you MUST fix (very important)
+Fix 1 — NEVER trust shared page blindly
+
+Add this check:
+
+function hasIeltsKeyword(text?: string) {
+  if (!text) return false;
+  return text.toLowerCase().includes("ielts");
+}
+
+Then change fallback:
+
+if (!ielts.overall && sharedRequirementsText && hasIeltsKeyword(sharedRequirementsText)) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+  }
+}
+
+👉 This prevents fake fallback
+
+Fix 2 — FORCE browser extraction before fallback
+
+Right now browser is weak or skipped.
+
+Replace your logic with this:
+
+let ielts = extractIeltsFromText(staticCourseText);
+let source = "static";
+
+if (!ielts.overall) {
+  // ALWAYS try browser first
+  const browserText = await getBrowserRenderedText(page);
+
+  if (browserText && hasIeltsKeyword(browserText)) {
+    const browserIelts = extractIeltsFromText(browserText);
+
+    if (browserIelts.overall) {
+      ielts = browserIelts;
+      source = "browser";
+    }
+  }
+}
+
+if (!ielts.overall && hasIeltsKeyword(sharedRequirementsText)) {
+  const sharedIelts = extractIeltsFromText(sharedRequirementsText);
+
+  if (sharedIelts.overall) {
+    ielts = sharedIelts;
+    source = "shared";
+  }
+}
+
+console.log(`[IELTS] FINAL SOURCE=${source} overall=${ielts.overall} course=${courseName}`);
+Fix 3 — Improve browser extraction (CRITICAL)
+
+Your browser fallback is weak.
+
+Replace with this:
+
+async function getBrowserRenderedText(page: any) {
+  try {
+    // wait for full render
+    await page.waitForTimeout(1500);
+
+    // click ALL possible requirement tabs
+    const buttons = await page.$$("button, a");
+
+    for (const btn of buttons) {
+      const text = (await page.evaluate(el => el.innerText, btn))?.toLowerCase();
+
+      if (
+        text?.includes("requirement") ||
+        text?.includes("entry") ||
+        text?.includes("english") ||
+        text?.includes("ielts")
+      ) {
+        try {
+          await btn.click();
+          await page.waitForTimeout(800);
+        } catch {}
+      }
+    }
+
+    // expand accordions
+    const expanders = await page.$$('[aria-expanded="false"], button');
+
+    for (const exp of expanders) {
+      try {
+        await exp.click();
+      } catch {}
+    }
+
+    await page.waitForTimeout(1000);
+
+    const text = await page.evaluate(() => document.body?.innerText || "");
+
+    return text;
+  } catch (e) {
+    return "";
+  }
+}
+Fix 4 — Add this DEBUG (VERY IMPORTANT)
+
+Replace your misleading log:
+
+[IELTS] shared requirements fallback
+
+With:
+
+console.log(`[IELTS] shared fallback attempted but no IELTS found for ${courseName}`);
+🎯 Expected Result After Fix
+Before
+90% → fallback (empty)
+IELTS missing
+After
+70–90% → browser extraction
+IELTS filled
+⚡ Real Insight (Important for your system)
+
+VU site structure:
+
+IELTS is NOT centralized
+Each course has:
+dynamic tab
+hidden content
+JS-rendered blocks
+
+👉 So your system must prioritize:
+
+Browser extraction > Static > Shared
+
+NOT:
+
+Static > Shared > Browser   ❌ (your current mistake)
