@@ -129,6 +129,86 @@ interface ScrapeJob {
 
 const scrapeJobs = new Map<string, ScrapeJob>();
 
+const FAST_MODE_MAX_COURSES = 40;
+const STANDARD_MODE_MAX_COURSES = 120;
+const GENERIC_CATEGORY_TITLES = new Set([
+  "design",
+  "health",
+  "business",
+  "hospitality",
+  "technology",
+  "education",
+  "higher degrees by research",
+  "single subjects",
+  "digital badges",
+  "challenging ageism",
+  "sport for good",
+  "on demand short courses",
+]);
+
+function normalizeCourseUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    u.hash = "";
+    u.search = "";
+    let pathname = u.pathname.replace(/\/+$/, "");
+    if (!pathname) pathname = "/";
+    return `${u.origin}${pathname}`.toLowerCase();
+  } catch {
+    return raw.trim().replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function normalizeCourseName(raw?: string | null): string {
+  return (raw || "").replace(/\s+/g, " ").trim();
+}
+
+function isGenericCategoryTitle(name?: string | null): boolean {
+  const title = normalizeCourseName(name).toLowerCase();
+  return GENERIC_CATEGORY_TITLES.has(title);
+}
+
+function dedupeCourseLinks(
+  links: { url: string; name: string }[],
+  options?: { dropGenericTitles?: boolean }
+): { links: { url: string; name: string }[]; skippedDuplicates: number; skippedGeneric: number } {
+  const out: { url: string; name: string }[] = [];
+  const seenUrls = new Set<string>();
+  const seenNames = new Set<string>();
+  let skippedDuplicates = 0;
+  let skippedGeneric = 0;
+
+  for (const item of links) {
+    const normalizedUrl = normalizeCourseUrl(item.url);
+    const normalizedName = normalizeCourseName(item.name);
+
+    if (options?.dropGenericTitles && isGenericCategoryTitle(normalizedName)) {
+      skippedGeneric++;
+      continue;
+    }
+
+    const nameKey = normalizedName.toLowerCase();
+    const duplicateByUrl = seenUrls.has(normalizedUrl);
+    const duplicateByName = !!normalizedName && seenNames.has(nameKey);
+
+    if (duplicateByUrl || duplicateByName) {
+      skippedDuplicates++;
+      continue;
+    }
+
+    seenUrls.add(normalizedUrl);
+    if (normalizedName) seenNames.add(nameKey);
+    out.push({
+      ...item,
+      url: normalizedUrl,
+      name: normalizedName || item.name,
+    });
+  }
+
+  return { links: out, skippedDuplicates, skippedGeneric };
+}
+
+
 function addLog(job: ScrapeJob, event: string, data: Record<string, unknown> = {}) {
   job.logs.push({ event, ...data });
   if (job.logs.length > 2000) job.logs = job.logs.slice(-1500);
@@ -404,102 +484,112 @@ function findImageUrls(html: string, courseUrl: string): string[] {
 
 /**
  * DOM-aware study mode detection.
- * Tracks hasOnline and hasOnCampus independently, combining them to "Blended".
- * Handles "Location: Sydney, Online" + "Delivery: Face to Face" → Blended.
+ * Preserves multi-mode values like "Online, On campus, Blended" instead of
+ * collapsing everything to a single value too early.
  */
 function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): string {
-  // ── PRIORITY 0: Title signal ──────────────────────────────────────────────
-  // Some courses put the mode right in the title (e.g. UEL "Ba Hons Special
-  // Education Online", "Bsc Hons Psychology Distance Learning").
   const title = (($("title").text() || "") + " " + ($("h1").first().text() || "")).toLowerCase();
-  if (/\bdistance\s+learning\b/.test(title)) return "Online";
-  if (/\(\s*online\s*\)|\bonline\s*$|\bonline\s+(?:study|programme?|course|degree)\b|\b(?:fully\s+)?online\s+(?:bachelor|master|diploma|certificate|mba|phd)/.test(title)) return "Online";
 
-  // ── PRIORITY: Find an explicit "Delivery" / "Study Mode" field. ──────────
-  // The "Delivery" field is authoritative — it overrides "Location" (which can
-  // contain "Online" meaning an online study option, e.g. ASA's "Sydney, Online").
-  // We look for label-value pairs in dt/dd, th/td, and <strong>Label</strong>+text patterns.
-  const DELIVERY_LABEL = /^(?:mode\s+of\s+(?:study|delivery|attendance)|study\s*mode|delivery(?:\s*mode)?|attendance\s*mode|course\s*mode|teaching\s*mode|learning\s*mode)\s*:?\s*$/i;
+  const normalizeStudyModes = (raw: string): string[] => {
+    if (!raw) return [];
+    const normalized = new Set<string>();
 
-  const evaluateDeliveryValue = (raw: string): string | null => {
-    const v = raw.toLowerCase();
-    const isOnCampus = /\b(?:face[- ]?to[- ]?face|on[- ]?campus|in[- ]?person|in\s+class(?:room)?)\b/.test(v);
-    const isOnline = /\b(?:online|distance|remote|virtual)\b/.test(v);
-    if (isOnCampus && isOnline) return "Blended";
-    if (isOnCampus) return "On Campus";
-    if (isOnline) return "Online";
-    return null;
+    const parts = raw
+      .replace(/[|;/]+/g, ",")
+      .replace(/\band\b/gi, ",")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    const values = parts.length ? parts : [raw.trim()];
+
+    for (const part of values) {
+      const v = part.toLowerCase();
+
+      if (/\b(?:blended|hybrid)\b/.test(v)) normalized.add("Blended");
+      if (/\b(?:online|distance|remote|virtual)\b/.test(v)) normalized.add("Online");
+      if (/\b(?:face[- ]?to[- ]?face|on[- ]?campus|on campus|in[- ]?person|in\s+class(?:room)?)\b/.test(v)) normalized.add("On Campus");
+    }
+
+    return Array.from(normalized);
   };
 
-  // Strategy A: <dt>Delivery</dt><dd>Face to Face</dd>
+  const formatStudyModes = (modes: string[]): string | null => {
+    if (!modes.length) return null;
+    const ordered = ["Online", "On Campus", "Blended"].filter((m) => modes.includes(m));
+    return ordered.join(", ");
+  };
+
+  if (/\bdistance\s+learning\b/.test(title)) return "Online";
+  if (/\(\s*online\s*\)|\bonline\s*$|\bonline\s+(?:study|programme?|course|degree)\b|\b(?:fully\s+)?online\s+(?:bachelor|master|diploma|certificate|mba|phd)/.test(title)) {
+    return "Online";
+  }
+
+  const DELIVERY_LABEL = /^(?:mode\s+of\s+(?:study|delivery|attendance)|study\s*mode|delivery(?:\s*mode)?|attendance\s*mode|course\s*mode|teaching\s*mode|learning\s*mode)\s*:?\s*$/i;
+
   let deliveryResult: string | null = null;
+
   $("dl dt").each((_, dt) => {
     if (DELIVERY_LABEL.test($(dt).text().trim())) {
       const dd = $(dt).next("dd").text().trim();
-      const r = evaluateDeliveryValue(dd);
+      const r = formatStudyModes(normalizeStudyModes(dd));
       if (r) { deliveryResult = r; return false; }
     }
   });
 
-  // Strategy B: <tr><th>Delivery</th><td>Face to Face</td></tr>
   if (!deliveryResult) {
     $("tr").each((_, tr) => {
       const cells = $(tr).find("th,td");
       if (cells.length < 2) return;
       const label = $(cells.get(0)!).text().trim();
       if (DELIVERY_LABEL.test(label)) {
-        const r = evaluateDeliveryValue($(cells.get(1)!).text().trim());
+        const r = formatStudyModes(normalizeStudyModes($(cells.get(1)!).text().trim()));
         if (r) { deliveryResult = r; return false; }
       }
     });
   }
 
-  // Strategy C: <strong>Delivery</strong> Face to Face on campus  (label inline with value)
   if (!deliveryResult) {
     $("strong, b, h3, h4, h5, h6, span").each((_, el) => {
       const txt = $(el).text().trim();
       if (!DELIVERY_LABEL.test(txt)) return;
-      // Try next sibling text first
       const sibling = $(el).next();
       let candidate = sibling.text().trim();
-      // Fall back to remaining text in the parent (after this label)
-      if (!candidate || candidate.length > 80) {
+      if (!candidate || candidate.length > 120) {
         const parentText = $(el).parent().text().trim();
         const idx = parentText.toLowerCase().indexOf(txt.toLowerCase());
-        if (idx >= 0) candidate = parentText.slice(idx + txt.length).slice(0, 80).trim();
+        if (idx >= 0) candidate = parentText.slice(idx + txt.length).slice(0, 120).trim();
       }
-      const r = evaluateDeliveryValue(candidate);
+      const r = formatStudyModes(normalizeStudyModes(candidate));
       if (r) { deliveryResult = r; return false; }
     });
   }
 
   if (deliveryResult) return deliveryResult;
 
-  // ── PRIORITY 2: Sentence-level signals that explicitly describe delivery. ─
-  // Be CONSERVATIVE: many UK university pages mention "blended learning",
-  // "online learning resources", "online application" etc. as marketing
-  // language — these are NOT statements of delivery mode.
+  const sentenceModes = new Set<string>();
 
-  // Strong "Online" signals: course/programme is explicitly stated as online
-  if (/\b(?:fully|entirely|100%)\s+online\b/i.test(fullText)) return "Online";
-  if (/\b(?:course|programme?|degree|bachelor|master|diploma)\s+is\s+(?:delivered|taught|studied|offered)\s+(?:fully\s+)?online\b/i.test(fullText)) return "Online";
-  if (/\bdistance[- ]learning\s+(?:course|degree|programme?|study|delivery|format|option|mode)\b/i.test(fullText)) return "Online";
-  if (/\bdelivered\s+(?:fully\s+)?(?:online|remotely|by\s+distance\s+learning)\b/i.test(fullText)) return "Online";
+  if (/\b(?:fully|entirely|100%)\s+online\b/i.test(fullText)) sentenceModes.add("Online");
+  if (/\b(?:course|programme?|degree|bachelor|master|diploma)\s+is\s+(?:delivered|taught|studied|offered)\s+(?:fully\s+)?online\b/i.test(fullText)) sentenceModes.add("Online");
+  if (/\bdistance[- ]learning\s+(?:course|degree|programme?|study|delivery|format|option|mode)\b/i.test(fullText)) sentenceModes.add("Online");
+  if (/\bdelivered\s+(?:fully\s+)?(?:online|remotely|by\s+distance\s+learning)\b/i.test(fullText)) sentenceModes.add("Online");
 
-  // Strong "Blended" signals: explicit mode-of-delivery statement
-  if (/\b(?:study\s+)?mode\s*[:=]\s*blended\b/i.test(fullText)) return "Blended";
-  if (/\b(?:course|programme?|degree)\s+is\s+delivered\s+(?:in\s+)?(?:a\s+)?(?:blended|hybrid)(?:\s+(?:format|mode|delivery|manner))?\b/i.test(fullText)) return "Blended";
-  if (/\bblended\s+(?:delivery|mode|format|study)\b/i.test(fullText)) return "Blended";
-  if (/\bhybrid\s+(?:delivery|mode|format|study)\b/i.test(fullText)) return "Blended";
-  if (/\b(?:on[- ]?campus|face[- ]?to[- ]?face)\s+(?:and|or|\/)\s+online\s+(?:delivery|study|learning|teaching)\b/i.test(fullText)) return "Blended";
+  if (/\b(?:study\s+)?mode\s*[:=]\s*blended\b/i.test(fullText)) sentenceModes.add("Blended");
+  if (/\b(?:course|programme?|degree)\s+is\s+delivered\s+(?:in\s+)?(?:a\s+)?(?:blended|hybrid)(?:\s+(?:format|mode|delivery|manner))?\b/i.test(fullText)) sentenceModes.add("Blended");
+  if (/\bblended\s+(?:delivery|mode|format|study)\b/i.test(fullText)) sentenceModes.add("Blended");
+  if (/\bhybrid\s+(?:delivery|mode|format|study)\b/i.test(fullText)) sentenceModes.add("Blended");
 
-  // Strong "On Campus" signals
-  if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
-  if (/\b(?:course|programme?)\s+is\s+(?:delivered|taught)\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
+  if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) sentenceModes.add("On Campus");
+  if (/\b(?:course|programme?)\s+is\s+(?:delivered|taught)\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) sentenceModes.add("On Campus");
 
-  // ── Default ─────────────────────────────────────────────────────────────
-  // When no explicit delivery signal is present, assume "On Campus" — that's
-  // the historical default for traditional universities.
+  if (/\b(?:on[- ]?campus|face[- ]?to[- ]?face)\s+(?:and|or|\/)\s+online\s+(?:delivery|study|learning|teaching)\b/i.test(fullText)) {
+    sentenceModes.add("On Campus");
+    sentenceModes.add("Online");
+  }
+
+  const sentenceResult = formatStudyModes(Array.from(sentenceModes));
+  if (sentenceResult) return sentenceResult;
+
   return "On Campus";
 }
 
@@ -2662,13 +2752,23 @@ async function researchAndValidateCourseLinks(
 ): Promise<ResearchResult> {
   if (candidates.length === 0) return { links: [], validSamples: 0, rejectedSamples: 0, validExamples: [], rejectedExamples: [] };
 
+  const dedupedCandidates = dedupeCourseLinks(candidates, { dropGenericTitles: true });
+  if (dedupedCandidates.skippedDuplicates > 0 || dedupedCandidates.skippedGeneric > 0) {
+    addLog(job, "status", {
+      message: `Candidate cleanup removed ${dedupedCandidates.skippedDuplicates} duplicate links and ${dedupedCandidates.skippedGeneric} generic pages.`,
+      phase: "discover",
+    });
+  }
+
+  const cleanedCandidates = dedupedCandidates.links;
+
   // Phase 1: URL-based pre-filter (instant, zero cost)
-  const urlFiltered = candidates.filter((c) => urlLastSegmentHasDegreeQualifier(c.url));
-  const urlFilterRatio = urlFiltered.length / candidates.length;
+  const urlFiltered = cleanedCandidates.filter((c) => urlLastSegmentHasDegreeQualifier(c.url));
+  const urlFilterRatio = cleanedCandidates.length > 0 ? urlFiltered.length / cleanedCandidates.length : 0;
 
   // Decide which list to sample from — use URL-filtered when confident, otherwise all candidates
-  const workingList = (urlFilterRatio > 0.4 && urlFiltered.length >= 5) ? urlFiltered : candidates;
-  const removedByUrl = candidates.length - workingList.length;
+  const workingList = (urlFilterRatio > 0.4 && urlFiltered.length >= 5) ? urlFiltered : cleanedCandidates;
+  const removedByUrl = cleanedCandidates.length - workingList.length;
   if (removedByUrl > 0) {
     addLog(job, "status", {
       message: `URL analysis: ${workingList.length} candidate course pages identified, filtered out ${removedByUrl} non-course URLs`,
@@ -3766,10 +3866,8 @@ function shouldUseFastStaticScraper(params: {
   const linkCount = params.listingLinks.length;
   if (linkCount === 0 || linkCount > FAST_ENGINE_MAX_LINKS) return false;
   if (!looksStaticFriendly(params.listingUrl, params.listingHtml)) return false;
-  // At least 50 % of sampled pages should yield useful data statically.
-  // This keeps the fast engine available for small mostly static sites
-  // where one sampled page may be thinner than the others.
-  if (params.sampleCount > 0 && params.successCount < Math.max(1, Math.ceil(params.sampleCount * 0.5))) return false;
+  // At least 60 % of sampled pages yielded useful data statically
+  if (params.sampleCount > 0 && params.successCount < Math.max(1, Math.floor(params.sampleCount * 0.6))) return false;
   return true;
 }
 
@@ -3793,7 +3891,7 @@ async function runFastStaticScrape(
 
   job.totalFound = directLinks.length;
 
-  // Approval gate — auto proceed for small high confidence static sites.
+  // Approval gate — always ask for fast scrapes so user can verify the link count
   const highConfidenceFast = directLinks.length > 0 && directLinks.length <= 20;
   if (!highConfidenceFast) {
     const approvalSummary: ApprovalSummary = {
@@ -3883,8 +3981,26 @@ async function scrapeCourseBatch(
   uniPages?: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string },
   universityCountry?: string,
 ) {
-  const max = Math.min(courseLinks.length, maxCourses);
-  job.totalFound = courseLinks.length;
+  const initialBatch = dedupeCourseLinks(courseLinks, { dropGenericTitles: true });
+  if (initialBatch.skippedDuplicates > 0 || initialBatch.skippedGeneric > 0) {
+    addLog(job, "status", {
+      message: `Batch de dupe removed ${initialBatch.skippedDuplicates} duplicate links and ${initialBatch.skippedGeneric} generic pages before fetch.`,
+      phase: "extract",
+    });
+  }
+
+  const effectiveBatch = initialBatch.links;
+  const limit = job.fastMode ? FAST_MODE_MAX_COURSES : STANDARD_MODE_MAX_COURSES;
+  const max = Math.min(effectiveBatch.length, Math.min(maxCourses, limit));
+  if (effectiveBatch.length > max) {
+    addLog(job, "status", {
+      message: job.fastMode
+        ? `[FAST] Limiting fetch to top ${max} validated pages for speed.`
+        : `Limiting fetch to top ${max} validated pages to avoid runaway scrape time.`,
+      phase: "extract",
+    });
+  }
+  job.totalFound = effectiveBatch.length;
 
   // Pre-fetch shared data ONCE (parallel)
   const feeCache: UniversityFeeCache = { fetched: false };
@@ -3961,12 +4077,23 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
   // Fast mode log — browser-fallback message is deferred to per-URL decision below.
   if (job.fastMode) {
-    addLog(job, "status", { message: "FAST MODE — static only HTTP scraping enabled. Browser rendering is skipped unless you turn Fast Mode off.", phase: "fetch" });
+    addLog(job, "status", { message: "FAST MODE — browser automation disabled, using HTTP fetch only", phase: "fetch" });
   }
 
-  const tasks = courseLinks.slice(0, max).map((link, i) =>
+  const queuedUrls = new Set<string>();
+  const completedUrls = new Set<string>();
+  const retryQueuedUrls = new Set<string>();
+
+  const tasks = effectiveBatch.slice(0, max).map((link, i) =>
     sem(async () => {
       if (job.stopped) return;
+      const normalizedUrl = normalizeCourseUrl(link.url);
+      if (queuedUrls.has(normalizedUrl) || completedUrls.has(normalizedUrl)) {
+        addLog(job, "status", { message: `[skip duplicate] ${link.name.slice(0, 60)}`, phase: "fetch" });
+        return;
+      }
+      queuedUrls.add(normalizedUrl);
+
       const num = ++completed;
       addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
@@ -4166,6 +4293,8 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
         const hasDuration = !!cheerioData.duration;
 
+        completedUrls.add(normalizedUrl);
+
         if (hasFees || hasEnglish || hasDuration) {
           // Cheerio got useful data — queue for batch AI classification (cheap)
           const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
@@ -4183,7 +4312,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const isTimeout = /timeout|aborted|abort/i.test(msg);
         if (isTimeout) {
           // Don't count as a permanent error — will retry with lower concurrency
-          retryQueue.push({ url: link.url, name: link.name, index: i });
+          if (!retryQueuedUrls.has(normalizedUrl)) {
+            retryQueuedUrls.add(normalizedUrl);
+            retryQueue.push({ url: normalizedUrl, name: link.name, index: i });
+          }
           addLog(job, "status", { message: `[timeout → will retry] ${link.name}`, phase: "fetch" });
         } else {
           job.errors++;
@@ -4208,6 +4340,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         retryDone++;
         addLog(job, "status", { message: `[retry ${retryDone}/${retryQueue.length}] ${name}`, phase: "fetch" });
         try {
+          if (completedUrls.has(normalizeCourseUrl(url))) return;
           const cHtml = await fetchPage(url);
           const cheerioData = extractWithCheerio(cHtml, url, name, universityCountry);
           const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
@@ -4243,6 +4376,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
             if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
           }
+          completedUrls.add(normalizeCourseUrl(url));
           const courseData = cheerioToCourseData(cheerioData, name, url);
           const saved = await stageCourse(courseData, uniId, jobId, job);
           if (saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
@@ -4605,7 +4739,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           return;
         }
         addLog(job, "status", {
-          message: `[ENGINE] Fast Static Scraper declined — ${directLinks.length > FAST_ENGINE_MAX_LINKS ? `too many links (${directLinks.length})` : "sampled pages were not static-friendly enough"}. Switching to Advanced Smart Scraper.`,
+          message: `[ENGINE] Fast engine declined — too many links (${directLinks.length}) or site not static-friendly enough. Switching to Advanced Smart Scraper.`,
           phase: "discover",
         });
       }
@@ -4720,6 +4854,15 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       courseLinks = result.links;
       researchStats = { validSamples: result.validSamples, rejectedSamples: result.rejectedSamples, validExamples: result.validExamples, rejectedExamples: result.rejectedExamples };
 
+      const dedupedValidated = dedupeCourseLinks(courseLinks, { dropGenericTitles: true });
+      if (dedupedValidated.skippedDuplicates > 0 || dedupedValidated.skippedGeneric > 0) {
+        addLog(job, "status", {
+          message: `Validated cleanup removed ${dedupedValidated.skippedDuplicates} duplicate links and ${dedupedValidated.skippedGeneric} generic pages.`,
+          phase: "discover",
+        });
+      }
+      courseLinks = dedupedValidated.links;
+
       // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
       // probe each known category slug to discover courses that only appear under specific filters
       if (/\/course-list|\/course-finder|\/courses?\/?$/i.test(new URL(resolvedUrl).pathname)) {
@@ -4749,6 +4892,15 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         estimatedMinutes: estMinutes,
       };
 
+      const finalValidated = dedupeCourseLinks(courseLinks, { dropGenericTitles: true });
+      if (finalValidated.skippedDuplicates > 0 || finalValidated.skippedGeneric > 0) {
+        addLog(job, "status", {
+          message: `Final cleanup removed ${finalValidated.skippedDuplicates} duplicate links and ${finalValidated.skippedGeneric} generic pages.`,
+          phase: "discover",
+        });
+      }
+      courseLinks = finalValidated.links;
+
       if (highConfidence) {
         addLog(job, "status", {
           message: `High confidence: ${researchStats.validSamples}/${sampleTotal} samples valid (${Math.round(confidenceRatio * 100)}%). Auto-proceeding with ${courseLinks.length} courses (~${estMinutes} min).`,
@@ -4769,7 +4921,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
 
       addLog(job, "status", {
-        message: `[SMART] Fetching ${courseLinks.length} validated course pages (browser-first for JS-heavy, static-first for the rest)...`,
+        message: `[SMART] Fetching ${courseLinks.length} validated course pages after de dupe (browser-first for JS-heavy, static-first for the rest)...`,
         phase: "extract",
         totalCourses: courseLinks.length,
       });
@@ -4861,7 +5013,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     job.url = url;
     job.fastMode = !!fastMode;
     scrapeJobs.set(jobId, job);
-    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (static only)" : ""}` });
+    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (browser disabled)" : ""}` });
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
@@ -4910,7 +5062,14 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
     await Promise.all(config.courseLinks.slice(0, max).map((link, i) =>
       sem(async () => {
         if (job.stopped) return;
-        const num = ++completed;
+        const normalizedUrl = normalizeCourseUrl(link.url);
+      if (queuedUrls.has(normalizedUrl) || completedUrls.has(normalizedUrl)) {
+        addLog(job, "status", { message: `[skip duplicate] ${link.name.slice(0, 60)}`, phase: "fetch" });
+        return;
+      }
+      queuedUrls.add(normalizedUrl);
+
+      const num = ++completed;
         addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
         try {
