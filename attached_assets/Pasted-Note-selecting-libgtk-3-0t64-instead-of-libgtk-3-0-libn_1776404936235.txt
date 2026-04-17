@@ -1,0 +1,48 @@
+Note, selecting 'libgtk-3-0t64' instead of 'libgtk-3-0'
+libnss3 is already the newest version (2:3.98-1ubuntu0.1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.9).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.1).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libpangocairo-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libgtk-3-0t64 is already the newest version (3.24.41-4ubuntu1.3).
+libgdk-pixbuf2.0-0 is already the newest version (2.40.2-3build2).
+fonts-liberation is already the newest version (1:2.1.5-3).
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Package libasound2 is a virtual package provided by:
+  liboss4-salsa-asound2 4.2-build2020-1ubuntu3.1
+  libasound2t64 1.2.11-1ubuntu0.2 (= 1.2.11-1ubuntu0.2)
+You should explicitly select one to install.
+
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.2).
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+=== 6. Clone repo ===
+Repo already exists — pulling latest changes
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 8 (delta 2), reused 1 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 12.62 MiB | 9.33 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   90b75e7..07d92ed  patch/fast-scraper-tuning-20260417 -> origin/patch/fast-scraper-tuning-20260417
+Updating 8f19687..a43a192
+error: The following untracked working tree files would be overwritten by merge:
+        deploy.sh
+Please move or remove them before you merge.
+Aborting
+root@university-and-course-data:~# 
