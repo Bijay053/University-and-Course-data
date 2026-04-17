@@ -585,7 +585,7 @@ export default function Scraping() {
                 className="mt-0.5 w-4 h-4 accent-amber-600"
               />
               <div className="flex-1 text-xs">
-                <div className="font-medium text-amber-900">Fast Mode (skip browser automation)</div>
+                <div className="font-medium text-amber-900">Fast Mode (prefer static scraping)</div>
                 <div className="text-amber-700 mt-0.5">
                   5–10× faster (~1 min for 1000 pages). May miss JS-rendered fields on sites like VIT, Newcastle, UEL, RMIT (International toggle, expandable Entry Requirements). Recommended for static-HTML sites.
                 </div>

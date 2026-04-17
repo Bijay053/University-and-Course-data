@@ -12,6 +12,11 @@ import {
   hasEnglishTestKeyword,
   type EnglishRequirementResult,
 } from "../lib/english-requirements.js";
+import {
+  parseAcademicRequirementsFromText,
+  mergeAcademicRequirementResults,
+  pickPrimaryAcademicRequirement,
+} from "../lib/academic-requirements.js";
 
 const router: IRouter = Router();
 
@@ -3787,22 +3792,30 @@ async function runFastStaticScrape(
   job.totalFound = directLinks.length;
 
   // Approval gate — always ask for fast scrapes so user can verify the link count
-  const approvalSummary: ApprovalSummary = {
-    totalCourses: directLinks.length,
-    validSamples: directLinks.length,
-    rejectedSamples: 0,
-    sampleTotal: directLinks.length,
-    validExamples: directLinks.slice(0, 3).map((l) => l.name),
-    rejectedExamples: [],
-    estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
-  };
+  const highConfidenceFast = directLinks.length > 0 && directLinks.length <= 20;
+  if (!highConfidenceFast) {
+    const approvalSummary: ApprovalSummary = {
+      totalCourses: directLinks.length,
+      validSamples: directLinks.length,
+      rejectedSamples: 0,
+      sampleTotal: directLinks.length,
+      validExamples: directLinks.slice(0, 3).map((l) => l.name),
+      rejectedExamples: [],
+      estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
+    };
 
-  const proceed = await waitForApproval(job, approvalSummary);
-  if (!proceed || job.stopped) {
-    addLog(job, "status", { message: "[FAST] Bulk fetch cancelled by user.", phase: "done" });
-    job.status = "stopped";
-    job.completedAt = Date.now();
-    return;
+    const proceed = await waitForApproval(job, approvalSummary);
+    if (!proceed || job.stopped) {
+      addLog(job, "status", { message: "[FAST] Bulk fetch cancelled by user.", phase: "done" });
+      job.status = "stopped";
+      job.completedAt = Date.now();
+      return;
+    }
+  } else {
+    addLog(job, "status", {
+      message: `[FAST] High confidence simple site — auto proceeding with ${directLinks.length} direct course links`,
+      phase: "discover",
+    });
   }
 
   addLog(job, "status", {
@@ -3848,17 +3861,15 @@ function makeSemaphore(concurrency: number) {
  * Used for per-URL browser escalation on sites NOT in the JS_HEAVY_DOMAINS list.
  */
 function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): boolean {
-  // No course name at all → likely fully JS-rendered, worth trying browser.
-  if (!data.courseName) return true;
-  const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
-  // If no English test found at all, ALWAYS try browser — the requirement block is
-  // almost certainly behind a JS-rendered tab / accordion (e.g. ASA, VU, UEL).
-  if (!hasEnglish) return true;
-  const hasFee      = !!data.internationalFee;
+  const hasName = !!data.courseName;
+  const hasDegree = !!data.degreeLevel;
   const hasDuration = !!data.duration;
-  const hasDegree   = !!data.degreeLevel;
-  // Two or more key fields found → static extraction is working; no browser needed.
-  return [hasFee, hasEnglish, hasDuration, hasDegree].filter(Boolean).length < 2;
+  const hasFee = !!data.internationalFee;
+  const hasEnglish = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
+
+  if (!hasName) return true;
+  if (!hasDegree && !hasDuration && !hasFee && !hasEnglish) return true;
+  return false;
 }
 
 async function scrapeCourseBatch(

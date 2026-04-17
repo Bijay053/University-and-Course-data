@@ -35,6 +35,10 @@ const INTERNATIONAL_SELECTORS = [
 const REQUIREMENTS_TAB_SELECTORS = [
   'a:has-text("Entry Requirements")',
   'button:has-text("Entry Requirements")',
+  'a:has-text("Requirements")',
+  'button:has-text("Requirements")',
+  'a:has-text("English Requirements")',
+  'button:has-text("English Requirements")',
   '[href*="entry-requirements"]',
   '[href*="entryrequirements"]',
   'a:has-text("Admission Requirements")',
@@ -157,6 +161,26 @@ export async function fetchPageWithBrowser(
         }
       }
 
+      // Fallback: try generic requirement-like controls if specific selectors failed
+      if (!tabClicked) {
+        const genericTargets = await page.$$("button, a, [role='tab'], summary");
+        for (const el of genericTargets) {
+          try {
+            const txt = ((await el.innerText()) || "").toLowerCase().trim();
+            if (!txt) continue;
+            if (/(entry|admission|english|language).*requirement|requirements?$|english proficiency/.test(txt)) {
+              await el.click();
+              await page.waitForTimeout(1200);
+              tabClicked = true;
+              clicksPerformed.push("requirements_tab_generic");
+              break;
+            }
+          } catch {
+            // continue
+          }
+        }
+      }
+
       // ── Step 3: Expand accordion sections ──────────────────────────────────
       if (tabClicked && expandAccordions) {
         let expanded = 0;
@@ -198,12 +222,17 @@ const JS_HEAVY_DOMAINS = [
   "newcastle.edu.au",
   "rmit.edu.au",
   "uts.edu.au",
+  "vu.edu.au",
 ];
 
 export function siteNeedsBrowser(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return JS_HEAVY_DOMAINS.some((d) => host === d || host.endsWith("." + d));
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (JS_HEAVY_DOMAINS.some((d) => host === d || host.endsWith("." + d))) return true;
+    if (/course|program|study|degrees/.test(path) && /(entry-requirements|admission|english|apply)/.test(path)) return true;
+    return false;
   } catch {
     return false;
   }
