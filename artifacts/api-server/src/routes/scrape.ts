@@ -6,6 +6,26 @@ import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
 
 const router: IRouter = Router();
 
+// ── IELTS debug helpers (targeted at two ASA courses) ───────────────────────
+function shouldDebugIelts(courseName?: string | null) {
+  if (!courseName) return false;
+  const n = courseName.toLowerCase();
+  return n.includes("bachelor of professional accounting") || n.includes("bachelor of business");
+}
+function debugIelts(courseName: string | undefined | null, stage: string, payload: any) {
+  if (!shouldDebugIelts(courseName)) return;
+  try { console.log(`[IELTS-DEBUG] ${stage} :: ${courseName} ::`, JSON.stringify(payload)); }
+  catch { console.log(`[IELTS-DEBUG] ${stage} :: ${courseName} ::`, payload); }
+}
+function snippetAroundIelts(rawText: string | null | undefined): string {
+  const text = rawText || "";
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf("ielts");
+  if (idx === -1) return "(no 'ielts' keyword found)";
+  return text.slice(Math.max(0, idx - 80), idx + 320).replace(/\s+/g, " ").trim();
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
 function geminiUrl(model: string) {
@@ -2304,6 +2324,16 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
 
   const { score: completeness, missing } = computeCompleteness(courseData);
 
+  // PROBE-G: exact payload entering the DB insert
+  debugIelts(courseData.courseName, "G-db-insert-payload", {
+    ieltsOverall: courseData.ieltsOverall,
+    ieltsListening: courseData.ieltsListening,
+    ieltsReading: courseData.ieltsReading,
+    ieltsWriting: courseData.ieltsWriting,
+    ieltsSpeaking: courseData.ieltsSpeaking,
+    missing,
+  });
+
   await db.insert(scrapedCoursesTable).values({
     scrapeJobId: jobId,
     universityId: uniId,
@@ -3852,6 +3882,13 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
         const cheerioData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
 
+        // PROBE-A: what cheerio found + what the page text looks like around "IELTS"
+        debugIelts(link.name, "A-after-cheerio", {
+          ieltsOverall: cheerioData.ieltsOverall,
+          wasBrowser: wasBrowserFetch,
+          textSnippet: snippetAroundIelts(cheerio.load(cHtml)("body").text()),
+        });
+
         // Only enrich if cheerio is missing critical fields (avoids extra network round-trips for most courses)
         const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
         if (needsEnrich) {
@@ -3913,6 +3950,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (cheerioData.toeflOverall) addLog(job, "status", { message: `[TOEFL] static page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
         }
 
+        // PROBE-B: after Tier-1/2 — what do we have before shared fallback?
+        debugIelts(link.name, "B-after-tier1-2", { ieltsOverall: cheerioData.ieltsOverall, pteOverall: cheerioData.pteOverall });
+
         // If the university fee page is explicitly an international fees page, always
         // consult it even when the course page already has a fee (which may be domestic).
         const feePageIsInternational = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
@@ -3973,6 +4013,13 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           extractIntakeMonths(uniReqsText, cheerioData);
         }
 
+        // PROBE-C: after Tier-3 shared fallback — did the shared page contribute?
+        debugIelts(link.name, "C-after-shared-fallback", {
+          ieltsOverall: cheerioData.ieltsOverall,
+          uniReqsTextAvailable: !!uniReqsText,
+          sharedTextSnippet: snippetAroundIelts(uniReqsText),
+        });
+
         // Apply the university-level cached English requirements (resolved once before this loop,
         // including any AI-extracted values when static parsing returned nothing).
         // Guard is per-field: even if PTE was found on the course page, we still fill missing IELTS.
@@ -3997,6 +4044,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (!(cheerioData as any).duolingoOverall && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
         }
 
+        // PROBE-D: final IELTS value after ALL extraction tiers + cache
+        debugIelts(link.name, "D-after-all-tiers-and-cache", {
+          ieltsOverall: cheerioData.ieltsOverall,
+          cachedIelts: cachedEnglishReqs?.ieltsOverall ?? null,
+        });
+
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
         const hasDuration = !!cheerioData.duration;
@@ -4004,9 +4057,13 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         if (hasFees || hasEnglish || hasDuration) {
           // Cheerio got useful data — queue for batch AI classification (cheap)
           const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
+          // PROBE-E: value after cheerioToCourseData conversion (catches mapping drops)
+          debugIelts(link.name, "E-courseData-to-classify", { ieltsOverall: courseData.ieltsOverall });
           classifyQueue.push({ index: i, name: link.name, existing: courseData, data: courseData });
         } else {
           // Cheerio got nothing — queue for full AI extraction (deferred)
+          // PROBE-E (full AI path): IELTS still missing before full AI queue
+          debugIelts(link.name, "E-into-fullAI-queue", { ieltsOverall: cheerioData.ieltsOverall ?? "null — going to full AI" });
           fullAIQueue.push({ index: i, name: link.name, html: cHtml, cheerioData });
         }
       } catch (err) {
@@ -4052,13 +4109,29 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             const feePageIsInternational = /international/i.test(uniPages.feePage);
             await extractFeeFromUniversityPage(uniPages.feePage, name, cheerioData, feeCache, false, feePageIsInternational);
           }
-          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall)) {
+          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall)) {
             extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
-            if (cachedEnglishReqs) {
-              if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
-              if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
-              if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+          }
+          if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall)) {
+            extractEnglishRequirements(uniReqsText, cheerioData);
+          }
+          // Strong parsers on shared requirements text
+          if (uniReqsText) {
+            if (!cheerioData.ieltsOverall) { const r = extractIeltsFromText(uniReqsText); if (r.overall) applyIeltsResult(cheerioData, r); }
+            if (!cheerioData.pteOverall)   { const r = extractPteFromText(uniReqsText);   if (r.overall) applyPteResult(cheerioData, r); }
+            if (!cheerioData.toeflOverall) { const r = extractToeflFromText(uniReqsText); if (r.overall) applyToeflResult(cheerioData, r); }
+          }
+          // Per-field cache fill (same logic as main batch)
+          if (cachedEnglishReqs) {
+            if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
+              cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
+              cheerioData.ieltsReading = cachedEnglishReqs.ieltsReading || undefined;
+              cheerioData.ieltsWriting = cachedEnglishReqs.ieltsWriting || undefined;
+              cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
+              cheerioData.ieltsSpeaking = cachedEnglishReqs.ieltsSpeaking || undefined;
             }
+            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
           }
           const courseData = cheerioToCourseData(cheerioData, name, url);
           const saved = await stageCourse(courseData, uniId, jobId, job);
@@ -4092,6 +4165,8 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (extra.degreeLevel && !item.data.degreeLevel) item.data.degreeLevel = extra.degreeLevel;
           if (extra.description && !item.data.description) item.data.description = extra.description;
         }
+        // PROBE-F: value entering stageCourse — proves whether Phase A merge wipes IELTS
+        debugIelts(item.data.courseName, "F-before-stageCourse-phaseA", { ieltsOverall: item.data.ieltsOverall });
         const saved = await stageCourse(item.data, uniId, jobId, job);
         if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
         else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
