@@ -1,0 +1,627 @@
+[INFO] Scraping started in background...
+[INFO] Scraping https://www.vu.edu.au/vu-sydney...
+[INFO] Using university: ECA-VU (ID: 19) — FAST MODE (browser disabled)
+[INFO] Fetching https://www.vu.edu.au/vu-sydney...
+[INFO] Discovering university-level fee & requirements pages...
+[INFO] Found university requirements page via probe: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Discovered university-level pages: feePage: https://www.vu.edu.au/fees, requirementsPage: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Analyzing page with AI (1 call)...
+[INFO] Phase 1: Discovering candidate course URLs from all sources...
+[INFO] Sitemap index: checking 3 sub-sitemaps...
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=1 → 442 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=2 → 58 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=3 → 49 courses
+[INFO] Sitemap: found 549 course URLs total
+[INFO] Sitemap found 549 candidate URLs. Analyzing to identify real course pages...
+[INFO] Phase 2: Researching 549 candidates — comparing pages to find genuine course pages before fetching...
+[INFO] URL analysis: 428 candidate course pages identified, filtered out 121 non-course URLs
+[INFO] Phase 2: Researching 428 candidates — sampling 12 pages to confirm genuine course pages...
+[INFO] Research complete: 0/12 sampled pages are genuine course pages
+[INFO] ⚠ WARNING: Content validation failed for all 12 samples, but URL analysis found 428 degree-qualified URLs. Proceeding with URL-filtered list — manual review recommended.
+[WAITING] Research complete. Found 428 course pages to fetch. Please review and confirm.
+[INFO] User confirmed — starting bulk course fetch...
+[INFO] Phase 3: Fetching 428 validated course pages...
+[INFO] Using university requirements page: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO] FAST MODE — browser automation disabled, using HTTP fetch only
+[1/300] Fetching 1/300: Certificate Iv In Tertiary Preparation 22582vic
+[2/300] Fetching 2/300: Certificate Iii In Enabling Technologies 22588vic
+[3/300] Fetching 3/300: Certificate Iii In Emerging Technologies 22589vic
+[4/300] Fetching 4/300: Diploma Of Teacher Education Preparation 22602vic
+[5/300] Fetching 5/300: Certificate Iv In Cyber Security 22603vic
+[6/300] Fetching 6/300: Certificate Ii In Building And Construction Pre Apprenticeship 22614vic
+[7/300] Fetching 7/300: Course In Safe Use Of Machinery For Technology Teaching 22623vic
+[8/300] Fetching 8/300: Advanced Diploma Of Building Design Architectural 22627vic
+[9/300] Fetching 9/300: Course In Initial Eal 22636vic
+[10/300] Fetching 10/300: Course In Eal 22637vic
+[11/300] Fetching 11/300: Certificate I In Eal Access 22638vic
+[12/300] Fetching 12/300: Certificate Ii In Eal Access 22639vic
+[13/300] Fetching 13/300: Certificate Iii In Eal Access 22640vic
+[14/300] Fetching 14/300: Certificate Iv In Eal Access 22641vic
+[15/300] Fetching 15/300: Certificate Ii In Eal Employment 22642vic
+[16/300] Fetching 16/300: Certificate Iii In Eal Employment 22643vic
+[17/300] Fetching 17/300: Certificate Iii In Eal Further Study 22645vic
+[18/300] Fetching 18/300: Certificate Iv In Eal Further Study 22646vic
+[19/300] Fetching 19/300: Bachelor Of Arts Abab
+[20/300] Fetching 20/300: Bachelor Of Community Development Abcd
+[21/300] Fetching 21/300: Bachelor Of Criminal Justice Abcj
+[22/300] Fetching 22/300: Bachelor Of Criminal Justice And Psychological Studies Abcy
+[23/300] Fetching 23/300: Bachelor Of Exercise Science Sport Practice Abhd
+[24/300] Fetching 24/300: Bachelor Of Exercise Science Clinical Practice Abhe
+[25/300] Fetching 25/300: Bachelor Of Psychological Studies Abpa
+[26/300] Fetching 26/300: Bachelor Of Psychological Studies Bachelor Of Business Abpb
+[27/300] Fetching 27/300: Bachelor Of Psychology Honours Abpc
+[28/300] Fetching 28/300: Bachelor Of Screen Media Absn
+[29/300] Fetching 29/300: Bachelor Of Social Work Absw
+[30/300] Fetching 30/300: Bachelor Of Youth Work And Criminal Justice Abyc
+[31/300] Fetching 31/300: Bachelor Of Youth Work Abyw
+[32/300] Fetching 32/300: Graduate Diploma In Digital Media Agdm
+[33/300] Fetching 33/300: Graduate Diploma In International Community Development Agid
+[34/300] Fetching 34/300: Graduate Diploma In Counselling Agpd
+[35/300] Fetching 35/300: Bachelor Of Psychological Studies Honours Ahpa
+[36/300] Fetching 36/300: Master Of Applied Psychology Clinical Psychology Amal
+[37/300] Fetching 37/300: Master Of International Community Development Amcd
+[38/300] Fetching 38/300: Master Of Digital Media Amdm
+[39/300] Fetching 39/300: Master Of Clinical Exercise Science And Rehabilitation Amep
+[40/300] Fetching 40/300: Master Of Counselling Ampe
+[41/300] Fetching 41/300: Graduate Certificate In Digital Content Creation Atdc
+[42/300] Fetching 42/300: Graduate Certificate In Digital Learning And Teaching Atdi
+[43/300] Fetching 43/300: Graduate Certificate In Digital Media Atdm
+[44/300] Fetching 44/300: Graduate Certificate In International Community Development Atid
+[45/300] Fetching 45/300: Bachelor Of Accounting Bbaq
+[46/300] Fetching 46/300: Bachelor Of Business Bbns
+[47/300] Fetching 47/300: Graduate Diploma In Business Bgab
+[48/300] Fetching 48/300: Graduate Diploma In Financial Planning Bgfp
+[49/300] Fetching 49/300: Graduate Diploma In Business Administration Bgpb
+[50/300] Fetching 50/300: Bachelor Of Laws Blaw
+[51/300] Fetching 51/300: Bachelor Of Laws Graduate Entry Blge
+[52/300] Fetching 52/300: Master Of Business Administration Global Bmag
+[53/300] Fetching 53/300: Master Of Professional Accounting Bmaq
+[54/300] Fetching 54/300: Master Of Business Analytics Bmbu
+[55/300] Fetching 55/300: Master Of Enterprise Resource Planning Bmen
+[56/300] Fetching 56/300: Master Of Financial Planning Bmfp
+[57/300] Fetching 57/300: Master Of Marketing Bmkt
+[58/300] Fetching 58/300: Master Of Business Administration Bmpf
+[59/300] Fetching 59/300: Master Of Supply Chain Management Bmsu
+[60/300] Fetching 60/300: Certificate Iii In Business Bsb30120
+[ERROR] Certificate Iv In Tertiary Preparation 22582vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-tertiary-preparation-22582vic
+[61/300] Fetching 61/300: Certificate Iv In Business Bsb40120
+[ERROR] Master Of Applied Psychology Clinical Psychology Amal — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-applied-psychology-clinical-psychology-amal
+[62/300] Fetching 62/300: Certificate Iv In Leadership And Management Bsb40520
+[ERROR] Bachelor Of Social Work Absw — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-social-work-absw
+[63/300] Fetching 63/300: Certificate Iv In Legal Services Bsb40620
+[ERROR] Certificate Ii In Eal Employment 22642vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-eal-employment-22642vic
+[64/300] Fetching 64/300: Diploma Of Business Bsb50120
+[ERROR] Certificate Iii In Emerging Technologies 22589vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-emerging-technologies-22589vic
+[65/300] Fetching 65/300: Diploma Of Leadership And Management Bsb50420
+[ERROR] Graduate Diploma In Counselling Agpd — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-counselling-agpd
+[66/300] Fetching 66/300: Diploma Of Project Management Bsb50820
+[ERROR] Certificate Iii In Eal Employment 22643vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-eal-employment-22643vic
+[67/300] Fetching 67/300: Graduate Certificate In Business Analytics Btbi
+[ERROR] Bachelor Of Psychological Studies Abpa — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-psychological-studies-abpa
+[68/300] Fetching 68/300: Graduate Certificate In Business Btbu
+[ERROR] Certificate Iii In Eal Further Study 22645vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-eal-further-study-22645vic
+[69/300] Fetching 69/300: Graduate Certificate In Change Management Btcm
+[ERROR] Graduate Certificate In Digital Learning And Teaching Atdi — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-digital-learning-and-teaching-atdi
+[70/300] Fetching 70/300: Graduate Certificate In Enterprise And Resource Planning Systems Bten
+[ERROR] Course In Initial Eal 22636vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/course-in-initial-eal-22636vic
+[71/300] Fetching 71/300: Graduate Certificate In Finance Btff
+[ERROR] Certificate Ii In Eal Access 22639vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-eal-access-22639vic
+[72/300] Fetching 72/300: Graduate Certificate In Financial Planning Btfp
+[ERROR] Certificate Iv In Cyber Security 22603vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-cyber-security-22603vic
+[73/300] Fetching 73/300: Graduate Certificate In Marketing Btkm
+[ERROR] Bachelor Of Community Development Abcd — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-community-development-abcd
+[74/300] Fetching 74/300: Graduate Certificate In Business Administration Btpf
+[ERROR] Graduate Certificate In Finance Btff — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-finance-btff
+[75/300] Fetching 75/300: Graduate Certificate In Supply Chain Management Btsp
+[ERROR] Bachelor Of Psychology Honours Abpc — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-psychology-honours-abpc
+[76/300] Fetching 76/300: Graduate Certificate In Transport Systems Btts
+[ERROR] Bachelor Of Criminal Justice And Psychological Studies Abcy — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-criminal-justice-and-psychological-studies-abcy
+[77/300] Fetching 77/300: Certificate Iii In Early Childhood Education And Care Chc30121
+[ERROR] Certificate Iii In Business Bsb30120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-business-bsb30120
+[78/300] Fetching 78/300: Certificate Iii In Individual Support Chc33021
+[ERROR] Bachelor Of Psychological Studies Bachelor Of Business Abpb — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-psychological-studies-bachelor-of-business-abpb
+[79/300] Fetching 79/300: Certificate Iv In School Based Education Support Chc40221
+[ERROR] Bachelor Of Exercise Science Sport Practice Abhd — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-exercise-science-sport-practice-abhd
+[80/300] Fetching 80/300: Certificate Iv In Youth Work Chc40421
+[ERROR] Bachelor Of Laws Graduate Entry Blge — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-graduate-entry-blge
+[81/300] Fetching 81/300: Certificate Iv In Ageing Support Chc43015
+[ERROR] Graduate Diploma In Financial Planning Bgfp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-financial-planning-bgfp
+[82/300] Fetching 82/300: Certificate Iv In Disability Support Chc43121
+[ERROR] Certificate Iv In Eal Further Study 22646vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-eal-further-study-22646vic
+[83/300] Fetching 83/300: Certificate Iv In Alcohol And Other Drugs Chc43215
+[ERROR] Bachelor Of Laws Blaw — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-blaw
+[84/300] Fetching 84/300: Certificate Iv In Mental Health Chc43315
+[ERROR] Bachelor Of Arts Abab — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-arts-abab
+[85/300] Fetching 85/300: Diploma Of Early Childhood Education And Care Chc50121
+[ERROR] Graduate Diploma In Business Bgab — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-business-bgab
+[86/300] Fetching 86/300: Diploma Of Community Services Chc52021
+[ERROR] Master Of International Community Development Amcd — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-international-community-development-amcd
+[87/300] Fetching 87/300: Assist Clients With Medication Skill Set Chcss00070
+[ERROR] Master Of Enterprise Resource Planning Bmen — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-enterprise-resource-planning-bmen
+[88/300] Fetching 88/300: Alcohol And Other Drugs Skill Set Chcss00093
+[ERROR] Master Of Supply Chain Management Bmsu — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-supply-chain-management-bmsu
+[89/300] Fetching 89/300: Prepare To Work Safely In The Construction Industry Coniss012
+[ERROR] Bachelor Of Exercise Science Clinical Practice Abhe — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-exercise-science-clinical-practice-abhe
+[90/300] Fetching 90/300: Certificate Ii In Drainage Cpc20720
+[ERROR] Master Of Counselling Ampe — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-counselling-ampe
+[91/300] Fetching 91/300: Certificate Iii In Signs And Graphics Cpc30216
+[ERROR] Bachelor Of Business Bbns — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-business-bbns
+[92/300] Fetching 92/300: Certificate Iii In Carpentry Cpc30220
+[ERROR] Graduate Diploma In Digital Media Agdm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-digital-media-agdm
+[93/300] Fetching 93/300: Certificate Iii In Plumbing Cpc32420
+[ERROR] Bachelor Of Accounting Bbaq — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-accounting-bbaq
+[94/300] Fetching 94/300: Certificate Iii In Bricklaying And Blocklaying Cpc33020
+[ERROR] Course In Eal 22637vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/course-in-eal-22637vic
+[95/300] Fetching 95/300: Certificate Iv In Plumbing And Services Cpc40920
+[ERROR] Certificate Ii In Building And Construction Pre Apprenticeship 22614vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-building-and-construction-pre-apprenticeship-22614vic
+[96/300] Fetching 96/300: Diploma Of Building And Construction Building Cpc50220
+[ERROR] Master Of Business Analytics Bmbu — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-business-analytics-bmbu
+[97/300] Fetching 97/300: Advanced Diploma Of Building Surveying Cpc60121
+[ERROR] Graduate Certificate In International Community Development Atid — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-international-community-development-atid
+[98/300] Fetching 98/300: Bachelor Of Early Childhood Education And Leadership Ebcl
+[ERROR] Certificate Iii In Enabling Technologies 22588vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-enabling-technologies-22588vic
+[99/300] Fetching 99/300: Bachelor Of Early Childhood Education Ebec
+[ERROR] Course In Safe Use Of Machinery For Technology Teaching 22623vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/course-in-safe-use-of-machinery-for-technology-teaching-22623vic
+[100/300] Fetching 100/300: Bachelor Of Education P 12 Ebed
+[ERROR] Certificate I In Eal Access 22638vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-i-in-eal-access-22638vic
+[101/300] Fetching 101/300: Bachelor Of Education Primary Ebpe
+[ERROR] Certificate Iii In Eal Access 22640vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-eal-access-22640vic
+[102/300] Fetching 102/300: Bachelor Of Education Studies Ebst
+[ERROR] Graduate Certificate In Digital Content Creation Atdc — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-digital-content-creation-atdc
+[103/300] Fetching 103/300: Bachelor Of Youth Work Bachelor Of Sport Management Ebys
+[ERROR] Master Of Business Administration Global Bmag — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-business-administration-global-bmag
+[104/300] Fetching 104/300: Bachelor Of Science Master Of Teaching Secondary Education Ecst
+[ERROR] Bachelor Of Youth Work And Criminal Justice Abyc — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-youth-work-and-criminal-justice-abyc
+[105/300] Fetching 105/300: Diploma Of Education Studies Edes
+[ERROR] Master Of Clinical Exercise Science And Rehabilitation Amep — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-clinical-exercise-science-and-rehabilitation-amep
+[106/300] Fetching 106/300: Graduate Diploma In Block Teaching Egbl
+[ERROR] Master Of Marketing Bmkt — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-marketing-bmkt
+[107/300] Fetching 107/300: Graduate Diploma In Early Childhood Education Egec
+[ERROR] Master Of Financial Planning Bmfp — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-financial-planning-bmfp
+[108/300] Fetching 108/300: Graduate Diploma In Education Eged
+[ERROR] Master Of Business Administration Bmpf — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-business-administration-bmpf
+[109/300] Fetching 109/300: Master Of Applied Teaching Secondary Education Emat
+[ERROR] Bachelor Of Criminal Justice Abcj — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-criminal-justice-abcj
+[110/300] Fetching 110/300: Master Of Education Emed
+[ERROR] Bachelor Of Psychological Studies Honours Ahpa — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-psychological-studies-honours-ahpa
+[111/300] Fetching 111/300: Master Of Teaching Secondary Education Emes
+[ERROR] Graduate Diploma In Block Teaching Egbl — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-block-teaching-egbl
+[112/300] Fetching 112/300: Master Of Teaching Primary Education Empe
+[ERROR] Certificate Iv In Leadership And Management Bsb40520 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-leadership-and-management-bsb40520
+[113/300] Fetching 113/300: Graduate Certificate In Block Teaching Etbl
+[ERROR] Bachelor Of Youth Work Abyw — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-youth-work-abyw
+[114/300] Fetching 114/300: Graduate Certificate In Early Childhood Education Etec
+[ERROR] Master Of Professional Accounting Bmaq — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-professional-accounting-bmaq
+[115/300] Fetching 115/300: Graduate Certificate In Education Eted
+[ERROR] Diploma Of Leadership And Management Bsb50420 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-leadership-and-management-bsb50420
+[116/300] Fetching 116/300: Graduate Certificate In Performance Based Building Fire Codes Etqb
+[ERROR] Graduate Certificate In Change Management Btcm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-change-management-btcm
+[117/300] Fetching 117/300: Undergraduate Certificate In Early Childhood Education Euec
+[ERROR] Graduate Certificate In Financial Planning Btfp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-financial-planning-btfp
+[118/300] Fetching 118/300: Undergraduate Certificate In Education P12 Stem Eued
+[ERROR] Bachelor Of Screen Media Absn — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-screen-media-absn
+[119/300] Fetching 119/300: Undergraduate Certificate In Education Studies Eues
+[ERROR] Certificate Iv In Legal Services Bsb40620 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-legal-services-bsb40620
+[120/300] Fetching 120/300: Certificate Iv In Accounting And Bookkeeping Fns40222
+[ERROR] Graduate Certificate In Business Analytics Btbi — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-business-analytics-btbi
+[121/300] Fetching 121/300: Diploma Of Accounting Fns50222
+[ERROR] Graduate Diploma In Business Administration Bgpb — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-business-administration-bgpb
+[122/300] Fetching 122/300: Bas Agent Registration Skill Set Fnsss00004
+[ERROR] Graduate Certificate In Transport Systems Btts — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-transport-systems-btts
+[123/300] Fetching 123/300: Tax Law For Tax Agents Skill Set Tax Documentation Fnsss00008
+[ERROR] Certificate Iv In Eal Access 22641vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-eal-access-22641vic
+[124/300] Fetching 124/300: Accounting Principles Skill Set Fnsss00014
+[ERROR] Diploma Of Business Bsb50120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-business-bsb50120
+[125/300] Fetching 125/300: Bachelor Of Biomedicine Hbbm
+[ERROR] Graduate Certificate In Enterprise And Resource Planning Systems Bten — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-enterprise-and-resource-planning-systems-bten
+[126/300] Fetching 126/300: Bachelor Of Biomedical Science Hbbs
+[ERROR] Certificate Iv In Mental Health Chc43315 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-mental-health-chc43315
+[127/300] Fetching 127/300: Bachelor Of Dermal Sciences Hbds
+[ERROR] Diploma Of Project Management Bsb50820 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-project-management-bsb50820
+[128/300] Fetching 128/300: Bachelor Of Biomedical And Exercise Science Hbes
+[ERROR] Diploma Of Early Childhood Education And Care Chc50121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-early-childhood-education-and-care-chc50121
+[129/300] Fetching 129/300: Bachelor Of Health Science Hbhl
+[ERROR] Assist Clients With Medication Skill Set Chcss00070 — HTTP 404 for https://www.vu.edu.au/site-7/courses/assist-clients-with-medication-skill-set-chcss00070
+[130/300] Fetching 130/300: Bachelor Of Midwifery Bachelor Of Nursing Hbma
+[ERROR] Graduate Certificate In Marketing Btkm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-marketing-btkm
+[131/300] Fetching 131/300: Bachelor Of Nursing Hbnb
+[ERROR] Master Of Digital Media Amdm — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-digital-media-amdm
+[132/300] Fetching 132/300: Bachelor Of Human Nutrition Hbnt
+[ERROR] Graduate Certificate In Supply Chain Management Btsp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-supply-chain-management-btsp
+[133/300] Fetching 133/300: Bachelor Of Paramedicine Hbpd
+[ERROR] Graduate Diploma In International Community Development Agid — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-international-community-development-agid
+[134/300] Fetching 134/300: Bachelor Of Nutritional Science Master Of Dietetics Hcnd
+[ERROR] Prepare To Work Safely In The Construction Industry Coniss012 — HTTP 404 for https://www.vu.edu.au/site-7/courses/prepare-to-work-safely-in-the-construction-industry-coniss012
+[135/300] Fetching 135/300: Bachelor Of Science Osteopathy Master Of Health Science Osteopathy Hcop
+[ERROR] Diploma Of Community Services Chc52021 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-community-services-chc52021
+[136/300] Fetching 136/300: Bachelor Of Applied Movement Sciences Master Of Physiotherapy Hcpt
+[ERROR] Alcohol And Other Drugs Skill Set Chcss00093 — HTTP 404 for https://www.vu.edu.au/site-7/courses/alcohol-and-other-drugs-skill-set-chcss00093
+[137/300] Fetching 137/300: Bachelor Of Speech And Language Sciences Master Of Speech Pathology Hcsp
+[ERROR] Certificate Iv In Business Bsb40120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-business-bsb40120
+[138/300] Fetching 138/300: Graduate Diploma In Counselling Theory And Practice Hgcp
+[ERROR] Certificate Iv In Ageing Support Chc43015 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-ageing-support-chc43015
+[139/300] Fetching 139/300: Graduate Diploma In Mental Health Nursing Hgmn
+[ERROR] Certificate Ii In Drainage Cpc20720 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-drainage-cpc20720
+[140/300] Fetching 140/300: Bachelor Of Science Honours Hhsc
+[ERROR] Certificate Iv In Alcohol And Other Drugs Chc43215 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-alcohol-and-other-drugs-chc43215
+[141/300] Fetching 141/300: Certificate Iii In Non Emergency Patient Transport Hlt31120
+[ERROR] Certificate Iii In Carpentry Cpc30220 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-carpentry-cpc30220
+[142/300] Fetching 142/300: Certificate Iii In Health Services Assistance Hlt33115
+[ERROR] Advanced Diploma Of Building Design Architectural 22627vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/advanced-diploma-of-building-design-architectural-22627vic
+[143/300] Fetching 143/300: Certificate Iii In Health Administration Hlt37315
+[ERROR] Certificate Iii In Bricklaying And Blocklaying Cpc33020 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-bricklaying-and-blocklaying-cpc33020
+[144/300] Fetching 144/300: Diploma Of Clinical Coding Hlt50321
+[ERROR] Certificate Iii In Non Emergency Patient Transport Hlt31120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-non-emergency-patient-transport-hlt31120
+[145/300] Fetching 145/300: Diploma Of Emergency Health Care Hlt51020
+[ERROR] Graduate Certificate In Business Btbu — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-business-btbu
+[146/300] Fetching 146/300: Diploma Of Nursing Hlt54121
+[ERROR] Certificate Iii In Plumbing Cpc32420 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-plumbing-cpc32420
+[147/300] Fetching 147/300: Master Of Child And Adolescent Mental Health Hmch
+[ERROR] Bachelor Of Education Primary Ebpe — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-education-primary-ebpe
+[148/300] Fetching 148/300: Master Of Dietetics Hmdt
+[ERROR] Diploma Of Teacher Education Preparation 22602vic — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-teacher-education-preparation-22602vic
+[149/300] Fetching 149/300: Master Of Global Public Health Hmgp
+[ERROR] Graduate Certificate In Business Administration Btpf — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-business-administration-btpf
+[150/300] Fetching 150/300: Master Of Mental Health Hmmh
+[ERROR] Diploma Of Building And Construction Building Cpc50220 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-building-and-construction-building-cpc50220
+[151/300] Fetching 151/300: Master Of Mental Health Nursing Hmmn
+[ERROR] Graduate Certificate In Digital Media Atdm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-digital-media-atdm
+[152/300] Fetching 152/300: Master Of Nursing Hmng
+[ERROR] Advanced Diploma Of Building Surveying Cpc60121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/advanced-diploma-of-building-surveying-cpc60121
+[153/300] Fetching 153/300: Master Of Professional Psychology Hmpp
+[ERROR] Bachelor Of Early Childhood Education And Leadership Ebcl — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-early-childhood-education-and-leadership-ebcl
+[154/300] Fetching 154/300: Master Of Physiotherapy Hmps
+[ERROR] Certificate Iv In Plumbing And Services Cpc40920 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-plumbing-and-services-cpc40920
+[155/300] Fetching 155/300: Master Of Public Health Hmpt
+[ERROR] Bachelor Of Early Childhood Education Ebec — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-early-childhood-education-ebec
+[156/300] Fetching 156/300: Master Of Speech Pathology Hmst
+[ERROR] Diploma Of Education Studies Edes — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-education-studies-edes
+[157/300] Fetching 157/300: Graduate Certificate In Child And Adolescent Mental Health Htch
+[ERROR] Certificate Iii In Individual Support Chc33021 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-individual-support-chc33021
+[158/300] Fetching 158/300: Graduate Certificate In Counselling Theory And Practice Htcp
+[ERROR] Master Of Applied Teaching Secondary Education Emat — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-applied-teaching-secondary-education-emat
+[159/300] Fetching 159/300: Graduate Certificate In Global Public Health Htgp
+[ERROR] Certificate Iv In Youth Work Chc40421 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-youth-work-chc40421
+[160/300] Fetching 160/300: Graduate Certificate In Mental Health Htmh
+[ERROR] Certificate Iii In Early Childhood Education And Care Chc30121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-early-childhood-education-and-care-chc30121
+[161/300] Fetching 161/300: Graduate Certificate In Mental Health Nursing Htmn
+[ERROR] Master Of Teaching Primary Education Empe — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-teaching-primary-education-empe
+[162/300] Fetching 162/300: Graduate Certificate In Nursing Htng
+[ERROR] Graduate Certificate In Early Childhood Education Etec — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-early-childhood-education-etec
+[163/300] Fetching 163/300: Graduate Certificate In Public Health Htpt
+[ERROR] Certificate Iv In School Based Education Support Chc40221 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-school-based-education-support-chc40221
+[164/300] Fetching 164/300: Undergraduate Certificate In Diet And Health Hudh
+[ERROR] Graduate Certificate In Performance Based Building Fire Codes Etqb — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-performance-based-building-fire-codes-etqb
+[165/300] Fetching 165/300: Undergraduate Certificate In Health Science Huhs
+[ERROR] Undergraduate Certificate In Early Childhood Education Euec — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-early-childhood-education-euec
+[166/300] Fetching 166/300: Undergraduate Certificate In Interpersonal And Organisational Skills Huio
+[ERROR] Graduate Certificate In Block Teaching Etbl — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-block-teaching-etbl
+[167/300] Fetching 167/300: Undergraduate Certificate In Laser Safety Huls
+[ERROR] Certificate Iv In Disability Support Chc43121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-disability-support-chc43121
+[168/300] Fetching 168/300: Undergraduate Certificate In Psychological Studies Hups
+[ERROR] Master Of Teaching Secondary Education Emes — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-teaching-secondary-education-emes
+[169/300] Fetching 169/300: Certificate Iii In Information Technology Ict30120
+[ERROR] Graduate Diploma In Education Eged — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-education-eged
+[170/300] Fetching 170/300: Certificate Iv In Information Technology Ict40120
+[ERROR] Bas Agent Registration Skill Set Fnsss00004 — HTTP 404 for https://www.vu.edu.au/site-7/courses/bas-agent-registration-skill-set-fnsss00004
+[171/300] Fetching 171/300: International Foundations At Vu Jqag
+[ERROR] Certificate Iii In Signs And Graphics Cpc30216 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-signs-and-graphics-cpc30216
+[172/300] Fetching 172/300: Chinese Language And Culture Program Jqak
+[ERROR] Bachelor Of Education Studies Ebst — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-education-studies-ebst
+[173/300] Fetching 173/300: Professional Course In Notarial Practice Jqnp
+[ERROR] Accounting Principles Skill Set Fnsss00014 — HTTP 404 for https://www.vu.edu.au/site-7/courses/accounting-principles-skill-set-fnsss00014
+[174/300] Fetching 174/300: Osce Preparation Program For Nurses Jqpn
+[ERROR] Bachelor Of Education P 12 Ebed — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-education-p-12-ebed
+[175/300] Fetching 175/300: Capstone Exam Preparatory Course Jvae
+[ERROR] Bachelor Of Biomedicine Hbbm — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-biomedicine-hbbm
+[176/300] Fetching 176/300: Sap Analytics Cloud Jvai
+[ERROR] Undergraduate Certificate In Education Studies Eues — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-education-studies-eues
+[177/300] Fetching 177/300: Sap Finance Financial Accounting Jvaj
+[ERROR] Master Of Mental Health Hmmh — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-mental-health-hmmh
+[178/300] Fetching 178/300: Sap Finance Management Accounting Jvak
+[ERROR] Sap Analytics Cloud Jvai — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-analytics-cloud-jvai
+[179/300] Fetching 179/300: Sap Extended Warehouse Management Jval
+[ERROR] Certificate Iv In Accounting And Bookkeeping Fns40222 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-accounting-and-bookkeeping-fns40222
+[180/300] Fetching 180/300: Sap Transportation Management Jvam
+[ERROR] Undergraduate Certificate In Education P12 Stem Eued — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-education-p12-stem-eued
+[181/300] Fetching 181/300: Sap Activate For Cloud Solutions Project Management Jvan
+[ERROR] Bachelor Of Science Master Of Teaching Secondary Education Ecst — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-science-master-of-teaching-secondary-education-ecst
+[182/300] Fetching 182/300: Sustainable Infrastructure Construction And Management Jvao
+[ERROR] Bachelor Of Health Science Hbhl — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-health-science-hbhl
+[183/300] Fetching 183/300: Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap
+[ERROR] Bachelor Of Nutritional Science Master Of Dietetics Hcnd — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-nutritional-science-master-of-dietetics-hcnd
+[184/300] Fetching 184/300: Foundations At Vu Jyac
+[ERROR] Bachelor Of Midwifery Bachelor Of Nursing Hbma — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-midwifery-bachelor-of-nursing-hbma
+[185/300] Fetching 185/300: Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp
+[ERROR] Bachelor Of Human Nutrition Hbnt — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-human-nutrition-hbnt
+[186/300] Fetching 186/300: Bachelor Of Criminology Lbcr
+[ERROR] Tax Law For Tax Agents Skill Set Tax Documentation Fnsss00008 — HTTP 404 for https://www.vu.edu.au/site-7/courses/tax-law-for-tax-agents-skill-set-tax-documentation-fnsss00008
+[187/300] Fetching 187/300: Bachelor Of Laws Bachelor Of Arts Lbla
+[ERROR] Graduate Diploma In Counselling Theory And Practice Hgcp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-counselling-theory-and-practice-hgcp
+[188/300] Fetching 188/300: Bachelor Of Laws Bachelor Of Criminology Lblc
+[ERROR] Bachelor Of Biomedical And Exercise Science Hbes — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-biomedical-and-exercise-science-hbes
+[189/300] Fetching 189/300: Bachelor Of Legal Services Lbls
+[ERROR] Bachelor Of Speech And Language Sciences Master Of Speech Pathology Hcsp — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-speech-and-language-sciences-master-of-speech-pathology-hcsp
+[190/300] Fetching 190/300: Bachelor Of Laws Bachelor Of Business Lbwb
+[ERROR] Bachelor Of Youth Work Bachelor Of Sport Management Ebys — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-youth-work-bachelor-of-sport-management-ebys
+[191/300] Fetching 191/300: Bachelor Of Laws Bachelor Of Psychological Studies Lbwp
+[ERROR] Graduate Diploma In Mental Health Nursing Hgmn — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-mental-health-nursing-hgmn
+[192/300] Fetching 192/300: Graduate Diploma In Migration Law Lgml
+[ERROR] Bachelor Of Biomedical Science Hbbs — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-biomedical-science-hbbs
+[193/300] Fetching 193/300: Bachelor Of Laws Honours Bachelor Of Criminology Lhcr
+[ERROR] Bachelor Of Science Honours Hhsc — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-science-honours-hhsc
+[194/300] Fetching 194/300: Bachelor Of Laws Honours Graduate Entry Lhge
+[ERROR] Graduate Diploma In Early Childhood Education Egec — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-early-childhood-education-egec
+[195/300] Fetching 195/300: Bachelor Of Laws Honours Lhlw
+[ERROR] Certificate Iii In Health Services Assistance Hlt33115 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-health-services-assistance-hlt33115
+[196/300] Fetching 196/300: Bachelor Of Laws Honours Bachelor Of Arts Lhwa
+[ERROR] Graduate Certificate In Education Eted — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-education-eted
+[197/300] Fetching 197/300: Bachelor Of Laws Honours Bachelor Of Business Lhwb
+[ERROR] Diploma Of Accounting Fns50222 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-accounting-fns50222
+[198/300] Fetching 198/300: Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp
+[ERROR] Master Of Education Emed — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-education-emed
+[199/300] Fetching 199/300: Graduate Certificate In Crime Prevention Ltcp
+[ERROR] Master Of Dietetics Hmdt — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-dietetics-hmdt
+[200/300] Fetching 200/300: Certificate Iii In Engineering Mechanical Trade Mem30219
+[ERROR] Bachelor Of Dermal Sciences Hbds — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-dermal-sciences-hbds
+[201/300] Fetching 201/300: Certificate Iii In Engineering Fabrication Trade Mem31922
+[ERROR] Master Of Nursing Hmng — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-nursing-hmng
+[202/300] Fetching 202/300: Certificate Ii In Cabinet Making And Timber Technology Msf20322
+[ERROR] Master Of Mental Health Nursing Hmmn — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-mental-health-nursing-hmmn
+[203/300] Fetching 203/300: Certificate Iii In Cabinet Making And Timber Technology Msf30322
+[ERROR] Diploma Of Nursing Hlt54121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-nursing-hlt54121
+[204/300] Fetching 204/300: Bachelor Of Building Surveying Nbbs
+[ERROR] Master Of Speech Pathology Hmst — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-speech-pathology-hmst
+[205/300] Fetching 205/300: Bachelor Of Cyber Security Nbcs
+[ERROR] Master Of Professional Psychology Hmpp — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-professional-psychology-hmpp
+[206/300] Fetching 206/300: Bachelor Of Data Science Nbds
+[ERROR] Bachelor Of Science Osteopathy Master Of Health Science Osteopathy Hcop — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-science-osteopathy-master-of-health-science-osteopathy-hcop
+[207/300] Fetching 207/300: Bachelor Of Information Technology Professional Nbip
+[ERROR] Graduate Certificate In Child And Adolescent Mental Health Htch — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-child-and-adolescent-mental-health-htch
+[208/300] Fetching 208/300: Bachelor Of Information Technology Nbit
+[ERROR] Diploma Of Emergency Health Care Hlt51020 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-emergency-health-care-hlt51020
+[209/300] Fetching 209/300: Bachelor Of Science Nbsc
+[ERROR] Master Of Child And Adolescent Mental Health Hmch — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-child-and-adolescent-mental-health-hmch
+[210/300] Fetching 210/300: Graduate Diploma In Building Surveying Ngbs
+[ERROR] Graduate Certificate In Mental Health Nursing Htmn — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-mental-health-nursing-htmn
+[211/300] Fetching 211/300: Graduate Diploma In Cyber Security Ngcs
+[ERROR] Graduate Certificate In Mental Health Htmh — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-mental-health-htmh
+[212/300] Fetching 212/300: Graduate Diploma In Project Management Ngpm
+[ERROR] Bachelor Of Nursing Hbnb — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-nursing-hbnb
+[213/300] Fetching 213/300: Bachelor Of Construction Management Honours Nhcm
+[ERROR] Bachelor Of Paramedicine Hbpd — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-paramedicine-hbpd
+[214/300] Fetching 214/300: Bachelor Of Engineering Honours Civil Engineering Nhec
+[ERROR] Master Of Global Public Health Hmgp — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-global-public-health-hmgp
+[215/300] Fetching 215/300: Bachelor Of Engineering Honours Electrical And Electronic Engineering Nhee
+[ERROR] Graduate Diploma In Cyber Security Ngcs — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-cyber-security-ngcs
+[216/300] Fetching 216/300: Bachelor Of Engineering Honours Mechanical Engineering Nhem
+[ERROR] Diploma Of Clinical Coding Hlt50321 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-clinical-coding-hlt50321
+[217/300] Fetching 217/300: Master Of Engineering Nmen
+[ERROR] Graduate Certificate In Counselling Theory And Practice Htcp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-counselling-theory-and-practice-htcp
+[218/300] Fetching 218/300: Master Of Applied Information Technology Nmit
+[ERROR] Undergraduate Certificate In Health Science Huhs — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-health-science-huhs
+[219/300] Fetching 219/300: Master Of Project Management Nmpm
+[ERROR] Master Of Public Health Hmpt — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-public-health-hmpt
+[220/300] Fetching 220/300: Graduate Certificate In Artificial Intelligence Ntai
+[ERROR] Undergraduate Certificate In Laser Safety Huls — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-laser-safety-huls
+[221/300] Fetching 221/300: Graduate Certificate In Building Surveying Ntbs
+[ERROR] Chinese Language And Culture Program Jqak — HTTP 404 for https://www.vu.edu.au/site-7/courses/chinese-language-and-culture-program-jqak
+[222/300] Fetching 222/300: Graduate Certificate In Construction Project Management Ntcp
+[ERROR] Graduate Certificate In Nursing Htng — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-nursing-htng
+[223/300] Fetching 223/300: Graduate Certificate In Cyber Security Ntcs
+[ERROR] Certificate Iii In Health Administration Hlt37315 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-health-administration-hlt37315
+[224/300] Fetching 224/300: Graduate Certificate In Information Technology Project Management Ntip
+[ERROR] Bachelor Of Applied Movement Sciences Master Of Physiotherapy Hcpt — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-applied-movement-sciences-master-of-physiotherapy-hcpt
+[225/300] Fetching 225/300: Graduate Certificate In Project Management Ntpm
+[ERROR] Capstone Exam Preparatory Course Jvae — HTTP 404 for https://www.vu.edu.au/site-7/courses/capstone-exam-preparatory-course-jvae
+[226/300] Fetching 226/300: Undergraduate Certificate In Architectural Design Nuad
+[ERROR] Master Of Physiotherapy Hmps — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-physiotherapy-hmps
+[227/300] Fetching 227/300: Undergraduate Certificate In Building Construction Management Nubc
+[ERROR] Graduate Certificate In Public Health Htpt — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-public-health-htpt
+[228/300] Fetching 228/300: Undergraduate Certificate In Engineering Fundamentals Nuef
+[ERROR] Graduate Certificate In Global Public Health Htgp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-global-public-health-htgp
+[229/300] Fetching 229/300: Undergraduate Certificate In Information Technology Nuit
+[ERROR] International Foundations At Vu Jqag — HTTP 404 for https://www.vu.edu.au/site-7/courses/international-foundations-at-vu-jqag
+[230/300] Fetching 230/300: Undergraduate Certificate In Science And The Environment Nuse
+[ERROR] Sap Finance Financial Accounting Jvaj — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-finance-financial-accounting-jvaj
+[231/300] Fetching 231/300: Certificate Ii In Civil Construction Rii20720
+[ERROR] Undergraduate Certificate In Psychological Studies Hups — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-psychological-studies-hups
+[232/300] Fetching 232/300: Certificate Iii In Civil Construction Plant Operations Rii30820
+[ERROR] Undergraduate Certificate In Diet And Health Hudh — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-diet-and-health-hudh
+[233/300] Fetching 233/300: Certificate Iii In Civil Construction Rii30920
+[ERROR] Professional Course In Notarial Practice Jqnp — HTTP 404 for https://www.vu.edu.au/site-7/courses/professional-course-in-notarial-practice-jqnp
+[234/300] Fetching 234/300: Certificate Iv In Civil Construction Rii40720
+[ERROR] Osce Preparation Program For Nurses Jqpn — HTTP 404 for https://www.vu.edu.au/site-7/courses/osce-preparation-program-for-nurses-jqpn
+[235/300] Fetching 235/300: Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp
+[ERROR] Undergraduate Certificate In Interpersonal And Organisational Skills Huio — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-interpersonal-and-organisational-skills-huio
+[236/300] Fetching 236/300: Bachelor Of Sport Science Human Movement Bachelor Of Sport Management Sbhs
+[ERROR] Bachelor Of Laws Bachelor Of Arts Lbla — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-bachelor-of-arts-lbla
+[237/300] Fetching 237/300: Bachelor Of Outdoor Education And Environmental Science Sboe
+[ERROR] Bachelor Of Criminology Lbcr — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-criminology-lbcr
+[238/300] Fetching 238/300: Bachelor Of Outdoor Leadership Sbol
+[ERROR] Sap Activate For Cloud Solutions Project Management Jvan — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-activate-for-cloud-solutions-project-management-jvan
+[239/300] Fetching 239/300: Bachelor Of Physical Education And Sport Science Sbph
+[ERROR] Certificate Iii In Information Technology Ict30120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-information-technology-ict30120
+[240/300] Fetching 240/300: Bachelor Of Sport Science Sbsa
+[ERROR] Sap Extended Warehouse Management Jval — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-extended-warehouse-management-jval
+[241/300] Fetching 241/300: Bachelor Of Sport Management Bachelor Of Business Sbsb
+[ERROR] Sap Transportation Management Jvam — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-transportation-management-jvam
+[242/300] Fetching 242/300: Bachelor Of Sport Management Sbsm
+[ERROR] Sustainable Infrastructure Construction And Management Jvao — HTTP 404 for https://www.vu.edu.au/site-7/courses/sustainable-infrastructure-construction-and-management-jvao
+[243/300] Fetching 243/300: Certificate Iii In Beauty Services Shb30121
+[ERROR] Certificate Iv In Information Technology Ict40120 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-information-technology-ict40120
+[244/300] Fetching 244/300: Certificate Iii In Hairdressing Shb30416
+[ERROR] Bachelor Of Laws Bachelor Of Business Lbwb — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-bachelor-of-business-lbwb
+[245/300] Fetching 245/300: Certificate Iii In Barbering Shb30516
+[ERROR] Bachelor Of Laws Bachelor Of Psychological Studies Lbwp — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-bachelor-of-psychological-studies-lbwp
+[246/300] Fetching 246/300: Diploma Of Beauty Therapy Shb50121
+[ERROR] Foundations At Vu Jyac — HTTP 404 for https://www.vu.edu.au/site-7/courses/foundations-at-vu-jyac
+[247/300] Fetching 247/300: Certificate Ii In Hospitality Sit20322
+[ERROR] Bachelor Of Laws Honours Graduate Entry Lhge — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-graduate-entry-lhge
+[248/300] Fetching 248/300: Certificate Ii In Cookery Sit20421
+[ERROR] Bachelor Of Laws Honours Bachelor Of Business Lhwb — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-bachelor-of-business-lhwb
+[249/300] Fetching 249/300: Certificate Iii In Hospitality Sit30622
+[ERROR] Diploma Of Beauty Therapy Shb50121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-beauty-therapy-shb50121
+[250/300] Fetching 250/300: Certificate Iii In Commercial Cookery Sit30821
+[ERROR] Bachelor Of Laws Honours Bachelor Of Criminology Lhcr — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-bachelor-of-criminology-lhcr
+[251/300] Fetching 251/300: Certificate Iv In Kitchen Management Sit40521
+[ERROR] Graduate Diploma In Migration Law Lgml — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-migration-law-lgml
+[252/300] Fetching 252/300: Diploma Of Travel And Tourism Management Sit50122
+[ERROR] Bachelor Of Laws Honours Lhlw — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-lhlw
+[253/300] Fetching 253/300: Diploma Of Event Management Sit50322
+[ERROR] Graduate Certificate In Crime Prevention Ltcp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-crime-prevention-ltcp
+[254/300] Fetching 254/300: Diploma Of Hospitality Management Sit50422
+[ERROR] Sap Finance Management Accounting Jvak — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-finance-management-accounting-jvak
+[255/300] Fetching 255/300: Advanced Diploma Of Hospitality Management Sit60322
+[ERROR] Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap — HTTP 404 for https://www.vu.edu.au/site-7/courses/sap-activate-for-cloud-solutions-s-4-hana-and-project-management-jvap
+[256/300] Fetching 256/300: Food Handling Skill Set Sitss00068
+[ERROR] Certificate Iii In Engineering Mechanical Trade Mem30219 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-engineering-mechanical-trade-mem30219
+[257/300] Fetching 257/300: Food Safety Supervision Skill Set Sitss00069
+[ERROR] Bachelor Of Laws Bachelor Of Criminology Lblc — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-bachelor-of-criminology-lblc
+[258/300] Fetching 258/300: Responsible Service Of Alcohol Sitss00071
+[ERROR] Certificate Iii In Cabinet Making And Timber Technology Msf30322 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-cabinet-making-and-timber-technology-msf30322
+[259/300] Fetching 259/300: Master Of Sport And Exercise Science Smes
+[ERROR] Graduate Certificate In Artificial Intelligence Ntai — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-artificial-intelligence-ntai
+[260/300] Fetching 260/300: Graduate Certificate In Strength And Conditioning Stsa
+[ERROR] Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-bachelor-of-psychology-honours-lhwp
+[261/300] Fetching 261/300: Graduate Certificate In Data Analytics For Sport Performance Stsp
+[ERROR] Bachelor Of Legal Services Lbls — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-legal-services-lbls
+[262/300] Fetching 262/300: Undergraduate Certificate In Primary Physical Education Supp
+[ERROR] Graduate Diploma In Building Surveying Ngbs — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-building-surveying-ngbs
+[263/300] Fetching 263/300: Undergraduate Certificate In Secondary Physical Education Susp
+[ERROR] Certificate Iii In Engineering Fabrication Trade Mem31922 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-engineering-fabrication-trade-mem31922
+[264/300] Fetching 264/300: Lantite Preparation Course Thaaa
+[ERROR] Bachelor Of Science Nbsc — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-science-nbsc
+[265/300] Fetching 265/300: Revit Level 1 Thaac
+[ERROR] Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-criminology-bachelor-of-psychological-studies-lbcp
+[266/300] Fetching 266/300: Welding For Beginners Thaan
+[ERROR] Bachelor Of Building Surveying Nbbs — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-building-surveying-nbbs
+[267/300] Fetching 267/300: Mechanical Fitting For Hobbyists Thaau
+[ERROR] Certificate Ii In Cabinet Making And Timber Technology Msf20322 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-cabinet-making-and-timber-technology-msf20322
+[268/300] Fetching 268/300: Effective Communication Skills Thaav
+[ERROR] Bachelor Of Data Science Nbds — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-data-science-nbds
+[269/300] Fetching 269/300: Introduction To Emotional Intelligence Thaaw
+[ERROR] Bachelor Of Information Technology Professional Nbip — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-information-technology-professional-nbip
+[270/300] Fetching 270/300: Leading A Team Thaax
+[ERROR] Bachelor Of Cyber Security Nbcs — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-cyber-security-nbcs
+[271/300] Fetching 271/300: Building The Team Thaay
+[ERROR] Bachelor Of Engineering Honours Civil Engineering Nhec — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-engineering-honours-civil-engineering-nhec
+[272/300] Fetching 272/300: Communicate With Influence Thaaz
+[ERROR] Graduate Diploma In Project Management Ngpm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-diploma-in-project-management-ngpm
+[273/300] Fetching 273/300: Effective Time Management Thaba
+[ERROR] Bachelor Of Laws Honours Bachelor Of Arts Lhwa — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-laws-honours-bachelor-of-arts-lhwa
+[274/300] Fetching 274/300: Introduction To Cybersecurity Thabb
+[ERROR] Bachelor Of Information Technology Nbit — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-information-technology-nbit
+[275/300] Fetching 275/300: Cybersecurity Essentials Thabc
+[ERROR] Graduate Certificate In Building Surveying Ntbs — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-building-surveying-ntbs
+[276/300] Fetching 276/300: Introduction To Internet Of Things Iot Thabd
+[ERROR] Bachelor Of Sport Science Sbsa — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-sport-science-sbsa
+[277/300] Fetching 277/300: Introduction To Managing Workplace Priorities Thabe
+[ERROR] Bachelor Of Engineering Honours Electrical And Electronic Engineering Nhee — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-engineering-honours-electrical-and-electronic-engineering-nhee
+[278/300] Fetching 278/300: Introduction To Coaching And Mentoring Skills Thabg
+[ERROR] Master Of Applied Information Technology Nmit — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-applied-information-technology-nmit
+[279/300] Fetching 279/300: Introduction To Presentation Skills Thabh
+[ERROR] Undergraduate Certificate In Building Construction Management Nubc — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-building-construction-management-nubc
+[280/300] Fetching 280/300: Introduction To Project Management Thabi
+[ERROR] Certificate Iii In Beauty Services Shb30121 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-beauty-services-shb30121
+[281/300] Fetching 281/300: Introduction To Change Management Thabk
+[ERROR] Master Of Engineering Nmen — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-engineering-nmen
+[282/300] Fetching 282/300: Introduction To Managing Workplace Relationships Thabl
+[ERROR] Bachelor Of Engineering Honours Mechanical Engineering Nhem — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-engineering-honours-mechanical-engineering-nhem
+[283/300] Fetching 283/300: Introduction To Effective Teamwork Thabm
+[ERROR] Graduate Certificate In Project Management Ntpm — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-project-management-ntpm
+[284/300] Fetching 284/300: Introduction To Positive Leadership Thabn
+[ERROR] Bachelor Of Construction Management Honours Nhcm — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-construction-management-honours-nhcm
+[285/300] Fetching 285/300: Introduction To Communication For Effective Leadership Thabo
+[ERROR] Graduate Certificate In Cyber Security Ntcs — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-cyber-security-ntcs
+[286/300] Fetching 286/300: Introduction For Women In Leadership Thabq
+[ERROR] Introduction To Change Management Thabk — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-change-management-thabk
+[287/300] Fetching 287/300: Microsoft Word Intermediate Thabs
+[ERROR] Master Of Project Management Nmpm — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-project-management-nmpm
+[288/300] Fetching 288/300: Microsoft Powerpoint Introduction Thabt
+[ERROR] Bachelor Of Physical Education And Sport Science Sbph — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-physical-education-and-sport-science-sbph
+[289/300] Fetching 289/300: Microsoft Excel Beginner Thabu
+[ERROR] Certificate Iii In Civil Construction Plant Operations Rii30820 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-civil-construction-plant-operations-rii30820
+[290/300] Fetching 290/300: Microsoft Excel Intermediate Thabv
+[ERROR] Certificate Ii In Cookery Sit20421 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-cookery-sit20421
+[291/300] Fetching 291/300: Microsoft Excel Advanced Thabw
+[ERROR] Diploma Of Hospitality Management Sit50422 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-hospitality-management-sit50422
+[292/300] Fetching 292/300: Furniture Making For Hobbyists Thaca
+[ERROR] Undergraduate Certificate In Information Technology Nuit — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-information-technology-nuit
+[293/300] Fetching 293/300: Continuing Professional Development Cpd Thacf
+[ERROR] Certificate Iii In Civil Construction Rii30920 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-civil-construction-rii30920
+[294/300] Fetching 294/300: Essential Eight Assessment Thacj
+[ERROR] Undergraduate Certificate In Engineering Fundamentals Nuef — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-engineering-fundamentals-nuef
+[295/300] Fetching 295/300: Restricted Electrical Workers Licence Class 1 Assessment Thacl
+[ERROR] Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-sport-science-human-movement-bachelor-of-psychological-studies-sbhp
+[296/300] Fetching 296/300: Restricted Electrical Workers Licence Class 2 Assessment Thacm
+[ERROR] Undergraduate Certificate In Architectural Design Nuad — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-architectural-design-nuad
+[297/300] Fetching 297/300: Safe Operation Of An Elevating Work Platform Tnaah
+[ERROR] Certificate Iv In Civil Construction Rii40720 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-civil-construction-rii40720
+[298/300] Fetching 298/300: Emergency First Aid In Childcare And Education Tnabd
+[ERROR] Certificate Iii In Hairdressing Shb30416 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-hairdressing-shb30416
+[299/300] Fetching 299/300: Cpr Refresher Tnabg
+[ERROR] Undergraduate Certificate In Science And The Environment Nuse — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-science-and-the-environment-nuse
+[300/300] Fetching 300/300: Level Ii First Aid Tnabj
+[ERROR] Undergraduate Certificate In Primary Physical Education Supp — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-primary-physical-education-supp
+[ERROR] Graduate Certificate In Information Technology Project Management Ntip — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-information-technology-project-management-ntip
+[ERROR] Bachelor Of Sport Management Bachelor Of Business Sbsb — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-sport-management-bachelor-of-business-sbsb
+[ERROR] Certificate Ii In Civil Construction Rii20720 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-civil-construction-rii20720
+[ERROR] Bachelor Of Outdoor Education And Environmental Science Sboe — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-outdoor-education-and-environmental-science-sboe
+[ERROR] Bachelor Of Outdoor Leadership Sbol — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-outdoor-leadership-sbol
+[ERROR] Graduate Certificate In Construction Project Management Ntcp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-construction-project-management-ntcp
+[ERROR] Diploma Of Travel And Tourism Management Sit50122 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-travel-and-tourism-management-sit50122
+[ERROR] Bachelor Of Sport Management Sbsm — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-sport-management-sbsm
+[ERROR] Bachelor Of Sport Science Human Movement Bachelor Of Sport Management Sbhs — HTTP 404 for https://www.vu.edu.au/site-7/courses/bachelor-of-sport-science-human-movement-bachelor-of-sport-management-sbhs
+[ERROR] Food Handling Skill Set Sitss00068 — HTTP 404 for https://www.vu.edu.au/site-7/courses/food-handling-skill-set-sitss00068
+[ERROR] Food Safety Supervision Skill Set Sitss00069 — HTTP 404 for https://www.vu.edu.au/site-7/courses/food-safety-supervision-skill-set-sitss00069
+[ERROR] Certificate Iii In Hospitality Sit30622 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-hospitality-sit30622
+[ERROR] Certificate Ii In Hospitality Sit20322 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-ii-in-hospitality-sit20322
+[ERROR] Master Of Sport And Exercise Science Smes — HTTP 404 for https://www.vu.edu.au/site-7/courses/master-of-sport-and-exercise-science-smes
+[ERROR] Graduate Certificate In Data Analytics For Sport Performance Stsp — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-data-analytics-for-sport-performance-stsp
+[ERROR] Certificate Iii In Barbering Shb30516 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-barbering-shb30516
+[ERROR] Certificate Iv In Kitchen Management Sit40521 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iv-in-kitchen-management-sit40521
+[ERROR] Responsible Service Of Alcohol Sitss00071 — HTTP 404 for https://www.vu.edu.au/site-7/courses/responsible-service-of-alcohol-sitss00071
+[ERROR] Graduate Certificate In Strength And Conditioning Stsa — HTTP 404 for https://www.vu.edu.au/site-7/courses/graduate-certificate-in-strength-and-conditioning-stsa
+[ERROR] Diploma Of Event Management Sit50322 — HTTP 404 for https://www.vu.edu.au/site-7/courses/diploma-of-event-management-sit50322
+[ERROR] Certificate Iii In Commercial Cookery Sit30821 — HTTP 404 for https://www.vu.edu.au/site-7/courses/certificate-iii-in-commercial-cookery-sit30821
+[ERROR] Introduction To Emotional Intelligence Thaaw — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-emotional-intelligence-thaaw
+[ERROR] Effective Communication Skills Thaav — HTTP 404 for https://www.vu.edu.au/site-7/courses/effective-communication-skills-thaav
+[ERROR] Welding For Beginners Thaan — HTTP 404 for https://www.vu.edu.au/site-7/courses/welding-for-beginners-thaan
+[ERROR] Advanced Diploma Of Hospitality Management Sit60322 — HTTP 404 for https://www.vu.edu.au/site-7/courses/advanced-diploma-of-hospitality-management-sit60322
+[ERROR] Undergraduate Certificate In Secondary Physical Education Susp — HTTP 404 for https://www.vu.edu.au/site-7/courses/undergraduate-certificate-in-secondary-physical-education-susp
+[ERROR] Introduction To Internet Of Things Iot Thabd — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-internet-of-things-iot-thabd
+[ERROR] Mechanical Fitting For Hobbyists Thaau — HTTP 404 for https://www.vu.edu.au/site-7/courses/mechanical-fitting-for-hobbyists-thaau
+[ERROR] Leading A Team Thaax — HTTP 404 for https://www.vu.edu.au/site-7/courses/leading-a-team-thaax
+[ERROR] Effective Time Management Thaba — HTTP 404 for https://www.vu.edu.au/site-7/courses/effective-time-management-thaba
+[ERROR] Introduction To Managing Workplace Priorities Thabe — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-managing-workplace-priorities-thabe
+[ERROR] Communicate With Influence Thaaz — HTTP 404 for https://www.vu.edu.au/site-7/courses/communicate-with-influence-thaaz
+[ERROR] Lantite Preparation Course Thaaa — HTTP 404 for https://www.vu.edu.au/site-7/courses/lantite-preparation-course-thaaa
+[ERROR] Revit Level 1 Thaac — HTTP 404 for https://www.vu.edu.au/site-7/courses/revit-level-1-thaac
+[ERROR] Building The Team Thaay — HTTP 404 for https://www.vu.edu.au/site-7/courses/building-the-team-thaay
+[ERROR] Cybersecurity Essentials Thabc — HTTP 404 for https://www.vu.edu.au/site-7/courses/cybersecurity-essentials-thabc
+[ERROR] Continuing Professional Development Cpd Thacf — HTTP 404 for https://www.vu.edu.au/site-7/courses/continuing-professional-development-cpd-thacf
+[ERROR] Introduction To Positive Leadership Thabn — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-positive-leadership-thabn
+[ERROR] Introduction For Women In Leadership Thabq — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-for-women-in-leadership-thabq
+[ERROR] Introduction To Presentation Skills Thabh — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-presentation-skills-thabh
+[ERROR] Cpr Refresher Tnabg — HTTP 404 for https://www.vu.edu.au/site-7/courses/cpr-refresher-tnabg
+[ERROR] Introduction To Cybersecurity Thabb — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-cybersecurity-thabb
+[ERROR] Microsoft Excel Beginner Thabu — HTTP 404 for https://www.vu.edu.au/site-7/courses/microsoft-excel-beginner-thabu
+[ERROR] Introduction To Managing Workplace Relationships Thabl — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-managing-workplace-relationships-thabl
+[ERROR] Introduction To Effective Teamwork Thabm — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-effective-teamwork-thabm
+[ERROR] Furniture Making For Hobbyists Thaca — HTTP 404 for https://www.vu.edu.au/site-7/courses/furniture-making-for-hobbyists-thaca
+[ERROR] Restricted Electrical Workers Licence Class 1 Assessment Thacl — HTTP 404 for https://www.vu.edu.au/site-7/courses/restricted-electrical-workers-licence-class-1-assessment-thacl
+[ERROR] Introduction To Coaching And Mentoring Skills Thabg — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-coaching-and-mentoring-skills-thabg
+[ERROR] Microsoft Excel Intermediate Thabv — HTTP 404 for https://www.vu.edu.au/site-7/courses/microsoft-excel-intermediate-thabv
+[ERROR] Introduction To Communication For Effective Leadership Thabo — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-communication-for-effective-leadership-thabo
+[ERROR] Safe Operation Of An Elevating Work Platform Tnaah — HTTP 404 for https://www.vu.edu.au/site-7/courses/safe-operation-of-an-elevating-work-platform-tnaah
+[ERROR] Restricted Electrical Workers Licence Class 2 Assessment Thacm — HTTP 404 for https://www.vu.edu.au/site-7/courses/restricted-electrical-workers-licence-class-2-assessment-thacm
+[ERROR] Microsoft Powerpoint Introduction Thabt — HTTP 404 for https://www.vu.edu.au/site-7/courses/microsoft-powerpoint-introduction-thabt
+[ERROR] Essential Eight Assessment Thacj — HTTP 404 for https://www.vu.edu.au/site-7/courses/essential-eight-assessment-thacj
+[ERROR] Level Ii First Aid Tnabj — HTTP 404 for https://www.vu.edu.au/site-7/courses/level-ii-first-aid-tnabj
+[ERROR] Emergency First Aid In Childcare And Education Tnabd — HTTP 404 for https://www.vu.edu.au/site-7/courses/emergency-first-aid-in-childcare-and-education-tnabd
+[ERROR] Microsoft Excel Advanced Thabw — HTTP 404 for https://www.vu.edu.au/site-7/courses/microsoft-excel-advanced-thabw
+[ERROR] Microsoft Word Intermediate Thabs — HTTP 404 for https://www.vu.edu.au/site-7/courses/microsoft-word-intermediate-thabs
+[ERROR] Introduction To Project Management Thabi — HTTP 404 for https://www.vu.edu.au/site-7/courses/introduction-to-project-management-thabi
+=== COMPLETE === Found: 428 | Staged: 0 | Skipped: 0 | Errors: 300

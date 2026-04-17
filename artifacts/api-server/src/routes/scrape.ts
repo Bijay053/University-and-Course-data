@@ -2440,6 +2440,12 @@ function normalizeSitemapUrl(loc: string): string {
     const DROP_PARAMS = ["students", "audience", "mode", "view", "tab", "ref"];
     DROP_PARAMS.forEach((p) => u.searchParams.delete(p));
     if (!u.search) u.search = "";
+    // Site-specific path rewrites for known-broken sitemap entries.
+    // VU's sitemap publishes Drupal-multisite legacy paths (/site-N/courses/...) that all 404;
+    // the canonical public path is /courses/<slug>.
+    if (u.hostname.endsWith("vu.edu.au")) {
+      u.pathname = u.pathname.replace(/^\/site-\d+\/courses\//i, "/courses/");
+    }
     return u.toString();
   } catch {
     return loc;
