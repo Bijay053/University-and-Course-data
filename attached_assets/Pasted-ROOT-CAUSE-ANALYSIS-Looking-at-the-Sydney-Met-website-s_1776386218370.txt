@@ -1,0 +1,680 @@
+ROOT CAUSE ANALYSIS
+Looking at the Sydney Met website (sydneymet.edu.au), this is a small, simple website with only 12 courses and structured data that should be EASY to extract. The fact that it's still getting wrong data means:
+
+Extractors are not working properly
+Multi-page data extraction is failing (not checking requirement pages)
+AI fallback is being used when rule-based extraction should work
+No validation is happening before staging
+
+
+COMPLETE EXTRACTOR IMPLEMENTATION
+Let me provide the FULL WORKING EXTRACTORS with proper logic:
+
+UPDATED DURATION EXTRACTOR WITH VALIDATION
+scraper/extractors/duration_extractor.py
+pythonimport re
+from typing import Dict, Optional
+from .base_extractor import BaseExtractor
+
+
+class DurationExtractor(BaseExtractor):
+    """
+    Extract duration, term, and study mode with VALIDATION
+    """
+    
+    async def extract(self, html: str, url: str, country: str) -> Dict:
+        """
+        Extract duration with validation to prevent "21 Year" errors
+        """
+        
+        text = re.sub(r'<[^>]+>', ' ', html)
+        
+        # ─────────────────────────────────────────────────────
+        # DURATION EXTRACTION
+        # ─────────────────────────────────────────────────────
+        
+        duration_data = self._extract_duration(text)
+        
+        # ─────────────────────────────────────────────────────
+        # STUDY MODE EXTRACTION
+        # ─────────────────────────────────────────────────────
+        
+        study_mode = self._extract_study_mode(text)
+        
+        # ─────────────────────────────────────────────────────
+        # VALIDATION
+        # ─────────────────────────────────────────────────────
+        
+        validated = self._validate_duration(duration_data)
+        
+        return {
+            'duration': validated['duration'],
+            'duration_term': validated['term'],
+            'study_mode': study_mode
+        }
+    
+    
+    def _extract_duration(self, text: str) -> Dict:
+        """
+        Extract duration with multiple patterns
+        """
+        
+        # Pattern 1: "2 years" or "18 months"
+        pattern1 = r'(\d+(?:\.\d+)?)\s+(years?|months?|weeks?|semesters?|trimesters?)'
+        match = re.search(pattern1, text, re.I)
+        if match:
+            return {
+                'duration': float(match.group(1)),
+                'term': self._normalize_term(match.group(2))
+            }
+        
+        # Pattern 2: "Duration: 1.5 years"
+        pattern2 = r'duration[:\s]+(\d+(?:\.\d+)?)\s+(years?|months?)'
+        match = re.search(pattern2, text, re.I)
+        if match:
+            return {
+                'duration': float(match.group(1)),
+                'term': self._normalize_term(match.group(2))
+            }
+        
+        # Pattern 3: "6 trimesters" or "4 semesters"
+        pattern3 = r'(\d+)\s+(semesters?|trimesters?)'
+        match = re.search(pattern3, text, re.I)
+        if match:
+            return {
+                'duration': int(match.group(1)),
+                'term': self._normalize_term(match.group(2))
+            }
+        
+        return {'duration': None, 'term': None}
+    
+    
+    def _normalize_term(self, term: str) -> str:
+        """
+        Normalize term to standard values
+        """
+        term_lower = term.lower().rstrip('s')  # Remove plural 's'
+        
+        mapping = {
+            'year': 'Years',
+            'month': 'Months',
+            'week': 'Weeks',
+            'semester': 'Semesters',
+            'trimester': 'Trimesters'
+        }
+        
+        return mapping.get(term_lower, 'Years')
+    
+    
+    def _validate_duration(self, duration_data: Dict) -> Dict:
+        """
+        CRITICAL: Validate duration to prevent wrong values like "21 Year"
+        
+        Validation rules:
+        - Graduate Certificate: 6 months - 1 year
+        - Graduate Diploma: 1 - 2 years
+        - Bachelor: 3 - 5 years
+        - Master: 1 - 3 years
+        - PhD: 3 - 5 years
+        """
+        
+        duration = duration_data.get('duration')
+        term = duration_data.get('term')
+        
+        if not duration or not term:
+            return {'duration': None, 'term': None}
+        
+        # Convert everything to years for validation
+        duration_in_years = duration
+        
+        if term == 'Months':
+            duration_in_years = duration / 12
+        elif term == 'Weeks':
+            duration_in_years = duration / 52
+        elif term == 'Semesters':
+            duration_in_years = duration / 2  # 2 semesters per year
+        elif term == 'Trimesters':
+            duration_in_years = duration / 3  # 3 trimesters per year
+        
+        # VALIDATION: Reject unrealistic durations
+        if duration_in_years > 10:
+            print(f"[WARNING] Duration {duration} {term} ({duration_in_years:.1f} years) is unrealistic - rejecting")
+            return {'duration': None, 'term': None}
+        
+        if duration_in_years < 0.25:  # Less than 3 months
+            print(f"[WARNING] Duration {duration} {term} ({duration_in_years:.1f} years) is too short - rejecting")
+            return {'duration': None, 'term': None}
+        
+        return {
+            'duration': duration,
+            'term': term
+        }
+    
+    
+    def _extract_study_mode(self, text: str) -> str:
+        """
+        Extract study mode with normalization
+        """
+        
+        text_lower = text.lower()
+        
+        # Check for each mode
+        modes_found = []
+        
+        if re.search(r'\bon[- ]?campus\b|\bface[- ]?to[- ]?face\b|\bin[- ]?person\b', text_lower):
+            modes_found.append('on_campus')
+        
+        if re.search(r'\bonline\b|\bremote\b|\bdistance\b|\bexternal\b', text_lower):
+            modes_found.append('online')
+        
+        if re.search(r'\bblended\b|\bhybrid\b|\bmixed\b', text_lower):
+            modes_found.append('blended')
+        
+        # Determine final mode
+        if len(modes_found) > 1 or 'blended' in modes_found:
+            return 'Blended'
+        elif 'online' in modes_found:
+            return 'Online'
+        elif 'on_campus' in modes_found:
+            return 'On Campus'
+        else:
+            return 'On Campus'  # Default
+
+UPDATED ENGLISH TEST EXTRACTOR WITH MULTI-PAGE SUPPORT
+scraper/extractors/english_test_extractor.py (COMPLETE REWRITE)
+pythonimport re
+from typing import Dict, Optional, List
+from .base_extractor import BaseExtractor
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import aiohttp
+
+
+class EnglishTestExtractor(BaseExtractor):
+    """
+    Extract ALL English tests: IELTS, PTE, TOEFL, CAE, DET, etc.
+    
+    CRITICAL: Multi-page extraction support
+    """
+    
+    async def extract(self, html: str, url: str, country: str) -> Dict:
+        """
+        Extract English requirements with multi-page support
+        
+        Steps:
+        1. Try to extract from current page
+        2. If incomplete, find requirements page link
+        3. Fetch and extract from requirements page
+        4. Merge results
+        """
+        
+        result = {}
+        
+        # ─────────────────────────────────────────────────────
+        # STEP 1: Extract from current page
+        # ─────────────────────────────────────────────────────
+        
+        current_page_data = self._extract_all_tests(html)
+        result.update(current_page_data)
+        
+        # ─────────────────────────────────────────────────────
+        # STEP 2: Check if we need requirements page
+        # ─────────────────────────────────────────────────────
+        
+        needs_requirements_page = (
+            not current_page_data.get('ielts_overall') and
+            not current_page_data.get('pte_overall') and
+            not current_page_data.get('toefl_overall')
+        )
+        
+        if needs_requirements_page:
+            # Find requirements page
+            req_page_url = self._find_requirements_page(html, url)
+            
+            if req_page_url:
+                print(f"[INFO] Fetching requirements from: {req_page_url}")
+                
+                # Fetch requirements page
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(req_page_url, timeout=15) as response:
+                            req_html = await response.text()
+                    
+                    # Extract from requirements page
+                    req_data = self._extract_all_tests(req_html)
+                    
+                    # Merge (requirements page data overwrites if present)
+                    result.update(req_data)
+                    
+                except Exception as e:
+                    print(f"[WARNING] Failed to fetch requirements page: {e}")
+        
+        return result
+    
+    
+    def _extract_all_tests(self, html: str) -> Dict:
+        """
+        Extract ALL English test types from HTML
+        """
+        
+        text = re.sub(r'<[^>]+>', ' ', html)
+        
+        result = {}
+        
+        # ─────────────────────────────────────────────────────
+        # IELTS
+        # ─────────────────────────────────────────────────────
+        
+        ielts = self._extract_ielts(text)
+        if ielts:
+            result.update({
+                'ielts_overall': ielts.get('overall'),
+                'ielts_listening': ielts.get('listening'),
+                'ielts_reading': ielts.get('reading'),
+                'ielts_writing': ielts.get('writing'),
+                'ielts_speaking': ielts.get('speaking')
+            })
+        
+        # ─────────────────────────────────────────────────────
+        # PTE
+        # ─────────────────────────────────────────────────────
+        
+        pte = self._extract_pte(text)
+        if pte:
+            result.update({
+                'pte_overall': pte.get('overall'),
+                'pte_listening': pte.get('listening'),
+                'pte_reading': pte.get('reading'),
+                'pte_writing': pte.get('writing'),
+                'pte_speaking': pte.get('speaking')
+            })
+        
+        # ─────────────────────────────────────────────────────
+        # TOEFL
+        # ─────────────────────────────────────────────────────
+        
+        toefl = self._extract_toefl(text)
+        if toefl:
+            result.update({
+                'toefl_overall': toefl.get('overall'),
+                'toefl_listening': toefl.get('listening'),
+                'toefl_reading': toefl.get('reading'),
+                'toefl_writing': toefl.get('writing'),
+                'toefl_speaking': toefl.get('speaking')
+            })
+        
+        # ─────────────────────────────────────────────────────
+        # CAE (Cambridge Advanced English)
+        # ─────────────────────────────────────────────────────
+        
+        cae = self._extract_cae(text)
+        if cae:
+            result['cae_score'] = cae
+        
+        # ─────────────────────────────────────────────────────
+        # DET (Duolingo English Test)
+        # ─────────────────────────────────────────────────────
+        
+        det = self._extract_duolingo(text)
+        if det:
+            result['duolingo_score'] = det
+        
+        return result
+    
+    
+    def _extract_ielts(self, text: str) -> Optional[Dict]:
+        """
+        Extract IELTS with band logic
+        
+        Enhanced patterns for Sydney Met style:
+        - "IELTS: 6.5 (no band less than 6.0)"
+        - "IELTS 6.5 overall with 6.0 in each band"
+        """
+        
+        # Pattern 1: Overall with minimum band
+        patterns = [
+            r'IELTS[:\s]*(\d+\.?\d*)[^\d]*(no\s+(?:band|component)\s+(?:less|lower)\s+than|minimum\s+(?:of\s+)?)([\d.]+)',
+            r'IELTS[:\s]*(\d+\.?\d*)\s*\([\s]*([\d.]+)\s+in\s+each',
+            r'IELTS[:\s]*(\d+\.?\d*).*?(?:with|and)\s+([\d.]+)\s+in\s+(?:each|all)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.I)
+            if match:
+                overall = float(match.group(1))
+                min_band = float(match.group(2) if len(match.groups()) >= 2 else match.group(1))
+                
+                return {
+                    'overall': overall,
+                    'listening': min_band,
+                    'reading': min_band,
+                    'writing': min_band,
+                    'speaking': min_band
+                }
+        
+        # Pattern 2: Detailed breakdown (L/R/W/S)
+        detailed_pattern = r'IELTS[:\s]*(\d+\.?\d*).*?L[istening]*[:\s]*([\d.]+).*?R[eading]*[:\s]*([\d.]+).*?W[riting]*[:\s]*([\d.]+).*?S[peaking]*[:\s]*([\d.]+)'
+        match = re.search(detailed_pattern, text, re.I)
+        if match:
+            return {
+                'overall': float(match.group(1)),
+                'listening': float(match.group(2)),
+                'reading': float(match.group(3)),
+                'writing': float(match.group(4)),
+                'speaking': float(match.group(5))
+            }
+        
+        # Pattern 3: Simple overall only
+        simple_pattern = r'IELTS[:\s]*(\d+\.?\d*)'
+        match = re.search(simple_pattern, text, re.I)
+        if match:
+            return {'overall': float(match.group(1))}
+        
+        return None
+    
+    
+    def _extract_pte(self, text: str) -> Optional[Dict]:
+        """
+        Extract PTE Academic scores
+        
+        Patterns:
+        - "PTE: 58 (no skill below 50)"
+        - "PTE Academic 58 overall with 50 in each"
+        """
+        
+        patterns = [
+            r'PTE[:\s]*(?:Academic)?[:\s]*(\d+)[^\d]*(no\s+(?:skill|score)\s+(?:less|lower|below)\s+than|minimum\s+(?:of\s+)?)([\d]+)',
+            r'PTE[:\s]*(?:Academic)?[:\s]*(\d+)\s*\([\s]*([\d]+)\s+in\s+each',
+            r'PTE[:\s]*(?:Academic)?[:\s]*(\d+).*?(?:with|and)\s+([\d]+)\s+in\s+(?:each|all)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.I)
+            if match:
+                overall = int(match.group(1))
+                min_score = int(match.group(2) if len(match.groups()) >= 2 else match.group(1))
+                
+                return {
+                    'overall': overall,
+                    'listening': min_score,
+                    'reading': min_score,
+                    'writing': min_score,
+                    'speaking': min_score
+                }
+        
+        # Simple overall
+        simple_pattern = r'PTE[:\s]*(?:Academic)?[:\s]*(\d+)'
+        match = re.search(simple_pattern, text, re.I)
+        if match:
+            return {'overall': int(match.group(1))}
+        
+        return None
+    
+    
+    def _extract_toefl(self, text: str) -> Optional[Dict]:
+        """
+        Extract TOEFL iBT scores
+        
+        Patterns:
+        - "TOEFL iBT: 79 (no section below 18)"
+        - "TOEFL 79 overall with 18 in each section"
+        """
+        
+        patterns = [
+            r'TOEFL[:\s]*(?:iBT)?[:\s]*(\d+)[^\d]*(no\s+(?:section|score)\s+(?:less|lower|below)\s+than|minimum\s+(?:of\s+)?)([\d]+)',
+            r'TOEFL[:\s]*(?:iBT)?[:\s]*(\d+)\s*\([\s]*([\d]+)\s+in\s+each',
+            r'TOEFL[:\s]*(?:iBT)?[:\s]*(\d+).*?(?:with|and)\s+([\d]+)\s+in\s+(?:each|all)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.I)
+            if match:
+                overall = int(match.group(1))
+                min_score = int(match.group(2) if len(match.groups()) >= 2 else match.group(1))
+                
+                return {
+                    'overall': overall,
+                    'listening': min_score,
+                    'reading': min_score,
+                    'writing': min_score,
+                    'speaking': min_score
+                }
+        
+        # Detailed breakdown
+        detailed_pattern = r'TOEFL[:\s]*(?:iBT)?[:\s]*(\d+).*?L[istening]*[:\s]*([\d]+).*?R[eading]*[:\s]*([\d]+).*?W[riting]*[:\s]*([\d]+).*?S[peaking]*[:\s]*([\d]+)'
+        match = re.search(detailed_pattern, text, re.I)
+        if match:
+            return {
+                'overall': int(match.group(1)),
+                'listening': int(match.group(2)),
+                'reading': int(match.group(3)),
+                'writing': int(match.group(4)),
+                'speaking': int(match.group(5))
+            }
+        
+        # Simple overall
+        simple_pattern = r'TOEFL[:\s]*(?:iBT)?[:\s]*(\d+)'
+        match = re.search(simple_pattern, text, re.I)
+        if match:
+            return {'overall': int(match.group(1))}
+        
+        return None
+    
+    
+    def _extract_cae(self, text: str) -> Optional[str]:
+        """
+        Extract Cambridge Advanced English (CAE) score
+        
+        Patterns:
+        - "CAE: 176"
+        - "Cambridge C1 Advanced: 176"
+        """
+        
+        patterns = [
+            r'CAE[:\s]*(\d+)',
+            r'Cambridge\s+(?:C1\s+)?Advanced[:\s]*(\d+)',
+            r'C1\s+Advanced[:\s]*(\d+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.I)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    
+    def _extract_duolingo(self, text: str) -> Optional[int]:
+        """
+        Extract Duolingo English Test (DET) score
+        
+        Patterns:
+        - "Duolingo: 105"
+        - "DET: 105"
+        """
+        
+        patterns = [
+            r'Duolingo[:\s]*(?:English\s+Test)?[:\s]*(\d+)',
+            r'DET[:\s]*(\d+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.I)
+            if match:
+                return int(match.group(1))
+        
+        return None
+    
+    
+    def _find_requirements_page(self, html: str, base_url: str) -> Optional[str]:
+        """
+        Find link to requirements/admission page
+        """
+        
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        requirement_keywords = [
+            'requirement', 'admission', 'entry', 'eligibility',
+            'english', 'language', 'how to apply'
+        ]
+        
+        for link in soup.find_all('a', href=True):
+            href = link.get('href')
+            text = link.get_text(strip=True).lower()
+            
+            if any(kw in text or kw in href.lower() for kw in requirement_keywords):
+                return urljoin(base_url, href)
+        
+        return None
+
+DATA VALIDATOR BEFORE STAGING
+scraper/validators.py
+pythonfrom typing import Dict, List
+
+
+class DataValidator:
+    """
+    Validate extracted course data before staging
+    """
+    
+    def validate_course(self, course_data: Dict) -> Dict:
+        """
+        Validate course data and return validation report
+        
+        Returns:
+        {
+            'score': float (0.0 - 1.0),
+            'missing_fields': list,
+            'warnings': list,
+            'errors': list
+        }
+        """
+        
+        missing = []
+        warnings = []
+        errors = []
+        
+        # ─────────────────────────────────────────────────────
+        # CHECK REQUIRED FIELDS
+        # ─────────────────────────────────────────────────────
+        
+        required_fields = [
+            'course_name',
+            'degree_level',
+            'duration',
+            'duration_term',
+            'study_mode'
+        ]
+        
+        for field in required_fields:
+            if not course_data.get(field):
+                missing.append(field)
+        
+        # ─────────────────────────────────────────────────────
+        # CHECK IMPORTANT FIELDS
+        # ─────────────────────────────────────────────────────
+        
+        important_fields = [
+            'international_fee',
+            'ielts_overall',
+            'intake_month'
+        ]
+        
+        for field in important_fields:
+            if not course_data.get(field):
+                warnings.append(f'Missing {field}')
+        
+        # ─────────────────────────────────────────────────────
+        # VALIDATE DURATION
+        # ─────────────────────────────────────────────────────
+        
+        duration = course_data.get('duration')
+        term = course_data.get('duration_term')
+        
+        if duration and term:
+            # Convert to years
+            if term == 'Months':
+                years = duration / 12
+            elif term == 'Years':
+                years = duration
+            else:
+                years = duration  # Assume years
+            
+            # Check realistic range
+            if years > 10:
+                errors.append(f'Unrealistic duration: {duration} {term}')
+            elif years < 0.25:
+                errors.append(f'Duration too short: {duration} {term}')
+        
+        # ─────────────────────────────────────────────────────
+        # VALIDATE FEE
+        # ─────────────────────────────────────────────────────
+        
+        fee = course_data.get('international_fee')
+        
+        if fee:
+            if fee < 1000 or fee > 100000:
+                warnings.append(f'Unusual fee amount: {fee}')
+        
+        # ─────────────────────────────────────────────────────
+        # CALCULATE SCORE
+        # ─────────────────────────────────────────────────────
+        
+        total_fields = len(required_fields) + len(important_fields)
+        present_fields = (
+            len([f for f in required_fields if course_data.get(f)]) +
+            len([f for f in important_fields if course_data.get(f)])
+        )
+        
+        score = present_fields / total_fields
+        
+        # Penalize for errors
+        if errors:
+            score *= 0.5
+        
+        return {
+            'score': round(score, 2),
+            'missing_fields': missing,
+            'warnings': warnings,
+            'errors': errors
+        }
+
+IMMEDIATE FIXES NEEDED FOR SYDNEY MET
+The Sydney Met site is simple and structured. Here's what needs to happen:
+1. Check Sydney Met's Actual Structure
+Visit one course page manually:
+https://sydneymet.edu.au/courses/bachelor-of-business/
+Check:
+
+Where is duration shown?
+Where are English requirements? (likely on a separate requirements page)
+Where is PTE/TOEFL/CAE/DET mentioned?
+
+2. Apply Multi-Page Extraction
+For Sydney Met, the extractors should:
+
+Extract basic info from course page
+Auto-detect that requirements are on /minimum-entry-requirement/
+Fetch that page
+Extract ALL English tests from there
+Merge data
+
+
+WHAT TO DO NOW
+Option 1: Fix Extractors (recommended)
+Replace the extractor files with the corrected code above, which includes:
+
+Duration validation (prevents "21 Year")
+Multi-page English test extraction
+All test types (IELTS/PTE/TOEFL/CAE/DET)
+Data validation before staging
+
+Option 2: Manual Data Check
+Go to Sydney Met's website and manually verify:
+
+What are the correct durations?
+Where are PTE/TOEFL/CAE mentioned?
+Are they on individual course pages or a global requirements page?
+
+Option 3: Add Site-Specific Rules
+For known simple sites like Sydney Met, create site-specific extraction rules that bypass AI completely.

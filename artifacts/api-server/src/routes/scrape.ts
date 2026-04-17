@@ -317,23 +317,39 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
   const text = $("body").text();
   const data: Partial<CourseData> = { courseName: name, courseWebsite: url, language: "English" };
 
-  // Duration: year → month → week → semester → trimester
-  const durMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:full[- ]?time)?/i);
-  if (durMatch) { data.duration = parseFloat(durMatch[1]); data.durationTerm = "Year"; }
-  else {
-    const mMatch = text.match(/(\d+)\s*months?\s*(?:full[- ]?time)?/i);
-    if (mMatch) { data.duration = parseInt(mMatch[1]); data.durationTerm = "Month"; }
-    else {
-      const wMatch = text.match(/(\d+)\s*weeks?\s*(?:full[- ]?time)?/i);
-      if (wMatch) { data.duration = parseInt(wMatch[1]); data.durationTerm = "Week"; }
-      else {
-        const semMatch = text.match(/(\d+)\s*trimesters?/i);
-        if (semMatch) { data.duration = parseInt(semMatch[1]); data.durationTerm = "Trimester"; }
-        else {
-          const sem2Match = text.match(/(\d+)\s*semesters?/i);
-          if (sem2Match) { data.duration = parseInt(sem2Match[1]); data.durationTerm = "Semester"; }
-        }
-      }
+  // Duration: prefer explicit "Duration:" label first, then fall back to general patterns
+  const durLabelMatch = text.match(/(?:duration|course\s*length|program\s*length)[:\s]+(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)/i);
+  const durYearMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:full[- ]?time)?/i);
+  const durMonthMatch = text.match(/(\d+)\s*months?\s*(?:full[- ]?time)?/i);
+  const durWeekMatch = text.match(/(\d+)\s*weeks?\s*(?:full[- ]?time)?/i);
+  const durTrimMatch = text.match(/(\d+)\s*trimesters?/i);
+  const durSemMatch = text.match(/(\d+)\s*semesters?/i);
+
+  if (durLabelMatch) {
+    data.duration = parseFloat(durLabelMatch[1]);
+    const t = durLabelMatch[2].toLowerCase();
+    if (/year|yr/.test(t)) data.durationTerm = "Year";
+    else if (/month/.test(t)) data.durationTerm = "Month";
+    else if (/week/.test(t)) data.durationTerm = "Week";
+    else if (/trimester/.test(t)) data.durationTerm = "Trimester";
+    else if (/semester/.test(t)) data.durationTerm = "Semester";
+  } else if (durYearMatch) { data.duration = parseFloat(durYearMatch[1]); data.durationTerm = "Year"; }
+  else if (durMonthMatch) { data.duration = parseInt(durMonthMatch[1]); data.durationTerm = "Month"; }
+  else if (durWeekMatch) { data.duration = parseInt(durWeekMatch[1]); data.durationTerm = "Week"; }
+  else if (durTrimMatch) { data.duration = parseInt(durTrimMatch[1]); data.durationTerm = "Trimester"; }
+  else if (durSemMatch) { data.duration = parseInt(durSemMatch[1]); data.durationTerm = "Semester"; }
+
+  // VALIDATION: Reject unrealistic durations (prevents "21 Year" type errors)
+  if (data.duration != null && data.durationTerm) {
+    const termToYearFactor: Record<string, number> = {
+      Year: 1, Month: 1 / 12, Week: 1 / 52, Trimester: 1 / 3, Semester: 1 / 2,
+    };
+    const factor = termToYearFactor[data.durationTerm] ?? 1;
+    const durationInYears = data.duration * factor;
+    if (durationInYears > 10 || durationInYears < 0.25) {
+      console.log(`[WARNING] Rejected unrealistic duration: ${data.duration} ${data.durationTerm} (${durationInYears.toFixed(2)} yrs)`);
+      data.duration = undefined;
+      data.durationTerm = undefined;
     }
   }
 
@@ -558,6 +574,22 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const ieltsSection = text.match(/IELTS\s*(?:Academic|academic)?[^]*?(?=(?:TOEF|TOFL|TOFEL|PTE|Cambridge|CAE|Duolingo|Pathway|Credit|Recognition|\n\s*\n))/i);
   const ieltsText = ieltsSection ? ieltsSection[0] : text;
 
+  // Pattern 0: "IELTS: 6.5 (no band less than 6.0)" — 3-group spec pattern
+  if (!data.ieltsOverall) {
+    const noBandLessM = ieltsText.match(/IELTS[:\s]*(?:Academic[:\s]*)?(\d+(?:\.\d+)?)[^\d]+(?:no\s+(?:band|component)\s+(?:less|lower|below)\s*(?:than)?|minimum\s+(?:of\s+)?(?:band|score)?)[:\s]*([\d.]+)/i);
+    if (noBandLessM) {
+      const overall = parseFloat(noBandLessM[1]);
+      const min = parseFloat(noBandLessM[2]);
+      if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9) {
+        data.ieltsOverall = overall;
+        if (!data.ieltsListening) data.ieltsListening = min;
+        if (!data.ieltsSpeaking) data.ieltsSpeaking = min;
+        if (!data.ieltsWriting) data.ieltsWriting = min;
+        if (!data.ieltsReading) data.ieltsReading = min;
+      }
+    }
+  }
+
   // Pattern: "IELTS 6.5 (6.0 in each band)" — spec's most common compact format
   if (!data.ieltsOverall) {
     const eachBandM = ieltsText.match(/IELTS[:\s]*(?:Academic[:\s]*)?(\d+(?:\.\d+)?)\s*\([\s]*(\d+(?:\.\d+)?)\s*(?:in\s*each|each\s*(?:band|component|skill))/i);
@@ -656,6 +688,33 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
     }
   }
 
+  // TOEFL "with X in each section" combined pattern — "TOEFL iBT: 79 (no section below 18)" / "TOEFL 79 overall with 18 in each section"
+  if (!data.toeflOverall) {
+    const toeflWithEachM = text.match(/(?:TOEFL|TOFEL)[:\s]*(?:iBT)?[:\s]*(\d+)[^.]*?(?:with|and)\s+(\d+)\s+in\s+(?:each|all)(?:\s+section)?/i);
+    if (toeflWithEachM) {
+      const overall = parseInt(toeflWithEachM[1]);
+      const min = parseInt(toeflWithEachM[2]);
+      if (overall >= 30 && overall <= 120 && min >= 0 && min <= 30) {
+        data.toeflOverall = overall;
+        data.toeflListening = min; data.toeflSpeaking = min;
+        data.toeflWriting = min; data.toeflReading = min;
+      }
+    }
+  }
+
+  if (!data.toeflOverall) {
+    const toeflNoSectionM = text.match(/(?:TOEFL|TOFEL)[:\s]*(?:iBT)?[:\s]*(\d+)[^)]*?\(no\s*section\s*(?:below|less\s*than)\s*(\d+)\)/i);
+    if (toeflNoSectionM) {
+      const overall = parseInt(toeflNoSectionM[1]);
+      const min = parseInt(toeflNoSectionM[2]);
+      if (overall >= 30 && overall <= 120 && min >= 0 && min <= 30) {
+        data.toeflOverall = overall;
+        data.toeflListening = min; data.toeflSpeaking = min;
+        data.toeflWriting = min; data.toeflReading = min;
+      }
+    }
+  }
+
   const toeflPatterns = [
     /(?:TOEFL|TOFEL|TOEF[FL])\s*(?:iBT|ibt|IBT)?[:\s]*(?:overall\s*(?:score\s*)?(?:of\s*)?)?(\d+)(?:\s*[-–]\s*(\d+))?/i,
     /(?:TOEFL|TOFEL|TOEF[FL])\s*(?:iBT|ibt|IBT)?[^.]*?(?:overall\s*(?:score\s*)?(?:of\s*)?)(\d+)(?:\s*[-–]\s*(\d+))?/i,
@@ -721,6 +780,20 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
     }
   }
 
+  // PTE "with X in each" combined pattern — "PTE Academic 58 overall with 50 in each" / "PTE: 58 (no skill below 50)"
+  if (!data.pteOverall) {
+    const pteWithEachM = text.match(/PTE[:\s]*(?:Academic)?[:\s]*(\d+)[^.]*?(?:with|and)\s+(\d+)\s+in\s+(?:each|all)/i);
+    if (pteWithEachM) {
+      const overall = parseInt(pteWithEachM[1]);
+      const min = parseInt(pteWithEachM[2]);
+      if (overall >= 30 && overall <= 90 && min >= 30 && min <= 90) {
+        data.pteOverall = overall;
+        data.pteListening = min; data.pteSpeaking = min;
+        data.pteWriting = min; data.pteReading = min;
+      }
+    }
+  }
+
   const ptePatterns = [
     /PTE\s*(?:Academic|academic)?[:\s]*(?:overall\s*(?:score\s*)?(?:of\s*)?)?(\d+)/i,
     /PTE\s*(?:Academic|academic)?[^.]*?(?:overall\s*(?:score\s*)?(?:of\s*)?)(\d+)/i,
@@ -740,9 +813,11 @@ function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   if (data.pteOverall && pteText) {
     const noPteBelow = pteText.match(/no\s*(?:score|band|component|communicative\s*skill)[^.]*?(?:below|less\s*than|lower\s*than|under)\s*(\d+)/i)
       || pteText.match(/(?:each|all)\s*(?:communicative\s*)?skill[^.]*?(?:minimum|at\s*least)\s*(\d+)/i)
-      || pteText.match(/(?:minimum|min)[^.]*?(?:in\s+each|per\s+section|per\s+skill)[^.]*?(\d+)/i);
+      || pteText.match(/(?:minimum|min)[^.]*?(?:in\s+each|per\s+section|per\s+skill)[^.]*?(\d+)/i)
+      || pteText.match(/PTE[^.]*?(\d+)\s*\(no\s*skill\s*(?:below|less\s*than)\s*(\d+)\)/i);
     if (noPteBelow) {
-      const min = parseInt(noPteBelow[1]);
+      const minStr = noPteBelow[2] ?? noPteBelow[1];
+      const min = parseInt(minStr);
       if (min >= 30 && min <= 90) {
         if (!data.pteListening) data.pteListening = min;
         if (!data.pteSpeaking) data.pteSpeaking = min;
@@ -1231,8 +1306,66 @@ function computeCompleteness(d: CourseData): { score: number; missing: string[] 
   return { score: Math.round((filled / maxScore) * 100), missing };
 }
 
+function validateAndSanitizeCourseData(courseData: CourseData): string[] {
+  const warnings: string[] = [];
+
+  // Validate duration
+  if (courseData.duration != null && courseData.durationTerm) {
+    const termToYearFactor: Record<string, number> = {
+      Year: 1, Month: 1 / 12, Week: 1 / 52, Trimester: 1 / 3, Semester: 1 / 2,
+    };
+    const factor = termToYearFactor[courseData.durationTerm] ?? 1;
+    const durationInYears = courseData.duration * factor;
+    if (durationInYears > 10 || durationInYears < 0.25) {
+      warnings.push(`Unrealistic duration rejected: ${courseData.duration} ${courseData.durationTerm} (${durationInYears.toFixed(2)} yrs)`);
+      courseData.duration = undefined as any;
+      courseData.durationTerm = undefined as any;
+    }
+  }
+
+  // Validate fee range
+  if (courseData.internationalFee != null) {
+    if (courseData.internationalFee < 1000 || courseData.internationalFee > 200000) {
+      warnings.push(`Unusual fee rejected: ${courseData.internationalFee}`);
+      courseData.internationalFee = undefined as any;
+    }
+  }
+
+  // Validate IELTS range
+  if (courseData.ieltsOverall != null && (courseData.ieltsOverall < 4 || courseData.ieltsOverall > 9)) {
+    warnings.push(`Invalid IELTS overall rejected: ${courseData.ieltsOverall}`);
+    courseData.ieltsOverall = undefined as any;
+    courseData.ieltsListening = undefined as any;
+    courseData.ieltsSpeaking = undefined as any;
+    courseData.ieltsWriting = undefined as any;
+    courseData.ieltsReading = undefined as any;
+  }
+
+  // Validate PTE range
+  if (courseData.pteOverall != null && (courseData.pteOverall < 30 || courseData.pteOverall > 90)) {
+    warnings.push(`Invalid PTE overall rejected: ${courseData.pteOverall}`);
+    courseData.pteOverall = undefined as any;
+  }
+
+  // Validate TOEFL range
+  if (courseData.toeflOverall != null && (courseData.toeflOverall < 30 || courseData.toeflOverall > 120)) {
+    warnings.push(`Invalid TOEFL overall rejected: ${courseData.toeflOverall}`);
+    courseData.toeflOverall = undefined as any;
+  }
+
+  return warnings;
+}
+
 async function stageCourse(courseData: CourseData, uniId: number, jobId: string): Promise<boolean> {
   if (!courseData.courseName) return false;
+
+  // Validate and sanitize before staging
+  const validationWarnings = validateAndSanitizeCourseData(courseData);
+  if (validationWarnings.length > 0) {
+    for (const w of validationWarnings) {
+      console.log(`[VALIDATE] ${courseData.courseName}: ${w}`);
+    }
+  }
 
   const dup = await pool.query(
     "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND course_name=$2 LIMIT 1",
