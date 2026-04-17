@@ -1,0 +1,48 @@
+root@university-and-course-data:~# git clone https://github.com/Bijay053/University-and-Course-data.git /opt/app
+Cloning into '/opt/app'...
+remote: Enumerating objects: 1004, done.
+remote: Counting objects: 100% (1004/1004), done.
+remote: Compressing objects: 100% (408/408), done.
+remote: Total 1004 (delta 587), reused 997 (delta 580), pack-reused 0 (from 0)
+Receiving objects: 100% (1004/1004), 12.76 MiB | 14.41 MiB/s, done.
+Resolving deltas: 100% (587/587), done.
+root@university-and-course-data:~# nano /opt/app/deploy.sh
+root@university-and-course-data:~# bash /opt/app/deploy.sh
+/opt/app/deploy.sh: line 2: yourpassword123: command not found
+root@university-and-course-data:~# pm2 status                    # api-server should show "online"
+curl http://localhost:8080/api/universities   # should return JSON
+Command 'pm2' not found, did you mean:
+  command 'pom2' from deb libpod-pom-perl (2.01-4)
+  command 'pmc' from deb linuxptp (4.0-1ubuntu1.1)
+  command 'gm2' from deb gm2 (4:13.2.0-2ubuntu1)
+  command 'pm' from deb powerman (2.3.27-4)
+  command 'wm2' from deb wm2 (4+svn20090216-4build1)
+  command 'tpm2' from deb tpm2-tools (5.4-1)
+  command 'pmw' from deb pmw (1:5.22-1)
+  command 'pms' from deb pms (0.42-1.1)
+  command 'pmg' from deb python3-pymatgen (2023.06.23+dfsg1-2build1)
+Try: apt install <deb name>
+curl: (7) Failed to connect to localhost port 8080 after 0 ms: Couldn't connect to server
+root@university-and-course-data:~# GEMINI_KEY="AQ.Ab8RN6LKEO3UAm_chl8KWIpqtvSYtC9b1MaVanRiYgWDCpCD1g"
+DB_PASS="Bij@y12345"
+SESSION_SECRET="pXUBUgzw+Fu7NC50TPMdRbOrLHnHH2+UX3NVvH5qmc6SJOmJsDbD09u6oym2DLGj3ajEMnrm13jb9gdwE4vSHw=="
+
+# --- Write .env ---
+cat > /opt/app/.env << EOF
+DATABASE_URL=postgresql://uniportal:${DB_PASS}@localhost:5432/university_portal
+GEMINI_API_KEY=${GEMINI_KEY}
+SESSION_SECRET=${SESSION_SECRET}
+PORT=8080
+NODE_ENV=production
+EOF
+
+# --- Restore clean deploy script ---
+curl -s https://raw.githubusercontent.com/Bijay053/University-and-Course-data/main/deploy.sh \
+  | sed "s/yourpassword123/${DB_PASS}/g" \
+  | sed "s/your_gemini_api_key_here/${GEMINI_KEY}/g" \
+  | sed "s/change_this_to_a_random_secret_string_64chars/${SESSION_SECRET}/g" \
+  > /opt/app/deploy.sh
+
+bash /opt/app/deploy.sh
+/opt/app/deploy.sh: line 1: 404:: command not found
+root@university-and-course-data:~# 
