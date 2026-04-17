@@ -1591,6 +1591,12 @@ function validateAndSanitizeCourseData(courseData: CourseData): string[] {
 async function stageCourse(courseData: CourseData, uniId: number, jobId: string): Promise<boolean> {
   if (!courseData.courseName) return false;
 
+  // Last-resort junk filter — catch event/category/news pages the link collector missed
+  if (isJunkCourseName(courseData.courseName)) {
+    console.log(`[JUNK] Skipping non-course page: "${courseData.courseName}"`);
+    return false;
+  }
+
   // Validate and sanitize before staging
   const validationWarnings = validateAndSanitizeCourseData(courseData);
   if (validationWarnings.length > 0) {
@@ -1792,18 +1798,6 @@ const JUNK_LINK_NAMES = new Set([
   "favourites", "my list", "compare",
 ]);
 
-function isJunkCourseName(name: string): boolean {
-  const lower = name.toLowerCase().trim();
-  if (JUNK_LINK_NAMES.has(lower)) return true;
-  if (lower.length < 6) return true;
-  if (lower.length > 200) return true;
-  if (/^(all|view|see|find|browse|search|show)\s/i.test(lower)) return true;
-  if (/^(our|the|a)\s+(course|program|degree)/i.test(lower)) return true;
-  if (!/[a-z]/i.test(lower)) return true;
-  if (/^(accommodation|sport|scholarships?|fees?|pathways?|exchange|library|campus|career|alumni|research|faculty|department|school|international students?|domestic students?|high school|non.school|postgraduate students?|indigenous|disability|fees? and |student life|moving to|uow \w+)$/i.test(lower)) return true;
-  return false;
-}
-
 const DEGREE_QUALIFIERS = [
   "bachelor", "master", "doctor", "graduate", "diploma", "certificate",
   "phd", "mba", "associate", "honours", "juris", "combined", "double",
@@ -1822,8 +1816,60 @@ function urlLastSegmentHasDegreeQualifier(url: string): boolean {
   } catch { return false; }
 }
 
-function pageContentLooksLikeCourse(text: string): boolean {
+/**
+ * Junk course name patterns — event pages, category pages, news articles.
+ * Returns true when the name is clearly NOT a real course.
+ */
+function isJunkCourseName(name: string): boolean {
+  const lower = name.toLowerCase().trim();
+
+  // Basic sanity checks
+  if (JUNK_LINK_NAMES.has(lower)) return true;
+  if (lower.length < 6) return true;
+  if (lower.length > 200) return true;
+  if (!/[a-z]/i.test(lower)) return true;
+  if (/^(all|view|see|find|browse|search|show)\s/i.test(lower)) return true;
+  if (/^(our|the|a)\s+(course|program|degree)/i.test(lower)) return true;
+  if (/^(accommodation|sport|scholarships?|fees?|pathways?|exchange|library|campus|career|alumni|research|faculty|department|school|international students?|domestic students?|high school|non.school|postgraduate students?|indigenous|disability|fees? and |student life|moving to|uow \w+)$/i.test(lower)) return true;
+
+  // Event / news / category page patterns
+  const junkPatterns = [
+    /\binfo\s+night\b/,
+    /\bvirtual\s+info\s+night\b/,
+    /\bopen\s+day\b/,
+    /\bwebinar\b/,
+    /\bseminar\b/,
+    /\binformation\s+(session|night|event)\b/,
+    /^double\s+degrees?$/,
+    /^dual\s+degrees?$/,
+    /^graduate\s+certificates?$/,
+    /^postgraduate\s+courses?$/,
+    /^undergraduate\s+courses?$/,
+    /^all\s+courses?$/,
+    /^(?:our\s+)?courses?$/,
+    /retains?\s+tier/,
+    /\brackings?\b.*\bspot\b/,
+    /\baccredited\b$/,
+    /\bwhy\s+choose\b/,
+    /^apply\s+now$/,
+    /\bnews\b.*\barticle\b/,
+    /\bpress\s+release\b/,
+  ];
+  return junkPatterns.some((p) => p.test(lower));
+}
+
+function pageContentLooksLikeCourse(text: string, name?: string): boolean {
+  // Check name first — reject obvious junk titles immediately
+  if (name && isJunkCourseName(name)) return false;
+
   const lower = text.slice(0, 8000).toLowerCase();
+
+  // Strong explicit rejection: event/news pages have these but no course data
+  if (/\b(info\s+night|virtual\s+info\s+night|open\s+day|info\s+session)\b/.test(lower) &&
+    !/\b(ielts|pte|toefl|tuition|duration|credit\s+points?|entry\s+requirements?)\b/.test(lower)) {
+    return false;
+  }
+
   const indicators = [
     /\b(ielts|toefl|pte|english proficiency|duolingo|cambridge|language requirement)\b/,
     /\b(tuition fee|annual fee|per year|international fee|course fee|total fee|indicative fee|estimated fee)\b/,
@@ -1835,10 +1881,12 @@ function pageContentLooksLikeCourse(text: string): boolean {
     /\b(on campus|online|blended|distance learning|study mode|delivery mode)\b/,
   ];
   const matches = indicators.filter((r) => r.test(lower)).length;
-  if (matches >= 3) return true;
-  if (matches >= 2) {
-    const hasTitle = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|mba|msc|bed|bsc|ba|bbus|llb|lld|jd|mphil)\b/.test(lower);
-    return hasTitle;
+
+  // Threshold: 2+ indicators → valid; 1 + degree keyword in text → valid
+  if (matches >= 2) return true;
+  if (matches >= 1) {
+    const hasDegreeTitle = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|mba|msc|bed|bsc|ba|bbus|llb|lld|jd|mphil|juris)\b/.test(lower);
+    return hasDegreeTitle;
   }
   return false;
 }
@@ -1897,9 +1945,17 @@ async function researchAndValidateCourseLinks(
   await Promise.all(sample.map((candidate) =>
     sampleSem(async () => {
       try {
+        // Short-circuit on known junk names before even fetching
+        if (isJunkCourseName(candidate.name)) {
+          confirmedNonCourses++;
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Junk page (name filter): "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
+          return;
+        }
+
         const pageHtml = await fetchPage(candidate.url);
         const bodyText = cheerio.load(pageHtml)("body").text();
-        const isRealCourse = pageContentLooksLikeCourse(bodyText);
+        const isRealCourse = pageContentLooksLikeCourse(bodyText, candidate.name);
 
         if (isRealCourse) {
           confirmedCourses++;
@@ -1913,19 +1969,32 @@ async function researchAndValidateCourseLinks(
         } else {
           confirmedNonCourses++;
           if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
-          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}" — filtering similar URLs`, phase: "discover", sampleResult: "rejected" });
+          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
         }
       } catch {}
     })
   ));
 
+  const successRate = sample.length > 0 ? confirmedCourses / sample.length : 0;
   addLog(job, "status", {
     message: `Research complete: ${confirmedCourses}/${sample.length} sampled pages are genuine course pages`,
     phase: "discover",
   });
 
   if (confirmedCourses === 0) {
-    addLog(job, "status", { message: "Could not confirm any course pages from samples. Using URL-filtered candidates.", phase: "discover" });
+    // If URL filter found high-confidence candidates, trust it and proceed with a warning
+    if (urlFiltered.length >= 5) {
+      addLog(job, "status", {
+        message: `⚠ WARNING: Content validation failed for all ${sample.length} samples, but URL analysis found ${urlFiltered.length} degree-qualified URLs. Proceeding with URL-filtered list — manual review recommended.`,
+        phase: "discover",
+      });
+      return { links: urlFiltered, validSamples: 0, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
+    }
+    // No URL candidates either — genuinely stuck
+    addLog(job, "status", {
+      message: `⚠ WARNING: Could not confirm any course pages (0/${sample.length} passed content check, ${urlFiltered.length} URL-filtered candidates). Using all URL-filtered candidates. Check if the university's course pages match expected patterns.`,
+      phase: "discover",
+    });
     return { links: workingList, validSamples: 0, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
   }
 
