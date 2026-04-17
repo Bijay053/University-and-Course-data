@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import * as cheerio from "cheerio";
 import { pool, db, universitiesTable, scrapedCoursesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
 
 const router: IRouter = Router();
 
@@ -3180,8 +3181,17 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio> }[] = [];
   let completed = 0;
 
+  // Browser automation is rate-limited to avoid exhausting OS resources
   const CONCURRENCY = 25;
+  const BROWSER_CONCURRENCY = 5;
   const sem = makeSemaphore(CONCURRENCY);
+  const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
+
+  // Determine once whether this batch of courses needs browser automation
+  const batchNeedsBrowser = courseLinks.length > 0 && siteNeedsBrowser(courseLinks[0].url);
+  if (batchNeedsBrowser) {
+    addLog(job, "status", { message: "JS-heavy site detected — using browser automation (International toggle + Entry Requirements tab)", phase: "fetch" });
+  }
 
   const tasks = courseLinks.slice(0, max).map((link, i) =>
     sem(async () => {
@@ -3190,7 +3200,34 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
       try {
-        const cHtml = await fetchPage(link.url);
+        // For JS-heavy sites use browser (clicks International toggle + Entry Requirements tab).
+        // For all others fall through to the plain HTTP fetch.
+        let cHtml: string;
+        let browserReqsHtml: string | null = null;  // per-course requirements HTML from browser
+
+        if (batchNeedsBrowser || siteNeedsBrowser(link.url)) {
+          const browserResult = await browserSem(() =>
+            fetchPageWithBrowser(link.url, {
+              clickInternational: true,
+              clickRequirementsTab: true,
+              expandAccordions: true,
+              timeoutMs: 35_000,
+            })
+          );
+          if (browserResult) {
+            cHtml = browserResult.mainHtml;
+            // Only use requirementsHtml when something extra was done
+            if (browserResult.requirementsHtml !== browserResult.mainHtml) {
+              browserReqsHtml = browserResult.requirementsHtml;
+            }
+          } else {
+            // Browser failed — fall back to plain HTTP fetch
+            cHtml = await fetchPage(link.url);
+          }
+        } else {
+          cHtml = await fetchPage(link.url);
+        }
+
         const cheerioData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
 
         // Only enrich if cheerio is missing critical fields (avoids extra network round-trips for most courses)
@@ -3199,6 +3236,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           const relatedPages = findRelatedPages(cHtml, link.url);
           if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
             await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
+          }
+        }
+
+        // When browser gave us per-course requirements HTML (after opening the
+        // Entry Requirements tab and expanding accordions), use it to extract
+        // IELTS — this beats the university-level requirements page for accuracy.
+        if (browserReqsHtml && !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall)) {
+          extractEnglishFromHtml(cheerio.load(browserReqsHtml), cheerioData);
+          if (!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall)) {
+            extractEnglishRequirements(cheerio.load(browserReqsHtml)("body").text(), cheerioData);
           }
         }
 
