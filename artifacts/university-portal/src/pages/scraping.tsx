@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
   Globe, Zap, Loader2, X, ExternalLink, Bot, ArrowRight,
   Eye, Pencil, Trash2, Check, XCircle, CheckCheck, Save,
-  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown,
+  Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -1054,35 +1054,49 @@ export default function Scraping() {
                               {course.internationalFee.toLocaleString()}
                               <span className="text-xs text-gray-400 ml-1">/{course.feeTerm || "yr"}</span>
                             </span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing international fee">
+                              <AlertTriangle className="w-3 h-3" />
+                            </span>
+                          )}
                         </td>
                         <td className="p-2 text-center">
                           {course.ieltsOverall ? (
                             <span className="text-purple-700 font-medium">{course.ieltsOverall}</span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing IELTS Overall">
+                              <AlertTriangle className="w-3 h-3" />
+                            </span>
+                          )}
                         </td>
                         <td className="p-2 text-center">
                           {course.pteOverall ? (
                             <span className="text-orange-600 font-medium">{course.pteOverall}</span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : <span className="text-gray-300 text-xs">-</span>}
                         </td>
                         <td className="p-2 text-center">
                           {course.toeflOverall ? (
                             <span className="text-rose-600 font-medium">{course.toeflOverall}</span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : <span className="text-gray-300 text-xs">-</span>}
                         </td>
                         <td className="p-2 text-center">
                           {course.cambridgeOverall ? (
                             <span className="text-teal-600 font-medium">{course.cambridgeOverall}</span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : <span className="text-gray-300 text-xs">-</span>}
                         </td>
                         <td className="p-2 text-center">
                           {course.duolingoOverall ? (
                             <span className="text-emerald-600 font-medium">{course.duolingoOverall}</span>
-                          ) : <span className="text-gray-300">-</span>}
+                          ) : <span className="text-gray-300 text-xs">-</span>}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
-                          {course.intakeMonths?.length ? course.intakeMonths.map(m => m.slice(0, 3)).join(", ") : <span className="text-gray-300">-</span>}
+                          {course.intakeMonths?.length ? (
+                            course.intakeMonths.map(m => m.slice(0, 3)).join(", ")
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing intake months">
+                              <AlertTriangle className="w-3 h-3" />
+                            </span>
+                          )}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
                           {course.studyMode || <span className="text-gray-300">-</span>}

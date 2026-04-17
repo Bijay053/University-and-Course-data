@@ -1,0 +1,361 @@
+ISSUE 1: Study Mode Detection Error
+Image 2 shows:
+Location: Sydney, Online
+Delivery: Face to Face on campus
+This means:
+
+✅ Available On Campus in Sydney
+✅ Available Online
+
+Therefore: Study Mode should be "Blended" (both options available)
+But Image 1 shows:
+
+❌ Mode column shows "Online" for ALL courses
+
+This is WRONG. The scraper is only detecting "Online" and missing "On Campus" / "Face to Face".
+
+ISSUE 2: Missing IELTS for 8 of 9 Courses
+Only "Bachelor of Professional Accounting" has complete data (100% score). All others show:
+
+⚠️ Missing: ieltsOverall
+❌ Empty IELTS/PTE/TOEFL/CAE/DET columns
+
+This means the English test extractor is STILL FAILING on 8 out of 9 courses.
+
+COMPLETE FIXES
+FIX 1: STUDY MODE EXTRACTOR - DETECT BOTH CAMPUS + ONLINE
+scraper/extractors/duration_extractor.py (Updated _extract_study_mode method)
+pythondef _extract_study_mode(self, text: str, html: str) -> str:
+    """
+    Extract study mode with proper multi-mode detection
+    
+    CRITICAL: Many courses offer BOTH on-campus AND online
+    This should be classified as "Blended"
+    
+    Examples:
+    - "Location: Sydney, Online" + "Delivery: Face to Face" = Blended
+    - "On campus and online available" = Blended
+    - "Online only" = Online
+    - "Face to face only" = On Campus
+    """
+    
+    text_lower = text.lower()
+    
+    # Parse HTML to check specific fields
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Check for "Location" field (ASAHE specific)
+    location_indicators = soup.find_all(string=re.compile(r'location', re.I))
+    
+    has_online = False
+    has_on_campus = False
+    
+    # ─────────────────────────────────────────────────────
+    # CHECK 1: Location field mentions both
+    # ─────────────────────────────────────────────────────
+    
+    for indicator in location_indicators:
+        parent = indicator.find_parent(['div', 'section', 'td', 'li'])
+        if parent:
+            parent_text = parent.get_text().lower()
+            
+            if 'online' in parent_text:
+                has_online = True
+            
+            if any(kw in parent_text for kw in ['sydney', 'melbourne', 'campus', 'city']):
+                has_on_campus = True
+    
+    # ─────────────────────────────────────────────────────
+    # CHECK 2: Delivery/Mode field
+    # ─────────────────────────────────────────────────────
+    
+    delivery_indicators = soup.find_all(string=re.compile(r'delivery|mode', re.I))
+    
+    for indicator in delivery_indicators:
+        parent = indicator.find_parent(['div', 'section', 'td', 'li'])
+        if parent:
+            parent_text = parent.get_text().lower()
+            
+            if any(kw in parent_text for kw in ['face to face', 'on campus', 'on-campus', 'in person']):
+                has_on_campus = True
+            
+            if 'online' in parent_text:
+                has_online = True
+    
+    # ─────────────────────────────────────────────────────
+    # CHECK 3: General text patterns
+    # ─────────────────────────────────────────────────────
+    
+    if re.search(r'\bon[- ]?campus\b|\bface[- ]?to[- ]?face\b|\bin[- ]?person\b', text_lower):
+        has_on_campus = True
+    
+    if re.search(r'\bonline\b|\bremote\b|\bdistance\b|\bexternal\b', text_lower):
+        has_online = True
+    
+    if re.search(r'\bblended\b|\bhybrid\b|\bmixed\s+mode\b', text_lower):
+        return 'Blended'
+    
+    # Explicit "both" keyword
+    if re.search(r'\bboth\b.*\bonline\b.*\bcampus\b|\bboth\b.*\bcampus\b.*\bonline\b', text_lower):
+        return 'Blended'
+    
+    # ─────────────────────────────────────────────────────
+    # DETERMINE FINAL MODE
+    # ─────────────────────────────────────────────────────
+    
+    if has_online and has_on_campus:
+        return 'Blended'
+    elif has_online:
+        return 'Online'
+    elif has_on_campus:
+        return 'On Campus'
+    else:
+        # Default to On Campus if not specified
+        return 'On Campus'
+
+FIX 2: ENGLISH TEST EXTRACTOR - UNIVERSITY-LEVEL FALLBACK
+The issue is that ASAHE has university-level English requirements that apply to ALL courses. If individual course pages don't repeat the requirements table, the extractor should fetch from the university-level requirements page.
+Updated extract method with university-level fallback:
+pythonasync def extract(self, html: str, url: str, country: str, university_requirements_url: Optional[str] = None) -> Dict:
+    """
+    Extract with university-level fallback
+    
+    Args:
+        html: Course page HTML
+        url: Course page URL
+        country: University country
+        university_requirements_url: University-wide requirements page URL (optional)
+    
+    Strategy:
+    1. Try course-specific requirements
+    2. If none found, try university-level requirements page
+    3. Fallback to text extraction
+    """
+    
+    soup = BeautifulSoup(html, 'html.parser')
+    result = {}
+    
+    # ═══════════════════════════════════════════════════════
+    # STRATEGY 1: Course-specific requirements
+    # ═══════════════════════════════════════════════════════
+    
+    requirements_section = self._find_requirements_section(soup)
+    
+    if requirements_section:
+        print("[INFO] Found course-specific Entry Requirements section")
+        
+        # Try table extraction
+        table_data = self._extract_from_table(requirements_section)
+        if table_data:
+            result.update(table_data)
+            return result
+        
+        # Try text extraction
+        section_html = str(requirements_section)
+        text_data = self._extract_all_tests(section_html)
+        if text_data and text_data.get('ielts_overall'):
+            result.update(text_data)
+            return result
+    
+    # ═══════════════════════════════════════════════════════
+    # STRATEGY 2: University-level requirements page
+    # ═══════════════════════════════════════════════════════
+    
+    if university_requirements_url and not result.get('ielts_overall'):
+        print(f"[INFO] Fetching university-level requirements from: {university_requirements_url}")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(university_requirements_url, timeout=15) as response:
+                    uni_html = await response.text()
+            
+            uni_soup = BeautifulSoup(uni_html, 'html.parser')
+            
+            # Find requirements section on university page
+            uni_req_section = self._find_requirements_section(uni_soup)
+            
+            if uni_req_section:
+                # Try table extraction
+                table_data = self._extract_from_table(uni_req_section)
+                if table_data:
+                    print("[SUCCESS] Extracted from university-level requirements table")
+                    result.update(table_data)
+                    return result
+            
+            # Try full page
+            text_data = self._extract_all_tests(uni_html)
+            if text_data and text_data.get('ielts_overall'):
+                print("[SUCCESS] Extracted from university-level requirements page")
+                result.update(text_data)
+                return result
+        
+        except Exception as e:
+            print(f"[WARNING] Failed to fetch university requirements: {e}")
+    
+    # ═══════════════════════════════════════════════════════
+    # STRATEGY 3: Linked requirements page from course
+    # ═══════════════════════════════════════════════════════
+    
+    if not result.get('ielts_overall'):
+        req_url = self._find_requirements_page_link(soup, url)
+        
+        if req_url:
+            print(f"[INFO] Fetching linked requirements from: {req_url}")
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(req_url, timeout=15) as response:
+                        req_html = await response.text()
+                
+                req_soup = BeautifulSoup(req_html, 'html.parser')
+                
+                # Try table extraction
+                table_data = self._extract_from_table(req_soup)
+                if table_data:
+                    result.update(table_data)
+                    return result
+                
+                # Try text extraction
+                text_data = self._extract_all_tests(req_html)
+                result.update(text_data)
+            
+            except Exception as e:
+                print(f"[WARNING] Failed to fetch linked requirements: {e}")
+    
+    # ═══════════════════════════════════════════════════════
+    # STRATEGY 4: Full page text extraction (last resort)
+    # ═══════════════════════════════════════════════════════
+    
+    if not result.get('ielts_overall'):
+        print("[INFO] Trying full page text extraction")
+        full_page_data = self._extract_all_tests(html)
+        result.update(full_page_data)
+    
+    return result
+
+FIX 3: ORCHESTRATOR - PASS UNIVERSITY REQUIREMENTS URL
+Update orchestrator.py:
+pythonasync def _extract_complete_course(
+    self,
+    course_url: str,
+    university: University,
+    saved_patterns: Optional[Dict] = None
+) -> Dict:
+    """
+    Extract complete course data with multi-page support
+    """
+    
+    # ... (existing code)
+    
+    # ─────────────────────────────────────────────────────
+    # Extract English requirements with university fallback
+    # ─────────────────────────────────────────────────────
+    
+    english_data = await self.extractors['english'].extract(
+        html, 
+        course_url,
+        university.country,
+        university_requirements_url=university.requirements_url  # NEW: Pass university requirements URL
+    )
+    course_data.update(english_data)
+    
+    # ... (rest of code)
+And in the scraping job setup, detect university-level requirements URL:
+python# In URL analysis phase
+university_requirements_url = self._discover_university_requirements_url(url)
+
+# Store in university record
+university.requirements_url = university_requirements_url
+await university.save()
+Add discovery method:
+pythondef _discover_university_requirements_url(self, base_url: str) -> Optional[str]:
+    """
+    Discover university-level requirements page
+    
+    Common URLs:
+    - /entry-requirements
+    - /minimum-entry-requirement  (ASAHE)
+    - /international/requirements
+    - /admissions/requirements
+    """
+    
+    from urllib.parse import urlparse, urljoin
+    
+    domain = f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}"
+    
+    candidate_paths = [
+        '/minimum-entry-requirement',
+        '/entry-requirements',
+        '/international/requirements',
+        '/admissions/requirements',
+        '/requirements',
+        '/international/entry-requirements'
+    ]
+    
+    for path in candidate_paths:
+        candidate_url = urljoin(domain, path)
+        
+        # Quick check if URL exists
+        try:
+            response = requests.head(candidate_url, timeout=5, allow_redirects=True)
+            if response.status_code == 200:
+                print(f"[INFO] Found university requirements page: {candidate_url}")
+                return candidate_url
+        except:
+            continue
+    
+    return None
+
+QUICK TEST FOR ASAHE
+Before full re-scrape, test the extractor directly:
+pythonimport asyncio
+from scraper.extractors.english_test_extractor import EnglishTestExtractor
+import aiohttp
+
+async def test():
+    url = 'https://www.asahe.edu.au/courses/bachelor-of-business-international-business'
+    uni_req_url = 'https://www.asahe.edu.au/minimum-entry-requirement/'
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            html = await response.text()
+    
+    extractor = EnglishTestExtractor()
+    result = await extractor.extract(html, url, 'Australia', uni_req_url)
+    
+    print("\nExtracted English Requirements:")
+    print(f"  IELTS Overall: {result.get('ielts_overall')}")
+    print(f"  IELTS L/R/W/S: {result.get('ielts_listening')}")
+    print(f"  PTE Overall: {result.get('pte_overall')}")
+    print(f"  TOEFL Overall: {result.get('toefl_overall')}")
+    print(f"  CAE Score: {result.get('cae_score')}")
+
+asyncio.run(test())
+Expected output:
+[INFO] Found course-specific Entry Requirements section
+[SUCCESS] Extracted from university-level requirements table
+Extracted English Requirements:
+  IELTS Overall: 6.0
+  IELTS L/R/W/S: 5.5
+  PTE Overall: 50
+  TOEFL Overall: 60
+  CAE Score: 169
+
+SUMMARY
+Problems Found:
+
+❌ Study Mode - Only detecting "Online", missing "On Campus" → Should be "Blended"
+❌ English Requirements - Failing on 8/9 courses because individual course pages link to university-level requirements
+
+Fixes Applied:
+
+✅ Study Mode Extractor - Now checks Location field for "Sydney, Online" pattern
+✅ English Test Extractor - Added university-level requirements fallback
+✅ Orchestrator - Auto-discovers university requirements URL and passes to extractor
+
+Next Steps:
+
+Apply these code fixes
+Re-scrape ASAHE (should now get 9/9 courses with complete data)
+Verify all columns populated: IELTS, PTE, TOEFL, CAE, and Mode = "Blended"

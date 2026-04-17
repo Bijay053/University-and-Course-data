@@ -373,7 +373,7 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
 
   extractInternationalFees(text, data, countryFallback);
   if (!data.internationalFee) extractFeeFromHtmlTables($, data, countryFallback);
-  extractEnglishRequirements(text, data);
+  extractEnglishFromHtml($, data);
   extractIntakeMonths(text, data);
 
   const desc = $("meta[name='description']").attr("content") || $("meta[property='og:description']").attr("content") || "";
@@ -568,6 +568,195 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
       if (!data.feeYear) data.feeYear = extractFeeYear(text);
     }
   }
+}
+
+/**
+ * Parse a single English test requirement cell text into overall + min band scores.
+ * Used by extractEnglishFromHtml table parsing.
+ */
+function parseEnglishTestCell(testType: string, reqText: string, data: Partial<CourseData>) {
+  const tl = testType.toLowerCase();
+
+  if (/ielts/.test(tl)) {
+    // "Overall Band Score 6.0 with a minimum sub-score of 5.5 ..."
+    // "6.5 (no band less than 6.0)" / "Overall 6.0, min 5.5"
+    const withMinM = reqText.match(/(?:overall|band)?\s*(?:score)?\s*([\d.]+)[^\d]*(?:minimum|no\s+(?:band|score)\s+(?:less|lower|below)\s+than|sub[-\s]?score)[^\d]*([\d.]+)/i);
+    if (withMinM) {
+      const overall = parseFloat(withMinM[1]);
+      const min = parseFloat(withMinM[2]);
+      if (overall >= 4 && overall <= 9) {
+        data.ieltsOverall = overall;
+        if (min >= 4 && min <= 9) {
+          if (!data.ieltsListening) data.ieltsListening = min;
+          if (!data.ieltsSpeaking) data.ieltsSpeaking = min;
+          if (!data.ieltsWriting) data.ieltsWriting = min;
+          if (!data.ieltsReading) data.ieltsReading = min;
+        }
+        return;
+      }
+    }
+    const simpleM = reqText.match(/([\d.]+)/);
+    if (simpleM) {
+      const v = parseFloat(simpleM[1]);
+      if (v >= 4 && v <= 9 && !data.ieltsOverall) data.ieltsOverall = v;
+    }
+
+  } else if (/pte|pearson/.test(tl)) {
+    const withMinM = reqText.match(/(?:overall)?\s*(?:score)?\s*(\d+)[^\d]*(?:minimum|no\s+(?:skill|score)\s+(?:less|lower|below)\s+than)[^\d]*(\d+)/i);
+    if (withMinM) {
+      const overall = parseInt(withMinM[1]);
+      const min = parseInt(withMinM[2]);
+      if (overall >= 30 && overall <= 90) {
+        data.pteOverall = overall;
+        if (min >= 30 && min <= 90) {
+          if (!data.pteListening) data.pteListening = min;
+          if (!data.pteSpeaking) data.pteSpeaking = min;
+          if (!data.pteWriting) data.pteWriting = min;
+          if (!data.pteReading) data.pteReading = min;
+        }
+        return;
+      }
+    }
+    const simpleM = reqText.match(/(\d+)/);
+    if (simpleM) {
+      const v = parseInt(simpleM[1]);
+      if (v >= 30 && v <= 90 && !data.pteOverall) data.pteOverall = v;
+    }
+
+  } else if (/toefl/.test(tl)) {
+    const withMinM = reqText.match(/(\d+)[^\d]*(?:minimum|no\s+(?:section|score)\s+(?:less|lower|below)\s+than)[^\d]*(\d+)/i);
+    if (withMinM) {
+      const overall = parseInt(withMinM[1]);
+      const min = parseInt(withMinM[2]);
+      if (overall >= 30 && overall <= 120) {
+        data.toeflOverall = overall;
+        if (min >= 0 && min <= 30) {
+          if (!data.toeflListening) data.toeflListening = min;
+          if (!data.toeflSpeaking) data.toeflSpeaking = min;
+          if (!data.toeflWriting) data.toeflWriting = min;
+          if (!data.toeflReading) data.toeflReading = min;
+        }
+        return;
+      }
+    }
+    const simpleM = reqText.match(/(\d+)/);
+    if (simpleM) {
+      const v = parseInt(simpleM[1]);
+      if (v >= 30 && v <= 120 && !data.toeflOverall) data.toeflOverall = v;
+    }
+
+  } else if (/cae|cambridge/.test(tl)) {
+    const m = reqText.match(/(\d+)/);
+    if (m) {
+      const v = parseInt(m[1]);
+      if (v >= 140 && v <= 230 && !data.cambridgeOverall) data.cambridgeOverall = v;
+    }
+
+  } else if (/duolingo|det/.test(tl)) {
+    const m = reqText.match(/(\d+)/);
+    if (m) {
+      const v = parseInt(m[1]);
+      if (v >= 50 && v <= 160 && !data.duolingoOverall) data.duolingoOverall = v;
+    }
+  }
+}
+
+/**
+ * Tab/Section-aware English test extraction.
+ * Strategy:
+ *   1. Find "Entry Requirements" section by ID, class, or heading → try table → try text
+ *   2. Fall back to full-page text extraction
+ */
+function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partial<CourseData>) {
+  // ── Strategy 1: Find entry requirements section ──────────────────────────
+  const reqSelectors = [
+    "[id*='entry'i][id*='requirement'i]",
+    "[id*='requirement'i]",
+    "[class*='entry'i][class*='requirement'i]",
+    "[class*='requirement'i]",
+    "[role='tabpanel']",
+    "section, article, div",
+  ];
+
+  let reqContainer: ReturnType<typeof $> | null = null;
+
+  // Try attribute-based selectors first
+  for (const sel of reqSelectors.slice(0, 4)) {
+    const el = $(sel).first();
+    if (el.length) { reqContainer = el; break; }
+  }
+
+  // Fallback: find by heading text
+  if (!reqContainer) {
+    $("h1,h2,h3,h4,h5").each((_, heading) => {
+      if (/entry\s+requirements?/i.test($(heading).text())) {
+        const parent = $(heading).closest("div,section,article");
+        if (parent.length) { reqContainer = parent; return false; }
+      }
+    });
+  }
+
+  // Fallback: find tabpanel/section containing IELTS text
+  if (!reqContainer) {
+    $("[role='tabpanel'], section, .tab-content, .accordion-content").each((_, el) => {
+      if (/ielts|english\s+(?:language|proficiency|test)/i.test($(el).text())) {
+        reqContainer = $(el);
+        return false;
+      }
+    });
+  }
+
+  if (reqContainer) {
+    // ── Strategy 1a: Table parsing inside the section ────────────────────
+    let foundInTable = false;
+    reqContainer.find("table").each((_, table) => {
+      const $table = $(table);
+      $table.find("tr").each((_, row) => {
+        const cells = $(row).find("td,th");
+        if (cells.length < 2) return;
+        const testType = $(cells.get(0)!).text().trim();
+        const reqText = $(cells.get(1)!).text().trim();
+        if (/ielts|pte|toefl|cae|cambridge|duolingo|det|pearson/i.test(testType)) {
+          parseEnglishTestCell(testType, reqText, data);
+          foundInTable = true;
+        }
+      });
+    });
+
+    if (foundInTable && (data.ieltsOverall || data.pteOverall || data.toeflOverall)) {
+      return; // Table parsing succeeded — done
+    }
+
+    // ── Strategy 1b: Text extraction from section text ───────────────────
+    const sectionText = reqContainer.text();
+    if (/ielts|pte|toefl/i.test(sectionText)) {
+      extractEnglishRequirements(sectionText, data);
+      if (data.ieltsOverall || data.pteOverall || data.toeflOverall) return;
+    }
+  }
+
+  // ── Strategy 2: Full page text fallback ──────────────────────────────────
+  // Also scan ALL tables on the page for test type/requirement rows
+  let foundInPageTable = false;
+  $("table").each((_, table) => {
+    if (data.ieltsOverall && data.pteOverall && data.toeflOverall) return false;
+    const $table = $(table);
+    $table.find("tr").each((_, row) => {
+      const cells = $(row).find("td,th");
+      if (cells.length < 2) return;
+      const testType = $(cells.get(0)!).text().trim();
+      const reqText = $(cells.get(1)!).text().trim();
+      if (/ielts|pte|toefl|cae|cambridge|duolingo|det|pearson/i.test(testType)) {
+        parseEnglishTestCell(testType, reqText, data);
+        foundInPageTable = true;
+      }
+    });
+  });
+
+  if (foundInPageTable && (data.ieltsOverall || data.pteOverall || data.toeflOverall)) return;
+
+  // Final fallback: plain text on the full page
+  extractEnglishRequirements($("body").text(), data);
 }
 
 function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
