@@ -380,26 +380,65 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
   if (/on[- ]?campus\s*(?:and|or|\/)\s*online|online\s*(?:and|or|\/)\s*on[- ]?campus/i.test(fullText)) return "Blended";
   if (/both\b[^.]{0,60}\b(?:online|on[- ]?campus)/i.test(fullText)) return "Blended";
 
-  // DOM inspection: find Location / Delivery / Mode field containers
-  const fieldSelectors = [
-    "[class*='location'i]", "[class*='delivery'i]", "[class*='mode'i]",
-    "[class*='study-mode'i]", "[class*='campus'i]",
-    "dt", "td", "th", "li",
-  ];
-  for (const sel of fieldSelectors) {
-    $(sel).each((_, el) => {
-      const label = $(el).text().trim().toLowerCase();
-      // Find sibling or next element value
-      const value = ($(el).next().text() + " " + $(el).parent().text()).toLowerCase();
-      const combined = label + " " + value;
+  // ── PRIORITY: Find an explicit "Delivery" / "Study Mode" field. ──────────
+  // The "Delivery" field is authoritative — it overrides "Location" (which can
+  // contain "Online" meaning an online study option, e.g. ASA's "Sydney, Online").
+  // We look for label-value pairs in dt/dd, th/td, and <strong>Label</strong>+text patterns.
+  const DELIVERY_LABEL = /^(?:mode\s+of\s+(?:study|delivery|attendance)|study\s*mode|delivery(?:\s*mode)?|attendance\s*mode|course\s*mode|teaching\s*mode|learning\s*mode)\s*:?\s*$/i;
 
-      if (/\blocation\b|\bdelivery\b|\bmode\b|\bstudy\s*mode\b/.test(label)) {
-        if (/online/.test(combined)) hasOnline = true;
-        if (/on[- ]?campus|face[- ]?to[- ]?face|in[- ]?person|sydney|melbourne|brisbane|perth|adelaide|campus/.test(combined)) hasOnCampus = true;
+  const evaluateDeliveryValue = (raw: string): string | null => {
+    const v = raw.toLowerCase();
+    const isOnCampus = /\b(?:face[- ]?to[- ]?face|on[- ]?campus|in[- ]?person|in\s+class(?:room)?)\b/.test(v);
+    const isOnline = /\b(?:online|distance|remote|virtual)\b/.test(v);
+    if (isOnCampus && isOnline) return "Blended";
+    if (isOnCampus) return "On Campus";
+    if (isOnline) return "Online";
+    return null;
+  };
+
+  // Strategy A: <dt>Delivery</dt><dd>Face to Face</dd>
+  let deliveryResult: string | null = null;
+  $("dl dt").each((_, dt) => {
+    if (DELIVERY_LABEL.test($(dt).text().trim())) {
+      const dd = $(dt).next("dd").text().trim();
+      const r = evaluateDeliveryValue(dd);
+      if (r) { deliveryResult = r; return false; }
+    }
+  });
+
+  // Strategy B: <tr><th>Delivery</th><td>Face to Face</td></tr>
+  if (!deliveryResult) {
+    $("tr").each((_, tr) => {
+      const cells = $(tr).find("th,td");
+      if (cells.length < 2) return;
+      const label = $(cells.get(0)!).text().trim();
+      if (DELIVERY_LABEL.test(label)) {
+        const r = evaluateDeliveryValue($(cells.get(1)!).text().trim());
+        if (r) { deliveryResult = r; return false; }
       }
     });
-    if (hasOnline && hasOnCampus) break;
   }
+
+  // Strategy C: <strong>Delivery</strong> Face to Face on campus  (label inline with value)
+  if (!deliveryResult) {
+    $("strong, b, h3, h4, h5, h6, span").each((_, el) => {
+      const txt = $(el).text().trim();
+      if (!DELIVERY_LABEL.test(txt)) return;
+      // Try next sibling text first
+      const sibling = $(el).next();
+      let candidate = sibling.text().trim();
+      // Fall back to remaining text in the parent (after this label)
+      if (!candidate || candidate.length > 80) {
+        const parentText = $(el).parent().text().trim();
+        const idx = parentText.toLowerCase().indexOf(txt.toLowerCase());
+        if (idx >= 0) candidate = parentText.slice(idx + txt.length).slice(0, 80).trim();
+      }
+      const r = evaluateDeliveryValue(candidate);
+      if (r) { deliveryResult = r; return false; }
+    });
+  }
+
+  if (deliveryResult) return deliveryResult;
 
   // General text scan — only count mentions in an explicit study-mode CONTEXT,
   // never raw "online" (which appears in nav/footer "apply online" etc.).
@@ -2080,6 +2119,9 @@ function isJunkCourseName(name: string): boolean {
     /^undergraduate\s+courses?$/,
     /^all\s+courses?$/,
     /^(?:our\s+)?courses?$/,
+    /^courses?\s+(list|listview|grid|tile|finder|overview|index)$/,
+    /^(programs?|degrees?|study)\s+(list|listview|grid|tile|finder|overview|index)$/,
+    /^(?:browse|explore|find|view)\s+(?:our\s+)?(?:courses?|programs?|degrees?)$/,
     /retains?\s+tier/,
     /\brackings?\b.*\bspot\b/,
     /\baccredited\b$/,
@@ -2328,11 +2370,18 @@ function isCourseUrl(urlStr: string): boolean {
     "/student-support", "/international-students/visa", "/fees-scholarships",
     "/why-choose", "/info-night", "/open-day", "/virtual-info",
     "/keydates", "/key-dates", "domestic-keydates", "int-keydates",
+    // Listing / index pages (not individual courses)
+    "/courses-list", "/courses-listview", "/courses-grid", "/courses-tile",
+    "/programs-list", "/program-list", "/course-list", "/course-finder",
+    "/find-a-course", "/all-courses", "/browse-courses", "/explore-courses",
   ];
   if (excludePatterns.some((p) => lower.includes(p))) return false;
   // Exclude URLs whose last path segment ends with known junk suffixes
   const lastSeg = lower.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
   if (/(scholarships?|jobs?(-and-internships?)?|internships?|employment|student-life|community|connect|network|hub|fair|expo|overview|handbook|tips|guide|pathway|pathways?|classes?|info-night|open-day)$/.test(lastSeg)) return false;
+  // Exclude listing/index page segments
+  if (/^(courses?|programs?|degrees?|study)([- _](list|listview|grid|tile|finder|index|all|browse|explore))?$/.test(lastSeg)) return false;
+  if (/^(our[- _])?(courses?|programs?|degrees?)$/.test(lastSeg)) return false;
 
   // Strong positive: full-path matches a known course detail URL structure
   try {
