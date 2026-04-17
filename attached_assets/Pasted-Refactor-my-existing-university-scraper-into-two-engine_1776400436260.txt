@@ -1,0 +1,403 @@
+Refactor my existing university scraper into two engines inside the current project:
+
+1. Fast Static Scraper
+2. Advanced Smart Scraper
+
+Important:
+Do not rebuild the whole project from scratch.
+Keep the existing routes, staging flow, approval flow, stop scrape support, and UI logs working.
+Modify the real implementation in the current codebase.
+
+Main goal:
+Simple static websites must scrape fast.
+Complex websites must use the full smart discovery flow.
+The scraper must automatically decide which engine to use for each site.
+
+==================================================
+ARCHITECTURE GOAL
+==================================================
+
+Create two scraping engines:
+
+A. Fast Static Scraper
+Use when:
+- a clean course listing page is found
+- number of course links is reasonably small, for example 1 to 30
+- course pages are normal HTML
+- key fields can be extracted from static HTML
+- no major JavaScript interaction is needed for most pages
+
+B. Advanced Smart Scraper
+Use when:
+- homepage must be researched to find listing pages
+- listing is paginated or huge
+- content is JS rendered
+- course data is hidden behind tabs, accordions, toggles, APIs
+- fees, English requirements, academic requirements, or campuses are on separate pages
+- browser interaction is required for many pages
+
+==================================================
+FILES TO OPEN FIRST
+==================================================
+
+Open these files first:
+
+1. artifacts/api-server/src/routes/scrape.ts
+2. artifacts/api-server/src/browser-helper.ts
+3. artifacts/api-server/src/routes/scraping.ts
+4. lib/db/src/schema/scraped_courses.ts
+5. lib/db/src/schema/scraping.ts
+6. artifacts/university-portal/src/pages/scraping.tsx
+
+Main backend file:
+artifacts/api-server/src/routes/scrape.ts
+
+==================================================
+STEP 1 — CREATE ENGINE SELECTOR
+==================================================
+
+In scrape.ts create a site analysis step that decides which engine to use.
+
+Add helpers like:
+
+- classifyInputUrl(url)
+- discoverListingPage(url)
+- extractListingLinks(html)
+- looksStaticFriendly(html)
+- shouldUseFastStaticScraper(...)
+- shouldUseAdvancedSmartScraper(...)
+
+Use this decision logic:
+
+Fast Static Scraper if:
+- listing page exists
+- listing page has direct course links
+- course count is between 1 and 30
+- sample course pages look static friendly
+- static extraction succeeds on sample pages
+- browser is not needed for most sample pages
+
+Advanced Smart Scraper if:
+- no clean listing page
+- listing is heavily JS driven
+- course count is large
+- pagination exists
+- sitemap discovery is needed
+- browser interaction is required
+- course pages are incomplete without smart enrichment
+
+Add a log:
+- [ENGINE] Using Fast Static Scraper
+or
+- [ENGINE] Using Advanced Smart Scraper
+
+==================================================
+STEP 2 — FAST STATIC SCRAPER
+==================================================
+
+Implement Fast Static Scraper inside scrape.ts or helper files.
+
+Fast Static Scraper rules:
+
+1. Start from resolved listing page directly
+2. Extract course links directly from listing page
+3. Skip sitemap
+4. Skip deep candidate research
+5. Skip AI during discovery
+6. Fetch course pages in parallel
+7. Use static HTML extraction first
+8. Use shared pages only as fallback
+9. Use browser only per course if required fields are missing
+10. Save results to staging
+
+Fast engine ideal flow:
+
+- listing page found
+- course links extracted
+- dedupe links
+- scrape all in concurrency 5 to 8
+- static extraction first
+- browser fallback only on failing pages
+- stage results
+- approval happens after stage
+
+Add logs:
+- [FAST] Listing page resolved
+- [FAST] X direct course links found
+- [FAST] Skipping sitemap
+- [FAST] Skipping deep research
+- [FAST] Static extraction success X/Y
+- [FAST] Browser fallback used for Y pages only
+
+==================================================
+STEP 3 — ADVANCED SMART SCRAPER
+==================================================
+
+Keep and improve the current heavy flow as Advanced Smart Scraper.
+
+Advanced Smart Scraper rules:
+
+1. classify input page
+2. discover candidate listing pages
+3. compare multiple candidate sources
+4. use homepage, listing page, search page, sitemap, and APIs when needed
+5. sample pages before full fetch
+6. validate real course pages
+7. support browser rendering and interaction
+8. support pagination
+9. support multi page enrichment
+10. support shared requirements, fee pages, PDFs, and AI fallback
+11. save to staging
+
+Advanced engine should still use:
+- browser fallback
+- smart discovery
+- enrichment logic
+- universal English requirement engine
+- universal academic requirement engine
+
+But:
+- AI must still be fallback only
+- browser should not be used when static extraction already succeeds
+
+Add logs:
+- [SMART] Discovering candidate sources
+- [SMART] Sampling candidate pages
+- [SMART] Pagination detected
+- [SMART] Browser mode required
+- [SMART] Shared page enrichment used
+- [SMART] AI fallback used for specific field only
+
+==================================================
+STEP 4 — SHARED EXTRACTION ENGINES
+==================================================
+
+Both engines must reuse the same extraction engines.
+
+Do not duplicate parsing logic.
+
+Shared parsers used by both:
+- universal English requirement engine
+- universal academic requirement by country engine
+- fee extraction engine
+- intake extraction engine
+- study mode normalization
+- duration parser
+- currency parser
+
+Only discovery strategy should differ between Fast and Smart engines.
+
+==================================================
+STEP 5 — FAST ENGINE DETECTION RULES
+==================================================
+
+Add this exact style of detection:
+
+- listing page exists
+- extracted direct links count <= 30
+- at least 2 sample course pages open correctly with static HTML
+- at least 60 percent of sample pages return useful fields statically
+- no forced JS only pattern found
+
+Example helper:
+
+```ts
+function shouldUseFastStaticScraper(params: {
+  listingUrl?: string | null;
+  listingLinks?: string[];
+  sampleStaticSuccessCount?: number;
+  sampleCount?: number;
+  siteLooksStatic?: boolean;
+}) {
+  const linkCount = params.listingLinks?.length || 0;
+  const sampleSuccess = params.sampleStaticSuccessCount || 0;
+  const sampleCount = params.sampleCount || 0;
+
+  return Boolean(
+    params.listingUrl &&
+    linkCount > 0 &&
+    linkCount <= 30 &&
+    params.siteLooksStatic &&
+    (
+      sampleCount === 0 ||
+      sampleSuccess >= Math.max(1, Math.floor(sampleCount * 0.6))
+    )
+  );
+}
+==================================================
+STEP 6 — FAST ENGINE CONCURRENCY
+
+Add concurrency limited scraping for the fast engine.
+
+Target:
+
+5 to 8 concurrent course pages
+
+Do not scrape one by one if the site is simple.
+
+==================================================
+STEP 7 — BROWSER POLICY
+
+Fast Static Scraper:
+
+browser only per course if static extraction misses required fields
+
+Advanced Smart Scraper:
+
+browser used when site structure clearly requires it
+still avoid browser if static works
+
+Required fields for deciding browser fallback:
+
+course name
+degree level
+duration or study mode
+at least one of fee, English requirement, academic requirement, intake
+==================================================
+STEP 8 — SITEMAP POLICY
+
+Fast Static Scraper:
+
+never use sitemap if listing page already gives direct course links
+
+Advanced Smart Scraper:
+
+use sitemap only when needed
+==================================================
+STEP 9 — AI POLICY
+
+Fast Static Scraper:
+
+no AI in discovery
+AI only as last extraction fallback
+
+Advanced Smart Scraper:
+
+no AI in discovery unless absolutely necessary
+AI only after rule based extraction and browser fallback fail
+==================================================
+STEP 10 — UI LOGGING
+
+In artifacts/university-portal/src/pages/scraping.tsx keep existing polling and logs, but show which engine is being used.
+
+Add visible log tags:
+
+FAST
+SMART
+
+Examples:
+
+[ENGINE] Fast Static Scraper selected
+[FAST] Skipping sitemap
+[SMART] Sampling candidate pages
+[FAST] Browser fallback used for 1 of 9 pages
+[SMART] Browser fallback required for 18 of 42 pages
+==================================================
+STEP 11 — ROUTING FLOW
+
+Do not break existing endpoints.
+
+Keep current scrape start and status routes, but inside the scrape start flow do:
+
+analyze site
+choose engine
+run selected engine
+save staged results
+keep approval flow unchanged
+==================================================
+STEP 12 — VERIFY WITH EXAMPLES
+
+Test these:
+
+A. ASA
+Expected:
+
+Fast Static Scraper
+listing page directly used
+sitemap skipped
+deep research skipped
+direct scrape of 9 links
+browser fallback minimal
+
+B. VIT
+Expected:
+
+likely Fast Static or hybrid fast mode depending on hidden tabs
+homepage or course list direct links used
+browser only where tabs hide requirements
+
+C. VU
+Expected:
+
+Advanced Smart Scraper
+large catalog
+sitemap and smart discovery allowed
+browser and enrichment allowed where needed
+==================================================
+STEP 13 — CODE ORGANIZATION
+
+Keep implementation clean.
+
+Recommended structure:
+
+scrape.ts orchestrates engine selection
+helper functions for fast engine
+helper functions for smart engine
+shared parsers in reusable modules
+
+If needed create:
+
+artifacts/api-server/src/lib/scrapers/fast-static-scraper.ts
+artifacts/api-server/src/lib/scrapers/advanced-smart-scraper.ts
+artifacts/api-server/src/lib/english-requirements.ts
+artifacts/api-server/src/lib/academic-requirements.ts
+
+Only create new files if it improves clarity and can be wired safely.
+
+==================================================
+STEP 14 — REPORT WHEN DONE
+
+When finished, tell me:
+
+files changed
+where engine selector was added
+where Fast Static Scraper lives
+where Advanced Smart Scraper lives
+how engine selection works
+what is skipped in fast mode
+ASA expected engine
+VIT expected engine
+VU expected engine
+any remaining limitation
+
+Important:
+Do not stop at planning.
+Implement directly in the current project and verify the app still runs.
+
+
+Here is a shorter version too:
+
+```text
+Refactor my existing scraper into two engines:
+
+1. Fast Static Scraper
+For small static sites with direct course links.
+Rules:
+- use listing page directly
+- skip sitemap
+- skip deep research
+- no AI in discovery
+- parallel static scraping
+- browser fallback only when static extraction fails
+
+2. Advanced Smart Scraper
+For large or JS heavy sites.
+Rules:
+- use smart discovery
+- allow sitemap, pagination, browser interaction, shared page enrichment
+- AI fallback only last
+
+Add automatic engine selection in scrape.ts.
+Keep current staging, approval, stop scrape, and UI logs working.
+Show [ENGINE] Fast Static Scraper or [ENGINE] Advanced Smart Scraper in logs.
+Implement in real project files, not as a plan only.

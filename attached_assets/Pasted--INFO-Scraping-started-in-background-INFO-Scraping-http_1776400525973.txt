@@ -1,0 +1,69 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping http://asahe.edu.au/...
+[INFO ] Using university: asa (ID: 9) — FAST MODE (browser disabled)
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[INFO ] Switched to course listing: http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovering university-level fee & requirements pages...
+[CLASSIFY] Page type: listing — 9 course links found
+[DISCOVER] Phase 1: Discovering candidate course URLs from all sources...
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] Phase 2: Researching 13 candidates — comparing pages to find genuine course pages before fetching...
+[DISCOVER] URL analysis: 9 candidate course pages identified, filtered out 4 non-course URLs
+[DISCOVER] Phase 2: Researching 9 candidates — sampling 9 pages to confirm genuine course pages...
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Master Of Information Technology Cyber Security"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Master Of Software Application Development"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Bachelor Of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Master Of Information Technology Artificial Intelligence"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Bachelor Of Professional Accounting"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Bachelor Of Business Technology Management"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Master Of Project Management"
+[SAMPLE✓] ✓ Confirmed course (URL+title fast-path): "Bachelor Of Business International Business"
+[DISCOVER] Research complete: 9/9 sampled pages are genuine course pages
+[DISCOVER] All 9 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (9 total).
+[DISCOVER] High confidence: 9/9 samples valid (100%). Auto-proceeding with 9 courses (~1 min). (9 courses)
+[EXTRACT ] Phase 3: Fetching 9 validated course pages... (9 courses)
+[INFO ] FAST MODE — browser automation disabled, using HTTP fetch only
+[ 1/9] Fetching 1/9: Bachelor Of Business
+[ 2/9] Fetching 2/9: Bachelor Of Business Hospitality Management
+[ 3/9] Fetching 3/9: Bachelor Of Business International Business
+[ 4/9] Fetching 4/9: Bachelor Of Business Technology Management
+[ 5/9] Fetching 5/9: Bachelor Of Professional Accounting
+[ 6/9] Fetching 6/9: Master Of Information Technology Artificial Intelligence
+[ 7/9] Fetching 7/9: Master Of Information Technology Cyber Security
+[ 8/9] Fetching 8/9: Master Of Project Management
+[ 9/9] Fetching 9/9: Master Of Software Application Development
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Bachelor Of Business"
+[EXTRACT ] [ENGLISH] course="Bachelor Of Business" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Master Of Software Application Developme"
+[EXTRACT ] [ENGLISH] course="Master Of Software Application Development" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Master Of Information Technology Cyber S"
+[EXTRACT ] [ENGLISH] course="Master Of Information Technology Cyber Security" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Bachelor Of Business Technology Manageme"
+[EXTRACT ] [ENGLISH] course="Bachelor Of Business Technology Management" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Bachelor Of Business International Busin"
+[EXTRACT ] [ENGLISH] course="Bachelor Of Business International Business" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Master Of Project Management"
+[EXTRACT ] [ENGLISH] course="Master Of Project Management" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Bachelor Of Business Hospitality Managem"
+[EXTRACT ] [ENGLISH] course="Bachelor Of Business Hospitality Management" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=— PTE=— TOEFL=— CAE=— DET=— | "Master Of Information Technology Artific"
+[EXTRACT ] [ENGLISH] course="Master Of Information Technology Artificial Intell" source=none IELTS=- PTE=- TOEFL=- CAE=- DET=-
+[EXTRACT ] [English] static page — IELTS=6 PTE=50 TOEFL=60 CAE=169 DET=— | "Bachelor Of Professional Accounting"
+[EXTRACT ] [ENGLISH] course="Bachelor Of Professional Accounting" source=static IELTS=6 PTE=50 TOEFL=60 CAE=169 DET=-
+[INFO ] Classifying 9 courses with AI (batched)...
+✓ Bachelor Of Business
+✓ Master Of Software Application Development
+✓ Master Of Information Technology Cyber Security
+✓ Bachelor Of Business Technology Management
+✓ Bachelor Of Business International Business
+✓ Master Of Project Management
+✓ Bachelor Of Business Hospitality Management
+✓ Master Of Information Technology Artificial Intelligence
+✓ Bachelor Of Professional Accounting
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Saved scraping config (9 links) for future no-AI re-scrapes

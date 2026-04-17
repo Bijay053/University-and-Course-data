@@ -3698,6 +3698,133 @@ function cheerioToCourseData(cheerioData: Partial<CourseData>, name: string, url
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ENGINE SELECTION — Fast Static Scraper vs Advanced Smart Scraper
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Maximum direct links for Fast Static Scraper to engage. */
+const FAST_ENGINE_MAX_LINKS = 30;
+
+/**
+ * Quick site-level check: does this domain / page look static-friendly?
+ * Returns false if the host is in the JS-heavy domains list, which forces Smart.
+ */
+function looksStaticFriendly(url: string, html: string): boolean {
+  if (siteNeedsBrowser(url)) return false;
+  // Pages with heavy JS frameworks that we know require browser rendering
+  const heavySignals = [
+    /__NEXT_DATA__|window\.__NUXT__|react-root|angular\s+app|vue-app|svelte-app/i,
+    /data-reactroot|ng-version|data-v-app/i,
+  ];
+  for (const sig of heavySignals) {
+    if (sig.test(html.slice(0, 8000))) return false;
+  }
+  return true;
+}
+
+/**
+ * Fetch 2–3 sample course pages and count how many yield useful static fields.
+ * Returns the count of pages that successfully extracted a course name + at least
+ * one critical field (fee, English requirement, duration, or degree level).
+ */
+async function samplePagesForStaticFriendliness(
+  links: { url: string; name: string }[],
+  sampleCount = 3,
+): Promise<{ sampleCount: number; successCount: number }> {
+  const sample = links.slice(0, sampleCount);
+  let successCount = 0;
+  await Promise.all(
+    sample.map(async (link) => {
+      try {
+        const html = await fetchPage(link.url);
+        const d = extractWithCheerio(html, link.url, link.name);
+        const hasRequired =
+          d.courseName &&
+          (d.degreeLevel || d.duration || d.internationalFee || d.ieltsOverall || d.pteOverall);
+        if (hasRequired) successCount++;
+      } catch {}
+    }),
+  );
+  return { sampleCount: sample.length, successCount };
+}
+
+/**
+ * Decide whether to use the Fast Static Scraper for this request.
+ */
+function shouldUseFastStaticScraper(params: {
+  listingUrl: string;
+  listingHtml: string;
+  listingLinks: { url: string; name: string }[];
+  sampleCount: number;
+  successCount: number;
+}): boolean {
+  const linkCount = params.listingLinks.length;
+  if (linkCount === 0 || linkCount > FAST_ENGINE_MAX_LINKS) return false;
+  if (!looksStaticFriendly(params.listingUrl, params.listingHtml)) return false;
+  // At least 60 % of sampled pages yielded useful data statically
+  if (params.sampleCount > 0 && params.successCount < Math.max(1, Math.floor(params.sampleCount * 0.6))) return false;
+  return true;
+}
+
+// ── Fast Static Scraper entry point ───────────────────────────────────────────
+/**
+ * Run the Fast Static Scraper engine.
+ * Skips sitemap, deep candidate research, AI discovery, and pagination crawl.
+ * Uses `scrapeCourseBatch` directly on the already-known course links.
+ */
+async function runFastStaticScrape(
+  directLinks: { url: string; name: string }[],
+  uniId: number,
+  job: ScrapeJob,
+  jobId: string,
+  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string },
+  universityCountry?: string,
+): Promise<void> {
+  addLog(job, "status", { message: `[FAST] Listing page resolved — ${directLinks.length} direct course links found`, phase: "discover" });
+  addLog(job, "status", { message: "[FAST] Skipping sitemap", phase: "discover" });
+  addLog(job, "status", { message: "[FAST] Skipping deep candidate research", phase: "discover" });
+
+  job.totalFound = directLinks.length;
+
+  // Approval gate — always ask for fast scrapes so user can verify the link count
+  const approvalSummary: ApprovalSummary = {
+    totalCourses: directLinks.length,
+    validSamples: directLinks.length,
+    rejectedSamples: 0,
+    sampleTotal: directLinks.length,
+    validExamples: directLinks.slice(0, 3).map((l) => l.name),
+    rejectedExamples: [],
+    estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
+  };
+
+  const proceed = await waitForApproval(job, approvalSummary);
+  if (!proceed || job.stopped) {
+    addLog(job, "status", { message: "[FAST] Bulk fetch cancelled by user.", phase: "done" });
+    job.status = "stopped";
+    job.completedAt = Date.now();
+    return;
+  }
+
+  addLog(job, "status", {
+    message: `[FAST] Fetching ${directLinks.length} course pages (concurrency 8, static-first)...`,
+    phase: "extract",
+    totalCourses: directLinks.length,
+  });
+
+  await scrapeCourseBatch(directLinks, uniId, job, directLinks.length, jobId, uniPages, universityCountry);
+
+  const browserCount = job.logs.filter((l) => l.message?.includes("[browser fallback ✓]")).length;
+  const staticCount = directLinks.length - browserCount;
+  addLog(job, "status", {
+    message: `[FAST] Static extraction success ${staticCount}/${directLinks.length}${browserCount ? ` — browser fallback used for ${browserCount} pages` : ""}`,
+    phase: "extract",
+  });
+
+  addLog(job, "done", { totalFound: job.totalFound, imported: job.imported, skipped: job.skipped, errors: job.errors });
+  job.status = "completed";
+  job.completedAt = Date.now();
+}
+
 function makeSemaphore(concurrency: number) {
   let running = 0;
   const queue: (() => void)[] = [];
@@ -4357,7 +4484,52 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       return;
     }
 
-    addLog(job, "status", { message: "Phase 1: Discovering candidate course URLs from all sources...", phase: "discover" });
+    // ── Engine Selection ─────────────────────────────────────────────────────
+    // Try Fast Static Scraper first when the listing page already has ≤ 30
+    // direct course links and the site looks static-friendly.
+    // Skip straight to Advanced Smart Scraper for JS-heavy domains, large
+    // catalogs, or when static sampling fails.
+    if (analysis.pageType === "listing" && analysis.courseLinks && analysis.courseLinks.length > 0) {
+      const directLinks = analysis.courseLinks.filter(
+        (l) => l.url && l.name && !isJunkCourseName(l.name),
+      );
+      if (directLinks.length > 0 && directLinks.length <= FAST_ENGINE_MAX_LINKS && looksStaticFriendly(resolvedUrl, html)) {
+        addLog(job, "status", {
+          message: `[ENGINE] Testing Fast Static Scraper — ${directLinks.length} direct links found, sampling pages...`,
+          phase: "discover",
+        });
+        const sampling = await samplePagesForStaticFriendliness(directLinks);
+        addLog(job, "status", {
+          message: `[ENGINE] Sample result: ${sampling.successCount}/${sampling.sampleCount} pages yielded data statically`,
+          phase: "discover",
+        });
+        if (
+          shouldUseFastStaticScraper({
+            listingUrl: resolvedUrl,
+            listingHtml: html,
+            listingLinks: directLinks,
+            sampleCount: sampling.sampleCount,
+            successCount: sampling.successCount,
+          })
+        ) {
+          addLog(job, "status", { message: "[ENGINE] Fast Static Scraper selected", phase: "discover" });
+          await runFastStaticScrape(directLinks, uniId, job, jobId, uniPages, universityCountry);
+          if (job.imported > 0) {
+            const config: ScrapeConfig = { courseLinks: directLinks, uniPages, resolvedUrl, lastScrapedAt: new Date().toISOString() };
+            job.discoveredConfig = config;
+            await db.update(universitiesTable).set({ scrapeConfig: config }).where(eq(universitiesTable.id, uniId));
+          }
+          return;
+        }
+        addLog(job, "status", {
+          message: `[ENGINE] Fast engine declined — too many links (${directLinks.length}) or site not static-friendly enough. Switching to Advanced Smart Scraper.`,
+          phase: "discover",
+        });
+      }
+    }
+
+    addLog(job, "status", { message: "[ENGINE] Advanced Smart Scraper selected", phase: "discover" });
+    addLog(job, "status", { message: "[SMART] Discovering candidate sources (sitemap + listing page + API)...", phase: "discover" });
 
     let rawCandidates: { url: string; name: string }[] = [];
 
@@ -4405,7 +4577,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     if (sitemapCandidates.length >= 10) {
       // Sitemap is the best source — use it exclusively to avoid listing page navigation pollution
       addLog(job, "status", {
-        message: `Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
+        message: `[SMART] Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
         phase: "discover",
       });
       rawCandidates = sitemapCandidates;
@@ -4437,7 +4609,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         const hasPagination = /showing\s+[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/i.test(listingBodyText) ||
           $("a[rel='next'], [class*='pagination'] a, [class*='pager'] a, [aria-label*='next'], [aria-label*='Next']").length > 0;
         if (hasPagination) {
-          addLog(job, "status", { message: `Listing page is paginated — following all pages for complete course list...`, phase: "discover" });
+          addLog(job, "status", { message: `[SMART] Pagination detected — following all pages for complete course list...`, phase: "discover" });
           listingLinks = await followPaginatedListing(resolvedUrl, html, job, listingLinks);
         }
       }
@@ -4458,7 +4630,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     let researchStats = { validSamples: 0, rejectedSamples: 0, validExamples: [] as string[], rejectedExamples: [] as string[] };
     if (rawCandidates.length > 0) {
       addLog(job, "status", {
-        message: `Phase 2: Researching ${rawCandidates.length} candidates — comparing pages to find genuine course pages before fetching...`,
+        message: `[SMART] Sampling candidate pages — researching ${rawCandidates.length} candidates to identify genuine course pages...`,
         phase: "discover",
       });
       const result = await researchAndValidateCourseLinks(rawCandidates, job);
@@ -4514,7 +4686,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
 
       addLog(job, "status", {
-        message: `Phase 3: Fetching ${courseLinks.length} validated course pages...`,
+        message: `[SMART] Fetching ${courseLinks.length} validated course pages (browser-first for JS-heavy, static-first for the rest)...`,
         phase: "extract",
         totalCourses: courseLinks.length,
       });
