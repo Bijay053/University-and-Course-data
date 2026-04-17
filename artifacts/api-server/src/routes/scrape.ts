@@ -416,6 +416,7 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
 
   extractInternationalFees(text, data, countryFallback);
   if (!data.internationalFee) extractFeeFromHtmlTables($, data, countryFallback);
+  if (!data.internationalFee) extractFeeFromDomToggle($, data, countryFallback);
   extractEnglishFromHtml($, data);
   extractIntakeMonths(text, data);
 
@@ -481,6 +482,83 @@ function extractFeeFromHtmlTables($: ReturnType<typeof cheerio.load>, data: Part
         }
       }
     });
+  });
+}
+
+/**
+ * Detect international fee from JS-toggled DOM elements.
+ * Sites like VIT use a Domestic/International button toggle — both sets of data
+ * are in the HTML, one is hidden. We extract the value from the "International"
+ * context by looking for:
+ *  - data attributes: [data-student-type="international"], [data-view="international"]
+ *  - elements with class containing "international" or "intl"
+ *  - elements adjacent to an "International" label/button containing a fee amount
+ */
+function extractFeeFromDomToggle($: ReturnType<typeof cheerio.load>, data: Partial<CourseData>, countryFallback?: string) {
+  const CURR_PAT = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
+  const feeRange = (n: number) => n >= 3000 && n <= 200000;
+
+  function parseFee(text: string): number | null {
+    const m = text.replace(/,/g, "").match(/[\d]+/);
+    const n = m ? parseInt(m[0]) : NaN;
+    return feeRange(n) ? n : null;
+  }
+
+  // Strategy A: data attributes explicitly marking international content
+  const intlDataSelectors = [
+    "[data-student-type='international']",
+    "[data-view='international']",
+    "[data-tab='international']",
+    "[data-type='international']",
+    ".international-fee", ".intl-fee", ".international .fee",
+    "[class*='international'][class*='fee']",
+  ];
+  for (const sel of intlDataSelectors) {
+    try {
+      $(sel).each((_, el) => {
+        if (data.internationalFee) return false;
+        const txt = $(el).text();
+        if (!CURR_PAT.test(txt)) return;
+        const fee = parseFee(txt);
+        if (fee) {
+          data.internationalFee = fee;
+          data.currency = detectCurrencyFromContext(txt, countryFallback);
+          data.feeTerm = normalizeFeeTerm(txt);
+        }
+      });
+    } catch {}
+    if (data.internationalFee) return;
+  }
+
+  // Strategy B: find "International" label/button elements, then check siblings/parent for fee
+  $("button, label, span, div, td, th, li").each((_, el) => {
+    if (data.internationalFee) return false;
+    const txt = $(el).text().trim();
+    if (!/^international(\s+students?)?$/i.test(txt)) return;
+
+    const $parent = $(el).parent();
+    const parentText = $parent.text();
+    if (!CURR_PAT.test(parentText)) return;
+
+    // Look at siblings and parent text for a fee amount
+    const fee = parseFee(parentText);
+    if (fee) {
+      data.internationalFee = fee;
+      data.currency = detectCurrencyFromContext(parentText, countryFallback);
+      data.feeTerm = normalizeFeeTerm(parentText);
+    }
+
+    // Also check next sibling
+    const $next = $(el).next();
+    const nextText = $next.text();
+    if (!data.internationalFee && CURR_PAT.test(nextText)) {
+      const fee2 = parseFee(nextText);
+      if (fee2) {
+        data.internationalFee = fee2;
+        data.currency = detectCurrencyFromContext(nextText, countryFallback);
+        data.feeTerm = normalizeFeeTerm(nextText);
+      }
+    }
   });
 }
 
@@ -559,6 +637,25 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
     data.feeTerm = normalizeFeeTerm(matchStr);
     if (!data.feeYear) data.feeYear = extractFeeYear(matchStr);
     return true;
+  }
+
+  // Priority 0 (highest): "Total fee (per-unit rate)" pattern
+  // e.g. "$48,000 ($3,000/unit)" — first number is the total full-course fee
+  // This prevents picking up the per-unit rate as the fee
+  const perUnitTotalPat = new RegExp(
+    `(?:fees?[:\\s]*)?${CURRENCY_SYM.source}\\s*([\\d,]+)\\s*\\(${CURRENCY_SYM.source}?\\s*[\\d,]+\\s*/\\s*(?:unit|credit|point|subject)\\)`,
+    "i"
+  );
+  const perUnitMatch = text.match(perUnitTotalPat);
+  if (perUnitMatch) {
+    const totalFee = parseInt(perUnitMatch[1].replace(/,/g, ""));
+    if (totalFee >= 3000 && totalFee <= 200000) {
+      data.internationalFee = totalFee;
+      data.currency = detectCurrencyFromContext(perUnitMatch[0], countryFallback);
+      data.feeTerm = "Full Course";
+      if (!data.feeYear) data.feeYear = extractFeeYear(text);
+      return;
+    }
   }
 
   // Priority 1: explicit international section with currency
@@ -2459,6 +2556,13 @@ async function followPaginatedListing(
   return allCourses;
 }
 
+// Common category slug names used by course-list pages (VIT-style)
+const COURSE_CATEGORY_SLUGS = [
+  "bits", "mits", "mba", "bbus", "vocational", "elicos",
+  "bachelor", "master", "diploma", "certificate", "graduate",
+  "undergraduate", "postgraduate", "phd", "honours",
+];
+
 async function detectCourseListingPage(homeUrl: string, html: string, job: ScrapeJob): Promise<string | null> {
   const origin = new URL(homeUrl).origin;
   const $ = cheerio.load(html);
@@ -2469,6 +2573,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
     /\/find-a-course/i, /\/search.*course/i, /\/course-search/i,
     /\/undergraduate-courses/i, /\/postgraduate-courses/i,
     /\/our-courses/i, /\/all-courses/i, /\/browse-courses/i,
+    /\/course-list/i, /\/course-finder/i, /\/course-guide/i,
   ];
 
   const candidates: { url: string; score: number }[] = [];
@@ -2506,6 +2611,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
     "/our-courses", "/find-a-course", "/course-search",
     "/study/undergraduate", "/study/postgraduate", "/academics/programs",
     "/academics/courses", "/future-students/courses",
+    "/course-list", "/course-finder", "/course-guide", "/all-courses",
   ];
 
   for (const path of commonCoursePaths) {
@@ -2520,6 +2626,55 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   }
 
   return null;
+}
+
+/**
+ * For sites using category-filtered course list pages (e.g. VIT /course-list?course_categories[0]=bits),
+ * gather links from each category variant and merge them into the main candidate list.
+ */
+async function expandCourseListWithCategories(listingUrl: string, existingCandidates: { url: string; name: string }[]): Promise<{ url: string; name: string }[]> {
+  const origin = new URL(listingUrl).origin;
+  const basePath = new URL(listingUrl).pathname;
+
+  // Only try category expansion for short listing paths (not already filtered)
+  if (!basePath.match(/\/course-list|\/course-finder|\/courses?$/i)) return existingCandidates;
+
+  const seen = new Set(existingCandidates.map((c) => c.url));
+  const extra: { url: string; name: string }[] = [];
+
+  for (const slug of COURSE_CATEGORY_SLUGS) {
+    const variants = [
+      `${origin}${basePath}?course_categories[0]=${slug}`,
+      `${origin}${basePath}?category=${slug}`,
+      `${origin}${basePath}?type=${slug}`,
+      `${origin}${basePath}/${slug}`,
+    ];
+    for (const variantUrl of variants) {
+      try {
+        const resp = await fetch(variantUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(4000) });
+        if (!resp.ok) continue;
+        const html = await fetchPage(variantUrl);
+        const $ = cheerio.load(html);
+        $("a[href]").each((_, el) => {
+          const href = $(el).attr("href") || "";
+          const text = $(el).text().trim();
+          try {
+            const fullUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
+            if (!fullUrl.startsWith(origin)) return;
+            if (seen.has(fullUrl)) return;
+            if (!isCourseUrl(fullUrl) && !isCourseText(text)) return;
+            if (isJunkCourseName(text)) return;
+            seen.add(fullUrl);
+            extra.push({ url: fullUrl, name: text || sitemapLocToCourseName(fullUrl) });
+          } catch {}
+        });
+        // Only try one working variant per category
+        if (extra.length > 0) break;
+      } catch {}
+    }
+  }
+
+  return [...existingCandidates, ...extra];
 }
 
 async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise<{ feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string }> {
@@ -3295,6 +3450,17 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       const result = await researchAndValidateCourseLinks(rawCandidates, job);
       courseLinks = result.links;
       researchStats = { validSamples: result.validSamples, rejectedSamples: result.rejectedSamples, validExamples: result.validExamples, rejectedExamples: result.rejectedExamples };
+
+      // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
+      // probe each known category slug to discover courses that only appear under specific filters
+      if (/\/course-list|\/course-finder|\/courses?\/?$/i.test(new URL(resolvedUrl).pathname)) {
+        const before = courseLinks.length;
+        courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);
+        const added = courseLinks.length - before;
+        if (added > 0) {
+          addLog(job, "status", { message: `Category expansion found ${added} additional course links (total: ${courseLinks.length})`, phase: "discover" });
+        }
+      }
     }
 
     if (courseLinks.length > 0) {

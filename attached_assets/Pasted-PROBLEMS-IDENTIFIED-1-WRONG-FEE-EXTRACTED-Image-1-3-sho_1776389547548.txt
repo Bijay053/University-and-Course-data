@@ -1,0 +1,293 @@
+PROBLEMS IDENTIFIED
+1. WRONG FEE EXTRACTED ❌
+Image 1 & 3 show:
+
+BITS Artificial Intelligence: Fee = $36,000 ($1500/unit) - 24 Units
+MBA Project Management: Fee = $48,000 ($3,000/unit)
+
+Image 4 shows (scraped data):
+
+MBA Project Management: A$28,000 /Annual ❌ WRONG!
+
+Should be: A$48,000 /Full Course
+2. MISSING COURSES ❌
+Image 4 shows: Only 7 courses scraped (all MBA)
+But VIT has:
+
+BITS courses (Bachelor - multiple specializations)
+MITS courses (Master)
+BBus courses (Bachelor of Business)
+MBA courses (7 scraped ✓)
+VOCATIONAL courses
+
+The scraper is ONLY finding MBA courses and missing all Bachelor/MITS/BBus courses.
+3. MISSING IELTS DATA ❌
+Image 4 shows: All courses have "Missing: ieltsOverall" warning
+Image 5 shows (Entry Requirements page):
+IELTS Academic overall score of 6.5, with no band below 6.0
+This data exists but wasn't extracted.
+4. DOMESTIC VS INTERNATIONAL CONFUSION ❌
+Images 1-3 show: There's a toggle button:
+
+✓ Domestic (selected by default)
+International
+
+When "International" is selected:
+
+Fee changes from $36,000 to $51,000 (BITS)
+Fee changes from $28,000 to $48,000 (MBA)
+
+The scraper is extracting DOMESTIC fees instead of INTERNATIONAL fees!
+5. WRONG FEE TERM ❌
+Image 3 shows:
+Fees: $48,000 ($3,000/unit)
+This is clearly a Full Course fee (not annual).
+But scraped data shows: /Annual ❌
+
+ROOT CAUSES
+Cause 1: Course Discovery Failure
+VIT has a dedicated course list page:
+https://vit.edu.au/course-list?course_categories[0]=bits
+But the scraper is NOT finding this page. It's only finding MBA courses from some other source.
+Cause 2: Domestic/International Toggle
+The page has JavaScript-based content switching:
+
+Default view: Domestic student data
+Click "International": Shows international fees
+
+The scraper is only getting the DEFAULT (domestic) view.
+Cause 3: Fee Calculation Error
+VIT shows fees as:
+
+Per unit: $1,500/unit
+Total: $36,000 (24 units)
+
+The scraper may be:
+
+Dividing by number of years: $48,000 / 2 years = $24,000 ❌
+Or extracting wrong fee field entirely
+
+Cause 4: Entry Requirements Not Linked
+VIT's IELTS requirements are on the "Entry Requirements" tab, but the scraper isn't:
+
+Clicking the tab
+Following the link
+Extracting from that section
+
+
+COMPLETE FIX REQUIRED
+FIX 1: COURSE DISCOVERY - USE COURSE LIST PAGE
+Add to url_analyzer.py:
+pythondef analyze(self, url: str, country: str) -> Dict:
+    """
+    UPDATED: Detect VIT course list page
+    """
+    
+    # ... existing code ...
+    
+    # VIT specific: Check for course list page
+    if 'vit.edu.au' in url:
+        course_list_url = 'https://vit.edu.au/course-list'
+        
+        # Check if this URL exists
+        response = requests.head(course_list_url, timeout=5)
+        if response.status_code == 200:
+            return {
+                'url_type': 'course_listing',
+                'suggested_listing_url': course_list_url,
+                'is_dynamic': True,  # Uses JS filters
+                'notes': 'VIT course list with category filters'
+            }
+FIX 2: HANDLE DOMESTIC/INTERNATIONAL TOGGLE
+VIT uses JavaScript to switch between domestic and international data. We need browser automation.
+Update browser_handler.py:
+pythonasync def fetch_vit_international(self, url: str) -> str:
+    """
+    Fetch VIT page with International student view selected
+    
+    Steps:
+    1. Load page
+    2. Click "International" button
+    3. Wait for content to update
+    4. Return HTML
+    """
+    
+    from playwright.async_api import async_playwright
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        # Load page
+        await page.goto(url, wait_until='networkidle')
+        
+        # Click "International" button
+        try:
+            international_button = await page.wait_for_selector(
+                'text="International"',
+                timeout=5000
+            )
+            await international_button.click()
+            
+            # Wait for content to update (fee changes)
+            await page.wait_for_timeout(2000)
+            
+        except Exception as e:
+            print(f"[WARNING] Could not click International button: {e}")
+        
+        # Get updated HTML
+        html = await page.content()
+        
+        await browser.close()
+        
+        return html
+Update orchestrator.py to use browser for VIT:
+pythonasync def _extract_complete_course(self, course_url: str, university: University, saved_patterns):
+    """
+    UPDATED: Use browser for VIT to get international view
+    """
+    
+    # Check if VIT
+    if 'vit.edu.au' in course_url:
+        print("[INFO] VIT detected - using browser to select International view")
+        html = await self.browser_handler.fetch_vit_international(course_url)
+    else:
+        html = await self._fetch_html(course_url)
+    
+    # ... rest of extraction
+FIX 3: CORRECT FEE EXTRACTION FOR VIT
+VIT shows fees in a specific format:
+Fees: $48,000 ($3,000/unit)
+Add VIT-specific fee extractor:
+pythondef _extract_vit_fee(self, html: str) -> Dict:
+    """
+    VIT-specific fee extraction
+    
+    Pattern: "$48,000 ($3,000/unit)"
+    or: "$51,000 ($2,125/unit) - 24 Units"
+    """
+    
+    # Pattern 1: Full course fee with unit fee
+    pattern1 = r'\$?([\d,]+)\s*\(\$?([\d,]+)/unit\)'
+    match = re.search(pattern1, html)
+    
+    if match:
+        full_course_fee = float(match.group(1).replace(',', ''))
+        
+        return {
+            'international_fee': full_course_fee,
+            'fee_term': 'Full Course',
+            'fee_year': 2026
+        }
+    
+    # Pattern 2: Just dollar amount
+    pattern2 = r'Fees[:\s]*\$?([\d,]+)'
+    match = re.search(pattern2, html)
+    
+    if match:
+        fee = float(match.group(1).replace(',', ''))
+        
+        # Determine if this is full course or annual
+        # Check nearby text
+        context = html[max(0, match.start()-100):match.end()+100]
+        
+        if 'full course' in context.lower():
+            fee_term = 'Full Course'
+        elif 'per year' in context.lower() or 'annual' in context.lower():
+            fee_term = 'Annual'
+        else:
+            # VIT typically shows full course fees
+            fee_term = 'Full Course'
+        
+        return {
+            'international_fee': fee,
+            'fee_term': fee_term,
+            'fee_year': 2026
+        }
+    
+    return {}
+FIX 4: EXTRACT FROM ENTRY REQUIREMENTS TAB
+VIT has tabs: Introduction | Overview | Course Content | Entry Requirements | Careers | Tuition Fees
+Update English test extractor to click tab:
+pythonasync def extract_vit_requirements(self, url: str) -> Dict:
+    """
+    VIT-specific: Navigate to Entry Requirements tab
+    """
+    
+    from playwright.async_api import async_playwright
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        # Load page
+        await page.goto(url, wait_until='networkidle')
+        
+        # Click "Entry Requirements" tab
+        try:
+            entry_tab = await page.wait_for_selector(
+                'text="Entry Requirements"',
+                timeout=5000
+            )
+            await entry_tab.click()
+            
+            # Wait for tab content to load
+            await page.wait_for_timeout(1000)
+            
+        except Exception as e:
+            print(f"[WARNING] Could not click Entry Requirements tab: {e}")
+        
+        # Get tab content
+        html = await page.content()
+        
+        await browser.close()
+        
+        # Extract IELTS from tab content
+        return self._extract_all_tests(html)
+FIX 5: COURSE LIST PAGE SCRAPING
+VIT course list page:
+https://vit.edu.au/course-list?course_categories[0]=bits
+https://vit.edu.au/course-list?course_categories[0]=mits
+https://vit.edu.au/course-list?course_categories[0]=mba
+Add course list parser:
+pythonasync def discover_vit_courses(self, base_url: str) -> List[str]:
+    """
+    Discover all VIT courses from course list page
+    """
+    
+    course_categories = ['bits', 'mits', 'mba', 'bbus', 'vocational', 'elicos']
+    all_courses = []
+    
+    for category in course_categories:
+        url = f'https://vit.edu.au/course-list?course_categories[0]={category}'
+        
+        print(f"[INFO] Fetching VIT {category.upper()} courses from: {url}")
+        
+        html = await self._fetch_html(url)
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Find all course links
+        for link in soup.find_all('a', href=True):
+            href = link.get('href')
+            
+            # VIT course URLs: /bits/..., /mits/..., /mba/...
+            if any(f'/{cat}/' in href for cat in course_categories):
+                full_url = urljoin('https://vit.edu.au', href)
+                if full_url not in all_courses:
+                    all_courses.append(full_url)
+    
+    print(f"[INFO] Discovered {len(all_courses)} VIT courses")
+    
+    return all_courses
+
+IMMEDIATE ACTION REQUIRED
+
+Add browser support for VIT (click "International" button)
+Use course list page instead of sitemap
+Fix fee extraction (recognize full course vs annual)
+Navigate to Entry Requirements tab to extract IELTS
+Test with all course categories (BITS, MITS, MBA, BBus)
+
+
+EXPECTED RESULTS AFTER FIX
+IssueBeforeAfterCourses Found7 (MBA only)40+ (all categories)Fee (MBA PM)A$28,000 /Annual ❌A$48,000 /Full Course ✅Fee (BITS AI)MissingA$51,000 /Full Course ✅IELTSMissing6.5 (6.0 min) ✅Fee SourceDomestic ❌
