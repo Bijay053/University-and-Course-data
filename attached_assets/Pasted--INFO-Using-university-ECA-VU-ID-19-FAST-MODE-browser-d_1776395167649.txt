@@ -1,0 +1,454 @@
+[INFO] Using university: ECA-VU (ID: 19) — FAST MODE (browser disabled)
+[INFO] Fetching https://www.vu.edu.au/vu-sydney...
+[INFO] Discovering university-level fee & requirements pages...
+[INFO] Found university requirements page via probe: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Discovered university-level pages: feePage: https://www.vu.edu.au/fees, requirementsPage: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Analyzing page with AI (1 call)...
+[INFO] AI analysis failed (All Gemini models are currently unavailable. Please try again in a minute.). Falling back to HTML scan...
+[INFO] Phase 1: Discovering candidate course URLs from all sources...
+[INFO] Sitemap index: checking 3 sub-sitemaps...
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=1 → 442 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=2 → 58 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=3 → 49 courses
+[INFO] Sitemap: found 549 course URLs total
+[INFO] Sitemap found 549 candidate URLs. Analyzing to identify real course pages...
+[INFO] Phase 2: Researching 549 candidates — comparing pages to find genuine course pages before fetching...
+[INFO] URL analysis: 428 candidate course pages identified, filtered out 121 non-course URLs
+[INFO] Phase 2: Researching 428 candidates — sampling 12 pages to confirm genuine course pages...
+[INFO] ✓ Confirmed course (URL+title fast-path): "Certificate Iv In Tertiary Preparation 22582vic"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Graduate Diploma In Cyber Security Ngcs"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Graduate Certificate In Finance Btff"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Master Of Applied Psychology Clinical Psychology Amal"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Diploma Of Beauty Therapy Shb50121"
+[INFO] ✓ Confirmed course: "Introduction To Change Management Thabk"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Graduate Diploma In Block Teaching Egbl"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Master Of Applied Research Urap"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Certificate Iii In Non Emergency Patient Transport Hlt31120"
+[INFO] ✓ Confirmed course: "Plumbing Licence In Gasfitting Work Skill Set Plumlicss3"
+[INFO] ✓ Confirmed course: "Sap Analytics Cloud Jvai"
+[INFO] Research complete: 11/12 sampled pages are genuine course pages
+[INFO] Filtered out 54 non-course pages. Will fetch 374 validated course pages.
+[WAITING] Research complete. Found 374 course pages to fetch. Please review and confirm.
+[INFO] User confirmed — starting bulk course fetch...
+[INFO] Phase 3: Fetching 374 validated course pages...
+[INFO] Using university requirements page: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO] FAST MODE — browser automation disabled, using HTTP fetch only
+[1/300] Fetching 1/300: Certificate Iv In Tertiary Preparation 22582vic
+[2/300] Fetching 2/300: Certificate Iii In Enabling Technologies 22588vic
+[3/300] Fetching 3/300: Certificate Iii In Emerging Technologies 22589vic
+[4/300] Fetching 4/300: Diploma Of Teacher Education Preparation 22602vic
+[5/300] Fetching 5/300: Certificate Iv In Cyber Security 22603vic
+[6/300] Fetching 6/300: Certificate Ii In Building And Construction Pre Apprenticeship 22614vic
+[7/300] Fetching 7/300: Course In Safe Use Of Machinery For Technology Teaching 22623vic
+[8/300] Fetching 8/300: Advanced Diploma Of Building Design Architectural 22627vic
+[9/300] Fetching 9/300: Course In Initial Eal 22636vic
+[10/300] Fetching 10/300: Course In Eal 22637vic
+[11/300] Fetching 11/300: Certificate I In Eal Access 22638vic
+[12/300] Fetching 12/300: Certificate Ii In Eal Access 22639vic
+[13/300] Fetching 13/300: Certificate Iii In Eal Access 22640vic
+[14/300] Fetching 14/300: Certificate Iv In Eal Access 22641vic
+[15/300] Fetching 15/300: Certificate Ii In Eal Employment 22642vic
+[16/300] Fetching 16/300: Certificate Iii In Eal Employment 22643vic
+[17/300] Fetching 17/300: Certificate Iii In Eal Further Study 22645vic
+[18/300] Fetching 18/300: Certificate Iv In Eal Further Study 22646vic
+[19/300] Fetching 19/300: Bachelor Of Arts Abab
+[20/300] Fetching 20/300: Bachelor Of Community Development Abcd
+[21/300] Fetching 21/300: Bachelor Of Criminal Justice Abcj
+[22/300] Fetching 22/300: Bachelor Of Criminal Justice And Psychological Studies Abcy
+[23/300] Fetching 23/300: Bachelor Of Exercise Science Sport Practice Abhd
+[24/300] Fetching 24/300: Bachelor Of Exercise Science Clinical Practice Abhe
+[25/300] Fetching 25/300: Bachelor Of Psychological Studies Abpa
+[26/300] Fetching 26/300: Bachelor Of Psychological Studies Bachelor Of Business Abpb
+[27/300] Fetching 27/300: Bachelor Of Psychology Honours Abpc
+[28/300] Fetching 28/300: Bachelor Of Screen Media Absn
+[29/300] Fetching 29/300: Bachelor Of Social Work Absw
+[30/300] Fetching 30/300: Bachelor Of Youth Work And Criminal Justice Abyc
+[31/300] Fetching 31/300: Bachelor Of Youth Work Abyw
+[32/300] Fetching 32/300: Graduate Diploma In Digital Media Agdm
+[33/300] Fetching 33/300: Graduate Diploma In International Community Development Agid
+[34/300] Fetching 34/300: Graduate Diploma In Counselling Agpd
+[35/300] Fetching 35/300: Bachelor Of Psychological Studies Honours Ahpa
+[36/300] Fetching 36/300: Master Of Applied Psychology Clinical Psychology Amal
+[37/300] Fetching 37/300: Master Of International Community Development Amcd
+[38/300] Fetching 38/300: Master Of Digital Media Amdm
+[39/300] Fetching 39/300: Master Of Clinical Exercise Science And Rehabilitation Amep
+[40/300] Fetching 40/300: Master Of Counselling Ampe
+[41/300] Fetching 41/300: Graduate Certificate In Digital Content Creation Atdc
+[42/300] Fetching 42/300: Graduate Certificate In Digital Learning And Teaching Atdi
+[43/300] Fetching 43/300: Graduate Certificate In Digital Media Atdm
+[44/300] Fetching 44/300: Graduate Certificate In International Community Development Atid
+[45/300] Fetching 45/300: Bachelor Of Accounting Bbaq
+[46/300] Fetching 46/300: Bachelor Of Business Bbns
+[47/300] Fetching 47/300: Graduate Diploma In Business Bgab
+[48/300] Fetching 48/300: Graduate Diploma In Financial Planning Bgfp
+[49/300] Fetching 49/300: Graduate Diploma In Business Administration Bgpb
+[50/300] Fetching 50/300: Bachelor Of Laws Blaw
+[51/300] Fetching 51/300: Bachelor Of Laws Graduate Entry Blge
+[52/300] Fetching 52/300: Master Of Business Administration Global Bmag
+[53/300] Fetching 53/300: Master Of Professional Accounting Bmaq
+[54/300] Fetching 54/300: Master Of Business Analytics Bmbu
+[55/300] Fetching 55/300: Master Of Enterprise Resource Planning Bmen
+[56/300] Fetching 56/300: Master Of Financial Planning Bmfp
+[57/300] Fetching 57/300: Master Of Marketing Bmkt
+[58/300] Fetching 58/300: Master Of Business Administration Bmpf
+[59/300] Fetching 59/300: Master Of Supply Chain Management Bmsu
+[60/300] Fetching 60/300: Certificate Iii In Business Bsb30120
+[61/300] Fetching 61/300: Certificate Iv In Business Bsb40120
+[62/300] Fetching 62/300: Certificate Iv In Leadership And Management Bsb40520
+[63/300] Fetching 63/300: Certificate Iv In Legal Services Bsb40620
+[64/300] Fetching 64/300: Diploma Of Business Bsb50120
+[65/300] Fetching 65/300: Diploma Of Leadership And Management Bsb50420
+[66/300] Fetching 66/300: Diploma Of Project Management Bsb50820
+[67/300] Fetching 67/300: Graduate Certificate In Business Analytics Btbi
+[68/300] Fetching 68/300: Graduate Certificate In Business Btbu
+[69/300] Fetching 69/300: Graduate Certificate In Change Management Btcm
+[70/300] Fetching 70/300: Graduate Certificate In Enterprise And Resource Planning Systems Bten
+[71/300] Fetching 71/300: Graduate Certificate In Finance Btff
+[72/300] Fetching 72/300: Graduate Certificate In Financial Planning Btfp
+[73/300] Fetching 73/300: Graduate Certificate In Marketing Btkm
+[74/300] Fetching 74/300: Graduate Certificate In Business Administration Btpf
+[75/300] Fetching 75/300: Graduate Certificate In Supply Chain Management Btsp
+[76/300] Fetching 76/300: Graduate Certificate In Transport Systems Btts
+[77/300] Fetching 77/300: Certificate Iii In Early Childhood Education And Care Chc30121
+[78/300] Fetching 78/300: Certificate Iii In Individual Support Chc33021
+[79/300] Fetching 79/300: Certificate Iv In School Based Education Support Chc40221
+[80/300] Fetching 80/300: Certificate Iv In Youth Work Chc40421
+[81/300] Fetching 81/300: Certificate Iv In Ageing Support Chc43015
+[82/300] Fetching 82/300: Certificate Iv In Disability Support Chc43121
+[83/300] Fetching 83/300: Certificate Iv In Alcohol And Other Drugs Chc43215
+[84/300] Fetching 84/300: Certificate Iv In Mental Health Chc43315
+[85/300] Fetching 85/300: Diploma Of Early Childhood Education And Care Chc50121
+[86/300] Fetching 86/300: Diploma Of Community Services Chc52021
+[87/300] Fetching 87/300: Assist Clients With Medication Skill Set Chcss00070
+[88/300] Fetching 88/300: Alcohol And Other Drugs Skill Set Chcss00093
+[89/300] Fetching 89/300: Prepare To Work Safely In The Construction Industry Coniss012
+[90/300] Fetching 90/300: Certificate Ii In Drainage Cpc20720
+[91/300] Fetching 91/300: Certificate Iii In Signs And Graphics Cpc30216
+[92/300] Fetching 92/300: Certificate Iii In Carpentry Cpc30220
+[93/300] Fetching 93/300: Certificate Iii In Plumbing Cpc32420
+[94/300] Fetching 94/300: Certificate Iii In Bricklaying And Blocklaying Cpc33020
+[95/300] Fetching 95/300: Certificate Iv In Plumbing And Services Cpc40920
+[96/300] Fetching 96/300: Diploma Of Building And Construction Building Cpc50220
+[97/300] Fetching 97/300: Advanced Diploma Of Building Surveying Cpc60121
+[98/300] Fetching 98/300: Bachelor Of Early Childhood Education And Leadership Ebcl
+[99/300] Fetching 99/300: Bachelor Of Early Childhood Education Ebec
+[100/300] Fetching 100/300: Bachelor Of Education P 12 Ebed
+[101/300] Fetching 101/300: Bachelor Of Education Primary Ebpe
+[102/300] Fetching 102/300: Bachelor Of Education Studies Ebst
+[103/300] Fetching 103/300: Bachelor Of Youth Work Bachelor Of Sport Management Ebys
+[104/300] Fetching 104/300: Bachelor Of Science Master Of Teaching Secondary Education Ecst
+[105/300] Fetching 105/300: Diploma Of Education Studies Edes
+[106/300] Fetching 106/300: Graduate Diploma In Block Teaching Egbl
+[107/300] Fetching 107/300: Graduate Diploma In Early Childhood Education Egec
+[108/300] Fetching 108/300: Graduate Diploma In Education Eged
+[109/300] Fetching 109/300: Master Of Applied Teaching Secondary Education Emat
+[110/300] Fetching 110/300: Master Of Education Emed
+[111/300] Fetching 111/300: Master Of Teaching Secondary Education Emes
+[112/300] Fetching 112/300: Master Of Teaching Primary Education Empe
+[113/300] Fetching 113/300: Graduate Certificate In Block Teaching Etbl
+[114/300] Fetching 114/300: Graduate Certificate In Early Childhood Education Etec
+[115/300] Fetching 115/300: Graduate Certificate In Education Eted
+[116/300] Fetching 116/300: Graduate Certificate In Performance Based Building Fire Codes Etqb
+[117/300] Fetching 117/300: Undergraduate Certificate In Early Childhood Education Euec
+[118/300] Fetching 118/300: Undergraduate Certificate In Education P12 Stem Eued
+[119/300] Fetching 119/300: Undergraduate Certificate In Education Studies Eues
+[120/300] Fetching 120/300: Certificate Iv In Accounting And Bookkeeping Fns40222
+[121/300] Fetching 121/300: Diploma Of Accounting Fns50222
+[122/300] Fetching 122/300: Bas Agent Registration Skill Set Fnsss00004
+[123/300] Fetching 123/300: Tax Law For Tax Agents Skill Set Tax Documentation Fnsss00008
+[124/300] Fetching 124/300: Accounting Principles Skill Set Fnsss00014
+[125/300] Fetching 125/300: Bachelor Of Biomedicine Hbbm
+[126/300] Fetching 126/300: Bachelor Of Biomedical Science Hbbs
+[127/300] Fetching 127/300: Bachelor Of Dermal Sciences Hbds
+[128/300] Fetching 128/300: Bachelor Of Biomedical And Exercise Science Hbes
+[129/300] Fetching 129/300: Bachelor Of Health Science Hbhl
+[130/300] Fetching 130/300: Bachelor Of Midwifery Bachelor Of Nursing Hbma
+[131/300] Fetching 131/300: Bachelor Of Nursing Hbnb
+[132/300] Fetching 132/300: Bachelor Of Human Nutrition Hbnt
+[133/300] Fetching 133/300: Bachelor Of Paramedicine Hbpd
+[134/300] Fetching 134/300: Bachelor Of Nutritional Science Master Of Dietetics Hcnd
+[135/300] Fetching 135/300: Bachelor Of Science Osteopathy Master Of Health Science Osteopathy Hcop
+[136/300] Fetching 136/300: Bachelor Of Applied Movement Sciences Master Of Physiotherapy Hcpt
+[137/300] Fetching 137/300: Bachelor Of Speech And Language Sciences Master Of Speech Pathology Hcsp
+[138/300] Fetching 138/300: Graduate Diploma In Counselling Theory And Practice Hgcp
+[139/300] Fetching 139/300: Graduate Diploma In Mental Health Nursing Hgmn
+[140/300] Fetching 140/300: Bachelor Of Science Honours Hhsc
+[141/300] Fetching 141/300: Certificate Iii In Non Emergency Patient Transport Hlt31120
+[142/300] Fetching 142/300: Certificate Iii In Health Services Assistance Hlt33115
+[143/300] Fetching 143/300: Certificate Iii In Health Administration Hlt37315
+[144/300] Fetching 144/300: Diploma Of Clinical Coding Hlt50321
+[145/300] Fetching 145/300: Diploma Of Emergency Health Care Hlt51020
+[146/300] Fetching 146/300: Diploma Of Nursing Hlt54121
+[147/300] Fetching 147/300: Master Of Child And Adolescent Mental Health Hmch
+[148/300] Fetching 148/300: Master Of Dietetics Hmdt
+[149/300] Fetching 149/300: Master Of Global Public Health Hmgp
+[150/300] Fetching 150/300: Master Of Mental Health Hmmh
+[151/300] Fetching 151/300: Master Of Mental Health Nursing Hmmn
+[ERROR] Diploma Of Teacher Education Preparation 22602vic — The operation was aborted due to timeout
+[152/300] Fetching 152/300: Master Of Nursing Hmng
+[ERROR] Certificate Ii In Eal Employment 22642vic — The operation was aborted due to timeout
+[153/300] Fetching 153/300: Master Of Professional Psychology Hmpp
+[ERROR] Certificate Iii In Eal Employment 22643vic — The operation was aborted due to timeout
+[154/300] Fetching 154/300: Master Of Physiotherapy Hmps
+[ERROR] Certificate Iv In Eal Further Study 22646vic — The operation was aborted due to timeout
+[155/300] Fetching 155/300: Master Of Public Health Hmpt
+[ERROR] Bachelor Of Exercise Science Clinical Practice Abhe — The operation was aborted due to timeout
+[156/300] Fetching 156/300: Master Of Speech Pathology Hmst
+[ERROR] Master Of Clinical Exercise Science And Rehabilitation Amep — The operation was aborted due to timeout
+[157/300] Fetching 157/300: Graduate Certificate In Child And Adolescent Mental Health Htch
+[ERROR] Bachelor Of Laws Blaw — The operation was aborted due to timeout
+[158/300] Fetching 158/300: Graduate Certificate In Counselling Theory And Practice Htcp
+[ERROR] Bachelor Of Laws Graduate Entry Blge — The operation was aborted due to timeout
+[159/300] Fetching 159/300: Graduate Certificate In Global Public Health Htgp
+[160/300] Fetching 160/300: Graduate Certificate In Mental Health Htmh
+[161/300] Fetching 161/300: Graduate Certificate In Mental Health Nursing Htmn
+[162/300] Fetching 162/300: Graduate Certificate In Nursing Htng
+[163/300] Fetching 163/300: Graduate Certificate In Public Health Htpt
+[164/300] Fetching 164/300: Undergraduate Certificate In Diet And Health Hudh
+[165/300] Fetching 165/300: Undergraduate Certificate In Health Science Huhs
+[166/300] Fetching 166/300: Undergraduate Certificate In Interpersonal And Organisational Skills Huio
+[167/300] Fetching 167/300: Undergraduate Certificate In Laser Safety Huls
+[168/300] Fetching 168/300: Undergraduate Certificate In Psychological Studies Hups
+[169/300] Fetching 169/300: Certificate Iii In Information Technology Ict30120
+[170/300] Fetching 170/300: Certificate Iv In Information Technology Ict40120
+[171/300] Fetching 171/300: International Foundations At Vu Jqag
+[ERROR] Certificate Iv In Leadership And Management Bsb40520 — The operation was aborted due to timeout
+[172/300] Fetching 172/300: Chinese Language And Culture Program Jqak
+[173/300] Fetching 173/300: Professional Course In Notarial Practice Jqnp
+[ERROR] Certificate Iv In Legal Services Bsb40620 — The operation was aborted due to timeout
+[174/300] Fetching 174/300: Osce Preparation Program For Nurses Jqpn
+[175/300] Fetching 175/300: Capstone Exam Preparatory Course Jvae
+[176/300] Fetching 176/300: Sap Analytics Cloud Jvai
+[177/300] Fetching 177/300: Sap Finance Financial Accounting Jvaj
+[178/300] Fetching 178/300: Sap Finance Management Accounting Jvak
+[ERROR] Graduate Certificate In Marketing Btkm — The operation was aborted due to timeout
+[179/300] Fetching 179/300: Sap Extended Warehouse Management Jval
+[ERROR] Graduate Certificate In Supply Chain Management Btsp — The operation was aborted due to timeout
+[180/300] Fetching 180/300: Sap Transportation Management Jvam
+[181/300] Fetching 181/300: Sap Activate For Cloud Solutions Project Management Jvan
+[182/300] Fetching 182/300: Sustainable Infrastructure Construction And Management Jvao
+[ERROR] Certificate Iv In Youth Work Chc40421 — The operation was aborted due to timeout
+[183/300] Fetching 183/300: Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap
+[184/300] Fetching 184/300: Foundations At Vu Jyac
+[185/300] Fetching 185/300: Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp
+[186/300] Fetching 186/300: Bachelor Of Criminology Lbcr
+[ERROR] Diploma Of Community Services Chc52021 — The operation was aborted due to timeout
+[187/300] Fetching 187/300: Bachelor Of Laws Bachelor Of Arts Lbla
+[188/300] Fetching 188/300: Bachelor Of Laws Bachelor Of Criminology Lblc
+[189/300] Fetching 189/300: Bachelor Of Legal Services Lbls
+[190/300] Fetching 190/300: Bachelor Of Laws Bachelor Of Business Lbwb
+[191/300] Fetching 191/300: Bachelor Of Laws Bachelor Of Psychological Studies Lbwp
+[192/300] Fetching 192/300: Graduate Diploma In Migration Law Lgml
+[ERROR] Certificate Iii In Plumbing Cpc32420 — The operation was aborted due to timeout
+[193/300] Fetching 193/300: Bachelor Of Laws Honours Bachelor Of Criminology Lhcr
+[ERROR] Certificate Iv In Plumbing And Services Cpc40920 — The operation was aborted due to timeout
+[194/300] Fetching 194/300: Bachelor Of Laws Honours Graduate Entry Lhge
+[195/300] Fetching 195/300: Bachelor Of Laws Honours Lhlw
+[ERROR] Advanced Diploma Of Building Surveying Cpc60121 — The operation was aborted due to timeout
+[196/300] Fetching 196/300: Bachelor Of Laws Honours Bachelor Of Arts Lhwa
+[197/300] Fetching 197/300: Bachelor Of Laws Honours Bachelor Of Business Lhwb
+[198/300] Fetching 198/300: Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp
+[199/300] Fetching 199/300: Graduate Certificate In Crime Prevention Ltcp
+[200/300] Fetching 200/300: Certificate Iii In Engineering Mechanical Trade Mem30219
+[ERROR] Bachelor Of Education P 12 Ebed — The operation was aborted due to timeout
+[201/300] Fetching 201/300: Certificate Iii In Engineering Fabrication Trade Mem31922
+[202/300] Fetching 202/300: Certificate Ii In Cabinet Making And Timber Technology Msf20322
+[203/300] Fetching 203/300: Certificate Iii In Cabinet Making And Timber Technology Msf30322
+[204/300] Fetching 204/300: Bachelor Of Building Surveying Nbbs
+[205/300] Fetching 205/300: Bachelor Of Cyber Security Nbcs
+[206/300] Fetching 206/300: Bachelor Of Data Science Nbds
+[ERROR] Bachelor Of Education Studies Ebst — The operation was aborted due to timeout
+[207/300] Fetching 207/300: Bachelor Of Information Technology Professional Nbip
+[208/300] Fetching 208/300: Bachelor Of Information Technology Nbit
+[209/300] Fetching 209/300: Bachelor Of Science Nbsc
+[210/300] Fetching 210/300: Graduate Diploma In Building Surveying Ngbs
+[211/300] Fetching 211/300: Graduate Diploma In Cyber Security Ngcs
+[212/300] Fetching 212/300: Graduate Diploma In Project Management Ngpm
+[213/300] Fetching 213/300: Bachelor Of Construction Management Honours Nhcm
+[214/300] Fetching 214/300: Bachelor Of Engineering Honours Civil Engineering Nhec
+[215/300] Fetching 215/300: Bachelor Of Engineering Honours Electrical And Electronic Engineering Nhee
+[216/300] Fetching 216/300: Bachelor Of Engineering Honours Mechanical Engineering Nhem
+[ERROR] Graduate Certificate In Performance Based Building Fire Codes Etqb — The operation was aborted due to timeout
+[217/300] Fetching 217/300: Master Of Engineering Nmen
+[218/300] Fetching 218/300: Master Of Applied Information Technology Nmit
+[ERROR] Undergraduate Certificate In Early Childhood Education Euec — The operation was aborted due to timeout
+[219/300] Fetching 219/300: Master Of Project Management Nmpm
+[ERROR] Certificate Iv In Accounting And Bookkeeping Fns40222 — The operation was aborted due to timeout
+[220/300] Fetching 220/300: Graduate Certificate In Artificial Intelligence Ntai
+[221/300] Fetching 221/300: Graduate Certificate In Building Surveying Ntbs
+[222/300] Fetching 222/300: Graduate Certificate In Construction Project Management Ntcp
+[ERROR] Bas Agent Registration Skill Set Fnsss00004 — The operation was aborted due to timeout
+[223/300] Fetching 223/300: Graduate Certificate In Cyber Security Ntcs
+[224/300] Fetching 224/300: Graduate Certificate In Information Technology Project Management Ntip
+[ERROR] Bachelor Of Biomedicine Hbbm — The operation was aborted due to timeout
+[225/300] Fetching 225/300: Graduate Certificate In Project Management Ntpm
+[ERROR] Bachelor Of Biomedical And Exercise Science Hbes — The operation was aborted due to timeout
+[226/300] Fetching 226/300: Undergraduate Certificate In Architectural Design Nuad
+[227/300] Fetching 227/300: Undergraduate Certificate In Building Construction Management Nubc
+[228/300] Fetching 228/300: Undergraduate Certificate In Engineering Fundamentals Nuef
+[229/300] Fetching 229/300: Undergraduate Certificate In Information Technology Nuit
+[230/300] Fetching 230/300: Undergraduate Certificate In Science And The Environment Nuse
+[ERROR] Bachelor Of Human Nutrition Hbnt — The operation was aborted due to timeout
+[231/300] Fetching 231/300: Certificate Ii In Civil Construction Rii20720
+[ERROR] Bachelor Of Paramedicine Hbpd — The operation was aborted due to timeout
+[232/300] Fetching 232/300: Certificate Iii In Civil Construction Plant Operations Rii30820
+[233/300] Fetching 233/300: Certificate Iii In Civil Construction Rii30920
+[234/300] Fetching 234/300: Certificate Iv In Civil Construction Rii40720
+[235/300] Fetching 235/300: Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp
+[236/300] Fetching 236/300: Bachelor Of Sport Science Human Movement Bachelor Of Sport Management Sbhs
+[ERROR] Graduate Diploma In Counselling Theory And Practice Hgcp — The operation was aborted due to timeout
+[237/300] Fetching 237/300: Bachelor Of Outdoor Education And Environmental Science Sboe
+[238/300] Fetching 238/300: Bachelor Of Outdoor Leadership Sbol
+[239/300] Fetching 239/300: Bachelor Of Physical Education And Sport Science Sbph
+[240/300] Fetching 240/300: Bachelor Of Sport Science Sbsa
+[ERROR] Bachelor Of Science Honours Hhsc — The operation was aborted due to timeout
+[241/300] Fetching 241/300: Bachelor Of Sport Management Bachelor Of Business Sbsb
+[ERROR] Certificate Iii In Health Services Assistance Hlt33115 — The operation was aborted due to timeout
+[242/300] Fetching 242/300: Bachelor Of Sport Management Sbsm
+[243/300] Fetching 243/300: Certificate Iii In Beauty Services Shb30121
+[244/300] Fetching 244/300: Certificate Iii In Hairdressing Shb30416
+[ERROR] Diploma Of Clinical Coding Hlt50321 — The operation was aborted due to timeout
+[245/300] Fetching 245/300: Certificate Iii In Barbering Shb30516
+[246/300] Fetching 246/300: Diploma Of Beauty Therapy Shb50121
+[ERROR] Diploma Of Nursing Hlt54121 — The operation was aborted due to timeout
+[247/300] Fetching 247/300: Certificate Ii In Hospitality Sit20322
+[248/300] Fetching 248/300: Certificate Ii In Cookery Sit20421
+[ERROR] Master Of Dietetics Hmdt — The operation was aborted due to timeout
+[249/300] Fetching 249/300: Certificate Iii In Hospitality Sit30622
+[ERROR] Master Of Physiotherapy Hmps — The operation was aborted due to timeout
+[250/300] Fetching 250/300: Certificate Iii In Commercial Cookery Sit30821
+[ERROR] Graduate Certificate In Counselling Theory And Practice Htcp — The operation was aborted due to timeout
+[251/300] Fetching 251/300: Certificate Iv In Kitchen Management Sit40521
+[ERROR] Graduate Certificate In Global Public Health Htgp — The operation was aborted due to timeout
+[252/300] Fetching 252/300: Diploma Of Travel And Tourism Management Sit50122
+[253/300] Fetching 253/300: Diploma Of Event Management Sit50322
+[ERROR] Undergraduate Certificate In Diet And Health Hudh — The operation was aborted due to timeout
+[254/300] Fetching 254/300: Diploma Of Hospitality Management Sit50422
+[255/300] Fetching 255/300: Advanced Diploma Of Hospitality Management Sit60322
+[ERROR] Undergraduate Certificate In Health Science Huhs — The operation was aborted due to timeout
+[256/300] Fetching 256/300: Food Handling Skill Set Sitss00068
+[ERROR] Undergraduate Certificate In Interpersonal And Organisational Skills Huio — The operation was aborted due to timeout
+[257/300] Fetching 257/300: Food Safety Supervision Skill Set Sitss00069
+[258/300] Fetching 258/300: Responsible Service Of Alcohol Sitss00071
+[259/300] Fetching 259/300: Master Of Sport And Exercise Science Smes
+[ERROR] Capstone Exam Preparatory Course Jvae — The operation was aborted due to timeout
+[260/300] Fetching 260/300: Graduate Certificate In Strength And Conditioning Stsa
+[ERROR] Sap Finance Financial Accounting Jvaj — The operation was aborted due to timeout
+[261/300] Fetching 261/300: Graduate Certificate In Data Analytics For Sport Performance Stsp
+[262/300] Fetching 262/300: Undergraduate Certificate In Primary Physical Education Supp
+[ERROR] Sap Finance Management Accounting Jvak — The operation was aborted due to timeout
+[263/300] Fetching 263/300: Undergraduate Certificate In Secondary Physical Education Susp
+[264/300] Fetching 264/300: Lantite Preparation Course Thaaa
+[265/300] Fetching 265/300: Revit Level 1 Thaac
+[266/300] Fetching 266/300: Welding For Beginners Thaan
+[ERROR] Sap Extended Warehouse Management Jval — The operation was aborted due to timeout
+[267/300] Fetching 267/300: Mechanical Fitting For Hobbyists Thaau
+[ERROR] Sap Transportation Management Jvam — The operation was aborted due to timeout
+[268/300] Fetching 268/300: Effective Communication Skills Thaav
+[ERROR] Sap Activate For Cloud Solutions Project Management Jvan — The operation was aborted due to timeout
+[269/300] Fetching 269/300: Introduction To Emotional Intelligence Thaaw
+[ERROR] Sustainable Infrastructure Construction And Management Jvao — The operation was aborted due to timeout
+[270/300] Fetching 270/300: Leading A Team Thaax
+[ERROR] Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap — The operation was aborted due to timeout
+[271/300] Fetching 271/300: Building The Team Thaay
+[272/300] Fetching 272/300: Communicate With Influence Thaaz
+[ERROR] Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp — The operation was aborted due to timeout
+[273/300] Fetching 273/300: Effective Time Management Thaba
+[ERROR] Bachelor Of Criminology Lbcr — The operation was aborted due to timeout
+[274/300] Fetching 274/300: Introduction To Cybersecurity Thabb
+[ERROR] Bachelor Of Laws Bachelor Of Criminology Lblc — The operation was aborted due to timeout
+[275/300] Fetching 275/300: Cybersecurity Essentials Thabc
+[276/300] Fetching 276/300: Introduction To Internet Of Things Iot Thabd
+[ERROR] Bachelor Of Laws Bachelor Of Psychological Studies Lbwp — The operation was aborted due to timeout
+[277/300] Fetching 277/300: Introduction To Managing Workplace Priorities Thabe
+[278/300] Fetching 278/300: Introduction To Coaching And Mentoring Skills Thabg
+[279/300] Fetching 279/300: Introduction To Presentation Skills Thabh
+[ERROR] Bachelor Of Laws Honours Graduate Entry Lhge — The operation was aborted due to timeout
+[280/300] Fetching 280/300: Introduction To Project Management Thabi
+[ERROR] Bachelor Of Laws Honours Bachelor Of Business Lhwb — The operation was aborted due to timeout
+[281/300] Fetching 281/300: Introduction To Change Management Thabk
+[ERROR] Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp — The operation was aborted due to timeout
+[282/300] Fetching 282/300: Introduction To Managing Workplace Relationships Thabl
+[ERROR] Certificate Iii In Engineering Fabrication Trade Mem31922 — The operation was aborted due to timeout
+[283/300] Fetching 283/300: Introduction To Effective Teamwork Thabm
+[ERROR] Certificate Iii In Cabinet Making And Timber Technology Msf30322 — The operation was aborted due to timeout
+[284/300] Fetching 284/300: Introduction To Positive Leadership Thabn
+[ERROR] Bachelor Of Building Surveying Nbbs — The operation was aborted due to timeout
+[285/300] Fetching 285/300: Introduction To Communication For Effective Leadership Thabo
+[ERROR] Bachelor Of Cyber Security Nbcs — The operation was aborted due to timeout
+[286/300] Fetching 286/300: Introduction For Women In Leadership Thabq
+[287/300] Fetching 287/300: Microsoft Word Intermediate Thabs
+[ERROR] Bachelor Of Information Technology Professional Nbip — The operation was aborted due to timeout
+[288/300] Fetching 288/300: Microsoft Powerpoint Introduction Thabt
+[ERROR] Bachelor Of Science Nbsc — The operation was aborted due to timeout
+[289/300] Fetching 289/300: Microsoft Excel Beginner Thabu
+[290/300] Fetching 290/300: Microsoft Excel Intermediate Thabv
+[ERROR] Graduate Diploma In Project Management Ngpm — The operation was aborted due to timeout
+[291/300] Fetching 291/300: Microsoft Excel Advanced Thabw
+[ERROR] Bachelor Of Construction Management Honours Nhcm — The operation was aborted due to timeout
+[292/300] Fetching 292/300: Furniture Making For Hobbyists Thaca
+[293/300] Fetching 293/300: Continuing Professional Development Cpd Thacf
+[294/300] Fetching 294/300: Essential Eight Assessment Thacj
+[ERROR] Master Of Project Management Nmpm — The operation was aborted due to timeout
+[295/300] Fetching 295/300: Restricted Electrical Workers Licence Class 1 Assessment Thacl
+[296/300] Fetching 296/300: Restricted Electrical Workers Licence Class 2 Assessment Thacm
+[ERROR] Graduate Certificate In Building Surveying Ntbs — The operation was aborted due to timeout
+[297/300] Fetching 297/300: Safe Operation Of An Elevating Work Platform Tnaah
+[298/300] Fetching 298/300: Emergency First Aid In Childcare And Education Tnabd
+[ERROR] Graduate Certificate In Construction Project Management Ntcp — The operation was aborted due to timeout
+[299/300] Fetching 299/300: Cpr Refresher Tnabg
+[ERROR] Graduate Certificate In Cyber Security Ntcs — The operation was aborted due to timeout
+[300/300] Fetching 300/300: Level Ii First Aid Tnabj
+[ERROR] Graduate Certificate In Information Technology Project Management Ntip — The operation was aborted due to timeout
+[ERROR] Graduate Certificate In Project Management Ntpm — The operation was aborted due to timeout
+[ERROR] Undergraduate Certificate In Architectural Design Nuad — The operation was aborted due to timeout
+[ERROR] Undergraduate Certificate In Engineering Fundamentals Nuef — The operation was aborted due to timeout
+[ERROR] Certificate Iii In Civil Construction Plant Operations Rii30820 — The operation was aborted due to timeout
+[ERROR] Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp — The operation was aborted due to timeout
+[ERROR] Bachelor Of Outdoor Education And Environmental Science Sboe — The operation was aborted due to timeout
+[ERROR] Bachelor Of Physical Education And Sport Science Sbph — The operation was aborted due to timeout
+[ERROR] Bachelor Of Sport Management Bachelor Of Business Sbsb — The operation was aborted due to timeout
+[ERROR] Certificate Ii In Hospitality Sit20322 — The operation was aborted due to timeout
+[ERROR] Certificate Ii In Cookery Sit20421 — The operation was aborted due to timeout
+[ERROR] Certificate Iii In Hospitality Sit30622 — The operation was aborted due to timeout
+[ERROR] Certificate Iii In Commercial Cookery Sit30821 — The operation was aborted due to timeout
+[ERROR] Certificate Iv In Kitchen Management Sit40521 — The operation was aborted due to timeout
+[ERROR] Advanced Diploma Of Hospitality Management Sit60322 — The operation was aborted due to timeout
+[ERROR] Food Handling Skill Set Sitss00068 — The operation was aborted due to timeout
+[ERROR] Food Safety Supervision Skill Set Sitss00069 — The operation was aborted due to timeout
+[ERROR] Graduate Certificate In Strength And Conditioning Stsa — The operation was aborted due to timeout
+[ERROR] Graduate Certificate In Data Analytics For Sport Performance Stsp — The operation was aborted due to timeout
+[ERROR] Undergraduate Certificate In Primary Physical Education Supp — The operation was aborted due to timeout
+[ERROR] Undergraduate Certificate In Secondary Physical Education Susp — The operation was aborted due to timeout
+[ERROR] Revit Level 1 Thaac — The operation was aborted due to timeout
+[ERROR] Welding For Beginners Thaan — The operation was aborted due to timeout
+[ERROR] Mechanical Fitting For Hobbyists Thaau — The operation was aborted due to timeout
+[ERROR] Effective Communication Skills Thaav — The operation was aborted due to timeout
+[ERROR] Introduction To Emotional Intelligence Thaaw — The operation was aborted due to timeout
+[ERROR] Leading A Team Thaax — The operation was aborted due to timeout
+[ERROR] Building The Team Thaay — The operation was aborted due to timeout
+[ERROR] Effective Time Management Thaba — The operation was aborted due to timeout
+[ERROR] Introduction To Cybersecurity Thabb — The operation was aborted due to timeout
+[ERROR] Cybersecurity Essentials Thabc — The operation was aborted due to timeout
+[ERROR] Introduction To Internet Of Things Iot Thabd — The operation was aborted due to timeout
+[ERROR] Introduction To Managing Workplace Priorities Thabe — The operation was aborted due to timeout
+[ERROR] Introduction To Coaching And Mentoring Skills Thabg — The operation was aborted due to timeout
+[ERROR] Introduction To Presentation Skills Thabh — The operation was aborted due to timeout
+[ERROR] Introduction To Project Management Thabi — The operation was aborted due to timeout
+[ERROR] Introduction To Managing Workplace Relationships Thabl — The operation was aborted due to timeout
+[ERROR] Introduction To Effective Teamwork Thabm — The operation was aborted due to timeout
+[ERROR] Introduction To Positive Leadership Thabn — The operation was aborted due to timeout
+[ERROR] Introduction To Communication For Effective Leadership Thabo — The operation was aborted due to timeout
+[ERROR] Microsoft Word Intermediate Thabs — The operation was aborted due to timeout
+[ERROR] Microsoft Excel Beginner Thabu — The operation was aborted due to timeout
+[ERROR] Microsoft Excel Intermediate Thabv — The operation was aborted due to timeout
+[ERROR] Microsoft Excel Advanced Thabw — The operation was aborted due to timeout
+[ERROR] Furniture Making For Hobbyists Thaca — The operation was aborted due to timeout
+[ERROR] Essential Eight Assessment Thacj — The operation was aborted due to timeout
+[ERROR] Restricted Electrical Workers Licence Class 1 Assessment Thacl — The operation was aborted due to timeout
+[ERROR] Safe Operation Of An Elevating Work Platform Tnaah — The operation was aborted due to timeout
+[ERROR] Emergency First Aid In Childcare And Education Tnabd — The operation was aborted due to timeout
+[ERROR] Cpr Refresher Tnabg — The operation was aborted due to timeout
+[ERROR] Level Ii First Aid Tnabj — The operation was aborted due to timeout
+Waiting for your confirmation above...
