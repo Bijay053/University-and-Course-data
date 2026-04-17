@@ -1,0 +1,593 @@
+[INFO] Scraping started in background...
+[INFO] Scraping https://www.uel.ac.uk/...
+[INFO] Using university: university east london (ID: 18)
+[INFO] Fetching https://www.uel.ac.uk/...
+[INFO] Home page detected. Searching for course listing page...
+[INFO] Home page detected → course listing found at https://www.uel.ac.uk/study/undergraduate/undergraduate-courses
+[INFO] Switched to course listing: https://www.uel.ac.uk/study/undergraduate/undergraduate-courses
+[INFO] Discovering university-level fee & requirements pages...
+[INFO] Discovered university-level pages: feePage: https://www.uel.ac.uk/about/governance/tuition-fee-policy, entryPage: https://www.uel.ac.uk/international/regions/english-language-requirements, requirementsPage: https://www.uel.ac.uk/international/guidance-your-region/entry-requirements
+[INFO] Analyzing page with AI (1 call)...
+[INFO] AI analysis failed (All Gemini models are currently unavailable. Please try again in a minute.). Falling back to HTML scan...
+[INFO] Phase 1: Discovering candidate course URLs from all sources...
+[INFO] Sitemap: found 452 course URLs total
+[INFO] Sitemap found 452 candidate URLs. Analyzing to identify real course pages...
+[INFO] Phase 2: Researching 452 candidates — comparing pages to find genuine course pages before fetching...
+[INFO] URL analysis: 351 candidate course pages identified, filtered out 101 non-course URLs
+[INFO] Phase 2: Researching 351 candidates — sampling 12 pages to confirm genuine course pages...
+[INFO] ✓ Confirmed course (URL+title fast-path): "Llb Hons Law"
+[INFO] ✓ Confirmed course: "Ba Hons Dance"
+[INFO] ✓ Confirmed course: "Pgce Primary Early Years 3 7"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Bsc Hons Accounting Finance"
+[INFO] ✓ Confirmed course: "Llm International Law Practice"
+[INFO] ✓ Confirmed course: "Ba Hons Interior Architecture"
+[INFO] ✓ Confirmed course: "Bachelor Laws Llb"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Beng Hons Electrical Electronic Engineering"
+[INFO] ✗ Not a course page: "Care Leavers"
+[INFO] ✓ Confirmed course: "Mres Sport Exercise Science"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Mba Master Business Administration Fintech Management"
+[INFO] ✓ Confirmed course (URL+title fast-path): "Bsc Hons Accounting Business Management"
+[INFO] Research complete: 11/12 sampled pages are genuine course pages
+[INFO] Filtered out 74 non-course pages. Will fetch 277 validated course pages.
+[WAITING] Research complete. Found 277 course pages to fetch. Please review and confirm.
+[INFO] User confirmed — starting bulk course fetch...
+[INFO] Phase 3: Fetching 277 validated course pages...
+[INFO] Using university requirements page: https://www.uel.ac.uk/international/guidance-your-region/entry-requirements
+[INFO] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[1/277] Fetching 1/277: Bsc Hons Accounting Finance
+[2/277] Fetching 2/277: Bsc Hons Human Resource Management
+[3/277] Fetching 3/277: Ba Hons Acting Stage Screen
+[4/277] Fetching 4/277: Bsc Hons Nursing Adult
+[5/277] Fetching 5/277: Maccfin Hons Accounting Finance
+[6/277] Fetching 6/277: Llb Hons Business Law
+[7/277] Fetching 7/277: Bsc Hons Business Management
+[8/277] Fetching 8/277: Bsc Hons Biochemistry Biotechnology
+[9/277] Fetching 9/277: Ba Hons Criminology Criminal Justice
+[10/277] Fetching 10/277: Ba Hons Criminology Law
+[11/277] Fetching 11/277: Ba Hons Criminology Psychology
+[12/277] Fetching 12/277: Bsc Hons Biomedical Science
+[13/277] Fetching 13/277: Bsc Hons Chemistry
+[14/277] Fetching 14/277: Bsc Hons Psychology Child Development
+[15/277] Fetching 15/277: Ba Hons Animation
+[16/277] Fetching 16/277: Bsc Hons Clinical Community Psychology
+[17/277] Fetching 17/277: Bsc Hons Counselling
+[18/277] Fetching 18/277: Bsc Hons Medical Physiology
+[19/277] Fetching 19/277: Bsc Hons Forensic Psychology
+[20/277] Fetching 20/277: Bsc Hons Applied Computing Top
+[21/277] Fetching 21/277: Bsc Hons Psychology
+[22/277] Fetching 22/277: Beng Hons Aeronautical Engineering
+[23/277] Fetching 23/277: Fdsc Nursing Associate
+[24/277] Fetching 24/277: Ba Hons Illustration Animation
+[25/277] Fetching 25/277: Bsc Hons Psychology Distance Learning
+[26/277] Fetching 26/277: Bsc Hons Architectural Design Technology Accredited Ciat
+[27/277] Fetching 27/277: Bsc Hons Economics
+[28/277] Fetching 28/277: Ba Hons Fashion Design
+[29/277] Fetching 29/277: Bsc Hons Architecture
+[30/277] Fetching 30/277: Ba Hons Dance
+[31/277] Fetching 31/277: Bsc Hons Podiatry
+[32/277] Fetching 32/277: Ba Hons Fashion Cultures Business
+[33/277] Fetching 33/277: Ba Hons Events Management
+[34/277] Fetching 34/277: Bsc Hons Pharmaceutical Science
+[35/277] Fetching 35/277: Beng Hons Biomedical Engineering
+[36/277] Fetching 36/277: Bsc Hons Pharmacology
+[37/277] Fetching 37/277: Fdsc Civil Engineering Construction Management
+[38/277] Fetching 38/277: Beng Hons Civil Engineering
+[39/277] Fetching 39/277: Ba Hons Fashion Marketing Communication
+[40/277] Fetching 40/277: Msc Psychology
+[41/277] Fetching 41/277: Bsc Hons Civil Engineering
+[42/277] Fetching 42/277: Ba Hons Hospitality Management
+[43/277] Fetching 43/277: Ba Hons Filmmaking
+[44/277] Fetching 44/277: Meng Civil Engineering Integrated Masters
+[45/277] Fetching 45/277: Bsc Hons Public Health
+[46/277] Fetching 46/277: Ba Hons Music Performance Production
+[47/277] Fetching 47/277: Ba Hons Digital Media Communication
+[48/277] Fetching 48/277: Ba Hons Commercial Photography
+[49/277] Fetching 49/277: Bsc Hons Physiotherapy
+[50/277] Fetching 50/277: Ma Counselling Psychotherapy
+[51/277] Fetching 51/277: Bsc Hons Computer Science
+[52/277] Fetching 52/277: Bsc Hons Computer Science Education Qualified Teacher Status
+[53/277] Fetching 53/277: Prof Doc Counselling Psychology
+[54/277] Fetching 54/277: Ba Hons Music Technology Production
+[55/277] Fetching 55/277: Bsc Hons Computing Business
+[56/277] Fetching 56/277: Bsc Hons Construction Management
+[57/277] Fetching 57/277: Bsc Hons Cloud Computing
+[58/277] Fetching 58/277: Ba Hons Early Childhood Studies
+[59/277] Fetching 59/277: Llb Hons Law
+[60/277] Fetching 60/277: Bsc Hons Cyber Security Networks
+[61/277] Fetching 61/277: Bsc Hons Data Science Artificial Intelligence
+[62/277] Fetching 62/277: Msc Business Psychology
+[63/277] Fetching 63/277: Llb Hons Law International Relations
+[64/277] Fetching 64/277: Ba Hons Early Childhood Studies Online
+[65/277] Fetching 65/277: Ba Hons Sports Journalism
+[66/277] Fetching 66/277: Beng Hons Engineering Management
+[67/277] Fetching 67/277: Ba Hons Fine Art
+[68/277] Fetching 68/277: Pgdip Counselling Psychotherapy
+[69/277] Fetching 69/277: Bsc Hons Marketing
+[70/277] Fetching 70/277: Beng Hons General Engineering
+[71/277] Fetching 71/277: Ba Hons Graphic Design
+[72/277] Fetching 72/277: Ba Hons Visual Communication
+[73/277] Fetching 73/277: Ma Mfa Filmmaking
+[74/277] Fetching 74/277: Msc Occupational Organisational Psychology
+[75/277] Fetching 75/277: Prof Doc Clinical Psychology
+[76/277] Fetching 76/277: Ba Hons Tourism Management
+[77/277] Fetching 77/277: Ba Hons Illustration
+[78/277] Fetching 78/277: Prof Doc Educational Child Psychology
+[79/277] Fetching 79/277: Ma Theatre Directing
+[80/277] Fetching 80/277: Bsc Hons Sport Exercise Science
+[81/277] Fetching 81/277: Llb Hons Law Criminology
+[82/277] Fetching 82/277: Msc Integrative Counselling Coaching
+[83/277] Fetching 83/277: Ba Hons Interior Design
+[84/277] Fetching 84/277: Ma International Fashion Business
+[85/277] Fetching 85/277: Bsc Hons Sport Physical Education Development
+[86/277] Fetching 86/277: Bsc Hons Sports Coaching Performance West Ham United Foundation
+[87/277] Fetching 87/277: Bsc Hons Sport Rehabilitation
+[88/277] Fetching 88/277: Ba Hons Interior Architecture
+[89/277] Fetching 89/277: Ma Fashion
+[90/277] Fetching 90/277: Bsc Hons Policing Studies Top
+[91/277] Fetching 91/277: Beng Hons Mechanical Engineering
+[92/277] Fetching 92/277: Pgdip Integrative Counselling Coaching
+[93/277] Fetching 93/277: Meng Mechanical Engineering Integrated Masters
+[94/277] Fetching 94/277: Beng Hons Mechatronics Computer Systems Engineering
+[95/277] Fetching 95/277: Beng Hons Mechatronics Engineering
+[96/277] Fetching 96/277: Ma Professional Sound Music
+[97/277] Fetching 97/277: Mphil Phd Psychology
+[98/277] Fetching 98/277: Ba Hons Photography
+[99/277] Fetching 99/277: Beng Hons Product Design Engineering
+[100/277] Fetching 100/277: Msc Sports Management
+[101/277] Fetching 101/277: Ba Hons Social Work
+[102/277] Fetching 102/277: Bsc Hons Quantity Surveying Commercial Management
+[103/277] Fetching 103/277: Msc International Business Management
+[104/277] Fetching 104/277: Beng Hons Railway Engineering
+[105/277] Fetching 105/277: Ba Hons Politics International Relations
+[106/277] Fetching 106/277: Bsc Hons Surveying Mapping Sciences
+[107/277] Fetching 107/277: Mba Master Business Administration Digital Marketing
+[108/277] Fetching 108/277: Ma Media Communication Industries
+[109/277] Fetching 109/277: Prof Doc Performing Arts
+[110/277] Fetching 110/277: Llm Human Rights Advocacy
+[111/277] Fetching 111/277: Mba Master Business Administration Project Management
+[112/277] Fetching 112/277: Ma Acting Stage Screen
+[113/277] Fetching 113/277: Mba Master Business Administration Business Analytics
+[114/277] Fetching 114/277: Ba Hons Special Education
+[115/277] Fetching 115/277: Llm Business Financial Law
+[116/277] Fetching 116/277: Ba Hons Special Education Online
+[117/277] Fetching 117/277: Llm International Law Practice
+[118/277] Fetching 118/277: Ma Architecture And Urbanism
+[119/277] Fetching 119/277: Ma Fine Art
+[120/277] Fetching 120/277: Prof Doc Fine Art
+[121/277] Fetching 121/277: Ba Hons Primary Education Qts
+[122/277] Fetching 122/277: Msc Computer Science
+[123/277] Fetching 123/277: Llm Fintech Law
+[124/277] Fetching 124/277: Ba Hons Psychosocial Studies
+[125/277] Fetching 125/277: Llm General
+[126/277] Fetching 126/277: Msc Data Science
+[127/277] Fetching 127/277: Msc Information Security Digital Forensics
+[128/277] Fetching 128/277: Msc Construction Engineering Management
+[129/277] Fetching 129/277: Msc Human Resource Management
+[130/277] Fetching 130/277: Msc Structural Engineering
+[131/277] Fetching 131/277: Msc Oil Gas Energy Management
+[132/277] Fetching 132/277: Ba Hons Education Top
+[133/277] Fetching 133/277: Ba Hons Education Studies
+[134/277] Fetching 134/277: Msc Finance Risk
+[135/277] Fetching 135/277: Ba Hons Education Top Online
+[136/277] Fetching 136/277: Msc Professional Accounting
+[137/277] Fetching 137/277: Ba Hons Education Studies Online
+[138/277] Fetching 138/277: Msc Cloud Computing
+[139/277] Fetching 139/277: Mba Master Business Administration
+[140/277] Fetching 140/277: Mphil Phd School Arts Creative Industries
+[141/277] Fetching 141/277: Msc Big Data Technologies
+[142/277] Fetching 142/277: Mba Master Business Administration Supply Chain Management
+[143/277] Fetching 143/277: Msc Events Hospitality Leadership
+[144/277] Fetching 144/277: Msc Civil Engineering
+[145/277] Fetching 145/277: Msc Mechanical Engineering
+[146/277] Fetching 146/277: Mba Master Business Administration Fintech Management
+[147/277] Fetching 147/277: Mba Master Business Administration Sustainable Business
+[148/277] Fetching 148/277: Mba Business Administration Entrepreneurship
+[149/277] Fetching 149/277: Ma Interior Architecture Design
+[150/277] Fetching 150/277: Mphil Phd School Business Law
+[151/277] Fetching 151/277: Ma Social Work
+[152/277] Fetching 152/277: Msc Artificial Intelligence
+[153/277] Fetching 153/277: Msc Computing
+[154/277] Fetching 154/277: Msc International Relations
+[155/277] Fetching 155/277: March Architecture Arbriba Part 2
+[156/277] Fetching 156/277: Pgdip Landscape Architecture
+[157/277] Fetching 157/277: Prof Doc Information Security
+[158/277] Fetching 158/277: Msc Intelligent Transport Planning Engineering
+[159/277] Fetching 159/277: Prof Doc Data Science
+[160/277] Fetching 160/277: Pgdip Civil Engineering
+[161/277] Fetching 161/277: Pgdip Structural Engineering
+[162/277] Fetching 162/277: Msc Mechatronics Computer Systems Engineering
+[163/277] Fetching 163/277: Ma Leadership Education
+[164/277] Fetching 164/277: Ma English Language Teaching
+[165/277] Fetching 165/277: Ma Special Educational Needs
+[166/277] Fetching 166/277: Ma Professional Landscape Architecture
+[167/277] Fetching 167/277: Pgce Further Education
+[168/277] Fetching 168/277: Pgce Non Qualified Teacher Status Qts
+[169/277] Fetching 169/277: Ma Professional Landscape Architecture Conversion
+[170/277] Fetching 170/277: Ma Education
+[171/277] Fetching 171/277: Pgce Secondary Physical Education
+[172/277] Fetching 172/277: Ma Directing Stage Screen
+[173/277] Fetching 173/277: Ma Early Childhood Leadership Practice
+[174/277] Fetching 174/277: Pgce Ipgce
+[175/277] Fetching 175/277: Pgce Primary Early Years 3 7
+[176/277] Fetching 176/277: Msc Engineering Management
+[177/277] Fetching 177/277: Ma English Language Teaching Distance Learning
+[178/277] Fetching 178/277: Ma Youth Community Work
+[179/277] Fetching 179/277: Edd Professional Doctorate Education
+[180/277] Fetching 180/277: Msc Civil Engineering Sustainability
+[181/277] Fetching 181/277: Pgce Secondary Mathematics
+[182/277] Fetching 182/277: Pgce Primary Sen Special Schools
+[183/277] Fetching 183/277: Pgcert Autism Spectrum Conditions Learning
+[184/277] Fetching 184/277: Ma Special Additional Learning Needs Icep Europe
+[185/277] Fetching 185/277: Pgce Secondary Music
+[186/277] Fetching 186/277: Msc Ngo Development Management
+[187/277] Fetching 187/277: Pgce Secondary Drama
+[188/277] Fetching 188/277: Pgce Secondary Religious Education
+[189/277] Fetching 189/277: Pgce Primary Sen Inclusion
+[190/277] Fetching 190/277: Pgce Secondary English
+[191/277] Fetching 191/277: Pgce Secondary Biology
+[192/277] Fetching 192/277: Pgce Secondary Design Technology
+[193/277] Fetching 193/277: Pgce Secondary Modern Languages
+[194/277] Fetching 194/277: Pgce Secondary Geography
+[195/277] Fetching 195/277: Pgce Secondary Physics
+[196/277] Fetching 196/277: Pgce Secondary Computing
+[197/277] Fetching 197/277: Pgcert Understanding Supporting Behaviour
+[198/277] Fetching 198/277: Pgce Primary Humanities Religious Education
+[199/277] Fetching 199/277: Pgce Primary Arts
+[200/277] Fetching 200/277: Pgce Primary Stem
+[201/277] Fetching 201/277: Ma Post Qualifying Professional Practice
+[202/277] Fetching 202/277: Msc Pharmaceutical Science Specialism
+[203/277] Fetching 203/277: Mres Health Science
+[204/277] Fetching 204/277: Mres Sport Exercise Science
+[205/277] Fetching 205/277: Msc Strength Conditioning
+[206/277] Fetching 206/277: Pgce Primary Sport Wellbeing
+[207/277] Fetching 207/277: Msc Sport Psychology
+[208/277] Fetching 208/277: Msc Sport Analytics
+[209/277] Fetching 209/277: Msc Applied Sport Exercise Physiology
+[210/277] Fetching 210/277: Mphil Phd Social Sciences
+[211/277] Fetching 211/277: Pgce Secondary Chemistry
+[212/277] Fetching 212/277: Pgce Primary English Additional Language
+[213/277] Fetching 213/277: Mres Bioscience
+[214/277] Fetching 214/277: Msc Public Health
+[215/277] Fetching 215/277: Msc Biomedical Science
+[216/277] Fetching 216/277: Pgdip Musculoskeletal Ultrasonography
+[217/277] Fetching 217/277: Msc Blockchain Financial Technologies
+[218/277] Fetching 218/277: Mphil Phd Architecture Computing Engineering
+[219/277] Fetching 219/277: Ba Hons Fashion Studies Top
+[220/277] Fetching 220/277: Msc Civil Engineering Environmental Management
+[221/277] Fetching 221/277: Msc Real Estate Management
+[222/277] Fetching 222/277: Bsc Hons International Business Management Top
+[223/277] Fetching 223/277: Ba Hons Product Design
+[224/277] Fetching 224/277: Bsc Hons Occupational Therapy
+[225/277] Fetching 225/277: Ba Hons Sport Business Management
+[226/277] Fetching 226/277: Bsc Hons Banking Finance
+[227/277] Fetching 227/277: Msc Sustainable Tourism Development Management
+[228/277] Fetching 228/277: Msc Innovation Sustainable Hospitality
+[229/277] Fetching 229/277: Msc Marketing
+[230/277] Fetching 230/277: Ba Hons Airline Airport Management
+[231/277] Fetching 231/277: Bsc Hons Computer Science Web Mobile Technologies
+[232/277] Fetching 232/277: Msc Electric Vehicle Engineering
+[233/277] Fetching 233/277: Beng Hons Electrical Electronic Engineering
+[234/277] Fetching 234/277: Msc Construction Asset Management Digital Technologies
+[235/277] Fetching 235/277: Msc Physician Associate
+[236/277] Fetching 236/277: Ba Hons Early Childhood Montessori Pedagogy Level 6 Top Up
+[237/277] Fetching 237/277: Ma Data Journalism
+[238/277] Fetching 238/277: Ma Global Sports Journalism
+[239/277] Fetching 239/277: Ba Hons Game Design
+[240/277] Fetching 240/277: Mphil Phd Education
+[241/277] Fetching 241/277: Mphil Phd School Health Sport Bioscience
+[242/277] Fetching 242/277: Meng Electrical Electronic Engineering
+[243/277] Fetching 243/277: Msc Sustainable Energy Engineering
+[244/277] Fetching 244/277: Mphil Phd Sustainability Development Environment
+[245/277] Fetching 245/277: Ma Applied Theatre
+[246/277] Fetching 246/277: Pgcert Independent Supplementary Prescribing
+[247/277] Fetching 247/277: Msc Applied Positive Psychology Mapp
+[248/277] Fetching 248/277: Mba Fashion Entrepreneurship
+[249/277] Fetching 249/277: Ma Creative Enterprise
+[250/277] Fetching 250/277: Msc Clinical Exercise Physiology
+[251/277] Fetching 251/277: Bsc Hons Midwifery
+[252/277] Fetching 252/277: Msc Internet Things
+[253/277] Fetching 253/277: Msc Cyber Diplomacy
+[254/277] Fetching 254/277: Msc Cyber Security Engineering
+[255/277] Fetching 255/277: Msc Robotic Construction
+[256/277] Fetching 256/277: Msc Project Management Digital Technology
+[257/277] Fetching 257/277: Msc Ai Data Science
+[258/277] Fetching 258/277: Mres Business Management Social Justice
+[259/277] Fetching 259/277: Prof Doc Cyber Diplomacy
+[260/277] Fetching 260/277: Ma Education Distance Learning
+[261/277] Fetching 261/277: Bsc Hons Business Economics
+[262/277] Fetching 262/277: Bsc Hons Accounting Business Management
+[263/277] Fetching 263/277: Ma Education Pathway Teaching Learning
+[264/277] Fetching 264/277: Mphil Phd Health Wellbeing Online Harms
+[265/277] Fetching 265/277: Msc Project Management
+[266/277] Fetching 266/277: Msc Software Engineering
+[267/277] Fetching 267/277: Ma Dance
+[268/277] Fetching 268/277: Prof Doc Business Administration
+[269/277] Fetching 269/277: Llm Legal Practice Sqe Preparation
+[270/277] Fetching 270/277: Msc Environment Sustainability Global Health
+[271/277] Fetching 271/277: Bsc Hons Nursing Mental Health
+[272/277] Fetching 272/277: Bachelor Laws Llb
+[273/277] Fetching 273/277: Bsc Hons Apprenticeship Digital Technology
+[274/277] Fetching 274/277: Practice Educator Pqsw Short Course
+[275/277] Fetching 275/277: Get Nursing
+[276/277] Fetching 276/277: Digital Technology Solutions Specialist Degree Apprenticeship
+[277/277] Fetching 277/277: Mres Biosciences Social Justice
+[INFO] Classifying 277 courses with AI (batched)...
+[STAGED] Bsc Hons Accounting Finance
+[STAGED] Bsc Hons Psychology Distance Learning
+[STAGED] Maccfin Hons Accounting Finance
+[STAGED] Bsc Hons Biomedical Science
+[STAGED] Bsc Hons Applied Computing Top
+[STAGED] Ba Hons Criminology Criminal Justice
+[STAGED] Bsc Hons Clinical Community Psychology
+[STAGED] Beng Hons Aeronautical Engineering
+[STAGED] Ba Hons Criminology Law
+[STAGED] Ba Hons Animation
+[STAGED] Bsc Hons Human Resource Management
+[STAGED] Ba Hons Dance
+[STAGED] Ba Hons Illustration Animation
+[STAGED] Bsc Hons Counselling
+[STAGED] Bsc Hons Business Management
+[STAGED] Ba Hons Acting Stage Screen
+[STAGED] Bsc Hons Biochemistry Biotechnology
+[STAGED] Bsc Hons Psychology
+[STAGED] Bsc Hons Psychology Child Development
+[STAGED] Llb Hons Business Law
+[STAGED] Bsc Hons Chemistry
+[STAGED] Ba Hons Fashion Design
+[STAGED] Bsc Hons Medical Physiology
+[STAGED] Bsc Hons Forensic Psychology
+[STAGED] Bsc Hons Architecture
+[STAGED] Bsc Hons Economics
+[STAGED] Beng Hons Biomedical Engineering
+[STAGED] Bsc Hons Pharmacology
+[STAGED] Fdsc Civil Engineering Construction Management
+[STAGED] Bsc Hons Civil Engineering
+[STAGED] Beng Hons Civil Engineering
+[STAGED] Ba Hons Fashion Marketing Communication
+[STAGED] Ba Hons Hospitality Management
+[STAGED] Msc Psychology
+[STAGED] Ba Hons Commercial Photography
+[STAGED] Ba Hons Music Performance Production
+[STAGED] Bsc Hons Public Health
+[STAGED] Bsc Hons Physiotherapy
+[STAGED] Ma Counselling Psychotherapy
+[STAGED] Meng Civil Engineering Integrated Masters
+[STAGED] Ba Hons Filmmaking
+[STAGED] Bsc Hons Nursing Adult
+[STAGED] Bsc Hons Computer Science Education Qualified Teacher Status
+[STAGED] Bsc Hons Computing Business
+[STAGED] Bsc Hons Computer Science
+[STAGED] Ba Hons Digital Media Communication
+[STAGED] Llb Hons Law
+[STAGED] Ba Hons Music Technology Production
+[STAGED] Bsc Hons Cloud Computing
+[STAGED] Msc Business Psychology
+[STAGED] Bsc Hons Cyber Security Networks
+[STAGED] Bsc Hons Construction Management
+[STAGED] Ba Hons Early Childhood Studies Online
+[STAGED] Bsc Hons Data Science Artificial Intelligence
+[STAGED] Llb Hons Law International Relations
+[STAGED] Ba Hons Early Childhood Studies
+[STAGED] Beng Hons Engineering Management
+[STAGED] Ba Hons Sports Journalism
+[STAGED] Prof Doc Counselling Psychology
+[STAGED] Pgdip Counselling Psychotherapy
+[STAGED] Ba Hons Fine Art
+[STAGED] Beng Hons General Engineering
+[STAGED] Ba Hons Graphic Design
+[STAGED] Ma Mfa Filmmaking
+[STAGED] Bsc Hons Marketing
+[STAGED] Msc Occupational Organisational Psychology
+[STAGED] Prof Doc Educational Child Psychology
+[STAGED] Msc Integrative Counselling Coaching
+[STAGED] Bsc Hons Sport Exercise Science
+[STAGED] Ba Hons Interior Architecture
+[STAGED] Ba Hons Tourism Management
+[STAGED] Ba Hons Interior Design
+[STAGED] Llb Hons Law Criminology
+[STAGED] Bsc Hons Sport Rehabilitation
+[STAGED] Meng Mechanical Engineering Integrated Masters
+[STAGED] Bsc Hons Sports Coaching Performance West Ham United Foundation
+[STAGED] Prof Doc Clinical Psychology
+[STAGED] Mphil Phd Psychology
+[STAGED] Ba Hons Photography
+[STAGED] Beng Hons Mechanical Engineering
+[STAGED] Pgdip Integrative Counselling Coaching
+[STAGED] Beng Hons Product Design Engineering
+[STAGED] Beng Hons Mechatronics Computer Systems Engineering
+[STAGED] Bsc Hons Policing Studies Top
+[STAGED] Msc Sports Management
+[STAGED] Ba Hons Social Work
+[STAGED] Ba Hons Politics International Relations
+[STAGED] Msc International Business Management
+[STAGED] Beng Hons Railway Engineering
+[STAGED] Bsc Hons Surveying Mapping Sciences
+[STAGED] Mba Master Business Administration Digital Marketing
+[STAGED] Ma Media Communication Industries
+[STAGED] Llm International Law Practice
+[STAGED] Mba Master Business Administration Project Management
+[STAGED] Ma Acting Stage Screen
+[STAGED] Mba Master Business Administration Business Analytics
+[STAGED] Ba Hons Special Education
+[STAGED] Ba Hons Special Education Online
+[STAGED] Prof Doc Performing Arts
+[STAGED] Llm Business Financial Law
+[STAGED] Ma Architecture And Urbanism
+[STAGED] Prof Doc Fine Art
+[STAGED] Msc Computer Science
+[STAGED] Msc Data Science
+[STAGED] Ba Hons Primary Education Qts
+[STAGED] Ma Fine Art
+[STAGED] Llm General
+[STAGED] Msc Information Security Digital Forensics
+[STAGED] Msc Human Resource Management
+[STAGED] Msc Construction Engineering Management
+[STAGED] Msc Structural Engineering
+[STAGED] Msc Oil Gas Energy Management
+[STAGED] Msc Finance Risk
+[STAGED] Ba Hons Education Studies Online
+[STAGED] Msc Professional Accounting
+[STAGED] Ba Hons Education Top
+[STAGED] Ba Hons Criminology Psychology
+[STAGED] Ba Hons Education Top Online
+[STAGED] Msc Cloud Computing
+[STAGED] Msc Big Data Technologies
+[STAGED] Mba Master Business Administration
+[STAGED] Mba Master Business Administration Fintech Management
+[STAGED] Msc Civil Engineering
+[STAGED] Mba Master Business Administration Supply Chain Management
+[STAGED] Msc Events Hospitality Leadership
+[STAGED] Msc Mechanical Engineering
+[STAGED] Mba Business Administration Entrepreneurship
+[STAGED] Ma Interior Architecture Design
+[STAGED] Msc Artificial Intelligence
+[STAGED] Mphil Phd School Business Law
+[STAGED] Mba Master Business Administration Sustainable Business
+[STAGED] Ma Social Work
+[STAGED] Pgdip Landscape Architecture
+[STAGED] Msc International Relations
+[STAGED] Msc Computing
+[STAGED] Prof Doc Information Security
+[STAGED] Bsc Hons Pharmaceutical Science
+[STAGED] March Architecture Arbriba Part 2
+[STAGED] Prof Doc Data Science
+[STAGED] Bsc Hons Architectural Design Technology Accredited Ciat
+[STAGED] Msc Intelligent Transport Planning Engineering
+[STAGED] Msc Mechatronics Computer Systems Engineering
+[STAGED] Ma Leadership Education
+[STAGED] Ma English Language Teaching
+[STAGED] Ma Special Educational Needs
+[STAGED] Ma Professional Landscape Architecture
+[STAGED] Pgce Further Education
+[STAGED] Pgce Non Qualified Teacher Status Qts
+[STAGED] Ba Hons Visual Communication
+[STAGED] Beng Hons Mechatronics Engineering
+[STAGED] Ma Early Childhood Leadership Practice
+[STAGED] Ma Education
+[STAGED] Ma Directing Stage Screen
+[STAGED] Pgce Primary Early Years 3 7
+[STAGED] Msc Engineering Management
+[STAGED] Pgce Ipgce
+[STAGED] Llm Human Rights Advocacy
+[STAGED] Ma Youth Community Work
+[STAGED] Ma English Language Teaching Distance Learning
+[STAGED] Msc Civil Engineering Sustainability
+[STAGED] Ma Professional Sound Music
+[STAGED] Pgce Secondary Mathematics
+[STAGED] Ma Special Additional Learning Needs Icep Europe
+[STAGED] Msc Ngo Development Management
+[STAGED] Pgce Secondary Music
+[STAGED] Pgce Secondary Religious Education
+[STAGED] Ba Hons Events Management
+[STAGED] Bsc Hons Sport Physical Education Development
+[STAGED] Pgce Secondary Modern Languages
+[STAGED] Fdsc Nursing Associate
+[STAGED] Ma Theatre Directing
+[STAGED] Pgce Secondary Design Technology
+[STAGED] Pgce Secondary Physics
+[STAGED] Pgce Secondary Computing
+[STAGED] Pgdip Structural Engineering
+[STAGED] Pgdip Civil Engineering
+[STAGED] Pgce Primary Arts
+[STAGED] Pgce Primary Stem
+[STAGED] Pgce Secondary Physical Education
+[STAGED] Pgce Primary Humanities Religious Education
+[STAGED] Msc Pharmaceutical Science Specialism
+[STAGED] Mres Sport Exercise Science
+[STAGED] Mres Health Science
+[STAGED] Msc Sport Analytics
+[STAGED] Msc Sport Psychology
+[STAGED] Pgcert Autism Spectrum Conditions Learning
+[STAGED] Pgce Secondary Drama
+[STAGED] Pgce Secondary Chemistry
+[STAGED] Pgce Secondary English
+[STAGED] Mres Bioscience
+[STAGED] Msc Biomedical Science
+[STAGED] Pgce Primary English Additional Language
+[STAGED] Msc Public Health
+[STAGED] Msc Blockchain Financial Technologies
+[STAGED] Mphil Phd Architecture Computing Engineering
+[STAGED] Pgdip Musculoskeletal Ultrasonography
+[STAGED] Ba Hons Fashion Studies Top
+[STAGED] Msc Civil Engineering Environmental Management
+[STAGED] Msc Real Estate Management
+[STAGED] Bsc Hons International Business Management Top
+[STAGED] Bsc Hons Occupational Therapy
+[STAGED] Ba Hons Product Design
+[STAGED] Pgce Secondary Geography
+[STAGED] Pgcert Understanding Supporting Behaviour
+[STAGED] Ba Hons Sport Business Management
+[STAGED] Bsc Hons Banking Finance
+[STAGED] Ba Hons Illustration
+[STAGED] Ba Hons Airline Airport Management
+[STAGED] Msc Sustainable Tourism Development Management
+[STAGED] Msc Innovation Sustainable Hospitality
+[STAGED] Mphil Phd School Arts Creative Industries
+[STAGED] Bsc Hons Computer Science Web Mobile Technologies
+[STAGED] Beng Hons Electrical Electronic Engineering
+[STAGED] Msc Marketing
+[STAGED] Ba Hons Game Design
+[STAGED] Ma Fashion
+[STAGED] Msc Physician Associate
+[STAGED] Ba Hons Early Childhood Montessori Pedagogy Level 6 Top Up
+[STAGED] Ma Global Sports Journalism
+[STAGED] Ma Data Journalism
+[STAGED] Mphil Phd Education
+[STAGED] Ma International Fashion Business
+[STAGED] Mphil Phd School Health Sport Bioscience
+[STAGED] Mphil Phd Social Sciences
+[STAGED] Meng Electrical Electronic Engineering
+[STAGED] Llm Fintech Law
+[STAGED] Msc Strength Conditioning
+[STAGED] Ma Applied Theatre
+[STAGED] Msc Sustainable Energy Engineering
+[STAGED] Msc Applied Positive Psychology Mapp
+[STAGED] Bsc Hons Podiatry
+[STAGED] Msc Applied Sport Exercise Physiology
+[STAGED] Mphil Phd Sustainability Development Environment
+[STAGED] Msc Cyber Diplomacy
+[STAGED] Bsc Hons Midwifery
+[STAGED] Msc Clinical Exercise Physiology
+[STAGED] Ba Hons Psychosocial Studies
+[STAGED] Msc Project Management Digital Technology
+[STAGED] Msc Ai Data Science
+[STAGED] Bsc Hons Accounting Business Management
+[STAGED] Ma Creative Enterprise
+[STAGED] Ma Education Distance Learning
+[STAGED] Msc Cyber Security Engineering
+[STAGED] Mres Business Management Social Justice
+[STAGED] Ma Education Pathway Teaching Learning
+[STAGED] Msc Project Management
+[STAGED] Llm Legal Practice Sqe Preparation
+[STAGED] Ma Dance
+[STAGED] Bsc Hons Business Economics
+[STAGED] Msc Software Engineering
+[STAGED] Msc Environment Sustainability Global Health
+[STAGED] Prof Doc Business Administration
+[STAGED] Bsc Hons Quantity Surveying Commercial Management
+[STAGED] Bachelor Laws Llb
+[STAGED] Mphil Phd Health Wellbeing Online Harms
+[STAGED] Practice Educator Pqsw Short Course
+[STAGED] Mres Biosciences Social Justice
+[STAGED] Bsc Hons Apprenticeship Digital Technology
+[STAGED] Get Nursing
+[STAGED] Digital Technology Solutions Specialist Degree Apprenticeship
+[STAGED] Ba Hons Education Studies
+[STAGED] Msc Construction Asset Management Digital Technologies
+[STAGED] Ma Professional Landscape Architecture Conversion
+[STAGED] Ba Hons Fashion Cultures Business
+[STAGED] Pgce Primary Sen Special Schools
+[STAGED] Pgce Primary Sen Inclusion
+[STAGED] Mba Fashion Entrepreneurship
+[STAGED] Pgce Secondary Biology
+[STAGED] Msc Internet Things
+[STAGED] Edd Professional Doctorate Education
+[STAGED] Prof Doc Cyber Diplomacy
+[STAGED] Ma Post Qualifying Professional Practice
+[STAGED] Bsc Hons Nursing Mental Health
+[STAGED] Pgce Primary Sport Wellbeing
+[STAGED] Msc Electric Vehicle Engineering
+[STAGED] Pgcert Independent Supplementary Prescribing
+[STAGED] Msc Robotic Construction
+=== COMPLETE === Found: 277 | Staged: 277 | Skipped: 0 | Errors: 0
+[INFO] Saved scraping config (277 links) for future no-AI re-scrapes

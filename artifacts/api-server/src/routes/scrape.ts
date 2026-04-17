@@ -372,13 +372,12 @@ function findImageUrls(html: string, courseUrl: string): string[] {
  * Handles "Location: Sydney, Online" + "Delivery: Face to Face" → Blended.
  */
 function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): string {
-  let hasOnline = false;
-  let hasOnCampus = false;
-
-  // Check explicit blended/hybrid keywords first
-  if (/blended|hybrid|mixed[- ]?mode/i.test(fullText)) return "Blended";
-  if (/on[- ]?campus\s*(?:and|or|\/)\s*online|online\s*(?:and|or|\/)\s*on[- ]?campus/i.test(fullText)) return "Blended";
-  if (/both\b[^.]{0,60}\b(?:online|on[- ]?campus)/i.test(fullText)) return "Blended";
+  // ── PRIORITY 0: Title signal ──────────────────────────────────────────────
+  // Some courses put the mode right in the title (e.g. UEL "Ba Hons Special
+  // Education Online", "Bsc Hons Psychology Distance Learning").
+  const title = (($("title").text() || "") + " " + ($("h1").first().text() || "")).toLowerCase();
+  if (/\bdistance\s+learning\b/.test(title)) return "Online";
+  if (/\(\s*online\s*\)|\bonline\s*$|\bonline\s+(?:study|programme?|course|degree)\b|\b(?:fully\s+)?online\s+(?:bachelor|master|diploma|certificate|mba|phd)/.test(title)) return "Online";
 
   // ── PRIORITY: Find an explicit "Delivery" / "Study Mode" field. ──────────
   // The "Delivery" field is authoritative — it overrides "Location" (which can
@@ -440,20 +439,32 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
 
   if (deliveryResult) return deliveryResult;
 
-  // General text scan — only count mentions in an explicit study-mode CONTEXT,
-  // never raw "online" (which appears in nav/footer "apply online" etc.).
-  if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) hasOnCampus = true;
-  if (/\bdelivered\s+(?:online|remotely|by\s+distance)\b/i.test(fullText)) hasOnline = true;
-  if (/\b(?:study|learn|delivery|attendance)\s+mode[^.]{0,40}\bon[- ]?campus\b/i.test(fullText)) hasOnCampus = true;
-  if (/\b(?:study|learn|delivery|attendance)\s+mode[^.]{0,40}\bonline\b/i.test(fullText)) hasOnline = true;
-  if (/\bonline\s+(?:study|delivery|learning|course|mode|program|programme|degree)\b/i.test(fullText)) hasOnline = true;
-  if (/\b(?:on[- ]?campus|face[- ]?to[- ]?face|in[- ]?person)\s+(?:study|delivery|learning|course|mode|program|programme|degree|classes|teaching)\b/i.test(fullText)) hasOnCampus = true;
+  // ── PRIORITY 2: Sentence-level signals that explicitly describe delivery. ─
+  // Be CONSERVATIVE: many UK university pages mention "blended learning",
+  // "online learning resources", "online application" etc. as marketing
+  // language — these are NOT statements of delivery mode.
 
-  if (hasOnline && hasOnCampus) return "Blended";
-  if (/fully\s*online|online[- ]?only|distance\s*(?:learning|education)\s+only/i.test(fullText)) return "Online";
-  if (hasOnline) return "Online";
-  if (hasOnCampus) return "On Campus";
-  return "On Campus"; // default
+  // Strong "Online" signals: course/programme is explicitly stated as online
+  if (/\b(?:fully|entirely|100%)\s+online\b/i.test(fullText)) return "Online";
+  if (/\b(?:course|programme?|degree|bachelor|master|diploma)\s+is\s+(?:delivered|taught|studied|offered)\s+(?:fully\s+)?online\b/i.test(fullText)) return "Online";
+  if (/\bdistance[- ]learning\s+(?:course|degree|programme?|study|delivery|format|option|mode)\b/i.test(fullText)) return "Online";
+  if (/\bdelivered\s+(?:fully\s+)?(?:online|remotely|by\s+distance\s+learning)\b/i.test(fullText)) return "Online";
+
+  // Strong "Blended" signals: explicit mode-of-delivery statement
+  if (/\b(?:study\s+)?mode\s*[:=]\s*blended\b/i.test(fullText)) return "Blended";
+  if (/\b(?:course|programme?|degree)\s+is\s+delivered\s+(?:in\s+)?(?:a\s+)?(?:blended|hybrid)(?:\s+(?:format|mode|delivery|manner))?\b/i.test(fullText)) return "Blended";
+  if (/\bblended\s+(?:delivery|mode|format|study)\b/i.test(fullText)) return "Blended";
+  if (/\bhybrid\s+(?:delivery|mode|format|study)\b/i.test(fullText)) return "Blended";
+  if (/\b(?:on[- ]?campus|face[- ]?to[- ]?face)\s+(?:and|or|\/)\s+online\s+(?:delivery|study|learning|teaching)\b/i.test(fullText)) return "Blended";
+
+  // Strong "On Campus" signals
+  if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
+  if (/\b(?:course|programme?)\s+is\s+(?:delivered|taught)\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
+
+  // ── Default ─────────────────────────────────────────────────────────────
+  // When no explicit delivery signal is present, assume "On Campus" — that's
+  // the historical default for traditional universities.
+  return "On Campus";
 }
 
 function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
