@@ -2954,8 +2954,10 @@ function extractInternationalSection(text: string): string {
   return idx >= 0 ? text.slice(idx) : text;
 }
 
-async function extractFeeFromUniversityPage(feePage: string, courseName: string, courseData: Partial<CourseData>, cache: UniversityFeeCache, noAi = false): Promise<void> {
-  if (courseData.internationalFee) return;
+async function extractFeeFromUniversityPage(feePage: string, courseName: string, courseData: Partial<CourseData>, cache: UniversityFeeCache, noAi = false, overrideExisting = false): Promise<void> {
+  // Skip if we already have a fee — UNLESS the caller knows this page is an authoritative
+  // international fee schedule and wants to override the (possibly domestic) course-page fee.
+  if (courseData.internationalFee && !overrideExisting) return;
 
   const text = await getUniversityFeePageText(feePage, cache);
   if (!text) return;
@@ -3018,7 +3020,7 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
   }
 
   // HTML table extraction — use the cached HTML to look for international/domestic columns
-  if (!courseData.internationalFee && cache.html) {
+  if ((!courseData.internationalFee || overrideExisting) && cache.html) {
     try {
       const $feeHtml = cheerio.load(cache.html);
       const tableData: Partial<CourseData> = {};
@@ -3034,7 +3036,7 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
   }
 
   // Multi-amount fallback on the international section — highest = international
-  if (!courseData.internationalFee) {
+  if (!courseData.internationalFee || overrideExisting) {
     const allAmounts = extractAllFeeAmounts(searchText);
     if (allAmounts.length >= 1) {
       courseData.internationalFee = Math.max(...allAmounts);
@@ -3045,7 +3047,7 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
     }
   }
 
-  if (!noAi && !courseData.internationalFee && GEMINI_API_KEY) {
+  if (!noAi && (!courseData.internationalFee || overrideExisting) && GEMINI_API_KEY) {
     try {
       const prompt = `From this university INTERNATIONAL fee schedule, find the tuition fee for the course "${courseName}".
 This may show fees per trimester, semester, or year. Return ONLY the international/overseas student fee amount.
@@ -3133,12 +3135,43 @@ async function scrapeCourseBatch(
   const feeCache: UniversityFeeCache = { fetched: false };
   let uniReqsText: string | null = null;
   let uniReqsHtml: string | null = null;
+  // University-level English requirements (resolved ONCE, applied to every course in the batch).
+  // Populated from the requirements page — first via static patterns, then AI if needed.
+  let cachedEnglishReqs: Partial<CourseData> | null = null;
   if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
       const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
       uniReqsHtml = await fetchPage(reqUrl);
       uniReqsText = cheerio.load(uniReqsHtml)("body").text();
       addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
+
+      // Try static extraction from the requirements page first
+      const tempReqData: Partial<CourseData> = {};
+      extractEnglishFromHtml(cheerio.load(uniReqsHtml), tempReqData);
+      if (!(tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall)) {
+        extractEnglishRequirements(uniReqsText, tempReqData);
+      }
+
+      if (tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall) {
+        cachedEnglishReqs = tempReqData;
+        addLog(job, "status", { message: `University requirements page: IELTS=${tempReqData.ieltsOverall} PTE=${tempReqData.pteOverall} TOEFL=${tempReqData.toeflOverall}`, phase: "fetch" });
+      } else if (GEMINI_API_KEY) {
+        // Static extraction found nothing — requirements are likely JS-rendered.
+        // Run Gemini ONCE on the requirements page and cache the result for all courses.
+        try {
+          addLog(job, "status", { message: "Static IELTS extraction failed — using AI on requirements page (1 call)...", phase: "fetch" });
+          const compactReqs = extractCompactContent(uniReqsHtml, reqUrl);
+          const enPrompt = `Extract ALL English language proficiency test requirements from this university page.
+Return JSON: {"ieltsOverall":<number|null>,"ieltsReading":<number|null>,"ieltsWriting":<number|null>,"ieltsListening":<number|null>,"ieltsSpeaking":<number|null>,"pteOverall":<number|null>,"toeflOverall":<number|null>,"cambridgeOverall":<number|null>,"duolingoOverall":<number|null>}
+Use null for any test not mentioned. Return ONLY valid JSON.`;
+          const enResult = await geminiChat(enPrompt, compactReqs.slice(0, 10000), 200);
+          const enParsed = JSON.parse(enResult);
+          if (enParsed.ieltsOverall || enParsed.pteOverall || enParsed.toeflOverall) {
+            cachedEnglishReqs = enParsed;
+            addLog(job, "status", { message: `AI extracted university IELTS=${enParsed.ieltsOverall} PTE=${enParsed.pteOverall} TOEFL=${enParsed.toeflOverall}`, phase: "fetch" });
+          }
+        } catch {}
+      }
     } catch {}
   }
 
@@ -3169,8 +3202,11 @@ async function scrapeCourseBatch(
           }
         }
 
-        if (!cheerioData.internationalFee && uniPages?.feePage) {
-          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache);
+        // If the university fee page is explicitly an international fees page, always
+        // consult it even when the course page already has a fee (which may be domestic).
+        const feePageIsInternational = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
+        if (uniPages?.feePage && (!cheerioData.internationalFee || feePageIsInternational)) {
+          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, false, feePageIsInternational);
         }
         if (!cheerioData.internationalFee && uniPages?.feesPdf) {
           try {
@@ -3194,6 +3230,16 @@ async function scrapeCourseBatch(
         }
         if (uniReqsText && !cheerioData.intakeMonths?.length) {
           extractIntakeMonths(uniReqsText, cheerioData);
+        }
+
+        // Apply the university-level cached English requirements (resolved once before this loop,
+        // including any AI-extracted values when static parsing returned nothing).
+        if (cachedEnglishReqs && !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall)) {
+          if (cachedEnglishReqs.ieltsOverall) { cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall; cheerioData.ieltsReading = cachedEnglishReqs.ieltsReading || undefined; cheerioData.ieltsWriting = cachedEnglishReqs.ieltsWriting || undefined; cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined; cheerioData.ieltsSpeaking = cachedEnglishReqs.ieltsSpeaking || undefined; }
+          if (cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+          if (cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+          if (cachedEnglishReqs.cambridgeOverall) cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
+          if ((cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
         }
 
         const hasFees = !!cheerioData.internationalFee;
@@ -3402,10 +3448,13 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         await enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl);
       }
 
-      if (!cheerioData.internationalFee && uniPages.feePage) {
+      if (uniPages.feePage) {
         addLog(job, "status", { message: "Checking university fee page...", phase: "enrich" });
         const singleFeeCache: UniversityFeeCache = { fetched: false };
-        await extractFeeFromUniversityPage(uniPages.feePage, cheerioData.courseName || "", cheerioData, singleFeeCache);
+        const singleFeePageIsIntl = /international/i.test(uniPages.feePage);
+        if (!cheerioData.internationalFee || singleFeePageIsIntl) {
+          await extractFeeFromUniversityPage(uniPages.feePage, cheerioData.courseName || "", cheerioData, singleFeeCache, false, singleFeePageIsIntl);
+        }
       }
       if (!cheerioData.internationalFee && uniPages.feesPdf) {
         try {
@@ -3741,8 +3790,9 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
             }
           }
 
-          if (!cheerioData.internationalFee && uniPages?.feePage) {
-            await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true);
+          const feePageIsIntl = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
+          if (uniPages?.feePage && (!cheerioData.internationalFee || feePageIsIntl)) {
+            await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true, feePageIsIntl);
           }
           if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
             extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);

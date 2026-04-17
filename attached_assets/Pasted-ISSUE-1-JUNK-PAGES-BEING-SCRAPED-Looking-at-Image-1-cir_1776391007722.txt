@@ -1,0 +1,149 @@
+ISSUE 1: JUNK PAGES BEING SCRAPED ❌
+Looking at Image 1 (circled courses):
+
+"Vocational" - This is NOT a course, it's a CATEGORY PAGE
+"Course List" - This is NOT a course, it's a NAVIGATION PAGE
+"ELICOS" - This is NOT a degree course, it's an ENGLISH LANGUAGE program
+
+These should be FILTERED OUT during validation, but they're being staged as courses!
+
+ISSUE 2: EXTRACTING DOMESTIC FEES INSTEAD OF INTERNATIONAL ❌
+You're absolutely right!
+Looking at the scraped data in Image 1:
+
+Master of IT: A$36,000 /Full Course
+Bachelor of IT: A$36,000 /Full Course
+Diploma of IT: A$15,500 /Annual
+
+But if we click "International" toggle on VIT's website, the fees would be HIGHER.
+Root Cause: The scraper is fetching the page with the DOMESTIC toggle selected (default), not clicking "International".
+This is exactly why we need browser automation - to click that toggle!
+
+ISSUE 3: MISSING IELTS FROM ENTRY REQUIREMENTS TAB ❌
+Image 2 & 3 show the Entry Requirements tab structure:
+Entry Requirements (tab)
+├── Minimum Age Requirement (collapsed)
+├── Minimum English Language Requirement (collapsed) ← IELTS IS HERE!
+└── Minimum Academic Requirement (collapsed)
+Image 3 shows the expanded section:
+Minimum English Language Requirement
+├── IELTS Academic: Overall 6.0, with no individual band below 5.5 ✓
+└── Equivalent scores in other recognised tests
+The data IS there, but it's:
+
+In a separate tab ("Entry Requirements")
+Inside a collapsed accordion ("Minimum English Language Requirement")
+Requires clicking to reveal
+
+This is why ALL scraped courses show "Missing: ieltsOverall" in Image 1!
+
+THE TRUTH: STATIC HTML EXTRACTION CANNOT SOLVE VIT
+You asked for static HTML only, but VIT's structure makes this impossible:
+Why Static HTML Fails:
+
+Domestic/International Toggle - JavaScript-based, changes content dynamically
+Collapsed Accordions - Content hidden until clicked
+Tab Navigation - Content loaded/shown on click
+
+What static HTML sees:
+html<!-- Default view (Domestic) -->
+<div class="fee-display">$28,000</div>
+
+<!-- International view (HIDDEN in static HTML) -->
+<div class="fee-display" style="display:none;">$48,000</div>
+The scraper cannot access the hidden content without JavaScript execution!
+
+THE ONLY SOLUTION: BROWSER AUTOMATION
+Here's what needs to happen for VIT (and similar universities):
+Step 1: Click "International" Toggle
+typescriptawait page.click('[data-student-type="international"]');
+await page.waitForTimeout(2000); // Wait for content update
+Step 2: Navigate to "Entry Requirements" Tab
+typescriptawait page.click('text="Entry Requirements"');
+await page.waitForTimeout(1000);
+Step 3: Expand "Minimum English Language Requirement"
+typescriptawait page.click('text="Minimum English Language Requirement"');
+await page.waitForTimeout(500);
+Step 4: Extract Data
+typescriptconst html = await page.content();
+// Now we can extract IELTS 6.0 (5.5 min)
+
+RECOMMENDATION: HYBRID APPROACH
+Since you want to avoid browser automation for ALL universities, use a hybrid approach:
+Option A: Browser Automation for VIT Only
+typescriptasync function scrapeCourse(url: string, university: University) {
+  // Check if VIT
+  if (url.includes('vit.edu.au')) {
+    return await scrapeWithBrowser(url, university);
+  } else {
+    return await scrapeWithStaticHTML(url, university);
+  }
+}
+Option B: Detect When Browser is Needed
+typescriptasync function scrapeCourse(url: string, university: University) {
+  // Try static HTML first
+  const staticData = await scrapeWithStaticHTML(url, university);
+  
+  // Check completeness
+  if (staticData.missingIELTS || staticData.suspiciouslyLowFee) {
+    console.log('Static scraping incomplete, using browser...');
+    return await scrapeWithBrowser(url, university);
+  }
+  
+  return staticData;
+}
+Option C: Manual Configuration
+In your database, add a flag:
+sqlALTER TABLE universities 
+ADD COLUMN requires_browser BOOLEAN DEFAULT false;
+
+-- Mark VIT as needing browser
+UPDATE universities 
+SET requires_browser = true 
+WHERE name = 'Victorian Institute of Technology';
+Then:
+typescriptif (university.requiresBrowser) {
+  return await scrapeWithBrowser(url, university);
+} else {
+  return await scrapeWithStaticHTML(url, university);
+}
+
+IMMEDIATE ACTION ITEMS
+1. Add Junk Page Filtering
+Update research_validator.py to reject these patterns:
+pythonself.junk_patterns = [
+    r'^vocational$',      # "Vocational" page
+    r'^course\s+list$',   # "Course List" page
+    r'^elicos$',          # ELICOS (English courses)
+    r'^bbus$',            # BBus category page
+    r'^bits$',            # BITS category page
+]
+2. For VIT Specifically
+You have 3 options:
+Option 1: Skip VIT until browser support added
+Option 2: Manually enter VIT courses (40 courses, one-time effort)
+Option 3: Accept incomplete data (missing IELTS, wrong fees)
+3. Course List Page
+VIT's actual courses are at:
+https://vit.edu.au/bits/bits-artificial-intelligence-analytics
+https://vit.edu.au/mits/mits-information-systems
+https://vit.edu.au/mba/mba-project-management
+NOT:
+https://vit.edu.au/vocational  ← JUNK
+https://vit.edu.au/course-list ← JUNK
+https://vit.edu.au/elicos      ← JUNK
+
+THE BOTTOM LINE
+Your observations are 100% correct:
+
+❌ Junk pages being scraped
+❌ Domestic fees extracted (should be International)
+❌ IELTS missing (it's in a collapsed accordion in a tab)
+
+Static HTML extraction CANNOT solve VIT because:
+
+International fees are hidden by default
+IELTS is in collapsed accordions
+Content requires JavaScript interaction
+
+You need browser automation for VIT (and likely other universities with similar structures).

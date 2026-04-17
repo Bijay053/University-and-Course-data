@@ -1,0 +1,95 @@
+[INFO] Scraping started in background...
+[INFO] Scraping https://vit.edu.au/...
+[INFO] Using university: VIT (ID: 16)
+[INFO] Fetching https://vit.edu.au/...
+[INFO] Home page detected. Searching for course listing page...
+[INFO] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO] Switched to course listing: https://vit.edu.au/course-list
+[INFO] Discovering university-level fee & requirements pages...
+[INFO] Discovered university-level pages: requirementsPage: https://vit.edu.au/resources/course-entry-requirements, feePage: https://vit.edu.au/international/fees
+[INFO] Analyzing page with AI (1 call)...
+[INFO] Phase 1: Discovering candidate course URLs from all sources...
+[INFO] Sitemap index: checking 6 sub-sitemaps...
+[INFO] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[INFO] Sitemap: found 13 course URLs total
+[INFO] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[INFO] Phase 2: Researching 13 candidates — comparing pages to find genuine course pages before fetching...
+[INFO] URL analysis: 7 candidate course pages identified, filtered out 6 non-course URLs
+[INFO] Phase 2: Researching 7 candidates — sampling 7 pages to confirm genuine course pages...
+[INFO] ✓ Confirmed course: "Bachelor Of Business"
+[INFO] ✓ Confirmed course: "Mba Finance"
+[INFO] ✓ Confirmed course: "Mba Tourism And Hospitality Management"
+[INFO] ✓ Confirmed course: "Mba Leadership And Management"
+[INFO] ✓ Confirmed course: "Diploma Of Business"
+[INFO] ✓ Confirmed course: "Mba Project Management"
+[INFO] ✓ Confirmed course: "Mba Information Systems"
+[INFO] Research complete: 7/7 sampled pages are genuine course pages
+[INFO] All 7 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (7 total).
+[INFO] Category expansion found 23 additional course links (total: 30)
+[WAITING] Research complete. Found 30 course pages to fetch. Please review and confirm.
+[INFO] User confirmed — starting bulk course fetch...
+[INFO] Phase 3: Fetching 30 validated course pages...
+[INFO] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[1/30] Fetching 1/30: Bachelor Of Business
+[2/30] Fetching 2/30: Diploma Of Business
+[3/30] Fetching 3/30: Mba Finance
+[4/30] Fetching 4/30: Mba Information Systems
+[5/30] Fetching 5/30: Mba Leadership And Management
+[6/30] Fetching 6/30: Mba Project Management
+[7/30] Fetching 7/30: Mba Tourism And Hospitality Management
+[8/30] Fetching 8/30: Bachelor of Information Technology and Systems (BITS)
+[9/30] Fetching 9/30: Master of Information Technology and Systems
+[10/30] Fetching 10/30: GDITS-Graduate Diploma of Information Technology and Systems
+[11/30] Fetching 11/30: GCITS-Graduate Certificate of Information Technology and Systems
+[12/30] Fetching 12/30: Master of Business Administration
+[13/30] Fetching 13/30: GDBA - Graduate Diploma of Business Administration
+[14/30] Fetching 14/30: GCBA - Graduate Certificate of Business Administration
+[15/30] Fetching 15/30: BBus - International Business Management Specialisation
+[16/30] Fetching 16/30: BBus - Tourism and Hospitality Management Specialisation
+[17/30] Fetching 17/30: BBus - Accounting Specialisation
+[18/30] Fetching 18/30: BBus - Human Resource Management Specialisation
+[19/30] Fetching 19/30: BBus - Marketing Specialisation
+[20/30] Fetching 20/30: BBus - Business Technology Specialisation
+[21/30] Fetching 21/30: Certificate III in Commercial Cookery
+[22/30] Fetching 22/30: Certificate IV in Kitchen Management
+[23/30] Fetching 23/30: Certificate III in Patisserie
+[24/30] Fetching 24/30: Certificate IV in Patisserie
+[25/30] Fetching 25/30: Diploma of Hospitality Management
+[26/30] Fetching 26/30: Advanced Diploma of Hospitality Management
+[27/30] Fetching 27/30: Certificate IV in Information Technology
+[28/30] Fetching 28/30: Diploma of Information Technology
+[29/30] Fetching 29/30: Advanced Diploma of Information Technology
+[30/30] Fetching 30/30: Certificate III in Carpentry
+[INFO] Classifying 30 courses with AI (batched)...
+[STAGED] Bachelor Of Business
+[STAGED] GCITS-Graduate Certificate of Information Technology and Systems
+[STAGED] Mba Leadership And Management
+[STAGED] Master of Business Administration
+[STAGED] Diploma Of Business
+[STAGED] Certificate IV in Kitchen Management
+[STAGED] GCBA - Graduate Certificate of Business Administration
+[STAGED] Certificate IV in Patisserie
+[STAGED] Certificate III in Commercial Cookery
+[STAGED] BBus - Tourism and Hospitality Management Specialisation
+[STAGED] Mba Tourism And Hospitality Management
+[STAGED] Bachelor of Information Technology and Systems (BITS)
+[STAGED] Mba Information Systems
+[STAGED] BBus - Human Resource Management Specialisation
+[STAGED] BBus - Marketing Specialisation
+[STAGED] Master of Information Technology and Systems
+[STAGED] Certificate III in Patisserie
+[STAGED] Diploma of Hospitality Management
+[STAGED] GDITS-Graduate Diploma of Information Technology and Systems
+[STAGED] BBus - Business Technology Specialisation
+[STAGED] BBus - Accounting Specialisation
+[STAGED] BBus - International Business Management Specialisation
+[STAGED] GDBA - Graduate Diploma of Business Administration
+[STAGED] Mba Project Management
+[STAGED] Mba Finance
+[STAGED] Advanced Diploma of Hospitality Management
+[STAGED] Diploma of Information Technology
+[STAGED] Advanced Diploma of Information Technology
+[STAGED] Certificate IV in Information Technology
+[STAGED] Certificate III in Carpentry
+=== COMPLETE === Found: 30 | Staged: 30 | Skipped: 0 | Errors: 0
+[INFO] Saved scraping config (30 links) for future no-AI re-scrapes
