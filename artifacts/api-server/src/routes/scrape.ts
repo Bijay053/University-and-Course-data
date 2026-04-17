@@ -811,17 +811,22 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
   // ── Strategy 1: Find entry requirements section ──────────────────────────
   const reqSelectors = [
     "[id*='entry'i][id*='requirement'i]",
+    "[id*='admission'i][id*='requirement'i]",
     "[id*='requirement'i]",
+    "[id*='english'i][id*='requirement'i]",
+    "[id*='english'i][id*='proficiency'i]",
     "[class*='entry'i][class*='requirement'i]",
+    "[class*='admission'i][class*='requirement'i]",
     "[class*='requirement'i]",
+    "[class*='english'i][class*='proficiency'i]",
     "[role='tabpanel']",
     "section, article, div",
   ];
 
   let reqContainer: ReturnType<typeof $> | null = null;
 
-  // Try attribute-based selectors first
-  for (const sel of reqSelectors.slice(0, 4)) {
+  // Try attribute-based selectors first (all except the two generic fallbacks at the end)
+  for (const sel of reqSelectors.slice(0, 9)) {
     const el = $(sel).first();
     if (el.length) { reqContainer = el; break; }
   }
@@ -829,7 +834,8 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
   // Fallback: find by heading text
   if (!reqContainer) {
     $("h1,h2,h3,h4,h5").each((_, heading) => {
-      if (/entry\s+requirements?/i.test($(heading).text())) {
+      const headingText = $(heading).text();
+      if (/entry\s+requirements?|admission\s+requirements?|english\s+(?:language\s+)?requirements?|language\s+requirements?|english\s+proficiency/i.test(headingText)) {
         const parent = $(heading).closest("div,section,article");
         if (parent.length) { reqContainer = parent; return false; }
       }
@@ -1701,6 +1707,18 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
   if (!hasDegreeLevel && !hasDuration && !hasFee) {
     console.log(`[JUNK] Skipping empty page (no degree/duration/fee): "${courseData.courseName}"`);
     return false;
+  }
+
+  // Fee term heuristic: fees ≥ $40,000 that have no explicit periodic label are almost
+  // certainly full-course totals, not annual fees. "Annual" at this scale is extremely rare
+  // for Australian universities. This catches VIT MBA ($48k), BITS ($51k), etc.
+  if (
+    courseData.internationalFee &&
+    courseData.internationalFee >= 40000 &&
+    (!courseData.feeTerm || courseData.feeTerm === "Annual")
+  ) {
+    courseData.feeTerm = "Full Course";
+    console.log(`[HEURISTIC] ${courseData.courseName}: fee $${courseData.internationalFee} ≥ $40k → feeTerm set to Full Course`);
   }
 
   // Validate and sanitize before staging
