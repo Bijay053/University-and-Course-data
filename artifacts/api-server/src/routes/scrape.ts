@@ -4247,6 +4247,76 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     addLog(job, "status", { message: `Stopped. ${completed} fetched, processing queued data...` });
   }
 
+  // ── Batch English propagation ──────────────────────────────────────────────
+  // After parallel fetching, some courses may have IELTS/PTE/TOEFL data while
+  // others don't — typically because the requirements section is JS-rendered on
+  // most pages but happens to be in static HTML on one (e.g. ASA). Since all
+  // courses at the same university share the same English entry requirements,
+  // propagate the values found from any single course to all others in the batch.
+  {
+    // Collect the richest English snapshot from classifyQueue items
+    const withEnglish = classifyQueue
+      .map((c) => c.data)
+      .filter((d) => d.ieltsOverall || d.pteOverall || d.toeflOverall || d.cambridgeOverall || d.duolingoOverall);
+
+    if (withEnglish.length > 0) {
+      // Pick the source with the most fields filled
+      const best = withEnglish.reduce((a, b) => {
+        const scoreA = [a.ieltsOverall, a.pteOverall, a.toeflOverall, a.cambridgeOverall, a.duolingoOverall].filter(Boolean).length;
+        const scoreB = [b.ieltsOverall, b.pteOverall, b.toeflOverall, b.cambridgeOverall, b.duolingoOverall].filter(Boolean).length;
+        return scoreB > scoreA ? b : a;
+      });
+
+      let propagated = 0;
+
+      // Apply to classifyQueue items missing English requirements
+      for (const item of classifyQueue) {
+        const d = item.data;
+        if (!d.ieltsOverall && !d.pteOverall && !d.toeflOverall && !d.cambridgeOverall) {
+          if (best.ieltsOverall) {
+            d.ieltsOverall   = best.ieltsOverall;
+            d.ieltsReading   = best.ieltsReading   || undefined;
+            d.ieltsWriting   = best.ieltsWriting   || undefined;
+            d.ieltsListening = best.ieltsListening || undefined;
+            d.ieltsSpeaking  = best.ieltsSpeaking  || undefined;
+          }
+          if (best.pteOverall)       d.pteOverall       = best.pteOverall;
+          if (best.toeflOverall)     d.toeflOverall     = best.toeflOverall;
+          if (best.cambridgeOverall) d.cambridgeOverall = best.cambridgeOverall;
+          if (best.duolingoOverall)  d.duolingoOverall  = best.duolingoOverall;
+          propagated++;
+        }
+      }
+
+      // Also fill cheerioData for fullAIQueue items (Cheerio wins for any
+      // field it set — same merge policy used throughout the batch)
+      for (const item of fullAIQueue) {
+        const d = item.cheerioData;
+        if (!d.ieltsOverall && !d.pteOverall && !d.toeflOverall && !d.cambridgeOverall) {
+          if (best.ieltsOverall) {
+            d.ieltsOverall   = best.ieltsOverall;
+            d.ieltsReading   = best.ieltsReading   ?? undefined;
+            d.ieltsWriting   = best.ieltsWriting   ?? undefined;
+            d.ieltsListening = best.ieltsListening ?? undefined;
+            d.ieltsSpeaking  = best.ieltsSpeaking  ?? undefined;
+          }
+          if (best.pteOverall)       d.pteOverall       = best.pteOverall;
+          if (best.toeflOverall)     d.toeflOverall     = best.toeflOverall;
+          if (best.cambridgeOverall) d.cambridgeOverall = best.cambridgeOverall;
+          if (best.duolingoOverall)  d.duolingoOverall  = best.duolingoOverall;
+          propagated++;
+        }
+      }
+
+      if (propagated > 0) {
+        addLog(job, "status", {
+          message: `[IELTS] Batch propagation: IELTS=${best.ieltsOverall ?? "–"} PTE=${best.pteOverall ?? "–"} TOEFL=${best.toeflOverall ?? "–"} CAE=${best.cambridgeOverall ?? "–"} → applied to ${propagated} courses missing English requirements`,
+          phase: "extract",
+        });
+      }
+    }
+  }
+
   // ── Phase A: Batch-classify courses that have cheerio data (15 per AI call) ──
   if (classifyQueue.length > 0) {
     addLog(job, "status", { message: `Classifying ${classifyQueue.length} courses with AI (batched)...`, phase: "classify" });
