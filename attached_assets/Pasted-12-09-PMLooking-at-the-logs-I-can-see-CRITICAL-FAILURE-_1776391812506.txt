@@ -1,0 +1,172 @@
+12:09 PMLooking at the logs, I can see CRITICAL FAILURE - all 30 courses resulted in errors!
+The system tried to use browser automation but something went catastrophically wrong:
+[INFO] JS-heavy site detected — using browser automation (International toggle + Entry Requirements tab)
+[ERROR] Mba Information Systems
+[ERROR] Mba Finance
+... [ERROR] × 30
+=== COMPLETE === Found: 30 | Staged: 0 | Skipped: 0 | Errors: 30
+
+ROOT CAUSE ANALYSIS
+The logs show:
+
+✅ Course discovery worked (found 30 courses)
+✅ Research validation worked (7/7 confirmed)
+✅ Detection of JS-heavy site worked
+❌ Browser automation FAILED for all 30 courses
+
+
+LIKELY CAUSES
+1. Playwright Not Installed
+bash# Check if Playwright is installed
+playwright --version
+# If not found:
+pip install playwright
+playwright install chromium
+2. Browser Launch Failure
+Common errors:
+
+Chromium binary not found
+Insufficient permissions
+Headless mode not supported in environment
+
+3. Network/Timeout Issues
+
+VIT blocking automated requests
+Timeout too short
+Rate limiting
+
+4. Selector Not Found
+
+"International" button selector changed
+"Entry Requirements" tab selector changed
+Element not visible/clickable
+
+
+IMMEDIATE DEBUG STEPS
+Step 1: Check Error Logs
+Add error logging to see what's failing:
+python# In browser automation code
+try:
+    result = await browser_helper.get_interactive_html(url)
+except Exception as e:
+    print(f"[ERROR DETAILS] {url}: {type(e).__name__}: {str(e)}")
+    import traceback
+    traceback.print_exc()
+Step 2: Test Single Course
+python# Test one VIT course manually
+from browser_helper import MinimalBrowserHelper
+
+async def test_single():
+    helper = MinimalBrowserHelper()
+    
+    result = await helper.get_interactive_html(
+        'https://vit.edu.au/mba/mba-project-management',
+        click_international=True,
+        click_requirements_tab=True,
+        expand_accordions=True
+    )
+    
+    print(f"Clicks performed: {result['clicks_performed']}")
+    print(f"Main HTML length: {len(result['main_html'])}")
+    print(f"Has requirements HTML: {result['requirements_html'] is not None}")
+
+asyncio.run(test_single())
+Step 3: Fallback to Static HTML
+If browser fails, at least get SOME data:
+python# In orchestrator - add try/except around browser
+
+try:
+    # Try browser automation
+    result = await extract_with_browser(url)
+except Exception as e:
+    print(f"[WARNING] Browser failed for {url}, falling back to static HTML: {e}")
+    
+    # Fallback to static HTML extraction
+    html = await fetch_html(url)
+    result = extract_with_static_html(html)
+
+QUICK FIX: DISABLE BROWSER FOR NOW
+Since browser is failing for ALL courses, disable it temporarily:
+python# In your scraper config or orchestrator
+
+USE_BROWSER_AUTOMATION = False  # Disable for now
+
+if USE_BROWSER_AUTOMATION and 'vit.edu.au' in url:
+    # Use browser (currently broken)
+    result = await extract_with_browser(url)
+else:
+    # Use static HTML (will be incomplete but better than 0 courses)
+    result = await extract_with_static_html(url)
+This will at least get you:
+
+✅ 30 courses staged (not 0)
+⚠️ Domestic fees (not international)
+❌ Missing IELTS
+⚠️ Incomplete data
+
+But incomplete data > no data.
+
+RECOMMENDED APPROACH
+Option 1: Fix Browser (Preferred)
+
+Check Playwright installation
+Test single course manually
+Add detailed error logging
+Fix the issue
+Re-run scraper
+
+Option 2: Accept Incomplete Data (Quick Fix)
+
+Disable browser automation
+Use static HTML extraction
+Get 30 courses with partial data
+Manually add missing IELTS later
+Mark as "needs review"
+
+Option 3: Hybrid Approach
+
+Try browser for each course
+If browser fails, fallback to static HTML
+Mark courses extracted with static HTML as "incomplete"
+Retry incomplete courses later
+
+
+IMPLEMENTATION: HYBRID FALLBACK
+pythonasync def extract_course_with_fallback(url: str, university: University) -> Dict:
+    """
+    Try browser first, fallback to static HTML on failure
+    """
+    
+    # Try browser automation
+    try:
+        print(f"[INFO] Trying browser for {url}")
+        
+        result = await extract_with_browser(url, university)
+        
+        # Check if successful
+        if result.get('international_fee') and result.get('ielts_overall'):
+            print(f"[SUCCESS] Browser extraction complete")
+            return result
+        else:
+            raise Exception("Browser returned incomplete data")
+    
+    except Exception as e:
+        print(f"[WARNING] Browser failed: {e}")
+        print(f"[INFO] Falling back to static HTML")
+        
+        # Fallback to static HTML
+        html = await fetch_html(url)
+        result = extract_with_static_html(html, university)
+        
+        # Mark as incomplete
+        result['extraction_method'] = 'static_html_fallback'
+        result['data_completeness'] = 'partial'
+        
+        return result
+
+WHAT TO DO NOW
+Immediate action:
+
+Check logs for actual error message - What's the exact error?
+Test Playwright manually - Does playwright install work?
+Try one course - Can you manually extract one VIT course?

@@ -75,14 +75,32 @@ export async function fetchPageWithBrowser(
     return null; // playwright not available
   }
 
-  const browser = await playwright.chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
+  // Prefer the system-managed Chromium (installed via Nix) over the Playwright-
+  // managed binary, because the Playwright binary needs system libs not present
+  // in this container environment.
+  let executablePath: string | undefined;
+  try {
+    const { execSync } = await import("child_process");
+    const found = execSync("which chromium 2>/dev/null || which chromium-browser 2>/dev/null || true")
+      .toString().trim();
+    if (found) executablePath = found;
+  } catch { /* use Playwright default */ }
 
   const clicksPerformed: string[] = [];
+  let browser: import("playwright").Browser | null = null;
 
   try {
+    browser = await playwright.chromium.launch({
+      headless: true,
+      executablePath,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-zygote",
+      ],
+    });
     const context = await browser.newContext({
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -167,7 +185,7 @@ export async function fetchPageWithBrowser(
     await browser.close();
     return { mainHtml, requirementsHtml, clicksPerformed };
   } catch (err) {
-    await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
     return null;
   }
 }
