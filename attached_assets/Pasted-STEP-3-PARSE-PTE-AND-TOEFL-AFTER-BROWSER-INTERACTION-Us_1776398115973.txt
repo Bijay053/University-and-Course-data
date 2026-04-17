@@ -1,0 +1,156 @@
+STEP 3 — PARSE PTE AND TOEFL AFTER BROWSER INTERACTION
+
+Use the browser rendered course page text after:
+
+International toggle
+Entry Requirements tab
+accordion expansion
+
+Add or update a helper like this:
+
+async function extractEnglishTestsFromCoursePageWithBrowser(page: any) {
+  const renderedText: string = await page.evaluate(() => {
+    return document.body?.innerText || "";
+  });
+
+  const ielts = extractIeltsFromText(renderedText);
+  const pte = extractPteFromText(renderedText);
+  const toefl = extractToeflFromText(renderedText);
+
+  return {
+    ieltsOverall: ielts.overall,
+    ieltsListening: ielts.listening,
+    ieltsReading: ielts.reading,
+    ieltsWriting: ielts.writing,
+    ieltsSpeaking: ielts.speaking,
+
+    pteOverall: pte.overall,
+    pteListening: pte.listening,
+    pteReading: pte.reading,
+    pteWriting: pte.writing,
+    pteSpeaking: pte.speaking,
+
+    toeflOverall: toefl.overall,
+    toeflListening: toefl.listening,
+    toeflReading: toefl.reading,
+    toeflWriting: toefl.writing,
+    toeflSpeaking: toefl.speaking,
+  };
+}
+==================================================
+STEP 4 — USE CORRECT FALLBACK ORDER
+
+For PTE and TOEFL use the same extraction order:
+
+static course page text
+browser rendered course page text
+shared requirements page
+AI fallback only if still missing
+
+Pseudo flow:
+
+let ielts = extractIeltsFromText(staticCourseText);
+let pte = extractPteFromText(staticCourseText);
+let toefl = extractToeflFromText(staticCourseText);
+
+const missingEnglishTests =
+  !ielts.overall || !pte.overall || !toefl.overall;
+
+if (missingEnglishTests) {
+  const browserEnglish = await extractEnglishTestsFromCoursePageWithBrowser(page);
+
+  if (!ielts.overall && browserEnglish.ieltsOverall) {
+    ielts = {
+      overall: browserEnglish.ieltsOverall,
+      listening: browserEnglish.ieltsListening,
+      reading: browserEnglish.ieltsReading,
+      writing: browserEnglish.ieltsWriting,
+      speaking: browserEnglish.ieltsSpeaking,
+    };
+  }
+
+  if (!pte.overall && browserEnglish.pteOverall) {
+    pte = {
+      overall: browserEnglish.pteOverall,
+      listening: browserEnglish.pteListening,
+      reading: browserEnglish.pteReading,
+      writing: browserEnglish.pteWriting,
+      speaking: browserEnglish.pteSpeaking,
+    };
+  }
+
+  if (!toefl.overall && browserEnglish.toeflOverall) {
+    toefl = {
+      overall: browserEnglish.toeflOverall,
+      listening: browserEnglish.toeflListening,
+      reading: browserEnglish.toeflReading,
+      writing: browserEnglish.toeflWriting,
+      speaking: browserEnglish.toeflSpeaking,
+    };
+  }
+}
+
+if ((!pte.overall || !toefl.overall) && sharedRequirementsText) {
+  const sharedPte = extractPteFromText(sharedRequirementsText);
+  const sharedToefl = extractToeflFromText(sharedRequirementsText);
+
+  if (!pte.overall && sharedPte.overall) pte = sharedPte;
+  if (!toefl.overall && sharedToefl.overall) toefl = sharedToefl;
+}
+
+// Only then existing AI fallback
+==================================================
+STEP 5 — MAP INTO STAGED COURSE FIELDS
+
+Map correctly into your staged records:
+
+pteOverall
+pteListening
+pteReading
+pteWriting
+pteSpeaking
+toeflOverall
+toeflListening
+toeflReading
+toeflWriting
+toeflSpeaking
+
+If schema names differ slightly, map to current schema correctly.
+
+Also update missing field logic so rows do not still show missing if browser extraction succeeded.
+
+==================================================
+STEP 6 — ADD DEBUG LOGS
+
+Add short logs during testing:
+
+[PTE] static hit
+[PTE] browser hit
+[PTE] shared fallback hit
+[PTE] AI fallback hit
+[PTE] extracted overall=XX min=YY for {courseName}
+[TOEFL] static hit
+[TOEFL] browser hit
+[TOEFL] shared fallback hit
+[TOEFL] AI fallback hit
+[TOEFL] extracted overall=XX min=YY for {courseName}
+
+Keep logs useful but not noisy after final cleanup.
+
+==================================================
+STEP 7 — VERIFY ON VIT
+
+Run VIT scrape again and check staged review.
+
+Expected:
+If course pages contain PTE and TOEFL values in rendered content, those values should now appear in the review grid instead of blank columns. The logs already prove the scraper reaches and interacts with the course pages, so the fix should come from extraction order and parser strength.
+
+==================================================
+STEP 8 — WHEN DONE, REPORT
+
+Show:
+
+files changed
+whether PTE and TOEFL now come from static, browser, or fallback
+one sample staged course row with IELTS, PTE, TOEFL fields
+any remaining limitation

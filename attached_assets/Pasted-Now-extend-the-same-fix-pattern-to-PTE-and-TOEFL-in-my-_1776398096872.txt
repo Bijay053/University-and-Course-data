@@ -1,0 +1,178 @@
+Now extend the same fix pattern to PTE and TOEFL in my existing scraper.
+
+Important:
+Work in the same real project files you already opened.
+Do not rebuild from scratch.
+Modify the actual extraction logic and verify in staging review.
+
+Main goal:
+Fix PTE and TOEFL extraction using the same correct order:
+1. static course page
+2. browser rendered course page after interaction
+3. shared requirements page
+4. AI fallback only if still missing
+
+The current issue with IELTS likely affects PTE and TOEFL too because the scraper is reaching the course pages but not correctly parsing the rendered requirement content. Use the same browser after click extraction approach. :contentReference[oaicite:0]{index=0}
+
+==================================================
+STEP 1 — WORK IN THESE FILES
+==================================================
+
+Use the same files:
+1. artifacts/api-server/src/routes/scrape.ts
+2. artifacts/api-server/src/browser-helper.ts
+3. artifacts/university-portal/src/pages/scraping.tsx
+
+Main changes should be in:
+artifacts/api-server/src/routes/scrape.ts
+
+==================================================
+STEP 2 — ADD PTE AND TOEFL PARSERS
+==================================================
+
+In scrape.ts, add these parser helpers next to the IELTS parser.
+
+Use this TypeScript code:
+
+```ts
+type PteResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+type ToeflResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractPteFromText(rawText: string): PteResult {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+
+  const empty: PteResult = {
+    overall: null,
+    listening: null,
+    reading: null,
+    writing: null,
+    speaking: null,
+  };
+
+  // Pattern 1
+  // PTE Academic overall 50 with no communicative skill below 42
+  let m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const minSkill = Number(m[2]);
+    return {
+      overall,
+      listening: minSkill,
+      reading: minSkill,
+      writing: minSkill,
+      speaking: minSkill,
+    };
+  }
+
+  // Pattern 2
+  // PTE overall 58 with 50 in each band
+  m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component|each\s+skill)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+    };
+  }
+
+  // Pattern 3
+  // explicit subscores
+  m = text.match(
+    /pte(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+    };
+  }
+
+  return empty;
+}
+
+function extractToeflFromText(rawText: string): ToeflResult {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+
+  const empty: ToeflResult = {
+    overall: null,
+    listening: null,
+    reading: null,
+    writing: null,
+    speaking: null,
+  };
+
+  // Pattern 1
+  // TOEFL iBT 79 with no band below 18
+  let m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:band|section|subscore)\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const minSection = Number(m[2]);
+    return {
+      overall,
+      listening: minSection,
+      reading: minSection,
+      writing: minSection,
+      speaking: minSection,
+    };
+  }
+
+  // Pattern 2
+  // TOEFL overall 94 with 20 in each section
+  m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+section|each\s+section|each\s+component|each\s+band)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+    };
+  }
+
+  // Pattern 3
+  // explicit subscores
+  m = text.match(
+    /toefl(?:\s+ibt)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+    };
+  }
+
+  return empty;
+}

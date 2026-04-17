@@ -1204,6 +1204,167 @@ function applyIeltsResult(data: Partial<CourseData>, r: IeltsResult): void {
   if (!data.ieltsSpeaking  && r.speaking  != null) data.ieltsSpeaking  = r.speaking;
 }
 
+// ── PTE parser ───────────────────────────────────────────────────────────────
+
+type PteResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractPteFromText(rawText: string): PteResult {
+  const text = rawText.replace(/\s+/g, " ").trim();
+  const empty: PteResult = { overall: null, listening: null, reading: null, writing: null, speaking: null };
+
+  // Pattern 1: "PTE Academic 50 with no communicative skill below 42"
+  let m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const min = Number(m[2]);
+    if (overall >= 10 && overall <= 90 && min >= 10 && min <= 90)
+      return { overall, listening: min, reading: min, writing: min, speaking: min };
+  }
+
+  // Pattern 2: "PTE overall 58 with 50 in each band/skill/component"
+  m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+(?:band|skill|component)|each\s+(?:band|skill|component))/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const each = Number(m[2]);
+    if (overall >= 10 && overall <= 90 && each >= 10 && each <= 90)
+      return { overall, listening: each, reading: each, writing: each, speaking: each };
+  }
+
+  // Pattern 3: explicit subscores in order
+  m = text.match(
+    /pte(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]), listening: Number(m[2]),
+      reading: Number(m[3]), writing: Number(m[4]), speaking: Number(m[5]),
+    };
+  }
+
+  // Pattern 4: overall near "PTE", bands individually
+  const overallM = text.match(/pte(?:\s+academic)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (!overallM) {
+    // Also try plain "PTE: 58" or "PTE Academic: 58"
+    const plainM = text.match(/pte(?:\s+academic)?[:\s]+([0-9]+(?:\.[0-9]+)?)/i);
+    if (plainM) {
+      const overall = Number(plainM[1]);
+      if (overall >= 10 && overall <= 90) return { overall, listening: null, reading: null, writing: null, speaking: null };
+    }
+    return empty;
+  }
+  const overall = Number(overallM[1]);
+  if (overall < 10 || overall > 90) return empty;
+  const listenM = text.match(/listening\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const readM   = text.match(/reading\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const writeM  = text.match(/writing\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const speakM  = text.match(/speaking\s*([0-9]+(?:\.[0-9]+)?)/i);
+  return {
+    overall,
+    listening: listenM ? Number(listenM[1]) : null,
+    reading:   readM   ? Number(readM[1])   : null,
+    writing:   writeM  ? Number(writeM[1])  : null,
+    speaking:  speakM  ? Number(speakM[1])  : null,
+  };
+}
+
+/** Map a PteResult onto a CourseData object (only fills missing slots). */
+function applyPteResult(data: Partial<CourseData>, r: PteResult): void {
+  if (!r.overall) return;
+  if (!data.pteOverall)   data.pteOverall   = r.overall;
+  if (!data.pteListening && r.listening != null) data.pteListening = r.listening;
+  if (!data.pteReading   && r.reading   != null) data.pteReading   = r.reading;
+  if (!data.pteWriting   && r.writing   != null) data.pteWriting   = r.writing;
+  if (!data.pteSpeaking  && r.speaking  != null) data.pteSpeaking  = r.speaking;
+}
+
+// ── TOEFL parser ─────────────────────────────────────────────────────────────
+
+type ToeflResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractToeflFromText(rawText: string): ToeflResult {
+  const text = rawText.replace(/\s+/g, " ").trim();
+  const empty: ToeflResult = { overall: null, listening: null, reading: null, writing: null, speaking: null };
+
+  // Pattern 1: "TOEFL iBT 79 with no band/section below 18"
+  let m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:band|section|subscore)\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const min = Number(m[2]);
+    if (overall >= 0 && overall <= 120 && min >= 0 && min <= 30)
+      return { overall, listening: min, reading: min, writing: min, speaking: min };
+  }
+
+  // Pattern 2: "TOEFL overall 94 with 20 in each section"
+  m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+(?:section|component|band)|each\s+(?:section|component|band))/i,
+  );
+  if (m) {
+    const overall = Number(m[1]); const each = Number(m[2]);
+    if (overall >= 0 && overall <= 120 && each >= 0 && each <= 30)
+      return { overall, listening: each, reading: each, writing: each, speaking: each };
+  }
+
+  // Pattern 3: explicit subscores in order
+  m = text.match(
+    /toefl(?:\s+ibt)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i,
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]), listening: Number(m[2]),
+      reading: Number(m[3]), writing: Number(m[4]), speaking: Number(m[5]),
+    };
+  }
+
+  // Pattern 4: overall near "TOEFL", bands individually
+  const overallM = text.match(/toefl(?:\s+ibt)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (!overallM) {
+    const plainM = text.match(/toefl(?:\s+ibt)?[:\s]+([0-9]+(?:\.[0-9]+)?)/i);
+    if (plainM) {
+      const overall = Number(plainM[1]);
+      if (overall >= 0 && overall <= 120) return { overall, listening: null, reading: null, writing: null, speaking: null };
+    }
+    return empty;
+  }
+  const overall = Number(overallM[1]);
+  if (overall < 0 || overall > 120) return empty;
+  const listenM = text.match(/listening\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const readM   = text.match(/reading\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const writeM  = text.match(/writing\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const speakM  = text.match(/speaking\s*([0-9]+(?:\.[0-9]+)?)/i);
+  return {
+    overall,
+    listening: listenM ? Number(listenM[1]) : null,
+    reading:   readM   ? Number(readM[1])   : null,
+    writing:   writeM  ? Number(writeM[1])  : null,
+    speaking:  speakM  ? Number(speakM[1])  : null,
+  };
+}
+
+/** Map a ToeflResult onto a CourseData object (only fills missing slots). */
+function applyToeflResult(data: Partial<CourseData>, r: ToeflResult): void {
+  if (!r.overall) return;
+  if (!data.toeflOverall)   data.toeflOverall   = r.overall;
+  if (!data.toeflListening && r.listening != null) data.toeflListening = r.listening;
+  if (!data.toeflReading   && r.reading   != null) data.toeflReading   = r.reading;
+  if (!data.toeflWriting   && r.writing   != null) data.toeflWriting   = r.writing;
+  if (!data.toeflSpeaking  && r.speaking  != null) data.toeflSpeaking  = r.speaking;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 
 function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
@@ -3669,23 +3830,56 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }
         }
 
-        // ── IELTS extraction waterfall ────────────────────────────────────────
+        // ── English test extraction waterfall (IELTS + PTE + TOEFL) ─────────────
         // Tier 1: extractWithCheerio(cHtml) above already ran extractEnglishFromHtml
-        //         on the browser-rendered page (requirementsHtml after all clicks).
-        // Tier 2: If still missing, run the stronger 4-pattern parser on the same HTML.
-        if (!cheerioData.ieltsOverall && wasBrowserFetch) {
+        //         on the full browser-rendered page (requirementsHtml after all clicks).
+        // Tier 2: If still missing, run the stronger parsers on the same body text.
+        if (wasBrowserFetch) {
           const bodyText = cheerio.load(cHtml)("body").text();
-          const ieltsResult = extractIeltsFromText(bodyText);
-          if (ieltsResult.overall) {
-            applyIeltsResult(cheerioData, ieltsResult);
-            addLog(job, "status", {
-              message: `[IELTS] browser page hit: overall=${ieltsResult.overall}${ieltsResult.listening != null ? ` min=${ieltsResult.listening}` : ""} for "${link.name.slice(0, 40)}"`,
-              phase: "extract",
-            });
+
+          if (!cheerioData.ieltsOverall) {
+            const r = extractIeltsFromText(bodyText);
+            if (r.overall) {
+              applyIeltsResult(cheerioData, r);
+              addLog(job, "status", {
+                message: `[IELTS] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                phase: "extract",
+              });
+            }
+          } else {
+            addLog(job, "status", { message: `[IELTS] browser page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
-        }
-        if (cheerioData.ieltsOverall && !wasBrowserFetch) {
-          addLog(job, "status", { message: `[IELTS] static page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+
+          if (!cheerioData.pteOverall) {
+            const r = extractPteFromText(bodyText);
+            if (r.overall) {
+              applyPteResult(cheerioData, r);
+              addLog(job, "status", {
+                message: `[PTE] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                phase: "extract",
+              });
+            }
+          } else {
+            addLog(job, "status", { message: `[PTE] browser page hit: overall=${cheerioData.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+
+          if (!cheerioData.toeflOverall) {
+            const r = extractToeflFromText(bodyText);
+            if (r.overall) {
+              applyToeflResult(cheerioData, r);
+              addLog(job, "status", {
+                message: `[TOEFL] browser page hit: overall=${r.overall}${r.listening != null ? ` min=${r.listening}` : ""} for "${link.name.slice(0, 40)}"`,
+                phase: "extract",
+              });
+            }
+          } else {
+            addLog(job, "status", { message: `[TOEFL] browser page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+        } else {
+          // Static fetch — log which tests were found
+          if (cheerioData.ieltsOverall) addLog(job, "status", { message: `[IELTS] static page hit: overall=${cheerioData.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          if (cheerioData.pteOverall)   addLog(job, "status", { message: `[PTE] static page hit: overall=${cheerioData.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          if (cheerioData.toeflOverall) addLog(job, "status", { message: `[TOEFL] static page hit: overall=${cheerioData.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
         }
 
         // If the university fee page is explicitly an international fees page, always
@@ -3707,9 +3901,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         }
 
         // Tier 3: University-level requirements page (shared fallback).
-        // Only used when course-page extraction (static + browser) found nothing.
-        if (!cheerioData.ieltsOverall) {
-          addLog(job, "status", { message: `[IELTS] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
+        // Only consulted when course-page extraction (static + browser tiers) found nothing.
+        const needsSharedFallback = !cheerioData.ieltsOverall || !cheerioData.pteOverall || !cheerioData.toeflOverall;
+        if (needsSharedFallback) {
+          if (!cheerioData.ieltsOverall) addLog(job, "status", { message: `[IELTS] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          if (!cheerioData.pteOverall)   addLog(job, "status", { message: `[PTE] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          if (!cheerioData.toeflOverall) addLog(job, "status", { message: `[TOEFL] shared requirements fallback for "${link.name.slice(0, 40)}"`, phase: "extract" });
         }
         if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
           extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
@@ -3717,15 +3914,28 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
           extractEnglishRequirements(uniReqsText, cheerioData);
         }
-        // Also run the stronger parser on the shared requirements text
-        if (!cheerioData.ieltsOverall && uniReqsText) {
-          const r = extractIeltsFromText(uniReqsText);
-          if (r.overall) {
-            applyIeltsResult(cheerioData, r);
-            addLog(job, "status", {
-              message: `[IELTS] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`,
-              phase: "extract",
-            });
+        // Run all three stronger parsers on the shared requirements text
+        if (uniReqsText) {
+          if (!cheerioData.ieltsOverall) {
+            const r = extractIeltsFromText(uniReqsText);
+            if (r.overall) {
+              applyIeltsResult(cheerioData, r);
+              addLog(job, "status", { message: `[IELTS] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            }
+          }
+          if (!cheerioData.pteOverall) {
+            const r = extractPteFromText(uniReqsText);
+            if (r.overall) {
+              applyPteResult(cheerioData, r);
+              addLog(job, "status", { message: `[PTE] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            }
+          }
+          if (!cheerioData.toeflOverall) {
+            const r = extractToeflFromText(uniReqsText);
+            if (r.overall) {
+              applyToeflResult(cheerioData, r);
+              addLog(job, "status", { message: `[TOEFL] shared requirements hit: overall=${r.overall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            }
           }
         }
         if (uniReqsText && !cheerioData.intakeMonths?.length) {

@@ -1,0 +1,166 @@
+Fix the remaining IELTS blank issue in my existing scraper.
+
+Important:
+Do not rebuild from scratch.
+Do not only change regex.
+Do not stop after parser changes.
+Debug the full pipeline end to end and fix the real issue in code.
+
+Current observed behavior:
+For ASA scrape, logs show:
+- shared IELTS fallback is triggered for most courses
+- one course "Bachelor Of Professional Accounting" shows static page hit: overall=6
+- that one row displays IELTS correctly in the review table
+- other rows still show Missing: ieltsOverall even though fallback was used
+
+This means the remaining bug is likely in one of these:
+1. shared fallback parser is not actually extracting a value
+2. extracted fallback result is not being mapped into staged course fields
+3. mapped value is being overwritten later
+4. DB save is dropping the value
+5. API response is returning a different field name
+6. UI table is reading a different field than what backend saves
+
+You must debug the full path and fix it.
+
+==================================================
+STEP 1 — OPEN THESE FILES
+==================================================
+
+Open in this order:
+
+1. artifacts/api-server/src/routes/scrape.ts
+2. lib/db/src/schema/scraped_courses.ts
+3. artifacts/university-portal/src/pages/scraping.tsx
+4. artifacts/api-server/src/routes/scraping.ts
+5. artifacts/api-server/src/browser-helper.ts
+
+Main backend file:
+artifacts/api-server/src/routes/scrape.ts
+
+Main UI file:
+artifacts/university-portal/src/pages/scraping.tsx
+
+==================================================
+STEP 2 — TRACE IELTS END TO END
+==================================================
+
+You must trace IELTS through all these stages:
+
+A. source text
+B. parser result
+C. staged course object before save
+D. DB insert payload
+E. DB row after save
+F. API response returned to UI
+G. UI column binding
+
+Add temporary debug logs for one failing course and one working course.
+
+Use these two examples from current behavior:
+- working example: Bachelor Of Professional Accounting
+- failing example: Bachelor Of Business
+
+==================================================
+STEP 3 — ADD TEMP DEBUG LOGS
+==================================================
+
+In scrape.ts add logs at all points below for both working and failing courses.
+
+A. After shared fallback text is loaded:
+log a small sanitized snippet around the IELTS match area
+
+Example:
+[IELTS-DEBUG] fallback text sample for {courseName}: "..."
+
+B. After parser result:
+[IELTS-DEBUG] parsed result for {courseName}: overall=X listening=Y reading=Z writing=W speaking=S
+
+C. Before staged object save:
+[IELTS-DEBUG] staged object for {courseName}: ieltsOverall=?, ieltsListening=?, ieltsReading=?, ieltsWriting=?, ieltsSpeaking=?
+
+D. After DB insert or returned staged row:
+[IELTS-DEBUG] saved row for {courseName}: ...
+
+E. In API response building:
+[IELTS-DEBUG] response row for {courseName}: ...
+
+Keep these logs temporary for debugging, then reduce noise after fix.
+
+==================================================
+STEP 4 — FIX SHARED FALLBACK PARSER
+==================================================
+
+If shared fallback text is being used, parse it with the same strong parser and confirm it returns values.
+
+Use this code if not already used consistently:
+
+```ts
+function normalizeWhitespace(input: string): string {
+  return input.replace(/\s+/g, " ").trim();
+}
+
+type IeltsResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractIeltsFromText(rawText: string): IeltsResult {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+
+  const empty: IeltsResult = {
+    overall: null,
+    listening: null,
+    reading: null,
+    writing: null,
+    speaking: null,
+  };
+
+  let m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,30}overall\s*([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const minBand = Number(m[2]);
+    return {
+      overall,
+      listening: minBand,
+      reading: minBand,
+      writing: minBand,
+      speaking: minBand,
+    };
+  }
+
+  m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,30}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,30}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+    };
+  }
+
+  m = text.match(
+    /ielts(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+    };
+  }
+
+  return empty;
+}
