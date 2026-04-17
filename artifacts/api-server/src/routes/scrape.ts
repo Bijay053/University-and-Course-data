@@ -1597,6 +1597,15 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string)
     return false;
   }
 
+  // Reject pages with no course data at all — likely category/landing pages that slipped through
+  const hasDegreeLevel = !!courseData.degreeLevel;
+  const hasDuration = !!courseData.duration;
+  const hasFee = !!courseData.internationalFee;
+  if (!hasDegreeLevel && !hasDuration && !hasFee) {
+    console.log(`[JUNK] Skipping empty page (no degree/duration/fee): "${courseData.courseName}"`);
+    return false;
+  }
+
   // Validate and sanitize before staging
   const validationWarnings = validateAndSanitizeCourseData(courseData);
   if (validationWarnings.length > 0) {
@@ -1807,11 +1816,20 @@ const DEGREE_QUALIFIERS = [
 function urlLastSegmentHasDegreeQualifier(url: string): boolean {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
+
+    // Fast-path: full-path matches a strong course detail pattern (e.g. /courses/bachelor-of-X)
+    if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) {
+      // Still reject known junk suffixes
+      const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+      if (/(scholarships?|info-night|open-day|event|news|fair|expo|community|hub)$/.test(lastSeg)) return false;
+      return true;
+    }
+
     const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
     if (!DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q)) return false;
     // Reject degree-qualified URLs that are clearly info/category pages, not actual course detail pages
     // e.g. phd-scholarships, phd-jobs-and-internships, integrated-masters (category), master-classes
-    if (/(scholarships?|jobs?|internships?|employment|career|life|accommodation|sport|news|event|blog|faq|help|support|overview|guide|information|handbook|tips|process|pathway|pathways?|class(?:es)?|fair|expo|hub|community|connect|network)$/.test(lastSeg)) return false;
+    if (/(scholarships?|jobs?|internships?|employment|career|life|accommodation|sport|news|event|blog|faq|help|support|overview|guide|information|handbook|tips|process|pathway|pathways?|class(?:es)?|fair|expo|hub|community|connect|network|info-night|open-day)$/.test(lastSeg)) return false;
     return true;
   } catch { return false; }
 }
@@ -1954,7 +1972,27 @@ async function researchAndValidateCourseLinks(
         }
 
         const pageHtml = await fetchPage(candidate.url);
-        const bodyText = cheerio.load(pageHtml)("body").text();
+        const $ = cheerio.load(pageHtml);
+        const bodyText = $("body").text();
+
+        // Fast-path: full-path course URL structure + degree keyword in page <h1> or <title> = auto-accept
+        // This prevents Torrens /courses/bachelor-of-X pages from being rejected on minimal content
+        const pageTitle = ($("h1").first().text() || $("title").text() || "").trim();
+        const urlPathFits = (() => {
+          try { return VALID_COURSE_PATH_PATTERNS.some((p) => p.test(new URL(candidate.url).pathname.toLowerCase())); }
+          catch { return false; }
+        })();
+        const titleHasDegree = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|mba|msc|bed|bsc|beng|llb|jd|juris|honours|associate)\b/i.test(pageTitle);
+        if (urlPathFits && titleHasDegree) {
+          confirmedCourses++;
+          if (validExamples.length < 4) validExamples.push(candidate.name);
+          const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
+          validUrlDepths.push(pathParts.length);
+          if (pathParts.length > 1) validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
+          addLog(job, "status", { message: `✓ Confirmed course (URL+title fast-path): "${candidate.name}"`, phase: "discover", sampleResult: "valid" });
+          return;
+        }
+
         const isRealCourse = pageContentLooksLikeCourse(bodyText, candidate.name);
 
         if (isRealCourse) {
@@ -2026,6 +2064,18 @@ async function researchAndValidateCourseLinks(
   return { links: finalLinks, validSamples: confirmedCourses, rejectedSamples: confirmedNonCourses, validExamples, rejectedExamples };
 }
 
+// Full-path patterns that strongly indicate a single course detail page
+// e.g. torrens.edu.au/courses/bachelor-of-cybersecurity
+const VALID_COURSE_PATH_PATTERNS = [
+  /\/courses?\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/study\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/programs?\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/degrees?\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/[a-z]+-courses?\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/postgraduate\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/undergraduate\/[a-z0-9][a-z0-9-]+\/?$/,
+];
+
 function isCourseUrl(urlStr: string): boolean {
   const lower = urlStr.toLowerCase();
 
@@ -2037,12 +2087,18 @@ function isCourseUrl(urlStr: string): boolean {
     "/research/", "/library/", "/scholarships", "/support/", "/services/",
     "/node/", "/page/", "/generic/", "/media/", "/documents/", "/resources/",
     "/student-support", "/international-students/visa", "/fees-scholarships",
+    "/why-choose", "/info-night", "/open-day", "/virtual-info",
   ];
   if (excludePatterns.some((p) => lower.includes(p))) return false;
   // Exclude URLs whose last path segment ends with known junk suffixes
-  // e.g. /study/phd-scholarships, /study/phd-jobs-and-internships, /integrated-masters (category)
   const lastSeg = lower.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
-  if (/(scholarships?|jobs?(-and-internships?)?|internships?|employment|student-life|community|connect|network|hub|fair|expo|overview|handbook|tips|guide|pathway|pathways?|classes?)$/.test(lastSeg)) return false;
+  if (/(scholarships?|jobs?(-and-internships?)?|internships?|employment|student-life|community|connect|network|hub|fair|expo|overview|handbook|tips|guide|pathway|pathways?|classes?|info-night|open-day)$/.test(lastSeg)) return false;
+
+  // Strong positive: full-path matches a known course detail URL structure
+  try {
+    const pathname = new URL(urlStr).pathname.toLowerCase();
+    if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) return true;
+  } catch {}
 
   return (
     lower.includes("/course") || lower.includes("/program") ||
