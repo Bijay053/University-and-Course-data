@@ -1,0 +1,128 @@
+STEP 5 — RUN IELTS PARSER AFTER BROWSER INTERACTION
+
+Find the browser extraction block in scrape.ts.
+After:
+
+clicking international toggle
+clicking requirements tab
+expanding accordions
+
+Get the final rendered text and then run extractIeltsFromText on that text.
+
+Use logic like this:
+
+async function extractEnglishFromCoursePageWithBrowser(page: any) {
+  // after all clicks are complete
+  const renderedText: string = await page.evaluate(() => {
+    return document.body?.innerText || "";
+  });
+
+  const ielts = extractIeltsFromText(renderedText);
+
+  return {
+    ieltsOverall: ielts.overall,
+    ieltsListening: ielts.listening,
+    ieltsReading: ielts.reading,
+    ieltsWriting: ielts.writing,
+    ieltsSpeaking: ielts.speaking,
+  };
+}
+
+Important:
+Do not parse IELTS from stale HTML captured before clicking.
+Do not parse only the initial request HTML.
+Use the browser rendered text after interaction.
+
+==================================================
+STEP 6 — ADD FALLBACK ORDER EXACTLY LIKE THIS
+
+Use this extraction order:
+
+static course page text
+browser rendered course page text after interaction
+shared requirements page text
+AI fallback only if still missing
+
+Pseudo flow:
+
+let english = extractIeltsFromText(staticCourseText);
+
+if (!english.overall) {
+  english = await extractEnglishFromCoursePageWithBrowser(page);
+}
+
+if (!english.overall && sharedRequirementsText) {
+  english = extractIeltsFromText(sharedRequirementsText);
+}
+
+if (!english.overall) {
+  // existing AI fallback logic
+}
+==================================================
+STEP 7 — MAP RESULT INTO STAGED COURSE DATA
+
+Find where staged scraped course object is created.
+Make sure these exact fields are set from the browser extracted IELTS result:
+
+ieltsOverall
+ieltsListening
+ieltsReading
+ieltsWriting
+ieltsSpeaking
+
+Also update missing fields logic so it does not mark Missing: ieltsOverall if browser extraction found it.
+
+If your staged schema uses slightly different field names, map correctly to the existing schema.
+
+==================================================
+STEP 8 — ADD DEBUG LOGS
+
+Add short logs while testing:
+
+[IELTS] static course page hit
+[IELTS] browser course page hit
+[IELTS] shared requirements fallback hit
+[IELTS] AI fallback hit
+[IELTS] extracted overall=6.0 min=5.5 for {courseName}
+
+Also log a small text sample around the first IELTS match if helpful during debugging.
+
+Do not leave overly noisy logs after final cleanup, but keep one success log.
+
+==================================================
+STEP 9 — OPTIONAL PTE AND TOEFL SUPPORT
+
+If easy, apply the same pattern to PTE and TOEFL:
+
+parse from browser rendered course page text first
+shared page second
+AI last
+
+But IELTS fix is priority one.
+
+==================================================
+STEP 10 — VERIFY WITH VIT
+
+Test on VIT again.
+
+Expected result:
+In the Review Scraped Courses table, courses like:
+
+MBA Finance
+MBA Information Systems
+Diploma of Business
+Bachelor of Business
+
+should no longer show Missing: ieltsOverall if the page contains IELTS text. The current logs already show the scraper is reaching and interacting with those course pages, so the fix should come from extraction order and parser improvement, not from discovery changes.
+
+==================================================
+STEP 11 — WHEN DONE, REPORT
+
+Show me:
+
+files changed
+exact old extraction order
+exact new extraction order
+whether IELTS is now coming from static, browser, or fallback
+sample staged record fields for one VIT course
+any remaining issue

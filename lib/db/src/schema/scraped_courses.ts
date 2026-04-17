@@ -39,6 +39,7 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   cambridgeOverall: real("cambridge_overall"),
   duolingoOverall: real("duolingo_overall"),
   intakeMonths: jsonb("intake_months").$type<string[]>(),
+  intakeDays: integer("intake_days"),
   academicLevel: text("academic_level"),
   academicScore: real("academic_score"),
   scoreType: text("score_type"),

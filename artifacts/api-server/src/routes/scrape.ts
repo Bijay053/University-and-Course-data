@@ -2083,6 +2083,7 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
     cambridgeOverall: courseData.cambridgeOverall || null,
     duolingoOverall: courseData.duolingoOverall || null,
     intakeMonths: courseData.intakeMonths || null,
+    intakeDays: courseData.intakeDays || null,
     academicLevel: courseData.academicLevel || null,
     academicScore: courseData.academicScore || null,
     scoreType: courseData.scoreType || null,
@@ -3417,6 +3418,22 @@ function makeSemaphore(concurrency: number) {
   };
 }
 
+/**
+ * Returns true when static extraction got little-to-no structured data,
+ * signalling the page likely renders content via JavaScript.
+ * Used for per-URL browser escalation on sites NOT in the JS_HEAVY_DOMAINS list.
+ */
+function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): boolean {
+  // No course name at all → likely fully JS-rendered, worth trying browser.
+  if (!data.courseName) return true;
+  const hasFee      = !!data.internationalFee;
+  const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
+  const hasDuration = !!data.duration;
+  const hasDegree   = !!data.degreeLevel;
+  // Two or more key fields found → static extraction is working; no browser needed.
+  return [hasFee, hasEnglish, hasDuration, hasDegree].filter(Boolean).length < 2;
+}
+
 async function scrapeCourseBatch(
   courseLinks: { url: string; name: string }[],
   uniId: number,
@@ -3490,13 +3507,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // Courses that time out on the first pass are retried here.
   const retryQueue: { url: string; name: string; index: number }[] = [];
 
-  // Determine once whether this batch of courses needs browser automation.
-  // Fast mode disables browser entirely (5–10× faster, may miss JS-rendered fields).
-  const batchNeedsBrowser = !job.fastMode && courseLinks.length > 0 && siteNeedsBrowser(courseLinks[0].url);
+  // Fast mode log — browser-fallback message is deferred to per-URL decision below.
   if (job.fastMode) {
     addLog(job, "status", { message: "FAST MODE — browser automation disabled, using HTTP fetch only", phase: "fetch" });
-  } else if (batchNeedsBrowser) {
-    addLog(job, "status", { message: "JS-heavy site detected — using browser automation (International toggle + Entry Requirements tab)", phase: "fetch" });
   }
 
   const tasks = courseLinks.slice(0, max).map((link, i) =>
@@ -3506,13 +3519,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
       try {
-        // For JS-heavy sites use browser (clicks International toggle + Entry Requirements tab).
-        // For all others fall through to the plain HTTP fetch.
+        // ── Per-URL static-first strategy ─────────────────────────────────────
+        // Fast mode      → always static (no browser).
+        // JS-heavy site  → go straight to browser (avoids wasted static round-trip
+        //                  when we know fees/reqs are behind a toggle/tab).
+        // Everything else → static first; escalate to browser only when cheerio
+        //                  extraction is missing most critical fields.
+        // ─────────────────────────────────────────────────────────────────────
         let cHtml: string;
-        let browserReqsHtml: string | null = null;  // per-course requirements HTML from browser
+        let browserReqsHtml: string | null = null;
 
-        if (!job.fastMode && (batchNeedsBrowser || siteNeedsBrowser(link.url))) {
-          const browserResult = await browserSem(() =>
+        const runBrowser = async () =>
+          browserSem(() =>
             fetchPageWithBrowser(link.url, {
               clickInternational: true,
               clickRequirementsTab: true,
@@ -3520,19 +3538,45 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               timeoutMs: 25_000,
             })
           );
+
+        if (job.fastMode) {
+          cHtml = await fetchPage(link.url);
+        } else if (siteNeedsBrowser(link.url)) {
+          // Known JS-heavy domain — skip static fetch, go straight to browser.
+          const browserResult = await runBrowser();
           if (browserResult) {
             cHtml = browserResult.mainHtml;
-            // Only use requirementsHtml when something extra was done
             if (browserResult.requirementsHtml !== browserResult.mainHtml) {
               browserReqsHtml = browserResult.requirementsHtml;
             }
-            addLog(job, "status", { message: `[browser ✓] ${link.name} (clicks: ${browserResult.clicksPerformed.join(", ") || "none"})`, phase: "fetch" });
+            addLog(job, "status", {
+              message: `[browser ✓] ${link.name.slice(0, 60)} (${browserResult.clicksPerformed.join(", ") || "no clicks"})`,
+              phase: "extract",
+            });
           } else {
-            addLog(job, "status", { message: `[browser ✗ → static] ${link.name}`, phase: "fetch" });
+            // Browser launch failed — fall back to static.
+            addLog(job, "status", { message: `[browser ✗ → static] ${link.name.slice(0, 60)}`, phase: "extract" });
             cHtml = await fetchPage(link.url);
           }
         } else {
+          // Static-first for all other sites.
           cHtml = await fetchPage(link.url);
+          // Content-aware browser escalation: if cheerio can't get critical fields,
+          // the page may be JS-rendered — try browser once as a fallback.
+          const quickData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
+          if (needsBrowserFallback(quickData)) {
+            const browserResult = await runBrowser();
+            if (browserResult?.mainHtml) {
+              cHtml = browserResult.mainHtml;
+              if (browserResult.requirementsHtml !== browserResult.mainHtml) {
+                browserReqsHtml = browserResult.requirementsHtml;
+              }
+              addLog(job, "status", {
+                message: `[browser fallback ✓] ${link.name.slice(0, 60)}`,
+                phase: "fallback",
+              });
+            }
+          }
         }
 
         const cheerioData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);

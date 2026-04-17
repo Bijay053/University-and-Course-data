@@ -1,0 +1,177 @@
+Fix the IELTS extraction bug in my existing project.
+
+Important:
+Do not give analysis only.
+Do not rebuild the scraper from scratch.
+Open the real project files, change the actual code, run it, and verify the fix in the staging review screen.
+
+Main issue:
+The scraper is successfully finding VIT courses, opening browser mode, clicking the International toggle and Entry Requirements tab, and staging all 30 courses, but IELTS is still missing in the review table. Logs show:
+- browser automation is working on course pages
+- static IELTS extraction failed
+- it falls back to the shared requirements page
+- staged rows still show Missing: ieltsOverall :contentReference[oaicite:0]{index=0}
+
+Root cause to fix:
+This is not mainly a discovery issue now.
+The scraper is already reaching the correct course pages.
+The real problem is extraction timing and extraction logic:
+1. IELTS extraction must happen after browser interaction on the course page
+2. course page content should be the primary source
+3. shared requirements page should be fallback only
+4. current IELTS regex and parser are too weak
+
+==================================================
+STEP 1 — OPEN THESE FILES FIRST
+==================================================
+
+Open in this order:
+
+1. artifacts/api-server/src/routes/scrape.ts
+2. artifacts/api-server/src/browser-helper.ts
+3. artifacts/university-portal/src/pages/scraping.tsx
+
+Main file to fix first:
+artifacts/api-server/src/routes/scrape.ts
+
+==================================================
+STEP 2 — FIND THE IELTS EXTRACTION FLOW
+==================================================
+
+Inside scrape.ts, find:
+- the function that extracts English requirements
+- the logic that logs "Static IELTS extraction failed"
+- the browser flow that clicks:
+  - international_toggle
+  - requirements_tab
+  - accordions_expanded_1
+- the place where staged course data is built before save
+
+You must inspect the current extraction order and change it.
+
+==================================================
+STEP 3 — CHANGE EXTRACTION PRIORITY
+==================================================
+
+Current wrong behavior:
+1. try static extraction
+2. fail
+3. jump to university requirements page
+4. AI fallback
+5. staged course still misses IELTS
+
+New required behavior:
+1. try static extraction from course page
+2. if missing, open browser on the same course page
+3. click International toggle if present
+4. click Entry Requirements tab if present
+5. expand accordions if needed
+6. get final rendered HTML or visible text from that course page
+7. run IELTS parser on that browser rendered course page content
+8. only if still missing, then use shared requirements page as fallback
+9. only if both fail, then use AI fallback
+
+Do not use the shared requirements page before browser extraction from the course page.
+
+==================================================
+STEP 4 — ADD OR REPLACE IELTS PARSER CODE
+==================================================
+
+In scrape.ts, add a stronger parser like this and wire it into the extraction pipeline.
+
+Use this TypeScript code:
+
+```ts
+function normalizeWhitespace(input: string): string {
+  return input.replace(/\s+/g, " ").trim();
+}
+
+type IeltsResult = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+};
+
+function extractIeltsFromText(rawText: string): IeltsResult {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+
+  const empty: IeltsResult = {
+    overall: null,
+    listening: null,
+    reading: null,
+    writing: null,
+    speaking: null,
+  };
+
+  // Pattern 1
+  // IELTS overall 6.0 with no band below 5.5
+  let m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const minBand = Number(m[2]);
+    return {
+      overall,
+      listening: minBand,
+      reading: minBand,
+      writing: minBand,
+      speaking: minBand,
+    };
+  }
+
+  // Pattern 2
+  // IELTS 6.5 overall, with 6.0 in each band
+  m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,20}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+    };
+  }
+
+  // Pattern 3
+  // explicit subscores
+  // IELTS overall 6.5, listening 6.0, reading 6.0, writing 6.0, speaking 6.0
+  m = text.match(
+    /ielts(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+    };
+  }
+
+  // Pattern 4
+  // Sometimes ordering differs
+  const overallMatch = text.match(/ielts(?:\s+academic)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const listeningMatch = text.match(/listening\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const readingMatch = text.match(/reading\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const writingMatch = text.match(/writing\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const speakingMatch = text.match(/speaking\s*([0-9]+(?:\.[0-9]+)?)/i);
+
+  if (overallMatch && (listeningMatch || readingMatch || writingMatch || speakingMatch)) {
+    return {
+      overall: Number(overallMatch[1]),
+      listening: listeningMatch ? Number(listeningMatch[1]) : null,
+      reading: readingMatch ? Number(readingMatch[1]) : null,
+      writing: writingMatch ? Number(writingMatch[1]) : null,
+      speaking: speakingMatch ? Number(speakingMatch[1]) : null,
+    };
+  }
+
+  return empty;
+}
