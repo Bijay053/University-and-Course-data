@@ -640,18 +640,27 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
   }
 
   // Priority 0 (highest): "Total fee (per-unit rate)" pattern
-  // e.g. "$48,000 ($3,000/unit)" — first number is the total full-course fee
-  // This prevents picking up the per-unit rate as the fee
+  // e.g. "$48,000 ($3,000/unit)" or "$36,000 ($1,500/unit)" for domestic
+  // VIT shows BOTH domestic and international on the same page — take the LARGEST total
+  // (international is always higher than domestic, so max = international fee)
   const perUnitTotalPat = new RegExp(
     `(?:fees?[:\\s]*)?${CURRENCY_SYM.source}\\s*([\\d,]+)\\s*\\(${CURRENCY_SYM.source}?\\s*[\\d,]+\\s*/\\s*(?:unit|credit|point|subject)\\)`,
-    "i"
+    "gi"
   );
-  const perUnitMatch = text.match(perUnitTotalPat);
-  if (perUnitMatch) {
-    const totalFee = parseInt(perUnitMatch[1].replace(/,/g, ""));
-    if (totalFee >= 3000 && totalFee <= 200000) {
-      data.internationalFee = totalFee;
-      data.currency = detectCurrencyFromContext(perUnitMatch[0], countryFallback);
+  const perUnitMatches = [...text.matchAll(perUnitTotalPat)];
+  if (perUnitMatches.length > 0) {
+    let bestTotal = 0;
+    let bestMatch = perUnitMatches[0];
+    for (const m of perUnitMatches) {
+      const fee = parseInt(m[1].replace(/,/g, ""));
+      if (fee > bestTotal && fee >= 3000 && fee <= 200000) {
+        bestTotal = fee;
+        bestMatch = m;
+      }
+    }
+    if (bestTotal > 0) {
+      data.internationalFee = bestTotal;
+      data.currency = detectCurrencyFromContext(bestMatch[0], countryFallback);
       data.feeTerm = "Full Course";
       if (!data.feeYear) data.feeYear = extractFeeYear(text);
       return;
@@ -908,6 +917,24 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
 function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const ieltsSection = text.match(/IELTS\s*(?:Academic|academic)?[^]*?(?=(?:TOEF|TOFL|TOFEL|PTE|Cambridge|CAE|Duolingo|Pathway|Credit|Recognition|\n\s*\n))/i);
   const ieltsText = ieltsSection ? ieltsSection[0] : text;
+
+  // Pattern -1 (highest priority): VIT/common format
+  // "IELTS Academic: Overall 6.0, with no individual band below 5.5."
+  // "IELTS: Overall 7.0, with no band below 6.5"
+  if (!data.ieltsOverall) {
+    const vitM = ieltsText.match(/IELTS[^:]*:\s*Overall\s+([\d.]+)[^.]*?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:less\s+than|lower\s+than|below)\s+([\d.]+)/i);
+    if (vitM) {
+      const overall = parseFloat(vitM[1]);
+      const min = parseFloat(vitM[2]);
+      if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9) {
+        data.ieltsOverall = overall;
+        if (!data.ieltsListening) data.ieltsListening = min;
+        if (!data.ieltsSpeaking) data.ieltsSpeaking = min;
+        if (!data.ieltsWriting) data.ieltsWriting = min;
+        if (!data.ieltsReading) data.ieltsReading = min;
+      }
+    }
+  }
 
   // Pattern 0: "IELTS: 6.5 (no band less than 6.0)" — 3-group spec pattern
   if (!data.ieltsOverall) {
@@ -1920,6 +1947,9 @@ const JUNK_LINK_NAMES = new Set([
   "research centres", "institutes", "faculty", "school", "department",
   "moving to", "high school", "non-school", "sport", "sports",
   "favourites", "my list", "compare",
+  // Standalone category / program-family names (not individual course names)
+  "vocational", "elicos", "bits", "mits", "bbus", "course list",
+  "english", "english language", "english courses",
 ]);
 
 const DEGREE_QUALIFIERS = [
