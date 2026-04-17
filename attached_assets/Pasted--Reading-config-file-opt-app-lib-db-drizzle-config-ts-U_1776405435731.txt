@@ -1,0 +1,42 @@
+
+Reading config file '/opt/app/lib/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[✓] Pulling schema from database...
+[✓] Changes applied
+root@university-and-course-data:/opt/app# cd /opt/app && set -a && source .env && set +a && pnpm --filter @workspace/api-server run build && PORT=3000 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/university-portal run build
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       6.8mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                  10.8mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.9kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 753ms
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1853 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-1aEVsloX.css  111.03 kB │ gzip:  18.47 kB
+dist/public/assets/index-llxPQ7Jc.js   585.17 kB │ gzip: 171.51 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.77s
+root@university-and-course-data:/opt/app# 
