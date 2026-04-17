@@ -3310,9 +3310,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio> }[] = [];
   let completed = 0;
 
-  // Browser automation is rate-limited to avoid exhausting OS resources
-  const CONCURRENCY = 25;
-  const BROWSER_CONCURRENCY = 3;
+  // Throughput tuning. HTTP fetches are cheap (~150KB+1socket each), so we run
+  // many in parallel. Browser launches are heavy (~150 MB RAM per Chromium),
+  // so we cap separately.
+  const CONCURRENCY = 60;
+  const BROWSER_CONCURRENCY = 8;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
 
@@ -3340,7 +3342,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               clickInternational: true,
               clickRequirementsTab: true,
               expandAccordions: true,
-              timeoutMs: 45_000,
+              timeoutMs: 25_000,
             })
           );
           if (browserResult) {
