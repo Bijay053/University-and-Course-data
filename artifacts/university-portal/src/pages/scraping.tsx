@@ -890,7 +890,12 @@ export default function Scraping() {
                     {log.event === "status" && <span>[INFO] {log.message}</span>}
                     {log.event === "approval_required" && <span>[WAITING] {log.message}</span>}
                     {log.event === "progress" && <span>[{log.current}/{log.total}] {log.message}</span>}
-                    {log.event === "course" && <span>[{log.status?.toUpperCase()}] {log.name}</span>}
+                    {log.event === "course" && (
+                      <span>
+                        [{log.status?.toUpperCase()}] {log.name}
+                        {log.status === "error" && log.message ? ` — ${log.message}` : ""}
+                      </span>
+                    )}
                     {log.event === "error" && <span>[ERROR] {log.message}</span>}
                     {log.event === "done" && (
                       <span>

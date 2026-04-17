@@ -1,0 +1,627 @@
+
+[INFO] Scraping started in background...
+[INFO] Scraping https://www.vu.edu.au/vu-sydney...
+[INFO] Using university: ECA-VU (ID: 19)
+[INFO] Fetching https://www.vu.edu.au/vu-sydney...
+[INFO] Discovering university-level fee & requirements pages...
+[INFO] Found university requirements page via probe: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Discovered university-level pages: feePage: https://www.vu.edu.au/fees, requirementsPage: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Analyzing page with AI (1 call)...
+[INFO] Phase 1: Discovering candidate course URLs from all sources...
+[INFO] Sitemap index: checking 3 sub-sitemaps...
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=1 → 442 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=2 → 58 courses
+[INFO] Sub-sitemap www.vu.edu.au/sitemap.xml?page=3 → 49 courses
+[INFO] Sitemap: found 549 course URLs total
+[INFO] Sitemap found 549 candidate URLs. Analyzing to identify real course pages...
+[INFO] Phase 2: Researching 549 candidates — comparing pages to find genuine course pages before fetching...
+[INFO] URL analysis: 428 candidate course pages identified, filtered out 121 non-course URLs
+[INFO] Phase 2: Researching 428 candidates — sampling 12 pages to confirm genuine course pages...
+[INFO] Research complete: 0/12 sampled pages are genuine course pages
+[INFO] ⚠ WARNING: Content validation failed for all 12 samples, but URL analysis found 428 degree-qualified URLs. Proceeding with URL-filtered list — manual review recommended.
+[WAITING] Research complete. Found 428 course pages to fetch. Please review and confirm.
+[INFO] User confirmed — starting bulk course fetch...
+[INFO] Phase 3: Fetching 428 validated course pages...
+[INFO] Using university requirements page: https://www.vu.edu.au/courses/entry-requirements
+[INFO] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[1/300] Fetching 1/300: Certificate Iv In Tertiary Preparation 22582vic
+[2/300] Fetching 2/300: Certificate Iii In Enabling Technologies 22588vic
+[3/300] Fetching 3/300: Certificate Iii In Emerging Technologies 22589vic
+[4/300] Fetching 4/300: Diploma Of Teacher Education Preparation 22602vic
+[5/300] Fetching 5/300: Certificate Iv In Cyber Security 22603vic
+[6/300] Fetching 6/300: Certificate Ii In Building And Construction Pre Apprenticeship 22614vic
+[7/300] Fetching 7/300: Course In Safe Use Of Machinery For Technology Teaching 22623vic
+[8/300] Fetching 8/300: Advanced Diploma Of Building Design Architectural 22627vic
+[9/300] Fetching 9/300: Course In Initial Eal 22636vic
+[10/300] Fetching 10/300: Course In Eal 22637vic
+[11/300] Fetching 11/300: Certificate I In Eal Access 22638vic
+[12/300] Fetching 12/300: Certificate Ii In Eal Access 22639vic
+[13/300] Fetching 13/300: Certificate Iii In Eal Access 22640vic
+[14/300] Fetching 14/300: Certificate Iv In Eal Access 22641vic
+[15/300] Fetching 15/300: Certificate Ii In Eal Employment 22642vic
+[16/300] Fetching 16/300: Certificate Iii In Eal Employment 22643vic
+[17/300] Fetching 17/300: Certificate Iii In Eal Further Study 22645vic
+[18/300] Fetching 18/300: Certificate Iv In Eal Further Study 22646vic
+[19/300] Fetching 19/300: Bachelor Of Arts Abab
+[20/300] Fetching 20/300: Bachelor Of Community Development Abcd
+[21/300] Fetching 21/300: Bachelor Of Criminal Justice Abcj
+[22/300] Fetching 22/300: Bachelor Of Criminal Justice And Psychological Studies Abcy
+[23/300] Fetching 23/300: Bachelor Of Exercise Science Sport Practice Abhd
+[24/300] Fetching 24/300: Bachelor Of Exercise Science Clinical Practice Abhe
+[25/300] Fetching 25/300: Bachelor Of Psychological Studies Abpa
+[ERROR] Certificate Iv In Tertiary Preparation 22582vic
+[26/300] Fetching 26/300: Bachelor Of Psychological Studies Bachelor Of Business Abpb
+[ERROR] Bachelor Of Community Development Abcd
+[27/300] Fetching 27/300: Bachelor Of Psychology Honours Abpc
+[ERROR] Certificate Iii In Eal Access 22640vic
+[28/300] Fetching 28/300: Bachelor Of Screen Media Absn
+[ERROR] Certificate Iii In Emerging Technologies 22589vic
+[29/300] Fetching 29/300: Bachelor Of Social Work Absw
+[ERROR] Certificate Iv In Eal Access 22641vic
+[30/300] Fetching 30/300: Bachelor Of Youth Work And Criminal Justice Abyc
+[ERROR] Course In Eal 22637vic
+[31/300] Fetching 31/300: Bachelor Of Youth Work Abyw
+[ERROR] Certificate I In Eal Access 22638vic
+[32/300] Fetching 32/300: Graduate Diploma In Digital Media Agdm
+[ERROR] Bachelor Of Exercise Science Clinical Practice Abhe
+[33/300] Fetching 33/300: Graduate Diploma In International Community Development Agid
+[ERROR] Certificate Iv In Cyber Security 22603vic
+[34/300] Fetching 34/300: Graduate Diploma In Counselling Agpd
+[ERROR] Certificate Ii In Eal Access 22639vic
+[35/300] Fetching 35/300: Bachelor Of Psychological Studies Honours Ahpa
+[ERROR] Certificate Iii In Eal Further Study 22645vic
+[36/300] Fetching 36/300: Master Of Applied Psychology Clinical Psychology Amal
+[ERROR] Bachelor Of Psychological Studies Abpa
+[37/300] Fetching 37/300: Master Of International Community Development Amcd
+[ERROR] Certificate Iii In Eal Employment 22643vic
+[38/300] Fetching 38/300: Master Of Digital Media Amdm
+[ERROR] Certificate Iii In Enabling Technologies 22588vic
+[39/300] Fetching 39/300: Master Of Clinical Exercise Science And Rehabilitation Amep
+[ERROR] Course In Initial Eal 22636vic
+[40/300] Fetching 40/300: Master Of Counselling Ampe
+[ERROR] Certificate Iv In Eal Further Study 22646vic
+[41/300] Fetching 41/300: Graduate Certificate In Digital Content Creation Atdc
+[ERROR] Certificate Ii In Eal Employment 22642vic
+[42/300] Fetching 42/300: Graduate Certificate In Digital Learning And Teaching Atdi
+[ERROR] Course In Safe Use Of Machinery For Technology Teaching 22623vic
+[43/300] Fetching 43/300: Graduate Certificate In Digital Media Atdm
+[ERROR] Bachelor Of Arts Abab
+[44/300] Fetching 44/300: Graduate Certificate In International Community Development Atid
+[ERROR] Bachelor Of Criminal Justice Abcj
+[45/300] Fetching 45/300: Bachelor Of Accounting Bbaq
+[ERROR] Certificate Ii In Building And Construction Pre Apprenticeship 22614vic
+[46/300] Fetching 46/300: Bachelor Of Business Bbns
+[ERROR] Advanced Diploma Of Building Design Architectural 22627vic
+[47/300] Fetching 47/300: Graduate Diploma In Business Bgab
+[ERROR] Bachelor Of Exercise Science Sport Practice Abhd
+[48/300] Fetching 48/300: Graduate Diploma In Financial Planning Bgfp
+[ERROR] Bachelor Of Criminal Justice And Psychological Studies Abcy
+[49/300] Fetching 49/300: Graduate Diploma In Business Administration Bgpb
+[ERROR] Bachelor Of Screen Media Absn
+[50/300] Fetching 50/300: Bachelor Of Laws Blaw
+[ERROR] Graduate Diploma In International Community Development Agid
+[51/300] Fetching 51/300: Bachelor Of Laws Graduate Entry Blge
+[ERROR] Diploma Of Teacher Education Preparation 22602vic
+[52/300] Fetching 52/300: Master Of Business Administration Global Bmag
+[ERROR] Bachelor Of Youth Work And Criminal Justice Abyc
+[53/300] Fetching 53/300: Master Of Professional Accounting Bmaq
+[ERROR] Master Of Applied Psychology Clinical Psychology Amal
+[54/300] Fetching 54/300: Master Of Business Analytics Bmbu
+[ERROR] Graduate Diploma In Counselling Agpd
+[55/300] Fetching 55/300: Master Of Enterprise Resource Planning Bmen
+[ERROR] Graduate Diploma In Digital Media Agdm
+[56/300] Fetching 56/300: Master Of Financial Planning Bmfp
+[ERROR] Graduate Certificate In Digital Learning And Teaching Atdi
+[57/300] Fetching 57/300: Master Of Marketing Bmkt
+[ERROR] Master Of International Community Development Amcd
+[58/300] Fetching 58/300: Master Of Business Administration Bmpf
+[ERROR] Bachelor Of Psychology Honours Abpc
+[59/300] Fetching 59/300: Master Of Supply Chain Management Bmsu
+[ERROR] Graduate Certificate In Digital Content Creation Atdc
+[60/300] Fetching 60/300: Certificate Iii In Business Bsb30120
+[ERROR] Master Of Counselling Ampe
+[61/300] Fetching 61/300: Certificate Iv In Business Bsb40120
+[ERROR] Graduate Certificate In Digital Media Atdm
+[62/300] Fetching 62/300: Certificate Iv In Leadership And Management Bsb40520
+[ERROR] Graduate Certificate In International Community Development Atid
+[63/300] Fetching 63/300: Certificate Iv In Legal Services Bsb40620
+[ERROR] Bachelor Of Accounting Bbaq
+[64/300] Fetching 64/300: Diploma Of Business Bsb50120
+[ERROR] Graduate Diploma In Business Bgab
+[65/300] Fetching 65/300: Diploma Of Leadership And Management Bsb50420
+[ERROR] Graduate Diploma In Financial Planning Bgfp
+[66/300] Fetching 66/300: Diploma Of Project Management Bsb50820
+[ERROR] Master Of Digital Media Amdm
+[67/300] Fetching 67/300: Graduate Certificate In Business Analytics Btbi
+[ERROR] Master Of Business Administration Global Bmag
+[68/300] Fetching 68/300: Graduate Certificate In Business Btbu
+[ERROR] Bachelor Of Psychological Studies Honours Ahpa
+[69/300] Fetching 69/300: Graduate Certificate In Change Management Btcm
+[ERROR] Master Of Professional Accounting Bmaq
+[70/300] Fetching 70/300: Graduate Certificate In Enterprise And Resource Planning Systems Bten
+[ERROR] Graduate Diploma In Business Administration Bgpb
+[71/300] Fetching 71/300: Graduate Certificate In Finance Btff
+[ERROR] Bachelor Of Laws Graduate Entry Blge
+[72/300] Fetching 72/300: Graduate Certificate In Financial Planning Btfp
+[ERROR] Bachelor Of Business Bbns
+[73/300] Fetching 73/300: Graduate Certificate In Marketing Btkm
+[ERROR] Master Of Enterprise Resource Planning Bmen
+[74/300] Fetching 74/300: Graduate Certificate In Business Administration Btpf
+[ERROR] Bachelor Of Social Work Absw
+[75/300] Fetching 75/300: Graduate Certificate In Supply Chain Management Btsp
+[ERROR] Bachelor Of Psychological Studies Bachelor Of Business Abpb
+[76/300] Fetching 76/300: Graduate Certificate In Transport Systems Btts
+[ERROR] Master Of Business Administration Bmpf
+[77/300] Fetching 77/300: Certificate Iii In Early Childhood Education And Care Chc30121
+[ERROR] Master Of Financial Planning Bmfp
+[78/300] Fetching 78/300: Certificate Iii In Individual Support Chc33021
+[ERROR] Master Of Business Analytics Bmbu
+[79/300] Fetching 79/300: Certificate Iv In School Based Education Support Chc40221
+[ERROR] Certificate Iii In Business Bsb30120
+[80/300] Fetching 80/300: Certificate Iv In Youth Work Chc40421
+[ERROR] Bachelor Of Youth Work Abyw
+[81/300] Fetching 81/300: Certificate Iv In Ageing Support Chc43015
+[ERROR] Certificate Iv In Business Bsb40120
+[82/300] Fetching 82/300: Certificate Iv In Disability Support Chc43121
+[ERROR] Bachelor Of Laws Blaw
+[83/300] Fetching 83/300: Certificate Iv In Alcohol And Other Drugs Chc43215
+[ERROR] Master Of Supply Chain Management Bmsu
+[84/300] Fetching 84/300: Certificate Iv In Mental Health Chc43315
+[ERROR] Master Of Marketing Bmkt
+[85/300] Fetching 85/300: Diploma Of Early Childhood Education And Care Chc50121
+[ERROR] Diploma Of Business Bsb50120
+[86/300] Fetching 86/300: Diploma Of Community Services Chc52021
+[ERROR] Diploma Of Leadership And Management Bsb50420
+[87/300] Fetching 87/300: Assist Clients With Medication Skill Set Chcss00070
+[ERROR] Certificate Iv In Legal Services Bsb40620
+[88/300] Fetching 88/300: Alcohol And Other Drugs Skill Set Chcss00093
+[ERROR] Graduate Certificate In Business Analytics Btbi
+[89/300] Fetching 89/300: Prepare To Work Safely In The Construction Industry Coniss012
+[ERROR] Diploma Of Project Management Bsb50820
+[90/300] Fetching 90/300: Certificate Ii In Drainage Cpc20720
+[ERROR] Graduate Certificate In Business Btbu
+[91/300] Fetching 91/300: Certificate Iii In Signs And Graphics Cpc30216
+[ERROR] Master Of Clinical Exercise Science And Rehabilitation Amep
+[92/300] Fetching 92/300: Certificate Iii In Carpentry Cpc30220
+[ERROR] Graduate Certificate In Change Management Btcm
+[93/300] Fetching 93/300: Certificate Iii In Plumbing Cpc32420
+[ERROR] Graduate Certificate In Finance Btff
+[94/300] Fetching 94/300: Certificate Iii In Bricklaying And Blocklaying Cpc33020
+[ERROR] Graduate Certificate In Supply Chain Management Btsp
+[95/300] Fetching 95/300: Certificate Iv In Plumbing And Services Cpc40920
+[ERROR] Graduate Certificate In Transport Systems Btts
+[96/300] Fetching 96/300: Diploma Of Building And Construction Building Cpc50220
+[ERROR] Graduate Certificate In Financial Planning Btfp
+[97/300] Fetching 97/300: Advanced Diploma Of Building Surveying Cpc60121
+[ERROR] Certificate Iv In Leadership And Management Bsb40520
+[98/300] Fetching 98/300: Bachelor Of Early Childhood Education And Leadership Ebcl
+[ERROR] Certificate Iii In Individual Support Chc33021
+[99/300] Fetching 99/300: Bachelor Of Early Childhood Education Ebec
+[ERROR] Graduate Certificate In Business Administration Btpf
+[100/300] Fetching 100/300: Bachelor Of Education P 12 Ebed
+[ERROR] Graduate Certificate In Marketing Btkm
+[101/300] Fetching 101/300: Bachelor Of Education Primary Ebpe
+[ERROR] Certificate Iv In Youth Work Chc40421
+[102/300] Fetching 102/300: Bachelor Of Education Studies Ebst
+[ERROR] Certificate Iv In School Based Education Support Chc40221
+[103/300] Fetching 103/300: Bachelor Of Youth Work Bachelor Of Sport Management Ebys
+[ERROR] Graduate Certificate In Enterprise And Resource Planning Systems Bten
+[104/300] Fetching 104/300: Bachelor Of Science Master Of Teaching Secondary Education Ecst
+[ERROR] Certificate Iv In Ageing Support Chc43015
+[105/300] Fetching 105/300: Diploma Of Education Studies Edes
+[ERROR] Certificate Iii In Early Childhood Education And Care Chc30121
+[106/300] Fetching 106/300: Graduate Diploma In Block Teaching Egbl
+[ERROR] Diploma Of Early Childhood Education And Care Chc50121
+[107/300] Fetching 107/300: Graduate Diploma In Early Childhood Education Egec
+[ERROR] Diploma Of Community Services Chc52021
+[108/300] Fetching 108/300: Graduate Diploma In Education Eged
+[ERROR] Certificate Iv In Disability Support Chc43121
+[109/300] Fetching 109/300: Master Of Applied Teaching Secondary Education Emat
+[ERROR] Certificate Iv In Alcohol And Other Drugs Chc43215
+[110/300] Fetching 110/300: Master Of Education Emed
+[ERROR] Assist Clients With Medication Skill Set Chcss00070
+[111/300] Fetching 111/300: Master Of Teaching Secondary Education Emes
+[ERROR] Prepare To Work Safely In The Construction Industry Coniss012
+[112/300] Fetching 112/300: Master Of Teaching Primary Education Empe
+[ERROR] Certificate Iii In Plumbing Cpc32420
+[113/300] Fetching 113/300: Graduate Certificate In Block Teaching Etbl
+[ERROR] Certificate Ii In Drainage Cpc20720
+[114/300] Fetching 114/300: Graduate Certificate In Early Childhood Education Etec
+[ERROR] Alcohol And Other Drugs Skill Set Chcss00093
+[115/300] Fetching 115/300: Graduate Certificate In Education Eted
+[ERROR] Bachelor Of Early Childhood Education And Leadership Ebcl
+[116/300] Fetching 116/300: Graduate Certificate In Performance Based Building Fire Codes Etqb
+[ERROR] Bachelor Of Education P 12 Ebed
+[117/300] Fetching 117/300: Undergraduate Certificate In Early Childhood Education Euec
+[ERROR] Certificate Iii In Carpentry Cpc30220
+[118/300] Fetching 118/300: Undergraduate Certificate In Education P12 Stem Eued
+[ERROR] Advanced Diploma Of Building Surveying Cpc60121
+[119/300] Fetching 119/300: Undergraduate Certificate In Education Studies Eues
+[ERROR] Certificate Iii In Signs And Graphics Cpc30216
+[120/300] Fetching 120/300: Certificate Iv In Accounting And Bookkeeping Fns40222
+[ERROR] Certificate Iv In Plumbing And Services Cpc40920
+[121/300] Fetching 121/300: Diploma Of Accounting Fns50222
+[ERROR] Bachelor Of Youth Work Bachelor Of Sport Management Ebys
+[122/300] Fetching 122/300: Bas Agent Registration Skill Set Fnsss00004
+[ERROR] Bachelor Of Education Primary Ebpe
+[123/300] Fetching 123/300: Tax Law For Tax Agents Skill Set Tax Documentation Fnsss00008
+[ERROR] Diploma Of Education Studies Edes
+[124/300] Fetching 124/300: Accounting Principles Skill Set Fnsss00014
+[ERROR] Bachelor Of Science Master Of Teaching Secondary Education Ecst
+[125/300] Fetching 125/300: Bachelor Of Biomedicine Hbbm
+[ERROR] Diploma Of Building And Construction Building Cpc50220
+[126/300] Fetching 126/300: Bachelor Of Biomedical Science Hbbs
+[ERROR] Certificate Iii In Bricklaying And Blocklaying Cpc33020
+[127/300] Fetching 127/300: Bachelor Of Dermal Sciences Hbds
+[ERROR] Bachelor Of Education Studies Ebst
+[128/300] Fetching 128/300: Bachelor Of Biomedical And Exercise Science Hbes
+[ERROR] Graduate Diploma In Block Teaching Egbl
+[129/300] Fetching 129/300: Bachelor Of Health Science Hbhl
+[ERROR] Graduate Diploma In Education Eged
+[130/300] Fetching 130/300: Bachelor Of Midwifery Bachelor Of Nursing Hbma
+[ERROR] Bachelor Of Early Childhood Education Ebec
+[131/300] Fetching 131/300: Bachelor Of Nursing Hbnb
+[ERROR] Master Of Education Emed
+[132/300] Fetching 132/300: Bachelor Of Human Nutrition Hbnt
+[ERROR] Graduate Diploma In Early Childhood Education Egec
+[133/300] Fetching 133/300: Bachelor Of Paramedicine Hbpd
+[ERROR] Graduate Certificate In Early Childhood Education Etec
+[134/300] Fetching 134/300: Bachelor Of Nutritional Science Master Of Dietetics Hcnd
+[ERROR] Certificate Iv In Mental Health Chc43315
+[135/300] Fetching 135/300: Bachelor Of Science Osteopathy Master Of Health Science Osteopathy Hcop
+[ERROR] Master Of Teaching Secondary Education Emes
+[136/300] Fetching 136/300: Bachelor Of Applied Movement Sciences Master Of Physiotherapy Hcpt
+[ERROR] Master Of Applied Teaching Secondary Education Emat
+[137/300] Fetching 137/300: Bachelor Of Speech And Language Sciences Master Of Speech Pathology Hcsp
+[ERROR] Undergraduate Certificate In Education Studies Eues
+[138/300] Fetching 138/300: Graduate Diploma In Counselling Theory And Practice Hgcp
+[ERROR] Certificate Iv In Accounting And Bookkeeping Fns40222
+[139/300] Fetching 139/300: Graduate Diploma In Mental Health Nursing Hgmn
+[ERROR] Undergraduate Certificate In Education P12 Stem Eued
+[140/300] Fetching 140/300: Bachelor Of Science Honours Hhsc
+[ERROR] Graduate Certificate In Performance Based Building Fire Codes Etqb
+[141/300] Fetching 141/300: Certificate Iii In Non Emergency Patient Transport Hlt31120
+[ERROR] Graduate Certificate In Education Eted
+[142/300] Fetching 142/300: Certificate Iii In Health Services Assistance Hlt33115
+[ERROR] Diploma Of Accounting Fns50222
+[143/300] Fetching 143/300: Certificate Iii In Health Administration Hlt37315
+[ERROR] Undergraduate Certificate In Early Childhood Education Euec
+[144/300] Fetching 144/300: Diploma Of Clinical Coding Hlt50321
+[ERROR] Master Of Teaching Primary Education Empe
+[145/300] Fetching 145/300: Diploma Of Emergency Health Care Hlt51020
+[ERROR] Bachelor Of Biomedical And Exercise Science Hbes
+[146/300] Fetching 146/300: Diploma Of Nursing Hlt54121
+[ERROR] Bachelor Of Biomedicine Hbbm
+[147/300] Fetching 147/300: Master Of Child And Adolescent Mental Health Hmch
+[ERROR] Bachelor Of Midwifery Bachelor Of Nursing Hbma
+[148/300] Fetching 148/300: Master Of Dietetics Hmdt
+[ERROR] Bachelor Of Dermal Sciences Hbds
+[149/300] Fetching 149/300: Master Of Global Public Health Hmgp
+[ERROR] Bas Agent Registration Skill Set Fnsss00004
+[150/300] Fetching 150/300: Master Of Mental Health Hmmh
+[ERROR] Bachelor Of Biomedical Science Hbbs
+[151/300] Fetching 151/300: Master Of Mental Health Nursing Hmmn
+[ERROR] Graduate Certificate In Block Teaching Etbl
+[152/300] Fetching 152/300: Master Of Nursing Hmng
+[ERROR] Tax Law For Tax Agents Skill Set Tax Documentation Fnsss00008
+[153/300] Fetching 153/300: Master Of Professional Psychology Hmpp
+[ERROR] Accounting Principles Skill Set Fnsss00014
+[154/300] Fetching 154/300: Master Of Physiotherapy Hmps
+[ERROR] Bachelor Of Health Science Hbhl
+[155/300] Fetching 155/300: Master Of Public Health Hmpt
+[ERROR] Bachelor Of Nursing Hbnb
+[156/300] Fetching 156/300: Master Of Speech Pathology Hmst
+[ERROR] Bachelor Of Nutritional Science Master Of Dietetics Hcnd
+[157/300] Fetching 157/300: Graduate Certificate In Child And Adolescent Mental Health Htch
+[ERROR] Bachelor Of Science Osteopathy Master Of Health Science Osteopathy Hcop
+[158/300] Fetching 158/300: Graduate Certificate In Counselling Theory And Practice Htcp
+[ERROR] Bachelor Of Speech And Language Sciences Master Of Speech Pathology Hcsp
+[159/300] Fetching 159/300: Graduate Certificate In Global Public Health Htgp
+[ERROR] Bachelor Of Applied Movement Sciences Master Of Physiotherapy Hcpt
+[160/300] Fetching 160/300: Graduate Certificate In Mental Health Htmh
+[ERROR] Bachelor Of Paramedicine Hbpd
+[161/300] Fetching 161/300: Graduate Certificate In Mental Health Nursing Htmn
+[ERROR] Graduate Diploma In Mental Health Nursing Hgmn
+[162/300] Fetching 162/300: Graduate Certificate In Nursing Htng
+[ERROR] Certificate Iii In Non Emergency Patient Transport Hlt31120
+[163/300] Fetching 163/300: Graduate Certificate In Public Health Htpt
+[ERROR] Diploma Of Clinical Coding Hlt50321
+[164/300] Fetching 164/300: Undergraduate Certificate In Diet And Health Hudh
+[ERROR] Bachelor Of Science Honours Hhsc
+[165/300] Fetching 165/300: Undergraduate Certificate In Health Science Huhs
+[ERROR] Graduate Diploma In Counselling Theory And Practice Hgcp
+[166/300] Fetching 166/300: Undergraduate Certificate In Interpersonal And Organisational Skills Huio
+[ERROR] Certificate Iii In Health Administration Hlt37315
+[167/300] Fetching 167/300: Undergraduate Certificate In Laser Safety Huls
+[ERROR] Certificate Iii In Health Services Assistance Hlt33115
+[168/300] Fetching 168/300: Undergraduate Certificate In Psychological Studies Hups
+[ERROR] Master Of Nursing Hmng
+[169/300] Fetching 169/300: Certificate Iii In Information Technology Ict30120
+[ERROR] Bachelor Of Human Nutrition Hbnt
+[170/300] Fetching 170/300: Certificate Iv In Information Technology Ict40120
+[ERROR] Diploma Of Emergency Health Care Hlt51020
+[171/300] Fetching 171/300: International Foundations At Vu Jqag
+[ERROR] Diploma Of Nursing Hlt54121
+[172/300] Fetching 172/300: Chinese Language And Culture Program Jqak
+[ERROR] Master Of Professional Psychology Hmpp
+[173/300] Fetching 173/300: Professional Course In Notarial Practice Jqnp
+[ERROR] Master Of Mental Health Hmmh
+[174/300] Fetching 174/300: Osce Preparation Program For Nurses Jqpn
+[ERROR] Master Of Child And Adolescent Mental Health Hmch
+[175/300] Fetching 175/300: Capstone Exam Preparatory Course Jvae
+[ERROR] Master Of Public Health Hmpt
+[176/300] Fetching 176/300: Sap Analytics Cloud Jvai
+[ERROR] Master Of Dietetics Hmdt
+[177/300] Fetching 177/300: Sap Finance Financial Accounting Jvaj
+[ERROR] Master Of Global Public Health Hmgp
+[178/300] Fetching 178/300: Sap Finance Management Accounting Jvak
+[ERROR] Graduate Certificate In Child And Adolescent Mental Health Htch
+[179/300] Fetching 179/300: Sap Extended Warehouse Management Jval
+[ERROR] Master Of Speech Pathology Hmst
+[180/300] Fetching 180/300: Sap Transportation Management Jvam
+[ERROR] Undergraduate Certificate In Diet And Health Hudh
+[181/300] Fetching 181/300: Sap Activate For Cloud Solutions Project Management Jvan
+[ERROR] Graduate Certificate In Mental Health Nursing Htmn
+[182/300] Fetching 182/300: Sustainable Infrastructure Construction And Management Jvao
+[ERROR] Graduate Certificate In Global Public Health Htgp
+[183/300] Fetching 183/300: Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap
+[ERROR] Graduate Certificate In Counselling Theory And Practice Htcp
+[184/300] Fetching 184/300: Foundations At Vu Jyac
+[ERROR] Graduate Certificate In Nursing Htng
+[185/300] Fetching 185/300: Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp
+[ERROR] Master Of Mental Health Nursing Hmmn
+[186/300] Fetching 186/300: Bachelor Of Criminology Lbcr
+[ERROR] Undergraduate Certificate In Health Science Huhs
+[187/300] Fetching 187/300: Bachelor Of Laws Bachelor Of Arts Lbla
+[ERROR] Master Of Physiotherapy Hmps
+[188/300] Fetching 188/300: Bachelor Of Laws Bachelor Of Criminology Lblc
+[ERROR] Graduate Certificate In Public Health Htpt
+[189/300] Fetching 189/300: Bachelor Of Legal Services Lbls
+[ERROR] Undergraduate Certificate In Interpersonal And Organisational Skills Huio
+[190/300] Fetching 190/300: Bachelor Of Laws Bachelor Of Business Lbwb
+[ERROR] Certificate Iii In Information Technology Ict30120
+[191/300] Fetching 191/300: Bachelor Of Laws Bachelor Of Psychological Studies Lbwp
+[ERROR] Undergraduate Certificate In Psychological Studies Hups
+[192/300] Fetching 192/300: Graduate Diploma In Migration Law Lgml
+[ERROR] Graduate Certificate In Mental Health Htmh
+[193/300] Fetching 193/300: Bachelor Of Laws Honours Bachelor Of Criminology Lhcr
+[ERROR] Certificate Iv In Information Technology Ict40120
+[194/300] Fetching 194/300: Bachelor Of Laws Honours Graduate Entry Lhge
+[ERROR] Chinese Language And Culture Program Jqak
+[195/300] Fetching 195/300: Bachelor Of Laws Honours Lhlw
+[ERROR] Professional Course In Notarial Practice Jqnp
+[196/300] Fetching 196/300: Bachelor Of Laws Honours Bachelor Of Arts Lhwa
+[ERROR] Osce Preparation Program For Nurses Jqpn
+[197/300] Fetching 197/300: Bachelor Of Laws Honours Bachelor Of Business Lhwb
+[ERROR] Capstone Exam Preparatory Course Jvae
+[198/300] Fetching 198/300: Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp
+[ERROR] Sap Analytics Cloud Jvai
+[199/300] Fetching 199/300: Graduate Certificate In Crime Prevention Ltcp
+[ERROR] Undergraduate Certificate In Laser Safety Huls
+[200/300] Fetching 200/300: Certificate Iii In Engineering Mechanical Trade Mem30219
+[ERROR] Sap Finance Management Accounting Jvak
+[201/300] Fetching 201/300: Certificate Iii In Engineering Fabrication Trade Mem31922
+[ERROR] Sap Activate For Cloud Solutions Project Management Jvan
+[202/300] Fetching 202/300: Certificate Ii In Cabinet Making And Timber Technology Msf20322
+[ERROR] Sap Activate For Cloud Solutions S 4 Hana And Project Management Jvap
+[203/300] Fetching 203/300: Certificate Iii In Cabinet Making And Timber Technology Msf30322
+[ERROR] Sap Extended Warehouse Management Jval
+[204/300] Fetching 204/300: Bachelor Of Building Surveying Nbbs
+[ERROR] Sap Transportation Management Jvam
+[205/300] Fetching 205/300: Bachelor Of Cyber Security Nbcs
+[ERROR] Bachelor Of Criminology Bachelor Of Psychological Studies Lbcp
+[206/300] Fetching 206/300: Bachelor Of Data Science Nbds
+[ERROR] Sustainable Infrastructure Construction And Management Jvao
+[207/300] Fetching 207/300: Bachelor Of Information Technology Professional Nbip
+[ERROR] Bachelor Of Criminology Lbcr
+[208/300] Fetching 208/300: Bachelor Of Information Technology Nbit
+[ERROR] Sap Finance Financial Accounting Jvaj
+[209/300] Fetching 209/300: Bachelor Of Science Nbsc
+[ERROR] Bachelor Of Laws Bachelor Of Arts Lbla
+[210/300] Fetching 210/300: Graduate Diploma In Building Surveying Ngbs
+[ERROR] Bachelor Of Legal Services Lbls
+[211/300] Fetching 211/300: Graduate Diploma In Cyber Security Ngcs
+[ERROR] Foundations At Vu Jyac
+[212/300] Fetching 212/300: Graduate Diploma In Project Management Ngpm
+[ERROR] Bachelor Of Laws Bachelor Of Psychological Studies Lbwp
+[213/300] Fetching 213/300: Bachelor Of Construction Management Honours Nhcm
+[ERROR] International Foundations At Vu Jqag
+[214/300] Fetching 214/300: Bachelor Of Engineering Honours Civil Engineering Nhec
+[ERROR] Bachelor Of Laws Honours Bachelor Of Criminology Lhcr
+[215/300] Fetching 215/300: Bachelor Of Engineering Honours Electrical And Electronic Engineering Nhee
+[ERROR] Bachelor Of Laws Honours Graduate Entry Lhge
+[216/300] Fetching 216/300: Bachelor Of Engineering Honours Mechanical Engineering Nhem
+[ERROR] Bachelor Of Laws Bachelor Of Criminology Lblc
+[217/300] Fetching 217/300: Master Of Engineering Nmen
+[ERROR] Bachelor Of Laws Honours Bachelor Of Arts Lhwa
+[218/300] Fetching 218/300: Master Of Applied Information Technology Nmit
+[ERROR] Bachelor Of Laws Honours Lhlw
+[219/300] Fetching 219/300: Master Of Project Management Nmpm
+[ERROR] Bachelor Of Laws Honours Bachelor Of Business Lhwb
+[220/300] Fetching 220/300: Graduate Certificate In Artificial Intelligence Ntai
+[ERROR] Bachelor Of Laws Bachelor Of Business Lbwb
+[221/300] Fetching 221/300: Graduate Certificate In Building Surveying Ntbs
+[ERROR] Certificate Iii In Engineering Fabrication Trade Mem31922
+[222/300] Fetching 222/300: Graduate Certificate In Construction Project Management Ntcp
+[ERROR] Certificate Iii In Engineering Mechanical Trade Mem30219
+[223/300] Fetching 223/300: Graduate Certificate In Cyber Security Ntcs
+[ERROR] Graduate Certificate In Crime Prevention Ltcp
+[224/300] Fetching 224/300: Graduate Certificate In Information Technology Project Management Ntip
+[ERROR] Graduate Diploma In Migration Law Lgml
+[225/300] Fetching 225/300: Graduate Certificate In Project Management Ntpm
+[ERROR] Bachelor Of Data Science Nbds
+[226/300] Fetching 226/300: Undergraduate Certificate In Architectural Design Nuad
+[ERROR] Bachelor Of Information Technology Professional Nbip
+[227/300] Fetching 227/300: Undergraduate Certificate In Building Construction Management Nubc
+[ERROR] Certificate Iii In Cabinet Making And Timber Technology Msf30322
+[228/300] Fetching 228/300: Undergraduate Certificate In Engineering Fundamentals Nuef
+[ERROR] Bachelor Of Cyber Security Nbcs
+[229/300] Fetching 229/300: Undergraduate Certificate In Information Technology Nuit
+[ERROR] Bachelor Of Building Surveying Nbbs
+[230/300] Fetching 230/300: Undergraduate Certificate In Science And The Environment Nuse
+[ERROR] Graduate Diploma In Building Surveying Ngbs
+[231/300] Fetching 231/300: Certificate Ii In Civil Construction Rii20720
+[ERROR] Bachelor Of Information Technology Nbit
+[232/300] Fetching 232/300: Certificate Iii In Civil Construction Plant Operations Rii30820
+[ERROR] Bachelor Of Science Nbsc
+[233/300] Fetching 233/300: Certificate Iii In Civil Construction Rii30920
+[ERROR] Bachelor Of Engineering Honours Civil Engineering Nhec
+[234/300] Fetching 234/300: Certificate Iv In Civil Construction Rii40720
+[ERROR] Graduate Diploma In Project Management Ngpm
+[235/300] Fetching 235/300: Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp
+[ERROR] Graduate Diploma In Cyber Security Ngcs
+[236/300] Fetching 236/300: Bachelor Of Sport Science Human Movement Bachelor Of Sport Management Sbhs
+[ERROR] Certificate Ii In Cabinet Making And Timber Technology Msf20322
+[237/300] Fetching 237/300: Bachelor Of Outdoor Education And Environmental Science Sboe
+[ERROR] Master Of Engineering Nmen
+[238/300] Fetching 238/300: Bachelor Of Outdoor Leadership Sbol
+[ERROR] Bachelor Of Engineering Honours Mechanical Engineering Nhem
+[239/300] Fetching 239/300: Bachelor Of Physical Education And Sport Science Sbph
+[ERROR] Master Of Applied Information Technology Nmit
+[240/300] Fetching 240/300: Bachelor Of Sport Science Sbsa
+[ERROR] Graduate Certificate In Artificial Intelligence Ntai
+[241/300] Fetching 241/300: Bachelor Of Sport Management Bachelor Of Business Sbsb
+[ERROR] Graduate Certificate In Building Surveying Ntbs
+[242/300] Fetching 242/300: Bachelor Of Sport Management Sbsm
+[ERROR] Master Of Project Management Nmpm
+[243/300] Fetching 243/300: Certificate Iii In Beauty Services Shb30121
+[ERROR] Graduate Certificate In Construction Project Management Ntcp
+[244/300] Fetching 244/300: Certificate Iii In Hairdressing Shb30416
+[ERROR] Bachelor Of Laws Honours Bachelor Of Psychology Honours Lhwp
+[245/300] Fetching 245/300: Certificate Iii In Barbering Shb30516
+[ERROR] Graduate Certificate In Cyber Security Ntcs
+[246/300] Fetching 246/300: Diploma Of Beauty Therapy Shb50121
+[ERROR] Graduate Certificate In Project Management Ntpm
+[247/300] Fetching 247/300: Certificate Ii In Hospitality Sit20322
+[ERROR] Undergraduate Certificate In Information Technology Nuit
+[248/300] Fetching 248/300: Certificate Ii In Cookery Sit20421
+[ERROR] Graduate Certificate In Information Technology Project Management Ntip
+[249/300] Fetching 249/300: Certificate Iii In Hospitality Sit30622
+[ERROR] Undergraduate Certificate In Engineering Fundamentals Nuef
+[250/300] Fetching 250/300: Certificate Iii In Commercial Cookery Sit30821
+[ERROR] Bachelor Of Construction Management Honours Nhcm
+[251/300] Fetching 251/300: Certificate Iv In Kitchen Management Sit40521
+[ERROR] Undergraduate Certificate In Science And The Environment Nuse
+[252/300] Fetching 252/300: Diploma Of Travel And Tourism Management Sit50122
+[ERROR] Certificate Iv In Civil Construction Rii40720
+[253/300] Fetching 253/300: Diploma Of Event Management Sit50322
+[ERROR] Bachelor Of Engineering Honours Electrical And Electronic Engineering Nhee
+[254/300] Fetching 254/300: Diploma Of Hospitality Management Sit50422
+[ERROR] Undergraduate Certificate In Architectural Design Nuad
+[255/300] Fetching 255/300: Advanced Diploma Of Hospitality Management Sit60322
+[ERROR] Undergraduate Certificate In Building Construction Management Nubc
+[256/300] Fetching 256/300: Food Handling Skill Set Sitss00068
+[ERROR] Certificate Iii In Civil Construction Rii30920
+[257/300] Fetching 257/300: Food Safety Supervision Skill Set Sitss00069
+[ERROR] Certificate Ii In Civil Construction Rii20720
+[258/300] Fetching 258/300: Responsible Service Of Alcohol Sitss00071
+[ERROR] Bachelor Of Sport Science Human Movement Bachelor Of Psychological Studies Sbhp
+[259/300] Fetching 259/300: Master Of Sport And Exercise Science Smes
+[ERROR] Bachelor Of Sport Science Human Movement Bachelor Of Sport Management Sbhs
+[260/300] Fetching 260/300: Graduate Certificate In Strength And Conditioning Stsa
+[ERROR] Bachelor Of Outdoor Education And Environmental Science Sboe
+[261/300] Fetching 261/300: Graduate Certificate In Data Analytics For Sport Performance Stsp
+[ERROR] Bachelor Of Outdoor Leadership Sbol
+[262/300] Fetching 262/300: Undergraduate Certificate In Primary Physical Education Supp
+[ERROR] Certificate Iii In Civil Construction Plant Operations Rii30820
+[263/300] Fetching 263/300: Undergraduate Certificate In Secondary Physical Education Susp
+[ERROR] Bachelor Of Sport Science Sbsa
+[264/300] Fetching 264/300: Lantite Preparation Course Thaaa
+[ERROR] Bachelor Of Sport Management Sbsm
+[265/300] Fetching 265/300: Revit Level 1 Thaac
+[ERROR] Bachelor Of Physical Education And Sport Science Sbph
+[266/300] Fetching 266/300: Welding For Beginners Thaan
+[ERROR] Certificate Iii In Beauty Services Shb30121
+[267/300] Fetching 267/300: Mechanical Fitting For Hobbyists Thaau
+[ERROR] Certificate Iii In Hairdressing Shb30416
+[268/300] Fetching 268/300: Effective Communication Skills Thaav
+[ERROR] Bachelor Of Sport Management Bachelor Of Business Sbsb
+[269/300] Fetching 269/300: Introduction To Emotional Intelligence Thaaw
+[ERROR] Certificate Ii In Hospitality Sit20322
+[270/300] Fetching 270/300: Leading A Team Thaax
+[ERROR] Certificate Iii In Barbering Shb30516
+[271/300] Fetching 271/300: Building The Team Thaay
+[ERROR] Diploma Of Beauty Therapy Shb50121
+[272/300] Fetching 272/300: Communicate With Influence Thaaz
+[ERROR] Certificate Iv In Kitchen Management Sit40521
+[273/300] Fetching 273/300: Effective Time Management Thaba
+[ERROR] Master Of Sport And Exercise Science Smes
+[274/300] Fetching 274/300: Introduction To Cybersecurity Thabb
+[ERROR] Food Safety Supervision Skill Set Sitss00069
+[275/300] Fetching 275/300: Cybersecurity Essentials Thabc
+[ERROR] Certificate Iii In Hospitality Sit30622
+[276/300] Fetching 276/300: Introduction To Internet Of Things Iot Thabd
+[ERROR] Food Handling Skill Set Sitss00068
+[277/300] Fetching 277/300: Introduction To Managing Workplace Priorities Thabe
+[ERROR] Diploma Of Event Management Sit50322
+[278/300] Fetching 278/300: Introduction To Coaching And Mentoring Skills Thabg
+[ERROR] Graduate Certificate In Strength And Conditioning Stsa
+[279/300] Fetching 279/300: Introduction To Presentation Skills Thabh
+[ERROR] Certificate Iii In Commercial Cookery Sit30821
+[280/300] Fetching 280/300: Introduction To Project Management Thabi
+[ERROR] Graduate Certificate In Data Analytics For Sport Performance Stsp
+[281/300] Fetching 281/300: Introduction To Change Management Thabk
+[ERROR] Undergraduate Certificate In Secondary Physical Education Susp
+[282/300] Fetching 282/300: Introduction To Managing Workplace Relationships Thabl
+[ERROR] Diploma Of Hospitality Management Sit50422
+[283/300] Fetching 283/300: Introduction To Effective Teamwork Thabm
+[ERROR] Certificate Ii In Cookery Sit20421
+[284/300] Fetching 284/300: Introduction To Positive Leadership Thabn
+[ERROR] Lantite Preparation Course Thaaa
+[285/300] Fetching 285/300: Introduction To Communication For Effective Leadership Thabo
+[ERROR] Effective Communication Skills Thaav
+[286/300] Fetching 286/300: Introduction For Women In Leadership Thabq
+[ERROR] Undergraduate Certificate In Primary Physical Education Supp
+[287/300] Fetching 287/300: Microsoft Word Intermediate Thabs
+[ERROR] Mechanical Fitting For Hobbyists Thaau
+[288/300] Fetching 288/300: Microsoft Powerpoint Introduction Thabt
+[ERROR] Introduction To Emotional Intelligence Thaaw
+[289/300] Fetching 289/300: Microsoft Excel Beginner Thabu
+[ERROR] Revit Level 1 Thaac
+[290/300] Fetching 290/300: Microsoft Excel Intermediate Thabv
+[ERROR] Diploma Of Travel And Tourism Management Sit50122
+[291/300] Fetching 291/300: Microsoft Excel Advanced Thabw
+[ERROR] Leading A Team Thaax
+[292/300] Fetching 292/300: Furniture Making For Hobbyists Thaca
+[ERROR] Welding For Beginners Thaan
+[293/300] Fetching 293/300: Continuing Professional Development Cpd Thacf
+[ERROR] Communicate With Influence Thaaz
+[294/300] Fetching 294/300: Essential Eight Assessment Thacj
+[ERROR] Cybersecurity Essentials Thabc
+[295/300] Fetching 295/300: Restricted Electrical Workers Licence Class 1 Assessment Thacl
+[ERROR] Introduction To Cybersecurity Thabb
+[296/300] Fetching 296/300: Restricted Electrical Workers Licence Class 2 Assessment Thacm
+[ERROR] Building The Team Thaay
+[297/300] Fetching 297/300: Safe Operation Of An Elevating Work Platform Tnaah
+[ERROR] Introduction To Internet Of Things Iot Thabd
+[298/300] Fetching 298/300: Emergency First Aid In Childcare And Education Tnabd
+[ERROR] Introduction To Coaching And Mentoring Skills Thabg
+[299/300] Fetching 299/300: Cpr Refresher Tnabg
+[ERROR] Introduction To Managing Workplace Priorities Thabe
+[300/300] Fetching 300/300: Level Ii First Aid Tnabj
+[ERROR] Introduction To Change Management Thabk
+[ERROR] Introduction To Presentation Skills Thabh
+[ERROR] Introduction To Positive Leadership Thabn
+[ERROR] Microsoft Word Intermediate Thabs
+[ERROR] Introduction To Project Management Thabi
+[ERROR] Introduction To Managing Workplace Relationships Thabl
+[ERROR] Introduction For Women In Leadership Thabq
+[ERROR] Introduction To Communication For Effective Leadership Thabo
+[ERROR] Advanced Diploma Of Hospitality Management Sit60322
+[ERROR] Microsoft Excel Beginner Thabu
+[ERROR] Microsoft Powerpoint Introduction Thabt
+[ERROR] Effective Time Management Thaba
+[ERROR] Microsoft Excel Advanced Thabw
+[ERROR] Continuing Professional Development Cpd Thacf
+[ERROR] Essential Eight Assessment Thacj
+[ERROR] Furniture Making For Hobbyists Thaca
+[ERROR] Microsoft Excel Intermediate Thabv
+[ERROR] Responsible Service Of Alcohol Sitss00071
+[ERROR] Safe Operation Of An Elevating Work Platform Tnaah
+[ERROR] Introduction To Effective Teamwork Thabm
+[ERROR] Emergency First Aid In Childcare And Education Tnabd
+[ERROR] Level Ii First Aid Tnabj
+[ERROR] Cpr Refresher Tnabg
+[ERROR] Restricted Electrical Workers Licence Class 2 Assessment Thacm
+[ERROR] Restricted Electrical Workers Licence Class 1 Assessment Thacl
+=== COMPLETE === Found: 428 | Staged: 0 | Skipped: 0 | Errors: 300
