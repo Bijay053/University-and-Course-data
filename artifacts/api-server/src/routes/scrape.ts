@@ -356,6 +356,7 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
   else if (/\bassociate\s*degree/i.test(lower)) data.degreeLevel = "Associate Degree";
 
   extractInternationalFees(text, data, countryFallback);
+  if (!data.internationalFee) extractFeeFromHtmlTables($, data, countryFallback);
   extractEnglishRequirements(text, data);
   extractIntakeMonths(text, data);
 
@@ -363,6 +364,82 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
   if (desc) data.description = desc.slice(0, 500);
 
   return data;
+}
+
+/**
+ * Extract fees from HTML tables with International/Domestic columns or rows.
+ * Many universities use structured tables — this handles them precisely.
+ */
+function extractFeeFromHtmlTables($: ReturnType<typeof cheerio.load>, data: Partial<CourseData>, countryFallback?: string) {
+  const CURR_PAT = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
+
+  $("table").each((_, table) => {
+    if (data.internationalFee) return false;
+    const $table = $(table);
+    const tableText = $table.text();
+    if (!CURR_PAT.test(tableText)) return;
+
+    // Strategy A: Column headers — find "International" column index, read values
+    const headerRow = $table.find("tr").first();
+    const headers = headerRow.find("th, td").map((_, th) => $(th).text().trim().toLowerCase()).toArray();
+    const intlColIdx = headers.findIndex(h => /international|overseas/.test(h) && !/domestic/.test(h));
+    if (intlColIdx >= 0) {
+      $table.find("tr").slice(1).each((_, row) => {
+        if (data.internationalFee) return false;
+        const cells = $(row).find("td").map((_, td) => $(td).text().trim()).toArray();
+        const cellText = cells[intlColIdx] || "";
+        const stripped = cellText.replace(/[,\s]/g, "").replace(/[A-Z$£€]/g, "");
+        const num = parseInt(stripped);
+        if (num >= 5000 && num <= 200000) {
+          data.internationalFee = num;
+          data.currency = detectCurrencyFromContext(cellText + tableText, countryFallback);
+          data.feeTerm = normalizeFeeTerm(tableText);
+          if (!data.feeYear) data.feeYear = extractFeeYear(tableText);
+          return false;
+        }
+      });
+    }
+    if (data.internationalFee) return false;
+
+    // Strategy B: Row labels — find a row containing "International" and read a fee amount from it
+    $table.find("tr").each((_, row) => {
+      if (data.internationalFee) return false;
+      const $row = $(row);
+      const cells = $row.find("td, th").map((_, td) => $(td).text().trim()).toArray();
+      const rowText = cells.join(" ").toLowerCase();
+      if (!/international|overseas/.test(rowText)) return;
+      if (/domestic|local|resident/.test(rowText.replace(/international/g, "").replace(/overseas/g, ""))) return;
+
+      for (const cell of cells) {
+        const stripped = cell.replace(/,/g, "").replace(/[A-Z$£€\s]/g, "");
+        const num = parseInt(stripped);
+        if (num >= 5000 && num <= 200000) {
+          data.internationalFee = num;
+          data.currency = detectCurrencyFromContext(cell + tableText, countryFallback);
+          data.feeTerm = normalizeFeeTerm(tableText);
+          if (!data.feeYear) data.feeYear = extractFeeYear(tableText);
+          return false;
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Extract ALL fee amounts in a reasonable range from text.
+ * If multiple found, the highest is assumed to be the international fee.
+ */
+function extractAllFeeAmounts(text: string): number[] {
+  const amounts: number[] = [];
+  const CURR_TOKENS = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
+  const pattern = new RegExp(`(?:${CURR_TOKENS.source})\\s*([\\d,]+)|([\\d,]+)\\s*(?:${CURR_TOKENS.source})`, "gi");
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    const raw = (m[1] || m[2] || "").replace(/,/g, "");
+    const num = parseInt(raw);
+    if (num >= 5000 && num <= 200000 && !amounts.includes(num)) amounts.push(num);
+  }
+  return amounts;
 }
 
 function normalizeFeeTerm(context: string): string {
@@ -457,11 +534,76 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
       applyFee(genericFee[0], genericFee[1]);
     }
   }
+
+  // Priority 4: Collect ALL currency amounts — if 2+ found, highest is likely international
+  if (!data.internationalFee) {
+    const allAmounts = extractAllFeeAmounts(text);
+    if (allAmounts.length >= 2) {
+      // Multiple amounts: assume higher = international (domestic is always lower)
+      const maxFee = Math.max(...allAmounts);
+      data.internationalFee = maxFee;
+      data.currency = detectCurrencyFromContext(text, countryFallback);
+      data.feeTerm = normalizeFeeTerm(text);
+      if (!data.feeYear) data.feeYear = extractFeeYear(text);
+    } else if (allAmounts.length === 1 && !data.internationalFee) {
+      data.internationalFee = allAmounts[0];
+      data.currency = detectCurrencyFromContext(text, countryFallback);
+      data.feeTerm = normalizeFeeTerm(text);
+      if (!data.feeYear) data.feeYear = extractFeeYear(text);
+    }
+  }
 }
 
 function extractEnglishRequirements(text: string, data: Partial<CourseData>) {
   const ieltsSection = text.match(/IELTS\s*(?:Academic|academic)?[^]*?(?=(?:TOEF|TOFL|TOFEL|PTE|Cambridge|CAE|Duolingo|Pathway|Credit|Recognition|\n\s*\n))/i);
   const ieltsText = ieltsSection ? ieltsSection[0] : text;
+
+  // Pattern: "IELTS 6.5 (6.0 in each band)" — spec's most common compact format
+  if (!data.ieltsOverall) {
+    const eachBandM = ieltsText.match(/IELTS[:\s]*(?:Academic[:\s]*)?(\d+(?:\.\d+)?)\s*\([\s]*(\d+(?:\.\d+)?)\s*(?:in\s*each|each\s*(?:band|component|skill))/i);
+    if (eachBandM) {
+      const overall = parseFloat(eachBandM[1]);
+      const each = parseFloat(eachBandM[2]);
+      if (overall >= 4 && overall <= 9 && each >= 4 && each <= 9) {
+        data.ieltsOverall = overall;
+        if (!data.ieltsListening) data.ieltsListening = each;
+        if (!data.ieltsSpeaking) data.ieltsSpeaking = each;
+        if (!data.ieltsWriting) data.ieltsWriting = each;
+        if (!data.ieltsReading) data.ieltsReading = each;
+      }
+    }
+  }
+
+  // Pattern: "IELTS 7.0 (L:6.5, R:6.5, W:7.0, S:7.0)" — explicit per-skill breakdown
+  if (!data.ieltsOverall) {
+    const detailedM = ieltsText.match(/IELTS[:\s]*(?:Academic[:\s]*)?(\d+(?:\.\d+)?)[^(]*\(L(?:istening)?[:\s]*(\d+(?:\.\d+)?)[,\s]+R(?:eading)?[:\s]*(\d+(?:\.\d+)?)[,\s]+W(?:riting)?[:\s]*(\d+(?:\.\d+)?)[,\s]+S(?:peaking)?[:\s]*(\d+(?:\.\d+)?)\)/i);
+    if (detailedM) {
+      const overall = parseFloat(detailedM[1]);
+      if (overall >= 4 && overall <= 9) {
+        data.ieltsOverall = overall;
+        data.ieltsListening = parseFloat(detailedM[2]);
+        data.ieltsReading = parseFloat(detailedM[3]);
+        data.ieltsWriting = parseFloat(detailedM[4]);
+        data.ieltsSpeaking = parseFloat(detailedM[5]);
+      }
+    }
+  }
+
+  // Pattern: "minimum IELTS overall X.X with no band below X.X" — combined in one phrase
+  if (!data.ieltsOverall) {
+    const minNoBandM = ieltsText.match(/IELTS[^.]*?(?:minimum|min|overall)\s*(?:score\s*(?:of\s*)?)?([\d.]+)[^.]*?(?:no\s+(?:individual\s+)?(?:band|score|component)[^.]*?(?:below|less\s+than|lower\s+than|under)|minimum\s+(?:of\s+)?(?:band|score|component)\s*(?:of\s*)?)[\s:]*([\d.]+)/i);
+    if (minNoBandM) {
+      const overall = parseFloat(minNoBandM[1]);
+      const min = parseFloat(minNoBandM[2]);
+      if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9) {
+        data.ieltsOverall = overall;
+        if (!data.ieltsListening) data.ieltsListening = min;
+        if (!data.ieltsSpeaking) data.ieltsSpeaking = min;
+        if (!data.ieltsWriting) data.ieltsWriting = min;
+        if (!data.ieltsReading) data.ieltsReading = min;
+      }
+    }
+  }
 
   const ieltsPatterns = [
     /IELTS\s*(?:Academic|academic)?[:\s]*(?:overall\s*(?:score\s*)?)?(\d+(?:\.\d+)?)/i,
@@ -684,6 +826,25 @@ function extractIntakeMonths(text: string, data: Partial<CourseData>) {
     }
   }
 
+  // Pass 1b: "Applications open: February, July" / "Next intake: September 2025" / "Available intakes: March"
+  if (intakeMonths.length === 0) {
+    const abbrevs = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+    const monthNames = MONTHS.join("|");
+    const appOpenRe = new RegExp(
+      `(?:applications?\\s*(?:open|open\\s*for|close|closing|date|open(?:ing)?\\s*date)|next\\s*(?:available\\s*)?intake|available\\s*intakes?|study\\s*(?:period|periods?|start|begins?)|course\\s*(?:start|commencement)|enrollment\\s*(?:date|period))[:\\s]+([^\\n.]{0,200})`,
+      "gi"
+    );
+    let appM: RegExpExecArray | null;
+    while ((appM = appOpenRe.exec(text)) !== null) {
+      const chunk = appM[1];
+      const found = chunk.match(new RegExp(`\\b(${monthNames}|${abbrevs})\\b`, "gi")) ?? [];
+      for (const raw of found) {
+        const m = normalizeMonth(raw);
+        if (MONTHS.includes(m) && !intakeMonths.includes(m)) intakeMonths.push(m);
+      }
+    }
+  }
+
   // Pass 2: Context-scoped intake sections
   if (intakeMonths.length === 0) {
     const intakeSections = text.match(/(?:intake|start\s*date|commencement|commence|entry\s*point|intake\s*option)[^]*?(?:\n\n|See\s|$)/gi) ?? [];
@@ -842,7 +1003,13 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
       const text = cheerio.load(pHtml)("body").text();
 
       if (page.type === "fees" || page.type === "requirements") {
-        if (!courseData.internationalFee) extractInternationalFees(text, courseData);
+        if (!courseData.internationalFee) {
+          extractInternationalFees(text, courseData);
+          if (!courseData.internationalFee) {
+            const $pg = cheerio.load(pHtml);
+            extractFeeFromHtmlTables($pg, courseData);
+          }
+        }
       }
       if (page.type === "english" || page.type === "requirements") {
         extractEnglishRequirements(text, courseData);
@@ -937,12 +1104,13 @@ async function batchClassify(courses: { index: number; name: string; existing: P
 }
 
 const SINGLE_EXTRACT_PROMPT = `Extract course data from this university course page. IMPORTANT RULES:
-1. ONLY extract INTERNATIONAL student fees, NEVER domestic/local fees. If only domestic fees shown, set internationalFee to null.
+1. ONLY extract INTERNATIONAL student fees, NEVER domestic/local fees. If a fee table has both "International" and "Domestic" columns, use ONLY the International column value.
 2. Look for ALL tab sections (Course Overview, Entry Requirements, Fees, Course Structure etc.) - data may be spread across tabs.
-3. Look for fee links (PDFs, fee schedule links) - if you see a link to a fee schedule, note the URL.
-4. Look for intake months (January, February, etc.), duration, study mode, and location.
-5. Extract ALL English language test requirements visible in text - IELTS, TOEFL iBT, PTE Academic, Cambridge CAE/C1 Advanced, Duolingo. They may be in images which you cannot read.
-6. For TOEFL, look for sub-scores per skill (Reading, Listening, Speaking, Writing).
+3. For IELTS: "IELTS 6.5 (6.0 in each band)" → ieltsOverall=6.5, all band scores=6.0. "IELTS 7.0 (L:6.5, R:6.5, W:7.0, S:7.0)" → parse each band. "No band below 6.0" → set all bands to 6.0.
+4. For intake: look for "Applications open:", "Next intake:", "Commencement:", "Study period starts", semester/trimester start dates.
+5. Extract ALL English language tests: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C1 Advanced, Duolingo.
+6. For fees: if you see a range (e.g. $38,000–$42,000), use the higher value as it's usually the international fee.
+7. For feeYear: extract the year the fee applies to (e.g. 2025, 2026) if mentioned.
 
 Return JSON:
 {
@@ -957,18 +1125,19 @@ Return JSON:
   "studyLoad": "<Full Time|Part Time>",
   "internationalFee": <INTERNATIONAL fee number only|null>,
   "feeTerm": "<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>",
-  "currency": "<AUD|GBP|USD>",
+  "feeYear": <year number e.g. 2025|null>,
+  "currency": "<AUD|GBP|USD|NZD|CAD|SGD|EUR>",
   "ieltsOverall": <number|null>, "ieltsListening": <number|null>, "ieltsSpeaking": <number|null>, "ieltsWriting": <number|null>, "ieltsReading": <number|null>,
   "pteOverall": <number|null>, "pteListening": <number|null>, "pteSpeaking": <number|null>, "pteWriting": <number|null>, "pteReading": <number|null>,
   "toeflOverall": <number|null>, "toeflListening": <number|null>, "toeflSpeaking": <number|null>, "toeflWriting": <number|null>, "toeflReading": <number|null>,
   "cambridgeOverall": <number|null>,
   "duolingoOverall": <number|null>,
-  "intakeMonths": ["<month>"],
-  "academicLevel": "<required education>",
-  "otherRequirement": "<other reqs>",
-  "scholarship": "<scholarship info>"
+  "intakeMonths": ["<full month name>"],
+  "academicLevel": "<required education level>",
+  "otherRequirement": "<other entry requirements>",
+  "scholarship": "<scholarship info if present>"
 }
-IMPORTANT: Only include INTERNATIONAL student fees. Exclude all domestic/local fees. Use null for missing fields.`;
+Use null for missing fields. For intakeMonths use full month names (January, February etc.).`;
 
 /**
  * Pre-filters compact text content to sections relevant to a specific data field.
@@ -2087,12 +2256,40 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
     }
   }
 
+  // HTML table extraction — use the cached HTML to look for international/domestic columns
+  if (!courseData.internationalFee && cache.html) {
+    try {
+      const $feeHtml = cheerio.load(cache.html);
+      const tableData: Partial<CourseData> = {};
+      extractFeeFromHtmlTables($feeHtml, tableData);
+      if (tableData.internationalFee) {
+        courseData.internationalFee = tableData.internationalFee;
+        if (tableData.currency) courseData.currency = tableData.currency;
+        if (tableData.feeTerm) courseData.feeTerm = tableData.feeTerm;
+        if (tableData.feeYear) courseData.feeYear = tableData.feeYear;
+        return;
+      }
+    } catch {}
+  }
+
+  // Multi-amount fallback on the international section — highest = international
+  if (!courseData.internationalFee) {
+    const allAmounts = extractAllFeeAmounts(searchText);
+    if (allAmounts.length >= 1) {
+      courseData.internationalFee = Math.max(...allAmounts);
+      courseData.currency = detectCurrencyFromContext(searchText);
+      courseData.feeTerm = normalizeFeeTerm(searchText);
+      if (!courseData.feeYear) courseData.feeYear = extractFeeYear(searchText);
+      return;
+    }
+  }
+
   if (!noAi && !courseData.internationalFee && GEMINI_API_KEY) {
     try {
       const prompt = `From this university INTERNATIONAL fee schedule, find the tuition fee for the course "${courseName}".
 This may show fees per trimester, semester, or year. Return ONLY the international/overseas student fee amount.
-Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>"}
-Use null if not found.`;
+Return JSON: {"internationalFee":<number>,"currency":"<AUD|GBP|USD|EUR>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>","feeYear":<number|null>}
+Use null if not found. Important: Only return INTERNATIONAL student fees, not domestic/local fees.`;
       const trimmedText = searchText.slice(0, 6000);
       const result = await geminiChat(prompt, trimmedText, 256);
       const parsed = JSON.parse(result);
@@ -2226,6 +2423,9 @@ async function scrapeCourseBatch(
 
         if (uniReqsText && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
           extractEnglishRequirements(uniReqsText, cheerioData);
+        }
+        if (uniReqsText && !cheerioData.intakeMonths?.length) {
+          extractIntakeMonths(uniReqsText, cheerioData);
         }
 
         const hasFees = !!cheerioData.internationalFee;
