@@ -1,0 +1,704 @@
+Build a universal English requirement engine in my existing scraper project.
+
+Important:
+Do not rebuild the scraper from scratch.
+Do not make only a regex patch.
+Implement a reusable engine that parses English test requirements consistently across course pages, browser rendered pages, and shared requirement pages.
+
+Goal:
+Create one shared parser system that extracts and normalizes English requirement data for:
+- IELTS
+- PTE
+- TOEFL
+- CAE
+- DET
+- other English tests when explicitly present
+
+This engine must be reusable across all university scrapers and must replace scattered one off logic in the current scraper.
+
+==================================================
+STEP 1 — OPEN THESE FILES
+==================================================
+
+Open:
+1. artifacts/api-server/src/routes/scrape.ts
+2. artifacts/api-server/src/browser-helper.ts
+3. lib/db/src/schema/scraped_courses.ts
+4. artifacts/university-portal/src/pages/scraping.tsx
+
+Main work file:
+artifacts/api-server/src/routes/scrape.ts
+
+If needed, create a helper file such as:
+artifacts/api-server/src/lib/english-requirements.ts
+
+If you create a helper file, wire it back into scrape.ts cleanly.
+
+==================================================
+STEP 2 — CREATE ONE UNIVERSAL ENGINE
+==================================================
+
+Create a reusable English requirement module with these parts:
+
+1. normalizeWhitespace
+2. test keyword detection
+3. universal extraction pipeline
+4. parser for each test type
+5. result merge logic
+6. confidence scoring
+7. final normalized output mapper
+
+The engine must return a normalized structure like:
+
+```ts
+type EnglishRequirementResult = {
+  source: "static" | "browser" | "shared" | "ai" | "none";
+
+  ielts: {
+    overall: number | null;
+    listening: number | null;
+    reading: number | null;
+    writing: number | null;
+    speaking: number | null;
+    confidence: number;
+  };
+
+  pte: {
+    overall: number | null;
+    listening: number | null;
+    reading: number | null;
+    writing: number | null;
+    speaking: number | null;
+    confidence: number;
+  };
+
+  toefl: {
+    overall: number | null;
+    listening: number | null;
+    reading: number | null;
+    writing: number | null;
+    speaking: number | null;
+    confidence: number;
+  };
+
+  cae: {
+    overall: number | null;
+    listening: number | null;
+    reading: number | null;
+    writing: number | null;
+    speaking: number | null;
+    confidence: number;
+  };
+
+  det: {
+    overall: number | null;
+    confidence: number;
+  };
+
+  otherTests: Array<{
+    name: string;
+    score: string;
+    notes?: string | null;
+  }>;
+};
+==================================================
+STEP 3 — ADD UNIVERSAL PARSER CODE
+
+Create this code and use it as the base engine.
+
+function normalizeWhitespace(input: string): string {
+  return (input || "").replace(/\s+/g, " ").trim();
+}
+
+function hasKeyword(text: string, keywords: string[]): boolean {
+  const t = normalizeWhitespace(text).toLowerCase();
+  return keywords.some(k => t.includes(k.toLowerCase()));
+}
+
+type BandScore = {
+  overall: number | null;
+  listening: number | null;
+  reading: number | null;
+  writing: number | null;
+  speaking: number | null;
+  confidence: number;
+};
+
+type SimpleScore = {
+  overall: number | null;
+  confidence: number;
+};
+
+type EnglishRequirementResult = {
+  source: "static" | "browser" | "shared" | "ai" | "none";
+  ielts: BandScore;
+  pte: BandScore;
+  toefl: BandScore;
+  cae: BandScore;
+  det: SimpleScore;
+  otherTests: Array<{
+    name: string;
+    score: string;
+    notes?: string | null;
+  }>;
+};
+
+function emptyBandScore(): BandScore {
+  return {
+    overall: null,
+    listening: null,
+    reading: null,
+    writing: null,
+    speaking: null,
+    confidence: 0,
+  };
+}
+
+function emptySimpleScore(): SimpleScore {
+  return {
+    overall: null,
+    confidence: 0,
+  };
+}
+
+function emptyEnglishResult(source: EnglishRequirementResult["source"] = "none"): EnglishRequirementResult {
+  return {
+    source,
+    ielts: emptyBandScore(),
+    pte: emptyBandScore(),
+    toefl: emptyBandScore(),
+    cae: emptyBandScore(),
+    det: emptySimpleScore(),
+    otherTests: [],
+  };
+}
+==================================================
+STEP 4 — IELTS PARSER
+
+Add this IELTS parser:
+
+function parseIelts(textRaw: string): BandScore {
+  const text = normalizeWhitespace(textRaw).toLowerCase();
+  const empty = emptyBandScore();
+
+  if (!text.includes("ielts")) return empty;
+
+  let m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,40}overall\s*([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const minBand = Number(m[2]);
+    return {
+      overall,
+      listening: minBand,
+      reading: minBand,
+      writing: minBand,
+      speaking: minBand,
+      confidence: 95,
+    };
+  }
+
+  m = text.match(
+    /ielts(?:\s+academic)?[^a-z0-9]{0,40}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,40}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component|each\s+skill)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+      confidence: 90,
+    };
+  }
+
+  m = text.match(
+    /ielts(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+      confidence: 92,
+    };
+  }
+
+  const overallMatch = text.match(/ielts(?:\s+academic)?.{0,150}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (overallMatch) {
+    return {
+      overall: Number(overallMatch[1]),
+      listening: null,
+      reading: null,
+      writing: null,
+      speaking: null,
+      confidence: 60,
+    };
+  }
+
+  return empty;
+}
+==================================================
+STEP 5 — PTE PARSER
+function parsePte(textRaw: string): BandScore {
+  const text = normalizeWhitespace(textRaw).toLowerCase();
+  const empty = emptyBandScore();
+
+  if (!text.includes("pte")) return empty;
+
+  let m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,40}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const min = Number(m[2]);
+    return {
+      overall,
+      listening: min,
+      reading: min,
+      writing: min,
+      speaking: min,
+      confidence: 95,
+    };
+  }
+
+  m = text.match(
+    /pte(?:\s+academic)?[^a-z0-9]{0,40}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,40}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+band|each\s+band|each\s+component|each\s+skill)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+      confidence: 90,
+    };
+  }
+
+  m = text.match(
+    /pte(?:\s+academic)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+      confidence: 92,
+    };
+  }
+
+  const overallMatch = text.match(/pte(?:\s+academic)?.{0,150}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (overallMatch) {
+    return {
+      overall: Number(overallMatch[1]),
+      listening: null,
+      reading: null,
+      writing: null,
+      speaking: null,
+      confidence: 60,
+    };
+  }
+
+  return empty;
+}
+==================================================
+STEP 6 — TOEFL PARSER
+function parseToefl(textRaw: string): BandScore {
+  const text = normalizeWhitespace(textRaw).toLowerCase();
+  const empty = emptyBandScore();
+
+  if (!text.includes("toefl")) return empty;
+
+  let m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,40}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:with\s*)?(?:no\s+(?:band|section|subscore)\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const min = Number(m[2]);
+    return {
+      overall,
+      listening: min,
+      reading: min,
+      writing: min,
+      speaking: min,
+      confidence: 95,
+    };
+  }
+
+  m = text.match(
+    /toefl(?:\s+ibt)?[^a-z0-9]{0,40}([0-9]+(?:\.[0-9]+)?)\s*overall[^a-z0-9]{0,40}(?:with\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:in\s+each\s+section|each\s+section|each\s+component|each\s+band)/i
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    return {
+      overall,
+      listening: each,
+      reading: each,
+      writing: each,
+      speaking: each,
+      confidence: 90,
+    };
+  }
+
+  m = text.match(
+    /toefl(?:\s+ibt)?.*?overall\s*([0-9]+(?:\.[0-9]+)?).*?listening\s*([0-9]+(?:\.[0-9]+)?).*?reading\s*([0-9]+(?:\.[0-9]+)?).*?writing\s*([0-9]+(?:\.[0-9]+)?).*?speaking\s*([0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      listening: Number(m[2]),
+      reading: Number(m[3]),
+      writing: Number(m[4]),
+      speaking: Number(m[5]),
+      confidence: 92,
+    };
+  }
+
+  const overallMatch = text.match(/toefl(?:\s+ibt)?.{0,150}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (overallMatch) {
+    return {
+      overall: Number(overallMatch[1]),
+      listening: null,
+      reading: null,
+      writing: null,
+      speaking: null,
+      confidence: 60,
+    };
+  }
+
+  return empty;
+}
+==================================================
+STEP 7 — CAE AND DET PARSER
+function parseCae(textRaw: string): BandScore {
+  const text = normalizeWhitespace(textRaw).toLowerCase();
+  const empty = emptyBandScore();
+
+  if (!text.includes("cae") && !text.includes("cambridge")) return empty;
+
+  const overallMatch =
+    text.match(/cae.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i) ||
+    text.match(/cambridge.{0,120}?score\s*of\s*([0-9]+(?:\.[0-9]+)?)/i);
+
+  if (overallMatch) {
+    return {
+      overall: Number(overallMatch[1]),
+      listening: null,
+      reading: null,
+      writing: null,
+      speaking: null,
+      confidence: 70,
+    };
+  }
+
+  return empty;
+}
+
+function parseDet(textRaw: string): SimpleScore {
+  const text = normalizeWhitespace(textRaw).toLowerCase();
+  const empty = emptySimpleScore();
+
+  if (!text.includes("duolingo") && !text.includes("det")) return empty;
+
+  const m =
+    text.match(/duolingo.{0,120}?score\s*of\s*([0-9]+(?:\.[0-9]+)?)/i) ||
+    text.match(/det.{0,120}?score\s*of\s*([0-9]+(?:\.[0-9]+)?)/i);
+
+  if (m) {
+    return {
+      overall: Number(m[1]),
+      confidence: 80,
+    };
+  }
+
+  return empty;
+}
+==================================================
+STEP 8 — OTHER TESTS PARSER
+function parseOtherTests(textRaw: string): Array<{ name: string; score: string; notes?: string | null }> {
+  const text = normalizeWhitespace(textRaw);
+  const results: Array<{ name: string; score: string; notes?: string | null }> = [];
+
+  const patterns = [
+    { name: "OET", regex: /oet.{0,80}([a-e](?:\s*in\s*each\s*component)?)/i },
+    { name: "TOEIC", regex: /toeic.{0,80}([0-9]{3,4})/i },
+    { name: "LanguageCert", regex: /languagecert.{0,80}([a-z0-9\s]+)/i },
+  ];
+
+  for (const p of patterns) {
+    const m = text.match(p.regex);
+    if (m) {
+      results.push({
+        name: p.name,
+        score: m[1].trim(),
+        notes: null,
+      });
+    }
+  }
+
+  return results;
+}
+==================================================
+STEP 9 — CREATE ONE UNIVERSAL EXTRACTION FUNCTION
+function parseEnglishRequirementsFromText(
+  rawText: string,
+  source: EnglishRequirementResult["source"]
+): EnglishRequirementResult {
+  return {
+    source,
+    ielts: parseIelts(rawText),
+    pte: parsePte(rawText),
+    toefl: parseToefl(rawText),
+    cae: parseCae(rawText),
+    det: parseDet(rawText),
+    otherTests: parseOtherTests(rawText),
+  };
+}
+==================================================
+STEP 10 — MERGE RESULTS FROM MULTIPLE SOURCES
+
+Create a merge function so best data wins.
+
+Priority:
+
+browser
+static
+shared
+ai
+
+But if static has values and browser is empty, keep static.
+If browser has more complete component scores, use browser.
+
+Use this code:
+
+function pickBetterBandScore(a: BandScore, b: BandScore): BandScore {
+  const scoreA =
+    (a.overall ? 20 : 0) +
+    (a.listening ? 15 : 0) +
+    (a.reading ? 15 : 0) +
+    (a.writing ? 15 : 0) +
+    (a.speaking ? 15 : 0) +
+    (a.confidence || 0);
+
+  const scoreB =
+    (b.overall ? 20 : 0) +
+    (b.listening ? 15 : 0) +
+    (b.reading ? 15 : 0) +
+    (b.writing ? 15 : 0) +
+    (b.speaking ? 15 : 0) +
+    (b.confidence || 0);
+
+  return scoreB > scoreA ? b : a;
+}
+
+function pickBetterSimpleScore(a: SimpleScore, b: SimpleScore): SimpleScore {
+  const scoreA = (a.overall ? 20 : 0) + (a.confidence || 0);
+  const scoreB = (b.overall ? 20 : 0) + (b.confidence || 0);
+  return scoreB > scoreA ? b : a;
+}
+
+function mergeEnglishResults(
+  base: EnglishRequirementResult,
+  incoming: EnglishRequirementResult
+): EnglishRequirementResult {
+  return {
+    source: incoming.source !== "none" ? incoming.source : base.source,
+    ielts: pickBetterBandScore(base.ielts, incoming.ielts),
+    pte: pickBetterBandScore(base.pte, incoming.pte),
+    toefl: pickBetterBandScore(base.toefl, incoming.toefl),
+    cae: pickBetterBandScore(base.cae, incoming.cae),
+    det: pickBetterSimpleScore(base.det, incoming.det),
+    otherTests: [...base.otherTests, ...incoming.otherTests],
+  };
+}
+==================================================
+STEP 11 — ADD EXTRACTION ORDER
+
+Replace scattered logic with one pipeline:
+
+parse static course page
+if missing important fields, parse browser rendered course page after clicking tabs
+if still missing, parse shared requirements page only if it contains relevant keywords
+if still missing, AI fallback last
+
+Example:
+
+let english = emptyEnglishResult("none");
+
+const staticEnglish = parseEnglishRequirementsFromText(staticCourseText, "static");
+english = mergeEnglishResults(english, staticEnglish);
+
+if (
+  !english.ielts.overall ||
+  !english.pte.overall ||
+  !english.toefl.overall
+) {
+  const browserText = await getBrowserRenderedText(page);
+  const browserEnglish = parseEnglishRequirementsFromText(browserText, "browser");
+  english = mergeEnglishResults(english, browserEnglish);
+}
+
+if (
+  (!english.ielts.overall || !english.pte.overall || !english.toefl.overall) &&
+  sharedRequirementsText &&
+  (
+    hasKeyword(sharedRequirementsText, ["ielts"]) ||
+    hasKeyword(sharedRequirementsText, ["pte"]) ||
+    hasKeyword(sharedRequirementsText, ["toefl"]) ||
+    hasKeyword(sharedRequirementsText, ["cambridge", "cae"]) ||
+    hasKeyword(sharedRequirementsText, ["duolingo", "det"])
+  )
+) {
+  const sharedEnglish = parseEnglishRequirementsFromText(sharedRequirementsText, "shared");
+  english = mergeEnglishResults(english, sharedEnglish);
+}
+
+// AI fallback only if still needed
+==================================================
+STEP 12 — MAP ENGINE OUTPUT INTO COURSE FIELDS
+
+Add one mapping helper:
+
+function applyEnglishRequirementsToCourse(course: any, english: EnglishRequirementResult) {
+  return {
+    ...course,
+
+    ieltsOverall: english.ielts.overall,
+    ieltsListening: english.ielts.listening,
+    ieltsReading: english.ielts.reading,
+    ieltsWriting: english.ielts.writing,
+    ieltsSpeaking: english.ielts.speaking,
+
+    pteOverall: english.pte.overall,
+    pteListening: english.pte.listening,
+    pteReading: english.pte.reading,
+    pteWriting: english.pte.writing,
+    pteSpeaking: english.pte.speaking,
+
+    toeflOverall: english.toefl.overall,
+    toeflListening: english.toefl.listening,
+    toeflReading: english.toefl.reading,
+    toeflWriting: english.toefl.writing,
+    toeflSpeaking: english.toefl.speaking,
+
+    englishTest: english.cae.overall ? "CAE" : english.det.overall ? "DET" : null,
+    englishTestOverall: english.cae.overall ?? english.det.overall ?? null,
+    englishTestListening: english.cae.listening ?? null,
+    englishTestReading: english.cae.reading ?? null,
+    englishTestWriting: english.cae.writing ?? null,
+    englishTestSpeaking: english.cae.speaking ?? null,
+  };
+}
+
+If your schema has different field names, map to the current schema correctly.
+
+==================================================
+STEP 13 — MISSING FIELD LOGIC
+
+Recompute missing English fields only after:
+
+static parse
+browser parse
+shared parse
+AI fallback
+final applyEnglishRequirementsToCourse
+
+Do not compute missingFields before enrichment.
+
+==================================================
+STEP 14 — DEBUG LOGS
+
+Add one clean log per course:
+
+console.log(
+  `[ENGLISH] course=${courseName} source=${english.source} IELTS=${english.ielts.overall ?? "-"} PTE=${english.pte.overall ?? "-"} TOEFL=${english.toefl.overall ?? "-"} CAE=${english.cae.overall ?? "-"} DET=${english.det.overall ?? "-"}`
+);
+
+Do not flood logs too much.
+
+==================================================
+STEP 15 — UI
+
+Make sure the staging review UI reads the same fields backend returns:
+
+ieltsOverall
+pteOverall
+toeflOverall
+englishTest
+englishTestOverall
+
+If DB returns snake_case, transform to camelCase consistently before UI.
+
+==================================================
+STEP 16 — VERIFY
+
+Test on:
+
+VIT
+ASA
+VU
+
+Expected:
+
+If course page has IELTS, parser picks it
+If only browser rendered content has IELTS, browser wins
+If shared page really contains valid English requirement text, shared fills missing values
+PTE and TOEFL should also populate where present
+CAE and DET should populate if found
+Missing field warnings should reduce after final mapping
+==================================================
+STEP 17 — REPORT
+
+When done, tell me:
+
+files changed
+where universal engine was added
+whether scrape.ts now uses shared engine
+sample result for one course from VIT
+sample result for one course from ASA
+sample result for one course from VU
+remaining limitations
+
+---
+
+# What this will solve
+
+This engine will stop your scraper from behaving like this:
+
+- one regex for IELTS here
+- another regex for PTE there
+- fallback page used even when empty
+- values overwritten later
+- UI field mismatch
+
+Instead it gives you:
+
+- one parser engine
+- one merge strategy
+- one mapping step
+- one final normalized output
+
+---
+
+# Very important rule to keep
+
+For your project, this order should always be:
+
+### Best source priority
+1. **browser rendered course page**
+2. **static course page**
+3. **shared requirement page**
+4. **AI fallback**
+
+Because many sites hide English requirements inside tabs or JS content.

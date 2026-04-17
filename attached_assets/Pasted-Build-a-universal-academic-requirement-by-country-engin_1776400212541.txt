@@ -1,0 +1,689 @@
+Build a universal academic requirement by country engine in my existing scraper project.
+
+Important:
+Do not rebuild the scraper from scratch.
+Do not make only one regex patch.
+Implement one reusable engine that parses and normalizes academic requirements by country across course pages, browser rendered pages, shared entry requirement pages, PDF extracted text, and AI fallback.
+
+Goal:
+Create one shared parser system that extracts academic entry requirements in structured format for different countries and different course levels.
+
+The engine must support:
+- country specific undergraduate entry requirements
+- country specific postgraduate entry requirements
+- general academic requirements when no country split exists
+- GPA
+- percentage
+- division
+- letter grades
+- subject prerequisites
+- equivalent qualification wording
+
+==================================================
+STEP 1 — OPEN THESE FILES
+==================================================
+
+Open:
+1. artifacts/api-server/src/routes/scrape.ts
+2. artifacts/api-server/src/browser-helper.ts
+3. lib/db/src/schema/scraped_courses.ts
+4. artifacts/university-portal/src/pages/scraping.tsx
+
+Main work file:
+artifacts/api-server/src/routes/scrape.ts
+
+If needed, create a helper file such as:
+artifacts/api-server/src/lib/academic-requirements.ts
+
+If you create a helper file, wire it back into scrape.ts cleanly.
+
+==================================================
+STEP 2 — CREATE ONE UNIVERSAL ACADEMIC ENGINE
+==================================================
+
+Create a reusable academic requirement module with these parts:
+
+1. normalize text
+2. country detection
+3. academic level detection
+4. score extraction
+5. score type normalization
+6. subject prerequisite extraction
+7. result merge logic
+8. final mapping to course output
+
+The engine must return a normalized structure like:
+
+```ts
+type AcademicCountryRequirement = {
+  country: string | null;
+  academicLevel: string | null;
+  academicScore: string | null;
+  scoreType: string | null;
+  otherRequirement: string | null;
+  confidence: number;
+  source: "static" | "browser" | "shared" | "pdf" | "ai" | "none";
+};
+
+type AcademicRequirementEngineResult = {
+  rows: AcademicCountryRequirement[];
+  generalRequirement: {
+    academicLevel: string | null;
+    academicScore: string | null;
+    scoreType: string | null;
+    otherRequirement: string | null;
+    confidence: number;
+    source: "static" | "browser" | "shared" | "pdf" | "ai" | "none";
+  } | null;
+};
+==================================================
+STEP 3 — TEXT NORMALIZATION
+
+Add base helpers:
+
+function normalizeWhitespace(input: string): string {
+  return (input || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeAcademicText(input: string): string {
+  return normalizeWhitespace(input)
+    .replace(/[•●▪◦]/g, " ")
+    .replace(/\u00a0/g, " ")
+    .trim();
+}
+==================================================
+STEP 4 — COUNTRY DETECTION
+
+Build a country list and synonym map.
+
+Use this structure:
+
+const COUNTRY_SYNONYMS: Record<string, string[]> = {
+  Nepal: ["nepal", "nepalese"],
+  Bangladesh: ["bangladesh", "bangladeshi"],
+  India: ["india", "indian"],
+  Pakistan: ["pakistan", "pakistani"],
+  Sri Lanka: ["sri lanka", "sri lankan"],
+  Bhutan: ["bhutan", "bhutanese"],
+  China: ["china", "chinese"],
+  Vietnam: ["vietnam", "vietnamese"],
+  Philippines: ["philippines", "philippine", "filipino"],
+  Kenya: ["kenya", "kenyan"],
+  Nigeria: ["nigeria", "nigerian"],
+  Ghana: ["ghana", "ghanaian"],
+  UAE: ["uae", "united arab emirates"],
+  UK: ["uk", "united kingdom", "britain", "british"],
+  USA: ["usa", "united states", "us", "american"],
+  Canada: ["canada", "canadian"],
+  Australia: ["australia", "australian"],
+  New Zealand: ["new zealand", "new zealander"],
+};
+
+Add helper:
+
+function detectCountriesInText(textRaw: string): string[] {
+  const text = normalizeAcademicText(textRaw).toLowerCase();
+  const found: string[] = [];
+
+  for (const [country, synonyms] of Object.entries(COUNTRY_SYNONYMS)) {
+    if (synonyms.some(s => text.includes(s))) {
+      found.push(country);
+    }
+  }
+
+  return [...new Set(found)];
+}
+==================================================
+STEP 5 — ACADEMIC LEVEL DETECTION
+
+Detect common academic level phrases:
+
+function detectAcademicLevel(textRaw: string): string | null {
+  const text = normalizeAcademicText(textRaw).toLowerCase();
+
+  const patterns: Array<[RegExp, string]> = [
+    [/\bgrade\s*12\b|\byear\s*12\b/, "Year 12"],
+    [/\bhsc\b|\bhigher secondary\b|\bhigher secondary certificate\b/, "Higher Secondary"],
+    [/\ba level\b|\bgce a level\b/, "A Level"],
+    [/\bo level\b|\bgce o level\b/, "O Level"],
+    [/\bib\b|\binternational baccalaureate\b/, "IB"],
+    [/\bbachelor(?:'s)? degree\b|\bcompleted bachelor\b|\bundergraduate degree\b/, "Bachelor Degree"],
+    [/\bmaster(?:'s)? degree\b/, "Master Degree"],
+    [/\bdiploma\b/, "Diploma"],
+    [/\bcertificate\b/, "Certificate"],
+  ];
+
+  for (const [regex, label] of patterns) {
+    if (regex.test(text)) return label;
+  }
+
+  return null;
+}
+==================================================
+STEP 6 — SCORE EXTRACTION
+
+Extract GPA, percentage, division, and letter grade.
+
+Add helpers:
+
+function extractGpa(textRaw: string): { score: string | null; scoreType: string | null } {
+  const text = normalizeAcademicText(textRaw).toLowerCase();
+
+  let m = text.match(/\bgpa\s*(?:of|out of)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:out of\s*([0-9]+(?:\.[0-9]+)?))?/i);
+  if (m) {
+    const score = m[1];
+    const outOf = m[2];
+    return {
+      score,
+      scoreType: outOf ? `GPA out of ${outOf}` : "GPA",
+    };
+  }
+
+  m = text.match(/([0-9]+(?:\.[0-9]+)?)\s*gpa\s*(?:out of\s*([0-9]+(?:\.[0-9]+)?))?/i);
+  if (m) {
+    const score = m[1];
+    const outOf = m[2];
+    return {
+      score,
+      scoreType: outOf ? `GPA out of ${outOf}` : "GPA",
+    };
+  }
+
+  return { score: null, scoreType: null };
+}
+
+function extractPercentage(textRaw: string): { score: string | null; scoreType: string | null } {
+  const text = normalizeAcademicText(textRaw).toLowerCase();
+
+  const m =
+    text.match(/([0-9]{2,3}(?:\.[0-9]+)?)\s*%/) ||
+    text.match(/\b([0-9]{2,3}(?:\.[0-9]+)?)\s*percent\b/i);
+
+  if (m) {
+    return {
+      score: m[1],
+      scoreType: "Percentage",
+    };
+  }
+
+  return { score: null, scoreType: null };
+}
+
+function extractDivision(textRaw: string): { score: string | null; scoreType: string | null } {
+  const text = normalizeAcademicText(textRaw).toLowerCase();
+
+  const m = text.match(/\b(first|second|third)\s+division\b/i);
+  if (m) {
+    return {
+      score: m[1],
+      scoreType: "Division",
+    };
+  }
+
+  return { score: null, scoreType: null };
+}
+
+function extractLetterGrade(textRaw: string): { score: string | null; scoreType: string | null } {
+  const text = normalizeAcademicText(textRaw);
+
+  const m = text.match(/\b([ABCDEF]{2,4})\b/);
+  if (m) {
+    return {
+      score: m[1],
+      scoreType: "Letter Grade",
+    };
+  }
+
+  return { score: null, scoreType: null };
+}
+==================================================
+STEP 7 — SUBJECT PREREQUISITE EXTRACTION
+
+Extract math, science, English, and similar prerequisite language.
+
+function extractSubjectRequirements(textRaw: string): string | null {
+  const text = normalizeAcademicText(textRaw);
+
+  const keywords = [
+    "mathematics",
+    "maths",
+    "math",
+    "science",
+    "chemistry",
+    "physics",
+    "biology",
+    "english",
+    "accounting",
+    "business",
+    "computer science",
+    "programming",
+  ];
+
+  const hits = keywords.filter(k => text.toLowerCase().includes(k));
+  if (!hits.length) return null;
+
+  return [...new Set(hits)].join(", ");
+}
+
+Also capture equivalent qualification wording:
+
+function extractEquivalentRequirement(textRaw: string): string | null {
+  const text = normalizeAcademicText(textRaw);
+
+  const phrases = [
+    "or equivalent",
+    "recognized institution",
+    "equivalent qualification",
+    "relevant bachelor degree",
+    "completed bachelor degree",
+    "qualification deemed equivalent",
+  ];
+
+  const hits = phrases.filter(p => text.toLowerCase().includes(p));
+  if (!hits.length) return null;
+
+  return hits.join("; ");
+}
+==================================================
+STEP 8 — PARSE A SINGLE REQUIREMENT BLOCK
+
+Add a parser for one paragraph or one country row:
+
+function parseAcademicRequirementBlock(
+  textRaw: string,
+  source: AcademicCountryRequirement["source"],
+  forcedCountry: string | null = null
+): AcademicCountryRequirement {
+  const text = normalizeAcademicText(textRaw);
+
+  const gpa = extractGpa(text);
+  const percentage = extractPercentage(text);
+  const division = extractDivision(text);
+  const letter = extractLetterGrade(text);
+
+  const level = detectAcademicLevel(text);
+  const countries = forcedCountry ? [forcedCountry] : detectCountriesInText(text);
+  const subjectReq = extractSubjectRequirements(text);
+  const equivalentReq = extractEquivalentRequirement(text);
+
+  const scoreData =
+    gpa.score ? gpa :
+    percentage.score ? percentage :
+    division.score ? division :
+    letter.score ? letter :
+    { score: null, scoreType: null };
+
+  const otherReqParts = [subjectReq, equivalentReq].filter(Boolean);
+
+  return {
+    country: countries[0] || forcedCountry || null,
+    academicLevel: level,
+    academicScore: scoreData.score,
+    scoreType: scoreData.scoreType,
+    otherRequirement: otherReqParts.length ? otherReqParts.join("; ") : null,
+    confidence:
+      (countries.length || forcedCountry ? 25 : 0) +
+      (level ? 25 : 0) +
+      (scoreData.score ? 30 : 0) +
+      (otherReqParts.length ? 10 : 0),
+    source,
+  };
+}
+==================================================
+STEP 9 — COUNTRY TABLE AND PARAGRAPH PARSING
+
+Universities often present requirements as:
+
+HTML table
+bullet list
+paragraph by country
+grouped blocks
+
+Build a parser that splits text into candidate blocks.
+
+function splitAcademicRequirementBlocks(textRaw: string): string[] {
+  const text = normalizeAcademicText(textRaw);
+
+  return text
+    .split(/(?=(?:Nepal|Bangladesh|India|Pakistan|Sri Lanka|China|Vietnam|Philippines|Kenya|Nigeria|Ghana|Canada|USA|UK|Australia|New Zealand)\b)/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+Then parse rows:
+
+function parseAcademicRequirementsFromText(
+  textRaw: string,
+  source: AcademicCountryRequirement["source"]
+): AcademicRequirementEngineResult {
+  const text = normalizeAcademicText(textRaw);
+  const blocks = splitAcademicRequirementBlocks(text);
+
+  const rows: AcademicCountryRequirement[] = [];
+
+  for (const block of blocks) {
+    const countries = detectCountriesInText(block);
+
+    if (countries.length) {
+      for (const country of countries) {
+        const row = parseAcademicRequirementBlock(block, source, country);
+        if (row.academicLevel || row.academicScore || row.otherRequirement) {
+          rows.push(row);
+        }
+      }
+    }
+  }
+
+  let generalRequirement: AcademicRequirementEngineResult["generalRequirement"] = null;
+
+  if (!rows.length) {
+    const general = parseAcademicRequirementBlock(text, source, null);
+    if (general.academicLevel || general.academicScore || general.otherRequirement) {
+      generalRequirement = {
+        academicLevel: general.academicLevel,
+        academicScore: general.academicScore,
+        scoreType: general.scoreType,
+        otherRequirement: general.otherRequirement,
+        confidence: general.confidence,
+        source,
+      };
+    }
+  }
+
+  return {
+    rows,
+    generalRequirement,
+  };
+}
+==================================================
+STEP 10 — MERGE RESULTS FROM STATIC BROWSER SHARED PDF AI
+
+Create merge logic:
+
+Priority:
+
+browser
+static
+pdf
+shared
+ai
+
+But preserve the best row per country based on completeness and confidence.
+
+function requirementCompletenessScore(row: AcademicCountryRequirement): number {
+  return (
+    (row.country ? 20 : 0) +
+    (row.academicLevel ? 20 : 0) +
+    (row.academicScore ? 20 : 0) +
+    (row.scoreType ? 15 : 0) +
+    (row.otherRequirement ? 10 : 0) +
+    (row.confidence || 0)
+  );
+}
+
+function mergeAcademicRequirementRows(
+  baseRows: AcademicCountryRequirement[],
+  incomingRows: AcademicCountryRequirement[]
+): AcademicCountryRequirement[] {
+  const map = new Map<string, AcademicCountryRequirement>();
+
+  for (const row of [...baseRows, ...incomingRows]) {
+    const key = (row.country || "general").toLowerCase();
+    const existing = map.get(key);
+
+    if (!existing || requirementCompletenessScore(row) > requirementCompletenessScore(existing)) {
+      map.set(key, row);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function mergeAcademicRequirementResults(
+  base: AcademicRequirementEngineResult,
+  incoming: AcademicRequirementEngineResult
+): AcademicRequirementEngineResult {
+  const rows = mergeAcademicRequirementRows(base.rows, incoming.rows);
+
+  let generalRequirement = base.generalRequirement;
+  if (
+    incoming.generalRequirement &&
+    (
+      !generalRequirement ||
+      requirementCompletenessScore({
+        country: null,
+        academicLevel: incoming.generalRequirement.academicLevel,
+        academicScore: incoming.generalRequirement.academicScore,
+        scoreType: incoming.generalRequirement.scoreType,
+        otherRequirement: incoming.generalRequirement.otherRequirement,
+        confidence: incoming.generalRequirement.confidence,
+        source: incoming.generalRequirement.source,
+      }) >
+      requirementCompletenessScore({
+        country: null,
+        academicLevel: generalRequirement.academicLevel,
+        academicScore: generalRequirement.academicScore,
+        scoreType: generalRequirement.scoreType,
+        otherRequirement: generalRequirement.otherRequirement,
+        confidence: generalRequirement.confidence,
+        source: generalRequirement.source,
+      })
+    )
+  ) {
+    generalRequirement = incoming.generalRequirement;
+  }
+
+  return { rows, generalRequirement };
+}
+==================================================
+STEP 11 — EXTRACTION ORDER
+
+Replace scattered academic requirement logic with one pipeline:
+
+parse static course page
+if missing or weak, parse browser rendered page
+if still weak, parse shared entry requirement page
+if PDF extracted text exists, parse PDF text
+AI fallback only last
+
+Example:
+
+let academic = { rows: [], generalRequirement: null };
+
+const staticAcademic = parseAcademicRequirementsFromText(staticCourseText, "static");
+academic = mergeAcademicRequirementResults(academic, staticAcademic);
+
+const needsMoreAcademicData =
+  academic.rows.length === 0 && !academic.generalRequirement;
+
+if (needsMoreAcademicData) {
+  const browserText = await getBrowserRenderedText(page);
+  const browserAcademic = parseAcademicRequirementsFromText(browserText, "browser");
+  academic = mergeAcademicRequirementResults(academic, browserAcademic);
+}
+
+if ((academic.rows.length === 0 && !academic.generalRequirement) && sharedRequirementsText) {
+  const sharedAcademic = parseAcademicRequirementsFromText(sharedRequirementsText, "shared");
+  academic = mergeAcademicRequirementResults(academic, sharedAcademic);
+}
+
+if ((academic.rows.length === 0 && !academic.generalRequirement) && pdfText) {
+  const pdfAcademic = parseAcademicRequirementsFromText(pdfText, "pdf");
+  academic = mergeAcademicRequirementResults(academic, pdfAcademic);
+}
+
+// AI fallback only if still empty or badly incomplete
+==================================================
+STEP 12 — MAP TO COURSE FIELDS
+
+Your current schema likely has single fields:
+
+academicCountry
+academicLevel
+academicScore
+scoreType
+otherRequirement
+
+But country based requirements need multiple rows.
+
+Do this carefully:
+
+A. Keep existing single fields for main display
+B. Add structured JSON metadata if possible for all country rows
+C. If schema change is too risky, store:
+
+best matching row for target markets or first best row in current fields
+full row list in a JSON text field if available
+
+Mapping helper:
+
+function pickPrimaryAcademicRequirement(rows: AcademicCountryRequirement[]) {
+  if (!rows.length) return null;
+
+  const priorityCountries = ["Nepal", "Bangladesh", "India", "Pakistan", "Sri Lanka"];
+  for (const country of priorityCountries) {
+    const found = rows.find(r => r.country === country);
+    if (found) return found;
+  }
+
+  return rows[0];
+}
+
+function applyAcademicRequirementsToCourse(course: any, academic: AcademicRequirementEngineResult) {
+  const primary = pickPrimaryAcademicRequirement(academic.rows);
+
+  return {
+    ...course,
+    academicCountry: primary?.country ?? academic.generalRequirement?.academicLevel ? primary?.country ?? null : null,
+    academicLevel: primary?.academicLevel ?? academic.generalRequirement?.academicLevel ?? null,
+    academicScore: primary?.academicScore ?? academic.generalRequirement?.academicScore ?? null,
+    scoreType: primary?.scoreType ?? academic.generalRequirement?.scoreType ?? null,
+    otherRequirement: primary?.otherRequirement ?? academic.generalRequirement?.otherRequirement ?? null,
+
+    academicRequirementsJson: JSON.stringify({
+      rows: academic.rows,
+      generalRequirement: academic.generalRequirement,
+    }),
+  };
+}
+
+If academicRequirementsJson column does not exist and adding it safely is possible, add it.
+If not, keep only the primary fields but do not break current schema.
+
+==================================================
+STEP 13 — UI
+
+Do not break the current review grid.
+
+If possible:
+
+keep single academic fields for list view
+full country requirement details can be shown later in edit modal or details panel
+
+Do not force a big frontend redesign now.
+
+==================================================
+STEP 14 — DEBUG LOG
+
+Add one clean per course log:
+
+console.log(
+  `[ACADEMIC] course=${courseName} rows=${academic.rows.length} general=${academic.generalRequirement ? "yes" : "no"} primaryCountry=${pickPrimaryAcademicRequirement(academic.rows)?.country ?? "-"} level=${pickPrimaryAcademicRequirement(academic.rows)?.academicLevel ?? academic.generalRequirement?.academicLevel ?? "-"} score=${pickPrimaryAcademicRequirement(academic.rows)?.academicScore ?? academic.generalRequirement?.academicScore ?? "-"}`
+);
+==================================================
+STEP 15 — EXAMPLES THE ENGINE MUST HANDLE
+
+These should parse correctly:
+
+"Nepal: Grade 12 with GPA 2.8 out of 4"
+country Nepal
+level Year 12
+score 2.8
+scoreType GPA out of 4
+"Bangladesh: HSC GPA 4.0 out of 5"
+country Bangladesh
+level Higher Secondary
+score 4.0
+scoreType GPA out of 5
+"India: Year 12 with 65%"
+country India
+level Year 12
+score 65
+scoreType Percentage
+"Sri Lanka: GCE A Level CCC"
+country Sri Lanka
+level A Level
+score CCC
+scoreType Letter Grade
+"Applicants must have completed a recognized bachelor degree or equivalent"
+general requirement
+level Bachelor Degree
+otherRequirement includes recognized bachelor degree or equivalent
+"Mathematics required"
+otherRequirement includes mathematics
+==================================================
+STEP 16 — VERIFY
+
+Test on:
+
+VIT
+ASA
+VU
+
+Expected:
+
+if course page contains country specific requirements, parse them
+if browser rendered content contains them, browser wins
+if shared entry page contains them, shared fills missing
+if only general postgraduate wording is present, generalRequirement is filled
+main course row still gets one usable academic requirement for current UI
+full row list is preserved if schema allows
+==================================================
+STEP 17 — REPORT
+
+When done, tell me:
+
+files changed
+where universal academic engine was added
+whether scrape.ts now uses the shared engine
+sample parsed result for Nepal
+sample parsed result for Bangladesh
+sample general postgraduate requirement
+whether full multi-country rows are preserved
+any remaining limitation
+
+---
+
+# Why this matters
+
+Without this engine, your scraper will keep doing bad things like:
+
+- picking only one country row and losing the rest
+- saving Nepal score into Bangladesh
+- treating GPA as percentage
+- losing “or equivalent”
+- missing subject requirements like mathematics
+
+With this engine, you get:
+
+- one parser
+- one merge flow
+- one structured result
+- reusable across all universities
+
+---
+
+# Recommended rule for your project
+
+For academic requirements, best source priority should be:
+
+1. **browser rendered course page**
+2. **static course page**
+3. **PDF extracted text**
+4. **shared requirement page**
+5. **AI fallback**
+
+Because many universities put country tables in:
+- accordions
+- tabs
+- downloadable PDFs
