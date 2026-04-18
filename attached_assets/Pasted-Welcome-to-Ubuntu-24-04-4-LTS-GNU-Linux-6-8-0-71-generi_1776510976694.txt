@@ -1,0 +1,307 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-71-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat Apr 18 11:15:47 UTC 2026
+
+  System load:           0.02
+  Usage of /:            4.0% of 115.20GB
+  Memory usage:          17%
+  Swap usage:            0%
+  Processes:             135
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+0 updates can be applied immediately.
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+*** System restart required ***
+Last login: Fri Apr 17 10:10:45 2026 from 198.211.111.194
+root@university-and-course-data:~# git -C /opt/app pull && cd /opt/app && pnpm install && pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run build && PORT=3000 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/university-portal run build && pm2 restart api-server && systemctl restart nginx && echo "DEPLOYED"
+remote: Enumerating objects: 203, done.
+remote: Counting objects: 100% (186/186), done.
+remote: Compressing objects: 100% (61/61), done.
+remote: Total 144 (delta 108), reused 117 (delta 82), pack-reused 0 (from 0)
+Receiving objects: 100% (144/144), 109.62 KiB | 3.42 MiB/s, done.
+Resolving deltas: 100% (108/108), completed with 29 local objects.
+From https://github.com/Bijay053/University-and-Course-data
+   07d92ed..f3f09af  patch/fast-scraper-tuning-20260417 -> origin/patch/fast-scraper-tuning-20260417
+   085b5ce..287a46c  main                               -> origin/main
+Updating 07d92ed..f3f09af
+Fast-forward
+ .env.example                                                                                     |    7 +
+ .gitignore                                                                                       |    7 +
+ BATCH_SCRAPE_VALIDATION_REPORT.md                                                                |  188 ++
+ api-server/build.mjs                                                                             |  126 ++
+ api-server/package.json                                                                          |   38 +
+ api-server/src/app.ts                                                                            |   34 +
+ api-server/src/browser-helper.ts                                                                 |  265 +++
+ api-server/src/index.ts                                                                          |   19 +
+ api-server/src/lib/academic-requirements.ts                                                      |  295 +++
+ api-server/src/lib/english-requirements.test.ts                                                  |   16 +
+ api-server/src/lib/english-requirements.ts                                                       |  548 +++++
+ api-server/src/lib/feedback-engine.ts                                                            |   96 +
+ api-server/src/lib/logger.ts                                                                     |   20 +
+ api-server/src/lib/review-engine.test.ts                                                         |   94 +
+ api-server/src/lib/review-engine.ts                                                              |  539 +++++
+ api-server/src/routes/academic_requirements.ts                                                   |   73 +
+ api-server/src/routes/bulk.ts                                                                    |  104 +
+ api-server/src/routes/courses.ts                                                                 |  226 ++
+ api-server/src/routes/dashboard.ts                                                               |   77 +
+ api-server/src/routes/english_requirements.ts                                                    |   73 +
+ api-server/src/routes/fees.ts                                                                    |   73 +
+ api-server/src/routes/health.ts                                                                  |   11 +
+ api-server/src/routes/import.ts                                                                  |  336 +++
+ api-server/src/routes/index.ts                                                                   |   32 +
+ api-server/src/routes/intakes.ts                                                                 |   73 +
+ api-server/src/routes/scholarships.ts                                                            |   73 +
+ api-server/src/routes/scrape.ts                                                                  | 7001 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ api-server/src/routes/scraping.ts                                                                |  215 ++
+ api-server/src/routes/universities.ts                                                            |  101 +
+ api-server/tsconfig.json                                                                         |   20 +
+ artifacts/api-server/package.json                                                                |    7 +-
+ artifacts/api-server/src/browser-helper.ts                                                       |   57 +-
+ artifacts/api-server/src/index.ts                                                                |   10 +-
+ artifacts/api-server/src/lib/english-requirements.test.ts                                        |   16 +
+ artifacts/api-server/src/lib/english-requirements.ts                                             |   11 +-
+ artifacts/api-server/src/lib/feedback-engine.test.ts                                             |   42 +
+ artifacts/api-server/src/lib/feedback-engine.ts                                                  |   96 +
+ artifacts/api-server/src/lib/review-engine.test.ts                                               |   94 +
+ artifacts/api-server/src/lib/review-engine.ts                                                    |  539 +++++
+ artifacts/api-server/src/routes/courses.ts                                                       |   20 +-
+ artifacts/api-server/src/routes/import.ts                                                        |  253 ++-
+ artifacts/api-server/src/routes/scrape.ts                                                        | 2347 +++++++++++++++++---
+ artifacts/api-server/src/routes/scraping.ts                                                      |  109 +-
+ artifacts/university-portal/src/lib/readResponseJson.ts                                          |   42 +
+ artifacts/university-portal/src/pages/bulk.tsx                                                   |   12 +-
+ artifacts/university-portal/src/pages/scraping.tsx                                               |  357 +++-
+ artifacts/university-portal/vite.config.ts                                                       |  130 +-
+ attached_assets/Pasted--bin-bash-set-e-echo-1-System-update-apt-get-update-y-a_1776401643162.txt |  115 +
+ attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-71-generi_1776402411199.txt |   75 +
+ lib/db/src/schema/course_review.ts                                                               |   80 +
+ lib/db/src/schema/courses.ts                                                                     |   14 +-
+ lib/db/src/schema/index.ts                                                                       |    1 +
+ lib/db/src/schema/scraped_courses.ts                                                             |   13 +-
+ lib/db/src/schema/scraping.ts                                                                    |    5 +
+ pnpm-lock.yaml                                                                                   | 1296 ++++++++++-
+ university-portal/components.json                                                                |   20 +
+ university-portal/index.html                                                                     |   16 +
+ university-portal/package.json                                                                   |   77 +
+ university-portal/public/favicon.svg                                                             |    3 +
+ university-portal/public/opengraph.jpg                                                           |  Bin 0 -> 30201 bytes
+ university-portal/src/App.tsx                                                                    |   50 +
+ university-portal/src/components/layout.tsx                                                      |  117 +
+ university-portal/src/components/ui/accordion.tsx                                                |   55 +
+ university-portal/src/components/ui/alert-dialog.tsx                                             |  139 ++
+ university-portal/src/components/ui/alert.tsx                                                    |   59 +
+ university-portal/src/components/ui/aspect-ratio.tsx                                             |    5 +
+ university-portal/src/components/ui/avatar.tsx                                                   |   50 +
+ university-portal/src/components/ui/badge.tsx                                                    |   43 +
+ university-portal/src/components/ui/breadcrumb.tsx                                               |  115 +
+ university-portal/src/components/ui/button-group.tsx                                             |   83 +
+ university-portal/src/components/ui/button.tsx                                                   |   65 +
+ university-portal/src/components/ui/calendar.tsx                                                 |  213 ++
+ university-portal/src/components/ui/card.tsx                                                     |   76 +
+ university-portal/src/components/ui/carousel.tsx                                                 |  260 +++
+ university-portal/src/components/ui/chart.tsx                                                    |  367 ++++
+ university-portal/src/components/ui/checkbox.tsx                                                 |   28 +
+ university-portal/src/components/ui/collapsible.tsx                                              |   11 +
+ university-portal/src/components/ui/command.tsx                                                  |  153 ++
+ university-portal/src/components/ui/context-menu.tsx                                             |  198 ++
+ university-portal/src/components/ui/dialog.tsx                                                   |  120 ++
+ university-portal/src/components/ui/drawer.tsx                                                   |  116 +
+ university-portal/src/components/ui/dropdown-menu.tsx                                            |  201 ++
+ university-portal/src/components/ui/empty.tsx                                                    |  104 +
+ university-portal/src/components/ui/field.tsx                                                    |  244 +++
+ university-portal/src/components/ui/form.tsx                                                     |  176 ++
+ university-portal/src/components/ui/hover-card.tsx                                               |   27 +
+ university-portal/src/components/ui/input-group.tsx                                              |  168 ++
+ university-portal/src/components/ui/input-otp.tsx                                                |   69 +
+ university-portal/src/components/ui/input.tsx                                                    |   22 +
+ university-portal/src/components/ui/item.tsx                                                     |  193 ++
+ university-portal/src/components/ui/kbd.tsx                                                      |   28 +
+ university-portal/src/components/ui/label.tsx                                                    |   26 +
+ university-portal/src/components/ui/menubar.tsx                                                  |  254 +++
+ university-portal/src/components/ui/navigation-menu.tsx                                          |  128 ++
+ university-portal/src/components/ui/pagination.tsx                                               |  117 +
+ university-portal/src/components/ui/popover.tsx                                                  |   31 +
+ university-portal/src/components/ui/progress.tsx                                                 |   28 +
+ university-portal/src/components/ui/radio-group.tsx                                              |   42 +
+ university-portal/src/components/ui/resizable.tsx                                                |   45 +
+ university-portal/src/components/ui/scroll-area.tsx                                              |   46 +
+ university-portal/src/components/ui/select.tsx                                                   |  159 ++
+ university-portal/src/components/ui/separator.tsx                                                |   29 +
+ university-portal/src/components/ui/sheet.tsx                                                    |  140 ++
+ university-portal/src/components/ui/sidebar.tsx                                                  |  727 +++++++
+ university-portal/src/components/ui/skeleton.tsx                                                 |   15 +
+ university-portal/src/components/ui/slider.tsx                                                   |   26 +
+ university-portal/src/components/ui/sonner.tsx                                                   |   31 +
+ university-portal/src/components/ui/spinner.tsx                                                  |   16 +
+ university-portal/src/components/ui/switch.tsx                                                   |   27 +
+ university-portal/src/components/ui/table.tsx                                                    |  120 ++
+ university-portal/src/components/ui/tabs.tsx                                                     |   53 +
+ university-portal/src/components/ui/textarea.tsx                                                 |   22 +
+ university-portal/src/components/ui/toast.tsx                                                    |  127 ++
+ university-portal/src/components/ui/toaster.tsx                                                  |   33 +
+ university-portal/src/components/ui/toggle-group.tsx                                             |   61 +
+ university-portal/src/components/ui/toggle.tsx                                                   |   43 +
+ university-portal/src/components/ui/tooltip.tsx                                                  |   32 +
+ university-portal/src/hooks/use-mobile.tsx                                                       |   19 +
+ university-portal/src/hooks/use-toast.ts                                                         |  191 ++
+ university-portal/src/index.css                                                                  |  149 ++
+ university-portal/src/lib/course-constants.ts                                                    |  237 ++
+ university-portal/src/lib/readResponseJson.ts                                                    |   42 +
+ university-portal/src/lib/utils.ts                                                               |    6 +
+ university-portal/src/main.tsx                                                                   |    5 +
+ university-portal/src/pages/bulk.tsx                                                             |  236 ++
+ university-portal/src/pages/course-detail.tsx                                                    |   55 +
+ university-portal/src/pages/courses.tsx                                                          |  380 ++++
+ university-portal/src/pages/dashboard.tsx                                                        |   84 +
+ university-portal/src/pages/new-course.tsx                                                       |   11 +
+ university-portal/src/pages/not-found.tsx                                                        |   21 +
+ university-portal/src/pages/scraping.tsx                                                         | 1729 +++++++++++++++
+ university-portal/src/pages/universities.tsx                                                     |  175 ++
+ university-portal/src/pages/university-detail.tsx                                                |  574 +++++
+ 133 files changed, 25897 insertions(+), 587 deletions(-)
+ create mode 100644 .env.example
+ create mode 100644 BATCH_SCRAPE_VALIDATION_REPORT.md
+ create mode 100644 api-server/build.mjs
+ create mode 100644 api-server/package.json
+ create mode 100644 api-server/src/app.ts
+ create mode 100644 api-server/src/browser-helper.ts
+ create mode 100644 api-server/src/index.ts
+ create mode 100644 api-server/src/lib/academic-requirements.ts
+ create mode 100644 api-server/src/lib/english-requirements.test.ts
+ create mode 100644 api-server/src/lib/english-requirements.ts
+ create mode 100644 api-server/src/lib/feedback-engine.ts
+ create mode 100644 api-server/src/lib/logger.ts
+ create mode 100644 api-server/src/lib/review-engine.test.ts
+ create mode 100644 api-server/src/lib/review-engine.ts
+ create mode 100644 api-server/src/routes/academic_requirements.ts
+ create mode 100644 api-server/src/routes/bulk.ts
+ create mode 100644 api-server/src/routes/courses.ts
+ create mode 100644 api-server/src/routes/dashboard.ts
+ create mode 100644 api-server/src/routes/english_requirements.ts
+ create mode 100644 api-server/src/routes/fees.ts
+ create mode 100644 api-server/src/routes/health.ts
+ create mode 100644 api-server/src/routes/import.ts
+ create mode 100644 api-server/src/routes/index.ts
+ create mode 100644 api-server/src/routes/intakes.ts
+ create mode 100644 api-server/src/routes/scholarships.ts
+ create mode 100644 api-server/src/routes/scrape.ts
+ create mode 100644 api-server/src/routes/scraping.ts
+ create mode 100644 api-server/src/routes/universities.ts
+ create mode 100644 api-server/tsconfig.json
+ create mode 100644 artifacts/api-server/src/lib/english-requirements.test.ts
+ create mode 100644 artifacts/api-server/src/lib/feedback-engine.test.ts
+ create mode 100644 artifacts/api-server/src/lib/feedback-engine.ts
+ create mode 100644 artifacts/api-server/src/lib/review-engine.test.ts
+ create mode 100644 artifacts/api-server/src/lib/review-engine.ts
+ create mode 100644 artifacts/university-portal/src/lib/readResponseJson.ts
+ create mode 100644 attached_assets/Pasted--bin-bash-set-e-echo-1-System-update-apt-get-update-y-a_1776401643162.txt
+ create mode 100644 attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-71-generi_1776402411199.txt
+ create mode 100644 lib/db/src/schema/course_review.ts
+ create mode 100644 university-portal/components.json
+ create mode 100644 university-portal/index.html
+ create mode 100644 university-portal/package.json
+ create mode 100644 university-portal/public/favicon.svg
+ create mode 100644 university-portal/public/opengraph.jpg
+ create mode 100644 university-portal/src/App.tsx
+ create mode 100644 university-portal/src/components/layout.tsx
+ create mode 100644 university-portal/src/components/ui/accordion.tsx
+ create mode 100644 university-portal/src/components/ui/alert-dialog.tsx
+ create mode 100644 university-portal/src/components/ui/alert.tsx
+ create mode 100644 university-portal/src/components/ui/aspect-ratio.tsx
+ create mode 100644 university-portal/src/components/ui/avatar.tsx
+ create mode 100644 university-portal/src/components/ui/badge.tsx
+ create mode 100644 university-portal/src/components/ui/breadcrumb.tsx
+ create mode 100644 university-portal/src/components/ui/button-group.tsx
+ create mode 100644 university-portal/src/components/ui/button.tsx
+ create mode 100644 university-portal/src/components/ui/calendar.tsx
+ create mode 100644 university-portal/src/components/ui/card.tsx
+ create mode 100644 university-portal/src/components/ui/carousel.tsx
+ create mode 100644 university-portal/src/components/ui/chart.tsx
+ create mode 100644 university-portal/src/components/ui/checkbox.tsx
+ create mode 100644 university-portal/src/components/ui/collapsible.tsx
+ create mode 100644 university-portal/src/components/ui/command.tsx
+ create mode 100644 university-portal/src/components/ui/context-menu.tsx
+ create mode 100644 university-portal/src/components/ui/dialog.tsx
+ create mode 100644 university-portal/src/components/ui/drawer.tsx
+ create mode 100644 university-portal/src/components/ui/dropdown-menu.tsx
+ create mode 100644 university-portal/src/components/ui/empty.tsx
+ create mode 100644 university-portal/src/components/ui/field.tsx
+ create mode 100644 university-portal/src/components/ui/form.tsx
+ create mode 100644 university-portal/src/components/ui/hover-card.tsx
+ create mode 100644 university-portal/src/components/ui/input-group.tsx
+ create mode 100644 university-portal/src/components/ui/input-otp.tsx
+ create mode 100644 university-portal/src/components/ui/input.tsx
+ create mode 100644 university-portal/src/components/ui/item.tsx
+ create mode 100644 university-portal/src/components/ui/kbd.tsx
+ create mode 100644 university-portal/src/components/ui/label.tsx
+ create mode 100644 university-portal/src/components/ui/menubar.tsx
+ create mode 100644 university-portal/src/components/ui/navigation-menu.tsx
+ create mode 100644 university-portal/src/components/ui/pagination.tsx
+ create mode 100644 university-portal/src/components/ui/popover.tsx
+ create mode 100644 university-portal/src/components/ui/progress.tsx
+ create mode 100644 university-portal/src/components/ui/radio-group.tsx
+ create mode 100644 university-portal/src/components/ui/resizable.tsx
+ create mode 100644 university-portal/src/components/ui/scroll-area.tsx
+ create mode 100644 university-portal/src/components/ui/select.tsx
+ create mode 100644 university-portal/src/components/ui/separator.tsx
+ create mode 100644 university-portal/src/components/ui/sheet.tsx
+ create mode 100644 university-portal/src/components/ui/sidebar.tsx
+ create mode 100644 university-portal/src/components/ui/skeleton.tsx
+ create mode 100644 university-portal/src/components/ui/slider.tsx
+ create mode 100644 university-portal/src/components/ui/sonner.tsx
+ create mode 100644 university-portal/src/components/ui/spinner.tsx
+ create mode 100644 university-portal/src/components/ui/switch.tsx
+ create mode 100644 university-portal/src/components/ui/table.tsx
+ create mode 100644 university-portal/src/components/ui/tabs.tsx
+ create mode 100644 university-portal/src/components/ui/textarea.tsx
+ create mode 100644 university-portal/src/components/ui/toast.tsx
+ create mode 100644 university-portal/src/components/ui/toaster.tsx
+ create mode 100644 university-portal/src/components/ui/toggle-group.tsx
+ create mode 100644 university-portal/src/components/ui/toggle.tsx
+ create mode 100644 university-portal/src/components/ui/tooltip.tsx
+ create mode 100644 university-portal/src/hooks/use-mobile.tsx
+ create mode 100644 university-portal/src/hooks/use-toast.ts
+ create mode 100644 university-portal/src/index.css
+ create mode 100644 university-portal/src/lib/course-constants.ts
+ create mode 100644 university-portal/src/lib/readResponseJson.ts
+ create mode 100644 university-portal/src/lib/utils.ts
+ create mode 100644 university-portal/src/main.tsx
+ create mode 100644 university-portal/src/pages/bulk.tsx
+ create mode 100644 university-portal/src/pages/course-detail.tsx
+ create mode 100644 university-portal/src/pages/courses.tsx
+ create mode 100644 university-portal/src/pages/dashboard.tsx
+ create mode 100644 university-portal/src/pages/new-course.tsx
+ create mode 100644 university-portal/src/pages/not-found.tsx
+ create mode 100644 university-portal/src/pages/scraping.tsx
+ create mode 100644 university-portal/src/pages/universities.tsx
+ create mode 100644 university-portal/src/pages/university-detail.tsx
+Scope: all 10 workspace projects
+ WARN  1 deprecated subdependencies found: whatwg-encoding@3.1.1
+Already up to date
+Progress: resolved 540, reused 537, downloaded 0, added 0, done
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+└─ Done in 20ms
+Done in 4.5s using pnpm v10.33.0
+
+> @workspace/db@0.0.0 push /opt/app/lib/db
+> drizzle-kit push --config ./drizzle.config.ts
+
+Reading config file '/opt/app/lib/db/drizzle.config.ts'
+DATABASE_URL, ensure the database is provisioned
+/opt/app/lib/db:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/db@0.0.0 push: `drizzle-kit push --config ./drizzle.config.ts`
+Exit status 1
+root@university-and-course-data:/opt/app# 
