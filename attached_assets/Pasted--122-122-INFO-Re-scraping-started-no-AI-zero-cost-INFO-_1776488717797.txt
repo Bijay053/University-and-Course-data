@@ -1,0 +1,253 @@
+
+122/122
+[INFO ] Re-scraping started (no AI, zero cost)...
+[INFO ] Re-scraping Torrens University Australia using saved config (NO AI, zero cost)
+[INFO ] Re-scraping with saved config (122 course links, no AI)...
+[DISCOVER] Using saved university pages: feePage: https://www.torrens.edu.au/international-fees, feesPdf: https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule
+[ 1/122] Fetching 1/122: Bachelor Of Architectural Technology
+[ 2/122] Fetching 2/122: Bachelor Of 3d Design And Animation
+[ 3/122] Fetching 3/122: Bachelor Of Game Design And Development
+[ 4/122] Fetching 4/122: Bachelor Of Game Programming
+[ 5/122] Fetching 5/122: Bachelor Of Branded Fashion Design
+[ 6/122] Fetching 6/122: Bachelor Of Communication Design
+[ 7/122] Fetching 7/122: Bachelor Of Media Production And Communication
+[ 8/122] Fetching 8/122: Diploma Of Media Production
+[ 9/122] Fetching 9/122: Bachelor Of Fashion Marketing And Enterprise
+[ 10/122] Fetching 10/122: Bachelor Of Interior Design Commercial
+[ 11/122] Fetching 11/122: Bachelor Of Interior Design Residential
+[ 12/122] Fetching 12/122: Bachelor Of Ux And Web Design
+[ 13/122] Fetching 13/122: Diploma Of 3d Design And Animation
+[ 14/122] Fetching 14/122: Diploma Of Branded Fashion Design
+[ 15/122] Fetching 15/122: Diploma Of Design
+[ 16/122] Fetching 16/122: Diploma Of Fashion Marketing And Enterprise
+[ 17/122] Fetching 17/122: Diploma Of Graphic Design
+[ 18/122] Fetching 18/122: Diploma Of Interior Design And Decoration
+[ 19/122] Fetching 19/122: Diploma Of Photography And Photo Imaging
+[ 20/122] Fetching 20/122: Diploma Of Ux And Web Design
+[ 21/122] Fetching 21/122: Graduate Certificate Of Design
+[ 22/122] Fetching 22/122: Graduate Certificate Of Ux Design
+[ 23/122] Fetching 23/122: Master Of Design
+[ 24/122] Fetching 24/122: Bachelor Of Community Services
+[ 25/122] Fetching 25/122: Bachelor Of Counselling
+[ 26/122] Fetching 26/122: Bachelor Of Health Science Chinese Medicine
+[ 27/122] Fetching 27/122: Bachelor Of Health Science Clinical Nutrition
+[ 28/122] Fetching 28/122: Bachelor Of Health Science Dermal Therapies
+[ 29/122] Fetching 29/122: Bachelor Of Health Science Naturopathy
+[ 30/122] Fetching 30/122: Bachelor Of Health Science Western Herbal Medicine
+[ 31/122] Fetching 31/122: Bachelor Of Nursing
+[ 32/122] Fetching 32/122: Bachelor Of Nutrition
+[ 33/122] Fetching 33/122: Bachelor Of Psychological Science
+[ 34/122] Fetching 34/122: Diploma Of Beauty And Spa Practice
+[ 35/122] Fetching 35/122: Diploma Of Counselling Vet
+[ 36/122] Fetching 36/122: Diploma Of Health And Wellbeing
+[ 37/122] Fetching 37/122: Diploma Of Health Science
+[ 38/122] Fetching 38/122: Diploma Of Nutrition
+[ 39/122] Fetching 39/122: Diploma Of Sport Development
+[ 40/122] Fetching 40/122: Graduate Certificate Of Counselling
+[ 41/122] Fetching 41/122: Graduate Certificate Of Public Health
+[ 42/122] Fetching 42/122: Graduate Diploma Of Counselling
+[ 43/122] Fetching 43/122: Graduate Diploma Of Psychology
+[ 44/122] Fetching 44/122: Graduate Diploma Of Public Health
+[ 45/122] Fetching 45/122: Master Of Counselling
+[ 46/122] Fetching 46/122: Master Of Counselling Advanced
+[ 47/122] Fetching 47/122: Master Of Public Health
+[ 48/122] Fetching 48/122: Master Of Public Health Advanced
+[ 49/122] Fetching 49/122: Bachelor Of Applied Business Management Partnership With Ducere
+[ 50/122] Fetching 50/122: Bachelor Of Applied Business Marketing Partnership With Ducere
+[ 51/122] Fetching 51/122: Bachelor Of Applied Entrepreneurship Partnership With Ducere
+[ 52/122] Fetching 52/122: Bachelor Of Business
+[ 53/122] Fetching 53/122: Bachelor Of Business Accounting
+[ 54/122] Fetching 54/122: Bachelor Of Business Entrepreneurship
+[ 55/122] Fetching 55/122: Bachelor Of Business Event Management
+[ 56/122] Fetching 56/122: Bachelor Of Business Marketing
+[ 57/122] Fetching 57/122: Bachelor Of Business Sports Management
+[ 58/122] Fetching 58/122: Diploma Of Business
+[ 59/122] Fetching 59/122: Diploma Of Business Accounting
+[ 60/122] Fetching 60/122: Diploma Of Business Entrepreneurship
+[ 61/122] Fetching 61/122: Diploma Of Business Sport Management
+[ 62/122] Fetching 62/122: Diploma Of Event Management
+[ 63/122] Fetching 63/122: Diploma Of Marketing
+[ 64/122] Fetching 64/122: Graduate Certificate Of Analytics
+[ 65/122] Fetching 65/122: Graduate Certificate Of Applied Business Partnership With Ducere
+[ 66/122] Fetching 66/122: Graduate Certificate Of Business Administration
+[ 67/122] Fetching 67/122: Graduate Certificate Of Business Administration On Demand
+[ 68/122] Fetching 68/122: Graduate Certificate Of Business Analytics
+[ 69/122] Fetching 69/122: Graduate Certificate Of Economics Of Sustainability
+[ 70/122] Fetching 70/122: Graduate Certificate Of Global Project Management
+[ 71/122] Fetching 71/122: Graduate Diploma Of Applied Business Partnership With Ducere
+[ 72/122] Fetching 72/122: Graduate Diploma Of Business Administration
+[ 73/122] Fetching 73/122: Graduate Diploma Of Business Administration On Demand
+[ 74/122] Fetching 74/122: Graduate Diploma Of Business Analytics
+[ 75/122] Fetching 75/122: Graduate Diploma Of Economics Of Sustainability
+[ 76/122] Fetching 76/122: Graduate Diploma Of Global Project Management
+[ 77/122] Fetching 77/122: Master Of Business Administration Advanced
+[ 78/122] Fetching 78/122: Master Of Business Administration And Global Project Management
+[ 79/122] Fetching 79/122: Master Of Business Administration And Master Of Public Health
+[ 80/122] Fetching 80/122: Master Of Business Administration Innovation And Leadership Partnership With Ducere
+[ 81/122] Fetching 81/122: Master Of Business Administration Mba
+[ 82/122] Fetching 82/122: Master Of Business Administration On Demand
+[ 83/122] Fetching 83/122: Master Of Business Analytics
+[ 84/122] Fetching 84/122: Master Of Business Analytics Advanced
+[ 85/122] Fetching 85/122: Master Of Economics Of Sustainability
+[ 86/122] Fetching 86/122: Master Of Engineering Management
+[ 87/122] Fetching 87/122: Master Of Global Project Management
+[ 88/122] Fetching 88/122: Master Of Global Project Management Advanced
+[ 89/122] Fetching 89/122: Master Of Global Project Management And Master Of Public Health
+[ 90/122] Fetching 90/122: Master Of Professional Accounting
+[ 91/122] Fetching 91/122: Master Of Professional Accounting Advanced
+[ 92/122] Fetching 92/122: Associate Degree Of Business Hospitality And Tourism Management
+[ 93/122] Fetching 93/122: Bachelor Of Business Hospitality And Tourism Management
+[ 94/122] Fetching 94/122: Bachelor Of Business International Hotel Management
+[ 95/122] Fetching 95/122: Diploma Of Business Hospitality And Tourism Management
+[ 96/122] Fetching 96/122: Diploma Of Business International Hotel Management
+[ 97/122] Fetching 97/122: Diploma Of Travel And Tourism In Partnership With Flight Centre Travel Academy
+[ 98/122] Fetching 98/122: Master Of International Hotel Management
+[ 99/122] Fetching 99/122: Bachelor Of Cybersecurity
+[ 100/122] Fetching 100/122: Bachelor Of Information Technology
+[ 101/122] Fetching 101/122: Diploma Of Cybersecurity
+[ 102/122] Fetching 102/122: Diploma Of Information Technology
+[ 103/122] Fetching 103/122: Graduate Certificate Of Cybersecurity
+[ 104/122] Fetching 104/122: Graduate Certificate Of Information Technology
+[ 105/122] Fetching 105/122: Graduate Diploma Of Cybersecurity
+[ 106/122] Fetching 106/122: Graduate Diploma Of Information Technology
+[ 107/122] Fetching 107/122: Master Of Cybersecurity
+[ 108/122] Fetching 108/122: Master Of Cybersecurity Advanced
+[ 109/122] Fetching 109/122: Master Of Information Technology
+[ 110/122] Fetching 110/122: Master Of Information Technology Advanced
+[ 111/122] Fetching 111/122: Graduate Certificate In Autism And Neurodivergent Studies
+[ 112/122] Fetching 112/122: Graduate Certificate In Higher Education Learning And Teaching
+[ 113/122] Fetching 113/122: Graduate Certificate Of Education
+[ 114/122] Fetching 114/122: Graduate Diploma Of Education
+[ 115/122] Fetching 115/122: Master Of Education Inclusive Education
+[ 116/122] Fetching 116/122: Master Of Education Inclusive Literacies
+[ 117/122] Fetching 117/122: Master Of Education Leadership And Innovation
+[ 118/122] Fetching 118/122: Master Of Education Advanced
+[ 119/122] Fetching 119/122: Graduate Certificate Of Research Studies
+[ 120/122] Fetching 120/122: Graduate Diploma Of Research Studies
+[ 121/122] Fetching 121/122: Master Of Philosophy
+[ 122/122] Fetching 122/122: Master Of Research Studies
+[STAGE ] Staging 122 courses...
+✓ Bachelor Of Architectural Technology
+✓ Bachelor Of 3d Design And Animation
+✓ Bachelor Of Game Design And Development
+✓ Bachelor Of Game Programming
+✓ Bachelor Of Branded Fashion Design
+✓ Bachelor Of Communication Design
+✓ Bachelor Of Media Production And Communication
+✓ Diploma Of Media Production
+✓ Bachelor Of Fashion Marketing And Enterprise
+✓ Bachelor Of Interior Design Commercial
+✓ Bachelor Of Interior Design Residential
+✓ Bachelor Of Ux And Web Design
+✓ Diploma Of 3d Design And Animation
+✓ Diploma Of Branded Fashion Design
+✓ Diploma Of Design
+✓ Diploma Of Fashion Marketing And Enterprise
+✓ Diploma Of Graphic Design
+✓ Diploma Of Interior Design And Decoration
+✓ Diploma Of Photography And Photo Imaging
+✓ Diploma Of Ux And Web Design
+✓ Graduate Certificate Of Design
+✓ Graduate Certificate Of Ux Design
+✓ Master Of Design
+✓ Bachelor Of Community Services
+✓ Bachelor Of Counselling
+✓ Bachelor Of Health Science Chinese Medicine
+✓ Bachelor Of Health Science Clinical Nutrition
+✓ Bachelor Of Health Science Dermal Therapies
+✓ Bachelor Of Health Science Naturopathy
+✓ Bachelor Of Health Science Western Herbal Medicine
+✓ Bachelor Of Nursing
+✓ Bachelor Of Nutrition
+✓ Bachelor Of Psychological Science
+✓ Diploma Of Beauty And Spa Practice
+✓ Diploma Of Counselling Vet
+✓ Diploma Of Health And Wellbeing
+✓ Diploma Of Health Science
+✓ Diploma Of Nutrition
+✓ Diploma Of Sport Development
+✓ Graduate Certificate Of Counselling
+✓ Graduate Certificate Of Public Health
+✓ Graduate Diploma Of Counselling
+✓ Graduate Diploma Of Psychology
+✓ Graduate Diploma Of Public Health
+✓ Master Of Counselling
+[VALIDATE] Skipped (domestic only): "Master Of Counselling Advanced"
+– Master Of Counselling Advanced [skipped]
+✓ Master Of Public Health
+✓ Master Of Public Health Advanced
+✓ Bachelor Of Applied Business Management Partnership With Ducere
+✓ Bachelor Of Applied Business Marketing Partnership With Ducere
+✓ Bachelor Of Applied Entrepreneurship Partnership With Ducere
+✓ Bachelor Of Business
+✓ Bachelor Of Business Accounting
+✓ Bachelor Of Business Entrepreneurship
+✓ Bachelor Of Business Event Management
+✓ Bachelor Of Business Marketing
+✓ Bachelor Of Business Sports Management
+✓ Diploma Of Business
+✓ Diploma Of Business Accounting
+✓ Diploma Of Business Entrepreneurship
+✓ Diploma Of Business Sport Management
+✓ Diploma Of Event Management
+✓ Diploma Of Marketing
+✓ Graduate Certificate Of Analytics
+✓ Graduate Certificate Of Applied Business Partnership With Ducere
+✓ Graduate Certificate Of Business Administration
+✓ Graduate Certificate Of Business Administration On Demand
+✓ Graduate Certificate Of Business Analytics
+✓ Graduate Certificate Of Economics Of Sustainability
+✓ Graduate Certificate Of Global Project Management
+✓ Graduate Diploma Of Applied Business Partnership With Ducere
+✓ Graduate Diploma Of Business Administration
+✓ Graduate Diploma Of Business Administration On Demand
+✓ Graduate Diploma Of Business Analytics
+✓ Graduate Diploma Of Economics Of Sustainability
+✓ Graduate Diploma Of Global Project Management
+✓ Master Of Business Administration Advanced
+✓ Master Of Business Administration And Global Project Management
+✓ Master Of Business Administration And Master Of Public Health
+✓ Master Of Business Administration Innovation And Leadership Partnership With Ducere
+✓ Master Of Business Administration Mba
+✓ Master Of Business Administration On Demand
+✓ Master Of Business Analytics
+✓ Master Of Business Analytics Advanced
+✓ Master Of Economics Of Sustainability
+✓ Master Of Engineering Management
+✓ Master Of Global Project Management
+✓ Master Of Global Project Management Advanced
+✓ Master Of Global Project Management And Master Of Public Health
+✓ Master Of Professional Accounting
+✓ Master Of Professional Accounting Advanced
+✓ Associate Degree Of Business Hospitality And Tourism Management
+✓ Bachelor Of Business Hospitality And Tourism Management
+✓ Bachelor Of Business International Hotel Management
+✓ Diploma Of Business Hospitality And Tourism Management
+✓ Diploma Of Business International Hotel Management
+✓ Diploma Of Travel And Tourism In Partnership With Flight Centre Travel Academy
+✓ Master Of International Hotel Management
+✓ Bachelor Of Cybersecurity
+✓ Bachelor Of Information Technology
+✓ Diploma Of Cybersecurity
+✓ Diploma Of Information Technology
+✓ Graduate Certificate Of Cybersecurity
+✓ Graduate Certificate Of Information Technology
+✓ Graduate Diploma Of Cybersecurity
+✓ Graduate Diploma Of Information Technology
+✓ Master Of Cybersecurity
+✓ Master Of Cybersecurity Advanced
+✓ Master Of Information Technology
+✓ Master Of Information Technology Advanced
+✓ Graduate Certificate In Autism And Neurodivergent Studies
+✓ Graduate Certificate In Higher Education Learning And Teaching
+✓ Graduate Certificate Of Education
+✓ Graduate Diploma Of Education
+✓ Master Of Education Inclusive Education
+✓ Master Of Education Inclusive Literacies
+✓ Master Of Education Leadership And Innovation
+✓ Master Of Education Advanced
+✓ Graduate Certificate Of Research Studies
+✓ Graduate Diploma Of Research Studies
+✓ Master Of Philosophy
+✓ Master Of Research Studies
+══ DONE ══ Found:122 | Staged:121 | Skipped:1 | Errors:0

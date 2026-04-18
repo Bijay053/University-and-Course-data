@@ -148,6 +148,18 @@ export function parseIelts(rawText: string): BandScore {
       return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 90 };
   }
 
+  // P3b-tor: "Academic IELTS 6.0 (no band less than 5.5)" — Torrens format
+  // Score appears directly after "IELTS" with no "overall" keyword; min band in parentheses.
+  m = text.match(
+    /(?:academic\s+)?ielts(?:\s+academic)?\s+([\d.]+)\s*\([^)]*?no\s+band\s+(?:less\s+than|below|lower\s+than)\s*([\d.]+)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const min = Number(m[2]);
+    if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9)
+      return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 92 };
+  }
+
   // P3b: "Academic IELTS band score of 5.5" / "IELTS band score of 5.5"
   m = text.match(
     /(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,40}?(?:band\s+score|score)\s+(?:of\s+)?([4-9](?:\.[05])?)/i,

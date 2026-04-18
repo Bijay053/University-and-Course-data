@@ -5351,7 +5351,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             })
           );
 
-        if (job.fastMode) {
+        if (job.fastMode && !siteNeedsBrowser(link.url)) {
+          // Fast mode: static only — but always use browser for known JS-heavy sites
+          // (e.g. Torrens hides IELTS requirements behind an International tab)
           cHtml = await fetchPage(link.url);
         } else if (siteNeedsBrowser(link.url)) {
           // Known JS-heavy domain — skip static fetch, go straight to browser.
