@@ -3247,8 +3247,10 @@ async function stageCourse(
     }
   }
 
+  // Case-insensitive dedup: "Bachelor Of Business" and "bachelor of business"
+  // are the same course — sitemap vs listing page path casing differences cause this.
   const dup = await pool.query(
-    "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND course_name=$2 LIMIT 1",
+    "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND LOWER(course_name)=LOWER($2) LIMIT 1",
     [jobId, courseData.courseName],
   );
   if (dup.rows.length > 0) return false;
@@ -6594,9 +6596,17 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       rawCandidates = listingLinks;
       // Supplement with sitemap if available
       if (sitemapCandidates.length > 0) {
-        const seen = new Set(rawCandidates.map((l) => l.url));
+        // Normalize URLs for dedup: lowercase path + strip trailing slash
+        // (ASA sitemap uses title-cased paths while listing page uses lowercase,
+        //  causing the same 9 courses to appear 18 times without this guard)
+        const normUrl = (u: string) => {
+          try { const p = new URL(u); return (p.origin + p.pathname).toLowerCase().replace(/\/$/, ""); }
+          catch { return u.toLowerCase().replace(/\/$/, ""); }
+        };
+        const seen = new Set(rawCandidates.map((l) => normUrl(l.url)));
         for (const c of sitemapCandidates) {
-          if (!seen.has(c.url)) { seen.add(c.url); rawCandidates.push(c); }
+          const nu = normUrl(c.url);
+          if (!seen.has(nu)) { seen.add(nu); rawCandidates.push(c); }
         }
       }
     }
@@ -6619,6 +6629,27 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           rawCandidates = crawled;
         }
       } catch { /* crawl is best-effort */ }
+    }
+
+    // --- Final dedup of rawCandidates before research ---
+    // Guard against sites (e.g. ASA) whose sitemap paths differ only in casing
+    // from listing-page paths, causing the same course to appear twice.
+    {
+      const normUrl = (u: string) => {
+        try { const p = new URL(u); return (p.origin + p.pathname).toLowerCase().replace(/\/$/, ""); }
+        catch { return u.toLowerCase().replace(/\/$/, ""); }
+      };
+      const normName = (n: string) => n.toLowerCase().replace(/\s+/g, " ").trim();
+      const seenUrl = new Set<string>();
+      const seenName = new Set<string>();
+      rawCandidates = rawCandidates.filter((c) => {
+        const nu = normUrl(c.url);
+        const nn = normName(c.name);
+        if (seenUrl.has(nu) || (nn.length > 5 && seenName.has(nn))) return false;
+        seenUrl.add(nu);
+        if (nn.length > 5) seenName.add(nn);
+        return true;
+      });
     }
 
     // --- Phase 2: Research & Validate — do NOT fetch everything blindly ---

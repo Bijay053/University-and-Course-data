@@ -1,0 +1,73 @@
+
+[INFO ] Scraping started in background...
+[INFO ] Scraping http://asahe.edu.au/...
+[INFO ] Using university: asa (ID: 9)
+[INFO ] Cleared 75 older pending staged rows for asa before starting fresh scrape
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[INFO ] Switched to course listing: http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovering university-level fee & requirements pages...
+[CLASSIFY] Page type: listing — 9 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap: found 9 course URLs total
+[DISCOVER] [SMART] Sampling candidate pages — researching 18 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 18 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: asahe.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business International Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Technology Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Professional Accounting"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Software Application Development"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Cyber Security)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Artificial Intelligence)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business International Business"
+[DISCOVER] Research complete: 12/12 sampled pages are genuine course pages
+[DISCOVER] All 12 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (18 total).
+[DISCOVER] High confidence: 12/12 samples valid (100%). Auto-proceeding with 18 courses (~1 min). (18 courses)
+[EXTRACT ] [SMART] Fetching 18 validated course pages (browser-first for JS-heavy, static-first for the rest)... (18 courses)
+[INFO ] Batch concurrency: HTTP 1, browser 1 (heavy host: asahe.edu.au, browser disabled)
+[ 1/18] Fetching 1/18: Bachelor of Business International Business
+[ 2/18] Fetching 2/18: Bachelor of Business Hospitality Management
+[ 3/18] Fetching 3/18: Bachelor of Business Technology Management
+[ 4/18] Fetching 4/18: Bachelor of Business
+[ 5/18] Fetching 5/18: Bachelor of Professional Accounting
+[ 6/18] Fetching 6/18: Master of Software Application Development
+[ 7/18] Fetching 7/18: Master of Project Management
+[ 8/18] Fetching 8/18: Master of Information Technology (Cyber Security)
+[ 9/18] Fetching 9/18: Master of Information Technology (Artificial Intelligence)
+[ 10/18] Fetching 10/18: Bachelor Of Business
+[ 11/18] Fetching 11/18: Bachelor Of Business Hospitality Management
+[ 12/18] Fetching 12/18: Bachelor Of Business International Business
+[ 13/18] Fetching 13/18: Bachelor Of Business Technology Management
+[ 14/18] Fetching 14/18: Bachelor Of Professional Accounting
+[ 15/18] Fetching 15/18: Master Of Information Technology Artificial Intelligence
+[ 16/18] Fetching 16/18: Master Of Information Technology Cyber Security
+[ 17/18] Fetching 17/18: Master Of Project Management
+[ 18/18] Fetching 18/18: Master Of Software Application Development
+[INFO ] Classifying 18 courses with AI (batched)...
+✓ Bachelor of Business International Business
+✓ Bachelor of Business Hospitality Management
+✓ Bachelor of Business Technology Management
+✓ Bachelor of Business
+✓ Bachelor of Professional Accounting
+✓ Master of Software Application Development
+✓ Master of Project Management
+✓ Master of Information Technology (Cyber Security)
+✓ Master of Information Technology (Artificial Intelligence)
+✓ Bachelor Of Business
+✓ Bachelor Of Business Hospitality Management
+✓ Bachelor Of Business International Business
+✓ Bachelor Of Business Technology Management
+✓ Bachelor Of Professional Accounting
+✓ Master Of Information Technology Artificial Intelligence
+✓ Master Of Information Technology Cyber Security
+✓ Master Of Project Management
+✓ Master Of Software Application Development
+══ DONE ══ Found:18 | Staged:18 | Skipped:0 | Errors:0
+[INFO ] Saved scraping config (18 links) for future no-AI re-scrapes
