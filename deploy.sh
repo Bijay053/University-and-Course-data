@@ -40,32 +40,23 @@ apt-get install -y \
 apt-get install -y libasound2 2>/dev/null || apt-get install -y libasound2t64 2>/dev/null || true
 
 echo "=== 6. Clone repo ==="
-if [ -d /opt/app/.git ]; then
+if [ -d /opt/app ]; then
   echo "Repo already exists — pulling latest changes"
-  # Remove any locally modified tracked files that would block the pull
-  git -C /opt/app checkout -- deploy.sh 2>/dev/null || true
-  # Remove untracked deploy.sh if git checkout didn't handle it
-  [ -f /opt/app/deploy.sh ] && git -C /opt/app ls-files --error-unmatch deploy.sh 2>/dev/null || rm -f /opt/app/deploy.sh
-  git -C /opt/app pull
+  cd /opt/app && git pull
 else
   git clone https://github.com/Bijay053/University-and-Course-data.git /opt/app
 fi
 cd /opt/app
 
 echo "=== 7. Environment variables ==="
-# Only write .env if it doesn't already contain real values
-if grep -q "yourpassword123\|your_gemini_api_key_here\|change_this_to_a_random" /opt/app/.env 2>/dev/null || [ ! -f /opt/app/.env ]; then
-  echo "Writing .env with placeholder values — EDIT THIS FILE before first run!"
-  cat > /opt/app/.env <<'ENV'
+# Edit the values below before running this script
+cat > /opt/app/.env <<'ENV'
 DATABASE_URL=postgresql://uniportal:yourpassword123@localhost:5432/university_portal
 GEMINI_API_KEY=your_gemini_api_key_here
 SESSION_SECRET=change_this_to_a_random_secret_string_64chars
 PORT=8080
 NODE_ENV=production
 ENV
-else
-  echo ".env already configured — keeping existing values"
-fi
 
 echo "=== 8. Install dependencies ==="
 cd /opt/app

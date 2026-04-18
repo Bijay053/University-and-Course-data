@@ -167,6 +167,10 @@ function normalizeFieldValue(fieldKey: ReviewFieldKey, value: string | null): st
       .sort()
       .join(",");
   }
+  if (fieldKey === "ieltsOverall" || fieldKey === "pteOverall" || fieldKey === "toeflOverall") {
+    const numeric = parseFloat(cleaned);
+    if (Number.isFinite(numeric)) return String(numeric);
+  }
   return cleaned.toLowerCase().replace(/\b(aud|a\$)\b/g, "aud").replace(/,/g, "");
 }
 
@@ -217,10 +221,25 @@ function buildPatterns(fieldKey: ReviewFieldKey, value: string): RegExp[] {
     case "courseLocation":
       return [new RegExp(escaped.replace(/\s+/g, "\\s+"), "i"), /\b(campus|location|locations)\b[\s\S]{0,120}/i];
     case "internationalFee":
-      return [/\b(international|tuition|fee|fees)\b[\s\S]{0,120}?(aud|a\$|\$)\s*[\d,]+/i, /\b(aud|a\$|\$)\s*[\d,]+/i];
+      {
+        const digits = value.replace(/[^\d]/g, "");
+        if (!digits) return [];
+        const commaFlexible = digits.length > 3
+          ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",?")
+          : digits;
+        return [
+          new RegExp(`\\b(?:aud|a\\$|\\$)?\\s*${commaFlexible}\\b`, "i"),
+          new RegExp(`\\b(?:international|tuition|fee|fees)\\b[\\s\\S]{0,120}?(?:aud|a\\$|\\$)?\\s*${commaFlexible}\\b`, "i"),
+        ];
+      }
     case "intakeMonths":
       return [/\b(intake|intakes|commence|start)\b[\s\S]{0,140}/i, new RegExp(`\\b(${MONTH_NAMES.join("|")})\\b`, "i")];
     case "ieltsOverall":
+      if (/^\d+(?:\.\d+)?$/.test(value)) {
+        const numeric = parseFloat(value);
+        const numericPattern = Number.isInteger(numeric) ? `${numeric}(?:\\.0)?` : `${numeric}`;
+        return [new RegExp(`\\bielts\\b[\\s\\S]{0,120}?\\b${numericPattern}\\b`, "i")];
+      }
       return [/\bielts\b[\s\S]{0,120}?\b\d(?:\.\d)?\b/i];
     case "pteOverall":
       return [/\bpte\b[\s\S]{0,120}?\b\d{2}\b/i];
@@ -287,6 +306,9 @@ function makeDerivedCandidate(fieldKey: ReviewFieldKey, rawValue: string | null)
 
 function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource): Array<{ value: string; snippet: string | null; confidence: number }> {
   const results: Array<{ value: string; snippet: string | null; confidence: number }> = [];
+  const pageType = source.pageType;
+  const feeSourceAllowed = pageType === "course_page" || pageType === "fee_page" || pageType === "fee_pdf" || pageType === "brochure_pdf";
+  const courseDetailSourceAllowed = pageType === "course_page" || pageType === "listing_page" || pageType === "brochure_pdf";
   const pushValue = (value: string, snippet: string | null, confidence: number) => {
     const normalized = normalizeFieldValue(fieldKey, value);
     if (!normalized) return;
@@ -295,6 +317,7 @@ function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource)
   };
 
   if (fieldKey === "internationalFee") {
+    if (!feeSourceAllowed) return results;
     const matches = Array.from(source.content.matchAll(/\b(?:aud|a\$|\$)\s*([\d,]{4,})/gi)).slice(0, 4);
     for (const match of matches) {
       const snippet = findSnippet(source, [new RegExp(`${escapeRegex(match[0])}`, "i"), /\b(international|tuition|fee|fees)\b[\s\S]{0,120}/i]);
@@ -310,14 +333,25 @@ function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource)
     const match = source.content.match(/\btoefl\b[\s\S]{0,120}?\b(\d{2,3})\b/i);
     if (match) pushValue(match[1], findSnippet(source, [/\btoefl\b[\s\S]{0,120}?\b\d{2,3}\b/i]), sourceBaseConfidence(source));
   } else if (fieldKey === "duration") {
+    if (!courseDetailSourceAllowed) return results;
     const match = source.content.match(/\b(\d(?:\.\d+)?)\s*(year|month|week|semester|trimester)s?\b/i);
     if (match) pushValue(`${match[1]} ${match[2]}`, findSnippet(source, [/\b(duration|length|study period)\b[\s\S]{0,80}?\b\d+(?:\.\d+)?\s*(year|month|week|semester|trimester)s?\b/i]), sourceBaseConfidence(source) - 0.05);
   } else if (fieldKey === "intakeMonths") {
-    const months = MONTH_NAMES.filter((month) => new RegExp(`\\b${month}\\b`, "i").test(source.content));
-    if (months.length > 0) pushValue(months.join(", "), findSnippet(source, [/\b(intake|intakes|commence|start)\b[\s\S]{0,140}/i]), sourceBaseConfidence(source) - 0.08);
+    if (!courseDetailSourceAllowed) return results;
+    const intakeContext = source.content.match(/\b(intake|intakes|commence|commencing|start|starts|starting)\b[\s\S]{0,180}/i)?.[0] || null;
+    if (intakeContext) {
+      const months = MONTH_NAMES.filter((month) => new RegExp(`\\b${month}\\b`, "i").test(intakeContext));
+      if (months.length > 0) pushValue(months.join(", "), normalizeWhitespace(intakeContext), sourceBaseConfidence(source) - 0.08);
+    }
   } else if (fieldKey === "studyMode") {
-    const match = source.content.match(/\b(on campus|online only|online|face[- ]to[- ]face|blended|mixed|hybrid|in person)\b/i);
-    if (match) pushValue(match[1], findSnippet(source, [/\b(on campus|online only|online|face[- ]to[- ]face|blended|mixed|hybrid|in person)\b/i]), sourceBaseConfidence(source) - 0.04);
+    if (!courseDetailSourceAllowed) return results;
+    const explicitMode =
+      source.content.match(/\b(?:study|delivery|attendance)\s*mode\b[\s:.-]{0,20}(on campus|online only|online|face[- ]to[- ]face|blended|mixed|hybrid|in person)\b/i) ||
+      source.content.match(/\b(on campus|online only|face[- ]to[- ]face|blended|mixed|hybrid|in person)\b[\s\S]{0,40}\b(?:study|delivery|attendance)\s*mode\b/i);
+    if (explicitMode) {
+      const valueMatch = explicitMode[1] || explicitMode[0].match(/\b(on campus|online only|online|face[- ]to[- ]face|blended|mixed|hybrid|in person)\b/i)?.[1];
+      if (valueMatch) pushValue(valueMatch, normalizeWhitespace(explicitMode[0]), sourceBaseConfidence(source) - 0.04);
+    }
   }
 
   return results;
@@ -401,7 +435,14 @@ function resolveField(fieldKey: ReviewFieldKey, candidates: FieldCandidate[]): {
   }
 
   const winner = sorted[0];
-  const conflicting = sorted.find((candidate) => candidate.normalizedValue && winner.normalizedValue && candidate.normalizedValue !== winner.normalizedValue);
+  const conflicting = sorted.find((candidate) =>
+    candidate.normalizedValue &&
+    winner.normalizedValue &&
+    candidate.normalizedValue !== winner.normalizedValue &&
+    candidate.sourceUrl &&
+    winner.sourceUrl &&
+    candidate.sourceUrl !== winner.sourceUrl
+  );
   if (conflicting && Math.abs(conflicting.confidence - winner.confidence) < 0.15) {
     conflicts.push({
       fieldKey,
@@ -472,6 +513,18 @@ function assessEligibility(data: ReviewCourseData, sources: ReviewSource[]): Eli
       eligibilityStatus: "rejected",
       reason: "Online-only evidence found",
       confidence: 0.94,
+      evidenceText: evidence,
+    };
+  }
+  if ((data.studyMode || "").trim().toLowerCase() === "online" && !data.courseLocation) {
+    return {
+      studentMarket: /\b(international students|cricos|student visa)\b/i.test(combined) ? "international" : "unknown",
+      deliveryMode: "online_only",
+      internationalEligible: !data.domesticOnly,
+      onCampusAvailable: false,
+      eligibilityStatus: "rejected",
+      reason: "Study mode is online with no physical campus evidence",
+      confidence: 0.93,
       evidenceText: evidence,
     };
   }

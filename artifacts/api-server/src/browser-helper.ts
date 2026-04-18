@@ -247,7 +247,6 @@ export async function fetchPageWithBrowser(
 
 const JS_HEAVY_DOMAINS = [
   "asahe.edu.au",
-  "torrens.edu.au",
   "vit.edu.au",
   "victorianinstitute.edu.au",
   "newcastle.edu.au",

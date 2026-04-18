@@ -168,6 +168,12 @@ type CourseReviewPayload = {
 };
 
 const ALL = "__new__";
+const MAX_SCRAPE_LOG_LINES = 800;
+const SCRAPE_POLL_BASE_DELAY_MS = 1500;
+const SCRAPE_POLL_MAX_DELAY_MS = 10000;
+const SCRAPE_POLL_TIMEOUT_MS = 90000;
+const SCRAPE_POLL_WARNING_AFTER_FAILURES = 4;
+const SCRAPE_POLL_WARNING_AFTER_IDLE_MS = 120000;
 
 function statusBadge(status: string) {
   if (status === "completed") return <Badge className="bg-green-100 text-green-700 border-green-200">Completed</Badge>;
@@ -200,6 +206,11 @@ export default function Scraping() {
   const logIndexRef = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollFailureCountRef = useRef(0);
+  const pollInFlightRef = useRef(false);
+  const pollWarningShownRef = useRef(false);
+  const pollLastSuccessAtRef = useRef(Date.now());
+  const pollRequestTimeoutRef = useRef<number | null>(null);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
   const [showReview, setShowReview] = useState(false);
@@ -271,6 +282,28 @@ export default function Scraping() {
     } catch {}
   }, []);
 
+  const resetActiveScrapeState = useCallback((message?: string) => {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+    if (pollRequestTimeoutRef.current !== null) {
+      window.clearTimeout(pollRequestTimeoutRef.current);
+      pollRequestTimeoutRef.current = null;
+    }
+    pollFailureCountRef.current = 0;
+    pollLastSuccessAtRef.current = Date.now();
+    setScraping(false);
+    setStopping(false);
+    setAwaitingApproval(null);
+    setActiveJobId(null);
+    setUrlQueueProgress(null);
+    sessionStorage.removeItem("activeScrapeJob");
+    if (message) {
+      setScrapeLogs((prev) => [...prev, { event: "error", message }].slice(-MAX_SCRAPE_LOG_LINES));
+    }
+  }, []);
+
   const startSingleJob = useCallback(async (url: string): Promise<string | false> => {
     const body: Record<string, unknown> = { url, ...uniBodyRef.current };
     const resp = await fetch("/api/scrape/start", {
@@ -280,38 +313,92 @@ export default function Scraping() {
     });
     if (!resp.ok) {
       const msg = await getFetchErrorMessage(resp);
-      setScrapeLogs((prev) => [...prev, { event: "error", message: msg }]);
+      setScrapeLogs((prev) => [...prev, { event: "error", message: msg }].slice(-MAX_SCRAPE_LOG_LINES));
       return false;
     }
     const data = await readResponseJson<{ jobId: string }>(resp);
     if (!data?.jobId) {
-      setScrapeLogs((prev) => [...prev, { event: "error", message: "Invalid response from server" }]);
+      setScrapeLogs((prev) => [...prev, { event: "error", message: "Invalid response from server" }].slice(-MAX_SCRAPE_LOG_LINES));
       return false;
     }
     setActiveJobId(data.jobId);
     setScrapeTargetUrl(url);
     sessionStorage.setItem("activeScrapeJob", data.jobId);
-    setScrapeLogs((prev) => [...prev, { event: "status", message: `Scraping ${url}...` }]);
+    setScrapeLogs((prev) => [...prev, { event: "status", message: `Scraping ${url}...` }].slice(-MAX_SCRAPE_LOG_LINES));
     return data.jobId;
   }, []);
 
   const pollJobStatus = useCallback((jobId: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollRef.current) clearTimeout(pollRef.current);
+    if (pollRequestTimeoutRef.current !== null) {
+      window.clearTimeout(pollRequestTimeoutRef.current);
+      pollRequestTimeoutRef.current = null;
+    }
     logIndexRef.current = 0;
+    pollFailureCountRef.current = 0;
+    pollInFlightRef.current = false;
+    pollWarningShownRef.current = false;
+    pollLastSuccessAtRef.current = Date.now();
+
+    const scheduleNextPoll = (delayMs: number) => {
+      if (pollRef.current) clearTimeout(pollRef.current);
+      pollRef.current = window.setTimeout(() => {
+        void poll();
+      }, delayMs);
+    };
+
+    const maybeReportPollingDelay = () => {
+      const idleMs = Date.now() - pollLastSuccessAtRef.current;
+      if (
+        pollFailureCountRef.current >= SCRAPE_POLL_WARNING_AFTER_FAILURES &&
+        idleMs >= SCRAPE_POLL_WARNING_AFTER_IDLE_MS &&
+        !pollWarningShownRef.current
+      ) {
+        pollWarningShownRef.current = true;
+        setScrapeLogs((prev) => [...prev, {
+          event: "status",
+          message: "Local scrape is still running. Status refresh is delayed, but it will keep retrying automatically.",
+        }].slice(-MAX_SCRAPE_LOG_LINES));
+      }
+    };
 
     const poll = async () => {
+      if (pollInFlightRef.current) return;
+      pollInFlightRef.current = true;
+      let continuePolling = true;
+      let nextDelayMs = SCRAPE_POLL_BASE_DELAY_MS;
       try {
-        const res = await fetch(`/api/scrape/status/${jobId}?since=${logIndexRef.current}`);
-        if (!res.ok) {
-          if (res.status === 404) {
-            setScraping(false);
-            setActiveJobId(null);
-            setUrlQueueProgress(null);
-            sessionStorage.removeItem("activeScrapeJob");
-            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-          }
+        const controller = new AbortController();
+        pollRequestTimeoutRef.current = window.setTimeout(() => controller.abort(), SCRAPE_POLL_TIMEOUT_MS);
+        const res = await fetch(`/api/scrape/status/${jobId}?since=${logIndexRef.current}`, {
+          signal: controller.signal,
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (pollRequestTimeoutRef.current !== null) {
+          window.clearTimeout(pollRequestTimeoutRef.current);
+          pollRequestTimeoutRef.current = null;
+        }
+        if (res.status === 304) {
+          pollFailureCountRef.current = 0;
+          pollWarningShownRef.current = false;
+          pollLastSuccessAtRef.current = Date.now();
           return;
         }
+        if (!res.ok) {
+          if (res.status === 404) {
+            resetActiveScrapeState("The previous scrape job is no longer available locally.");
+            continuePolling = false;
+            return;
+          }
+          pollFailureCountRef.current += 1;
+          nextDelayMs = Math.min(SCRAPE_POLL_BASE_DELAY_MS * (pollFailureCountRef.current + 1), SCRAPE_POLL_MAX_DELAY_MS);
+          maybeReportPollingDelay();
+          return;
+        }
+        pollFailureCountRef.current = 0;
+        pollWarningShownRef.current = false;
+        pollLastSuccessAtRef.current = Date.now();
         const data = await readResponseJson<ScrapeStatusResponse>(res);
         if (!data) return;
 
@@ -320,7 +407,7 @@ export default function Scraping() {
 
         const logs = data.logs;
         if (logs && logs.length > 0) {
-          setScrapeLogs((prev) => [...prev, ...logs]);
+          setScrapeLogs((prev) => [...prev, ...logs].slice(-MAX_SCRAPE_LOG_LINES));
           if (data.logIndex !== undefined) logIndexRef.current = data.logIndex;
 
           const doneLog = logs.find((l: ScrapeLog) => l.event === "done");
@@ -348,7 +435,7 @@ export default function Scraping() {
         if (data.status !== "running" && data.status !== "awaiting_approval") {
           setStopping(false);
           setAwaitingApproval(null);
-          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
           if ((data.status === "completed" || data.status === "stopped") && (data.imported ?? 0) > 0) {
             loadStagedCourses(jobId);
           }
@@ -356,8 +443,9 @@ export default function Scraping() {
           // Process next URL in queue
           const nextUrl = urlQueueRef.current.shift();
           if (nextUrl) {
+            continuePolling = false;
             setUrlQueueProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
-            setScrapeLogs((prev) => [...prev, { event: "status", message: `── Starting next URL (${nextUrl}) ──` }]);
+            setScrapeLogs((prev) => [...prev, { event: "status", message: `── Starting next URL (${nextUrl}) ──` }].slice(-MAX_SCRAPE_LOG_LINES));
             const nextJobId = await startSingleJob(nextUrl);
             if (nextJobId) {
               pollJobStatus(nextJobId);
@@ -368,18 +456,40 @@ export default function Scraping() {
           } else {
             setScraping(false);
             setUrlQueueProgress(null);
+            continuePolling = false;
           }
         }
-      } catch {}
+      } catch (error) {
+        if (pollRequestTimeoutRef.current !== null) {
+          window.clearTimeout(pollRequestTimeoutRef.current);
+          pollRequestTimeoutRef.current = null;
+        }
+        pollFailureCountRef.current += 1;
+        const aborted =
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof Error && /abort|timeout/i.test(error.message));
+        nextDelayMs = Math.min(
+          SCRAPE_POLL_BASE_DELAY_MS * (aborted ? pollFailureCountRef.current + 2 : pollFailureCountRef.current + 1),
+          SCRAPE_POLL_MAX_DELAY_MS
+        );
+        maybeReportPollingDelay();
+      } finally {
+        pollInFlightRef.current = false;
+        if (continuePolling) {
+          scheduleNextPoll(nextDelayMs);
+        }
+      }
     };
 
-    poll();
-    pollRef.current = setInterval(poll, 1500);
-  }, [loadStagedCourses, startSingleJob]);
+    void poll();
+  }, [loadStagedCourses, resetActiveScrapeState, startSingleJob]);
 
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
+      if (pollRequestTimeoutRef.current !== null) {
+        window.clearTimeout(pollRequestTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -458,7 +568,7 @@ export default function Scraping() {
     }
 
     try {
-      setScrapeLogs([{ event: "status", message: "Scraping started in background..." }]);
+      setScrapeLogs([{ event: "status", message: "Scraping started in background..." }].slice(-MAX_SCRAPE_LOG_LINES));
       const jobId = await startSingleJob(validUrls[0]);
       if (jobId) {
         pollJobStatus(jobId);
@@ -466,7 +576,7 @@ export default function Scraping() {
         setScraping(false);
       }
     } catch (err) {
-      setScrapeLogs([{ event: "error", message: (err as Error).message }]);
+      setScrapeLogs([{ event: "error", message: (err as Error).message }].slice(-MAX_SCRAPE_LOG_LINES));
       setScraping(false);
     }
   }, [scrapeUrls, feePageUrl, requirementsPageUrl, fastMode, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
@@ -843,22 +953,22 @@ export default function Scraping() {
                     });
                     if (!resp.ok) {
                       const msg = await getFetchErrorMessage(resp);
-                      setScrapeLogs([{ event: "error", message: msg }]);
+                      setScrapeLogs([{ event: "error", message: msg }].slice(-MAX_SCRAPE_LOG_LINES));
                       setScraping(false);
                       return;
                     }
                     const data = await readResponseJson<{ jobId: string }>(resp);
                     if (!data?.jobId) {
-                      setScrapeLogs([{ event: "error", message: "Invalid response from server" }]);
+                      setScrapeLogs([{ event: "error", message: "Invalid response from server" }].slice(-MAX_SCRAPE_LOG_LINES));
                       setScraping(false);
                       return;
                     }
                     setActiveJobId(data.jobId);
                     sessionStorage.setItem("activeScrapeJob", data.jobId);
-                    setScrapeLogs([{ event: "status", message: "Re-scraping started (no AI, zero cost)..." }]);
+                    setScrapeLogs([{ event: "status", message: "Re-scraping started (no AI, zero cost)..." }].slice(-MAX_SCRAPE_LOG_LINES));
                     pollJobStatus(data.jobId);
                   } catch (err) {
-                    setScrapeLogs([{ event: "error", message: (err as Error).message }]);
+                    setScrapeLogs([{ event: "error", message: (err as Error).message }].slice(-MAX_SCRAPE_LOG_LINES));
                     setScraping(false);
                   }
                 }}

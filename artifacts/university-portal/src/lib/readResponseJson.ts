@@ -24,7 +24,7 @@ export async function getFetchErrorMessage(res: Response): Promise<string> {
   if (!trimmed) {
     return (
       `Request failed (${statusBit}). Empty response — is the API running and is /api proxied to it? ` +
-      `(Local dev: run the API and set API_PROXY_TARGET if not http://127.0.0.1:8080.)`
+      `(Local dev: run the API and set API_PROXY_TARGET if not http://localhost:8080.)`
     );
   }
 
