@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "pnpm run build && NODE_ENV=development node --env-file-if-exists=../../.env --enable-source-maps ./dist/index.mjs",
     "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "start": "node --env-file-if-exists=../../.env --enable-source-maps ./dist/index.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --experimental-strip-types --test ./src/**/*.test.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

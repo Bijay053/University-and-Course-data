@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
+import { readResponseJson } from "@/lib/readResponseJson";
 
 type ImportResult = {
   universityName: string;
@@ -63,8 +64,15 @@ export default function Bulk() {
 
     try {
       const res = await fetch("/api/import/excel", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Import failed"); return; }
+      const data = await readResponseJson<ImportResult & { error?: string }>(res);
+      if (!res.ok) {
+        setError(data?.error ?? "Import failed");
+        return;
+      }
+      if (!data) {
+        setError("Import failed (empty response)");
+        return;
+      }
       setResult(data as ImportResult);
     } catch (err) {
       setError("Network error: " + (err as Error).message);
