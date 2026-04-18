@@ -5093,6 +5093,11 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
           if (!result.feePage && /\b(tuition.?fee|fee.?schedule|international.?fee)\b/i.test(fullUrl) && !/fee.?help|scholarship|refund/i.test(fullUrl)) {
             result.feePage = fullUrl;
           }
+          // Broad catch: URL path contains /fees or /fee- or /pricing (covers e.g. ASA
+          // "fees-and-charges" page linked as "Pricing Information")
+          if (!result.feePage && /\/(fees?[-/]|pricing[-/]?)/i.test(fullUrl) && !/fee.?help|scholarship|refund|domestic/i.test(fullUrl + " " + text)) {
+            result.feePage = fullUrl;
+          }
         }
         if (!/\.pdf/i.test(fullUrl) && !result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
           result.requirementsPage = fullUrl;
@@ -5140,6 +5145,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     "/tuition-fees", "/study-with-us/tuition-fees", "/international/fees",
     "/fees", "/fees-and-scholarships", "/tuition", "/international-fees",
     "/study/fees", "/courses/fees", "/admissions/fees",
+    // Broad synonyms used by small private providers (e.g. ASA: "fees-and-charges",
+    // "pricing-information", "course-fees")
+    "/fees-and-charges", "/fees-charges", "/pricing-information", "/pricing",
+    "/course-fees", "/international-student-fees", "/student-fees",
   ];
   if (!result.feePage) {
     for (const path of commonFeePaths) {
