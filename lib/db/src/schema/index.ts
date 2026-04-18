@@ -8,3 +8,4 @@ export * from "./scholarships";
 export * from "./scraping";
 export * from "./import_jobs";
 export * from "./scraped_courses";
+export * from "./course_review";

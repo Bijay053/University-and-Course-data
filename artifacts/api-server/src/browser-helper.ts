@@ -12,7 +12,7 @@
 export interface BrowserPageResult {
   /** HTML after clicking International toggle */
   mainHtml: string;
-  /** HTML after also opening the Entry Requirements tab (may equal mainHtml) */
+  /** HTML after opening important tabs (requirements/fees) and merging snapshots */
   requirementsHtml: string;
   /** List of interactions that succeeded */
   clicksPerformed: string[];
@@ -42,6 +42,17 @@ const REQUIREMENTS_TAB_SELECTORS = [
   'li:has-text("Entry Requirements") button',
 ];
 
+const FEES_TAB_SELECTORS = [
+  'a:has-text("Fees and Scholarships")',
+  'button:has-text("Fees and Scholarships")',
+  'a:has-text("Fees & Scholarships")',
+  'button:has-text("Fees & Scholarships")',
+  '[href*="fees-and-scholarships"]',
+  '[href*="fees"]',
+  'li:has-text("Fees and Scholarships") a',
+  'li:has-text("Fees and Scholarships") button',
+];
+
 const ACCORDION_PATTERNS = [
   "Minimum English Language Requirement",
   "English Language Requirements",
@@ -49,6 +60,25 @@ const ACCORDION_PATTERNS = [
   "Language Requirements",
   "English Requirements",
 ];
+
+function extractBodyInnerHtml(html: string): string {
+  const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  return match ? match[1] : html;
+}
+
+function mergeSnapshots(htmls: string[]): string {
+  const seen = new Set<string>();
+  const sections = htmls
+    .map((html) => extractBodyInnerHtml(html).trim())
+    .filter((body) => body.length > 0)
+    .filter((body) => {
+      if (seen.has(body)) return false;
+      seen.add(body);
+      return true;
+    });
+
+  return `<!doctype html><html><body>${sections.join("\n<!-- cursor-tab-snapshot -->\n")}</body></html>`;
+}
 
 // ── Core helper ───────────────────────────────────────────────────────────────
 
@@ -112,6 +142,8 @@ export async function fetchPageWithBrowser(
     // Extra settle time for JS widgets
     await page.waitForTimeout(2000);
 
+    const snapshots: string[] = [];
+
     // ── Step 1: Click International toggle ───────────────────────────────────
     if (clickInternational) {
       for (const sel of INTERNATIONAL_SELECTORS) {
@@ -135,6 +167,7 @@ export async function fetchPageWithBrowser(
     }
 
     const mainHtml = await page.content();
+    snapshots.push(mainHtml);
 
     // ── Step 2: Click Entry Requirements tab ─────────────────────────────────
     let requirementsHtml = mainHtml;
@@ -180,7 +213,27 @@ export async function fetchPageWithBrowser(
       }
 
       requirementsHtml = await page.content();
+      snapshots.push(requirementsHtml);
     }
+
+    // ── Step 4: Click Fees tab (for fee schedule links / hidden fee content) ──
+    for (const sel of FEES_TAB_SELECTORS) {
+      try {
+        const el = await page.$(sel);
+        if (!el) continue;
+        const visible = await el.isVisible();
+        if (!visible) continue;
+        await el.click();
+        await page.waitForTimeout(1500);
+        clicksPerformed.push("fees_tab");
+        snapshots.push(await page.content());
+        break;
+      } catch {
+        // try next selector
+      }
+    }
+
+    requirementsHtml = mergeSnapshots(snapshots);
 
     await browser.close();
     return { mainHtml, requirementsHtml, clicksPerformed };
@@ -193,6 +246,8 @@ export async function fetchPageWithBrowser(
 // ── Domain/URL heuristic: is this site likely JS-interactive? ────────────────
 
 const JS_HEAVY_DOMAINS = [
+  "asahe.edu.au",
+  "torrens.edu.au",
   "vit.edu.au",
   "victorianinstitute.edu.au",
   "newcastle.edu.au",

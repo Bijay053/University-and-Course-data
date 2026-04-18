@@ -114,9 +114,10 @@ export function parseIelts(rawText: string): BandScore {
   if (!text.toLowerCase().includes("ielts")) return emptyBandScore();
 
   // P1: "IELTS[Academic]: Overall X with no [individual] band below Y"
-  //     Also handles "IELTS: Overall score X, with no band below Y" (VIT format)
+  //     Also handles "IELTS: Overall score X, with no band below Y" and
+  //     "IELTS Academic overall score of 6.5, with no band below 6.0" (VIT format)
   let m = text.match(
-    /ielts(?:\s+academic)?[^a-z0-9]{0,40}overall\s+(?:score\s+)?([\d.]+)[^.]{0,60}?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:below|less\s+than|lower\s+than)\s*([\d.]+)/i,
+    /ielts(?:\s+academic)?(?:[^a-z0-9]{0,40}|.{0,40}?)overall\s+(?:score\s+)?(?:of\s+)?([\d.]+)[^.]{0,80}?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:below|less\s+than|lower\s+than)\s*([\d.]+)/i,
   );
   if (m) {
     const overall = Number(m[1]);
@@ -138,7 +139,7 @@ export function parseIelts(rawText: string): BandScore {
 
   // P3: "IELTS overall X with no score less than Y" (alternate phrasing)
   m = text.match(
-    /ielts(?:\s+academic)?[^a-z0-9]{0,40}overall\s*([\d.]+)[^.]{0,60}?(?:minimum\s+of|no\s+score\s+less\s+than|no\s+section\s+below)\s*([\d.]+)/i,
+    /ielts(?:\s+academic)?(?:[^a-z0-9]{0,40}|.{0,40}?)overall\s*(?:score\s+)?(?:of\s+)?([\d.]+)[^.]{0,80}?(?:minimum\s+of|no\s+score\s+less\s+than|no\s+section\s+below)\s*([\d.]+)/i,
   );
   if (m) {
     const overall = Number(m[1]);
@@ -163,7 +164,7 @@ export function parseIelts(rawText: string): BandScore {
   }
 
   // P5: overall score near "IELTS" + possibly individual bands nearby
-  const overallM = text.match(/ielts(?:\s+academic)?.{0,150}?overall\s*([\d.]+)/i);
+  const overallM = text.match(/ielts(?:\s+academic)?.{0,180}?overall\s*(?:score\s+)?(?:of\s+)?([\d.]+)/i);
   const listenM = text.match(/listening\s*([\d.]+)/i);
   const readM = text.match(/reading\s*([\d.]+)/i);
   const writeM = text.match(/writing\s*([\d.]+)/i);
@@ -186,7 +187,7 @@ export function parseIelts(rawText: string): BandScore {
   // P6: broad catch-all — "IELTS minimum 6.0", "IELTS 6.0", "minimum IELTS 6.0",
   //     "IELTS score of 6.0", "IELTS of 6.0", "IELTS 6.0 or higher", "IELTS: 6.5"
   const broadM =
-    text.match(/(?:minimum\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,60}?([4-9](?:\.[05])?)/i) ||
+    text.match(/(?:minimum\s+)?ielts(?:\s+academic)?(?:[^a-z0-9]{0,60}|.{0,80}?\bscore\s+of\s+)([4-9](?:\.[05])?)/i) ||
     text.match(
       /ielts[^a-z0-9]{0,80}?([4-9](?:\.[05])?)\s*(?:or\s+(?:above|higher|more)|minimum|overall|and\s+above|plus)/i,
     );

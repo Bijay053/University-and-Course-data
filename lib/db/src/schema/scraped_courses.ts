@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, real, jsonb, boolean } from "drizzle-orm/pg-core";
 import { universitiesTable } from "./universities";
 
 export const scrapedCoursesTable = pgTable("scraped_courses", {
@@ -9,6 +9,7 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   category: text("category"),
   subCategory: text("sub_category"),
   courseWebsite: text("course_website"),
+  courseLocation: text("course_location"),
   duration: real("duration"),
   durationTerm: text("duration_term"),
   studyMode: text("study_mode"),
@@ -45,9 +46,19 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   scoreType: text("score_type"),
   academicCountry: text("academic_country"),
   scholarship: text("scholarship"),
+  studentMarket: text("student_market"),
+  deliveryMode: text("delivery_mode"),
+  internationalEligible: boolean("international_eligible"),
+  onCampusAvailable: boolean("on_campus_available"),
+  eligibilityStatus: text("eligibility_status").notNull().default("unknown"),
+  eligibilityReason: text("eligibility_reason"),
+  eligibilityConfidence: real("eligibility_confidence"),
+  autoPublishStatus: text("auto_publish_status").notNull().default("pending_review"),
+  decisionScore: real("decision_score"),
   status: text("status").notNull().default("pending"),
   notes: text("notes"),
   completeness: integer("completeness"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

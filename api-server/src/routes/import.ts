@@ -1,8 +1,17 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import { pool, db, universitiesTable, importJobsTable } from "@workspace/db";
+import {
+  pool,
+  db,
+  universitiesTable,
+  importJobsTable,
+  scrapedCoursesTable,
+  scrapedFieldEvidenceTable,
+  fieldConflictsTable,
+} from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { buildCourseReviewSnapshot } from "../lib/review-engine.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -66,6 +75,7 @@ function getCol(row: Record<string, unknown>, ...keys: string[]): unknown {
 async function importRows(
   rows: Record<string, unknown>[],
   uniId: number,
+  scrapeJobId: string,
 ): Promise<{ imported: number; skipped: number; errors: string[] }> {
   let imported = 0;
   let skipped = 0;
@@ -77,100 +87,163 @@ async function importRows(
 
     try {
       const dup = await pool.query(
-        "SELECT id FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1",
-        [uniId, courseName],
+        "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND course_name=$2 LIMIT 1",
+        [scrapeJobId, courseName],
       );
-      let courseId: number;
-      if (dup.rows.length > 0) {
-        courseId = dup.rows[0].id;
-      } else {
-        const cRes = await pool.query(
-          `INSERT INTO courses (university_id, name, category, sub_category, course_website, duration, duration_term, study_mode, degree_level, study_load, language, description, course_structure, career_outcomes, other_test, other_requirement, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'active') RETURNING id`,
-          [
-            uniId,
-            courseName,
-            cleanText(getCol(row, "Category")),
-            cleanText(getCol(row, "Sub Category", "Sub_Category")),
-            cleanText(getCol(row, "Course Website")),
-            toNum(getCol(row, "Duration")),
-            cleanText(getCol(row, "Duration Term", "Duration_Term")),
-            cleanText(getCol(row, "Study Mode", "Study mode", "Study_mode")),
-            cleanText(getCol(row, "Degree Level", "Degree level", "Degree_level")),
-            cleanText(getCol(row, "Study Load", "Study_Load")),
-            cleanText(getCol(row, "Language")),
-            stripHtml(getCol(row, "Course Description")),
-            stripHtml(getCol(row, "Course Structure")),
-            cleanText(getCol(row, "Career")),
-            cleanText(getCol(row, "Other Test", "Other_Test")),
-            cleanText(getCol(row, "Other Requirement", "Other_Requriment", "Other Requriment")),
-          ],
-        );
-        courseId = cRes.rows[0].id;
-        imported++;
-      }
+      if (dup.rows.length > 0) { skipped++; continue; }
 
-      const intakeStr = cleanText(getCol(row, "Intake Month", "Intake_Month"));
-      const months = parseMonths(intakeStr);
-      const intakeDay = toInt(getCol(row, "Intake Day", "Intake_Day"));
-      for (const m of months) {
-        const exists = await pool.query("SELECT id FROM intakes WHERE course_id=$1 AND intake_month=$2", [courseId, m]);
-        if (exists.rows.length === 0) {
-          await pool.query("INSERT INTO intakes (course_id, intake_month, intake_day) VALUES ($1,$2,$3)", [courseId, m, intakeDay]);
-        }
-      }
-
-      const intlFee = toNum(getCol(row, "International Fee", "International_Fee"));
-      if (intlFee) {
-        const feeExists = await pool.query("SELECT id FROM fees WHERE course_id=$1", [courseId]);
-        if (feeExists.rows.length === 0) {
-          await pool.query(
-            "INSERT INTO fees (course_id, international_fee, fee_term, fee_year, currency) VALUES ($1,$2,$3,$4,$5)",
-            [courseId, intlFee, cleanText(getCol(row, "Fee Term", "Fee_Term")), toInt(getCol(row, "Fee Year", "Fee_Year")), cleanText(getCol(row, "Currency"))],
-          );
-        }
-      }
-
-      for (const test of ["IELTS", "PTE", "TOEFL"] as const) {
-        const overall = toNum(getCol(row, `${test} Overall`, `${test}_Overall`));
-        const listening = toNum(getCol(row, `${test} Listening`, `${test}_Listening`));
-        const speaking = toNum(getCol(row, `${test} Speaking`, `${test}_Speaking`));
-        const writing = toNum(getCol(row, `${test} Writing`, `${test}_Writing`));
-        const reading = toNum(getCol(row, `${test} Reading`, `${test}_Reading`));
-        if (overall || listening || speaking || writing || reading) {
-          const eExists = await pool.query("SELECT id FROM english_requirements WHERE course_id=$1 AND test_type=$2", [courseId, test]);
-          if (eExists.rows.length === 0) {
-            await pool.query(
-              "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-              [courseId, test, listening, speaking, writing, reading, overall],
-            );
-          }
-        }
-      }
-
-      const academicCountry = cleanText(getCol(row, "Academic Country", "Academic_Country"));
-      const scoreType = cleanText(getCol(row, "Score Type", "Score_Type"));
+      const courseWebsite = cleanText(getCol(row, "Course Website"));
+      const intakeMonths = parseMonths(cleanText(getCol(row, "Intake Month", "Intake_Month")));
       const academicLevel = cleanText(getCol(row, "Academic Level"));
-      if (academicCountry || scoreType || academicLevel) {
-        const acExists = await pool.query("SELECT id FROM academic_requirements WHERE course_id=$1 LIMIT 1", [courseId]);
-        if (acExists.rows.length === 0) {
-          await pool.query(
-            "INSERT INTO academic_requirements (course_id, academic_level, score_type, academic_country) VALUES ($1,$2,$3,$4)",
-            [courseId, academicLevel, scoreType, academicCountry],
-          );
-        }
-      }
+      const academicScore = toNum(getCol(row, "Academic Score", "Academic_Score"));
+      const staged = {
+        courseName,
+        courseWebsite,
+        courseLocation: cleanText(getCol(row, "Course Location", "Course_Location")),
+        duration: toNum(getCol(row, "Duration")),
+        durationTerm: cleanText(getCol(row, "Duration Term", "Duration_Term")),
+        studyMode: cleanText(getCol(row, "Study Mode", "Study mode", "Study_mode")),
+        degreeLevel: cleanText(getCol(row, "Degree Level", "Degree level", "Degree_level")),
+        studyLoad: cleanText(getCol(row, "Study Load", "Study_Load")),
+        language: cleanText(getCol(row, "Language")),
+        description: stripHtml(getCol(row, "Course Description")),
+        otherRequirement: cleanText(getCol(row, "Other Requirement", "Other_Requriment", "Other Requriment")),
+        internationalFee: toNum(getCol(row, "International Fee", "International_Fee")),
+        feeTerm: cleanText(getCol(row, "Fee Term", "Fee_Term")),
+        feeYear: toInt(getCol(row, "Fee Year", "Fee_Year")),
+        currency: cleanText(getCol(row, "Currency")),
+        ieltsOverall: toNum(getCol(row, "IELTS Overall", "IELTS_Overall")),
+        ieltsListening: toNum(getCol(row, "IELTS Listening", "IELTS_Listening")),
+        ieltsSpeaking: toNum(getCol(row, "IELTS Speaking", "IELTS_Speaking")),
+        ieltsWriting: toNum(getCol(row, "IELTS Writing", "IELTS_Writing")),
+        ieltsReading: toNum(getCol(row, "IELTS Reading", "IELTS_Reading")),
+        pteOverall: toNum(getCol(row, "PTE Overall", "PTE_Overall")),
+        pteListening: toNum(getCol(row, "PTE Listening", "PTE_Listening")),
+        pteSpeaking: toNum(getCol(row, "PTE Speaking", "PTE_Speaking")),
+        pteWriting: toNum(getCol(row, "PTE Writing", "PTE_Writing")),
+        pteReading: toNum(getCol(row, "PTE Reading", "PTE_Reading")),
+        toeflOverall: toNum(getCol(row, "TOEFL Overall", "TOEFL_Overall")),
+        toeflListening: toNum(getCol(row, "TOEFL Listening", "TOEFL_Listening")),
+        toeflSpeaking: toNum(getCol(row, "TOEFL Speaking", "TOEFL_Speaking")),
+        toeflWriting: toNum(getCol(row, "TOEFL Writing", "TOEFL_Writing")),
+        toeflReading: toNum(getCol(row, "TOEFL Reading", "TOEFL_Reading")),
+        intakeMonths,
+        intakeDays: toInt(getCol(row, "Intake Day", "Intake_Day")),
+        academicLevel,
+        academicScore,
+        scoreType: cleanText(getCol(row, "Score Type", "Score_Type")),
+        academicCountry: cleanText(getCol(row, "Academic Country", "Academic_Country")),
+        scholarship: cleanText(getCol(row, "Scholarship")),
+      };
+      const snapshot = buildCourseReviewSnapshot(
+        staged,
+        [{
+          url: courseWebsite || `import://excel/${encodeURIComponent(courseName)}`,
+          pageType: "other",
+          extractionMethod: "import",
+          content: JSON.stringify(row),
+        }],
+      );
+      const filled = [
+        staged.duration,
+        staged.internationalFee,
+        staged.ieltsOverall,
+        staged.degreeLevel,
+        staged.studyMode,
+        staged.courseLocation,
+        staged.intakeMonths.length > 0 ? "intakes" : null,
+      ].filter((value) => value != null).length;
+      const completeness = Math.round((filled / 7) * 100);
+      const notes = [
+        "Imported from Excel; pending evidence-first review",
+        snapshot.eligibility.eligibilityStatus !== "eligible" ? `Eligibility: ${snapshot.eligibility.reason}` : null,
+        snapshot.conflicts.length > 0 ? `Conflicts: ${snapshot.conflicts.map((item) => item.fieldKey).join(", ")}` : null,
+      ].filter(Boolean).join(" | ");
 
-      const scholarship = cleanText(getCol(row, "Scholarship"));
-      if (scholarship) {
-        const scExists = await pool.query("SELECT id FROM scholarships WHERE course_id=$1 LIMIT 1", [courseId]);
-        if (scExists.rows.length === 0) {
-          await pool.query(
-            "INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)",
-            [courseId, "Scholarship", scholarship],
-          );
-        }
+      const [inserted] = await db.insert(scrapedCoursesTable).values({
+        scrapeJobId,
+        universityId: uniId,
+        courseName: staged.courseName,
+        courseWebsite: staged.courseWebsite,
+        courseLocation: staged.courseLocation,
+        duration: staged.duration,
+        durationTerm: staged.durationTerm,
+        studyMode: staged.studyMode,
+        degreeLevel: staged.degreeLevel,
+        studyLoad: staged.studyLoad,
+        language: staged.language,
+        description: staged.description,
+        otherRequirement: staged.otherRequirement,
+        internationalFee: staged.internationalFee,
+        feeTerm: staged.feeTerm,
+        feeYear: staged.feeYear,
+        currency: staged.currency,
+        ieltsOverall: staged.ieltsOverall,
+        ieltsListening: staged.ieltsListening,
+        ieltsSpeaking: staged.ieltsSpeaking,
+        ieltsWriting: staged.ieltsWriting,
+        ieltsReading: staged.ieltsReading,
+        pteOverall: staged.pteOverall,
+        pteListening: staged.pteListening,
+        pteSpeaking: staged.pteSpeaking,
+        pteWriting: staged.pteWriting,
+        pteReading: staged.pteReading,
+        toeflOverall: staged.toeflOverall,
+        toeflListening: staged.toeflListening,
+        toeflSpeaking: staged.toeflSpeaking,
+        toeflWriting: staged.toeflWriting,
+        toeflReading: staged.toeflReading,
+        intakeMonths: staged.intakeMonths,
+        intakeDays: staged.intakeDays,
+        academicLevel: staged.academicLevel,
+        academicScore: staged.academicScore,
+        scoreType: staged.scoreType,
+        academicCountry: staged.academicCountry,
+        scholarship: staged.scholarship,
+        studentMarket: snapshot.eligibility.studentMarket,
+        deliveryMode: snapshot.eligibility.deliveryMode,
+        internationalEligible: snapshot.eligibility.internationalEligible,
+        onCampusAvailable: snapshot.eligibility.onCampusAvailable,
+        eligibilityStatus: snapshot.eligibility.eligibilityStatus,
+        eligibilityReason: snapshot.eligibility.reason,
+        eligibilityConfidence: snapshot.eligibility.confidence,
+        autoPublishStatus: snapshot.autoPublishStatus,
+        decisionScore: snapshot.decisionScore,
+        status: "pending",
+        notes,
+        completeness,
+      }).returning({ id: scrapedCoursesTable.id });
+
+      if (snapshot.candidates.length > 0) {
+        await db.insert(scrapedFieldEvidenceTable).values(snapshot.candidates.map((candidate) => ({
+          scrapedCourseId: inserted.id,
+          fieldKey: candidate.fieldKey,
+          candidateValue: candidate.candidateValue,
+          normalizedValue: candidate.normalizedValue,
+          sourceUrl: candidate.sourceUrl,
+          pageType: candidate.pageType,
+          extractionMethod: candidate.extractionMethod,
+          rawText: candidate.rawText,
+          snippet: candidate.snippet,
+          confidence: candidate.confidence,
+          decisionScore: candidate.decisionScore,
+          validationStatus: candidate.validationStatus,
+          decisionStatus: candidate.decisionStatus,
+          selected: candidate.selected,
+        })));
       }
+      if (snapshot.conflicts.length > 0) {
+        await db.insert(fieldConflictsTable).values(snapshot.conflicts.map((conflict) => ({
+          scrapedCourseId: inserted.id,
+          fieldKey: conflict.fieldKey,
+          valueA: conflict.valueA,
+          valueB: conflict.valueB,
+          conflictType: conflict.conflictType,
+          reason: conflict.reason,
+          status: "open",
+        })));
+      }
+      imported++;
     } catch (err) {
       errors.push(`Row "${courseName}": ${(err as Error).message}`);
     }
@@ -227,7 +300,7 @@ router.post("/import/excel", upload.single("file"), async (req, res): Promise<vo
       totalRows: rows.length,
     }).returning();
 
-    const result = await importRows(rows, uniId);
+    const result = await importRows(rows, uniId, `import_${job.id}`);
 
     await db.update(importJobsTable).set({
       status: result.errors.length > 0 ? "completed_with_errors" : "completed",

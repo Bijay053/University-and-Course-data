@@ -2,6 +2,8 @@ import { pgTable, serial, integer, timestamp, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { universitiesTable } from "./universities";
+import { scrapedCoursesTable } from "./scraped_courses";
+import { coursesTable } from "./courses";
 
 export const scrapingJobsTable = pgTable("scraping_jobs", {
   id: serial("id").primaryKey(),
@@ -17,11 +19,14 @@ export const scrapingJobsTable = pgTable("scraping_jobs", {
 export const scrapingChangesTable = pgTable("scraping_changes", {
   id: serial("id").primaryKey(),
   scrapingJobId: integer("scraping_job_id").references(() => scrapingJobsTable.id, { onDelete: "set null" }),
+  scrapedCourseId: integer("scraped_course_id").references(() => scrapedCoursesTable.id, { onDelete: "set null" }),
+  courseId: integer("course_id").references(() => coursesTable.id, { onDelete: "set null" }),
   universityName: text("university_name"),
   courseName: text("course_name"),
   fieldChanged: text("field_changed").notNull(),
   oldValue: text("old_value"),
   newValue: text("new_value"),
+  reason: text("reason"),
   status: text("status").notNull().default("pending"),
   detectedAt: timestamp("detected_at", { withTimezone: true }).notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),

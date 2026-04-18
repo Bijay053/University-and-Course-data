@@ -34,6 +34,11 @@ router.get("/courses", async (req, res): Promise<void> => {
   if (degreeLevel) { whereClauses.push(`c.degree_level = $${pIdx++}`); params.push(degreeLevel); }
   if (studyMode) { whereClauses.push(`c.study_mode = $${pIdx++}`); params.push(studyMode); }
 
+  whereClauses.push("c.approval_status = 'approved'");
+  whereClauses.push("c.status = 'active'");
+  whereClauses.push("(c.eligibility_status IS NULL OR c.eligibility_status <> 'rejected')");
+  whereClauses.push("(c.international_eligible IS NULL OR c.international_eligible = true)");
+  whereClauses.push("(c.on_campus_available IS NULL OR c.on_campus_available = true)");
   const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const dataQuery = `
@@ -44,7 +49,10 @@ router.get("/courses", async (req, res): Promise<void> => {
       c.degree_level AS "degreeLevel", c.study_load AS "studyLoad", c.language,
       c.description, c.course_structure AS "courseStructure", c.career_outcomes AS "careerOutcomes",
       c.other_test AS "otherTest", c.other_test_score AS "otherTestScore",
-      c.other_requirement AS "otherRequirement", c.status, c.created_at AS "createdAt", c.updated_at AS "updatedAt",
+      c.other_requirement AS "otherRequirement", c.student_market AS "studentMarket", c.delivery_mode AS "deliveryMode",
+      c.international_eligible AS "internationalEligible", c.on_campus_available AS "onCampusAvailable",
+      c.eligibility_status AS "eligibilityStatus", c.approval_status AS "approvalStatus",
+      c.status, c.created_at AS "createdAt", c.updated_at AS "updatedAt",
       (SELECT string_agg(DISTINCT i.intake_month, ', ' ORDER BY i.intake_month) FROM intakes i WHERE i.course_id = c.id) AS "intakeMonths",
       (SELECT string_agg(DISTINCT i.intake_day::text, ', ') FROM intakes i WHERE i.course_id = c.id AND i.intake_day IS NOT NULL) AS "intakeDays",
       (SELECT f.international_fee FROM fees f WHERE f.course_id = c.id LIMIT 1) AS "internationalFee",
@@ -137,6 +145,12 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
       otherTest: coursesTable.otherTest,
       otherTestScore: coursesTable.otherTestScore,
       otherRequirement: coursesTable.otherRequirement,
+      studentMarket: coursesTable.studentMarket,
+      deliveryMode: coursesTable.deliveryMode,
+      internationalEligible: coursesTable.internationalEligible,
+      onCampusAvailable: coursesTable.onCampusAvailable,
+      eligibilityStatus: coursesTable.eligibilityStatus,
+      approvalStatus: coursesTable.approvalStatus,
       status: coursesTable.status,
       createdAt: coursesTable.createdAt,
       updatedAt: coursesTable.updatedAt,
@@ -146,6 +160,10 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
     .where(eq(coursesTable.id, id));
 
   if (!courseRow) {
+    res.status(404).json({ error: "Course not found" });
+    return;
+  }
+  if (courseRow.approvalStatus !== "approved" || courseRow.eligibilityStatus === "rejected" || courseRow.internationalEligible === false || courseRow.onCampusAvailable === false) {
     res.status(404).json({ error: "Course not found" });
     return;
   }

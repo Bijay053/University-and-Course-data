@@ -14,6 +14,7 @@ import {
   Square, StopCircle, Play, ShieldCheck, Info, PlusCircle, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
+import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 
 type ImportJob = {
   id: number;
@@ -44,6 +45,16 @@ type ApprovalSummary = {
   validExamples: string[];
   rejectedExamples: string[];
   estimatedMinutes: number;
+};
+
+type ScrapeStatusResponse = {
+  universityName?: string;
+  url?: string;
+  logs?: ScrapeLog[];
+  logIndex?: number;
+  status?: string;
+  imported?: number;
+  awaitingApproval?: ApprovalSummary;
 };
 
 type ScrapeLog = {
@@ -77,6 +88,7 @@ type StagedCourse = {
   category: string | null;
   subCategory: string | null;
   courseWebsite: string | null;
+  courseLocation: string | null;
   duration: number | null;
   durationTerm: string | null;
   studyMode: string | null;
@@ -112,10 +124,47 @@ type StagedCourse = {
   scoreType: string | null;
   academicCountry: string | null;
   scholarship: string | null;
+  studentMarket: string | null;
+  deliveryMode: string | null;
+  internationalEligible: boolean | null;
+  onCampusAvailable: boolean | null;
+  eligibilityStatus: string | null;
+  eligibilityReason: string | null;
+  eligibilityConfidence: number | null;
+  autoPublishStatus: string | null;
+  decisionScore: number | null;
   status: string;
   completeness: number | null;
   notes: string | null;
   createdAt: string;
+};
+
+type ReviewEvidence = {
+  id: number;
+  fieldKey: string;
+  candidateValue: string | null;
+  sourceUrl: string | null;
+  pageType: string | null;
+  extractionMethod: string | null;
+  snippet: string | null;
+  confidence: number | null;
+  decisionStatus: string;
+  selected: boolean;
+};
+
+type ReviewConflict = {
+  id: number;
+  fieldKey: string;
+  valueA: string | null;
+  valueB: string | null;
+  reason: string | null;
+  status: string;
+};
+
+type CourseReviewPayload = {
+  course: StagedCourse;
+  evidence: ReviewEvidence[];
+  conflicts: ReviewConflict[];
 };
 
 const ALL = "__new__";
@@ -156,6 +205,7 @@ export default function Scraping() {
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [reviewDetail, setReviewDetail] = useState<CourseReviewPayload | null>(null);
   const [approving, setApproving] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -175,7 +225,10 @@ export default function Scraping() {
     setLoadingJobs(true);
     try {
       const res = await fetch("/api/import/history");
-      if (res.ok) setJobs(await res.json());
+      if (res.ok) {
+        const rows = await readResponseJson<ImportJob[]>(res);
+        if (rows) setJobs(rows);
+      }
     } finally {
       setLoadingJobs(false);
     }
@@ -188,8 +241,11 @@ export default function Scraping() {
     Promise.all(
       uniData.data.map(async (u) => {
         const res = await fetch(`/api/courses?universityId=${u.id}&limit=1`);
-        const d = await res.json();
-        return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d.total ?? 0 };
+        if (!res.ok) {
+          return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: 0 };
+        }
+        const d = await readResponseJson<{ total?: number }>(res);
+        return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d?.total ?? 0 };
       })
     ).then(setUniStats);
   }, [uniData]);
@@ -202,7 +258,8 @@ export default function Scraping() {
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await readResponseJson<StagedCourse[]>(res);
+        if (!data) return;
         setStagedCourses(data.filter((c: StagedCourse) => c.status === "pending"));
         setReviewJobId(jobId);
         setShowReview(true);
@@ -211,7 +268,7 @@ export default function Scraping() {
     } catch {}
   }, []);
 
-  const startSingleJob = useCallback(async (url: string): Promise<boolean> => {
+  const startSingleJob = useCallback(async (url: string): Promise<string | false> => {
     const body: Record<string, unknown> = { url, ...uniBodyRef.current };
     const resp = await fetch("/api/scrape/start", {
       method: "POST",
@@ -219,11 +276,15 @@ export default function Scraping() {
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
-      const err = await resp.json();
-      setScrapeLogs((prev) => [...prev, { event: "error", message: err.error || "Failed to start scraping" }]);
+      const msg = await getFetchErrorMessage(resp);
+      setScrapeLogs((prev) => [...prev, { event: "error", message: msg }]);
       return false;
     }
-    const data = await resp.json();
+    const data = await readResponseJson<{ jobId: string }>(resp);
+    if (!data?.jobId) {
+      setScrapeLogs((prev) => [...prev, { event: "error", message: "Invalid response from server" }]);
+      return false;
+    }
     setActiveJobId(data.jobId);
     setScrapeTargetUrl(url);
     sessionStorage.setItem("activeScrapeJob", data.jobId);
@@ -248,19 +309,21 @@ export default function Scraping() {
           }
           return;
         }
-        const data = await res.json();
+        const data = await readResponseJson<ScrapeStatusResponse>(res);
+        if (!data) return;
 
         if (data.universityName) setScrapeUniName(data.universityName);
         if (data.url) setScrapeTargetUrl(data.url);
 
-        if (data.logs && data.logs.length > 0) {
-          setScrapeLogs((prev) => [...prev, ...data.logs]);
-          logIndexRef.current = data.logIndex;
+        const logs = data.logs;
+        if (logs && logs.length > 0) {
+          setScrapeLogs((prev) => [...prev, ...logs]);
+          if (data.logIndex !== undefined) logIndexRef.current = data.logIndex;
 
-          const doneLog = data.logs.find((l: ScrapeLog) => l.event === "done");
+          const doneLog = logs.find((l: ScrapeLog) => l.event === "done");
           if (doneLog) setScrapeResult(doneLog);
 
-          const approvalLog = data.logs.find((l: ScrapeLog) => l.event === "approval_required");
+          const approvalLog = logs.find((l: ScrapeLog) => l.event === "approval_required");
           if (approvalLog) {
             setAwaitingApproval({
               totalCourses: approvalLog.totalCourses ?? 0,
@@ -283,7 +346,7 @@ export default function Scraping() {
           setStopping(false);
           setAwaitingApproval(null);
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-          if ((data.status === "completed" || data.status === "stopped") && data.imported > 0) {
+          if ((data.status === "completed" || data.status === "stopped") && (data.imported ?? 0) > 0) {
             loadStagedCourses(jobId);
           }
 
@@ -294,7 +357,7 @@ export default function Scraping() {
             setScrapeLogs((prev) => [...prev, { event: "status", message: `── Starting next URL (${nextUrl}) ──` }]);
             const nextJobId = await startSingleJob(nextUrl);
             if (nextJobId) {
-              pollJobStatus(nextJobId as string);
+              pollJobStatus(nextJobId);
             } else {
               setScraping(false);
               setUrlQueueProgress(null);
@@ -395,7 +458,7 @@ export default function Scraping() {
       setScrapeLogs([{ event: "status", message: "Scraping started in background..." }]);
       const jobId = await startSingleJob(validUrls[0]);
       if (jobId) {
-        pollJobStatus(jobId as string);
+        pollJobStatus(jobId);
       } else {
         setScraping(false);
       }
@@ -416,12 +479,20 @@ export default function Scraping() {
     setApproving(true);
     const succeededIds = new Set<number>();
     const failedIds = new Set<number>();
+    const failedMessages: string[] = [];
 
     for (const id of selectedIds) {
       try {
         const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
-        if (res.ok) succeededIds.add(id); else failedIds.add(id);
-      } catch { failedIds.add(id); }
+        if (res.ok) {
+          succeededIds.add(id);
+        } else {
+          failedIds.add(id);
+          failedMessages.push(await getFetchErrorMessage(res));
+        }
+      } catch {
+        failedIds.add(id);
+      }
     }
 
     setStagedCourses((prev) => prev.filter((c) => !succeededIds.has(c.id)));
@@ -432,10 +503,16 @@ export default function Scraping() {
       Promise.all(
         uniData.data.map(async (u) => {
           const res = await fetch(`/api/courses?universityId=${u.id}&limit=1`);
-          const d = await res.json();
-          return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d.total ?? 0 };
+          if (!res.ok) {
+            return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: 0 };
+          }
+          const d = await readResponseJson<{ total?: number }>(res);
+          return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d?.total ?? 0 };
         })
       ).then(setUniStats);
+    }
+    if (failedMessages.length > 0) {
+      window.alert(failedMessages.slice(0, 3).join("\n"));
     }
   };
 
@@ -459,6 +536,8 @@ export default function Scraping() {
       if (res.ok) {
         setStagedCourses((prev) => prev.filter((c) => c.id !== id));
         setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      } else {
+        window.alert(await getFetchErrorMessage(res));
       }
     } catch {}
     setApprovingId(null);
@@ -472,15 +551,33 @@ export default function Scraping() {
     } catch {}
   };
 
+  const handleOpenReview = async (id: number) => {
+    try {
+      const res = await fetch(`/api/scrape/staged/${id}/review`);
+      if (!res.ok) {
+        window.alert(await getFetchErrorMessage(res));
+        return;
+      }
+      const data = await readResponseJson<CourseReviewPayload>(res);
+      if (data) setReviewDetail(data);
+    } catch {}
+  };
+
   const handleSaveEdit = async () => {
     if (!editingCourse) return;
     try {
-      await fetch(`/api/scrape/staged/${editingCourse.id}`, {
+      const res = await fetch(`/api/scrape/staged/${editingCourse.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingCourse),
       });
-      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? editingCourse : c));
+      if (!res.ok) {
+        window.alert(await getFetchErrorMessage(res));
+        return;
+      }
+      const data = await readResponseJson<{ course?: StagedCourse }>(res);
+      const updatedCourse = data?.course ?? editingCourse;
+      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? updatedCourse : c));
       setEditingCourse(null);
     } catch {}
   };
@@ -585,9 +682,9 @@ export default function Scraping() {
                 className="mt-0.5 w-4 h-4 accent-amber-600"
               />
               <div className="flex-1 text-xs">
-                <div className="font-medium text-amber-900">Fast Mode (static first scraping)</div>
+                <div className="font-medium text-amber-900">Fast Mode (skip browser automation)</div>
                 <div className="text-amber-700 mt-0.5">
-                  Uses direct HTTP scraping first for faster results on mostly static sites. Turn this off for JS heavy sites with tabs, toggles, or hidden entry requirement sections.
+                  5–10× faster (~1 min for 1000 pages). May miss JS-rendered fields on sites like VIT, Newcastle, UEL, RMIT (International toggle, expandable Entry Requirements). Recommended for static-HTML sites.
                 </div>
               </div>
             </label>
@@ -723,12 +820,17 @@ export default function Scraping() {
                       body: JSON.stringify({ universityId: parseInt(selectedUni) }),
                     });
                     if (!resp.ok) {
-                      const err = await resp.json();
-                      setScrapeLogs([{ event: "error", message: err.error || "Failed to start re-scraping" }]);
+                      const msg = await getFetchErrorMessage(resp);
+                      setScrapeLogs([{ event: "error", message: msg }]);
                       setScraping(false);
                       return;
                     }
-                    const data = await resp.json();
+                    const data = await readResponseJson<{ jobId: string }>(resp);
+                    if (!data?.jobId) {
+                      setScrapeLogs([{ event: "error", message: "Invalid response from server" }]);
+                      setScraping(false);
+                      return;
+                    }
                     setActiveJobId(data.jobId);
                     sessionStorage.setItem("activeScrapeJob", data.jobId);
                     setScrapeLogs([{ event: "status", message: "Re-scraping started (no AI, zero cost)..." }]);
@@ -1059,6 +1161,7 @@ export default function Scraping() {
                       <th className="text-center p-2 font-medium text-teal-600">CAE</th>
                       <th className="text-center p-2 font-medium text-emerald-600">DET</th>
                       <th className="text-left p-2 font-medium text-gray-600">Intakes</th>
+                      <th className="text-left p-2 font-medium text-gray-600">Course Location</th>
                       <th className="text-left p-2 font-medium text-gray-600">Mode</th>
                       <th className="text-center p-2 font-medium text-gray-600 w-[120px]">Actions</th>
                     </tr>
@@ -1095,6 +1198,26 @@ export default function Scraping() {
                           {course.category && (
                             <div className="text-xs text-gray-400 truncate">{course.category}</div>
                           )}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {course.autoPublishStatus && (
+                              <Badge variant="outline" className={`text-[10px] ${
+                                course.autoPublishStatus === "approved" ? "text-green-700 border-green-200" :
+                                course.autoPublishStatus === "rejected" ? "text-red-700 border-red-200" :
+                                "text-amber-700 border-amber-200"
+                              }`}>
+                                {course.autoPublishStatus === "approved" ? "Auto publish ready" : course.autoPublishStatus}
+                              </Badge>
+                            )}
+                            {course.eligibilityStatus && (
+                              <Badge variant="outline" className={`text-[10px] ${
+                                course.eligibilityStatus === "eligible" ? "text-green-700 border-green-200" :
+                                course.eligibilityStatus === "rejected" ? "text-red-700 border-red-200" :
+                                "text-amber-700 border-amber-200"
+                              }`}>
+                                {course.eligibilityStatus}
+                              </Badge>
+                            )}
+                          </div>
                           {course.notes && (
                             <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
                           )}
@@ -1168,10 +1291,22 @@ export default function Scraping() {
                           )}
                         </td>
                         <td className="p-2 text-xs text-gray-600">
+                          {course.courseLocation || <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className="p-2 text-xs text-gray-600">
                           {course.studyMode || <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2">
                           <div className="flex gap-1 justify-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-slate-600 hover:bg-slate-50"
+                              onClick={() => handleOpenReview(course.id)}
+                              title="Review evidence"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -1221,6 +1356,67 @@ export default function Scraping() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!reviewDetail} onOpenChange={(o) => { if (!o) setReviewDetail(null); }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Evidence Review</DialogTitle>
+          </DialogHeader>
+          {reviewDetail && (
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="font-medium text-base">{reviewDetail.course.courseName}</div>
+                <div className="text-muted-foreground">
+                  Eligibility: {reviewDetail.course.eligibilityStatus || "unknown"}
+                  {reviewDetail.course.eligibilityReason ? ` - ${reviewDetail.course.eligibilityReason}` : ""}
+                </div>
+              </div>
+              {reviewDetail.conflicts.length > 0 && (
+                <div className="rounded border border-amber-200 bg-amber-50 p-3">
+                  <div className="font-medium text-amber-800 mb-2">Conflicts</div>
+                  <div className="space-y-2">
+                    {reviewDetail.conflicts.map((conflict) => (
+                      <div key={conflict.id} className="text-xs text-amber-900">
+                        <span className="font-medium">{conflict.fieldKey}</span>: {conflict.valueA || "-"} vs {conflict.valueB || "-"}
+                        {conflict.reason ? ` - ${conflict.reason}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-3">
+                {Array.from(new Set(reviewDetail.evidence.map((item) => item.fieldKey))).map((fieldKey) => {
+                  const items = reviewDetail.evidence.filter((item) => item.fieldKey === fieldKey);
+                  return (
+                    <div key={fieldKey} className="rounded border p-3">
+                      <div className="font-medium mb-2">{fieldKey}</div>
+                      <div className="space-y-2">
+                        {items.map((item) => (
+                          <div key={item.id} className="rounded bg-slate-50 p-2 text-xs">
+                            <div className="flex flex-wrap gap-2 mb-1">
+                              <Badge variant="outline" className="text-[10px]">{item.decisionStatus}</Badge>
+                              {item.selected && <Badge variant="outline" className="text-[10px] border-green-200 text-green-700">selected</Badge>}
+                              <span className="text-muted-foreground">{item.pageType} / {item.extractionMethod}</span>
+                              {typeof item.confidence === "number" && <span className="text-muted-foreground">confidence {Math.round(item.confidence * 100)}%</span>}
+                            </div>
+                            <div className="font-medium">{item.candidateValue || "-"}</div>
+                            {item.snippet && <div className="text-muted-foreground mt-1">{item.snippet}</div>}
+                            {item.sourceUrl && (
+                              <a className="text-blue-600 hover:underline break-all" href={item.sourceUrl} target="_blank" rel="noreferrer">
+                                {item.sourceUrl}
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) setEditingCourse(null); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -1423,6 +1619,10 @@ export default function Scraping() {
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Course Website</label>
                 <Input value={editingCourse.courseWebsite || ""} onChange={(e) => setEditingCourse({ ...editingCourse, courseWebsite: e.target.value || null })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Course Location</label>
+                <Input value={editingCourse.courseLocation || ""} onChange={(e) => setEditingCourse({ ...editingCourse, courseLocation: e.target.value || null })} />
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Description</label>

@@ -84,11 +84,14 @@ router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
     if (!match) {
       await db.insert(scrapingChangesTable).values({
         scrapingJobId: job.id,
+        scrapedCourseId: row.id,
+        courseId: null,
         universityName: null,
         courseName: row.courseName,
         fieldChanged: "new_course",
         oldValue: null,
         newValue: row.courseWebsite || row.courseName,
+        reason: "New staged course requires approval before publish",
         status: "pending",
       });
       inserted++;
@@ -98,7 +101,9 @@ router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
     const comparable = [
       ["degree_level", match.degreeLevel, row.degreeLevel],
       ["study_mode", match.studyMode, row.studyMode],
+      ["course_location", match.courseLocation, row.courseLocation],
       ["duration_term", match.durationTerm, row.durationTerm],
+      ["eligibility_status", (match as any).eligibilityStatus, (row as any).eligibilityStatus],
       ["other_requirement", match.otherRequirement, row.otherRequirement],
       ["description", match.description, row.description],
     ] as const;
@@ -109,11 +114,14 @@ router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
       if (a && a !== b) {
         await db.insert(scrapingChangesTable).values({
           scrapingJobId: job.id,
+          scrapedCourseId: row.id,
+          courseId: match.id,
           universityName: null,
           courseName: row.courseName,
           fieldChanged,
           oldValue: b,
           newValue: a,
+          reason: "Staged scrape differs from approved course value",
           status: "pending",
         });
         inserted++;
@@ -150,16 +158,40 @@ router.post("/scraping/changes/:id/approve", async (req, res): Promise<void> => 
     res.status(400).json({ error: params.error.message });
     return;
   }
+  const [current] = await db.select().from(scrapingChangesTable).where(eq(scrapingChangesTable.id, params.data.id));
+  if (!current) {
+    res.status(404).json({ error: "Change not found" });
+    return;
+  }
+
+  let applyResult: { ok: boolean; body: unknown } | null = null;
+  if (current.scrapedCourseId) {
+    const apiPort = process.env["API_PORT"] ?? process.env["PORT"] ?? "8080";
+    const resp = await fetch(`http://127.0.0.1:${apiPort}/api/scrape/staged/${current.scrapedCourseId}/approve`, { method: "POST" });
+    const bodyText = await resp.text();
+    applyResult = {
+      ok: resp.ok,
+      body: (() => {
+        if (!bodyText) return null;
+        try {
+          return JSON.parse(bodyText);
+        } catch {
+          return { error: bodyText };
+        }
+      })(),
+    };
+    if (!resp.ok) {
+      res.status(resp.status).json(typeof applyResult.body === "object" && applyResult.body ? applyResult.body : { error: "Failed to apply change approval" });
+      return;
+    }
+  }
+
   const [row] = await db
     .update(scrapingChangesTable)
     .set({ status: "approved", reviewedAt: new Date() })
     .where(eq(scrapingChangesTable.id, params.data.id))
     .returning();
-  if (!row) {
-    res.status(404).json({ error: "Change not found" });
-    return;
-  }
-  res.json(row);
+  res.json({ ...row, applyResult: applyResult?.body ?? null });
 });
 
 router.post("/scraping/changes/:id/reject", async (req, res): Promise<void> => {

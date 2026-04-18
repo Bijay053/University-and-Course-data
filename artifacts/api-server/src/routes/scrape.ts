@@ -1,19 +1,41 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as cheerio from "cheerio";
-import { pool, db, universitiesTable, scrapedCoursesTable } from "@workspace/db";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import {
+  pool,
+  db,
+  universitiesTable,
+  scrapedCoursesTable,
+  scrapedFieldEvidenceTable,
+  fieldConflictsTable,
+  courseFieldApprovalsTable,
+  courseAuditLogTable,
+  scrapeFeedbackTable,
+} from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
+import {
+  buildCourseReviewSnapshot,
+  type CourseReviewSnapshot,
+  type ReviewSource,
+  type ReviewFieldKey,
+} from "../lib/review-engine.js";
+import { applyFeedbackRules, inferFeedbackIssue, type FeedbackRule } from "../lib/feedback-engine.js";
 import {
   parseEnglishRequirementsFromText,
   mergeEnglishResults,
   applyEnglishResultToCourse,
   englishResultSummary,
-  emptyEnglishResult,
   hasEnglishTestKeyword,
   type EnglishRequirementResult,
 } from "../lib/english-requirements.js";
 
 const router: IRouter = Router();
+const execFileAsync = promisify(execFile);
 
 // ── IELTS debug helpers (targeted at two ASA courses) ───────────────────────
 function shouldDebugIelts(courseName?: string | null) {
@@ -46,6 +68,7 @@ interface CourseData {
   category?: string;
   subCategory?: string;
   courseWebsite?: string;
+  courseLocation?: string;
   duration?: number;
   durationTerm?: string;
   studyMode?: string;
@@ -82,13 +105,19 @@ interface CourseData {
   academicCountry?: string;
   otherRequirement?: string;
   scholarship?: string;
+  domesticOnly?: boolean;
+  onlineOnly?: boolean;
 }
 
 interface ScrapeConfig {
   courseLinks: { url: string; name: string }[];
-  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string };
+  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string };
   resolvedUrl: string;
   lastScrapedAt: string;
+}
+
+interface CourseReviewContext {
+  sources: ReviewSource[];
 }
 
 interface ApprovalSummary {
@@ -220,19 +249,33 @@ const STEALTH_COMMON_HEADERS: Record<string, string> = {
   "sec-ch-ua-mobile": "?0",
 };
 
+function preferInternationalCourseUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const isUniSq = /(^|\.)unisq\.edu\.au$/i.test(u.hostname);
+    const isDetail = /^\/study\/degrees-and-courses\/[^/]+\/?$/i.test(u.pathname);
+    if (isUniSq && isDetail && !u.searchParams.has("studentType")) {
+      u.searchParams.set("studentType", "international");
+      return u.toString();
+    }
+  } catch {}
+  return url;
+}
+
 async function fetchPage(url: string): Promise<string> {
+  const requestUrl = preferInternationalCourseUrl(url);
   let lastStatus = 0;
   // Try each stealth profile in turn
   for (let i = 0; i < STEALTH_PROFILES.length; i++) {
     try {
-      const resp = await fetch(url, {
+      const resp = await fetch(requestUrl, {
         headers: { ...STEALTH_PROFILES[i], ...STEALTH_COMMON_HEADERS },
         signal: AbortSignal.timeout(18000),
       });
       if (resp.ok) return await resp.text();
       lastStatus = resp.status;
       // Only retry on 403/429; fail fast on 404, 5xx etc.
-      if (resp.status !== 403 && resp.status !== 429) throw new Error(`HTTP ${resp.status} for ${url}`);
+      if (resp.status !== 403 && resp.status !== 429) throw new Error(`HTTP ${resp.status} for ${requestUrl}`);
       if (i < STEALTH_PROFILES.length - 1) await new Promise(r => setTimeout(r, 800 * (i + 1)));
     } catch (err) {
       const msg = (err as Error).message;
@@ -242,12 +285,12 @@ async function fetchPage(url: string): Promise<string> {
   }
   // Stealth profiles exhausted — try headless browser
   try {
-    const browserResult = await fetchPageWithBrowser(url, {});
+    const browserResult = await fetchPageWithBrowser(requestUrl, {});
     if (browserResult?.mainHtml) return browserResult.mainHtml;
   } catch {}
   // Last resort: Google cache
   try {
-    const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
+    const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(requestUrl)}`;
     const resp = await fetch(cacheUrl, {
       headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS },
       signal: AbortSignal.timeout(12000),
@@ -255,6 +298,59 @@ async function fetchPage(url: string): Promise<string> {
     if (resp.ok) {
       const html = await resp.text();
       if (html.length > 1000) return html;
+    }
+  } catch {}
+  // Last resort for WAF/Cloudflare-blocked sites: fetch a mirrored markdown view
+  // and convert its links into lightweight HTML so discovery can still proceed.
+  try {
+    const mirrorUrl = `https://r.jina.ai/http://${requestUrl}`;
+    const resp = await fetch(mirrorUrl, {
+      headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"] },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (resp.ok) {
+      const markdown = await resp.text();
+      if (markdown.length > 1000) {
+        const requestedUrl = new URL(requestUrl);
+        const escapeHtml = (value: string) => value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+        const normalizeMirrorHref = (rawHref: string) => {
+          try {
+            const parsed = new URL(rawHref);
+            if (parsed.hostname.replace(/^www\./, "") === requestedUrl.hostname.replace(/^www\./, "")) {
+              parsed.protocol = requestedUrl.protocol;
+              parsed.host = requestedUrl.host;
+            }
+            return parsed.toString();
+          } catch {
+            return rawHref;
+          }
+        };
+
+        const linkMatches = [...markdown.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)(?:\s+"[^"]*")?\)/g)];
+        const uniqueLinks = new Map<string, string>();
+        for (const match of linkMatches) {
+          const label = match[1]?.trim();
+          const href = match[2]?.trim() ? normalizeMirrorHref(match[2].trim()) : "";
+          if (!label || !href || uniqueLinks.has(href)) continue;
+          uniqueLinks.set(href, label);
+        }
+
+        const linkedMarkdown = escapeHtml(markdown).replace(
+          /\[([^\]]+)\]\((https?:\/\/[^)\s]+)(?:\s+&quot;[^&]*&quot;)?\)/g,
+          (_m, label, href) => `<a href="${escapeHtml(normalizeMirrorHref(href))}">${escapeHtml(label)}</a>`,
+        );
+
+        const extraLinks = [...uniqueLinks.entries()]
+          .slice(0, 1500)
+          .map(([href, label]) => `<a href="${escapeHtml(href)}">${escapeHtml(label)}</a>`)
+          .join("<br/>");
+
+        return `<html><head><title>Mirror for ${escapeHtml(url)}</title></head><body><main>${linkedMarkdown.replace(/\n/g, "<br/>\n")}</main>${extraLinks ? `<section>${extraLinks}</section>` : ""}</body></html>`;
+      }
     }
   } catch {}
   throw new Error(`HTTP 403 for ${url} (all fallbacks failed)`);
@@ -344,10 +440,31 @@ function extractFullPageContent(html: string, url: string): string {
   return `URL: ${url}\n\nPAGE TEXT:\n${bodyText.slice(0, 12000)}\n\nLINKS ON PAGE:\n${links.slice(0, 150).join("\n")}`;
 }
 
-function findRelatedPages(html: string, courseUrl: string): { fees?: string; requirements?: string; entry?: string; feesPdf?: string } {
+function resolveDiscoverableUrl(href: string, baseUrl: string, origin: string): string | null {
+  const trimmed = href.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+  if (/^(?:javascript:|mailto:|tel:)/i.test(trimmed)) return null;
+
+  try {
+    const resolved = new URL(trimmed, baseUrl);
+    resolved.hash = "";
+    const fullUrl = resolved.toString();
+    if (!fullUrl.startsWith(origin)) return null;
+
+    const current = new URL(baseUrl);
+    current.hash = "";
+    if (fullUrl === current.toString()) return null;
+
+    return fullUrl;
+  } catch {
+    return null;
+  }
+}
+
+function findRelatedPages(html: string, courseUrl: string): { fees?: string; requirements?: string; entry?: string; feesPdf?: string; requirementsPdf?: string; brochurePdf?: string } {
   const $ = cheerio.load(html);
   const origin = new URL(courseUrl).origin;
-  const result: { fees?: string; requirements?: string; entry?: string; feesPdf?: string } = {};
+  const result: { fees?: string; requirements?: string; entry?: string; feesPdf?: string; requirementsPdf?: string; brochurePdf?: string } = {};
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href") || "";
@@ -359,6 +476,16 @@ function findRelatedPages(html: string, courseUrl: string): { fees?: string; req
       if (!result.feesPdf && /\.pdf/i.test(fullUrl) && /fee|tuition|international/i.test(fullUrl + " " + text)) {
         result.feesPdf = fullUrl;
       }
+      if (!result.brochurePdf && /\.pdf/i.test(fullUrl) && /\b(brochure|course\s+guide|guide)\b/i.test(fullUrl + " " + text) && !/application/i.test(fullUrl + " " + text)) {
+        result.brochurePdf = fullUrl;
+      }
+      if (
+        !result.requirementsPdf &&
+        /\.pdf/i.test(fullUrl) &&
+        /\b(entry|admission|requirement|criteria|eligib|english|language|ielts|pte|toefl|duolingo|course\s+information|admission\s+information)\b/i.test(fullUrl + " " + text)
+      ) {
+        result.requirementsPdf = fullUrl;
+      }
 
       if (!result.fees && (
         /\b(international|overseas)\s*(fee|tuition|cost)/i.test(text) ||
@@ -366,10 +493,10 @@ function findRelatedPages(html: string, courseUrl: string): { fees?: string; req
       )) {
         result.fees = fullUrl;
       }
-      if (!result.requirements && /\b(entry|admission|requirement|eligib|how\s*to\s*apply)/i.test(text)) {
+      if (!/\.pdf/i.test(fullUrl) && !result.requirements && /\b(entry|admission|requirement|eligib|how\s*to\s*apply)/i.test(text)) {
         result.requirements = fullUrl;
       }
-      if (!result.entry && /\b(english|language|ielts|pte|toefl)/i.test(text)) {
+      if (!/\.pdf/i.test(fullUrl) && !result.entry && /\b(english|language|ielts|pte|toefl)/i.test(text)) {
         result.entry = fullUrl;
       }
     } catch {}
@@ -449,9 +576,9 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
     });
   }
 
-  // Strategy C: <strong>Delivery</strong> Face to Face on campus  (label inline with value)
+  // Strategy C: inline label/value pairs like "Delivery: Face to Face on campus"
   if (!deliveryResult) {
-    $("strong, b, h3, h4, h5, h6, span").each((_, el) => {
+    $("strong, b, h3, h4, h5, h6, span, div, p, label").each((_, el) => {
       const txt = $(el).text().trim();
       if (!DELIVERY_LABEL.test(txt)) return;
       // Try next sibling text first
@@ -492,6 +619,18 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
   if (/\bdelivered\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
   if (/\b(?:course|programme?)\s+is\s+(?:delivered|taught)\s+(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/i.test(fullText)) return "On Campus";
 
+  // Fallback to the explicit course location field when no study mode is stated.
+  const location = extractCourseLocation($);
+  if (location) {
+    const locationKind = classifyLocationValue(location);
+    const locationLower = location.toLowerCase();
+    const hasOnline = /\b(?:online|virtual|remote|distance(?: learning)?|off[- ]?campus)\b/.test(locationLower);
+
+    if (locationKind === "online_only") return "Online";
+    if (locationKind === "physical_or_mixed" && hasOnline) return "Blended";
+    if (locationKind === "physical_or_mixed") return "On Campus";
+  }
+
   // ── Default ─────────────────────────────────────────────────────────────
   // When no explicit delivery signal is present, assume "On Campus" — that's
   // the historical default for traditional universities.
@@ -501,7 +640,13 @@ function detectStudyMode($: ReturnType<typeof cheerio.load>, fullText: string): 
 function extractWithCheerio(html: string, url: string, name: string, countryFallback?: string): Partial<CourseData> {
   const $ = cheerio.load(html);
   const text = $("body").text();
-  const data: Partial<CourseData> = { courseName: name, courseWebsite: url, language: "English" };
+  const preferredUrl = preferInternationalCourseUrl(url);
+  const data: Partial<CourseData> = { courseName: name, courseWebsite: preferredUrl, language: "English" };
+  data.courseLocation = sanitizeCourseLocationForDisplay(extractCourseLocation($));
+
+  if (hasDomesticAudienceField($) || pageIndicatesDomesticOnly(text, $("h1").first().text() || $("title").text(), url)) {
+    data.domesticOnly = true;
+  }
 
   // Duration: prefer explicit "Duration:" label first, then fall back to general patterns
   const durLabelMatch = text.match(/(?:duration|course\s*length|program\s*length)[:\s]+(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)/i);
@@ -545,6 +690,9 @@ function extractWithCheerio(html: string, url: string, name: string, countryFall
 
   // Study mode — DOM-aware detection, checks Location and Delivery fields independently
   data.studyMode = detectStudyMode($, text);
+  if (data.studyMode === "Online" && (hasOnlineOnlyCampusField($) || pageIndicatesOnlineOnlyNoPhysicalCampus(text, $("h1").first().text() || $("title").text(), url))) {
+    data.onlineOnly = true;
+  }
 
   const lower = name.toLowerCase();
   if (/\bphd\b|doctor of philosophy/i.test(lower)) data.degreeLevel = "PhD";
@@ -707,12 +855,18 @@ function extractFeeFromDomToggle($: ReturnType<typeof cheerio.load>, data: Parti
  * Extract ALL fee amounts in a reasonable range from text.
  * If multiple found, the highest is assumed to be the international fee.
  */
+function isSalaryContext(context: string): boolean {
+  return /\b(?:average\s+salary|salary|salaries|career\s+paths?|earn(?:ings)?|talent\.com\/salary)\b/i.test(context);
+}
+
 function extractAllFeeAmounts(text: string): number[] {
   const amounts: number[] = [];
   const CURR_TOKENS = /A\$|NZ\$|CA\$|US\$|S\$|\$|£|€|AUD|NZD|CAD|USD|GBP|SGD|EUR/;
   const pattern = new RegExp(`(?:${CURR_TOKENS.source})\\s*([\\d,]+)|([\\d,]+)\\s*(?:${CURR_TOKENS.source})`, "gi");
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(text)) !== null) {
+    const context = text.slice(Math.max(0, m.index - 120), Math.min(text.length, m.index + 160));
+    if (isSalaryContext(context)) continue;
     const raw = (m[1] || m[2] || "").replace(/,/g, "");
     const num = parseInt(raw);
     if (num >= 5000 && num <= 200000 && !amounts.includes(num)) amounts.push(num);
@@ -771,6 +925,7 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
   const CURRENCY_SYM = /(?:AUD|NZD|CAD|USD|GBP|SGD|EUR|A\$|NZ\$|CA\$|US\$|S\$|£|€|\$)/;
 
   function applyFee(matchStr: string, feeStr: string) {
+    if (isSalaryContext(matchStr)) return false;
     const fee = parseInt(feeStr.replace(/,/g, ""));
     if (fee <= 1000 || fee >= 200000) return false;
     data.internationalFee = fee;
@@ -778,6 +933,28 @@ function extractInternationalFees(text: string, data: Partial<CourseData>, count
     data.feeTerm = normalizeFeeTerm(matchStr);
     if (!data.feeYear) data.feeYear = extractFeeYear(matchStr);
     return true;
+  }
+
+  // Priority 0a (highest): Explicitly-labelled INTERNATIONAL fee card pattern.
+  //
+  // Handles sites like VIT that render a clearly-labelled fee card such as:
+  //     "INTERNATIONAL (On campus)"        -> $48,000
+  //     "INTERNATIONAL (Online)"           -> $48,000
+  // with the price appearing within ~200 chars. The parenthetical qualifier makes
+  // this an unambiguous card-style label (it's never a nav link or radio-button
+  // label). Before this fix, VIT pages mis-bound "International" (radio button)
+  // to the first "$36,000" on the page (the DOMESTIC fee).
+  //
+  // We iterate all matches and keep the one whose captured snippet does NOT
+  // contain a "domestic" signal between the label and the fee.
+  const labelledIntlCardPat = new RegExp(
+    `international\\s*\\([^)]{1,40}\\)[\\s\\S]{0,200}?${CURRENCY_SYM.source}\\s*([\\d,]+)`,
+    "gi"
+  );
+  for (const m of text.matchAll(labelledIntlCardPat)) {
+    const snippet = m[0];
+    if (/\bdomestic\b/i.test(snippet)) continue;
+    if (applyFee(snippet, m[1])) return;
   }
 
   // Priority 0 (highest): "Total fee (per-unit rate)" pattern
@@ -1878,7 +2055,111 @@ Extract ALL test types: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C
 }
 
 async function extractFeesFromPdf(pdfUrl: string, courseName: string): Promise<Partial<CourseData>> {
-  if (!GEMINI_API_KEY) return {};
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const extractAmountCandidates = (text: string): number[] => [
+    ...new Set(
+      [...text.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
+        .map((m) => Math.round(parseFloat(m[1].replace(/,/g, ""))))
+        .filter((n) => n > 1000 && n < 200000),
+    ),
+  ].sort((a, b) => a - b);
+  const buildNamePattern = (name: string) => {
+    const tokens = name.match(/[a-z0-9]+/gi) ?? [];
+    return tokens.length > 0 ? new RegExp(tokens.join("\\W+"), "i") : null;
+  };
+  const courseNameVariants = (name: string): string[] => {
+    const variants = new Set<string>([name]);
+    const stripped = name.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+    if (stripped) variants.add(stripped);
+    if (/^bachelor of business\b/i.test(stripped) && !/^bachelor of business$/i.test(stripped)) variants.add("Bachelor of Business");
+    if (/^diploma of business\b/i.test(stripped) && !/^diploma of business$/i.test(stripped)) variants.add("Diploma of Business");
+    return [...variants].filter(Boolean);
+  };
+  const PDF_ROW_STOPWORDS = new Set([
+    "adelaide", "brisbane", "melbourne", "sydney", "online", "onshore", "offshore",
+    "undergraduate", "postgraduate", "domestic", "international", "course", "courses",
+    "year", "years", "month", "months", "trimester", "semester", "full", "time",
+  ]);
+  const pickAmounts = (amounts: number[], context: string): Partial<CourseData> => {
+    if (amounts.length === 0) return {};
+    const unique = Array.from(new Set(amounts)).sort((a, b) => a - b);
+    const chosen = Math.max(...unique);
+    const nextLargest = unique.length > 1 ? unique[unique.length - 2] : undefined;
+    const looksLikeFullCourse =
+      unique.length >= 3 ||
+      (typeof nextLargest === "number" && chosen >= nextLargest * 1.4) ||
+      /\bfull\s+course\b/i.test(context);
+    return {
+      internationalFee: chosen,
+      currency: "AUD",
+      feeTerm: looksLikeFullCourse ? "Full Course" : /\bper\s+unit\b/i.test(context) ? "Per Unit" : "Annual",
+      feeYear: extractFeeYear(context) || undefined,
+    };
+  };
+  const parseFeeFromLayoutPdfText = (text: string): Partial<CourseData> => {
+    const lines = text.split(/\r?\n/).map((line) => line.trimEnd());
+    const variants = courseNameVariants(courseName).map((variant) => ({
+      raw: variant,
+      normalized: normalize(variant),
+      tokens: normalize(variant).split(" ").filter(Boolean),
+    }));
+
+    let best: { score: number; amounts: number[]; context: string } | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      for (let windowSize = 2; windowSize <= 6; windowSize++) {
+        const joined = lines.slice(i, i + windowSize).join(" ");
+        const normalizedJoined = normalize(joined);
+        if (!normalizedJoined) continue;
+
+        for (const variant of variants) {
+          const overlap = variant.tokens.filter((token) => normalizedJoined.includes(token)).length;
+          const exact = normalizedJoined.includes(variant.normalized);
+          if (!exact && overlap < Math.max(2, Math.ceil(variant.tokens.length * 0.7))) continue;
+
+          const amounts = extractAmountCandidates(joined);
+          if (amounts.length === 0) continue;
+
+          const joinedTokens = normalizedJoined.split(" ").filter(Boolean);
+          const extraTokens = joinedTokens.filter((token) =>
+            token.length > 3 &&
+            !variant.tokens.includes(token) &&
+            !PDF_ROW_STOPWORDS.has(token) &&
+            !/^\d+[a-z]*$/.test(token),
+          ).length;
+          const score = (exact ? 120 : 0) + overlap * 8 + amounts.length * 3 - extraTokens * 6 - i / 1000;
+          if (!best || score > best.score) best = { score, amounts, context: joined };
+        }
+      }
+    }
+
+    return best ? pickAmounts(best.amounts, best.context) : {};
+  };
+  const parseFeeFromPdfText = (text: string): Partial<CourseData> => {
+    const lower = text.toLowerCase();
+    for (const variant of courseNameVariants(courseName)) {
+      const pat = buildNamePattern(variant);
+      if (!pat) continue;
+      const match = pat.exec(text);
+      if (!match) continue;
+      const chunk = text.slice(match.index, Math.min(text.length, match.index + 900));
+      const amounts = [...chunk.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
+        .map((m) => parseInt(m[1].replace(/,/g, ""), 10))
+        .filter((n) => n > 1000 && n < 200000);
+      const parsed = pickAmounts(amounts, `${text}\n${chunk}`);
+      if (parsed.internationalFee) return parsed;
+    }
+    if (normalize(lower).includes(normalize(courseName))) {
+      const allAmounts = [...text.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
+        .map((m) => parseInt(m[1].replace(/,/g, ""), 10))
+        .filter((n) => n > 1000 && n < 200000);
+      if (allAmounts.length > 0) {
+        return pickAmounts(allAmounts, text);
+      }
+    }
+    return {};
+  };
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -1890,45 +2171,139 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string): Promise<P
 
     const buffer = await resp.arrayBuffer();
     if (buffer.byteLength > 5 * 1024 * 1024) return {};
-    const base64 = Buffer.from(buffer).toString("base64");
 
-    const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
+    try {
+      const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
+      const pdfPath = path.join(tmpDir, "source.pdf");
+      const txtPath = path.join(tmpDir, "source.txt");
+      const layoutTxtPath = path.join(tmpDir, "source-layout.txt");
+      await writeFile(pdfPath, Buffer.from(buffer));
+      await execFileAsync("pdftotext", [pdfPath, txtPath]);
+      await execFileAsync("pdftotext", ["-layout", pdfPath, layoutTxtPath]);
+      const pdfText = await readFile(txtPath, "utf8");
+      const layoutPdfText = await readFile(layoutTxtPath, "utf8");
+      await rm(tmpDir, { recursive: true, force: true });
+      const layoutParsed = parseFeeFromLayoutPdfText(layoutPdfText);
+      if (layoutParsed.internationalFee) return layoutParsed;
+      const parsed = parseFeeFromPdfText(pdfText);
+      if (parsed.internationalFee) return parsed;
+
+      const validAmounts = new Set<number>([
+        ...extractAmountCandidates(pdfText),
+        ...extractAmountCandidates(layoutPdfText),
+      ]);
+      if (!GEMINI_API_KEY || validAmounts.size === 0) return {};
+
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
 Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>","feeYear":<year>}
 Use null for missing fields. Only include INTERNATIONAL fees.`;
 
-    const body = JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inline_data: { mime_type: "application/pdf", data: base64 } },
-        ],
-      }],
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-    });
+      const body = JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: "application/pdf", data: base64 } },
+          ],
+        }],
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
+      });
 
-    for (const model of GEMINI_MODELS) {
-      try {
-        const apiResp = await fetch(geminiUrl(model), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-        if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
-        if (!apiResp.ok) continue;
-        const data = await apiResp.json() as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (text) return JSON.parse(text) as Partial<CourseData>;
-      } catch { continue; }
-    }
+      for (const model of GEMINI_MODELS) {
+        try {
+          const apiResp = await fetch(geminiUrl(model), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+          });
+          if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
+          if (!apiResp.ok) continue;
+          const data = await apiResp.json() as any;
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+          if (!text) continue;
+          const parsedAi = JSON.parse(text) as Partial<CourseData>;
+          const fee = parsedAi.internationalFee;
+          if (typeof fee === "number" && validAmounts.has(Math.round(fee))) return parsedAi;
+        } catch { continue; }
+      }
+      return {};
+    } catch {}
   } catch {}
   return {};
 }
 
-async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPages: { fees?: string; requirements?: string; entry?: string; feesPdf?: string }, html?: string, courseUrl?: string) {
+async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData>> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(pdfUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) return {};
+    const ct = resp.headers.get("content-type") || "";
+    if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return {};
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > 10 * 1024 * 1024) return {};
+
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
+    const pdfPath = path.join(tmpDir, "source.pdf");
+    const txtPath = path.join(tmpDir, "source.txt");
+    await writeFile(pdfPath, Buffer.from(buffer));
+    await execFileAsync("pdftotext", [pdfPath, txtPath]);
+    const pdfText = await readFile(txtPath, "utf8");
+    await rm(tmpDir, { recursive: true, force: true });
+
+    const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
+    const courseData: Partial<CourseData> = {};
+    applyEnglishResultToCourse(courseData, parsed);
+    return courseData;
+  } catch {}
+  return {};
+}
+
+function mergeEnglishRequirements(target: Partial<CourseData>, source: Partial<CourseData>): boolean {
+  let changed = false;
+  const fields: (keyof CourseData)[] = [
+    "ieltsOverall", "ieltsListening", "ieltsSpeaking", "ieltsWriting", "ieltsReading",
+    "pteOverall", "pteListening", "pteSpeaking", "pteWriting", "pteReading",
+    "toeflOverall", "toeflListening", "toeflSpeaking", "toeflWriting", "toeflReading",
+    "cambridgeOverall", "duolingoOverall",
+  ];
+  for (const field of fields) {
+    const value = source[field];
+    if ((target as Record<string, unknown>)[field] == null && value != null) {
+      (target as Record<string, unknown>)[field] = value;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+async function enrichFromRelatedPages(
+  courseData: Partial<CourseData>,
+  relatedPages: { fees?: string; requirements?: string; entry?: string; feesPdf?: string; requirementsPdf?: string; brochurePdf?: string },
+  html?: string,
+  courseUrl?: string,
+  evidenceCollector?: ReviewSource[],
+) {
   const needsFees = !courseData.internationalFee;
   const needsAnyEnglish = !(courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall && courseData.cambridgeOverall);
 
   const pagesToFetch: { url: string; type: string }[] = [];
+
+  // Prefer a dedicated international fee PDF before generic fee pages.
+  if (needsFees && relatedPages.feesPdf && !courseData.internationalFee) {
+    try {
+      const pdfData = await extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "");
+      if (pdfData.internationalFee) {
+        courseData.internationalFee = pdfData.internationalFee;
+        courseData.currency = pdfData.currency || "AUD";
+        courseData.feeTerm = pdfData.feeTerm || "Annual";
+        courseData.feeYear = pdfData.feeYear || undefined;
+      }
+    } catch {}
+  }
 
   if (needsFees && relatedPages.fees) pagesToFetch.push({ url: relatedPages.fees, type: "fees" });
   if (needsAnyEnglish && relatedPages.entry) pagesToFetch.push({ url: relatedPages.entry, type: "english" });
@@ -1938,6 +2313,14 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
     try {
       const pHtml = await fetchPage(page.url);
       const text = cheerio.load(pHtml)("body").text();
+      if (evidenceCollector) {
+        evidenceCollector.push({
+          url: page.url,
+          pageType: page.type === "fees" ? "fee_page" : (page.type === "english" ? "english_page" : "requirements_page"),
+          extractionMethod: "cheerio",
+          content: text,
+        });
+      }
 
       if (page.type === "fees" || page.type === "requirements") {
         if (!courseData.internationalFee) {
@@ -1955,19 +2338,24 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
     } catch {}
   }
 
-  if (needsFees && relatedPages.feesPdf && !courseData.internationalFee) {
+  if (needsAnyEnglish && relatedPages.requirementsPdf) {
     try {
-      const pdfData = await extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "");
-      if (pdfData.internationalFee) {
-        courseData.internationalFee = pdfData.internationalFee;
-        courseData.currency = pdfData.currency || "AUD";
-        courseData.feeTerm = pdfData.feeTerm || "Annual";
-        courseData.feeYear = pdfData.feeYear || undefined;
-      }
+      const pdfEnglish = await extractEnglishFromPdf(relatedPages.requirementsPdf);
+      mergeEnglishRequirements(courseData, pdfEnglish);
     } catch {}
   }
 
   if (needsAnyEnglish && html && courseUrl) {
+    const validVisibleAmounts = new Set<number>(
+      extractAllFeeAmounts(cheerio.load(html)("body").text()).map((n) => Math.round(n)),
+    );
+    if (relatedPages.brochurePdf && !(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall)) {
+      try {
+        const pdfEnglish = await extractEnglishFromPdf(relatedPages.brochurePdf);
+        mergeEnglishRequirements(courseData, pdfEnglish);
+      } catch {}
+    }
+
     const images = findImageUrls(html, courseUrl);
     for (const imgUrl of images.slice(0, 3)) {
       try {
@@ -1985,7 +2373,13 @@ async function enrichFromRelatedPages(courseData: Partial<CourseData>, relatedPa
             foundAnything = true;
           }
         }
-        if (imgData.internationalFee && typeof imgData.internationalFee === "number" && imgData.internationalFee > 1000 && !courseData.internationalFee) {
+        if (
+          imgData.internationalFee &&
+          typeof imgData.internationalFee === "number" &&
+          imgData.internationalFee > 1000 &&
+          !courseData.internationalFee &&
+          validVisibleAmounts.has(Math.round(imgData.internationalFee))
+        ) {
           courseData.internationalFee = imgData.internationalFee;
           courseData.currency = imgData.currency || "AUD";
           courseData.feeTerm = imgData.feeTerm || "Annual";
@@ -2142,15 +2536,13 @@ function classifyPageByRules(
     const href = $(el).attr("href") || "";
     const text = $(el).text().trim().replace(/\s+/g, " ");
     if (!text || text.length < 5 || text.length > 180) return;
-    try {
-      const fullUrl = new URL(href, url).toString();
-      if (!fullUrl.startsWith(origin)) return;
-      if (seenUrls.has(fullUrl)) return;
-      if (isCourseUrl(fullUrl) && !isJunkCourseName(text)) {
-        seenUrls.add(fullUrl);
-        courseLinks.push({ url: fullUrl, name: text });
-      }
-    } catch {}
+    const fullUrl = resolveDiscoverableUrl(href, url, origin);
+    if (!fullUrl) return;
+    if (seenUrls.has(fullUrl)) return;
+    if (isCourseUrl(fullUrl) && !isJunkCourseName(text)) {
+      seenUrls.add(fullUrl);
+      courseLinks.push({ url: fullUrl, name: text });
+    }
   });
 
   // Signals for "detail" (single course page)
@@ -2160,11 +2552,22 @@ function classifyPageByRules(
   let urlLooksLikeDetail = false;
   try {
     const pathname = new URL(url).pathname.toLowerCase();
-    urlLooksLikeDetail = VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname)) && pathname.split("/").filter(Boolean).length >= 2;
+    urlLooksLikeDetail =
+      VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname)) &&
+      pathname.split("/").filter(Boolean).length >= 2 &&
+      lastSegmentHasDegreeQualifier(pathname);
   } catch {}
 
   const bodyText = $("body").text().toLowerCase().slice(0, 12000);
+  const looksLikeLanding = pageLooksLikeCourseLandingPage(bodyText, h1 || titleEl, url);
   const hasCourseContent = pageContentLooksLikeCourse(bodyText, h1 || titleEl);
+
+  if (looksLikeLanding && courseLinks.length >= 3) {
+    return { pageType: "listing", courseLinks, reason: `${courseLinks.length} links on a listing-style page` };
+  }
+  if (looksLikeLanding) {
+    return { pageType: "unknown", courseLinks: [], reason: "listing-style page without enough direct course links" };
+  }
 
   // DETAIL: degree H1 + URL pattern + limited outbound course links
   if (hasDegreeH1 && urlLooksLikeDetail && courseLinks.length < 6) {
@@ -2283,8 +2686,179 @@ function validateAndSanitizeCourseData(courseData: CourseData): string[] {
   return warnings;
 }
 
-async function stageCourse(courseData: CourseData, uniId: number, jobId: string, job?: ScrapeJob): Promise<boolean> {
+type PublishableCourseLike = Partial<CourseData> & {
+  courseName?: string | null;
+  courseWebsite?: string | null;
+  courseLocation?: string | null;
+  duration?: number | null;
+  durationTerm?: string | null;
+  studyMode?: string | null;
+  degreeLevel?: string | null;
+  internationalFee?: number | null;
+  currency?: string | null;
+  ieltsOverall?: number | null;
+  pteOverall?: number | null;
+  toeflOverall?: number | null;
+  cambridgeOverall?: number | null;
+  duolingoOverall?: number | null;
+  intakeMonths?: string[] | null;
+  academicLevel?: string | null;
+  academicScore?: number | null;
+  otherRequirement?: string | null;
+  description?: string | null;
+  completeness?: number | null;
+};
+
+function hasAnyEnglishRequirement(courseData: PublishableCourseLike): boolean {
+  return [
+    courseData.ieltsOverall,
+    courseData.pteOverall,
+    courseData.toeflOverall,
+    courseData.cambridgeOverall,
+    courseData.duolingoOverall,
+  ].some((value) => value != null);
+}
+
+function hasAcademicRequirement(courseData: PublishableCourseLike): boolean {
+  return !!(
+    courseData.academicLevel ||
+    courseData.academicScore != null ||
+    (courseData.otherRequirement && courseData.otherRequirement.trim())
+  );
+}
+
+function assessPublishReadiness(courseData: PublishableCourseLike): { blockers: string[]; warnings: string[] } {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const studyMode = (courseData.studyMode || "").toLowerCase();
+  const hasLocation = !!courseData.courseLocation?.trim();
+  const hasIntakes = Array.isArray(courseData.intakeMonths) && courseData.intakeMonths.length > 0;
+  const hasCampusSignal =
+    /\bon\s*campus\b|\bface.?to.?face\b|\bin[- ]person\b|\bblended\b|\bmixed\b|\bhybrid\b/.test(studyMode);
+  const onlineOnlySignal = /\bonline\b/.test(studyMode) && !hasCampusSignal;
+  const requiresLocation = !onlineOnlySignal;
+
+  if (!courseData.degreeLevel) warnings.push("missing degree level");
+  if (courseData.duration == null || !courseData.durationTerm) blockers.push("missing duration");
+  if (courseData.internationalFee == null || !courseData.currency) blockers.push("missing international fee");
+  if (!hasIntakes) blockers.push("missing intake");
+  if (!hasAnyEnglishRequirement(courseData)) blockers.push("missing English requirement");
+  if (requiresLocation && !hasLocation) blockers.push("missing on-campus location");
+  if (!courseData.studyMode && !hasLocation) blockers.push("missing delivery mode evidence");
+  else if (!courseData.studyMode) warnings.push("missing study mode");
+  if (!hasAcademicRequirement(courseData)) warnings.push("missing academic requirement");
+  if (!courseData.courseWebsite) warnings.push("missing source URL");
+  if (!courseData.description || courseData.description.trim().length < 80) warnings.push("weak course description");
+  if ((courseData.completeness ?? 100) < 70) warnings.push("low completeness score");
+
+  return { blockers, warnings };
+}
+
+function buildReviewNotes(
+  missing: string[],
+  validationWarnings: string[],
+  blockers: string[],
+  warnings: string[],
+): string | null {
+  const parts: string[] = [];
+  if (blockers.length > 0) parts.push(`Publish blocked: ${blockers.join(", ")}`);
+  if (validationWarnings.length > 0) parts.push(`Validation: ${validationWarnings.join("; ")}`);
+  if (missing.length > 0) parts.push(`Missing: ${missing.join(", ")}`);
+  if (warnings.length > 0) parts.push(`Warnings: ${warnings.join(", ")}`);
+  return parts.length > 0 ? parts.join(" | ") : null;
+}
+
+function buildSnapshotNotes(snapshot: CourseReviewSnapshot): string[] {
+  const parts: string[] = [];
+  if (snapshot.eligibility.eligibilityStatus !== "eligible") {
+    parts.push(`Eligibility: ${snapshot.eligibility.reason}`);
+  }
+  const conflictFields = Array.from(new Set(snapshot.conflicts.map((conflict) => conflict.fieldKey)));
+  if (conflictFields.length > 0) {
+    parts.push(`Conflicts: ${conflictFields.join(", ")}`);
+  }
+  const weakFields = snapshot.resolutions
+    .filter((resolution) => resolution.status !== "accepted")
+    .map((resolution) => resolution.fieldKey);
+  if (weakFields.length > 0) {
+    parts.push(`Needs review: ${Array.from(new Set(weakFields)).join(", ")}`);
+  }
+  return parts;
+}
+
+async function loadApplicableFeedback(universityId: number, courseName: string): Promise<FeedbackRule[]> {
+  const rows = await db.select().from(scrapeFeedbackTable).where(eq(scrapeFeedbackTable.universityId, universityId));
+  const lowerName = courseName.trim().toLowerCase();
+  return rows
+    .filter((row) => row.status === "active")
+    .filter((row) => !row.courseName || row.courseName.trim().toLowerCase() === lowerName)
+    .map((row) => ({
+      fieldKey: row.fieldKey,
+      issueType: row.issueType,
+      reason: row.reason,
+      preferredValue: row.preferredValue,
+    }));
+}
+
+async function persistReviewArtifacts(scrapedCourseId: number, snapshot: CourseReviewSnapshot) {
+  if (snapshot.candidates.length > 0) {
+    await db.insert(scrapedFieldEvidenceTable).values(snapshot.candidates.map((candidate) => ({
+      scrapedCourseId,
+      fieldKey: candidate.fieldKey,
+      candidateValue: candidate.candidateValue,
+      normalizedValue: candidate.normalizedValue,
+      sourceUrl: candidate.sourceUrl,
+      pageType: candidate.pageType,
+      extractionMethod: candidate.extractionMethod,
+      rawText: candidate.rawText,
+      snippet: candidate.snippet,
+      confidence: candidate.confidence,
+      decisionScore: candidate.decisionScore,
+      validationStatus: candidate.validationStatus,
+      decisionStatus: candidate.decisionStatus,
+      selected: candidate.selected,
+    })));
+  }
+
+  if (snapshot.conflicts.length > 0) {
+    await db.insert(fieldConflictsTable).values(snapshot.conflicts.map((conflict) => ({
+      scrapedCourseId,
+      fieldKey: conflict.fieldKey,
+      valueA: conflict.valueA,
+      valueB: conflict.valueB,
+      conflictType: conflict.conflictType,
+      reason: conflict.reason,
+      status: "open",
+    })));
+  }
+}
+
+async function stageCourse(
+  courseData: CourseData,
+  uniId: number,
+  jobId: string,
+  job?: ScrapeJob,
+  reviewContext?: CourseReviewContext,
+): Promise<boolean> {
   if (!courseData.courseName) return false;
+
+  if (courseData.domesticOnly) {
+    if (job) addLog(job, "status", { message: `Skipped (domestic only): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping domestic-only course: "${courseData.courseName}"`);
+    return false;
+  }
+
+  if (courseData.onlineOnly) {
+    if (job) addLog(job, "status", { message: `Skipped (online only / no physical campus): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping online-only course: "${courseData.courseName}"`);
+    return false;
+  }
+
+  if (courseData.courseWebsite && isKnownNonCourseLandingUrl(courseData.courseWebsite)) {
+    if (job) addLog(job, "status", { message: `Skipped (landing page): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
+    else console.log(`[JUNK] Skipping landing page: "${courseData.courseName}"`);
+    return false;
+  }
 
   // Last-resort junk filter — catch event/category/news pages the link collector missed
   if (isJunkCourseName(courseData.courseName)) {
@@ -2332,6 +2906,23 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
   if (dup.rows.length > 0) return false;
 
   const { score: completeness, missing } = computeCompleteness(courseData);
+  const snapshot = buildCourseReviewSnapshot(courseData, reviewContext?.sources || [{
+    url: courseData.courseWebsite || "",
+    pageType: "other",
+    extractionMethod: "cheerio",
+    content: courseData.description || courseData.courseName,
+  }]);
+  const feedbackRules = await loadApplicableFeedback(uniId, courseData.courseName);
+  if (feedbackRules.length > 0) {
+    applyFeedbackRules(snapshot, feedbackRules);
+  }
+  const readiness = assessPublishReadiness({ ...courseData, completeness });
+  const notes = buildReviewNotes(
+    missing,
+    validationWarnings,
+    [...readiness.blockers, ...buildSnapshotNotes(snapshot)],
+    readiness.warnings,
+  );
 
   // PROBE-G: exact payload entering the DB insert
   debugIelts(courseData.courseName, "G-db-insert-payload", {
@@ -2343,13 +2934,14 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
     missing,
   });
 
-  await db.insert(scrapedCoursesTable).values({
+  const [inserted] = await db.insert(scrapedCoursesTable).values({
     scrapeJobId: jobId,
     universityId: uniId,
     courseName: courseData.courseName,
     category: courseData.category || null,
     subCategory: courseData.subCategory || null,
     courseWebsite: courseData.courseWebsite || null,
+    courseLocation: courseData.courseLocation || null,
     duration: courseData.duration || null,
     durationTerm: courseData.durationTerm || null,
     studyMode: courseData.studyMode || null,
@@ -2386,10 +2978,21 @@ async function stageCourse(courseData: CourseData, uniId: number, jobId: string,
     scoreType: courseData.scoreType || null,
     academicCountry: courseData.academicCountry || null,
     scholarship: courseData.scholarship || null,
+    studentMarket: snapshot.eligibility.studentMarket,
+    deliveryMode: snapshot.eligibility.deliveryMode,
+    internationalEligible: snapshot.eligibility.internationalEligible,
+    onCampusAvailable: snapshot.eligibility.onCampusAvailable,
+    eligibilityStatus: snapshot.eligibility.eligibilityStatus,
+    eligibilityReason: snapshot.eligibility.reason,
+    eligibilityConfidence: snapshot.eligibility.confidence,
+    autoPublishStatus: snapshot.autoPublishStatus,
+    decisionScore: snapshot.decisionScore,
     status: "pending",
     completeness,
-    notes: missing.length > 0 ? `Missing: ${missing.join(", ")}` : null,
-  });
+    notes,
+  }).returning({ id: scrapedCoursesTable.id });
+
+  await persistReviewArtifacts(inserted.id, snapshot);
 
   return true;
 }
@@ -2538,19 +3141,114 @@ const DEGREE_QUALIFIERS = [
   "integrated", "coursework",
 ];
 
+function lastSegmentHasDegreeQualifier(pathname: string): boolean {
+  const lastSeg = pathname
+    .split("/")
+    .filter(Boolean)
+    .pop()
+    ?.replace(/\?.*$/, "")
+    .replace(/\.html?$/i, "") || "";
+  return DEGREE_QUALIFIERS.some(
+    (q) => lastSeg.startsWith(`${q}-`) || lastSeg === q || lastSeg.includes(`-${q}-`) || lastSeg.endsWith(`-${q}`),
+  );
+}
+
+const NON_AWARD_PATH_PATTERNS = [
+  /\/short-courses?(?:\/|$)/,
+  /\/single-subjects?(?:\/|$)/,
+  /\/digital-badges?(?:\/|$)/,
+  /\/micro-credentials?(?:\/|$)/,
+  /\/study-options(?:\/|$)/,
+  /\/executive-education(?:\/|$)/,
+  /\/professional-development(?:\/|$)/,
+  /\/continuing-education(?:\/|$)/,
+  /\/free-courses?(?:\/|$)/,
+  /\/online-short-courses?(?:\/|$)/,
+];
+
+function isKnownNonCourseLandingUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname.toLowerCase();
+    const pathParts = pathname.split("/").filter(Boolean);
+    const lastSeg = pathParts[pathParts.length - 1] ?? "";
+    const normalizedLastSeg = lastSeg.replace(/\.html?$/i, "");
+
+    if (
+      /(^|\.)wgtn\.ac\.nz$/i.test(parsed.hostname) &&
+      /^\/courses\/[a-z]{2,10}\/\d{3,4}\/\d{4}\/?$/i.test(pathname)
+    ) {
+      return true;
+    }
+
+    if (
+      pathname.includes("/units/") ||
+      pathname.includes("/handbooks/") ||
+      pathname.includes("/subject-areas/") ||
+      pathname.includes("/career-finder/") ||
+      pathname.includes("/testimonials/") ||
+      pathname.includes("/study/why-unisq/") ||
+      pathname.includes("/blogs/")
+    ) return true;
+
+    if (pathname.startsWith("/study/degrees-and-courses/")) {
+      const afterBase = pathname.slice("/study/degrees-and-courses/".length).split("/").filter(Boolean);
+      const firstSeg = (afterBase[0] ?? "").replace(/\.html?$/i, "");
+      const blockedSections = new Set([
+        "major",
+        "specialisation",
+        "undergraduate-study",
+        "postgraduate-study",
+        "online-study",
+        "research-study",
+        "pathway-programs",
+        "new-degrees",
+        "program-information-resources",
+        "understanding-university-offers",
+        "postgraduate-csp",
+      ]);
+      if (blockedSections.has(firstSeg)) return true;
+      if (afterBase.length === 1 && !DEGREE_QUALIFIERS.some((q) =>
+        firstSeg.startsWith(`${q}-`) || firstSeg === q || firstSeg.includes(`-${q}-`) || firstSeg.endsWith(`-${q}`)
+      )) {
+        return true;
+      }
+    }
+
+    if (NON_AWARD_PATH_PATTERNS.some((p) => p.test(pathname))) return true;
+
+    const firstSeg = pathParts[0] ?? "";
+    const isShallowCatalogPath =
+      ["courses", "course", "programs", "programmes", "degrees", "study"].includes(firstSeg) &&
+      pathParts.length === 2;
+    const hasDegreeQualifier = DEGREE_QUALIFIERS.some(
+      (q) => normalizedLastSeg.startsWith(`${q}-`) || normalizedLastSeg === q || normalizedLastSeg.includes(`-${q}-`) || normalizedLastSeg.endsWith(`-${q}`),
+    );
+    if (isShallowCatalogPath && !hasDegreeQualifier) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function urlLastSegmentHasDegreeQualifier(url: string): boolean {
   try {
+    if (isKnownNonCourseLandingUrl(url)) return false;
     const pathname = new URL(url).pathname.toLowerCase();
 
     // Fast-path: full-path matches a strong course detail pattern (e.g. /courses/bachelor-of-X)
     if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) {
-      // Still reject known junk suffixes
-      const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+      // Still reject generic category URLs such as /courses/design and known junk suffixes.
+      if (!lastSegmentHasDegreeQualifier(pathname)) return false;
+      const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "").replace(/\.html?$/i, "") || "";
       if (/(scholarships?|info-night|open-day|event|news|fair|expo|community|hub|keydates?|key-dates?)$/.test(lastSeg)) return false;
       return true;
     }
 
-    const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+    const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "").replace(/\.html?$/i, "") || "";
     if (!DEGREE_QUALIFIERS.some((q) => lastSeg.startsWith(q + "-") || lastSeg === q)) return false;
     // Reject degree-qualified URLs that are clearly info/category pages, not actual course detail pages
     // e.g. phd-scholarships, phd-jobs-and-internships, integrated-masters (category), master-classes
@@ -2589,10 +3287,17 @@ function isJunkCourseName(name: string): boolean {
     /^postgraduate\s+courses?$/,
     /^undergraduate\s+courses?$/,
     /^all\s+courses?$/,
+    /^higher\s+degrees\s+by\s+research$/,
     /^(?:our\s+)?courses?$/,
+    /\bcourses?\s+and\s+degrees?\b/,
     /^courses?\s+(list|listview|grid|tile|finder|overview|index)$/,
     /^(programs?|degrees?|study)\s+(list|listview|grid|tile|finder|overview|index)$/,
     /^(?:browse|explore|find|view)\s+(?:our\s+)?(?:courses?|programs?|degrees?)$/,
+    /\bshort\s+courses?\b/,
+    /\bon[\s-]?demand\s+short\s+courses?\b/,
+    /\bdigital\s+badges?\b/,
+    /^single\s+subjects?$/,
+    /^sport\s+for\s+good$/,
     /retains?\s+tier/,
     /\brackings?\b.*\bspot\b/,
     /\baccredited\b$/,
@@ -2610,11 +3315,427 @@ function isJunkCourseName(name: string): boolean {
   return junkPatterns.some((p) => p.test(lower));
 }
 
+function pageLooksLikeCourseLandingPage(text: string, title = "", url = ""): boolean {
+  const lower = `${title}\n${text}`.slice(0, 12000).toLowerCase();
+
+  const landingIndicators = [
+    /\bfind\s+(?:an?|your)\s+.+?\s+course\b/,
+    /\bfind\s+(?:an?|your)\s+course\b/,
+    /\bview\s+courses\b/,
+    /\bexplore\s+courses\b/,
+    /\bexplore\s+our\s+courses\b/,
+    /\bexplore\s+similar\s+courses\b/,
+    /\bthere are\s+\{count\}\s+results\b/,
+    /\bload more results\b/,
+    /\bclear all\b/,
+    /\bfilter\b/,
+    /\bstudy level\b/,
+    /\barea of interest\b/,
+    /\bmode of study\b/,
+    /\bduration of course\b/,
+    /\bexplore career opportunities\b/,
+    /\brecommended reading\b/,
+    /\bshort courses?\b/,
+    /\bdigital badges?\b/,
+    /\bsingle subjects?\b/,
+    /\bmicro-credentials?\b/,
+    /\bon[\s-]?demand short courses?\b/,
+  ];
+  const landingScore = landingIndicators.filter((p) => p.test(lower)).length;
+
+  const detailIndicators = [
+    /\b(bachelor of|master of|doctor of|graduate certificate|graduate diploma|associate degree|diploma of)\b/,
+    /\b(tuition fee|international fee|course fee|estimated fee|indicative fee)\b/,
+    /\b(entry requirements?|admission requirements?|academic requirements?)\b/,
+    /\b(ielts|pte|toefl|duolingo|cambridge)\b/,
+    /\b(duration|course length|credit points?|units of study)\b/,
+  ];
+  const detailScore = detailIndicators.filter((p) => p.test(lower)).length;
+
+  let shallowCatalogPath = false;
+  try {
+    const pathParts = new URL(url).pathname.toLowerCase().split("/").filter(Boolean);
+    shallowCatalogPath =
+      ["courses", "course", "programs", "programmes", "degrees", "study"].includes(pathParts[0] ?? "") &&
+      pathParts.length === 2;
+  } catch {}
+
+  if (landingScore >= 3 && detailScore === 0) return true;
+  if (shallowCatalogPath && landingScore >= 1 && detailScore < 2) return true;
+  if (/\bcourses?\s+and\s+degrees?\b/.test(lower) && detailScore < 2) return true;
+  if (/\bdegrees?\s+and\s+courses?\b/.test(lower) && detailScore < 2) return true;
+
+  return false;
+}
+
+function hasDomesticAudienceField($: ReturnType<typeof cheerio.load>): boolean {
+  const AUDIENCE_LABEL = /^(?:student|student\s*type|applicant\s*type|availability|entry\s*type)\s*:?\s*$/i;
+  const classifyAudienceValue = (raw: string): "domestic_only" | "international_available" | "other" => {
+    const v = raw.toLowerCase().replace(/\s+/g, " ").trim();
+    const hasDomestic = /\b(domestic|domestic students?|australian domestic students?)\b/.test(v);
+    const hasInternational = /\b(international|international students?|overseas students?)\b/.test(v);
+    if (hasInternational) return "international_available";
+    if (hasDomestic) return "domestic_only";
+    return "other";
+  };
+  let sawDomesticOnly = false;
+  let sawInternationalAvailability = false;
+
+  $("dl dt").each((_, dt) => {
+    const label = $(dt).text().trim();
+    if (!AUDIENCE_LABEL.test(label)) return;
+    const value = $(dt).next("dd").text().trim();
+    const kind = classifyAudienceValue(value);
+    if (kind === "international_available") sawInternationalAvailability = true;
+    if (kind === "domestic_only") sawDomesticOnly = true;
+  });
+
+  $("tr").each((_, tr) => {
+    const cells = $(tr).find("th,td");
+    if (cells.length < 2) return;
+    const label = $(cells.get(0)!).text().trim();
+    if (!AUDIENCE_LABEL.test(label)) return;
+    const value = $(cells.get(1)!).text().trim();
+    const kind = classifyAudienceValue(value);
+    if (kind === "international_available") sawInternationalAvailability = true;
+    if (kind === "domestic_only") sawDomesticOnly = true;
+  });
+
+  $("strong, b, h3, h4, h5, h6, span, div, p, label").each((_, el) => {
+    const label = $(el).text().trim().slice(0, 80);
+    if (!AUDIENCE_LABEL.test(label)) return;
+    const sibling = $(el).next();
+    const nearbyOptionText = sibling.nextAll().slice(0, 3).text().trim();
+    const parentText = $(el).parent().text().trim();
+    const idx = parentText.toLowerCase().indexOf(label.toLowerCase());
+    const parentTail = idx >= 0 ? parentText.slice(idx + label.length).slice(0, 160).trim() : "";
+    let candidate = [sibling.text().trim(), nearbyOptionText, parentTail].filter(Boolean).join(" ");
+    if (candidate.length > 160) candidate = candidate.slice(0, 160).trim();
+    const kind = classifyAudienceValue(candidate);
+    if (kind === "international_available") sawInternationalAvailability = true;
+    if (kind === "domestic_only") sawDomesticOnly = true;
+  });
+
+  return sawDomesticOnly && !sawInternationalAvailability;
+}
+
+const LOCATION_LABEL = /^(?:campus(?:\s+locations?)?|location|locations|study\s+location|study\s+locations|where\s+you(?:'ll| will)\s+study)\s*(?:[\*\u2020\u2021]+)?\s*:?\s*$/i;
+const ONLINE_LOCATION_TOKENS = new Set(["online", "virtual", "remote", "distance", "off", "campus", "offcampus"]);
+const LOCATION_STOP_TOKENS = new Set([
+  "location", "locations", "campus", "campuses", "study", "where", "you", "ll", "will",
+  "only", "available", "at", "the", "and", "or",
+]);
+
+function normalizeCourseLocation(raw: string): string | undefined {
+  const cleaned = raw.replace(/\s+/g, " ").replace(/\s*,\s*/g, ", ").trim();
+  if (!cleaned) return undefined;
+  if (/^(?:qtac|cricos|degree|program|course)\s*codes?$/i.test(cleaned)) return undefined;
+  if (/^(?:qtac|cricos)\b/i.test(cleaned)) return undefined;
+  if (/^[a-z]{2,12}\s*code$/i.test(cleaned)) return undefined;
+  if (/^\d{4,}[a-z]?$/i.test(cleaned)) return undefined;
+  return cleaned ? cleaned.slice(0, 120) : undefined;
+}
+
+function sanitizeCourseLocationForDisplay(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+
+  const parts = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/\b(?:online|virtual|remote|distance(?: learning)?|off[- ]?campus)\b/i.test(part));
+
+  if (parts.length > 0) return parts.join(", ");
+
+  const cleaned = raw
+    .replace(/\b(?:online|virtual|remote|distance(?: learning)?|off[- ]?campus)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/^(?:,\s*)+|(?:,\s*)+$/g, "")
+    .trim();
+
+  return cleaned || undefined;
+}
+
+function classifyLocationValue(raw: string): "online_only" | "physical_or_mixed" | "other" {
+  const v = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!v) return "other";
+
+  const hasOnline = /\b(?:online|virtual|remote|distance(?: learning)?|off[- ]?campus)\b/.test(v);
+  const hasPhysicalSignal = /\b(?:on[- ]?campus|in[- ]?person|face[- ]?to[- ]?face)\b/.test(v);
+  const tokens = v.match(/[a-z]+/g) ?? [];
+  const meaningfulTokens = tokens.filter((token) => !ONLINE_LOCATION_TOKENS.has(token) && !LOCATION_STOP_TOKENS.has(token));
+
+  if (hasPhysicalSignal) return "physical_or_mixed";
+  if (hasOnline && meaningfulTokens.length === 0) return "online_only";
+  if (meaningfulTokens.length > 0) return "physical_or_mixed";
+  return "other";
+}
+
+function extractStructuredCourseInstances($: ReturnType<typeof cheerio.load>): Array<{ courseMode?: string; location?: string }> {
+  const instances: Array<{ courseMode?: string; location?: string }> = [];
+
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+
+    const record = node as Record<string, unknown>;
+    const rawType = record["@type"];
+    const types = Array.isArray(rawType) ? rawType : [rawType];
+    const isCourseInstance = types.some((value) => typeof value === "string" && value.toLowerCase() === "courseinstance");
+
+    if (isCourseInstance) {
+      const rawLocation = record.location;
+      let location: string | undefined;
+      if (typeof rawLocation === "string") {
+        location = rawLocation;
+      } else if (rawLocation && typeof rawLocation === "object") {
+        const place = rawLocation as Record<string, unknown>;
+        if (typeof place.name === "string") location = place.name;
+        else if (typeof place.address === "string") location = place.address;
+      }
+
+      instances.push({
+        courseMode: typeof record.courseMode === "string" ? record.courseMode : undefined,
+        location: normalizeCourseLocation(location || ""),
+      });
+    }
+
+    for (const value of Object.values(record)) visit(value);
+  };
+
+  $("script[type='application/ld+json']").each((_, el) => {
+    const raw = $(el).contents().text().trim();
+    if (!raw) return;
+    try {
+      visit(JSON.parse(raw));
+    } catch {}
+  });
+
+  return instances;
+}
+
+function extractCourseLocation($: ReturnType<typeof cheerio.load>): string | undefined {
+  let result: string | undefined;
+
+  $("dl dt").each((_, dt) => {
+    const label = $(dt).text().trim();
+    if (!LOCATION_LABEL.test(label)) return;
+    const value = normalizeCourseLocation($(dt).next("dd").text().trim());
+    if (value) {
+      result = value;
+      return false;
+    }
+  });
+  if (result) return result;
+
+  $("tr").each((_, tr) => {
+    const cells = $(tr).find("th,td");
+    if (cells.length < 2) return;
+    const label = $(cells.get(0)!).text().trim();
+    if (!LOCATION_LABEL.test(label)) return;
+    const value = normalizeCourseLocation($(cells.get(1)!).text().trim());
+    if (value) {
+      result = value;
+      return false;
+    }
+  });
+  if (result) return result;
+
+  $("strong, b, h3, h4, h5, h6, span, div, p, label").each((_, el) => {
+    const label = $(el).text().trim();
+    if (!LOCATION_LABEL.test(label)) return;
+    const sibling = $(el).next();
+    let candidate = sibling.text().trim();
+    if (!candidate || candidate.length > 120) {
+      const parentText = $(el).parent().text().trim();
+      const idx = parentText.toLowerCase().indexOf(label.toLowerCase());
+      if (idx >= 0) candidate = parentText.slice(idx + label.length).slice(0, 120).trim();
+    }
+    const value = normalizeCourseLocation(candidate);
+    if (value) {
+      result = value;
+      return false;
+    }
+  });
+
+  if (result) return result;
+
+  // Fallback: "Our campus locations" / "Campus locations" card grid.
+  //
+  // Sites like VIT don't label each course page with a per-course "Location" field
+  // in static HTML — instead, the course page has an "INTERNATIONAL (On campus)"
+  // fee card and a page-wide "Our campus locations" section listing the cities
+  // where that on-campus cohort can study (Sydney, Melbourne, Adelaide, Geelong).
+  //
+  // We only apply this fallback when BOTH signals are present, so we don't
+  // accidentally stamp campus names onto online-only courses.
+  const pageText = $("body").text();
+  const hasIntlOnCampusCard = /international\s*\(\s*on\s*campus\s*\)/i.test(pageText);
+  if (hasIntlOnCampusCard) {
+    const AU_NZ_CITIES = new Set([
+      "sydney", "melbourne", "brisbane", "adelaide", "perth", "canberra",
+      "darwin", "hobart", "gold coast", "geelong", "newcastle", "wollongong",
+      "cairns", "townsville", "ballarat", "bendigo", "launceston",
+      "auckland", "wellington", "christchurch", "dunedin", "hamilton",
+      "palmerston north", "tauranga", "rotorua",
+    ]);
+    const $locHeading = $("h2, h3, h4").filter((_, h) => /\bcampus\s+locations?\b/i.test($(h).text())).first();
+    if ($locHeading.length) {
+      // Walk up the ancestor chain until we find a container that holds ≥2 city cards,
+      // since the heading and city cards are typically siblings-of-siblings, not parent/child.
+      const collectCities = (root: cheerio.Cheerio<cheerio.AnyNode>): Set<string> => {
+        const found = new Set<string>();
+        root.find("h3, h4, h5, a, .rbt-card-title, .card-title").each((_, el) => {
+          const raw = $(el).text().trim().replace(/\s+/g, " ");
+          const lower = raw.toLowerCase();
+          if (AU_NZ_CITIES.has(lower)) found.add(raw);
+        });
+        return found;
+      };
+      let $scope: cheerio.Cheerio<cheerio.AnyNode> = $locHeading.parent();
+      let cities = collectCities($scope);
+      for (let hop = 0; hop < 6 && cities.size < 2; hop++) {
+        const $parent = $scope.parent();
+        if (!$parent.length || $parent.is("body, html")) break;
+        $scope = $parent;
+        cities = collectCities($scope);
+      }
+      if (cities.size >= 1 && cities.size <= 8) {
+        result = normalizeCourseLocation(Array.from(cities).join(", "));
+        if (result) return result;
+      }
+    }
+  }
+
+  const structuredLocations = extractStructuredCourseInstances($)
+    .map((instance) => instance.location)
+    .filter((value): value is string => !!value)
+    .filter((value) => classifyLocationValue(value) !== "online_only");
+
+  if (structuredLocations.length > 0) {
+    const unique = [...new Set(structuredLocations)];
+    return normalizeCourseLocation(unique.join(", "));
+  }
+
+  return result;
+}
+
+function hasOnlineOnlyCampusField($: ReturnType<typeof cheerio.load>): boolean {
+  const location = extractCourseLocation($);
+  return !!location && classifyLocationValue(location) === "online_only";
+}
+
+function pageIndicatesOnlineOnlyNoPhysicalCampus(text: string, title = "", url = ""): boolean {
+  const lower = `${title}\n${url}\n${text}`.slice(0, 24000).toLowerCase();
+
+  const explicitOnlineOnlyPatterns = [
+    /\b(?:study\s*mode|delivery(?:\s*mode)?|attendance\s*mode)\s*[:=]\s*online\b/,
+    /\bcampus locations?\s*[:=]\s*online\b/,
+    /\blocations?\s*[:=]\s*online\b/,
+    /\b(?:available|delivered|studied|offered)\s+online\s+only\b/,
+    /\bonline\s+only\b/,
+  ];
+
+  return explicitOnlineOnlyPatterns.some((p) => p.test(lower));
+}
+
+function pageIndicatesDomesticOnly(text: string, title = "", url = ""): boolean {
+  const lower = `${title}\n${url}\n${text}`.slice(0, 16000).toLowerCase();
+  const hasInternationalAvailabilitySignals =
+    /\b(?:international|overseas)\b/.test(lower) &&
+    (/\bcricos\b/.test(lower) || /\binternational fee\b/.test(lower) || /\bielts\b/.test(lower));
+
+  // Torrens-style strong signal: course page references only the DOMESTIC fee schedule
+  // (no mirrored "international course fee schedule" on the same page).
+  const mentionsDomesticFeeSchedule = /\b(?:check\s+the\s+)?domestic\s+course\s+fee\s+schedule\b/.test(lower);
+  const mentionsInternationalFeeSchedule = /\b(?:check\s+the\s+)?international\s+course\s+fee\s+schedule\b/.test(lower);
+  if (mentionsDomesticFeeSchedule && !mentionsInternationalFeeSchedule) return true;
+
+  const explicitDomesticOnlyPatterns = [
+    /\bdomestic students?\s+only\b/,
+    /\bfor domestic students?\s+only\b/,
+    /\bonly available to domestic students?\b/,
+    /\bavailable to domestic students?\s+only\b/,
+    /\bthis course is only available to domestic students?\b/,
+    /\bnot available to international students?\b/,
+    /\bthis course is not available to international students?\b/,
+    /\binternational students?\s+(?:are\s+)?not eligible\b/,
+    /\binternational applicants?\s+(?:are\s+)?not eligible\b/,
+    /\bnot open to international students?\b/,
+    /\bnot open to overseas students?\b/,
+    /\bnot accepting international students?\b/,
+    /\baustralian citizens?(?: and permanent residents?)?\s+only\b/,
+    /\bpermanent residents?\s+only\b/,
+    /\bnon-?cricos\b/,
+    /\bnon cricos\b/,
+    /\bcricos not available\b/,
+  ];
+
+  if (hasInternationalAvailabilitySignals) {
+    // Hard-block list: phrases that unambiguously mean "domestic-only" even when the
+    // page happens to mention "international" / "CRICOS" elsewhere (e.g. in nav, FAQ,
+    // or a provider's CRICOS provider code in the footer — which is typical of Torrens).
+    const hardBlockPatterns = [
+      // Positive domestic-only statements
+      /\bdomestic students?\s+only\b/,
+      /\bfor domestic students?\s+only\b/,
+      /\bonly available to domestic students?\b/,
+      /\bavailable to domestic students?\s+only\b/,
+      /\bthis course is only available to domestic students?\b/,
+      /\baustralian citizens?(?: and permanent residents?)?\s+only\b/,
+      /\bpermanent residents?\s+only\b/,
+      // Explicit exclusion of international students
+      /\bnot available to international students?\b/,
+      /\bthis course is not available to international students?\b/,
+      /\binternational students?\s+(?:are\s+)?not eligible\b/,
+      /\binternational applicants?\s+(?:are\s+)?not eligible\b/,
+      /\bnot open to international students?\b/,
+      /\bnot open to overseas students?\b/,
+      /\bnot accepting international students?\b/,
+      /\bnon-?cricos\b/,
+      /\bcricos not available\b/,
+    ];
+    return hardBlockPatterns.some((p) => p.test(lower));
+  }
+
+  return explicitDomesticOnlyPatterns.some((p) => p.test(lower));
+}
+
+function pageHasStrongCourseDetailSignals($: ReturnType<typeof cheerio.load>, text: string, title = ""): boolean {
+  const heading = (($("h1").first().text() || title || "").replace(/\s+/g, " ").trim());
+  const combined = `${heading}\n${text}`.slice(0, 30000).toLowerCase();
+
+  const hasDegreeHeading = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|associate)\b/i.test(heading);
+  const hasCricos = /\bcricos\s*[a-z0-9]/i.test(combined);
+  const detailSignals = [
+    /\bstudy mode\b/i.test(combined),
+    /\bcampus locations?\b/i.test(combined),
+    /\bstudent\b/i.test(combined) && /\bdomestic\b/i.test(combined) && /\binternational\b/i.test(combined),
+    /\bcourse duration\b/i.test(combined),
+    /\bduration\b/i.test(combined),
+    /\bstart date\b/i.test(combined),
+    /\bentry requirements?\b/i.test(combined),
+    /\b(ielts|pte|toefl|duolingo|cambridge)\b/i.test(combined),
+    /\b(how to apply|apply now)\b/i.test(combined),
+    /\b(international fee|tuition fee|annual fee|estimated fee|indicative fee)\b/i.test(combined),
+    /\bfee(?:s)?\s*&\s*scholarships\b/i.test(combined),
+  ].filter(Boolean).length;
+
+  return hasDegreeHeading && (hasCricos || detailSignals >= 2);
+}
+
 function pageContentLooksLikeCourse(text: string, name?: string): boolean {
   // Check name first — reject obvious junk titles immediately
   if (name && isJunkCourseName(name)) return false;
 
   const lower = text.slice(0, 8000).toLowerCase();
+
+  if (pageLooksLikeCourseLandingPage(lower, name ?? "")) return false;
 
   // Strong explicit rejection: event/news pages have these but no course data
   if (/\b(info\s+night|virtual\s+info\s+night|open\s+day|info\s+session)\b/.test(lower) &&
@@ -2649,6 +3770,15 @@ interface ResearchResult {
   rejectedSamples: number;
   validExamples: string[];
   rejectedExamples: string[];
+}
+
+function sanitizeCourseLinks(links: { url: string; name: string }[]): { url: string; name: string }[] {
+  return links.filter((link) => {
+    if (!link?.url || !link?.name) return false;
+    if (isKnownNonCourseLandingUrl(link.url)) return false;
+    if (isJunkCourseName(link.name)) return false;
+    return true;
+  });
 }
 
 async function researchAndValidateCourseLinks(
@@ -2705,15 +3835,72 @@ async function researchAndValidateCourseLinks(
           return;
         }
 
-        const pageHtml = await fetchPage(candidate.url);
+        let pageHtml = await fetchPage(candidate.url);
+        if (siteNeedsBrowser(candidate.url)) {
+          try {
+            const browserResult = await fetchPageWithBrowser(candidate.url, {
+              clickInternational: true,
+              clickRequirementsTab: true,
+              expandAccordions: true,
+              timeoutMs: 25_000,
+            });
+            if (browserResult?.requirementsHtml) {
+              pageHtml = browserResult.requirementsHtml;
+            } else if (browserResult?.mainHtml) {
+              pageHtml = browserResult.mainHtml;
+            }
+          } catch {}
+        }
         const $ = cheerio.load(pageHtml);
         const bodyText = $("body").text();
+        const pageTitle = ($("h1").first().text() || $("title").text() || "").trim();
+
+        if (/^(?:404|not found)\b/i.test(pageTitle) || /\b(?:error\s*\(404\)|404 resource|resource .* not found|page not found|the page requested was not found)\b/i.test(`${pageTitle}\n${bodyText}`.slice(0, 4000))) {
+          confirmedNonCourses++;
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Not a course page: "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
+          return;
+        }
+
+        if (hasDomesticAudienceField($) || pageIndicatesDomesticOnly(bodyText, pageTitle, candidate.url)) {
+          confirmedNonCourses++;
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Domestic-only course: "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
+          return;
+        }
+
+        const sampleStudyMode = detectStudyMode($, bodyText);
+        if (sampleStudyMode === "Online" && (hasOnlineOnlyCampusField($) || pageIndicatesOnlineOnlyNoPhysicalCampus(bodyText, pageTitle, candidate.url))) {
+          confirmedNonCourses++;
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Online-only course with no physical campus: "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
+          return;
+        }
+
+        if (pageHasStrongCourseDetailSignals($, bodyText, pageTitle)) {
+          confirmedCourses++;
+          if (validExamples.length < 4) validExamples.push(candidate.name);
+          const pathParts = new URL(candidate.url).pathname.split("/").filter(Boolean);
+          validUrlDepths.push(pathParts.length);
+          if (pathParts.length > 1) validUrlPrefixes.push("/" + pathParts.slice(0, -1).join("/") + "/");
+          addLog(job, "status", { message: `✓ Confirmed course (detail metadata): "${candidate.name}"`, phase: "discover", sampleResult: "valid" });
+          return;
+        }
+
+        if (pageLooksLikeCourseLandingPage(bodyText, pageTitle, candidate.url)) {
+          confirmedNonCourses++;
+          if (rejectedExamples.length < 3) rejectedExamples.push(candidate.name);
+          addLog(job, "status", { message: `✗ Landing/listing page: "${candidate.name}"`, phase: "discover", sampleResult: "rejected" });
+          return;
+        }
 
         // Fast-path: full-path course URL structure + degree keyword in page <h1> or <title> = auto-accept
         // This prevents Torrens /courses/bachelor-of-X pages from being rejected on minimal content
-        const pageTitle = ($("h1").first().text() || $("title").text() || "").trim();
         const urlPathFits = (() => {
-          try { return VALID_COURSE_PATH_PATTERNS.some((p) => p.test(new URL(candidate.url).pathname.toLowerCase())); }
+          try {
+            const pathname = new URL(candidate.url).pathname.toLowerCase();
+            return VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname)) && lastSegmentHasDegreeQualifier(pathname);
+          }
           catch { return false; }
         })();
         const titleHasDegree = /\b(bachelor|master|doctor|phd|graduate|diploma|certificate|mba|msc|bed|bsc|beng|llb|jd|juris|honours|associate)\b/i.test(pageTitle);
@@ -2820,6 +4007,7 @@ async function researchAndValidateCourseLinks(
 // e.g. torrens.edu.au/courses/bachelor-of-cybersecurity
 const VALID_COURSE_PATH_PATTERNS = [
   /\/courses?\/[a-z0-9][a-z0-9-]+\/?$/,
+  /\/courses\/courses\/[a-z0-9-]+\/(?:bachelor|master|doctor|graduate-certificate|graduate-diploma|diploma|certificate|associate)[a-z0-9-]*\.html?$/,
   /\/study\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/programs?\/[a-z0-9][a-z0-9-]+\/?$/,
   /\/degrees?\/[a-z0-9][a-z0-9-]+\/?$/,
@@ -2831,6 +4019,8 @@ const VALID_COURSE_PATH_PATTERNS = [
 function isCourseUrl(urlStr: string): boolean {
   const lower = urlStr.toLowerCase();
 
+  if (isKnownNonCourseLandingUrl(urlStr)) return false;
+
   // Explicit exclusions — these are never course pages
   const excludePatterns = [
     "/accommodation", "/student-life", "/campus-life", "/campus-map", "/campus-tour",
@@ -2841,6 +4031,8 @@ function isCourseUrl(urlStr: string): boolean {
     "/student-support", "/international-students/visa", "/fees-scholarships",
     "/why-choose", "/info-night", "/open-day", "/virtual-info",
     "/keydates", "/key-dates", "domestic-keydates", "int-keydates",
+    "/career-finder", "/testimonials", "/study/why-unisq/", "/blogs/",
+    "/degrees/compare", "/degrees/research", "/degrees/teach-out",
     // Listing / index pages (not individual courses)
     "/courses-list", "/courses-listview", "/courses-grid", "/courses-tile",
     "/programs-list", "/program-list", "/course-list", "/course-finder",
@@ -2857,21 +4049,23 @@ function isCourseUrl(urlStr: string): boolean {
   // Strong positive: full-path matches a known course detail URL structure
   try {
     const pathname = new URL(urlStr).pathname.toLowerCase();
-    if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname))) return true;
+    const lastSeg = pathname.split("/").filter(Boolean).pop()?.replace(/\?.*$/, "") || "";
+    const normalizedLastSeg = lastSeg.replace(/\.html?$/i, "");
+    if (/\.html?$/i.test(lastSeg) && !DEGREE_QUALIFIERS.some((q) => normalizedLastSeg.startsWith(q + "-") || normalizedLastSeg === q)) {
+      return false;
+    }
+    if (VALID_COURSE_PATH_PATTERNS.some((p) => p.test(pathname)) && lastSegmentHasDegreeQualifier(pathname)) return true;
   } catch {}
 
   return (
-    lower.includes("/course") || lower.includes("/program") ||
     lower.includes("/bachelor") || lower.includes("/master") ||
-    lower.includes("/diploma") || lower.includes("/study/") ||
+    lower.includes("/diploma") ||
     lower.includes("/graduate-certificate") || lower.includes("/graduate-diploma") ||
-    lower.includes("/certificate") || lower.includes("/degree") ||
+    lower.includes("/associate-degree") || lower.includes("/juris-doctor") ||
     lower.includes("/phd") || lower.includes("/mba") ||
     lower.includes("/doctorate") || lower.includes("/doctoral") ||
-    lower.includes("/undergraduate") || lower.includes("/postgraduate") ||
-    lower.includes("/associate-degree") || lower.includes("/double-degree") ||
-    lower.includes("/dual-degree") || lower.includes("/juris-doctor") ||
-    lower.includes("/honours") || lower.includes("/pathway")
+    lower.includes("/double-degree") || lower.includes("/dual-degree") ||
+    lower.includes("/honours")
   );
 }
 
@@ -2884,6 +4078,7 @@ function sitemapLocToCourseName(loc: string): string {
   const pathParts = new URL(loc).pathname.split("/").filter(Boolean);
   return pathParts[pathParts.length - 1]
     .replace(/\?.*$/, "")
+    .replace(/\.html?$/i, "")
     .replace(/[-_]/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim();
@@ -2936,8 +4131,23 @@ async function fetchAndParseSitemapForCourses(sitemapUrl: string, seen: Set<stri
 async function discoverCourseLinksFromSitemap(origin: string, job: ScrapeJob): Promise<{ url: string; name: string }[]> {
   const courses: { url: string; name: string }[] = [];
   const seen = new Set<string>();
+  const skipCourseUnitSitemap = /(^|\.)wgtn\.ac\.nz$/i.test(new URL(origin).hostname);
 
-  const sitemapIndexUrls = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
+  const sitemapIndexUrls = [
+    `${origin}/sitemap.xml`,
+    `${origin}/sitemap_index.xml`,
+    `${origin}/sitemap-index.xml`,
+    `${origin}/sitemaps.xml`,
+  ];
+
+  // Also probe robots.txt for non-standard sitemap locations (very common).
+  try {
+    const robots = await fetchPage(`${origin}/robots.txt`);
+    const fromRobots = [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((m) => m[1].trim());
+    for (const sm of fromRobots) {
+      if (!sitemapIndexUrls.includes(sm)) sitemapIndexUrls.push(sm);
+    }
+  } catch { /* no robots.txt is fine */ }
 
   for (const smUrl of sitemapIndexUrls) {
     try {
@@ -2951,6 +4161,10 @@ async function discoverCourseLinksFromSitemap(origin: string, job: ScrapeJob): P
       if (nestedSitemaps.length > 0) {
         addLog(job, "status", { message: `Sitemap index: checking ${nestedSitemaps.length} sub-sitemaps...`, phase: "discover" });
         for (const nestedUrl of nestedSitemaps) {
+          if (skipCourseUnitSitemap && /\/sitemap-courses\.xml$/i.test(nestedUrl)) {
+            addLog(job, "status", { message: "Skipping unit-course sitemap for Wellington (not degree pages)", phase: "discover" });
+            continue;
+          }
           if (seen.has(nestedUrl)) continue;
           seen.add(nestedUrl);
           const found = await fetchAndParseSitemapForCourses(nestedUrl, seen);
@@ -3002,30 +4216,28 @@ async function crawlForCourseLinks(startUrl: string, origin: string, job: Scrape
       $("a[href]").each((_, el) => {
         const href = $(el).attr("href") || "";
         const text = $(el).text().trim().replace(/\s+/g, " ");
-        try {
-          const fullUrl = new URL(href, origin).toString();
-          if (!fullUrl.startsWith(origin)) return;
-          if (seen.has(fullUrl)) return;
+        const fullUrl = resolveDiscoverableUrl(href, currentUrl, origin);
+        if (!fullUrl) return;
+        if (seen.has(fullUrl)) return;
 
-          const lower = fullUrl.toLowerCase();
+        const lower = fullUrl.toLowerCase();
 
-          if (isCourseUrl(lower) && !isJunkCourseName(text)) {
-            seen.add(fullUrl);
-            courses.push({ url: fullUrl, name: text });
-          } else if (isCourseText(text) && !isJunkCourseName(text)) {
-            seen.add(fullUrl);
-            courses.push({ url: fullUrl, name: text });
-          } else if (
-            depth < maxDepth &&
-            fullUrl.startsWith(origin) &&
-            !visited.has(fullUrl) &&
-            (lower.includes("/study") || lower.includes("/course") || lower.includes("/program") ||
-             lower.includes("/academ") || lower.includes("/facult") || lower.includes("/school") ||
-             lower.includes("/department") || lower.includes("/undergrad") || lower.includes("/postgrad"))
-          ) {
-            queue.push({ url: fullUrl, depth: depth + 1 });
-          }
-        } catch {}
+        if (isCourseUrl(lower) && !isJunkCourseName(text)) {
+          seen.add(fullUrl);
+          courses.push({ url: fullUrl, name: text });
+        } else if (isCourseText(text) && !isJunkCourseName(text)) {
+          seen.add(fullUrl);
+          courses.push({ url: fullUrl, name: text });
+        } else if (
+          depth < maxDepth &&
+          fullUrl.startsWith(origin) &&
+          !visited.has(fullUrl) &&
+          (lower.includes("/study") || lower.includes("/course") || lower.includes("/program") ||
+           lower.includes("/academ") || lower.includes("/facult") || lower.includes("/school") ||
+           lower.includes("/department") || lower.includes("/undergrad") || lower.includes("/postgrad"))
+        ) {
+          queue.push({ url: fullUrl, depth: depth + 1 });
+        }
       });
 
       if (depth > 0 && courses.length > 0) {
@@ -3062,15 +4274,13 @@ async function discoverAllCourseLinks(
     $("a[href]").each((_, el) => {
       const href = $(el).attr("href") || "";
       const text = $(el).text().trim().replace(/\s+/g, " ");
-      try {
-        const fullUrl = new URL(href, origin).toString();
-        if (!fullUrl.startsWith(origin) || seen.has(fullUrl)) return;
+      const fullUrl = resolveDiscoverableUrl(href, url, origin);
+      if (!fullUrl || seen.has(fullUrl)) return;
 
-        if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
-          seen.add(fullUrl);
-          allCourses.push({ url: fullUrl, name: text });
-        }
-      } catch {}
+      if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+        seen.add(fullUrl);
+        allCourses.push({ url: fullUrl, name: text });
+      }
     });
   }
 
@@ -3161,14 +4371,12 @@ async function followPaginatedListing(
           $p("a[href]").each((_, el) => {
             const href = $p(el).attr("href") || "";
             const text = $p(el).text().trim().replace(/\s+/g, " ");
-            try {
-              const fullUrl = new URL(href, origin).toString();
-              if (!fullUrl.startsWith(origin) || seen.has(fullUrl)) return;
-              if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
-                seen.add(fullUrl);
-                allCourses.push({ url: fullUrl, name: text });
-              }
-            } catch {}
+            const fullUrl = resolveDiscoverableUrl(href, pageUrl, origin);
+            if (!fullUrl || seen.has(fullUrl)) return;
+            if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+              seen.add(fullUrl);
+              allCourses.push({ url: fullUrl, name: text });
+            }
           });
 
           const $link = $p("a[rel='next']");
@@ -3240,15 +4448,23 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   // These are preferred over generic "/courses" found via link scanning, because
   // sites like VIT use /course-list for their real listing while /courses just redirects.
   const highPriorityPaths = [
-    "/course-list", "/course-finder", "/course-guide",
+    "/study/degrees-and-courses", "/degrees", "/course-list", "/course-finder", "/course-guide",
     "/study/courses", "/courses/undergraduate", "/courses/postgraduate",
   ];
   for (const path of highPriorityPaths) {
+    const testUrl = `${origin}${path}`;
     try {
-      const testUrl = `${origin}${path}`;
       const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
-        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (high-priority probe)`, phase: "discover" });
+        const finalUrl = resp.url || testUrl;
+        addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl} (high-priority probe)`, phase: "discover" });
+        return finalUrl;
+      }
+    } catch {}
+    try {
+      const content = await fetchPage(testUrl);
+      if (content.length > 1000) {
+        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (content probe)`, phase: "discover" });
         return testUrl;
       }
     } catch {}
@@ -3256,7 +4472,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
 
   // ── STEP 2: Link scanning — find the best-linked course listing page ─────────
   const strongUrlPatterns = [
-    /\/study\/courses\b/i, /\/courses\/$/i, /\/courses\b/i,
+    /\/study\/degrees-and-courses\b/i, /\/degrees\b/i, /\/study\/courses\b/i, /\/courses\/$/i, /\/courses\b/i,
     /\/programs\b/i, /\/programmes\b/i,
     /\/find-a-course/i, /\/search.*course/i, /\/course-search/i,
     /\/undergraduate-courses/i, /\/postgraduate-courses/i,
@@ -3295,7 +4511,7 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
 
   // ── STEP 3: Broad HEAD-probe fallback ────────────────────────────────────────
   const commonCoursePaths = [
-    "/courses", "/programs", "/programmes",
+    "/study/degrees-and-courses", "/degrees", "/courses", "/programs", "/programmes",
     "/study/programs", "/undergraduate-courses", "/postgraduate-courses",
     "/our-courses", "/find-a-course", "/course-search",
     "/study/undergraduate", "/study/postgraduate", "/academics/programs",
@@ -3303,11 +4519,19 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   ];
 
   for (const path of commonCoursePaths) {
+    const testUrl = `${origin}${path}`;
     try {
-      const testUrl = `${origin}${path}`;
       const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
-        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl}`, phase: "discover" });
+        const finalUrl = resp.url || testUrl;
+        addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl}`, phase: "discover" });
+        return finalUrl;
+      }
+    } catch {}
+    try {
+      const content = await fetchPage(testUrl);
+      if (content.length > 1000) {
+        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (content fallback)`, phase: "discover" });
         return testUrl;
       }
     } catch {}
@@ -3365,9 +4589,48 @@ async function expandCourseListWithCategories(listingUrl: string, existingCandid
   return [...existingCandidates, ...extra];
 }
 
-async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise<{ feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string }> {
-  const result: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string } = {};
+async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise<{ feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string }> {
+  const result: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string } = {};
   const origin = new URL(siteUrl).origin;
+  const maybeSetFeesPdf = (url: string, label: string) => {
+    if (!/^https?:/i.test(url)) return;
+    if (!(/\.pdf/i.test(url) || /intelligencebank/i.test(url))) return;
+    const haystack = `${url} ${label}`.toLowerCase();
+    if (!/\b(fee|fees|tuition|pricing|cost|schedule)\b/.test(haystack)) return;
+    const score =
+      (/\binternational\b/.test(haystack) ? 4 : 0) +
+      (/\bdomestic\b/.test(haystack) ? -3 : 0) +
+      (/\bpricing\b|\bfee\s*schedule\b|\bfees\s*pdf\b/.test(haystack) ? 2 : 0) +
+      (/intelligencebank/.test(haystack) ? 1 : 0);
+    const currentScore = result.feesPdf
+      ? (
+        (/\binternational\b/.test(result.feesPdf.toLowerCase()) ? 4 : 0) +
+        (/\bdomestic\b/.test(result.feesPdf.toLowerCase()) ? -3 : 0) +
+        (/intelligencebank/.test(result.feesPdf.toLowerCase()) ? 1 : 0)
+      )
+      : Number.NEGATIVE_INFINITY;
+    if (!result.feesPdf || score > currentScore) result.feesPdf = url;
+  };
+  const maybeSetRequirementsPdf = (url: string, label: string) => {
+    if (!/^https?:/i.test(url)) return;
+    if (!(/\.pdf/i.test(url) || /intelligencebank/i.test(url))) return;
+    const haystack = `${url} ${label}`.toLowerCase();
+    if (!/\b(entry|admission|requirement|criteria|english|language|ielts|pte|toefl|duolingo|course\s+information|admission\s+information)\b/.test(haystack)) return;
+    const score =
+      (/\benglish\b|\blanguage\b|\bielts\b|\bpte\b|\btoefl\b|\bduolingo\b/.test(haystack) ? 4 : 0) +
+      (/\badmission\b|\bentry\b|\brequirement\b|\bcriteria\b/.test(haystack) ? 3 : 0) +
+      (/\bdomestic\b/.test(haystack) ? -3 : 0) +
+      (/intelligencebank/.test(haystack) ? 1 : 0);
+    const currentScore = result.requirementsPdf
+      ? (
+        (/\benglish\b|\blanguage\b|\bielts\b|\bpte\b|\btoefl\b|\bduolingo\b/.test(result.requirementsPdf.toLowerCase()) ? 4 : 0) +
+        (/\badmission\b|\bentry\b|\brequirement\b|\bcriteria\b/.test(result.requirementsPdf.toLowerCase()) ? 3 : 0) +
+        (/\bdomestic\b/.test(result.requirementsPdf.toLowerCase()) ? -3 : 0) +
+        (/intelligencebank/.test(result.requirementsPdf.toLowerCase()) ? 1 : 0)
+      )
+      : Number.NEGATIVE_INFINITY;
+    if (!result.requirementsPdf || score > currentScore) result.requirementsPdf = url;
+  };
 
   try {
     const homepageHtml = await fetchPage(origin);
@@ -3381,6 +4644,8 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
         const rawUrl = href.startsWith("http") ? href : new URL(href, origin).toString();
         // Strip hash fragments — servers ignore them, so #FeeInformation → homepage HTML
         const fullUrl = rawUrl.split("#")[0];
+        maybeSetFeesPdf(fullUrl, text);
+        maybeSetRequirementsPdf(fullUrl, text);
         if (!fullUrl || fullUrl === origin || fullUrl === origin + "/") return;
         if (!fullUrl.startsWith(origin)) return;
         if (visited.has(fullUrl)) return;
@@ -3403,10 +4668,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
             result.feePage = fullUrl;
           }
         }
-        if (!result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
+        if (!/\.pdf/i.test(fullUrl) && !result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
           result.requirementsPage = fullUrl;
         }
-        if (!result.entryPage && (/\b(english|language)\s*(require|proficiency|test)/i.test(text) || /english.?require|language.?require/i.test(fullUrl))) {
+        if (!/\.pdf/i.test(fullUrl) && !result.entryPage && (/\b(english|language)\s*(require|proficiency|test)/i.test(text) || /english.?require|language.?require/i.test(fullUrl))) {
           result.entryPage = fullUrl;
         }
       } catch {}
@@ -3421,6 +4686,8 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
         const rawUrl2 = href.startsWith("http") ? href : new URL(href, origin).toString();
         // Strip hash fragments — servers ignore them
         const fullUrl = rawUrl2.split("#")[0];
+        maybeSetFeesPdf(fullUrl, text);
+        maybeSetRequirementsPdf(fullUrl, text);
         if (!fullUrl || fullUrl === origin || fullUrl === origin + "/") return;
         if (!fullUrl.startsWith(origin)) return;
         const isDrupalNode = /\/node\/\d+$/.test(fullUrl);
@@ -3433,10 +4700,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
             result.feePage = fullUrl;
           }
         }
-        if (!result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
+        if (!/\.pdf/i.test(fullUrl) && !result.requirementsPage && (/\b(entry|admission)\s*(require|criteria)/i.test(text) || /entry.?require|admission.?require/i.test(fullUrl))) {
           result.requirementsPage = fullUrl;
         }
-        if (!result.entryPage && (/\b(english|language)\s*(require|proficiency|test)/i.test(text) || /english.?require|language.?require/i.test(fullUrl))) {
+        if (!/\.pdf/i.test(fullUrl) && !result.entryPage && (/\b(english|language)\s*(require|proficiency|test)/i.test(text) || /english.?require|language.?require/i.test(fullUrl))) {
           result.entryPage = fullUrl;
         }
       } catch {}
@@ -3480,6 +4747,21 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     } catch {}
   }
 
+  if (result.feePage) {
+    try {
+      const feeHtml = await fetchPage(result.feePage);
+      const $fee = cheerio.load(feeHtml);
+      $fee("a[href]").each((_, el) => {
+        const href = $fee(el).attr("href") || "";
+        const text = $fee(el).text().trim().toLowerCase();
+        try {
+          const fullUrl = (href.startsWith("http") ? href : new URL(href, result.feePage!).toString()).split("#")[0];
+          maybeSetFeesPdf(fullUrl, text);
+        } catch {}
+      });
+    } catch {}
+  }
+
   // Probe common university-level requirements paths (like the fee page probe above)
   if (!result.requirementsPage && !result.entryPage) {
     const commonRequirementsPaths = [
@@ -3514,6 +4796,25 @@ interface UniversityFeeCache {
   html?: string;
   text?: string;
   fetched: boolean;
+}
+
+function shouldPreferSharedFeePdf(existingFee?: number, currency?: string | null, pdfUrl?: string): boolean {
+  if (!pdfUrl) return false;
+  const lowerPdfUrl = pdfUrl.toLowerCase();
+  if (/\binternational\b/.test(lowerPdfUrl)) return true;
+  if (!existingFee) return true;
+  if (currency && currency !== "AUD") return true;
+  return false;
+}
+
+function shouldOverrideWithSharedFeePdf(existingFee: number | undefined, pdfFee: number, currency?: string | null, pdfUrl?: string): boolean {
+  if (!existingFee) return true;
+  if (currency && currency !== "AUD") return true;
+  if (pdfUrl && /\binternational\b/.test(pdfUrl.toLowerCase())) {
+    return Math.abs(pdfFee - existingFee) / Math.max(pdfFee, existingFee) >= 0.05;
+  }
+  if (existingFee < 10000 && pdfFee > existingFee) return true;
+  return pdfFee >= existingFee * 1.4;
 }
 
 async function getUniversityFeePageText(feePage: string, cache: UniversityFeeCache): Promise<string> {
@@ -3631,15 +4932,38 @@ async function extractFeeFromUniversityPage(feePage: string, courseName: string,
     } catch {}
   }
 
-  // Multi-amount fallback on the international section — highest = international
+  // Multi-amount fallback on the international section — highest = international.
+  //
+  // Safety: only apply this fallback when we have strong evidence that the fee page
+  // is specific to THIS course. Otherwise a generic "Tuition fees" index page will
+  // stamp its largest amount (e.g. A$186,544 for a PhD) onto every course we extract,
+  // which is how users end up with identical, wildly-wrong fees across dozens of rows.
   if (!courseData.internationalFee || overrideExisting) {
     const allAmounts = extractAllFeeAmounts(searchText);
     if (allAmounts.length >= 1) {
-      courseData.internationalFee = Math.max(...allAmounts);
-      courseData.currency = detectCurrencyFromContext(searchText);
-      courseData.feeTerm = normalizeFeeTerm(searchText);
-      if (!courseData.feeYear) courseData.feeYear = extractFeeYear(searchText);
-      return;
+      const uniqueAmounts = Array.from(new Set(allAmounts));
+      const feePageSlug = (() => {
+        try { return new URL(feePage).pathname.toLowerCase(); } catch { return ""; }
+      })();
+      const courseSlugTokens = courseName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4 && !/^(bachelor|master|doctor|graduate|diploma|certificate|advanced|course|degree|program|online|studies)$/.test(w));
+      const feePageLooksCourseSpecific =
+        courseSlugTokens.length > 0 && courseSlugTokens.some((t) => feePageSlug.includes(t));
+
+      // Accept the fallback only when:
+      //   (a) page is clearly dedicated to this course (URL contains a course keyword), OR
+      //   (b) there is exactly one distinct amount on the page (single-course fee page).
+      if (feePageLooksCourseSpecific || uniqueAmounts.length === 1) {
+        courseData.internationalFee = Math.max(...allAmounts);
+        courseData.currency = detectCurrencyFromContext(searchText);
+        courseData.feeTerm = normalizeFeeTerm(searchText);
+        if (!courseData.feeYear) courseData.feeYear = extractFeeYear(searchText);
+        return;
+      }
+      // Otherwise: leave fee blank rather than guess. A missing fee is better than a wrong fee.
     }
   }
 
@@ -3662,9 +4986,11 @@ Use null if not found. Important: Only return INTERNATIONAL student fees, not do
 }
 
 function cheerioToCourseData(cheerioData: Partial<CourseData>, name: string, url: string): CourseData {
+  const preferredUrl = preferInternationalCourseUrl(url);
   return {
     courseName: cheerioData.courseName || name,
-    courseWebsite: url,
+    courseWebsite: preferredUrl,
+    courseLocation: cheerioData.courseLocation,
     duration: cheerioData.duration,
     durationTerm: cheerioData.durationTerm,
     studyMode: cheerioData.studyMode,
@@ -3695,6 +5021,8 @@ function cheerioToCourseData(cheerioData: Partial<CourseData>, name: string, url
     intakeMonths: cheerioData.intakeMonths,
     academicLevel: cheerioData.academicLevel,
     otherRequirement: cheerioData.otherRequirement,
+    domesticOnly: cheerioData.domesticOnly,
+    onlineOnly: cheerioData.onlineOnly,
   };
 }
 
@@ -3777,7 +5105,7 @@ async function runFastStaticScrape(
   uniId: number,
   job: ScrapeJob,
   jobId: string,
-  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string },
+  uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string },
   universityCountry?: string,
 ): Promise<void> {
   addLog(job, "status", { message: `[FAST] Listing page resolved — ${directLinks.length} direct course links found`, phase: "discover" });
@@ -3867,7 +5195,7 @@ async function scrapeCourseBatch(
   job: ScrapeJob,
   maxCourses: number,
   jobId: string,
-  uniPages?: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string },
+  uniPages?: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string },
   universityCountry?: string,
 ) {
   const max = Math.min(courseLinks.length, maxCourses);
@@ -3928,10 +5256,19 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       }
     } catch {}
   }
+  if (!cachedEnglishReqs && uniPages?.requirementsPdf) {
+    try {
+      const pdfEnglish = await extractEnglishFromPdf(uniPages.requirementsPdf);
+      if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
+        cachedEnglishReqs = pdfEnglish;
+        addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
+      }
+    } catch {}
+  }
 
   // Queues filled by parallel workers, flushed after all done
-  const classifyQueue: { index: number; name: string; existing: Partial<CourseData>; data: CourseData }[] = [];
-  const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio> }[] = [];
+  const classifyQueue: { index: number; name: string; existing: Partial<CourseData>; data: CourseData; reviewSources: ReviewSource[] }[] = [];
+  const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio>; reviewSources: ReviewSource[] }[] = [];
   let completed = 0;
 
   // Throughput tuning. HTTP fetches are cheap (~150KB+1socket each), so we run
@@ -4018,6 +5355,24 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         }
 
         const cheerioData = extractWithCheerio(cHtml, link.url, link.name, universityCountry);
+        const reviewSources: ReviewSource[] = [{
+          url: link.url,
+          pageType: "course_page",
+          extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
+          content: cheerio.load(cHtml)("body").text(),
+        }];
+
+        if (cheerioData.domesticOnly) {
+          job.skipped++;
+          addLog(job, "course", { name: link.name, status: "skipped", message: "Domestic-only course", index: i + 1 });
+          return;
+        }
+
+        if (cheerioData.onlineOnly) {
+          job.skipped++;
+          addLog(job, "course", { name: link.name, status: "skipped", message: "Online-only course with no physical campus", index: i + 1 });
+          return;
+        }
 
         // PROBE-A: what cheerio found + what the page text looks like around "IELTS"
         debugIelts(link.name, "A-after-cheerio", {
@@ -4030,8 +5385,8 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
         if (needsEnrich) {
           const relatedPages = findRelatedPages(cHtml, link.url);
-          if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
-            await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url);
+          if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
+            await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources);
           }
         }
 
@@ -4057,16 +5412,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // PROBE-B: after Tier-1/2 — what do we have before shared fallback?
         debugIelts(link.name, "B-after-tier1-2", { ieltsOverall: cheerioData.ieltsOverall, pteOverall: cheerioData.pteOverall });
 
-        // If the university fee page is explicitly an international fees page, always
-        // consult it even when the course page already has a fee (which may be domestic).
-        const feePageIsInternational = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
-        if (uniPages?.feePage && (!cheerioData.internationalFee || feePageIsInternational)) {
-          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, false, feePageIsInternational);
-        }
-        if (!cheerioData.internationalFee && uniPages?.feesPdf) {
+        if (uniPages?.feesPdf && shouldPreferSharedFeePdf(cheerioData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
           try {
             const pdfData = await extractFeesFromPdf(uniPages.feesPdf, link.name);
-            if (pdfData.internationalFee) {
+            if (pdfData.internationalFee && shouldOverrideWithSharedFeePdf(cheerioData.internationalFee, pdfData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
               cheerioData.internationalFee = pdfData.internationalFee;
               cheerioData.currency = pdfData.currency || "AUD";
               cheerioData.feeTerm = pdfData.feeTerm || "Annual";
@@ -4074,10 +5423,20 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             }
           } catch {}
         }
+        const feePageIsInternational = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
+        if (uniPages?.feePage && !uniPages?.feesPdf && !cheerioData.internationalFee) {
+          await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, false, feePageIsInternational);
+        }
 
         // Tier 3: University-level shared requirements page.
         // ONLY consulted when the shared page actually contains an English test keyword.
         if (uniReqsText && hasEnglishTestKeyword(uniReqsText)) {
+          reviewSources.push({
+            url: uniPages?.requirementsPage || uniPages?.entryPage || link.url,
+            pageType: "english_page",
+            extractionMethod: "cheerio",
+            content: uniReqsText,
+          });
           // HTML-level structured extraction first (table parsing)
           if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
             extractEnglishFromHtml(cheerio.load(uniReqsHtml), cheerioData);
@@ -4158,12 +5517,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           const courseData = cheerioToCourseData(cheerioData, link.name, link.url);
           // PROBE-E: value after cheerioToCourseData conversion (catches mapping drops)
           debugIelts(link.name, "E-courseData-to-classify", { ieltsOverall: courseData.ieltsOverall });
-          classifyQueue.push({ index: i, name: link.name, existing: courseData, data: courseData });
+          classifyQueue.push({ index: i, name: link.name, existing: courseData, data: courseData, reviewSources });
         } else {
           // Cheerio got nothing — queue for full AI extraction (deferred)
           // PROBE-E (full AI path): IELTS still missing before full AI queue
           debugIelts(link.name, "E-into-fullAI-queue", { ieltsOverall: cheerioData.ieltsOverall ?? "null — going to full AI" });
-          fullAIQueue.push({ index: i, name: link.name, html: cHtml, cheerioData });
+          fullAIQueue.push({ index: i, name: link.name, html: cHtml, cheerioData, reviewSources });
         }
       } catch (err) {
         const msg = (err as Error).message || "";
@@ -4197,10 +5556,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         try {
           const cHtml = await fetchPage(url);
           const cheerioData = extractWithCheerio(cHtml, url, name, universityCountry);
+          const reviewSources: ReviewSource[] = [{
+            url,
+            pageType: "course_page",
+            extractionMethod: "cheerio",
+            content: cheerio.load(cHtml)("body").text(),
+          }];
           const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
           if (needsEnrich) {
             const relatedPages = findRelatedPages(cHtml, url);
-            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
               await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, url);
             }
           }
@@ -4231,7 +5596,15 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
           }
           const courseData = cheerioToCourseData(cheerioData, name, url);
-          const saved = await stageCourse(courseData, uniId, jobId, job);
+          if (uniReqsText && hasEnglishTestKeyword(uniReqsText)) {
+            reviewSources.push({
+              url: uniPages?.requirementsPage || uniPages?.entryPage || url,
+              pageType: "english_page",
+              extractionMethod: "cheerio",
+              content: uniReqsText,
+            });
+          }
+          const saved = await stageCourse(courseData, uniId, jobId, job, { sources: reviewSources });
           if (saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name, status: "skipped", index: index + 1 }); }
         } catch (retryErr) {
@@ -4334,7 +5707,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         }
         // PROBE-F: value entering stageCourse — proves whether Phase A merge wipes IELTS
         debugIelts(item.data.courseName, "F-before-stageCourse-phaseA", { ieltsOverall: item.data.ieltsOverall });
-        const saved = await stageCourse(item.data, uniId, jobId, job);
+        const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
         if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
         else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
       }
@@ -4359,12 +5732,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (val !== undefined && val !== null && !(cData as any)[key]) (cData as any)[key] = val;
           }
           cData.courseWebsite = cData.courseWebsite || courseLinks[item.index].url;
-          const saved = await stageCourse(cData, uniId, jobId, job);
+          const saved = await stageCourse(cData, uniId, jobId, job, { sources: item.reviewSources });
           if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: item.index + 1 }); }
         } else if (item.cheerioData.courseName || item.name) {
           const fallbackData = cheerioToCourseData(item.cheerioData, item.name, courseLinks[item.index].url);
-          const saved = await stageCourse(fallbackData, uniId, jobId, job);
+          const saved = await stageCourse(fallbackData, uniId, jobId, job, { sources: item.reviewSources });
           if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: item.index + 1 }); }
         } else {
@@ -4445,6 +5818,8 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
     }
 
+    const activeOrigin = new URL(resolvedUrl || url).origin;
+
     addLog(job, "status", { message: "Discovering university-level fee & requirements pages...", phase: "discover" });
     const uniPages = await discoverUniversityPages(resolvedUrl, job);
     // Apply manually-provided pages — they override auto-discovered ones
@@ -4454,7 +5829,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
     if (!html) {
       addLog(job, "status", { message: "No direct page available. Scanning sitemap for course URLs...", phase: "discover" });
-      const sitemapCourses = await discoverCourseLinksFromSitemap(origin, job);
+      const sitemapCourses = await discoverCourseLinksFromSitemap(activeOrigin, job);
       if (sitemapCourses.length > 0) {
         addLog(job, "status", { message: `Found ${sitemapCourses.length} courses from sitemap. Extracting...`, phase: "extract", totalCourses: sitemapCourses.length });
         await scrapeCourseBatch(sitemapCourses, uniId, job, sitemapCourses.length, jobId, uniPages, universityCountry);
@@ -4465,7 +5840,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
 
       addLog(job, "status", { message: "Crawling site for course pages...", phase: "discover" });
-      const crawled = await crawlForCourseLinks(origin, origin, job, 2);
+      const crawled = await crawlForCourseLinks(activeOrigin, activeOrigin, job, 2);
       if (crawled.length > 0) {
         addLog(job, "status", { message: `Found ${crawled.length} courses by crawling. Extracting...`, phase: "extract", totalCourses: crawled.length });
         await scrapeCourseBatch(crawled, uniId, job, crawled.length, jobId, uniPages, universityCountry);
@@ -4494,31 +5869,49 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       addLog(job, "status", { message: "Found single course page. Extracting...", phase: "extract" });
       const cheerioData = extractWithCheerio(html, resolvedUrl, "");
 
+      if (cheerioData.domesticOnly) {
+        addLog(job, "status", { message: "Skipped: course is marked domestic-only / not available to international students.", phase: "validate" });
+        job.totalFound = 1;
+        job.skipped = 1;
+        addLog(job, "done", { totalFound: 1, imported: 0, skipped: 1, errors: 0 });
+        job.status = "completed";
+        job.completedAt = Date.now();
+        return;
+      }
+
+      if (cheerioData.onlineOnly) {
+        addLog(job, "status", { message: "Skipped: course is online-only and has no physical campus location.", phase: "validate" });
+        job.totalFound = 1;
+        job.skipped = 1;
+        addLog(job, "done", { totalFound: 1, imported: 0, skipped: 1, errors: 0 });
+        job.status = "completed";
+        job.completedAt = Date.now();
+        return;
+      }
+
       const relatedPages = findRelatedPages(html, resolvedUrl);
-      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf) {
+      if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
         addLog(job, "status", { message: "Checking related pages/PDFs for fees/requirements...", phase: "enrich" });
         await enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl);
       } else if (!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) || !cheerioData.internationalFee) {
         await enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl);
       }
 
-      if (uniPages.feePage) {
-        addLog(job, "status", { message: "Checking university fee page...", phase: "enrich" });
-        const singleFeeCache: UniversityFeeCache = { fetched: false };
-        const singleFeePageIsIntl = /international/i.test(uniPages.feePage);
-        if (!cheerioData.internationalFee || singleFeePageIsIntl) {
-          await extractFeeFromUniversityPage(uniPages.feePage, cheerioData.courseName || "", cheerioData, singleFeeCache, false, singleFeePageIsIntl);
-        }
-      }
-      if (!cheerioData.internationalFee && uniPages.feesPdf) {
+      if (uniPages.feesPdf && shouldPreferSharedFeePdf(cheerioData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
         try {
           const pdfData = await extractFeesFromPdf(uniPages.feesPdf, cheerioData.courseName || "");
-          if (pdfData.internationalFee) {
+          if (pdfData.internationalFee && shouldOverrideWithSharedFeePdf(cheerioData.internationalFee, pdfData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
             cheerioData.internationalFee = pdfData.internationalFee;
             cheerioData.currency = pdfData.currency || "AUD";
             cheerioData.feeTerm = pdfData.feeTerm || "Annual";
           }
         } catch {}
+      }
+      if (uniPages.feePage && !uniPages.feesPdf && !cheerioData.internationalFee) {
+        addLog(job, "status", { message: "Checking university fee page...", phase: "enrich" });
+        const singleFeeCache: UniversityFeeCache = { fetched: false };
+        const singleFeePageIsIntl = /international/i.test(uniPages.feePage);
+        await extractFeeFromUniversityPage(uniPages.feePage, cheerioData.courseName || "", cheerioData, singleFeeCache, false, singleFeePageIsIntl);
       }
 
       const compactContent = extractCompactContent(html, resolvedUrl);
@@ -4532,7 +5925,14 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
           }
         }
         aiData.courseWebsite = aiData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(aiData, uniId, jobId, job);
+        const saved = await stageCourse(aiData, uniId, jobId, job, {
+          sources: [{
+            url: resolvedUrl,
+            pageType: "course_page",
+            extractionMethod: "ai",
+            content: cheerio.load(html)("body").text(),
+          }],
+        });
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
         addLog(job, "course", { name: aiData.courseName, status: saved ? "staged" : "skipped (duplicate)" });
@@ -4541,7 +5941,14 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
         // AI failed but Cheerio extracted data — use it directly rather than losing the course
         addLog(job, "status", { message: "AI extraction failed; saving Cheerio-extracted data as fallback.", phase: "extract" });
         cheerioData.courseWebsite = cheerioData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId, job);
+        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId, job, {
+          sources: [{
+            url: resolvedUrl,
+            pageType: "course_page",
+            extractionMethod: "cheerio",
+            content: cheerio.load(html)("body").text(),
+          }],
+        });
         job.totalFound = 1;
         if (saved) job.imported = 1; else job.skipped = 1;
         addLog(job, "course", { name: cheerioData.courseName, status: saved ? "staged (partial)" : "skipped (duplicate)" });
@@ -4604,7 +6011,7 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
     let rawCandidates: { url: string; name: string }[] = [];
 
     // --- Source A: Sitemap (most comprehensive for large universities) ---
-    const sitemapCandidates = await discoverCourseLinksFromSitemap(origin, job);
+    const sitemapCandidates = await discoverCourseLinksFromSitemap(activeOrigin, job);
 
     // AI fallback: only when rules returned "unknown" AND sitemap is empty.
     // This is rare (JS-rendered listing pages with no static links and no sitemap).
@@ -4662,15 +6069,13 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       $("a[href]").each((_, el) => {
         const href = $(el).attr("href") || "";
         const text = $(el).text().trim().replace(/\s+/g, " ");
-        try {
-          const fullUrl = new URL(href, origin).toString();
-          if (!fullUrl.startsWith(origin)) return;
-          if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
-            if (!listingLinks.find((l) => l.url === fullUrl)) {
-              listingLinks.push({ url: fullUrl, name: text });
-            }
+        const fullUrl = resolveDiscoverableUrl(href, resolvedUrl, activeOrigin);
+        if (!fullUrl) return;
+        if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+          if (!listingLinks.find((l) => l.url === fullUrl)) {
+            listingLinks.push({ url: fullUrl, name: text });
           }
-        } catch {}
+        }
       });
 
       // Follow pagination if the listing page has multiple pages
@@ -4694,6 +6099,26 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
       }
     }
 
+    // --- Last-resort fallback: if sitemap and HTML yielded nothing, try a
+    // lightweight crawl one or two hops from the listing page to surface
+    // course-detail links hidden behind JS-rendered card grids.
+    if (rawCandidates.length === 0) {
+      addLog(job, "status", {
+        message: "[SMART] No sitemap or HTML links found — crawling sub-pages for course links...",
+        phase: "discover",
+      });
+      try {
+        const crawled = await crawlForCourseLinks(resolvedUrl, activeOrigin, job, 2);
+        if (crawled.length > 0) {
+          addLog(job, "status", {
+            message: `[SMART] Crawl found ${crawled.length} candidate course links`,
+            phase: "discover",
+          });
+          rawCandidates = crawled;
+        }
+      } catch { /* crawl is best-effort */ }
+    }
+
     // --- Phase 2: Research & Validate — do NOT fetch everything blindly ---
     // Sample pages to confirm which candidates are genuine course pages
     let courseLinks: { url: string; name: string }[] = [];
@@ -4709,7 +6134,11 @@ async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, jobId: s
 
       // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
       // probe each known category slug to discover courses that only appear under specific filters
-      if (/\/course-list|\/course-finder|\/courses?\/?$/i.test(new URL(resolvedUrl).pathname)) {
+      if (
+        /\/course-list|\/course-finder|\/courses?\/?$/i.test(new URL(resolvedUrl).pathname) &&
+        courseLinks.length > 0 &&
+        courseLinks.length < 50
+      ) {
         const before = courseLinks.length;
         courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);
         const added = courseLinks.length - before;
@@ -4803,7 +6232,6 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
   };
 
   if (!url) { res.status(400).json({ error: "URL is required" }); return; }
-  if (!GEMINI_API_KEY) { res.status(500).json({ error: "GEMINI_API_KEY not configured" }); return; }
 
   try {
     let uniId: number;
@@ -4831,6 +6259,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     }
 
     const jobId = `scrape_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const effectiveFastMode = !!fastMode || !GEMINI_API_KEY;
     const job: ScrapeJob = {
       id: jobId,
       status: "running",
@@ -4846,9 +6275,14 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     job.universityId = uniId;
     job.universityName = uniName;
     job.url = url;
-    job.fastMode = !!fastMode;
+    job.fastMode = effectiveFastMode;
     scrapeJobs.set(jobId, job);
-    addLog(job, "status", { message: `Using university: ${uniName} (ID: ${uniId})${fastMode ? " — FAST MODE (browser disabled)" : ""}` });
+    addLog(job, "status", {
+      message:
+        `Using university: ${uniName} (ID: ${uniId})` +
+        `${effectiveFastMode ? " — FAST MODE (browser disabled)" : ""}` +
+        `${!GEMINI_API_KEY ? " — GEMINI_API_KEY missing, AI features disabled" : ""}`,
+    });
 
     await db.update(universitiesTable).set({ scrapeUrl: url }).where(eq(universitiesTable.id, uniId));
 
@@ -4867,7 +6301,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
 
 async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: number, jobId: string) {
   try {
-    addLog(job, "status", { message: `Re-scraping with saved config (${config.courseLinks.length} course links, no AI)...`, phase: "fetch" });
+    const courseLinks = sanitizeCourseLinks(config.courseLinks);
+    addLog(job, "status", { message: `Re-scraping with saved config (${courseLinks.length} course links, no AI)...`, phase: "fetch" });
 
     const uniPages = config.uniPages;
     const found = Object.entries(uniPages).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(", ");
@@ -4876,6 +6311,8 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
     const feeCache: UniversityFeeCache = { fetched: false };
     let uniReqsText: string | null = null;
     let uniReqsHtml: string | null = null;
+    let cachedEnglishReqs: Partial<CourseData> | null = null;
+    const browserSem = makeSemaphore(4);
 
     if (uniPages?.requirementsPage || uniPages?.entryPage) {
       try {
@@ -4883,48 +6320,111 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
         uniReqsHtml = await fetchPage(reqUrl);
         uniReqsText = cheerio.load(uniReqsHtml)("body").text();
         addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
+        const tempReqData: Partial<CourseData> = {};
+        extractEnglishFromHtml(cheerio.load(uniReqsHtml), tempReqData);
+        if (!(tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall)) {
+          extractEnglishRequirements(uniReqsText, tempReqData);
+        }
+        applyEnglishResultToCourse(tempReqData, parseEnglishRequirementsFromText(uniReqsText, "shared"));
+        if (tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall || tempReqData.cambridgeOverall || tempReqData.duolingoOverall) {
+          cachedEnglishReqs = tempReqData;
+        }
+      } catch {}
+    }
+    if (!cachedEnglishReqs && uniPages?.requirementsPdf) {
+      try {
+        const pdfEnglish = await extractEnglishFromPdf(uniPages.requirementsPdf);
+        if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
+          cachedEnglishReqs = pdfEnglish;
+          addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
+        }
       } catch {}
     }
 
-    const max = config.courseLinks.length;
+    const max = courseLinks.length;
     job.totalFound = max;
-    const stagedCourses: { index: number; data: CourseData }[] = [];
+    const stagedCourses: { index: number; data: CourseData; reviewSources: ReviewSource[] }[] = [];
     let completed = 0;
 
     const CONCURRENCY = 25;
     const sem = makeSemaphore(CONCURRENCY);
 
-    await Promise.all(config.courseLinks.slice(0, max).map((link, i) =>
+    await Promise.all(courseLinks.slice(0, max).map((link, i) =>
       sem(async () => {
         if (job.stopped) return;
         const num = ++completed;
         addLog(job, "progress", { current: num, total: max, courseName: link.name, message: `Fetching ${num}/${max}: ${link.name}` });
 
         try {
-          const cHtml = await fetchPage(link.url);
+          let cHtml = await fetchPage(link.url);
+          let wasBrowserFetch = false;
+          if (siteNeedsBrowser(link.url)) {
+            const browserResult = await browserSem(() =>
+              fetchPageWithBrowser(link.url, {
+                clickInternational: true,
+                clickRequirementsTab: true,
+                expandAccordions: true,
+                timeoutMs: 25_000,
+              })
+            );
+            if (browserResult?.requirementsHtml) {
+              cHtml = browserResult.requirementsHtml;
+              wasBrowserFetch = true;
+            }
+          } else {
+            const quickData = extractWithCheerio(cHtml, link.url, link.name);
+            if (needsBrowserFallback(quickData)) {
+              const browserResult = await browserSem(() =>
+                fetchPageWithBrowser(link.url, {
+                  clickInternational: true,
+                  clickRequirementsTab: true,
+                  expandAccordions: true,
+                  timeoutMs: 25_000,
+                })
+              );
+              if (browserResult?.requirementsHtml) {
+                cHtml = browserResult.requirementsHtml;
+                wasBrowserFetch = true;
+              }
+            }
+          }
+
           const cheerioData = extractWithCheerio(cHtml, link.url, link.name);
+          const reviewSources: ReviewSource[] = [{
+            url: link.url,
+            pageType: "course_page",
+            extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
+            content: cheerio.load(cHtml)("body").text(),
+          }];
 
           const needsEnrich = !cheerioData.internationalFee || !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall);
           if (needsEnrich) {
             const relatedPages = findRelatedPages(cHtml, link.url);
-            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry) {
-              await Promise.all([
-                relatedPages.fees && fetchPage(relatedPages.fees).then(h => {
-                  const t = cheerio.load(h)("body").text();
-                  if (!cheerioData.internationalFee) extractInternationalFees(t, cheerioData);
-                  if (!cheerioData.intakeMonths?.length) extractIntakeMonths(t, cheerioData);
-                }).catch(() => {}),
-                (relatedPages.entry || relatedPages.requirements) && fetchPage((relatedPages.entry || relatedPages.requirements)!).then(h => {
-                  const t = cheerio.load(h)("body").text();
-                  extractEnglishRequirements(t, cheerioData);
-                  if (!cheerioData.internationalFee) extractInternationalFees(t, cheerioData);
-                }).catch(() => {}),
-              ].filter(Boolean));
+            if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
+              await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources);
             }
           }
 
+          {
+            const bodyText = cheerio.load(cHtml)("body").text();
+            const fetchType = wasBrowserFetch ? "browser" : "static";
+            const tier2Result = parseEnglishRequirementsFromText(bodyText, fetchType as EnglishRequirementResult["source"]);
+            applyEnglishResultToCourse(cheerioData, tier2Result);
+          }
+
+          if (uniPages?.feesPdf && shouldPreferSharedFeePdf(cheerioData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
+            try {
+              const pdfData = await extractFeesFromPdf(uniPages.feesPdf, link.name);
+              if (pdfData.internationalFee && shouldOverrideWithSharedFeePdf(cheerioData.internationalFee, pdfData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
+                cheerioData.internationalFee = pdfData.internationalFee;
+                cheerioData.currency = pdfData.currency || "AUD";
+                cheerioData.feeTerm = pdfData.feeTerm || "Annual";
+                cheerioData.feeYear = pdfData.feeYear || undefined;
+              }
+            } catch {}
+          }
           const feePageIsIntl = !!uniPages?.feePage && /international/i.test(uniPages.feePage);
-          if (uniPages?.feePage && (!cheerioData.internationalFee || feePageIsIntl)) {
+          if (uniPages?.feePage && !uniPages?.feesPdf && !cheerioData.internationalFee) {
             await extractFeeFromUniversityPage(uniPages.feePage, link.name, cheerioData, feeCache, true, feePageIsIntl);
           }
           if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
@@ -4935,13 +6435,22 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
           }
           // Universal engine pass on shared requirements text (mirrors main scrape path)
           if (uniReqsText && hasEnglishTestKeyword(uniReqsText)) {
+            reviewSources.push({
+              url: uniPages?.requirementsPage || uniPages?.entryPage || link.url,
+              pageType: "english_page",
+              extractionMethod: "cheerio",
+              content: uniReqsText,
+            });
             applyEnglishResultToCourse(cheerioData, parseEnglishRequirementsFromText(uniReqsText, "shared"));
           }
           if (uniReqsText && !cheerioData.intakeMonths?.length) {
             extractIntakeMonths(uniReqsText, cheerioData);
           }
+          if (cachedEnglishReqs) {
+            mergeEnglishRequirements(cheerioData, cachedEnglishReqs);
+          }
 
-          stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url) });
+          stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url), reviewSources });
         } catch (err) {
           job.errors++;
           addLog(job, "course", { name: link.name, status: "error", message: (err as Error).message, index: i + 1 });
@@ -4952,7 +6461,7 @@ async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uniId: num
     // Stage all collected courses
     addLog(job, "status", { message: `Staging ${stagedCourses.length} courses...`, phase: "stage" });
     for (const item of stagedCourses.sort((a, b) => a.index - b.index)) {
-      const saved = await stageCourse(item.data, uniId, jobId, job);
+      const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
       if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
       else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
     }
@@ -4979,6 +6488,7 @@ router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<voi
     if (!uni.scrapeConfig) { res.status(400).json({ error: "No saved scraping config for this university. Run a full AI scrape first." }); return; }
 
     const config = uni.scrapeConfig as ScrapeConfig;
+    config.courseLinks = sanitizeCourseLinks(config.courseLinks);
 
     const jobId = `scrape_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const job: ScrapeJob = {
@@ -5124,7 +6634,7 @@ router.put("/scrape/staged/:id", async (req: Request, res: Response): Promise<vo
     const body = req.body;
     const allowedFields = [
       "courseName", "category", "subCategory", "courseWebsite", "duration", "durationTerm",
-      "studyMode", "degreeLevel", "studyLoad", "language", "description", "otherRequirement",
+      "courseLocation", "studyMode", "degreeLevel", "studyLoad", "language", "description", "otherRequirement",
       "internationalFee", "feeTerm", "feeYear", "currency",
       "ieltsOverall", "ieltsListening", "ieltsSpeaking", "ieltsWriting", "ieltsReading",
       "pteOverall", "pteListening", "pteSpeaking", "pteWriting", "pteReading",
@@ -5143,11 +6653,76 @@ router.put("/scrape/staged/:id", async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    await db.update(scrapedCoursesTable)
-      .set(updates)
-      .where(eq(scrapedCoursesTable.id, id));
+    const merged = { ...existing, ...updates };
+    const { score: completeness, missing } = computeCompleteness(merged as CourseData);
+    const snapshot = buildCourseReviewSnapshot(merged as CourseData, [{
+      url: String(merged.courseWebsite || ""),
+      pageType: "other",
+      extractionMethod: "manual",
+      content: [merged.courseName, merged.description, merged.otherRequirement, Array.isArray(merged.intakeMonths) ? merged.intakeMonths.join(", ") : ""].filter(Boolean).join(" "),
+    }]);
+    const readiness = assessPublishReadiness({ ...merged, completeness });
+    updates.completeness = completeness;
+    updates.notes = buildReviewNotes(missing, [], [...readiness.blockers, ...buildSnapshotNotes(snapshot)], readiness.warnings);
+    updates.studentMarket = snapshot.eligibility.studentMarket;
+    updates.deliveryMode = snapshot.eligibility.deliveryMode;
+    updates.internationalEligible = snapshot.eligibility.internationalEligible;
+    updates.onCampusAvailable = snapshot.eligibility.onCampusAvailable;
+    updates.eligibilityStatus = snapshot.eligibility.eligibilityStatus;
+    updates.eligibilityReason = snapshot.eligibility.reason;
+    updates.eligibilityConfidence = snapshot.eligibility.confidence;
+    updates.autoPublishStatus = snapshot.autoPublishStatus;
+    updates.decisionScore = snapshot.decisionScore;
 
-    res.json({ success: true });
+    const [updatedCourse] = await db.update(scrapedCoursesTable)
+      .set(updates)
+      .where(eq(scrapedCoursesTable.id, id))
+      .returning();
+
+    await db.delete(scrapedFieldEvidenceTable).where(eq(scrapedFieldEvidenceTable.scrapedCourseId, id));
+    await db.delete(fieldConflictsTable).where(eq(fieldConflictsTable.scrapedCourseId, id));
+    await persistReviewArtifacts(id, snapshot);
+
+    res.json({ success: true, course: updatedCourse });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/scrape/staged/:id/reject", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    const { reason, fieldKey, preferredValue } = req.body as { reason?: string; fieldKey?: string | null; preferredValue?: string | null };
+    const trimmedReason = (reason || "").trim();
+    if (!trimmedReason) {
+      res.status(400).json({ error: "Reject reason is required" });
+      return;
+    }
+
+    const [course] = await db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    if (!course || course.status !== "pending") {
+      res.status(404).json({ error: "Pending staged course not found" });
+      return;
+    }
+
+    const combinedNotes = [course.notes, `Rejected: ${trimmedReason}`].filter(Boolean).join(" | ");
+    const [updated] = await db.update(scrapedCoursesTable)
+      .set({ status: "rejected", notes: combinedNotes, reviewedAt: new Date() })
+      .where(eq(scrapedCoursesTable.id, id))
+      .returning();
+
+    await db.insert(scrapeFeedbackTable).values({
+      universityId: course.universityId,
+      scrapedCourseId: course.id,
+      courseName: course.courseName,
+      fieldKey: fieldKey || null,
+      issueType: inferFeedbackIssue(trimmedReason, fieldKey || null),
+      reason: trimmedReason,
+      preferredValue: preferredValue || null,
+      status: "active",
+    });
+
+    res.json({ success: true, course: updated });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -5163,88 +6738,222 @@ router.delete("/scrape/staged/:id", async (req: Request, res: Response): Promise
   }
 });
 
-async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSelect): Promise<{ success: boolean; courseId?: number; error?: string }> {
+router.get("/scrape/staged/:id/review", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    const [course] = await db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    if (!course) { res.status(404).json({ error: "Not found" }); return; }
+
+    const [evidenceRows, conflictRows] = await Promise.all([
+      db.select().from(scrapedFieldEvidenceTable).where(eq(scrapedFieldEvidenceTable.scrapedCourseId, id)),
+      db.select().from(fieldConflictsTable).where(eq(fieldConflictsTable.scrapedCourseId, id)),
+    ]);
+
+    res.json({
+      course,
+      evidence: evidenceRows,
+      conflicts: conflictRows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+const REQUIRED_PUBLISH_FIELDS: ReviewFieldKey[] = ["courseName", "duration", "internationalFee", "intakeMonths", "ieltsOverall"];
+
+function acceptedFieldMap(rows: Array<{ id: number; fieldKey: string; candidateValue: string | null; decisionStatus: string; decisionScore: number | null }>) {
+  return new Map(rows.filter((row) => row.decisionStatus === "accepted").map((row) => [row.fieldKey, row]));
+}
+
+async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSelect): Promise<{ success: boolean; courseId?: number; error?: string; blocked?: boolean }> {
   const client = await pool.connect();
   try {
+    if (course.eligibilityStatus === "rejected" || course.internationalEligible === false || course.onCampusAvailable === false) {
+      return {
+        success: false,
+        blocked: true,
+        error: `Publish blocked: ${course.eligibilityReason || "course failed eligibility checks"}`,
+      };
+    }
+
+    const selectedEvidence = await client.query<{
+      id: number;
+      fieldKey: string;
+      candidateValue: string | null;
+      decisionStatus: string;
+      decisionScore: number | null;
+    }>(
+      `SELECT id, field_key AS "fieldKey", candidate_value AS "candidateValue", decision_status AS "decisionStatus", decision_score AS "decisionScore"
+       FROM scraped_field_evidence
+       WHERE scraped_course_id = $1 AND selected = true`,
+      [course.id],
+    );
+    const acceptedFields = acceptedFieldMap(selectedEvidence.rows);
+
     await client.query("BEGIN");
 
-    const dup = await client.query(
-      "SELECT id FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1",
+    const dup = await client.query<{
+      id: number;
+      category: string | null;
+      subCategory: string | null;
+      courseWebsite: string | null;
+      courseLocation: string | null;
+      duration: number | null;
+      durationTerm: string | null;
+      studyMode: string | null;
+      degreeLevel: string | null;
+      studyLoad: string | null;
+      language: string | null;
+      description: string | null;
+      otherRequirement: string | null;
+    }>(
+      `SELECT id, category, sub_category AS "subCategory", course_website AS "courseWebsite", course_location AS "courseLocation",
+              duration, duration_term AS "durationTerm", study_mode AS "studyMode", degree_level AS "degreeLevel",
+              study_load AS "studyLoad", language, description, other_requirement AS "otherRequirement"
+       FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1`,
       [course.universityId, course.courseName],
     );
+
+    if (dup.rows.length === 0) {
+      const missingRequired = REQUIRED_PUBLISH_FIELDS.filter((fieldKey) => !acceptedFields.has(fieldKey));
+      if (missingRequired.length > 0) {
+        await client.query("ROLLBACK");
+        return {
+          success: false,
+          blocked: true,
+          error: `Publish blocked until reviewed: ${missingRequired.join(", ")}`,
+        };
+      }
+    }
 
     let courseId: number;
     if (dup.rows.length > 0) {
       courseId = dup.rows[0].id;
+      const existing = dup.rows[0];
+      const nextDuration = acceptedFields.has("duration") ? course.duration : existing.duration;
+      const nextDurationTerm = acceptedFields.has("duration") ? course.durationTerm : existing.durationTerm;
+      const nextLocation = acceptedFields.has("courseLocation") ? course.courseLocation : existing.courseLocation;
+      const nextStudyMode = acceptedFields.has("studyMode") ? course.studyMode : existing.studyMode;
+      const nextDegree = acceptedFields.has("degreeLevel") ? course.degreeLevel : existing.degreeLevel;
+      const nextOtherReq = acceptedFields.has("academicRequirement") ? course.otherRequirement : existing.otherRequirement;
       await client.query(
-        `UPDATE courses SET category=$2, sub_category=$3, course_website=$4, duration=$5, duration_term=$6, 
-         study_mode=$7, degree_level=$8, study_load=$9, language=$10, description=$11, other_requirement=$12, updated_at=NOW()
+        `UPDATE courses SET category=$2, sub_category=$3, course_website=$4, duration=$5, duration_term=$6,
+         course_location=$7, study_mode=$8, degree_level=$9, study_load=$10, language=$11, description=$12, other_requirement=$13,
+         student_market=$14, delivery_mode=$15, international_eligible=$16, on_campus_available=$17, eligibility_status=$18,
+         eligibility_reason=$19, eligibility_confidence=$20, approval_status='approved', approval_score=$21, approved_at=NOW(), last_reviewed_at=NOW(), updated_at=NOW()
          WHERE id=$1`,
-        [courseId, course.category, course.subCategory, course.courseWebsite, course.duration, course.durationTerm,
-         course.studyMode, course.degreeLevel, course.studyLoad, course.language, course.description, course.otherRequirement],
+        [
+          courseId,
+          course.category,
+          course.subCategory,
+          course.courseWebsite || existing.courseWebsite,
+          nextDuration,
+          nextDurationTerm,
+          nextLocation,
+          nextStudyMode,
+          nextDegree,
+          course.studyLoad || existing.studyLoad,
+          course.language || existing.language,
+          course.description || existing.description,
+          nextOtherReq,
+          course.studentMarket,
+          course.deliveryMode,
+          course.internationalEligible,
+          course.onCampusAvailable,
+          course.eligibilityStatus,
+          course.eligibilityReason,
+          course.eligibilityConfidence,
+          course.decisionScore,
+        ],
       );
-      await client.query("DELETE FROM fees WHERE course_id=$1", [courseId]);
-      await client.query("DELETE FROM english_requirements WHERE course_id=$1", [courseId]);
-      await client.query("DELETE FROM intakes WHERE course_id=$1", [courseId]);
-      await client.query("DELETE FROM academic_requirements WHERE course_id=$1", [courseId]);
-      await client.query("DELETE FROM scholarships WHERE course_id=$1", [courseId]);
     } else {
       const cRes = await client.query(
         `INSERT INTO courses (university_id, name, category, sub_category, course_website, duration, duration_term, 
-         study_mode, degree_level, study_load, language, description, other_requirement, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active') RETURNING id`,
-        [course.universityId, course.courseName, course.category, course.subCategory, course.courseWebsite,
-         course.duration, course.durationTerm, course.studyMode, course.degreeLevel, course.studyLoad,
-         course.language, course.description, course.otherRequirement],
+         course_location, study_mode, degree_level, study_load, language, description, other_requirement,
+         student_market, delivery_mode, international_eligible, on_campus_available, eligibility_status, eligibility_reason, eligibility_confidence,
+         approval_status, approval_score, approved_at, last_reviewed_at, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'approved',$21,NOW(),NOW(),'active') RETURNING id`,
+        [
+          course.universityId,
+          course.courseName,
+          course.category,
+          course.subCategory,
+          course.courseWebsite,
+          acceptedFields.has("duration") ? course.duration : null,
+          acceptedFields.has("duration") ? course.durationTerm : null,
+          acceptedFields.has("courseLocation") ? course.courseLocation : null,
+          acceptedFields.has("studyMode") ? course.studyMode : null,
+          acceptedFields.has("degreeLevel") ? course.degreeLevel : null,
+          course.studyLoad,
+          course.language,
+          course.description,
+          acceptedFields.has("academicRequirement") ? course.otherRequirement : null,
+          course.studentMarket,
+          course.deliveryMode,
+          course.internationalEligible,
+          course.onCampusAvailable,
+          course.eligibilityStatus,
+          course.eligibilityReason,
+          course.eligibilityConfidence,
+          course.decisionScore,
+        ],
       );
       courseId = cRes.rows[0].id;
     }
 
-    if (course.intakeMonths && Array.isArray(course.intakeMonths) && course.intakeMonths.length > 0) {
+    if (acceptedFields.has("intakeMonths") && course.intakeMonths && Array.isArray(course.intakeMonths) && course.intakeMonths.length > 0) {
+      await client.query("DELETE FROM intakes WHERE course_id=$1", [courseId]);
       for (const m of course.intakeMonths) {
         await client.query("INSERT INTO intakes (course_id, intake_month) VALUES ($1,$2)", [courseId, m]);
       }
     }
 
-    if (course.internationalFee) {
+    if (acceptedFields.has("internationalFee") && course.internationalFee) {
+      await client.query("DELETE FROM fees WHERE course_id=$1", [courseId]);
       await client.query(
         "INSERT INTO fees (course_id, international_fee, fee_term, fee_year, currency) VALUES ($1,$2,$3,$4,$5)",
         [courseId, course.internationalFee, course.feeTerm, course.feeYear, course.currency],
       );
     }
 
-    if (course.ieltsOverall) {
+    if (acceptedFields.has("ieltsOverall") && course.ieltsOverall) {
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='IELTS'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
         [courseId, "IELTS", course.ieltsListening, course.ieltsSpeaking, course.ieltsWriting, course.ieltsReading, course.ieltsOverall],
       );
     }
-    if (course.pteOverall) {
+    if (acceptedFields.has("pteOverall") && course.pteOverall) {
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='PTE'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
         [courseId, "PTE", course.pteListening, course.pteSpeaking, course.pteWriting, course.pteReading, course.pteOverall],
       );
     }
-    if (course.toeflOverall) {
+    if (acceptedFields.has("toeflOverall") && course.toeflOverall) {
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='TOEFL'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
         [courseId, "TOEFL", course.toeflListening, course.toeflSpeaking, course.toeflWriting, course.toeflReading, course.toeflOverall],
       );
     }
     if (course.cambridgeOverall) {
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='Cambridge CAE'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, overall) VALUES ($1,$2,$3)",
         [courseId, "Cambridge CAE", course.cambridgeOverall],
       );
     }
     if (course.duolingoOverall) {
+      await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='Duolingo'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, overall) VALUES ($1,$2,$3)",
         [courseId, "Duolingo", course.duolingoOverall],
       );
     }
 
-    if (course.academicLevel || course.academicScore) {
+    if (acceptedFields.has("academicRequirement") && (course.academicLevel || course.academicScore || course.otherRequirement)) {
+      await client.query("DELETE FROM academic_requirements WHERE course_id=$1", [courseId]);
       await client.query(
         "INSERT INTO academic_requirements (course_id, academic_level, academic_score, score_type, academic_country) VALUES ($1,$2,$3,$4,$5)",
         [courseId, course.academicLevel, course.academicScore, course.scoreType, course.academicCountry],
@@ -5252,10 +6961,25 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
     }
 
     if (course.scholarship) {
+      await client.query("DELETE FROM scholarships WHERE course_id=$1", [courseId]);
       await client.query("INSERT INTO scholarships (course_id, name, details) VALUES ($1,$2,$3)", [courseId, "Scholarship", course.scholarship]);
     }
 
-    await client.query("UPDATE scraped_courses SET status='approved' WHERE id=$1", [course.id]);
+    for (const [fieldKey, evidence] of acceptedFields.entries()) {
+      await client.query("DELETE FROM course_field_approvals WHERE course_id=$1 AND field_key=$2", [courseId, fieldKey]);
+      await client.query(
+        `INSERT INTO course_field_approvals (course_id, field_key, final_value, source_evidence_id, decision_score, approval_status, approved_by, approved_at)
+         VALUES ($1,$2,$3,$4,$5,'approved','system',NOW())`,
+        [courseId, fieldKey, evidence.candidateValue, evidence.id, evidence.decisionScore],
+      );
+      await client.query(
+        `INSERT INTO course_audit_log (course_id, scraped_course_id, source_evidence_id, field_key, action, old_value, new_value, reason, actor)
+         VALUES ($1,$2,$3,$4,'approve',$5,$6,$7,'system')`,
+        [courseId, course.id, evidence.id, fieldKey, null, evidence.candidateValue, "approved field from staged review"],
+      );
+    }
+
+    await client.query("UPDATE scraped_courses SET status='approved', reviewed_at=NOW() WHERE id=$1", [course.id]);
     await client.query("COMMIT");
     return { success: true, courseId };
   } catch (err) {
@@ -5276,7 +7000,7 @@ router.post("/scrape/staged/:id/approve", async (req: Request, res: Response): P
     if (result.success) {
       res.json({ success: true, courseId: result.courseId });
     } else {
-      res.status(500).json({ error: result.error });
+      res.status(result.blocked ? 400 : 500).json({ error: result.error });
     }
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -5291,12 +7015,17 @@ router.post("/scrape/staged/approve-all", async (req: Request, res: Response): P
 
     let approved = 0;
     let failed = 0;
+    let skippedReview = 0;
     for (const course of courses) {
+      if (course.autoPublishStatus !== "approved") {
+        skippedReview++;
+        continue;
+      }
       const result = await approveSingleCourse(course);
       if (result.success) approved++; else failed++;
     }
 
-    res.json({ approved, failed, total: courses.length });
+    res.json({ approved, failed, skippedReview, total: courses.length });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
