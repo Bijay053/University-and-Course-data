@@ -3247,11 +3247,13 @@ async function stageCourse(
     }
   }
 
-  // Case-insensitive dedup: "Bachelor Of Business" and "bachelor of business"
-  // are the same course — sitemap vs listing page path casing differences cause this.
+  // Cross-job dedup: if the same university already has this course name pending (from
+  // any previous scrape run), skip it. This prevents the same course appearing N times
+  // when the user re-scrapes without first approving/rejecting the previous results.
+  // Also catches intra-job casing differences (e.g. "Bachelor Of Business" vs "bachelor of business").
   const dup = await pool.query(
-    "SELECT id FROM scraped_courses WHERE scrape_job_id=$1 AND LOWER(course_name)=LOWER($2) LIMIT 1",
-    [jobId, courseData.courseName],
+    "SELECT id FROM scraped_courses WHERE university_id=$1 AND LOWER(course_name)=LOWER($2) AND status='pending' LIMIT 1",
+    [uniId, courseData.courseName],
   );
   if (dup.rows.length > 0) return false;
 
@@ -7328,6 +7330,29 @@ router.delete("/scrape/staged/:id", async (req: Request, res: Response): Promise
     const id = parseInt(req.params.id);
     await db.delete(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// DELETE duplicate pending courses for a university — keeps the newest copy of each
+// course name and discards older duplicates created by repeated scrape runs.
+router.post("/scrape/staged/dedup/:universityId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uniId = parseInt(req.params.universityId);
+    if (isNaN(uniId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
+    const result = await pool.query(`
+      DELETE FROM scraped_courses
+      WHERE status = 'pending'
+        AND university_id = $1
+        AND id NOT IN (
+          SELECT MAX(id)
+          FROM scraped_courses
+          WHERE status = 'pending' AND university_id = $1
+          GROUP BY LOWER(course_name)
+        )
+    `, [uniId]);
+    res.json({ deleted: result.rowCount ?? 0 });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

@@ -652,6 +652,35 @@ export default function Scraping() {
     setRejectingIds([id]);
   };
 
+  const handleDedupPending = async () => {
+    if (!selectedUni || selectedUni === ALL) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    try {
+      const res = await fetch(`/api/scrape/staged/dedup/${uniId}`, { method: "POST" });
+      if (res.ok) {
+        const { deleted } = await res.json();
+        if (deleted > 0) {
+          // Remove duplicate entries locally: for each course name, keep the highest id
+          setStagedCourses((prev) => {
+            const byName = new Map<string, StagedCourse>();
+            for (const c of prev) {
+              const key = c.courseName.toLowerCase().trim();
+              const existing = byName.get(key);
+              if (!existing || c.id > existing.id) byName.set(key, c);
+            }
+            return Array.from(byName.values());
+          });
+        }
+        window.alert(`Removed ${deleted} duplicate course(s). The list now shows only the newest copy of each course.`);
+      } else {
+        window.alert(await getFetchErrorMessage(res));
+      }
+    } catch (e) {
+      window.alert("Failed to clean up duplicates");
+    }
+  };
+
   const submitReject = async () => {
     if (!rejectingIds || rejectingIds.length === 0 || !rejectReason.trim()) return;
     const succeededIds = new Set<number>();
@@ -1243,6 +1272,17 @@ export default function Scraping() {
                 <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
               </CardTitle>
               <div className="flex gap-2">
+                {selectedUni && selectedUni !== ALL && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                    onClick={handleDedupPending}
+                    title="Remove duplicate courses from previous scrape runs — keeps the newest copy of each course name"
+                  >
+                    Remove duplicates
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
