@@ -1,12 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useListUniversities } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -186,8 +185,24 @@ function UniversityCombobox({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const selected = value && value !== ALL ? universities.find((u) => String(u.id) === value) : null;
   const label = value === ALL ? "+ Create New University" : selected ? selected.name : "Select university...";
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return universities;
+    return universities.filter((u) => u.name.toLowerCase().includes(q));
+  }, [universities, search]);
+
+  useEffect(() => {
+    if (open) {
+      setSearch("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -204,41 +219,42 @@ function UniversityCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-[280px]" align="start">
-        <Command
-          filter={(itemValue, search) => {
-            if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
-            return 0;
-          }}
-        >
-          <CommandInput placeholder="Search universities..." />
-          <CommandList>
-            <CommandEmpty>No university found.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value="create new university"
-                onSelect={() => {
-                  onChange(ALL);
-                  setOpen(false);
-                }}
+        <div className="flex flex-col">
+          <div className="flex items-center border-b px-3 py-2">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search universities..."
+              className="flex h-7 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto p-1">
+            <button
+              type="button"
+              onClick={() => { onChange(ALL); setOpen(false); }}
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+            >
+              <span className="text-blue-600 font-medium">+ Create New University</span>
+            </button>
+            {filtered.length === 0 && search.trim() && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No university found.</div>
+            )}
+            {filtered.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => { onChange(String(u.id)); setOpen(false); }}
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
               >
-                <span className="text-blue-600 font-medium">+ Create New University</span>
-              </CommandItem>
-              {universities.map((u) => (
-                <CommandItem
-                  key={u.id}
-                  value={u.name}
-                  onSelect={() => {
-                    onChange(String(u.id));
-                    setOpen(false);
-                  }}
-                >
-                  <span className="truncate">{u.name}</span>
-                  {u.scrapeUrl && <span className="ml-2 text-green-600 text-xs">(saved)</span>}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+                <span className="truncate">{u.name}</span>
+                {u.scrapeUrl && <span className="ml-2 text-green-600 text-xs">(saved)</span>}
+              </button>
+            ))}
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
   );
