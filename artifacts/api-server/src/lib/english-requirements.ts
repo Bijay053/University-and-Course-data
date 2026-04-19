@@ -639,14 +639,20 @@ export function parsePte(rawText: string): BandScore {
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
-  // P6: policy-table wording like "PTE (Pearson Test of English Academic) Academic Score of 50"
+  // P6: policy-table wording — "PTE (Pearson Test of English Academic) Academic Score of N"
+  // ONLY accept this loose match if the value is in a realistic per-course entry-requirement
+  // band (>=51). The wording "Academic Score of 50" is universal CEFR-floor boilerplate that
+  // almost every Australian university lists for ELICOS/foundation pathways — it is NOT the
+  // bachelor/master entry requirement and should NOT pollute every course's PTE field.
+  // For real per-course requirements we rely on P1–P5 (explicit "PTE 58 with no skill below 50"
+  // wording) or, on image-based pages like ASA, the vision-AI fallback.
   m = text.match(
     /pte(?:\s*\([^)]*\))?(?:\s+academic)?[^0-9]{0,120}?(?:academic\s+)?score\s+of\s+([\d.]+)/i,
   );
   if (m) {
     const overall = Number(m[1]);
-    if (overall >= 10 && overall <= 90)
-      return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 74 };
+    if (overall >= 51 && overall <= 90)
+      return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
   return emptyBandScore();
