@@ -385,10 +385,20 @@ function attachRuntimeJobBinding(job: ScrapeJob, runtimeJobId: string) {
 async function detachRuntimeJobBinding(job: ScrapeJob) {
   const binding = job.runtimeBinding;
   if (!binding) return;
-  binding.disposed = true;
-  if (binding.flushTimer) clearTimeout(binding.flushTimer);
+  // Stop the heartbeat/control interval FIRST so no new ticks fire while we flush.
   if (binding.controlTimer) clearInterval(binding.controlTimer);
+  // Cancel any pending lazy flush — we're about to do a synchronous final flush.
+  if (binding.flushTimer) clearTimeout(binding.flushTimer);
+  // Do the final flush BEFORE marking disposed=true.
+  // flushRuntimeJobBinding bails immediately when disposed is true, so doing
+  // this in the original order (disposed=true first) means the terminal
+  // "completed" / "failed" status is never written to the DB and the job
+  // stays "running" until the 5-minute stale reaper fires.
   await flushRuntimeJobBinding(job);
+  // Clear any flush timer that flushRuntimeJobBinding's finally-block may have
+  // re-scheduled (it reschedules when binding.dirty || pendingLogs.length > 0).
+  if (binding.flushTimer) clearTimeout(binding.flushTimer);
+  binding.disposed = true;
   job.runtimeBinding = undefined;
 }
 
@@ -3135,10 +3145,7 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
 async function analyzeImageWithGemini(imageUrl: string, context: string): Promise<Partial<CourseData>> {
   if (!GEMINI_API_KEY) return {};
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const resp = await fetch(imageUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+    const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(20_000) });
     if (!resp.ok) return {};
     const buffer = await resp.arrayBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
@@ -3165,6 +3172,7 @@ Extract ALL test types: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
+          signal: AbortSignal.timeout(45_000),
         });
         if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
         if (!apiResp.ok) continue;
@@ -3421,10 +3429,9 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string, evidenceCo
 
   try {
     const cachedPromise = feePdfContentCache.get(pdfUrl) ?? (async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      const resp = await fetch(pdfUrl, { signal: controller.signal });
-      clearTimeout(timeout);
+      // Keep the abort signal alive through both fetch AND arrayBuffer() — clearing
+      // it after headers (old pattern) left arrayBuffer() unguarded on slow CDNs.
+      const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(45_000) });
       if (!resp.ok) return null;
       const ct = resp.headers.get("content-type") || "";
       if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return null;
@@ -3439,8 +3446,9 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string, evidenceCo
         const txtPath = path.join(tmpDir, "source.txt");
         const layoutTxtPath = path.join(tmpDir, "source-layout.txt");
         await writeFile(pdfPath, buffer);
-        await execFileAsync("pdftotext", [pdfPath, txtPath]);
-        await execFileAsync("pdftotext", ["-layout", pdfPath, layoutTxtPath]);
+        // pdftotext can hang on malformed PDFs — cap at 30 s per call
+        await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
+        await execFileAsync("pdftotext", ["-layout", pdfPath, layoutTxtPath], { timeout: 30_000 });
         const pdfText = await readFile(txtPath, "utf8");
         const layoutPdfText = await readFile(layoutTxtPath, "utf8");
         return { buffer, pdfText, layoutPdfText };
@@ -3479,6 +3487,13 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string, evidenceCo
       ]);
       if (!GEMINI_API_KEY || validAmounts.size === 0) return {};
 
+      // Skip Gemini entirely if NO significant token from the course name appears
+      // anywhere in the PDF text — Gemini cannot find what the text parsers couldn't.
+      const courseTokens = normalize(courseName).split(" ").filter((t) => t.length > 3 && t !== "bachelor" && t !== "master" && t !== "graduate" && t !== "diploma");
+      const combinedText = `${pdfText}\n${layoutPdfText}`.toLowerCase();
+      const courseAppearsInPdf = courseTokens.length === 0 || courseTokens.some((t) => combinedText.includes(t));
+      if (!courseAppearsInPdf) return {};
+
       const base64 = buffer.toString("base64");
 
       const prompt = `Extract the INTERNATIONAL student tuition fee for the course "${courseName}" from this PDF fee schedule.
@@ -3501,6 +3516,7 @@ Use null for missing fields. Only include INTERNATIONAL fees.`;
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
+            signal: AbortSignal.timeout(45_000),
           });
           if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
           if (!apiResp.ok) continue;
@@ -3513,6 +3529,8 @@ Use null for missing fields. Only include INTERNATIONAL fees.`;
             pushFeeEvidence(pdfText, fee, "ai");
             return parsedAi;
           }
+          // Got a valid Gemini response but fee didn't match validAmounts — stop retrying.
+          return {};
         } catch { continue; }
       }
       return {};
@@ -3523,10 +3541,7 @@ Use null for missing fields. Only include INTERNATIONAL fees.`;
 
 async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData>> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const resp = await fetch(pdfUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+    const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(45_000) });
     if (!resp.ok) return {};
     const ct = resp.headers.get("content-type") || "";
     if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return {};
@@ -3538,7 +3553,7 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
     const pdfPath = path.join(tmpDir, "source.pdf");
     const txtPath = path.join(tmpDir, "source.txt");
     await writeFile(pdfPath, Buffer.from(buffer));
-    await execFileAsync("pdftotext", [pdfPath, txtPath]);
+    await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
     const pdfText = await readFile(txtPath, "utf8");
     await rm(tmpDir, { recursive: true, force: true });
 
@@ -3552,10 +3567,7 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
 
 async function extractCourseFactsFromPdf(pdfUrl: string): Promise<Partial<CourseData>> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const resp = await fetch(pdfUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+    const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(45_000) });
     if (!resp.ok) return {};
     const ct = resp.headers.get("content-type") || "";
     if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf") && !/intelligencebank/i.test(pdfUrl)) return {};
@@ -3567,7 +3579,7 @@ async function extractCourseFactsFromPdf(pdfUrl: string): Promise<Partial<Course
     const pdfPath = path.join(tmpDir, "source.pdf");
     const txtPath = path.join(tmpDir, "source.txt");
     await writeFile(pdfPath, Buffer.from(buffer));
-    await execFileAsync("pdftotext", [pdfPath, txtPath]);
+    await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
     const pdfText = await readFile(txtPath, "utf8");
     await rm(tmpDir, { recursive: true, force: true });
 
@@ -3669,6 +3681,7 @@ async function enrichFromRelatedPages(
   courseUrl?: string,
   evidenceCollector?: ReviewSource[],
 ) {
+  const _enrichT0 = Date.now();
   const needsFees = !courseData.internationalFee;
   const needsAnyEnglish = !(courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall && courseData.cambridgeOverall);
   const needsFacts =
@@ -3682,7 +3695,10 @@ async function enrichFromRelatedPages(
   // Prefer a dedicated international fee PDF before generic fee pages.
   if (needsFees && relatedPages.feesPdf && !courseData.internationalFee) {
     try {
+      const _pdfT0 = Date.now();
       const pdfData = await extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "", evidenceCollector);
+      const _pdfMs = Date.now() - _pdfT0;
+      if (_pdfMs > 5000) process.stdout.write(`[enrich] feePdf ${_pdfMs}ms course="${courseData.courseName?.slice(0, 40)}"\n`);
       if (pdfData.internationalFee) {
         courseData.internationalFee = pdfData.internationalFee;
         courseData.currency = pdfData.currency || "AUD";
@@ -3773,10 +3789,17 @@ async function enrichFromRelatedPages(
       } catch {}
     }
 
-    const images = findImageUrls(html, courseUrl);
+    // Only analyze images if NO English requirements were found via text/PDF extraction.
+    // If we already have at least one test score (e.g. IELTS from the page text),
+    // skip the expensive Gemini image calls — they rarely add new data.
+    const foundAnyEnglish = !!(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall || courseData.duolingoOverall);
+    const images = !foundAnyEnglish ? findImageUrls(html, courseUrl) : [];
+    if (images.length > 0) process.stdout.write(`[enrich] imageAnalysis start n=${images.length} course="${courseData.courseName?.slice(0, 40)}" t=${Date.now() - _enrichT0}ms\n`);
     for (const imgUrl of images.slice(0, 3)) {
       try {
+        const _imgT0 = Date.now();
         const imgData = await analyzeImageWithGemini(imgUrl, `Course: ${courseData.courseName}`);
+        process.stdout.write(`[enrich] image ${Date.now() - _imgT0}ms url=${imgUrl.slice(0, 80)}\n`);
         let foundAnything = false;
         if (imgData.ieltsOverall && typeof imgData.ieltsOverall === "number" && imgData.ieltsOverall >= 4 && imgData.ieltsOverall <= 9) {
           courseData.ieltsOverall = imgData.ieltsOverall;
@@ -3806,6 +3829,8 @@ async function enrichFromRelatedPages(
       } catch {}
     }
   }
+  const _enrichMs = Date.now() - _enrichT0;
+  if (_enrichMs > 3000) process.stdout.write(`[enrich] total ${_enrichMs}ms course="${courseData.courseName?.slice(0, 40)}"\n`);
 }
 
 const BATCH_CLASSIFY_PROMPT = `You are a university course classifier. Given a list of courses with their names and any extracted data, fill in ONLY the missing fields.
@@ -7491,7 +7516,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         if (needsEnrich) {
           const relatedPages = findRelatedPages(cHtml, link.url);
           if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
-            await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources);
+            await withHardTimeout(enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources), 180_000, "enrich");
             if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
           }
         }
@@ -7769,7 +7794,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (needsEnrich) {
             const relatedPages = findRelatedPages(cHtml, url);
             if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
-              await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, url);
+              await withHardTimeout(enrichFromRelatedPages(cheerioData, relatedPages, cHtml, url), 180_000, "enrich");
             }
           }
           const forceFeePageOverride = !!uniPages?.feePage && shouldForceUniversityFeePageOverride(uniPages.feePage, cheerioData);
@@ -8141,7 +8166,7 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
       const relatedPages = findRelatedPages(html, resolvedUrl);
       if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
         addLog(job, "status", { message: "Checking related pages/PDFs for fees/requirements...", phase: "enrich" });
-        await enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl);
+        await withHardTimeout(enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl), 180_000, "enrich");
       } else if (
         !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) ||
         !cheerioData.internationalFee ||
@@ -8150,7 +8175,7 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
         !cheerioData.courseLocation ||
         !cheerioData.intakeMonths?.length
       ) {
-        await enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl);
+        await withHardTimeout(enrichFromRelatedPages(cheerioData, relatedPages, html, resolvedUrl), 180_000, "enrich");
       }
 
       if (uniPages.feesPdf && shouldRunSharedFeePdfWithHints(detailFeedbackHints, cheerioData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
@@ -8835,7 +8860,7 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
           if (needsEnrich) {
             const relatedPages = findRelatedPages(cHtml, link.url);
             if (relatedPages.fees || relatedPages.requirements || relatedPages.entry || relatedPages.feesPdf || relatedPages.requirementsPdf || relatedPages.brochurePdf) {
-              await enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources);
+              await withHardTimeout(enrichFromRelatedPages(cheerioData, relatedPages, cHtml, link.url, reviewSources), 180_000, "enrich");
             }
           }
 

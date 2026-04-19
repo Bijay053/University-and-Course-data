@@ -52,6 +52,7 @@ export const scrapeRuntimeJobsTable = pgTable("scrape_runtime_jobs", {
   totalFound: integer("total_found").notNull().default(0),
   current: integer("current").notNull().default(0),
   logCount: integer("log_count").notNull().default(0),
+  claimCount: integer("claim_count").notNull().default(0),
   workerId: text("worker_id"),
   workerPid: integer("worker_pid"),
   heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),

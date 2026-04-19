@@ -379,6 +379,7 @@ export async function claimNextRuntimeJob(workerId: string, workerPid: number): 
     totalFound: number;
     current: number;
     logCount: number;
+    claimCount: number;
     workerId: string | null;
     workerPid: number | null;
     heartbeatAt: Date | null;
@@ -401,6 +402,7 @@ export async function claimNextRuntimeJob(workerId: string, workerPid: number): 
       UPDATE scrape_runtime_jobs AS jobs
       SET
         status = 'running',
+        claim_count = jobs.claim_count + 1,
         claimed_at = NOW(),
         heartbeat_at = NOW(),
         worker_id = $1,
@@ -428,6 +430,7 @@ export async function claimNextRuntimeJob(workerId: string, workerPid: number): 
         jobs.total_found AS "totalFound",
         jobs.current,
         jobs.log_count AS "logCount",
+        jobs.claim_count AS "claimCount",
         jobs.worker_id AS "workerId",
         jobs.worker_pid AS "workerPid",
         jobs.heartbeat_at AS "heartbeatAt",
@@ -443,9 +446,36 @@ export async function claimNextRuntimeJob(workerId: string, workerPid: number): 
   return result.rows[0] as unknown as ScrapeRuntimeJob ?? null;
 }
 
+const MAX_CLAIM_COUNT = 3;
+
 export async function requeueStaleRuntimeJobs(heartbeatMaxAgeMs: number) {
   const seconds = Math.max(1, Math.floor(heartbeatMaxAgeMs / 1000));
-  const result = await pool.query<{ runtime_job_id: string }>(
+
+  // Dead-letter jobs that have been claimed too many times — they are
+  // stuck in a crash-loop and will never complete. Mark them failed.
+  const deadResult = await pool.query<{ runtime_job_id: string }>(
+    `
+      UPDATE scrape_runtime_jobs
+      SET
+        status = 'failed',
+        completed_at = NOW(),
+        error_message = 'Job exceeded maximum claim attempts (${MAX_CLAIM_COUNT}) — likely hung on a slow PDF or external fetch. Restart to retry.',
+        worker_id = NULL,
+        worker_pid = NULL,
+        heartbeat_at = NULL,
+        claimed_at = NULL,
+        updated_at = NOW()
+      WHERE status IN ('running', 'awaiting_approval')
+        AND heartbeat_at IS NOT NULL
+        AND heartbeat_at < NOW() - ($1::text || ' seconds')::interval
+        AND claim_count >= ${MAX_CLAIM_COUNT}
+      RETURNING runtime_job_id
+    `,
+    [String(seconds)],
+  );
+
+  // Requeue jobs that are stale but haven't hit the claim limit yet.
+  const requeueResult = await pool.query<{ runtime_job_id: string }>(
     `
       UPDATE scrape_runtime_jobs
       SET
@@ -460,11 +490,16 @@ export async function requeueStaleRuntimeJobs(heartbeatMaxAgeMs: number) {
       WHERE status IN ('running', 'awaiting_approval')
         AND heartbeat_at IS NOT NULL
         AND heartbeat_at < NOW() - ($1::text || ' seconds')::interval
+        AND claim_count < ${MAX_CLAIM_COUNT}
       RETURNING runtime_job_id
     `,
     [String(seconds)],
   );
-  return result.rows.map((row) => row.runtime_job_id);
+
+  return {
+    requeued: requeueResult.rows.map((row) => row.runtime_job_id),
+    deadLettered: deadResult.rows.map((row) => row.runtime_job_id),
+  };
 }
 
 export async function markRuntimeJobHeartbeat(runtimeJobId: string, workerId: string, workerPid: number) {

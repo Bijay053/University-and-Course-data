@@ -87,16 +87,20 @@ app.listen(port, host, async (err) => {
   }
 
   // Periodic stale-job reaper: any "running" job whose worker hasn't sent a
-  // heartbeat in 90 seconds is presumed dead. We requeue it so a healthy worker
-  // can pick it up — this guarantees no job ever stays stuck forever and that
-  // we eventually process 100% of the data.
-  const STALE_HEARTBEAT_MS = 90_000;
+  // heartbeat in 5 minutes is presumed dead (PDF fetches + pdftotext on large
+  // Torrens/ASA fee schedules can take 2-4 minutes on first run).
+  // Jobs that have been claimed MAX_CLAIM_COUNT (3) times are dead-lettered
+  // (marked "failed") so they never loop forever.
+  const STALE_HEARTBEAT_MS = 300_000;
   setInterval(() => {
     void (async () => {
       try {
-        const requeued = await requeueStaleRuntimeJobs(STALE_HEARTBEAT_MS);
+        const { requeued, deadLettered } = await requeueStaleRuntimeJobs(STALE_HEARTBEAT_MS);
         if (requeued.length > 0) {
           logger.warn({ count: requeued.length, runtimeJobIds: requeued }, "Requeued stale scrape jobs (heartbeat expired)");
+        }
+        if (deadLettered.length > 0) {
+          logger.error({ count: deadLettered.length, runtimeJobIds: deadLettered }, "Dead-lettered scrape jobs (exceeded max claim count)");
         }
       } catch (err) {
         logger.error({ err }, "Stale-job reaper failed");
