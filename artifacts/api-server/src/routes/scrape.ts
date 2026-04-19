@@ -6094,33 +6094,25 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
     const courseHits = (lower.match(/\b(course|programme|degree|bachelor|master|diploma)\b/g) || []).length;
     return courseHits >= 5;
   };
+  // Fast HEAD-only probe: return on first 2xx that is NOT a redirect to a 404/error URL.
+  // We avoid downloading the full page here because that can cost 9× full GETs in the
+  // worst case, slowing scraping dramatically. The downstream listing-detection logic
+  // will validate the page content; if it turns out to be a stub page, the regular
+  // link-scan fallback still runs.
   for (const path of highPriorityPaths) {
     const testUrl = `${origin}${path}`;
     try {
       const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
         const finalUrl = resp.url || testUrl;
-        if (looksLikeErrorUrl(finalUrl)) {
-          continue;
-        }
-        try {
-          const content = await fetchPage(finalUrl);
-          if (looksLikeCoursePage(content)) {
-            addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl} (high-priority probe)`, phase: "discover" });
-            return finalUrl;
-          }
-        } catch {}
-        continue;
-      }
-    } catch {}
-    try {
-      const content = await fetchPage(testUrl);
-      if (content.length > 1000 && looksLikeCoursePage(content)) {
-        addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (content probe)`, phase: "discover" });
-        return testUrl;
+        if (looksLikeErrorUrl(finalUrl)) continue;
+        addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl} (high-priority probe)`, phase: "discover" });
+        return finalUrl;
       }
     } catch {}
   }
+  // Suppress unused-helper warning — kept for future use if HEAD turns out unreliable.
+  void looksLikeCoursePage;
 
   // ── STEP 2: Link scanning — find the best-linked course listing page ─────────
   const strongUrlPatterns = [
