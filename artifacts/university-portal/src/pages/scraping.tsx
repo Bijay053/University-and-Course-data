@@ -277,6 +277,7 @@ export default function Scraping() {
   const [scrapeResult, setScrapeResult] = useState<ScrapeLog | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [urlQueueProgress, setUrlQueueProgress] = useState<{ current: number; total: number } | null>(null);
+  const [scrapeStartTime, setScrapeStartTime] = useState<number | null>(null);
   const urlQueueRef = useRef<string[]>([]);
   const uniBodyRef = useRef<Record<string, unknown>>({});
   const logIndexRef = useRef(0);
@@ -527,6 +528,8 @@ export default function Scraping() {
           if ((data.status === "completed" || data.status === "completed_with_errors" || data.status === "stopped") && (data.imported ?? 0) > 0) {
             loadStagedCourses(jobId);
           }
+          // ETA tracking: clear start time when this URL finishes (next URL will reset it).
+          if (urlQueueRef.current.length === 0) setScrapeStartTime(null);
 
           // Process next URL in queue
           const nextUrl = urlQueueRef.current.shift();
@@ -534,6 +537,7 @@ export default function Scraping() {
             continuePolling = false;
             setUrlQueueProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
             setScrapeLogs((prev) => [...prev, { event: "status", message: `── Starting next URL (${nextUrl}) ──` }].slice(-MAX_SCRAPE_LOG_LINES));
+            setScrapeStartTime(Date.now());
             const nextJobId = await startSingleJob(nextUrl);
             if (nextJobId) {
               pollJobStatus(nextJobId);
@@ -658,6 +662,7 @@ export default function Scraping() {
 
     try {
       setScrapeLogs([{ event: "status", message: "Scraping started in background..." }].slice(-MAX_SCRAPE_LOG_LINES));
+      setScrapeStartTime(Date.now());
       const jobId = await startSingleJob(validUrls[0]);
       if (jobId) {
         pollJobStatus(jobId);
@@ -1141,20 +1146,52 @@ export default function Scraping() {
                 </div>
               )}
 
-              {progressLog && progressLog.total && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>{progressLog.message || "Scraping courses..."}</span>
-                    <span>{progressLog.current}/{progressLog.total}</span>
+              {progressLog && progressLog.total && (() => {
+                const current = progressLog.current ?? 0;
+                const total = progressLog.total ?? 1;
+                const pct = (current / total) * 100;
+                let eta: string | null = null;
+                let elapsed: string | null = null;
+                if (scrapeStartTime && current > 0 && current < total) {
+                  const elapsedMs = Date.now() - scrapeStartTime;
+                  const pacePerItem = elapsedMs / current;
+                  const remainingMs = pacePerItem * (total - current);
+                  const fmt = (ms: number) => {
+                    const s = Math.max(0, Math.round(ms / 1000));
+                    const m = Math.floor(s / 60);
+                    const r = s % 60;
+                    return m > 0 ? `${m}m ${r}s` : `${r}s`;
+                  };
+                  eta = fmt(remainingMs);
+                  elapsed = fmt(elapsedMs);
+                }
+                return (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>{progressLog.message || "Scraping courses..."}</span>
+                      <span className="tabular-nums">
+                        {current}/{total}
+                        {eta && (
+                          <span className="ml-2 text-blue-600 font-medium">
+                            ~{eta} left
+                          </span>
+                        )}
+                        {elapsed && (
+                          <span className="ml-2 text-gray-400">
+                            ({elapsed} elapsed)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                      style={{ width: `${((progressLog.current ?? 0) / progressLog.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {scraping && !progressLog && !awaitingApproval && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
