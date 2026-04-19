@@ -7192,9 +7192,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const disableBrowserForHeavyHost =
     /(^|\.)torrens\.edu\.au$/.test(batchHost) ||
     /(^|\.)asahe\.edu\.au$/.test(batchHost);
-  const CONCURRENCY = isHeavyBatchHost ? 1 : 24;
-  const BROWSER_CONCURRENCY = isHeavyBatchHost ? 1 : 6;
-  const RETRY_CONCURRENCY = isHeavyBatchHost ? 1 : 8;
+  // Heavy hosts (Torrens, VIT, ASA) used to be fully sequential (concurrency=1) which
+  // multiplied their wall-clock time by N. Modern test runs show 3 concurrent fetches
+  // are well-tolerated; bump them up while keeping a safety margin vs normal hosts.
+  const CONCURRENCY = isHeavyBatchHost ? 3 : 32;
+  const BROWSER_CONCURRENCY = isHeavyBatchHost ? 2 : 8;
+  const RETRY_CONCURRENCY = isHeavyBatchHost ? 2 : 12;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Courses that time out on the first pass are retried here.
