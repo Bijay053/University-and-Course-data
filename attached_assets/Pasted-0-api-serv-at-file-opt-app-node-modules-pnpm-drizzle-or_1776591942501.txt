@@ -1,0 +1,252 @@
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-server    │ default     │ 0.0.0   │ fork    │ 197022   │ 0s     │ 23   │ online    │ 0%       │ 16.3mb   │ root     │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# cd /opt/app && git stash && git pull origin main && pnpm --filter @workspace/university-portal run build
+No local changes to save
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.52 KiB | 311.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   9bc74cd..3eb579a  main       -> origin/main
+Updating 9bc74cd..3eb579a
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx | 90 +++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------
+ 1 file changed, 53 insertions(+), 37 deletions(-)
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1856 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-CuAWopyg.css  112.01 kB │ gzip:  18.67 kB
+dist/public/assets/index-hd6xdIML.js   603.01 kB │ gzip: 176.63 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.18s
+root@university-and-course-data:/opt/app# cd /opt/app && git stash && git pull origin main && pnpm --filter @workspace/university-portal run build
+No local changes to save
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 917 bytes | 183.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   3eb579a..d486eca  main       -> origin/main
+Updating 3eb579a..d486eca
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1856 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-CuAWopyg.css  112.01 kB │ gzip:  18.67 kB
+dist/public/assets/index-DU-f0kQJ.js   603.06 kB │ gzip: 176.65 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.24s
+root@university-and-course-data:/opt/app# cd /opt/app && git stash && git pull origin main && pnpm --filter @workspace/api-server run build && pm2 restart api-server
+No local changes to save
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 5), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.24 KiB | 634.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   d486eca..d595e4f  main       -> origin/main
+Updating d486eca..d595e4f
+Fast-forward
+ artifacts/api-server/src/lib/english-requirements.ts | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.7mb ⚠️
+  dist/workers/scrape-worker.mjs        4.6mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.0kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.0mb
+  dist/workers/scrape-worker.mjs.map    7.6mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.0kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 961ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-server    │ default     │ 0.0.0   │ fork    │ 197379   │ 0s     │ 24   │ online    │ 0%       │ 15.4mb   │ root     │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# # 1. Restart the API server (clears any stuck in-process work)
+pm2 restart api-server
+
+# 2. Clear any orphaned job rows so the UI doesn't pick them back up
+psql "$DATABASE_URL" -c "UPDATE scraping_jobs SET status='cancelled', finished_at=NOW() WHERE status IN ('running','queued','awaiting_approval');"
+
+# 3. Show last 80 lines of API logs so we can see WHY it hung
+pm2 logs api-server --lines 80 --nostream
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-server    │ default     │ 0.0.0   │ fork    │ 197489   │ 0s     │ 25   │ online    │ 0%       │ 18.0mb   │ root     │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+[TAILING] Tailing last 80 lines for [api-server] process (change the value with --lines option)
+/root/.pm2/logs/api-server-error.log last 80 lines:
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at async Promise.all (index 0)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/universities.ts:28:29
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+0|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" limit $1
+0|api-serv | params: 100
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at async Promise.all (index 0)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/universities.ts:28:29
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at requestStopForRuntimeJob (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:294:15)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9029:18
+0|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" limit $1
+0|api-serv | params: 100
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at async Promise.all (index 0)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/universities.ts:28:29
+0|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" limit $1
+0|api-serv | params: 100
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at async Promise.all (index 0)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/universities.ts:28:29
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+0|api-serv | Error: Failed query: select "runtime_job_id", "scraping_job_id", "university_id", "university_name", "url", "job_type", "status", "request_payload", "discovered_config", "approval_summary", "approval_decision", "stop_requested", "fast_mode", "imported", "skipped", "errors", "total_found", "current", "log_count", "worker_id", "worker_pid", "heartbeat_at", "claimed_at", "started_at", "completed_at", "error_message", "created_at", "updated_at" from "scrape_runtime_jobs" where "scrape_runtime_jobs"."runtime_job_id" = $1 limit $2
+0|api-serv | params: scrape_1776589593486_rj6036,1
+0|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+0|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+0|api-serv |     at file:///opt/app/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+0|api-serv |     at getRuntimeJobRecord (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:142:17)
+0|api-serv |     at getRuntimeJobStatus (file:///opt/app/artifacts/api-server/src/services/scrape-runtime-jobs.ts:193:21)
+0|api-serv |     at file:///opt/app/artifacts/api-server/src/routes/scrape.ts:9018:19
+
+/root/.pm2/logs/api-server-out.log last 80 lines:
+0|api-serv | sh (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":16,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591851346,"pid":197379,"hostname":"university-and-course-data","req":{"id":31,"method":"GET","url":"/api/dashboard/stats"},"res":{"statusCode":304},"responseTime":27,"msg":"request completed"}
+0|api-serv | {"level":30,"time":1776591851916,"pid":197379,"hostname":"university-and-course-data","req":{"id":32,"method":"GET","url":"/api/import/history"},"res":{"statusCode":304},"responseTime":2,"msg":"request completed"}
+0|api-serv | {"level":30,"time":1776591851931,"pid":197379,"hostname":"university-and-course-data","req":{"id":33,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)\n    at runNextTicks (node:internal/process/task_queues:69:3)\n    at processImmediate (node:internal/timers:472:9)"},"responseTime":4,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591851932,"pid":197379,"hostname":"university-and-course-data","req":{"id":34,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":4,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591853103,"pid":197379,"hostname":"university-and-course-data","req":{"id":35,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":3,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591855109,"pid":197379,"hostname":"university-and-course-data","req":{"id":36,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":2,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591855279,"pid":197379,"hostname":"university-and-course-data","req":{"id":37,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":5,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591859448,"pid":197379,"hostname":"university-and-course-data","req":{"id":38,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":3,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591860421,"pid":197379,"hostname":"university-and-course-data","req":{"id":39,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":2,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591867439,"pid":197379,"hostname":"university-and-course-data","req":{"id":40,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":14,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591875221,"pid":197379,"hostname":"university-and-course-data","req":{"id":41,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":18,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591875226,"pid":197379,"hostname":"university-and-course-data","req":{"id":42,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":18,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591876287,"pid":197379,"hostname":"university-and-course-data","req":{"id":43,"method":"POST","url":"/api/scrape/stop/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":3,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591876398,"pid":197379,"hostname":"university-and-course-data","req":{"id":44,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":12,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591878571,"pid":197379,"hostname":"university-and-course-data","req":{"id":45,"method":"GET","url":"/api/universities"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":4,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591884421,"pid":197379,"hostname":"university-and-course-data","req":{"id":46,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":2,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591895434,"pid":197379,"hostname":"university-and-course-data","req":{"id":47,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":9,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591906431,"pid":197379,"hostname":"university-and-course-data","req":{"id":48,"method":"GET","url":"/api/scrape/status/scrape_1776589593486_rj6036"},"res":{"statusCode":500},"err":{"type":"Error","message":"failed with status code 500","stack":"Error: failed with status code 500\n    at onResFinished (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)\n    at ServerResponse.onResponseComplete (file:///opt/app/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)\n    at ServerResponse.emit (node:events:520:35)\n    at onFinish (node:_http_outgoing:1026:10)\n    at callback (node:internal/streams/writable:764:21)\n    at afterWrite (node:internal/streams/writable:708:5)\n    at afterWriteTick (node:internal/streams/writable:694:10)\n    at processTicksAndRejections (node:internal/process/task_queues:89:21)"},"responseTime":10,"msg":"request errored"}
+0|api-serv | {"level":30,"time":1776591908397,"pid":197379,"hostname":"university-and-course-data","signal":"SIGINT","msg":"Stopping scrape workers"}
+
+root@university-and-course-data:/opt/app# free -h && pm2 status
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       812Mi       2.7Gi        38Mi       623Mi       3.0Gi
+Swap:             0B          0B          0B
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-server    │ default     │ 0.0.0   │ fork    │ 197489   │ 13s    │ 25   │ online    │ 0%       │ 329.4mb  │ root     │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# 

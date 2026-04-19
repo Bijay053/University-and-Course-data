@@ -139,12 +139,17 @@ export async function updateRuntimeJob(runtimeJobId: string, patch: Partial<type
 }
 
 export async function getRuntimeJobRecord(runtimeJobId: string) {
-  const [job] = await db
-    .select()
-    .from(scrapeRuntimeJobsTable)
-    .where(eq(scrapeRuntimeJobsTable.runtimeJobId, runtimeJobId))
-    .limit(1);
-  return job ?? null;
+  try {
+    const [job] = await db
+      .select()
+      .from(scrapeRuntimeJobsTable)
+      .where(eq(scrapeRuntimeJobsTable.runtimeJobId, runtimeJobId))
+      .limit(1);
+    return job ?? null;
+  } catch (err) {
+    console.error("[getRuntimeJobRecord] DB error", { runtimeJobId, err: (err as Error)?.message });
+    return null;
+  }
 }
 
 async function reconcileRuntimeJobFromStagedCourses(job: ScrapeRuntimeJob) {
@@ -191,17 +196,28 @@ async function reconcileRuntimeJobFromStagedCourses(job: ScrapeRuntimeJob) {
 
 export async function getRuntimeJobStatus(runtimeJobId: string, since = 0): Promise<RuntimeJobStatusPayload | null> {
   const jobRecord = await getRuntimeJobRecord(runtimeJobId);
-  const job = jobRecord ? await reconcileRuntimeJobFromStagedCourses(jobRecord as ScrapeRuntimeJob) : null;
+  let job: ScrapeRuntimeJob | null = null;
+  try {
+    job = jobRecord ? await reconcileRuntimeJobFromStagedCourses(jobRecord as ScrapeRuntimeJob) : null;
+  } catch (err) {
+    console.error("[getRuntimeJobStatus] reconcile failed", { runtimeJobId, err: (err as Error)?.message });
+    job = (jobRecord as ScrapeRuntimeJob) ?? null;
+  }
   if (!job) return null;
 
-  const logs = await db
-    .select({
-      event: scrapeRuntimeLogsTable.event,
-      payload: scrapeRuntimeLogsTable.payload,
-    })
-    .from(scrapeRuntimeLogsTable)
-    .where(sql`${scrapeRuntimeLogsTable.runtimeJobId} = ${runtimeJobId} AND ${scrapeRuntimeLogsTable.sequence} > ${since}`)
-    .orderBy(scrapeRuntimeLogsTable.sequence);
+  let logs: { event: string; payload: unknown }[] = [];
+  try {
+    logs = await db
+      .select({
+        event: scrapeRuntimeLogsTable.event,
+        payload: scrapeRuntimeLogsTable.payload,
+      })
+      .from(scrapeRuntimeLogsTable)
+      .where(sql`${scrapeRuntimeLogsTable.runtimeJobId} = ${runtimeJobId} AND ${scrapeRuntimeLogsTable.sequence} > ${since}`)
+      .orderBy(scrapeRuntimeLogsTable.sequence);
+  } catch (err) {
+    console.error("[getRuntimeJobStatus] logs fetch failed", { runtimeJobId, err: (err as Error)?.message });
+  }
 
   return {
     id: job.runtimeJobId,
