@@ -1458,21 +1458,21 @@ export default function Scraping() {
                           )}
                           <div className="flex flex-wrap gap-1 mt-1">
                             {course.autoPublishStatus && (
-                              <Badge variant="outline" className={`text-[10px] ${
+                              <Badge variant="outline" title="Auto-publish decision" className={`text-[10px] ${
                                 course.autoPublishStatus === "approved" ? "text-green-700 border-green-200" :
                                 course.autoPublishStatus === "rejected" ? "text-red-700 border-red-200" :
                                 "text-amber-700 border-amber-200"
                               }`}>
-                                {course.autoPublishStatus === "approved" ? "Auto publish ready" : course.autoPublishStatus}
+                                Publish: {course.autoPublishStatus === "approved" ? "ready" : course.autoPublishStatus === "pending_review" ? "review" : course.autoPublishStatus}
                               </Badge>
                             )}
                             {course.eligibilityStatus && (
-                              <Badge variant="outline" className={`text-[10px] ${
+                              <Badge variant="outline" title="Eligibility for international on-campus students" className={`text-[10px] ${
                                 course.eligibilityStatus === "eligible" ? "text-green-700 border-green-200" :
                                 course.eligibilityStatus === "rejected" ? "text-red-700 border-red-200" :
                                 "text-amber-700 border-amber-200"
                               }`}>
-                                {course.eligibilityStatus}
+                                Eligibility: {course.eligibilityStatus}
                               </Badge>
                             )}
                           </div>
