@@ -449,13 +449,13 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
     },
   });
 
-  // Generous per-request timeout. Gemini can take 30-60s on large prompts; we still
-  // want a ceiling so we don't hang forever on a stuck connection.
-  const GEMINI_REQUEST_TIMEOUT_MS = 90000;
-  // Up to 3 full passes across all models. Each pass tries every model once.
-  // Total worst-case time (when everything is failing): 3 passes × 3 models × 90s ≈ 13 min,
-  // then we throw and the caller retries — no silent data loss.
-  const MAX_PASSES = 3;
+  // Per-request timeout. Gemini usually responds in 5-25s; 45s is plenty of headroom
+  // without making a stuck connection drag the whole scrape down.
+  const GEMINI_REQUEST_TIMEOUT_MS = 45000;
+  // Up to 2 full passes across all models. Each pass tries every model once.
+  // Total worst-case time (when everything is failing): 2 passes × 3 models × 45s ≈ 4.5 min,
+  // then we throw and the caller falls back to per-course classification — no silent data loss.
+  const MAX_PASSES = 2;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     for (const model of GEMINI_MODELS) {
       const startedAt = Date.now();
