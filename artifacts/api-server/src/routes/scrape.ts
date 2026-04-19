@@ -3056,6 +3056,48 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
   const bodyText = compactWhitespace(extractVisibleBodyTextFromHtml(html));
   if (!bodyText) return;
 
+  // VIT-specific DOM extractor: find <p> elements ending in "intakes:" and
+  // grab ALL <li> items from the very next <ul>. This is the most reliable path
+  // because the page structure is:
+  //   <p class="...">2026 intakes:</p>
+  //   <ul class="rbt-list-style-3">
+  //     <li><i class="feather-calendar"></i>02-Mar-2026</li>
+  //     <li><i class="feather-calendar"></i>25-May-2026</li>
+  //     ... (5 dates total)
+  //   </ul>
+  // The generic text/regex paths sometimes capture only the first match; this
+  // one walks the DOM and pulls every <li> so all intake months are recorded.
+  try {
+    const $vit = cheerio.load(html);
+    const dateText = (n: AnyNode) => $vit(n).text().replace(/\s+/g, " ").trim();
+    let collected: string[] = [];
+    $vit("p, h1, h2, h3, h4, h5, h6, strong, b, label, div").each((_, el) => {
+      if (collected.length > 0) return false;
+      const label = dateText(el);
+      if (!/^\s*(?:20\d{2}\s+)?intakes?\s*:?\s*$/i.test(label)) return undefined;
+      const $next = $vit(el).nextAll("ul, ol").first();
+      if (!$next.length) return undefined;
+      const items = $next
+        .find("li")
+        .map((__, li) => dateText(li))
+        .get()
+        .filter(Boolean);
+      if (items.length > 0) collected = items;
+      return undefined;
+    });
+    if (collected.length > 0) {
+      const joined = collected.join(" ");
+      const fresh: Partial<CourseData> = {};
+      extractIntakeMonths(joined, fresh);
+      if (fresh.intakeMonths?.length) {
+        // Override even if a previous path already set intakeMonths — VIT's
+        // explicit list is the source of truth here.
+        data.intakeMonths = fresh.intakeMonths;
+        if (fresh.intakeDays !== undefined) data.intakeDays = fresh.intakeDays;
+      }
+    }
+  } catch {}
+
   const locationsBlock =
     bodyText.match(/\bLocations:\s*([\s\S]{0,220}?)(?=\b(?:20\d{2}\s+intakes:|Duration\b|Fees\b|CRICOS\b))/i)?.[1] ??
     bodyText.match(/\bLocations:\s*([^\n]{8,220}?)(?=\s*(?:20\d{2}\s+intakes|Duration|Fees|CRICOS))/i)?.[1];
