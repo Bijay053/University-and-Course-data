@@ -7163,10 +7163,31 @@ async function scrapeCourseBatch(
         addVerboseLog(job, "status", { message: `[IELTS-DEBUG] requirements page has no "IELTS" keyword`, phase: "fetch" });
       }
 
-      if (tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall) {
+      // ── CEFR-floor boilerplate detector ─────────────────────────────────────
+      // Many AU universities (ASA, VIT, Torrens, etc.) publish a generic policy
+      // table that lists the absolute minimum acceptable scores across ALL tests,
+      // typically: PTE 50, TOEFL iBT 60, CAE 169, IELTS 6.0. These are CEFR B1/B2
+      // thresholds — NOT real per-course entry requirements. If we see this exact
+      // combination, the extraction is boilerplate, not data; reject it so the
+      // browser+vision fallback can read the real per-course image-based table.
+      const looksLikeCefrFloor = (() => {
+        const t = tempReqData as any;
+        const markers =
+          (t.pteOverall === 50 ? 1 : 0) +
+          (t.toeflOverall === 60 ? 1 : 0) +
+          (t.cambridgeOverall === 169 ? 1 : 0);
+        return markers >= 2; // any two floor values together = boilerplate
+      })();
+      if (looksLikeCefrFloor) {
+        addLog(job, "status", {
+          message: `[boilerplate] Shared requirements page returned CEFR-floor values (PTE=${(tempReqData as any).pteOverall} TOEFL=${(tempReqData as any).toeflOverall} CAE=${(tempReqData as any).cambridgeOverall}) — ignoring text and forcing vision-AI extraction from image.`,
+          phase: "fetch",
+        });
+      } else if (tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall) {
         cachedEnglishReqs = tempReqData;
         addLog(job, "status", { message: `University requirements page: IELTS=${tempReqData.ieltsOverall} PTE=${tempReqData.pteOverall} TOEFL=${tempReqData.toeflOverall}`, phase: "fetch" });
-      } else if (GEMINI_API_KEY) {
+      }
+      if (!cachedEnglishReqs && GEMINI_API_KEY) {
         // Static extraction found nothing — requirements are likely JS-rendered.
         // Run Gemini ONCE on the requirements page and cache the result for all courses.
         try {
