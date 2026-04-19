@@ -449,9 +449,15 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
     },
   });
 
-  const GEMINI_REQUEST_TIMEOUT_MS = 30000;
-  for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+  // Generous per-request timeout. Gemini can take 30-60s on large prompts; we still
+  // want a ceiling so we don't hang forever on a stuck connection.
+  const GEMINI_REQUEST_TIMEOUT_MS = 90000;
+  // Up to 3 full passes across all models. Each pass tries every model once.
+  // Total worst-case time (when everything is failing): 3 passes × 3 models × 90s ≈ 13 min,
+  // then we throw and the caller retries — no silent data loss.
+  const MAX_PASSES = 3;
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    for (const model of GEMINI_MODELS) {
       const startedAt = Date.now();
       try {
         const resp = await fetch(geminiUrl(model), {
@@ -462,11 +468,12 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
         });
 
         if (resp.status === 429 || resp.status === 503) {
-          console.log(`Gemini ${model} returned ${resp.status}, ${attempt === 0 ? "retrying..." : "trying next model..."}`);
-          if (attempt === 0) { await new Promise((r) => setTimeout(r, 2000)); continue; }
-          break;
+          const backoffMs = Math.min(2000 * Math.pow(2, pass), 15000);
+          console.log(`Gemini ${model} returned ${resp.status} (pass ${pass + 1}/${MAX_PASSES}), backing off ${backoffMs}ms then trying next model...`);
+          await new Promise((r) => setTimeout(r, backoffMs));
+          continue;
         }
-        if (resp.status === 404) { console.log(`Gemini model ${model} not available, trying next...`); break; }
+        if (resp.status === 404) { console.log(`Gemini model ${model} not available, trying next...`); continue; }
         if (!resp.ok) {
           const errText = await resp.text();
           throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 300)}`);
@@ -474,20 +481,25 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
 
         const data = await resp.json() as any;
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (!text) { console.log(`Empty response from ${model}, trying next...`); break; }
-        console.log(`Gemini response OK from ${model} in ${Date.now() - startedAt}ms`);
+        if (!text) { console.log(`Empty response from ${model} (pass ${pass + 1}/${MAX_PASSES}), trying next...`); continue; }
+        console.log(`Gemini response OK from ${model} in ${Date.now() - startedAt}ms (pass ${pass + 1})`);
         return text;
       } catch (err) {
         const e = err as Error;
         if (e.message.includes("Gemini API error")) throw err;
         const isTimeout = e.name === "TimeoutError" || e.message.includes("aborted") || e.message.includes("timeout");
-        console.log(`Gemini ${model} attempt ${attempt + 1} failed${isTimeout ? " (timeout)" : ""}: ${e.message}`);
-        if (isTimeout) break;
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
+        console.log(`Gemini ${model} pass ${pass + 1} failed${isTimeout ? " (timeout)" : ""}: ${e.message}`);
+        // Continue to next model immediately on timeout; small backoff on other errors
+        if (!isTimeout) await new Promise((r) => setTimeout(r, 1500));
       }
     }
+    if (pass < MAX_PASSES - 1) {
+      const passBackoffMs = Math.min(5000 * Math.pow(2, pass), 30000);
+      console.log(`All Gemini models failed in pass ${pass + 1}/${MAX_PASSES}. Waiting ${passBackoffMs}ms before next pass...`);
+      await new Promise((r) => setTimeout(r, passBackoffMs));
+    }
   }
-  throw new Error("All Gemini models are currently unavailable. Please try again in a minute.");
+  throw new Error("All Gemini models are currently unavailable after multiple retries. Please try again in a minute.");
 }
 
 // ── Stealth browser profiles (rotate on 403 to bypass WAF fingerprinting) ────
@@ -3753,21 +3765,55 @@ async function batchClassify(courses: { index: number; name: string; existing: P
     return parts.join(", ");
   }).join("\n");
 
-  try {
-    const text = await geminiChat(BATCH_CLASSIFY_PROMPT, input, 4096);
-    const parsed = JSON.parse(text) as any[];
-    for (const item of parsed) {
-      if (item.index !== undefined) {
-        result.set(item.index, {
-          category: item.category || undefined,
-          subCategory: item.subCategory || undefined,
-          degreeLevel: item.degreeLevel || undefined,
-          description: item.description || undefined,
-        });
+  // Retry the whole batch up to 2 extra times if Gemini fails or returns nothing.
+  // This guarantees AI enrichment is attempted thoroughly before we accept
+  // the courses with cheerio-only data.
+  const MAX_BATCH_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_BATCH_ATTEMPTS; attempt++) {
+    try {
+      const text = await geminiChat(BATCH_CLASSIFY_PROMPT, input, 4096);
+      const parsed = JSON.parse(text) as any[];
+      for (const item of parsed) {
+        if (item.index !== undefined) {
+          result.set(item.index, {
+            category: item.category || undefined,
+            subCategory: item.subCategory || undefined,
+            degreeLevel: item.degreeLevel || undefined,
+            description: item.description || undefined,
+          });
+        }
       }
+      if (result.size > 0) return result;
+      console.log(`Batch classify returned no results on attempt ${attempt + 1}/${MAX_BATCH_ATTEMPTS}`);
+    } catch (err) {
+      console.log(`Batch classify attempt ${attempt + 1}/${MAX_BATCH_ATTEMPTS} error:`, (err as Error).message);
     }
-  } catch (err) {
-    console.log("Batch classify error:", (err as Error).message);
+    if (attempt < MAX_BATCH_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+  }
+
+  // After all retries failed, fall back to per-course classification so we
+  // don't lose AI enrichment for the whole batch because of one bad call.
+  console.log(`Batch classify exhausted retries; falling back to per-course classification for ${courses.length} courses`);
+  for (const c of courses) {
+    try {
+      const single = `#${c.index}: "${c.name}"${c.existing.degreeLevel ? `, level=${c.existing.degreeLevel}` : ""}`;
+      const text = await geminiChat(BATCH_CLASSIFY_PROMPT, single, 1024);
+      const parsed = JSON.parse(text) as any[];
+      for (const item of parsed) {
+        if (item.index !== undefined) {
+          result.set(item.index, {
+            category: item.category || undefined,
+            subCategory: item.subCategory || undefined,
+            degreeLevel: item.degreeLevel || undefined,
+            description: item.description || undefined,
+          });
+        }
+      }
+    } catch (err) {
+      console.log(`Per-course classify failed for "${c.name}":`, (err as Error).message);
+    }
   }
 
   return result;
