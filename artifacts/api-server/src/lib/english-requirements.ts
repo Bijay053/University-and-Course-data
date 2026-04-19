@@ -454,10 +454,24 @@ export function parseIelts(rawText: string): BandScore {
   const text = normalizeWhitespace(rawText);
   if (!text.toLowerCase().includes("ielts")) return emptyBandScore();
 
+  // P0a: "[Academic] IELTS [Academic] X.X (no band[s]/score[s] less than/below Y.Y)"
+  //      Handles Torrens phrasing "Academic IELTS 6.0 (no band less than 5.5)" where
+  //      the overall comes immediately after IELTS without the word "overall".
+  let m = text.match(
+    /(?:academic\s+)?ielts(?:\s+academic)?\s+([4-9](?:\.[05])?)\s*[\(\[,]\s*(?:with\s+)?no\s+(?:individual\s+)?(?:band|score|sub-?score|component)s?\s+(?:less\s+than|below|lower\s+than)\s*([4-9](?:\.[05])?)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const min = Number(m[2]);
+    if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9 && min <= overall) {
+      return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 95 };
+    }
+  }
+
   // P1: "IELTS[Academic]: Overall X with no [individual] band below Y"
   //     Also handles "IELTS: Overall score X, with no band below Y" and
   //     "IELTS Academic overall score of 6.5, with no band below 6.0" (VIT format)
-  let m = text.match(
+  m = text.match(
     /ielts(?:\s+academic)?(?:[^a-z0-9]{0,40}|.{0,40}?)overall\s+(?:score\s+)?(?:of\s+)?([\d.]+)[^.]{0,80}?no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:below|less\s+than|lower\s+than)\s*([\d.]+)/i,
   );
   if (m) {
