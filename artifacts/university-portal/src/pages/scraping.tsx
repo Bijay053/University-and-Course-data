@@ -642,11 +642,14 @@ export default function Scraping() {
 
   // Auto-proceed: as soon as the backend reports research complete,
   // approve immediately so the bulk fetch starts without manual confirmation.
+  // Track per-job so a failed POST never causes an infinite retry loop.
+  const autoApprovedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (awaitingApproval && activeJobId && !approvalLoading) {
-      handleApproval(true);
-    }
-  }, [awaitingApproval, activeJobId, approvalLoading, handleApproval]);
+    if (!awaitingApproval || !activeJobId) return;
+    if (autoApprovedRef.current.has(activeJobId)) return;
+    autoApprovedRef.current.add(activeJobId);
+    handleApproval(true);
+  }, [awaitingApproval, activeJobId, handleApproval]);
 
   const startScraping = useCallback(async () => {
     const validUrls = scrapeUrls.map((u) => u.trim()).filter(Boolean);
