@@ -624,6 +624,14 @@ export default function Scraping() {
     setApprovalLoading(false);
   }, [activeJobId]);
 
+  // Auto-proceed: as soon as the backend reports research complete,
+  // approve immediately so the bulk fetch starts without manual confirmation.
+  useEffect(() => {
+    if (awaitingApproval && activeJobId && !approvalLoading) {
+      handleApproval(true);
+    }
+  }, [awaitingApproval, activeJobId, approvalLoading, handleApproval]);
+
   const startScraping = useCallback(async () => {
     const validUrls = scrapeUrls.map((u) => u.trim()).filter(Boolean);
     if (validUrls.length === 0) return;
