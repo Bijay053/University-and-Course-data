@@ -658,8 +658,18 @@ export function parseToefl(rawText: string): BandScore {
   const text = normalizeWhitespace(rawText);
   if (!text.toLowerCase().includes("toefl")) return emptyBandScore();
 
+  // P0: ASA-style policy table — "TOEFL (Test of English as a Foreign Language) Internet
+  // Based Test (iBT) 60 Overall" — number is explicitly followed by the word "Overall".
+  // This is highest-priority because the "Overall" suffix anchors the score unambiguously.
+  let m = text.match(/toefl[^a-z\d]{0,300}?(\d{2,3})\s+overall\b/i);
+  if (m) {
+    const overall = Number(m[1]);
+    if (overall >= 30 && overall <= 120)
+      return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 88 };
+  }
+
   // P1: "TOEFL iBT 79 with no section/band below 18"
-  let m = text.match(
+  m = text.match(
     /toefl(?:\s+ibt)?[^a-z0-9]{0,40}(?:overall\s*)?([\d.]+)\s*(?:with\s*)?(?:no\s+(?:band|section|subscore)\s+below|minimum\s+of|no\s+score\s+less\s+than)\s*([\d.]+)/i,
   );
   if (m) {
@@ -742,11 +752,12 @@ export function parseCae(rawText: string): BandScore {
   if (!lower.includes("cae") && !lower.includes("cambridge")) return emptyBandScore();
 
   // "CAE overall X" or "Cambridge score of X" (Cambridge scale: 140–230)
+  // ASA-style: "CAE (Cambridge English: Advanced from Cambridge ESOL) 169"
   const overallM =
     text.match(/cae.{0,120}?overall\s*([\d.]+)/i) ||
     text.match(/cambridge(?:\s+english)?.{0,120}?score\s*of\s*([\d.]+)/i) ||
-    text.match(/cambridge(?:\s+english)?.{0,120}?(1[4-9][0-9]|2[0-2][0-9]|230)/i) ||
-    text.match(/cambridge(?:\s+english)?[^0-9]{0,120}?(1[4-9][0-9]|2[0-2][0-9]|230)\b/i);
+    text.match(/\bcae\b[^0-9]{0,250}?(1[4-9][0-9]|2[0-2][0-9]|230)\b/i) ||
+    text.match(/cambridge(?:\s+english)?.{0,250}?(1[4-9][0-9]|2[0-2][0-9]|230)\b/i);
 
   if (overallM) {
     const overall = Number(overallM[1]);
