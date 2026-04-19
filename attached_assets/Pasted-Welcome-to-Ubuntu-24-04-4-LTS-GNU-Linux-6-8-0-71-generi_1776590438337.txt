@@ -1,0 +1,53 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-71-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sun Apr 19 08:40:52 UTC 2026
+
+  System load:           0.0
+  Usage of /:            4.1% of 115.20GB
+  Memory usage:          16%
+  Swap usage:            0%
+  Processes:             137
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+2 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+*** System restart required ***
+Last login: Sun Apr 19 09:16:04 2026 from 198.211.111.194
+root@university-and-course-data:~# cd /opt/app && git pull && pnpm --filter @workspace/university-portal run build && pm2 restart university-portal
+Already up to date.
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1854 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-CmNaO804.css  111.41 kB │ gzip:  18.55 kB
+dist/public/assets/index-DEyyQSD5.js   591.83 kB │ gzip: 173.18 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 10.29s
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace university-portal not found
+root@university-and-course-data:/opt/app# 
