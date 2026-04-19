@@ -4284,13 +4284,16 @@ async function stageCourse(
   }
 
   // Cross-job dedup: if the same university already has this course name pending (from
-  // any previous scrape run), skip it. This prevents the same course appearing N times
-  // when the user re-scrapes without first approving/rejecting the previous results.
+  // any previous scrape run OR same run / parallel insert), skip it. The trimmed
+  // case-insensitive match catches "Master of X" vs "Master Of X" vs "  master of x ".
+  const normalizedName = courseData.courseName.trim().replace(/\s+/g, " ");
   const dup = await pool.query(
-    "SELECT id FROM scraped_courses WHERE university_id=$1 AND LOWER(course_name)=LOWER($2) AND status='pending' LIMIT 1",
-    [uniId, courseData.courseName],
+    "SELECT id FROM scraped_courses WHERE university_id=$1 AND LOWER(TRIM(REGEXP_REPLACE(course_name, '\\s+', ' ', 'g')))=LOWER($2) AND status='pending' LIMIT 1",
+    [uniId, normalizedName],
   );
   if (dup.rows.length > 0) return false;
+  // Use the normalized form when storing so future dedup checks match consistently.
+  courseData.courseName = normalizedName;
 
   const { score: completeness, missing } = computeCompleteness(courseData);
   const snapshot = buildCourseReviewSnapshot(courseData, reviewContext?.sources || [{
