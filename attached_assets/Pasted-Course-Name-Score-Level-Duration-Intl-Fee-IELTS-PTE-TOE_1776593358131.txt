@@ -1,0 +1,822 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor Of Architectural Technology
+Architecture, Building & Design
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of 3d Design And Animation
+Media & Communications
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of Game Design And Development
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep, Feb, May	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of Game Programming
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep, Feb, May	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of Branded Fashion Design
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Bachelor Of Communication Design
+Media & Communications
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Bachelor Of Fashion Marketing And Enterprise
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	On Campus	
+
+
+
+
+	
+Bachelor Of Interior Design Commercial
+Architecture, Building & Design
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of Interior Design Residential
+Architecture, Building & Design
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Diploma Of Branded Fashion Design
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Diploma Of Design
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Diploma Of Fashion Marketing And Enterprise
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Diploma Of Graphic Design
+Media & Communications
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	18 Month	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep, Feb, May	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Diploma Of Interior Design And Decoration
+Architecture, Building & Design
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Diploma Of Photography And Photo Imaging
+Media & Communications
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	18 Month	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Diploma Of Ux And Web Design
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	18 Month	A$37,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Graduate Certificate Of Design
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$17,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Master Of Design
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.7 Year	A$53,400/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney	Blended	
+
+
+
+
+	
+Bachelor Of Community Services
+Education & Social Work
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$105,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Adelaide	On Campus	
+
+
+
+
+	
+Bachelor Of Health Science Chinese Medicine
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	4 Year	A$117,320/Full Course	5.5	-	-	-	-	Jun, Sep	Melbourne	On Campus	
+
+
+
+
+	
+Bachelor Of Health Science Clinical Nutrition
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$87,990/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	On Campus	
+
+
+
+
+	
+Bachelor Of Health Science Dermal Therapies
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,500/Full Course	6	-	-	-	-	Jun, Sep	Brisbane	On Campus	
+
+
+
+
+	
+Bachelor Of Health Science Naturopathy
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	4 Year	A$117,320/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	On Campus	
+
+
+
+
+	
+Bachelor Of Health Science Western Herbal Medicine
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$87,990/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	On Campus	
+
+
+
+
+	
+Bachelor Of Nursing
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$105,000/Full Course	5.5	-	-	-	-	Sep	Sydney, Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Bachelor Of Nutrition
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$103,635/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Melbourne	Blended	
+
+
+
+
+	
+Diploma Of Beauty And Spa Practice
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$34,990/Full Course	5.5	-	-	-	-	Jun, Sep	Brisbane	On Campus	
+
+
+
+
+	
+Diploma Of Health Science
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$29,330/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Graduate Certificate Of Public Health
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$15,900/Full Course	5.5	-	-	-	-	Jun, Sep	Adelaide, Brisbane, Melbourne, Sydney	Blended	
+
+
+
+
+	
+Graduate Diploma Of Public Health
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$31,800/Full Course	5.5	-	-	-	-	Jun, Sep, Feb, May	Adelaide, Brisbane, Melbourne, Sydney	Blended	
+
+
+
+
+	
+Master Of Public Health
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.5 Year	A$47,700/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Public Health Advanced
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$63,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Bachelor Of Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Bachelor Of Business Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Bachelor Of Business Entrepreneurship
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Bachelor Of Business Event Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Bachelor Of Business Marketing
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Bachelor Of Business Sports Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Business Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Diploma Of Business Entrepreneurship
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Business Sport Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Event Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Marketing
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	6	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Certificate Of Analytics
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	0.7 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Certificate Of Business Administration
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	0.5 Year	A$13,330/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Certificate Of Business Analytics
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	0.7 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Adelaide, Melbourne, Brisbane	Blended	
+
+
+
+
+	
+Graduate Certificate Of Global Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	2 Trimester	A$18,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Diploma Of Business Administration
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Diploma Of Business Analytics
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Diploma Of Global Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Business Administration Advanced
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Business Administration And Global Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Business Administration And Master Of Public Health
+Business & Management; Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$63,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Master Of Business Administration Mba
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.5 Year	A$54,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Business Analytics
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.7 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Business Analytics Advanced
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Engineering Management
+Engineering & Technology
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Global Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.5 Year	A$54,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Global Project Management Advanced
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Global Project Management And Master Of Public Health
+Medicine & Health
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$63,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Master Of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.5 Year	A$54,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Master Of Professional Accounting Advanced
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Bachelor Of Cybersecurity
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$112,500/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne	Blended	
+
+
+
+
+	
+Bachelor Of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$94,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Diploma Of Cybersecurity
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$39,800/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Adelaide, Melbourne	Blended	
+
+
+
+
+	
+Diploma Of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$31,600/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Graduate Certificate Of Cybersecurity
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	7 Month	A$19,900/Full Course	5.5	-	-	-	-	Jun, Sep	Brisbane, Melbourne, Adelaide	Blended	
+
+
+
+
+	
+Graduate Certificate Of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	7 Month	A$18,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Melbourne, Adelaide	Blended	
+
+
+
+
+	
+Graduate Diploma Of Cybersecurity
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$39,800/Full Course	5.5	-	-	-	-	Jun, Sep	Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Graduate Diploma Of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$36,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Brisbane, Melbourne, Adelaide	On Campus	
+
+
+
+
+	
+Master Of Cybersecurity
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.7 Year	A$59,700/Full Course	5.5	-	-	-	-	Jun, Sep	Melbourne, Brisbane, Adelaide	On Campus	
+
+
+
+
+	
+Master Of Cybersecurity Advanced
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$79,600/Full Course	5.5	-	-	-	-	Jun, Sep	Brisbane, Melbourne, Adelaide	On Campus	
+
+
+
+
+	
+Master Of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	1.7 Year	A$54,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	Blended	
+
+
+
+
+	
+Master Of Information Technology Advanced
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$72,000/Full Course	5.5	-	-	-	-	Jun, Sep	Sydney, Melbourne, Brisbane, Adelaide	On Campus
