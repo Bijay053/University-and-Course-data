@@ -6030,20 +6030,37 @@ async function detectCourseListingPage(homeUrl: string, html: string, job: Scrap
   const highPriorityPaths = [
     "/study/degrees-and-courses", "/degrees", "/course-list", "/course-finder", "/course-guide",
     "/study/courses", "/courses/undergraduate", "/courses/postgraduate",
+    "/courses", "/programs", "/programmes", "/our-courses",
   ];
+  const looksLikeErrorUrl = (u: string) => /\/(404|not[-_]?found|error|page[-_]?not[-_]?found)(\/?$|\?|#)/i.test(u);
+  const looksLikeCoursePage = (html: string) => {
+    const lower = html.toLowerCase();
+    if (/(page not found|404 error|sorry,? (the|this) page|cannot be found|doesn't exist)/i.test(lower)) return false;
+    const courseHits = (lower.match(/\b(course|programme|degree|bachelor|master|diploma)\b/g) || []).length;
+    return courseHits >= 5;
+  };
   for (const path of highPriorityPaths) {
     const testUrl = `${origin}${path}`;
     try {
       const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
       if (resp.ok) {
         const finalUrl = resp.url || testUrl;
-        addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl} (high-priority probe)`, phase: "discover" });
-        return finalUrl;
+        if (looksLikeErrorUrl(finalUrl)) {
+          continue;
+        }
+        try {
+          const content = await fetchPage(finalUrl);
+          if (looksLikeCoursePage(content)) {
+            addLog(job, "status", { message: `Home page detected → course listing at ${finalUrl} (high-priority probe)`, phase: "discover" });
+            return finalUrl;
+          }
+        } catch {}
+        continue;
       }
     } catch {}
     try {
       const content = await fetchPage(testUrl);
-      if (content.length > 1000) {
+      if (content.length > 1000 && looksLikeCoursePage(content)) {
         addLog(job, "status", { message: `Home page detected → course listing at ${testUrl} (content probe)`, phase: "discover" });
         return testUrl;
       }
