@@ -7589,6 +7589,55 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           sharedTextSnippet: snippetAroundIelts(uniReqsText),
         });
 
+        // Tier 3.5: Per-course browser + vision escalation for heavy hosts where
+        // we deliberately skipped browser on the first pass. ASA's per-course pages
+        // are JS-rendered — without this escalation, every Master course inherits the
+        // university-level UG cached values (IELTS=6/PTE=50/TOEFL=60/CAE=169), which
+        // are wrong for postgrad. Run browser ONCE per course, only when static found
+        // zero English values. At concurrency=1 this adds ~5-10s per affected course.
+        if (
+          disableBrowserForHeavyHost &&
+          !wasBrowserFetch &&
+          !cheerioData.ieltsOverall &&
+          !cheerioData.pteOverall &&
+          !cheerioData.toeflOverall &&
+          !(cheerioData as any).cambridgeOverall
+        ) {
+          try {
+            const browserResult = await runBrowser();
+            if (browserResult) {
+              const renderedHtml = browserResult.requirementsHtml || browserResult.mainHtml;
+              if (renderedHtml) {
+                const $r = cheerio.load(renderedHtml);
+                const renderedText = $r("body").text();
+                const reqSupplement: Partial<CourseData> = {};
+                extractEnglishFromHtml($r, reqSupplement);
+                mergeEnglishRequirements(cheerioData, reqSupplement);
+                const tier35Result = parseEnglishRequirementsFromText(renderedText, "browser", {
+                  courseName: cheerioData.courseName || link.name,
+                  degreeLevel: cheerioData.degreeLevel,
+                });
+                applyEnglishResultToCourse(cheerioData, tier35Result);
+                reviewSources.push({
+                  url: link.url,
+                  pageType: "course_page",
+                  extractionMethod: "browser",
+                  content: renderedText,
+                });
+                addLog(job, "status", {
+                  message: `[per-course browser ✓] ${link.name.slice(0, 60)} — IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                  phase: "fallback",
+                });
+              }
+            }
+          } catch (e) {
+            addLog(job, "status", {
+              message: `[per-course browser ✗] ${link.name.slice(0, 60)}: ${(e as Error).message}`,
+              phase: "fallback",
+            });
+          }
+        }
+
         // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
         // Per-field: fills only slots still empty after the three tiers above.
         if (cachedEnglishReqs) {
