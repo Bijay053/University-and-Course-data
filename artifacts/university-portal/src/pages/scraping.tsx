@@ -4,6 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -168,6 +171,78 @@ type CourseReviewPayload = {
 };
 
 const ALL = "__new__";
+
+type UniLite = { id: number; name: string; scrapeUrl?: string | null };
+
+function UniversityCombobox({
+  value,
+  onChange,
+  universities,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  universities: UniLite[];
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value && value !== ALL ? universities.find((u) => String(u.id) === value) : null;
+  const label = value === ALL ? "+ Create New University" : selected ? selected.name : "Select university...";
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="bg-white h-9 w-full justify-between font-normal"
+        >
+          <span className={`truncate ${!selected && value !== ALL ? "text-muted-foreground" : ""}`}>{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-[280px]" align="start">
+        <Command
+          filter={(itemValue, search) => {
+            if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder="Search universities..." />
+          <CommandList>
+            <CommandEmpty>No university found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="create new university"
+                onSelect={() => {
+                  onChange(ALL);
+                  setOpen(false);
+                }}
+              >
+                <span className="text-blue-600 font-medium">+ Create New University</span>
+              </CommandItem>
+              {universities.map((u) => (
+                <CommandItem
+                  key={u.id}
+                  value={u.name}
+                  onSelect={() => {
+                    onChange(String(u.id));
+                    setOpen(false);
+                  }}
+                >
+                  <span className="truncate">{u.name}</span>
+                  {u.scrapeUrl && <span className="ml-2 text-green-600 text-xs">(saved)</span>}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 const MAX_SCRAPE_LOG_LINES = 800;
 const SCRAPE_POLL_BASE_DELAY_MS = 1500;
 const SCRAPE_POLL_MAX_DELAY_MS = 10000;
@@ -908,32 +983,24 @@ export default function Scraping() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="text-xs font-medium text-gray-500 mb-1 block">University</label>
-              <Select value={selectedUni} onValueChange={(val) => {
-                setSelectedUni(val);
-                if (val && val !== ALL) {
-                  const uni = uniData?.data?.find((u) => String(u.id) === val);
-                  setScrapeUrls([uni?.scrapeUrl || ""]);
-                  setFeePageUrl(uni?.feePageUrl || "");
-                  setRequirementsPageUrl(uni?.requirementsPageUrl || "");
-                  if (uni?.feePageUrl || uni?.requirementsPageUrl) setShowAdvanced(true);
-                } else {
-                  setFeePageUrl("");
-                  setRequirementsPageUrl("");
-                }
-              }} disabled={scraping}>
-                <SelectTrigger className="bg-white h-9">
-                  <SelectValue placeholder="Select university..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>+ Create New University</SelectItem>
-                  {uniData?.data?.map((u) => (
-                    <SelectItem key={u.id} value={String(u.id)}>
-                      {u.name}
-                      {u.scrapeUrl && <span className="ml-1 text-green-500 text-xs">(saved)</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UniversityCombobox
+                value={selectedUni}
+                onChange={(val) => {
+                  setSelectedUni(val);
+                  if (val && val !== ALL) {
+                    const uni = uniData?.data?.find((u) => String(u.id) === val);
+                    setScrapeUrls([uni?.scrapeUrl || ""]);
+                    setFeePageUrl(uni?.feePageUrl || "");
+                    setRequirementsPageUrl(uni?.requirementsPageUrl || "");
+                    if (uni?.feePageUrl || uni?.requirementsPageUrl) setShowAdvanced(true);
+                  } else {
+                    setFeePageUrl("");
+                    setRequirementsPageUrl("");
+                  }
+                }}
+                universities={uniData?.data || []}
+                disabled={scraping}
+              />
             </div>
 
             {(!selectedUni || selectedUni === ALL) && (
