@@ -437,7 +437,20 @@ function waitForApproval(job: ScrapeJob, summary: ApprovalSummary): Promise<bool
   });
 }
 
-async function geminiChat(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
+// Hard-cap any awaitable so it can never silently hang the worker. If the inner
+// promise doesn't settle within `ms`, we throw a timeout error and the caller
+// can fall back gracefully. Used for AI calls + DB writes.
+function withHardTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} hard-timeout after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function geminiChatInner(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
   const body = JSON.stringify({
@@ -500,6 +513,17 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
     }
   }
   throw new Error("All Gemini models are currently unavailable after multiple retries. Please try again in a minute.");
+}
+
+// Outer hard cap on the entire Gemini call. Even if AbortSignal misbehaves or
+// a model hangs past its 45s timeout, this guarantees we never block a worker
+// for more than 90 seconds on a single AI call. Caller catches and falls back.
+async function geminiChat(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
+  return withHardTimeout(
+    geminiChatInner(systemPrompt, userContent, maxTokens),
+    90_000,
+    "geminiChat",
+  );
 }
 
 // ── Stealth browser profiles (rotate on 403 to bypass WAF fingerprinting) ────

@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startMonthlyScrapingScheduler } from "./services/monthly-scraping";
-import { stopRunningRuntimeJobs } from "./services/scrape-runtime-jobs";
+import { stopRunningRuntimeJobs, requeueStaleRuntimeJobs } from "./services/scrape-runtime-jobs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -85,4 +85,22 @@ app.listen(port, host, async (err) => {
   for (let i = 0; i < scrapeWorkerCount; i++) {
     startScrapeWorker();
   }
+
+  // Periodic stale-job reaper: any "running" job whose worker hasn't sent a
+  // heartbeat in 90 seconds is presumed dead. We requeue it so a healthy worker
+  // can pick it up — this guarantees no job ever stays stuck forever and that
+  // we eventually process 100% of the data.
+  const STALE_HEARTBEAT_MS = 90_000;
+  setInterval(() => {
+    void (async () => {
+      try {
+        const requeued = await requeueStaleRuntimeJobs(STALE_HEARTBEAT_MS);
+        if (requeued.length > 0) {
+          logger.warn({ count: requeued.length, runtimeJobIds: requeued }, "Requeued stale scrape jobs (heartbeat expired)");
+        }
+      } catch (err) {
+        logger.error({ err }, "Stale-job reaper failed");
+      }
+    })();
+  }, 30_000).unref();
 });
