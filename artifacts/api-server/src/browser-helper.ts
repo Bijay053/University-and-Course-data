@@ -1,3 +1,5 @@
+import { normalizeScrapeUrl } from "./lib/normalize-scrape-url.js";
+
 /**
  * Minimal browser automation helper.
  *
@@ -30,6 +32,25 @@ const INTERNATIONAL_SELECTORS = [
   '.international-toggle',
   '#international-btn',
   '[aria-label*="International" i]',
+];
+
+const ON_CAMPUS_SELECTORS = [
+  'button:has-text("On-campus")',
+  'button:has-text("On campus")',
+  'a:has-text("On-campus")',
+  'a:has-text("On campus")',
+  'label:has-text("On-campus")',
+  'label:has-text("On campus")',
+  '#on-campus',
+  '#on_campus',
+  '[value="on-campus"]',
+  '[value="on campus"]',
+  '[data-learning-mode="on-campus"]',
+  '[data-learning-mode="on campus"]',
+  '[data-mode="on-campus"]',
+  '[data-mode="on campus"]',
+  '[aria-label*="On-campus" i]',
+  '[aria-label*="On campus" i]',
 ];
 
 const REQUIREMENTS_TAB_SELECTORS = [
@@ -86,6 +107,7 @@ export async function fetchPageWithBrowser(
   url: string,
   opts: {
     clickInternational?: boolean;
+    clickOnCampus?: boolean;
     clickRequirementsTab?: boolean;
     expandAccordions?: boolean;
     timeoutMs?: number;
@@ -93,6 +115,7 @@ export async function fetchPageWithBrowser(
 ): Promise<BrowserPageResult | null> {
   const {
     clickInternational = true,
+    clickOnCampus = true,
     clickRequirementsTab = true,
     expandAccordions = true,
     timeoutMs = 30_000,
@@ -166,6 +189,29 @@ export async function fetchPageWithBrowser(
       }
     }
 
+    // ── Step 1b: Click On-campus / On campus mode ────────────────────────────
+    if (clickOnCampus) {
+      for (const sel of ON_CAMPUS_SELECTORS) {
+        try {
+          const el = await page.$(sel);
+          if (!el) continue;
+          const visible = await el.isVisible();
+          if (!visible) continue;
+          const classes = (await el.getAttribute("class")) || "";
+          const ariaSelected = await el.getAttribute("aria-selected");
+          const checked = await el.getAttribute("checked");
+          const alreadyActive =
+            classes.includes("active") || classes.includes("selected") || ariaSelected === "true" || checked != null;
+          if (!alreadyActive) await el.click();
+          await page.waitForTimeout(2000);
+          clicksPerformed.push("on_campus_toggle");
+          break;
+        } catch {
+          // try next selector
+        }
+      }
+    }
+
     const mainHtml = await page.content();
     snapshots.push(mainHtml);
 
@@ -198,7 +244,7 @@ export async function fetchPageWithBrowser(
             const candidates = await page.$$(`text="${pattern}"`);
             for (const el of candidates) {
               if (!(await el.isVisible())) continue;
-              const tag = await el.evaluate((n: Element) => n.tagName.toLowerCase());
+              const tag = await el.evaluate((n: { tagName: string }) => n.tagName.toLowerCase());
               if (["button", "a", "div", "summary", "span", "li"].includes(tag)) {
                 await el.click();
                 await page.waitForTimeout(600);
@@ -256,7 +302,7 @@ const JS_HEAVY_DOMAINS = [
 
 export function siteNeedsBrowser(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
+    const host = new URL(normalizeScrapeUrl(url)).hostname.toLowerCase();
     return JS_HEAVY_DOMAINS.some((d) => host === d || host.endsWith("." + d));
   } catch {
     return false;

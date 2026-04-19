@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, type SQL } from "drizzle-orm";
+import { eq, and, desc, type SQL } from "drizzle-orm";
 import { db, scrapingJobsTable, scrapingChangesTable, universitiesTable, scrapedCoursesTable, coursesTable } from "@workspace/db";
 import {
   CreateScrapingJobBody,
@@ -8,6 +8,7 @@ import {
   ApproveScrapingChangeParams,
   RejectScrapingChangeParams,
 } from "@workspace/api-zod";
+import { enqueueUniversityRuntimeScrape, getMonthlyScrapingStatus, triggerMonthlyScrapes } from "../services/monthly-scraping";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,16 @@ router.get("/scraping/jobs", async (_req, res): Promise<void> => {
     .from(scrapingJobsTable)
     .leftJoin(universitiesTable, eq(scrapingJobsTable.universityId, universitiesTable.id));
   res.json(rows);
+});
+
+router.get("/scraping/monthly/status", async (_req, res): Promise<void> => {
+  const snapshot = await getMonthlyScrapingStatus();
+  res.json(snapshot);
+});
+
+router.post("/scraping/monthly/run", async (_req, res): Promise<void> => {
+  const summary = await triggerMonthlyScrapes("manual");
+  res.json(summary);
 });
 
 router.post("/scraping/jobs", async (req, res): Promise<void> => {
@@ -50,12 +61,27 @@ router.post("/scraping/jobs/:id/run", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Scraping job not found" });
     return;
   }
+  if (!job.universityId) {
+    res.status(400).json({ error: "Scraping job is not linked to a university" });
+    return;
+  }
+  const [university] = await db.select({
+    id: universitiesTable.id,
+    name: universitiesTable.name,
+    scrapeUrl: universitiesTable.scrapeUrl,
+    scrapeConfig: universitiesTable.scrapeConfig,
+  }).from(universitiesTable).where(eq(universitiesTable.id, job.universityId));
+  if (!university) {
+    res.status(404).json({ error: "University not found" });
+    return;
+  }
+  const started = await enqueueUniversityRuntimeScrape(university, job.id);
   const [updated] = await db
     .update(scrapingJobsTable)
-    .set({ lastRun: new Date(), status: "running" })
+    .set({ lastRun: new Date(), status: "active" })
     .where(eq(scrapingJobsTable.id, params.data.id))
     .returning();
-  res.json(updated);
+  res.json({ ...updated, runtimeJobId: started.jobId });
 });
 
 router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
@@ -73,9 +99,10 @@ router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
   const pending = await db
     .select()
     .from(scrapedCoursesTable)
-    .where(and(eq(scrapedCoursesTable.universityId, job.universityId), eq(scrapedCoursesTable.status, "pending")));
+    .where(and(eq(scrapedCoursesTable.universityId, job.universityId), eq(scrapedCoursesTable.status, "pending")))
+    .orderBy(desc(scrapedCoursesTable.createdAt));
   const existing = await db.select().from(coursesTable).where(eq(coursesTable.universityId, job.universityId));
-  const existingByName = new Map(existing.map((course) => [course.name.trim().toLowerCase(), course]));
+  const existingByName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c]));
 
   let inserted = 0;
   for (const row of pending) {
@@ -102,7 +129,7 @@ router.post("/scraping/jobs/:id/compare", async (req, res): Promise<void> => {
       ["study_mode", match.studyMode, row.studyMode],
       ["course_location", match.courseLocation, row.courseLocation],
       ["duration_term", match.durationTerm, row.durationTerm],
-      ["eligibility_status", match.eligibilityStatus, row.eligibilityStatus],
+      ["eligibility_status", (match as any).eligibilityStatus, (row as any).eligibilityStatus],
       ["other_requirement", match.otherRequirement, row.otherRequirement],
       ["description", match.description, row.description],
     ] as const;

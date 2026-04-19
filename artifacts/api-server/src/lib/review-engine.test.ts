@@ -187,3 +187,30 @@ test("ignores unrelated university-level sources for course-specific fee and dur
   assert.equal(snapshot.resolutions.find((resolution) => resolution.fieldKey === "duration")?.status, "accepted");
   assert.equal(snapshot.resolutions.find((resolution) => resolution.fieldKey === "internationalFee")?.status, "accepted");
 });
+
+test("accepts abbreviated start-date months (Jun, Sep) in intake evidence", () => {
+  const snapshot = buildCourseReviewSnapshot(
+    {
+      courseName: "Master of Information Technology (Advanced)",
+      degreeLevel: "Master",
+      duration: 1,
+      durationTerm: "Year",
+      studyMode: "On Campus",
+      courseLocation: "Ultimo campus",
+      internationalFee: 72000,
+      currency: "AUD",
+      feeTerm: "Full Course",
+      intakeMonths: ["June", "September"],
+      ieltsOverall: 5.5,
+    },
+    [{
+      url: "https://www.torrens.edu.au/courses/technology/master-of-information-technology-advanced",
+      pageType: "course_page",
+      extractionMethod: "browser",
+      content: "Start date 01 Jun 2026 14 Sep 2026. International fee A$72000.",
+    }],
+  );
+
+  assert.equal(snapshot.conflicts.some((conflict) => conflict.fieldKey === "intakeMonths"), false);
+  assert.equal(snapshot.resolutions.find((resolution) => resolution.fieldKey === "intakeMonths")?.status, "accepted");
+});

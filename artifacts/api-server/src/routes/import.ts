@@ -11,7 +11,8 @@ import {
   fieldConflictsTable,
 } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { buildCourseReviewSnapshot } from "../lib/review-engine.js";
+import { buildCourseReviewSnapshot, type ReviewCourseData } from "../lib/review-engine.js";
+import { findUniversityByNameCaseInsensitive, formatDatabaseSetupHint } from "../lib/university-name-match.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -136,7 +137,7 @@ async function importRows(
         scholarship: cleanText(getCol(row, "Scholarship")),
       };
       const snapshot = buildCourseReviewSnapshot(
-        staged,
+        staged as unknown as ReviewCourseData,
         [{
           url: courseWebsite || `import://excel/${encodeURIComponent(courseName)}`,
           pageType: "other",
@@ -270,10 +271,10 @@ router.post("/import/excel", upload.single("file"), async (req, res): Promise<vo
       uniId = u[0].id;
       uniName = u[0].name;
     } else if (universityName) {
-      const existing = await db.select().from(universitiesTable).where(eq(universitiesTable.name, universityName));
-      if (existing[0]) {
-        uniId = existing[0].id;
-        uniName = existing[0].name;
+      const existing = await findUniversityByNameCaseInsensitive(universityName);
+      if (existing) {
+        uniId = existing.id;
+        uniName = existing.name;
       } else {
         const [created] = await db.insert(universitiesTable).values({
           name: universityName,
@@ -320,7 +321,7 @@ router.post("/import/excel", upload.single("file"), async (req, res): Promise<vo
       errors: result.errors.slice(0, 10),
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    res.status(500).json({ error: formatDatabaseSetupHint(err) });
   }
 });
 

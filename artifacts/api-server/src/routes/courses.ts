@@ -12,6 +12,12 @@ import {
 
 const router: IRouter = Router();
 
+/** In production, list only catalog-eligible courses. In development, show all rows unless API_STRICT_CATALOG=1. */
+function useCatalogCourseFilters(): boolean {
+  if (process.env.API_STRICT_CATALOG === "1" || process.env.API_STRICT_CATALOG === "true") return true;
+  return process.env.NODE_ENV === "production";
+}
+
 router.get("/courses", async (req, res): Promise<void> => {
   const query = ListCoursesQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -34,11 +40,13 @@ router.get("/courses", async (req, res): Promise<void> => {
   if (degreeLevel) { whereClauses.push(`c.degree_level = $${pIdx++}`); params.push(degreeLevel); }
   if (studyMode) { whereClauses.push(`c.study_mode = $${pIdx++}`); params.push(studyMode); }
 
-  whereClauses.push("c.approval_status = 'approved'");
-  whereClauses.push("c.status = 'active'");
-  whereClauses.push("(c.eligibility_status IS NULL OR c.eligibility_status <> 'rejected')");
-  whereClauses.push("(c.international_eligible IS NULL OR c.international_eligible = true)");
-  whereClauses.push("(c.on_campus_available IS NULL OR c.on_campus_available = true)");
+  if (useCatalogCourseFilters()) {
+    whereClauses.push("c.approval_status = 'approved'");
+    whereClauses.push("c.status = 'active'");
+    whereClauses.push("(c.eligibility_status IS NULL OR c.eligibility_status <> 'rejected')");
+    whereClauses.push("(c.international_eligible IS NULL OR c.international_eligible = true)");
+    whereClauses.push("(c.on_campus_available IS NULL OR c.on_campus_available = true)");
+  }
   const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const dataQuery = `
@@ -163,7 +171,14 @@ router.get("/courses/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Course not found" });
     return;
   }
-  if (courseRow.approvalStatus !== "approved" || courseRow.eligibilityStatus === "rejected" || courseRow.internationalEligible === false || courseRow.onCampusAvailable === false) {
+  if (
+    useCatalogCourseFilters() &&
+    (courseRow.approvalStatus !== "approved" ||
+      courseRow.status !== "active" ||
+      courseRow.eligibilityStatus === "rejected" ||
+      courseRow.internationalEligible === false ||
+      courseRow.onCampusAvailable === false)
+  ) {
     res.status(404).json({ error: "Course not found" });
     return;
   }

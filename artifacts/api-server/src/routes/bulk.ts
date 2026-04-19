@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, coursesTable, universitiesTable } from "@workspace/db";
 import { DownloadCoursesQueryParams, UploadCoursesBody } from "@workspace/api-zod";
+import { findUniversityByNameCaseInsensitive } from "../lib/university-name-match.js";
 
 const router: IRouter = Router();
 
@@ -75,7 +76,7 @@ router.post("/bulk/courses/upload", async (req, res): Promise<void> => {
         errors.push(`Row ${i}: universityName and name are required`);
         continue;
       }
-      const [uni] = await db.select().from(universitiesTable).where(eq(universitiesTable.name, row.universityName));
+      const uni = await findUniversityByNameCaseInsensitive(row.universityName);
       if (!uni) {
         errors.push(`Row ${i}: University "${row.universityName}" not found`);
         continue;

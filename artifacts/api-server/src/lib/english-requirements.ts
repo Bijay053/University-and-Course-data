@@ -45,6 +45,11 @@ export type EnglishRequirementResult = {
   otherTests: OtherTest[];
 };
 
+export interface EnglishParseContext {
+  courseName?: string | null;
+  degreeLevel?: string | null;
+}
+
 // ── Minimal CourseData interface (only the fields we touch) ───────────────────
 
 export interface EnglishCourseFields {
@@ -107,6 +112,342 @@ export function emptyEnglishResult(
   };
 }
 
+function bandScore(
+  overall: number | null,
+  each: number | null,
+  confidence: number,
+): BandScore {
+  return {
+    overall,
+    listening: each,
+    reading: each,
+    writing: each,
+    speaking: each,
+    confidence,
+  };
+}
+
+function normalizeCourseMatcher(input: string | null | undefined): string {
+  return normalizeWhitespace(input)
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\bwith\s+specialisations?\b/g, " ")
+    .replace(/\bwith\s+specializations?\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scorePattern(value: number): string {
+  const normalized = Number(value).toFixed(1);
+  if (normalized.endsWith(".0")) {
+    return `${parseInt(normalized, 10)}(?:\\.0)?`;
+  }
+  return normalized.replace(".", "\\.");
+}
+
+function looksLikeCsuTieredPolicyPage(rawText: string): boolean {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+  return (
+    text.includes("charles sturt") &&
+    text.includes("undergraduate courses") &&
+    text.includes("postgraduate coursework courses") &&
+    text.includes("higher degree by research courses")
+  );
+}
+
+function looksLikeKbsEnglishRequirementsPage(rawText: string): boolean {
+  const text = normalizeWhitespace(rawText).toLowerCase();
+  return (
+    text.includes("kaplan business school") &&
+    text.includes("bachelor and all postgraduate programs") &&
+    text.includes("academic ielts") &&
+    text.includes("pte (pearson test of english academic)")
+  );
+}
+
+export function sharedEnglishPageNeedsCourseContext(rawText: string | null | undefined): boolean {
+  if (!rawText) return false;
+  return looksLikeCsuTieredPolicyPage(rawText) || looksLikeKbsEnglishRequirementsPage(rawText);
+}
+
+function determineCourseTrack(context: EnglishParseContext): "undergraduate" | "postgraduate" | "research" | null {
+  const degree = normalizeWhitespace(context.degreeLevel).toLowerCase();
+  const courseName = normalizeWhitespace(context.courseName).toLowerCase();
+  const combined = `${degree} ${courseName}`.trim();
+  if (!combined) return null;
+  if (/\b(phd|doctor of philosophy|professional doctoral|doctorate|higher degree by research|master by research)\b/i.test(combined)) {
+    return "research";
+  }
+  if (/\b(master|graduate certificate|graduate diploma|postgraduate)\b/i.test(combined)) {
+    return "postgraduate";
+  }
+  if (/\b(bachelor|associate degree|certificate|diploma|undergraduate)\b/i.test(combined)) {
+    return "undergraduate";
+  }
+  return null;
+}
+
+function courseHasHigherEnglishOverride(rawText: string, context: EnglishParseContext): boolean {
+  const courseName = normalizeCourseMatcher(context.courseName);
+  if (!courseName) return false;
+  const lower = rawText.toLowerCase();
+  const start = lower.indexOf("courses with higher english language proficiency");
+  if (start === -1) return false;
+
+  const nextStarts = [
+    lower.indexOf("if you have previous studies in english", start),
+    lower.indexOf("if you've completed ielts or another english language test", start),
+    lower.indexOf("charles sturt english language proficiency concordance tables", start),
+  ].filter((idx) => idx > start);
+  const end = nextStarts.length ? Math.min(...nextStarts) : Math.min(rawText.length, start + 8000);
+  const section = normalizeCourseMatcher(rawText.slice(start, end));
+  return section.includes(courseName);
+}
+
+function buildCsuContextualResult(
+  rawText: string,
+  source: EnglishRequirementResult["source"],
+  context: EnglishParseContext,
+): EnglishRequirementResult | null {
+  if (!looksLikeCsuTieredPolicyPage(rawText)) return null;
+  if (courseHasHigherEnglishOverride(rawText, context)) {
+    return emptyEnglishResult(source);
+  }
+
+  const track = determineCourseTrack(context);
+  if (!track) return emptyEnglishResult(source);
+
+  const text = normalizeWhitespace(rawText);
+  const branchPatterns: Record<typeof track, RegExp> = {
+    undergraduate:
+      /for[^a-z0-9]+undergraduate[^a-z0-9]+courses.*?minimum\s+overall\s+score\s+of\s+([\d.]+).*?no\s+individual\s+score\s+below\s+([\d.]+)/i,
+    postgraduate:
+      /for[^a-z0-9]+postgraduate[^a-z0-9]+coursework[^a-z0-9]+courses.*?minimum\s+overall\s+score\s+of\s+([\d.]+).*?no\s+individual\s+score\s+below\s+([\d.]+)/i,
+    research:
+      /for[^a-z0-9]+higher[^a-z0-9]+degree[^a-z0-9]+by[^a-z0-9]+research[^a-z0-9]+courses.*?minimum\s+overall\s+score\s+of\s+([\d.]+).*?no\s+individual\s+score\s+below\s+([\d.]+)/i,
+  };
+
+  const branchMatch = text.match(branchPatterns[track]);
+  if (!branchMatch) return emptyEnglishResult(source);
+
+  const ieltsOverall = Number(branchMatch[1]);
+  const ieltsEach = Number(branchMatch[2]);
+  const result = emptyEnglishResult(source);
+  result.ielts = bandScore(ieltsOverall, ieltsEach, 99);
+
+  const lower = rawText.toLowerCase();
+  const concordanceStart = lower.indexOf("charles sturt english language proficiency concordance tables");
+  if (concordanceStart === -1) return result;
+
+  const skillHeader = lower.indexOf("individual skill requirement", concordanceStart);
+  const overallTable = normalizeWhitespace(
+    rawText.slice(concordanceStart, skillHeader > concordanceStart ? skillHeader : rawText.length),
+  );
+  const skillTable = skillHeader > concordanceStart
+    ? normalizeWhitespace(rawText.slice(skillHeader))
+    : "";
+  const compactOverallTable = overallTable.replace(/\|/g, " ");
+  const compactSkillTable = skillTable.replace(/\|/g, " ");
+
+  const overallRow = compactOverallTable.match(
+    new RegExp(
+      `\\b${scorePattern(ieltsOverall)}\\b\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(?:\\d{3}|N/?A)\\b`,
+      "i",
+    ),
+  );
+  if (overallRow) {
+    const toeflOverall = Number(overallRow[1]);
+    const pteOverall = Number(overallRow[4]);
+    if (toeflOverall >= 0 && toeflOverall <= 120) {
+      result.toefl.overall = toeflOverall;
+      result.toefl.confidence = Math.max(result.toefl.confidence, 95);
+    }
+    if (pteOverall >= 10 && pteOverall <= 90) {
+      result.pte.overall = pteOverall;
+      result.pte.confidence = Math.max(result.pte.confidence, 95);
+    }
+  }
+
+  const skillRow = compactSkillTable.match(
+    new RegExp(
+      `\\b${scorePattern(ieltsEach)}\\b\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(\\d{2,3})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{2,3})\\b`,
+      "i",
+    ),
+  );
+  if (skillRow) {
+    const toeflListening = Number(skillRow[5]);
+    const toeflSpeaking = Number(skillRow[6]);
+    const toeflReading = Number(skillRow[7]);
+    const toeflWriting = Number(skillRow[8]);
+    const pteEach = Number(skillRow[9]);
+    if ([toeflListening, toeflSpeaking, toeflReading, toeflWriting].every((v) => v >= 0 && v <= 30)) {
+      result.toefl.listening = toeflListening;
+      result.toefl.speaking = toeflSpeaking;
+      result.toefl.reading = toeflReading;
+      result.toefl.writing = toeflWriting;
+      result.toefl.confidence = Math.max(result.toefl.confidence, 98);
+    }
+    if (pteEach >= 10 && pteEach <= 90) {
+      result.pte.listening = pteEach;
+      result.pte.reading = pteEach;
+      result.pte.writing = pteEach;
+      result.pte.speaking = pteEach;
+      result.pte.confidence = Math.max(result.pte.confidence, 98);
+    }
+  }
+
+  return result;
+}
+
+function extractBetween(text: string, startPattern: RegExp, endPattern: RegExp): string {
+  const start = text.search(startPattern);
+  if (start === -1) return "";
+  const rest = text.slice(start);
+  const end = rest.search(endPattern);
+  return normalizeWhitespace(end === -1 ? rest : rest.slice(0, end));
+}
+
+function determineKbsProgramTrack(context: EnglishParseContext): "diploma" | "bachelor_postgraduate" | null {
+  const combined = `${normalizeWhitespace(context.degreeLevel)} ${normalizeWhitespace(context.courseName)}`.toLowerCase();
+  if (!combined) return null;
+  if (/\bdiploma\b/.test(combined) && !/\bgraduate\s+diploma\b/.test(combined)) {
+    return "diploma";
+  }
+  if (/\b(bachelor|master|graduate certificate|graduate diploma|postgraduate)\b/.test(combined)) {
+    return "bachelor_postgraduate";
+  }
+  return null;
+}
+
+function buildKbsContextualResult(
+  rawText: string,
+  source: EnglishRequirementResult["source"],
+  context: EnglishParseContext,
+): EnglishRequirementResult | null {
+  if (!looksLikeKbsEnglishRequirementsPage(rawText)) return null;
+
+  const track = determineKbsProgramTrack(context);
+  if (!track) return emptyEnglishResult(source);
+
+  const text = normalizeWhitespace(rawText);
+  const result = emptyEnglishResult(source);
+
+  const ieltsRow = extractBetween(
+    text,
+    /academic\s+ielts,\s*including\s+one\s+skill\s+retake/i,
+    /pte\s*\(\s*pearson\s+test\s+of\s+english\s+academic\s*\)/i,
+  );
+  if (ieltsRow) {
+    if (track === "bachelor_postgraduate") {
+      const m = ieltsRow.match(
+        /overall\s+6(?:\.0)?\s*,\s*with\s+not\s+less\s+than\s+6(?:\.0)?\s+for\s+speaking\s+and\s+writing\s+and\s+5\.5\s+for\s+listening\s+and\s+reading/i,
+      );
+      if (m) {
+        result.ielts = {
+          overall: 6.0,
+          listening: 5.5,
+          reading: 5.5,
+          writing: 6.0,
+          speaking: 6.0,
+          confidence: 99,
+        };
+      }
+    } else {
+      const m = ieltsRow.match(/overall\s+5\.5\s*\(\s*with\s+a\s+minimum\s+5\.0\s+in\s+writing\s*\)/i);
+      if (m) {
+        result.ielts = {
+          overall: 5.5,
+          listening: null,
+          reading: null,
+          writing: 5.0,
+          speaking: null,
+          confidence: 96,
+        };
+      }
+    }
+  }
+
+  const pteRow = extractBetween(
+    text,
+    /pte\s*\(\s*pearson\s+test\s+of\s+english\s+academic\s*\)/i,
+    /toefl\s+ibt/i,
+  );
+  if (pteRow) {
+    const pteTarget = track === "bachelor_postgraduate"
+      ? pteRow.match(/academic\s+score\s+of\s+50/i)
+      : pteRow.match(/academic\s+score\s+of\s+46/i);
+    if (pteTarget) {
+      const score = track === "bachelor_postgraduate" ? 50 : 46;
+      result.pte = {
+        overall: score,
+        listening: null,
+        reading: null,
+        writing: null,
+        speaking: null,
+        confidence: 97,
+      };
+    }
+  }
+
+  const toeflRow = extractBetween(
+    text,
+    /toefl\s+ibt\s*\(\s*test\s+of\s+english\s+as\s+a\s+foreign\s+language\s*\)/i,
+    /kte\s*\(\s*kaplan\s+test\s+of\s+english\s*\)/i,
+  );
+  if (toeflRow) {
+    if (track === "bachelor_postgraduate") {
+      const m = toeflRow.match(
+        /total\s+band\s+score\s+of\s+72\s+or\s+total\s+score\s+of\s+4\s*\(\s*with\s+a\s+minimum\s+4\.0\s+for\s+speaking\s+and\s+a\s+minimum\s+3\.5\s+for\s+listening,\s*reading\s+and\s+writing\s*\)/i,
+      );
+      if (m) {
+        result.toefl = {
+          overall: 72,
+          listening: 3.5,
+          reading: 3.5,
+          writing: 3.5,
+          speaking: 4.0,
+          confidence: 98,
+        };
+      }
+    } else {
+      const m = toeflRow.match(
+        /total\s+band\s+score\s+of\s+58\s+or\s+total\s+score\s+of\s+3\.5\s*\(\s*with\s+a\s+minimum\s+3\.0\s+in\s+all\s+papers\s*\)/i,
+      );
+      if (m) {
+        result.toefl = {
+          overall: 58,
+          listening: 3.0,
+          reading: 3.0,
+          writing: 3.0,
+          speaking: 3.0,
+          confidence: 96,
+        };
+      }
+    }
+  }
+
+  const caeRow = extractBetween(text, /cae\s*\(\s*cambridge\s+c1\s+advanced\s+test\s*\)/i, /duolingo\s+english\s+test/i);
+  if (caeRow && track === "bachelor_postgraduate") {
+    const m = caeRow.match(/overall\s+band\s+score\s+of\s+169/i);
+    if (m) {
+      result.cae = { overall: 169, listening: null, reading: null, writing: null, speaking: null, confidence: 95 };
+    }
+  }
+
+  const detRow = extractBetween(text, /duolingo\s+english\s+test/i, /oet\s*\(\s*occupational\s+english\s+test\s*\)/i);
+  if (detRow) {
+    const m = track === "bachelor_postgraduate"
+      ? detRow.match(/overall\s+score\s+of\s+110/i)
+      : detRow.match(/overall\s+score\s+of\s+100/i);
+    if (m) {
+      result.det = { overall: track === "bachelor_postgraduate" ? 110 : 100, confidence: 95 };
+    }
+  }
+
+  return result;
+}
+
 // ── IELTS Parser ──────────────────────────────────────────────────────────────
 
 export function parseIelts(rawText: string): BandScore {
@@ -146,18 +487,6 @@ export function parseIelts(rawText: string): BandScore {
     const min = Number(m[2]);
     if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9)
       return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 90 };
-  }
-
-  // P3b-tor: "Academic IELTS 6.0 (no band less than 5.5)" — Torrens format
-  // Score appears directly after "IELTS" with no "overall" keyword; min band in parentheses.
-  m = text.match(
-    /(?:academic\s+)?ielts(?:\s+academic)?\s+([\d.]+)\s*\([^)]*?no\s+band\s+(?:less\s+than|below|lower\s+than)\s*([\d.]+)/i,
-  );
-  if (m) {
-    const overall = Number(m[1]);
-    const min = Number(m[2]);
-    if (overall >= 4 && overall <= 9 && min >= 4 && min <= 9)
-      return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 92 };
   }
 
   // P3b: "Academic IELTS band score of 5.5" / "IELTS band score of 5.5"
@@ -310,6 +639,16 @@ export function parsePte(rawText: string): BandScore {
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
+  // P6: policy-table wording like "PTE (Pearson Test of English Academic) Academic Score of 50"
+  m = text.match(
+    /pte(?:\s*\([^)]*\))?(?:\s+academic)?[^0-9]{0,120}?(?:academic\s+)?score\s+of\s+([\d.]+)/i,
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    if (overall >= 10 && overall <= 90)
+      return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 74 };
+  }
+
   return emptyBandScore();
 }
 
@@ -384,6 +723,14 @@ export function parseToefl(rawText: string): BandScore {
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
+  // P6: policy-table wording like "TOEFL iBT (Test of English as a Foreign Language) 60"
+  m = text.match(/toefl(?:\s+ibt)?(?:\s*\([^)]*\))?[^0-9]{0,120}?([\d.]{2,3})\b/i);
+  if (m) {
+    const overall = Number(m[1]);
+    if (overall >= 0 && overall <= 120)
+      return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 72 };
+  }
+
   return emptyBandScore();
 }
 
@@ -398,7 +745,8 @@ export function parseCae(rawText: string): BandScore {
   const overallM =
     text.match(/cae.{0,120}?overall\s*([\d.]+)/i) ||
     text.match(/cambridge(?:\s+english)?.{0,120}?score\s*of\s*([\d.]+)/i) ||
-    text.match(/cambridge(?:\s+english)?.{0,120}?(1[4-9][0-9]|2[0-2][0-9]|230)/i);
+    text.match(/cambridge(?:\s+english)?.{0,120}?(1[4-9][0-9]|2[0-2][0-9]|230)/i) ||
+    text.match(/cambridge(?:\s+english)?[^0-9]{0,120}?(1[4-9][0-9]|2[0-2][0-9]|230)\b/i);
 
   if (overallM) {
     const overall = Number(overallM[1]);
@@ -459,9 +807,10 @@ export function parseOtherTests(rawText: string): OtherTest[] {
 export function parseEnglishRequirementsFromText(
   rawText: string | null | undefined,
   source: EnglishRequirementResult["source"],
+  context: EnglishParseContext = {},
 ): EnglishRequirementResult {
   if (!rawText) return emptyEnglishResult(source);
-  return {
+  const generic = {
     source,
     ielts: parseIelts(rawText),
     pte: parsePte(rawText),
@@ -470,6 +819,20 @@ export function parseEnglishRequirementsFromText(
     det: parseDet(rawText),
     otherTests: parseOtherTests(rawText),
   };
+
+  const contextual = buildCsuContextualResult(rawText, source, context);
+  const kbsContextual = buildKbsContextualResult(rawText, source, context);
+  if (sharedEnglishPageNeedsCourseContext(rawText)) {
+    return kbsContextual ?? contextual ?? emptyEnglishResult(source);
+  }
+  if (kbsContextual) {
+    return mergeEnglishResults(generic, kbsContextual);
+  }
+  if (contextual) {
+    return mergeEnglishResults(generic, contextual);
+  }
+
+  return generic;
 }
 
 // ── Merge Logic ───────────────────────────────────────────────────────────────

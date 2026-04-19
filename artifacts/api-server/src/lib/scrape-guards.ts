@@ -3,6 +3,8 @@ function normalize(input: string): string {
 }
 
 const GENERIC_CATEGORY_NAMES = new Set([
+  "master s degrees",
+  "masters degrees",
   "design",
   "business",
   "health",
@@ -19,6 +21,10 @@ const GENERIC_CATEGORY_NAMES = new Set([
 ]);
 
 export function isGenericCourseCategoryName(name: string): boolean {
+  const raw = name.trim();
+  if (/^master'?s degrees?$/i.test(raw)) return true;
+  if (/^graduate diploma$/i.test(raw)) return true;
+  if (/^graduate certificate$/i.test(raw)) return true;
   const lower = normalize(name);
   if (!lower) return true;
   if (GENERIC_CATEGORY_NAMES.has(lower)) return true;

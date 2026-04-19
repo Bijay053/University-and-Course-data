@@ -3,6 +3,29 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+const MONTH_ABBREV_TO_FULL: Record<string, string> = {
+  jan: "January", feb: "February", mar: "March", apr: "April",
+  may: "May", jun: "June", jul: "July", aug: "August",
+  sep: "September", oct: "October", nov: "November", dec: "December",
+};
+
+const MONTH_TOKEN_PATTERN = `${MONTH_NAMES.join("|")}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec`;
+
+/** Collect full month names from text (supports Jun, Sep, etc.). */
+function monthsFoundInText(text: string): string[] {
+  const seen: string[] = [];
+  const re = new RegExp(`\\b(${MONTH_TOKEN_PATTERN})\\b`, "gi");
+  for (const m of text.matchAll(re)) {
+    const raw = m[1];
+    if (!raw) continue;
+    const full = MONTH_NAMES.includes(raw)
+      ? raw
+      : MONTH_ABBREV_TO_FULL[raw.toLowerCase().slice(0, 3)];
+    if (full && !seen.includes(full)) seen.push(full);
+  }
+  return seen;
+}
+
 export const REVIEW_FIELD_KEYS = [
   "courseName",
   "degreeLevel",
@@ -233,7 +256,7 @@ function buildPatterns(fieldKey: ReviewFieldKey, value: string): RegExp[] {
         ];
       }
     case "intakeMonths":
-      return [/\b(intake|intakes|commence|start)\b[\s\S]{0,140}/i, new RegExp(`\\b(${MONTH_NAMES.join("|")})\\b`, "i")];
+      return [/\b(intake|intakes|commence|start)\b[\s\S]{0,140}/i, new RegExp(`\\b(${MONTH_TOKEN_PATTERN})\\b`, "i")];
     case "ieltsOverall":
       if (/^\d+(?:\.\d+)?$/.test(value)) {
         const numeric = parseFloat(value);
@@ -276,7 +299,7 @@ function validateField(fieldKey: ReviewFieldKey, normalizedValue: string | null,
     case "duration":
       return /\b(year|month|week|semester|trimester)\b/i.test(rawValue) ? "accepted" : "needs_review";
     case "intakeMonths":
-      return MONTH_NAMES.some((month) => rawValue.includes(month)) ? "accepted" : "needs_review";
+      return monthsFoundInText(rawValue).length > 0 ? "accepted" : "needs_review";
     default:
       return rawValue.trim().length >= 2 ? "accepted" : "needs_review";
   }
@@ -338,9 +361,9 @@ function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource)
     if (match) pushValue(`${match[1]} ${match[2]}`, findSnippet(source, [/\b(duration|length|study period)\b[\s\S]{0,80}?\b\d+(?:\.\d+)?\s*(year|month|week|semester|trimester)s?\b/i]), sourceBaseConfidence(source) - 0.05);
   } else if (fieldKey === "intakeMonths") {
     if (!courseDetailSourceAllowed) return results;
-    const intakeContext = source.content.match(/\b(intake|intakes|commence|commencing|start|starts|starting)\b[\s\S]{0,180}/i)?.[0] || null;
+    const intakeContext = source.content.match(/\b(intake|intakes|commence|commencing|start|starts|starting|start\s*date)\b[\s\S]{0,220}/i)?.[0] || null;
     if (intakeContext) {
-      const months = MONTH_NAMES.filter((month) => new RegExp(`\\b${month}\\b`, "i").test(intakeContext));
+      const months = monthsFoundInText(intakeContext);
       if (months.length > 0) pushValue(months.join(", "), normalizeWhitespace(intakeContext), sourceBaseConfidence(source) - 0.08);
     }
   } else if (fieldKey === "studyMode") {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyFeedbackRules, inferFeedbackIssue } from "./feedback-engine.ts";
+import { applyFeedbackRules, inferFeedbackIssue, buildScrapeFeedbackHints } from "./feedback-engine.ts";
 import { buildCourseReviewSnapshot } from "./review-engine.ts";
 
 test("infers domestic fee feedback type", () => {
@@ -8,6 +8,18 @@ test("infers domestic fee feedback type", () => {
     inferFeedbackIssue("VIT picked domestic fee instead of international fee", "internationalFee"),
     "domestic_fee_picked",
   );
+});
+
+test("buildScrapeFeedbackHints enables stricter international fee + PDF preference from saved rows", () => {
+  const h = buildScrapeFeedbackHints([
+    {
+      issueType: "domestic_fee_picked",
+      reason: "Example: VIT picked domestic fee instead of international fee. Use international fee page or PDF only.",
+    },
+  ]);
+  assert.equal(h.strictInternationalFee, true);
+  assert.equal(h.preferFeePdfFirst, true);
+  assert.equal(h.activeCount, 1);
 });
 
 test("feedback demotes weak fee evidence on rerun", () => {

@@ -7,6 +7,44 @@ export interface FeedbackRule {
   preferredValue?: string | null;
 }
 
+/** Aggregated from active `scrape_feedback` rows for a university — drives extraction strategy on reruns */
+export type ScrapeFeedbackHints = {
+  /** User reported domestic/wrong fee — skip generic course-page fee lines and single-amount guesses */
+  strictInternationalFee: boolean;
+  /** User asked to use PDF / international fee schedule — consult shared fee PDF before trusting course page */
+  preferFeePdfFirst: boolean;
+  /** When reading `uniPages.feePage`, bias toward international section */
+  forceInternationalFeePageContext: boolean;
+  activeCount: number;
+  issueTypeSummary: string[];
+};
+
+const FEE_ISSUE_TYPES = new Set(["domestic_fee_picked", "international_fee_required", "wrong_fee"]);
+
+/**
+ * Build runtime hints from DB rows (or tests). Called once per scrape batch.
+ */
+export function buildScrapeFeedbackHints(rows: readonly { issueType: string; reason: string }[]): ScrapeFeedbackHints {
+  let strictInternationalFee = false;
+  let preferFeePdfFirst = false;
+  const types: string[] = [];
+  for (const r of rows) {
+    types.push(r.issueType);
+    const t = `${r.reason} ${r.issueType}`.toLowerCase();
+    if (FEE_ISSUE_TYPES.has(r.issueType)) strictInternationalFee = true;
+    if (/\bpdf\b|fee\s*schedule|international\s+fee|fee\s+page|only.*(?:pdf|fee\s+page)/.test(t)) {
+      preferFeePdfFirst = true;
+    }
+  }
+  return {
+    strictInternationalFee,
+    preferFeePdfFirst,
+    forceInternationalFeePageContext: strictInternationalFee,
+    activeCount: rows.length,
+    issueTypeSummary: [...new Set(types)],
+  };
+}
+
 export function inferFeedbackIssue(reason: string, fieldKey?: string | null): string {
   const text = reason.toLowerCase();
   const field = (fieldKey || "").toLowerCase();

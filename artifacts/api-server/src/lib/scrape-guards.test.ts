@@ -10,6 +10,8 @@ test("rejects generic category names as non-course pages", () => {
   assert.equal(isGenericCourseCategoryName("Design"), true);
   assert.equal(isGenericCourseCategoryName("Business"), true);
   assert.equal(isGenericCourseCategoryName("Digital Badges"), true);
+  assert.equal(isGenericCourseCategoryName("Master's Degrees"), true);
+  assert.equal(isGenericCourseCategoryName("Graduate Diploma"), true);
   assert.equal(isGenericCourseCategoryName("Master of Design"), false);
 });
 

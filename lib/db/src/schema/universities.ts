@@ -11,6 +11,8 @@ export const universitiesTable = pgTable("universities", {
   description: text("description"),
   logoUrl: text("logo_url"),
   scrapeUrl: text("scrape_url"),
+  feePageUrl: text("fee_page_url"),
+  requirementsPageUrl: text("requirements_page_url"),
   scrapeConfig: jsonb("scrape_config"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

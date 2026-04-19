@@ -178,6 +178,7 @@ const SCRAPE_POLL_WARNING_AFTER_IDLE_MS = 120000;
 function statusBadge(status: string) {
   if (status === "completed") return <Badge className="bg-green-100 text-green-700 border-green-200">Completed</Badge>;
   if (status === "completed_with_errors") return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Completed (Errors)</Badge>;
+  if (status === "queued") return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Queued</Badge>;
   if (status === "running") return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Running</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
 }
@@ -405,6 +406,7 @@ export default function Scraping() {
         if (data.universityName) setScrapeUniName(data.universityName);
         if (data.url) setScrapeTargetUrl(data.url);
 
+        let nextAwaitingApproval: ApprovalSummary | null = null;
         const logs = data.logs;
         if (logs && logs.length > 0) {
           setScrapeLogs((prev) => [...prev, ...logs].slice(-MAX_SCRAPE_LOG_LINES));
@@ -415,7 +417,7 @@ export default function Scraping() {
 
           const approvalLog = logs.find((l: ScrapeLog) => l.event === "approval_required");
           if (approvalLog) {
-            setAwaitingApproval({
+            nextAwaitingApproval = {
               totalCourses: approvalLog.totalCourses ?? 0,
               validSamples: approvalLog.validSamples ?? 0,
               rejectedSamples: approvalLog.rejectedSamples ?? 0,
@@ -423,20 +425,31 @@ export default function Scraping() {
               validExamples: approvalLog.validExamples ?? [],
               rejectedExamples: approvalLog.rejectedExamples ?? [],
               estimatedMinutes: approvalLog.estimatedMinutes ?? 1,
-            });
+            };
           }
         }
 
-        // Also sync approval state from status response directly
-        if (data.awaitingApproval && !awaitingApproval) {
-          setAwaitingApproval(data.awaitingApproval);
+        const fetchAlreadyStarted =
+          (data.current ?? 0) > 0 ||
+          !!logs?.some((log) =>
+            log.event === "progress" ||
+            (log.event === "status" && (
+              String(log.message || "").includes("User confirmed") ||
+              String(log.message || "").includes("Fetching") && log.phase === "extract"
+            ))
+          );
+
+        if (data.status === "awaiting_approval" && !fetchAlreadyStarted) {
+          setAwaitingApproval(nextAwaitingApproval ?? (data.awaitingApproval as ApprovalSummary | null) ?? null);
+        } else {
+          setAwaitingApproval(null);
         }
 
-        if (data.status !== "running" && data.status !== "awaiting_approval") {
+        if (data.status !== "queued" && data.status !== "running" && data.status !== "awaiting_approval") {
           setStopping(false);
           setAwaitingApproval(null);
           if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
-          if ((data.status === "completed" || data.status === "stopped") && (data.imported ?? 0) > 0) {
+          if ((data.status === "completed" || data.status === "completed_with_errors" || data.status === "stopped") && (data.imported ?? 0) > 0) {
             loadStagedCourses(jobId);
           }
 
@@ -517,11 +530,12 @@ export default function Scraping() {
     if (!activeJobId) return;
     setApprovalLoading(true);
     try {
-      await fetch(`/api/scrape/approve/${activeJobId}`, {
+      const res = await fetch(`/api/scrape/approve/${activeJobId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proceed }),
       });
+      if (!res.ok) return;
       if (!proceed) {
         setScraping(false);
         setStopping(false);
@@ -661,7 +675,6 @@ export default function Scraping() {
       if (res.ok) {
         const { deleted } = await res.json();
         if (deleted > 0) {
-          // Remove duplicate entries locally: for each course name, keep the highest id
           setStagedCourses((prev) => {
             const byName = new Map<string, StagedCourse>();
             for (const c of prev) {
@@ -676,7 +689,7 @@ export default function Scraping() {
       } else {
         window.alert(await getFetchErrorMessage(res));
       }
-    } catch (e) {
+    } catch {
       window.alert("Failed to clean up duplicates");
     }
   };
@@ -899,7 +912,13 @@ export default function Scraping() {
                 setSelectedUni(val);
                 if (val && val !== ALL) {
                   const uni = uniData?.data?.find((u) => String(u.id) === val);
-                  if (uni?.scrapeUrl) setScrapeUrls([uni.scrapeUrl]);
+                  setScrapeUrls([uni?.scrapeUrl || ""]);
+                  setFeePageUrl(uni?.feePageUrl || "");
+                  setRequirementsPageUrl(uni?.requirementsPageUrl || "");
+                  if (uni?.feePageUrl || uni?.requirementsPageUrl) setShowAdvanced(true);
+                } else {
+                  setFeePageUrl("");
+                  setRequirementsPageUrl("");
                 }
               }} disabled={scraping}>
                 <SelectTrigger className="bg-white h-9">
@@ -1542,7 +1561,7 @@ export default function Scraping() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              This feedback will be saved and used to make future reruns more conservative for similar courses.
+              Describe what was wrong on this university's website so the next rerun can use that guidance and produce more accurate data. This feedback is scoped to this university and its similar page layouts, not copied to other universities.
             </div>
             <div>
               <label className="text-sm font-medium">Field</label>
@@ -1566,7 +1585,7 @@ export default function Scraping() {
                 className="mt-1"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Example: VIT picked domestic fee instead of international fee. Use international fee page or PDF only."
+                placeholder="Example: On this university site, intake is shown under Start Date / Class start date, and location is under Campus Location. Use those labels for rerun. Do not copy this rule to other universities."
               />
             </div>
           </div>
@@ -1582,7 +1601,7 @@ export default function Scraping() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={submitReject} disabled={!rejectReason.trim()}>
-              Reject And Save Feedback
+              Reject And Save University Feedback
             </Button>
           </DialogFooter>
         </DialogContent>
