@@ -4284,16 +4284,18 @@ async function stageCourse(
   }
 
   // Cross-job dedup: if the same university already has this course name pending (from
-  // any previous scrape run OR same run / parallel insert), skip it. The trimmed
-  // case-insensitive match catches "Master of X" vs "Master Of X" vs "  master of x ".
-  const normalizedName = courseData.courseName.trim().replace(/\s+/g, " ");
+  // any previous scrape run OR same run / parallel insert), skip it. We compare a
+  // normalized form that ignores case, whitespace, AND punctuation so that:
+  //   "Master of IT (Cyber Security)" == "Master Of IT Cyber Security" == "master-of-it cyber security"
+  const displayName = courseData.courseName.trim().replace(/\s+/g, " ");
+  const fingerprint = displayName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const dup = await pool.query(
-    "SELECT id FROM scraped_courses WHERE university_id=$1 AND LOWER(TRIM(REGEXP_REPLACE(course_name, '\\s+', ' ', 'g')))=LOWER($2) AND status='pending' LIMIT 1",
-    [uniId, normalizedName],
+    "SELECT id FROM scraped_courses WHERE university_id=$1 AND TRIM(REGEXP_REPLACE(LOWER(course_name), '[^a-z0-9]+', ' ', 'g'))=$2 AND status='pending' LIMIT 1",
+    [uniId, fingerprint],
   );
   if (dup.rows.length > 0) return false;
-  // Use the normalized form when storing so future dedup checks match consistently.
-  courseData.courseName = normalizedName;
+  // Use the cleaned display form when storing so future dedup checks match consistently.
+  courseData.courseName = displayName;
 
   const { score: completeness, missing } = computeCompleteness(courseData);
   const snapshot = buildCourseReviewSnapshot(courseData, reviewContext?.sources || [{
