@@ -7159,6 +7159,70 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }
         } catch {}
       }
+
+      // ── Browser + vision fallback for JS-rendered sites with image-based tables ──
+      // Used by sites like asahe.edu.au where the requirements table is loaded by JS
+      // and/or rendered as an image. We render with Playwright, re-parse the rendered
+      // HTML, and as a last resort send any candidate images to Gemini Vision.
+      if (!cachedEnglishReqs && siteNeedsBrowser(reqUrl)) {
+        try {
+          addLog(job, "status", { message: `Rendering requirements page with browser (JS-heavy site)...`, phase: "fetch" });
+          const browserResult = await fetchPageWithBrowser(reqUrl, {
+            clickInternational: true,
+            clickRequirementsTab: true,
+            expandAccordions: true,
+            timeoutMs: 25000,
+          });
+          if (browserResult) {
+            const renderedHtml = browserResult.requirementsHtml || browserResult.mainHtml;
+            const $r = cheerio.load(renderedHtml);
+            const renderedText = $r("body").text();
+            const renderedReq: Partial<CourseData> = {};
+            extractEnglishFromHtml($r, renderedReq);
+            if (!(renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall)) {
+              extractEnglishRequirements(renderedText, renderedReq);
+            }
+            applyEnglishResultToCourse(renderedReq, parseEnglishRequirementsFromText(renderedText, "browser"));
+
+            if (renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall) {
+              cachedEnglishReqs = renderedReq;
+              addLog(job, "status", { message: `Browser-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall} CAE=${(renderedReq as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
+            } else if (GEMINI_API_KEY) {
+              // Still nothing — try vision-AI on every candidate image on the page.
+              // Filter out obvious logos/icons by size hints and filename keywords.
+              const imgUrls: string[] = [];
+              $r("img").each((_, el) => {
+                const src = $r(el).attr("src") || $r(el).attr("data-src") || "";
+                if (!src) return;
+                if (/logo|icon|favicon|avatar|header|footer|social|facebook|instagram|linkedin|twitter|youtube|map-marker|phone|email/i.test(src)) return;
+                try {
+                  const abs = new URL(src, reqUrl).toString();
+                  if (!imgUrls.includes(abs)) imgUrls.push(abs);
+                } catch {}
+              });
+              if (imgUrls.length > 0) {
+                addLog(job, "status", { message: `Trying vision-AI on ${Math.min(imgUrls.length, 6)} candidate image(s) for requirements table...`, phase: "fetch" });
+                const merged: Partial<CourseData> = {};
+                for (const imgUrl of imgUrls.slice(0, 6)) {
+                  try {
+                    const visionData = await analyzeImageWithGemini(imgUrl, "This image may contain English language test score requirements (IELTS, TOEFL, PTE, Cambridge CAE, Duolingo).");
+                    for (const [k, v] of Object.entries(visionData)) {
+                      if (v != null && (merged as any)[k] == null) (merged as any)[k] = v;
+                    }
+                    if (merged.ieltsOverall && merged.pteOverall && merged.toeflOverall) break;
+                  } catch {}
+                }
+                if (merged.ieltsOverall || merged.pteOverall || merged.toeflOverall || (merged as any).cambridgeOverall) {
+                  cachedEnglishReqs = merged;
+                  addLog(job, "status", { message: `Vision-AI extracted from image: IELTS=${merged.ieltsOverall} PTE=${merged.pteOverall} TOEFL=${merged.toeflOverall} CAE=${(merged as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          addLog(job, "status", { message: `Browser+vision fallback failed: ${(e as Error).message}`, phase: "fetch" });
+        }
+      }
     } catch {}
   }
   if (!cachedEnglishReqs && uniPages?.requirementsPdf) {
