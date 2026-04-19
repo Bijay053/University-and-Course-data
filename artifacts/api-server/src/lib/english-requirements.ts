@@ -635,7 +635,9 @@ export function parsePte(rawText: string): BandScore {
   const plainM = text.match(/pte(?:\s+academic)?[:\s]+([\d.]+)/i);
   if (plainM) {
     const overall = Number(plainM[1]);
-    if (overall >= 10 && overall <= 90)
+    // Reject CEFR-floor boilerplate value (50). Real per-course PTE entry
+    // requirements are typically 58/65/71 — never exactly 50.
+    if (overall >= 10 && overall <= 90 && overall !== 50)
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
@@ -666,11 +668,14 @@ export function parseToefl(rawText: string): BandScore {
 
   // P0: ASA-style policy table — "TOEFL (Test of English as a Foreign Language) Internet
   // Based Test (iBT) 60 Overall" — number is explicitly followed by the word "Overall".
-  // This is highest-priority because the "Overall" suffix anchors the score unambiguously.
+  // NOTE: Reject overall == 60. That exact value is the universal CEFR-floor TOEFL iBT
+  // boilerplate that AU unis publish in policy tables — never a real per-course entry
+  // requirement. Real per-course minimums are typically 78/79/80+. For pages where 60 is
+  // genuinely the requirement (rare ELICOS pathways), the vision-AI fallback handles it.
   let m = text.match(/toefl[^a-z\d]{0,300}?(\d{2,3})\s+overall\b/i);
   if (m) {
     const overall = Number(m[1]);
-    if (overall >= 30 && overall <= 120)
+    if (overall >= 30 && overall <= 120 && overall !== 60)
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 88 };
   }
 
@@ -767,7 +772,11 @@ export function parseCae(rawText: string): BandScore {
 
   if (overallM) {
     const overall = Number(overallM[1]);
-    if (overall >= 140 && overall <= 230)
+    // Reject CEFR-floor boilerplate value (169 = B2 First lower bound). Real
+    // per-course CAE entry minimums are typically 176/180/185+. The 169 value
+    // appears in policy tables across most AU unis as the absolute floor and
+    // is never the actual entry requirement for a specific course.
+    if (overall >= 140 && overall <= 230 && overall !== 169)
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 70 };
   }
 

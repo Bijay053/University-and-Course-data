@@ -1,0 +1,337 @@
+Review Scraped Courses
+30 pending
+Reject (30)
+Approve (30)
+Review each course below. Edit any details, then approve to save to the database or reject to discard. Existing courses with the same name will be updated.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Information Technology and Systems (BITS)
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$51,000/Full Course	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Diploma Of Business
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$12,000/Semester	5.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Bachelor Of Business
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Sydney, Melbourne, Geelong, Adelaide	Online	
+
+
+
+
+	
+Mba Finance
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: courseName, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Mba Information Systems
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: courseName, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Mba Tourism And Hospitality Management
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: courseName, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Mba Leadership And Management
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: courseName, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Mba Project Management
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: courseName, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Master of Information Technology and Systems
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+GDITS-Graduate Diploma of Information Technology and Systems
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: missing on-campus location, Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, courseLocation, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$18,000/Annual	6.5	-	-	-	-	May	-	On Campus	
+
+
+
+
+	
+BBus - International Business Management Specialisation
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Sydney, Melbourne, Geelong, Adelaide	Online	
+
+
+
+
+	
+GCITS-Graduate Certificate of Information Technology and Systems
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: missing on-campus location, Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, courseLocation, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$9,000/Annual	6.5	-	-	-	-	May	-	On Campus	
+
+
+
+
+	
+GDBA - Graduate Diploma of Business Administration
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, internationalFee, intakeMonths, Needs review: degreeLevel, duration, courseLocation, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$14,000/Annual	6.5	-	-	-	-	May, Feb, Mar, Dec	-	Online	
+
+
+
+
+	
+Master of Business Administration
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+BBus - Tourism and Hospitality Management Specialisation
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+GCBA - Graduate Certificate of Business Administration
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, internationalFee, intakeMonths, Needs review: degreeLevel, duration, courseLocation, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$7,000/Annual	6.5	-	-	-	-	May, Feb, Mar, Dec	-	Online	
+
+
+
+
+	
+BBus - Human Resource Management Specialisation
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Certificate III in Commercial Cookery
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	64 Week	A$12,169/Annual	5.5	-	-	-	-	May	Melbourne Adelaide Sydney	On Campus	
+
+
+
+
+	
+BBus - Business Technology Specialisation
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Certificate IV in Kitchen Management
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	100 Week	A$14,919/Annual	5.5	-	-	-	-	May	Melbourne Sydney Adelaide	On Campus	
+
+
+
+
+	
+Certificate IV in Patisserie
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	88 Week	A$15,919/Annual	5.5	-	-	-	-	May	Melbourne	On Campus	
+
+
+
+
+	
+BBus - Accounting Specialisation
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+BBus - Marketing Specialisation
+Business & Management
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Semester	6	-	-	-	-	May	Melbourne Sydney Adelaide Geelong	On Campus	
+
+
+
+
+	
+Certificate III in Patisserie
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	52 Week	A$13,169/Annual	5.5	-	-	-	-	May	Melbourne	On Campus	
+
+
+
+
+	
+Diploma of Information Technology
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	66 Week	A$15,500/Annual	5.5	-	-	-	-	May	Melbourne Adelaide Sydney	On Campus	
+
+
+
+
+	
+Advanced Diploma of Information Technology
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	104 Week	A$28,000/Annual	5.5	-	-	-	-	May	Melbourne Sydney Adelaide	On Campus	
+
+
+
+
+	
+Advanced Diploma of Hospitality Management
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	107 Week	A$17,219/Annual	5.5	-	-	-	-	May	Melbourne Adelaide Sydney	On Campus	
+
+
+
+
+	
+Certificate IV in Information Technology
+Computer Science & IT
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	52 Week	A$12,000/Annual	5.5	-	-	-	-	May	Melbourne Sydney Adelaide	On Campus	
+
+
+
+
+	
+Diploma of Hospitality Management
+Hospitality, Tourism & Events
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	88 Week	A$16,219/Annual	5.5	-	-	-	-	May	Melbourne Adelaide Sydney	On Campus	
+
+
+
+
+	
+Certificate III in Carpentry
+Architecture, Building & Design
+pending_review
+eligible
+⚠ Publish blocked: Conflicts: duration, studyMode, internationalFee, intakeMonths, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, pteOverall, toeflOverall, academicRequirement | Warnings: missing academic requirement
+90%	Certificate & Diploma	104 Week	A$24,000/Annual	5.5	-	-	-	-	May	Melbourne	On Campus	
+
+
+
+
