@@ -449,18 +449,21 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
     },
   });
 
+  const GEMINI_REQUEST_TIMEOUT_MS = 30000;
   for (const model of GEMINI_MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      const startedAt = Date.now();
       try {
         const resp = await fetch(geminiUrl(model), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
+          signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
         });
 
         if (resp.status === 429 || resp.status === 503) {
           console.log(`Gemini ${model} returned ${resp.status}, ${attempt === 0 ? "retrying..." : "trying next model..."}`);
-          if (attempt === 0) { await new Promise((r) => setTimeout(r, 5000)); continue; }
+          if (attempt === 0) { await new Promise((r) => setTimeout(r, 2000)); continue; }
           break;
         }
         if (resp.status === 404) { console.log(`Gemini model ${model} not available, trying next...`); break; }
@@ -472,12 +475,15 @@ async function geminiChat(systemPrompt: string, userContent: string, maxTokens =
         const data = await resp.json() as any;
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         if (!text) { console.log(`Empty response from ${model}, trying next...`); break; }
-        console.log(`Gemini response OK from ${model}`);
+        console.log(`Gemini response OK from ${model} in ${Date.now() - startedAt}ms`);
         return text;
       } catch (err) {
-        if ((err as Error).message.includes("Gemini API error")) throw err;
-        console.log(`Gemini ${model} attempt ${attempt + 1} failed: ${(err as Error).message}`);
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 3000));
+        const e = err as Error;
+        if (e.message.includes("Gemini API error")) throw err;
+        const isTimeout = e.name === "TimeoutError" || e.message.includes("aborted") || e.message.includes("timeout");
+        console.log(`Gemini ${model} attempt ${attempt + 1} failed${isTimeout ? " (timeout)" : ""}: ${e.message}`);
+        if (isTimeout) break;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
       }
     }
   }
