@@ -1,0 +1,27 @@
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ api-server    │ default     │ 0.0.0   │ fork    │ 197607   │ 0s     │ 26   │ online    │ 0%       │ 18.0mb   │ root     │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# sudo -u postgres psql -d unicourse -c "UPDATE scraping_jobs SET status='cancelled', finished_at=NOW() WHERE status IN ('running','queued','awaiting_approval');"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  database "unicourse" does not exist
+root@university-and-course-data:/opt/app# sudo -u postgres psql -l
+                                                         List of databases
+       Name        |   Owner   | Encoding | Locale Provider | Collate |  Ctype  | ICU Locale | ICU Rules |    Access privileges    
+-------------------+-----------+----------+-----------------+---------+---------+------------+-----------+-------------------------
+ postgres          | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+ template0         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ template1         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ test              | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/postgres           +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres  +
+                   |           |          |                 |         |         |            |           | test=CTc/postgres
+ university_portal | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                   |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+(5 rows)
+
+root@university-and-course-data:/opt/app# 
