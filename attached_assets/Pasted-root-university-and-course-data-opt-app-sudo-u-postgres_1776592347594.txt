@@ -1,0 +1,52 @@
+root@university-and-course-data:/opt/app# sudo -u postgres psql -d university_portal <<'EOF'
+UPDATE scraping_jobs SET status='cancelled', completed_at=NOW() WHERE status IN ('running','queued','awaiting_approval');
+UPDATE scrape_runtime_jobs SET status='cancelled', completed_at=NOW() WHERE status IN ('running','queued','awaiting_approval');
+EOF
+ERROR:  column "completed_at" of relation "scraping_jobs" does not exist
+LINE 1: UPDATE scraping_jobs SET status='cancelled', completed_at=NO...
+                                                     ^
+ERROR:  relation "scrape_runtime_jobs" does not exist
+LINE 1: UPDATE scrape_runtime_jobs SET status='cancelled', completed...
+               ^
+root@university-and-course-data:/opt/app# sudo -u postgres psql -d university_portal -c "\d scraping_jobs"
+sudo -u postgres psql -d university_portal -c "\dt"
+                                        Table "public.scraping_jobs"
+    Column     |           Type           | Collation | Nullable |                  Default                  
+---------------+--------------------------+-----------+----------+-------------------------------------------
+ id            | integer                  |           | not null | nextval('scraping_jobs_id_seq'::regclass)
+ university_id | integer                  |           |          | 
+ url           | text                     |           | not null | 
+ frequency     | text                     |           | not null | 'weekly'::text
+ status        | text                     |           | not null | 'active'::text
+ last_run      | timestamp with time zone |           |          | 
+ next_run      | timestamp with time zone |           |          | 
+ created_at    | timestamp with time zone |           | not null | now()
+Indexes:
+    "scraping_jobs_pkey" PRIMARY KEY, btree (id)
+Foreign-key constraints:
+    "scraping_jobs_university_id_universities_id_fk" FOREIGN KEY (university_id) REFERENCES universities(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "scraping_changes" CONSTRAINT "scraping_changes_scraping_job_id_scraping_jobs_id_fk" FOREIGN KEY (scraping_job_id) REFERENCES scraping_jobs(id) ON DELETE SET NULL
+
+                  List of relations
+ Schema |          Name          | Type  |   Owner   
+--------+------------------------+-------+-----------
+ public | academic_requirements  | table | uniportal
+ public | course_audit_log       | table | uniportal
+ public | course_field_approvals | table | uniportal
+ public | courses                | table | uniportal
+ public | english_requirements   | table | uniportal
+ public | fees                   | table | uniportal
+ public | field_conflicts        | table | uniportal
+ public | import_jobs            | table | uniportal
+ public | intakes                | table | uniportal
+ public | scholarships           | table | uniportal
+ public | scrape_feedback        | table | uniportal
+ public | scraped_courses        | table | uniportal
+ public | scraped_field_evidence | table | uniportal
+ public | scraping_changes       | table | uniportal
+ public | scraping_jobs          | table | uniportal
+ public | universities           | table | uniportal
+(16 rows)
+
+root@university-and-course-data:/opt/app# 
