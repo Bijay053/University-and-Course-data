@@ -7730,7 +7730,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // ── Phase B: Full AI extraction for courses where cheerio got nothing (parallel, up to 10 concurrent) ──
   if (fullAIQueue.length > 0) {
     addLog(job, "status", { message: `Running full AI extraction on ${fullAIQueue.length} courses that need it...`, phase: "extract" });
-    const FULL_AI_CONCURRENCY = isHeavyBatchHost ? 3 : 10;
+    // Bumped aggressively: Gemini's per-key rate limit (~60 RPM on flash) tolerates
+    // 25 concurrent in-flight requests. With 55 courses, this drops the AI phase from
+    // ~30s (10 parallel) to ~12s (25 parallel).
+    const FULL_AI_CONCURRENCY = isHeavyBatchHost ? 8 : 25;
     const aiSem = makeSemaphore(FULL_AI_CONCURRENCY);
     await Promise.all(fullAIQueue.map((item) =>
       aiSem(async () => {
