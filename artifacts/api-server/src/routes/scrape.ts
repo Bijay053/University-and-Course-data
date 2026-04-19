@@ -7192,12 +7192,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const disableBrowserForHeavyHost =
     /(^|\.)torrens\.edu\.au$/.test(batchHost) ||
     /(^|\.)asahe\.edu\.au$/.test(batchHost);
-  // Heavy hosts (Torrens, VIT, ASA) used to be fully sequential (concurrency=1) which
-  // multiplied their wall-clock time by N. Modern test runs show 3 concurrent fetches
-  // are well-tolerated; bump them up while keeping a safety margin vs normal hosts.
-  const CONCURRENCY = isHeavyBatchHost ? 3 : 32;
-  const BROWSER_CONCURRENCY = isHeavyBatchHost ? 2 : 8;
-  const RETRY_CONCURRENCY = isHeavyBatchHost ? 2 : 12;
+  // Heavy hosts (Torrens, VIT, ASA) MUST stay sequential — bumping them causes hung
+  // requests due to slow origin servers and aggressive bot-protection. ASA at
+  // concurrency=1 already completes in ~130s (under 3 min target). Do not raise.
+  const CONCURRENCY = isHeavyBatchHost ? 1 : 32;
+  const BROWSER_CONCURRENCY = isHeavyBatchHost ? 1 : 8;
+  const RETRY_CONCURRENCY = isHeavyBatchHost ? 1 : 12;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Courses that time out on the first pass are retried here.
@@ -7730,10 +7730,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // ── Phase B: Full AI extraction for courses where cheerio got nothing (parallel, up to 10 concurrent) ──
   if (fullAIQueue.length > 0) {
     addLog(job, "status", { message: `Running full AI extraction on ${fullAIQueue.length} courses that need it...`, phase: "extract" });
-    // Bumped aggressively: Gemini's per-key rate limit (~60 RPM on flash) tolerates
-    // 25 concurrent in-flight requests. With 55 courses, this drops the AI phase from
-    // ~30s (10 parallel) to ~12s (25 parallel).
-    const FULL_AI_CONCURRENCY = isHeavyBatchHost ? 8 : 25;
+    // Normal hosts: 25 parallel Gemini calls (well within ~60 RPM flash limit).
+    // Heavy hosts: keep at 3 — bumping caused hung requests on ASA in testing.
+    const FULL_AI_CONCURRENCY = isHeavyBatchHost ? 3 : 25;
     const aiSem = makeSemaphore(FULL_AI_CONCURRENCY);
     await Promise.all(fullAIQueue.map((item) =>
       aiSem(async () => {
