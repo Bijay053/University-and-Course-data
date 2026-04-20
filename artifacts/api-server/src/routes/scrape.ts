@@ -246,6 +246,130 @@ interface ScrapeJob {
 
 const scrapeJobs = new Map<string, ScrapeJob>();
 
+// ─── Server-side Bulk Session ────────────────────────────────────────────────
+type BulkUniEntry = {
+  uniId: number;
+  name: string;
+  url: string;
+  jobId: string | null;
+  status: "pending" | "running" | "done" | "error" | "skipped" | "stopped";
+  imported: number;
+  found: number;
+  staged: number;
+  error?: string;
+};
+type BulkSession = {
+  sessionId: string;
+  status: "running" | "stopped" | "completed";
+  unis: BulkUniEntry[];
+  currentIndex: number;
+  startedAt: Date;
+  updatedAt: Date;
+  fastMode: boolean;
+};
+const bulkSessions = new Map<string, BulkSession>();
+
+async function runBulkSessionLoop(session: BulkSession): Promise<void> {
+  for (let i = 0; i < session.unis.length; i++) {
+    if (session.status === "stopped") break;
+    const entry = session.unis[i];
+    if (!entry || !entry.url) { entry && (entry.status = "skipped"); continue; }
+    session.currentIndex = i;
+    session.updatedAt = new Date();
+    entry.status = "running";
+
+    try {
+      const uni = await db.select().from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
+      if (!uni[0]) { entry.status = "error"; entry.error = "University not found"; continue; }
+
+      const activeJob = (await listActiveRuntimeJobs()).find((j) => j.universityId === entry.uniId);
+      if (activeJob) await requestStopForRuntimeJob(activeJob.id);
+
+      const savedConfigRows = await db.select({
+        scrapeConfig: universitiesTable.scrapeConfig,
+        feePageUrl: universitiesTable.feePageUrl,
+        requirementsPageUrl: universitiesTable.requirementsPageUrl,
+        scholarshipPageUrl: universitiesTable.scholarshipPageUrl,
+        academicRequirementsPageUrl: universitiesTable.academicRequirementsPageUrl,
+      }).from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
+      const savedUniPages = (savedConfigRows[0]?.scrapeConfig as Partial<ScrapeConfig> | null)?.uniPages;
+      const isPdfUrl = (u?: string | null) => !!u && /\.pdf(\?|#|$)/i.test(u);
+      const savedFeeRaw = savedConfigRows[0]?.feePageUrl ?? undefined;
+      const savedReqRaw = savedConfigRows[0]?.requirementsPageUrl ?? undefined;
+      const savedUniversityPages: SharedUniversityPages = {
+        ...(savedFeeRaw ? (isPdfUrl(savedFeeRaw) ? { feesPdf: savedFeeRaw } : { feePage: savedFeeRaw }) : {}),
+        ...(savedReqRaw ? (isPdfUrl(savedReqRaw) ? { requirementsPdf: savedReqRaw } : { requirementsPage: savedReqRaw }) : {}),
+        ...(savedConfigRows[0]?.scholarshipPageUrl ? { scholarshipPage: savedConfigRows[0].scholarshipPageUrl } : {}),
+        ...(savedConfigRows[0]?.academicRequirementsPageUrl ? { academicRequirementsPage: savedConfigRows[0].academicRequirementsPageUrl } : {}),
+      };
+      const savedPages = (savedUniPages ?? {}) as SharedUniversityPages;
+      const manualPages: SharedUniversityPages = { ...savedPages, ...savedUniversityPages };
+
+      const jobId = createRuntimeJobId();
+      entry.jobId = jobId;
+      await clearPendingStagedCoursesForUniversity(entry.uniId);
+      await db.update(universitiesTable).set({ scrapeUrl: entry.url }).where(eq(universitiesTable.id, entry.uniId));
+      await enqueueRuntimeJob({
+        runtimeJobId: jobId,
+        universityId: entry.uniId,
+        universityName: entry.name,
+        url: entry.url,
+        jobType: "start",
+        fastMode: session.fastMode,
+        requestPayload: {
+          url: entry.url,
+          universityId: entry.uniId,
+          universityName: entry.name,
+          manualPages: Object.values(manualPages).some(Boolean) ? manualPages : undefined,
+          fastMode: session.fastMode,
+          bulkMode: true,
+        },
+        initialLogs: [{ event: "status", message: `[Bulk] Starting ${entry.name}` }],
+      });
+
+      // Poll until the job leaves the active-job set
+      let pollFailures = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if ((session.status as string) === "stopped") break;
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const snap = await getRuntimeJobStatus(jobId, 0);
+          if (!snap) { pollFailures++; if (pollFailures >= 10) { entry.status = "error"; entry.error = "Job status unavailable"; break; } continue; }
+          const terminalStatuses = ["completed", "completed_with_errors", "failed", "stopped"];
+          if (terminalStatuses.includes(snap.status)) {
+            entry.imported = snap.imported;
+            entry.found = snap.totalFound;
+            entry.staged = snap.imported;
+            entry.status = snap.status === "completed" || snap.status === "completed_with_errors" ? "done" : "error";
+            if (snap.status === "failed") entry.error = "Job failed on server";
+            break;
+          }
+          pollFailures = 0;
+        } catch {
+          pollFailures++;
+          if (pollFailures >= 10) {
+            entry.status = "error";
+            entry.error = "Lost connection to job status";
+            break;
+          }
+        }
+      }
+      if ((session.status as string) === "stopped") { entry.status = "stopped"; break; }
+    } catch (err) {
+      entry.status = "error";
+      entry.error = (err as Error).message;
+    }
+    session.updatedAt = new Date();
+  }
+  if (session.status !== "stopped") session.status = "completed";
+  session.currentIndex = -1;
+  session.updatedAt = new Date();
+  // Evict after 2 hours
+  setTimeout(() => bulkSessions.delete(session.sessionId), 2 * 60 * 60 * 1000);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface RuntimeJobBinding {
   runtimeJobId: string;
   pendingLogs: PersistedRuntimeLogEvent[];
@@ -9858,6 +9982,90 @@ router.get("/scrape/jobs", async (_req: Request, res: Response): Promise<void> =
     completedAt: job.completedAt?.getTime?.() ?? job.completedAt,
   })));
 });
+
+// ─── Bulk Session Endpoints ───────────────────────────────────────────────────
+router.get("/scrape/bulk/active", (_req: Request, res: Response): void => {
+  const active = Array.from(bulkSessions.values())
+    .filter((s) => s.status === "running")
+    .map((s) => ({
+      sessionId: s.sessionId,
+      status: s.status,
+      currentIndex: s.currentIndex,
+      total: s.unis.length,
+      startedAt: s.startedAt.toISOString(),
+    }));
+  res.json(active);
+});
+
+router.post("/scrape/bulk/start", async (req: Request, res: Response): Promise<void> => {
+  const { unis, fastMode } = req.body as {
+    unis: Array<{ id: number; name: string; scrapeUrl: string }>;
+    fastMode?: boolean;
+  };
+  if (!Array.isArray(unis) || unis.length === 0) {
+    res.status(400).json({ error: "unis array is required and must not be empty" });
+    return;
+  }
+  const sessionId = `bulk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const session: BulkSession = {
+    sessionId,
+    status: "running",
+    unis: unis.map((u) => ({
+      uniId: u.id,
+      name: u.name,
+      url: u.scrapeUrl,
+      jobId: null,
+      status: "pending",
+      imported: 0,
+      found: 0,
+      staged: 0,
+    })),
+    currentIndex: -1,
+    startedAt: new Date(),
+    updatedAt: new Date(),
+    fastMode: !!fastMode || !GEMINI_API_KEY,
+  };
+  bulkSessions.set(sessionId, session);
+  void runBulkSessionLoop(session);
+  res.json({ sessionId });
+});
+
+router.get("/scrape/bulk/status/:sessionId", (req: Request, res: Response): void => {
+  const sessionId = paramString(req, "sessionId");
+  const session = bulkSessions.get(sessionId);
+  if (!session) {
+    res.status(404).json({ error: "Bulk session not found or expired" });
+    return;
+  }
+  res.json({
+    sessionId: session.sessionId,
+    status: session.status,
+    currentIndex: session.currentIndex,
+    total: session.unis.length,
+    startedAt: session.startedAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
+    unis: session.unis.map((u) => ({
+      uniId: u.uniId,
+      name: u.name,
+      jobId: u.jobId,
+      status: u.status,
+      imported: u.imported,
+      found: u.found,
+      staged: u.staged,
+      error: u.error,
+    })),
+  });
+});
+
+router.post("/scrape/bulk/stop/:sessionId", (req: Request, res: Response): void => {
+  const sessionId = paramString(req, "sessionId");
+  const session = bulkSessions.get(sessionId);
+  if (!session) { res.status(404).json({ error: "Bulk session not found" }); return; }
+  session.status = "stopped";
+  session.updatedAt = new Date();
+  res.json({ ok: true });
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
   try {

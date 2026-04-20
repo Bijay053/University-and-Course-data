@@ -9,10 +9,11 @@ import { Progress } from "@/components/ui/progress";
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, X,
   Play, Square, Download, RefreshCw, Globe, ChevronDown, ChevronRight,
-  SkipForward, FileJson, FileText, CheckCheck,
+  FileJson, FileText, CheckCheck, WifiOff, RotateCcw,
 } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type ImportResult = {
   universityName: string;
   totalRows: number;
@@ -30,33 +31,34 @@ type University = {
   website?: string | null;
 };
 
-type ScrapeLog = {
-  event: string;
-  message?: string;
-  current?: number;
-  total?: number;
-  totalFound?: number;
-  imported?: number;
-  phase?: string;
-};
+type BulkUniStatus = "pending" | "running" | "done" | "error" | "skipped" | "stopped";
 
-type JobState = {
-  jobId: string;
-  status: "starting" | "running" | "done" | "error" | "stopped";
-  logs: ScrapeLog[];
-  courseCount: number;
+type BulkUniEntry = {
+  uniId: number;
+  name: string;
+  jobId: string | null;
+  status: BulkUniStatus;
+  imported: number;
+  found: number;
+  staged: number;
   error?: string;
-  imported?: number;
 };
 
-type UniQueueItem = {
-  uni: University;
-  state: JobState | null;
-  skipped?: boolean;
+type BulkSessionData = {
+  sessionId: string;
+  status: "running" | "stopped" | "completed";
+  currentIndex: number;
+  total: number;
+  startedAt: string;
+  updatedAt: string;
+  unis: BulkUniEntry[];
 };
 
-const POLL_INTERVAL = 2000;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const STORAGE_KEY = "bulkScrapeSessionId";
+const POLL_INTERVAL = 3000;
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function downloadFile(url: string, filename: string) {
   const a = document.createElement("a");
   a.href = url;
@@ -66,46 +68,33 @@ function downloadFile(url: string, filename: string) {
   document.body.removeChild(a);
 }
 
-function getLatestProgress(logs: ScrapeLog[]): { current: number; total: number } | null {
-  for (let i = logs.length - 1; i >= 0; i--) {
-    const l = logs[i];
-    if (l.event === "progress" && l.total) return { current: l.current ?? 0, total: l.total };
-  }
-  return null;
-}
-
-function getLatestMessage(logs: ScrapeLog[]): string {
-  for (let i = logs.length - 1; i >= 0; i--) {
-    const l = logs[i];
-    if (l.message) return l.message;
-  }
-  return "";
-}
-
-function StatusBadge({ state }: { state: JobState | null; skipped?: boolean }) {
-  if (!state) return <Badge variant="outline" className="text-gray-400">Queued</Badge>;
-  switch (state.status) {
-    case "starting": return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Starting</Badge>;
-    case "running": return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Scraping</Badge>;
-    case "done": return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Done</Badge>;
-    case "error": return <Badge className="bg-red-100 text-red-700 border-red-200"><AlertCircle className="w-3 h-3 mr-1" />Error</Badge>;
-    case "stopped": return <Badge variant="outline" className="text-gray-500">Stopped</Badge>;
-    default: return null;
+function StatusBadge({ status }: { status?: BulkUniStatus }) {
+  switch (status) {
+    case "running":  return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Scraping</Badge>;
+    case "done":     return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Done</Badge>;
+    case "error":    return <Badge className="bg-red-100 text-red-700 border-red-200"><AlertCircle className="w-3 h-3 mr-1" />Error</Badge>;
+    case "stopped":  return <Badge variant="outline" className="text-gray-500">Stopped</Badge>;
+    case "skipped":  return <Badge variant="outline" className="text-gray-400">Skipped</Badge>;
+    case "pending":  return <Badge variant="outline" className="text-gray-400">Queued</Badge>;
+    default:         return <Badge variant="outline" className="text-gray-400">Queued</Badge>;
   }
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function Bulk() {
   const [activeTab, setActiveTab] = useState<"scrape" | "import">("scrape");
 
-  // ── Bulk Scrape state ──────────────────────────────────────────────────────
-  const [queue, setQueue] = useState<UniQueueItem[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [isRunning, setIsRunning] = useState(false);
-  const [currentIdx, setCurrentIdx] = useState<number>(-1);
+  // ── Server-side session state ──────────────────────────────────────────────
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionData, setSessionData] = useState<BulkSessionData | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [sessionNotFound, setSessionNotFound] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const stopRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const logIndexRef = useRef<Record<number, number>>({});
+  const pollActiveRef = useRef(false);
+
+  // ── Selection state (used when no session is active) ──────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // ── Excel Import state ────────────────────────────────────────────────────
   const [file, setFile] = useState<File | null>(null);
@@ -123,158 +112,125 @@ export default function Bulk() {
   const universities = (uniData?.data ?? []) as University[];
   const scrapeable = universities.filter((u) => u.scrapeUrl);
 
+  // Initialise selectedIds when universities load
   useEffect(() => {
-    if (scrapeable.length && queue.length === 0) {
-      setQueue(scrapeable.map((u) => ({ uni: u, state: null })));
+    if (scrapeable.length && selectedIds.size === 0 && !sessionId) {
       setSelectedIds(new Set(scrapeable.map((u) => u.id)));
     }
   }, [scrapeable.length]);
 
-  const updateQueueItem = useCallback((uniId: number, updater: (prev: UniQueueItem) => UniQueueItem) => {
-    setQueue((q) => q.map((item) => (item.uni.id === uniId ? updater(item) : item)));
+  // ── Polling ───────────────────────────────────────────────────────────────
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+    pollActiveRef.current = false;
   }, []);
 
-  const pollJob = useCallback(async (uniId: number, jobId: string): Promise<boolean> => {
-    const idx = logIndexRef.current[uniId] ?? 0;
+  const pollStatus = useCallback(async (sid: string) => {
     try {
-      const res = await fetch(`/api/scrape/status/${jobId}?since=${idx}`);
-      if (!res.ok) return false;
-      const data = await res.json() as { status?: string; logs?: ScrapeLog[]; logIndex?: number; imported?: number };
-      const newLogs = data.logs ?? [];
-      logIndexRef.current[uniId] = data.logIndex ?? idx;
-
-      updateQueueItem(uniId, (prev) => ({
-        ...prev,
-        state: prev.state
-          ? {
-              ...prev.state,
-              status: data.status === "done" || data.status === "complete" ? "done"
-                : data.status === "error" ? "error"
-                : "running",
-              logs: [...(prev.state.logs ?? []), ...newLogs],
-              imported: data.imported ?? prev.state.imported,
-              courseCount: data.imported ?? prev.state.courseCount,
-            }
-          : null,
-      }));
-
-      const finished = data.status === "done" || data.status === "complete" || data.status === "error";
-      return finished;
-    } catch {
-      return false;
-    }
-  }, [updateQueueItem]);
-
-  const runUniversity = useCallback(async (item: UniQueueItem, idx: number) => {
-    if (stopRef.current) return false;
-    const { uni } = item;
-    logIndexRef.current[uni.id] = 0;
-
-    updateQueueItem(uni.id, (prev) => ({
-      ...prev,
-      state: { jobId: "", status: "starting", logs: [], courseCount: 0 },
-    }));
-    setCurrentIdx(idx);
-    setExpandedId(uni.id);
-
-    try {
-      const res = await fetch("/api/scrape/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: uni.scrapeUrl, universityId: uni.id, bulkMode: true }),
-      });
-      const data = await readResponseJson<{ jobId?: string; error?: string }>(res);
-      if (!res.ok || !data?.jobId) {
-        updateQueueItem(uni.id, (prev) => ({
-          ...prev,
-          state: { jobId: "", status: "error", logs: [], courseCount: 0, error: data?.error ?? "Failed to start" },
-        }));
-        return true;
+      const res = await fetch(`/api/scrape/bulk/status/${sid}`);
+      if (res.status === 404) {
+        setSessionNotFound(true);
+        stopPolling();
+        return;
       }
+      if (!res.ok) return;
+      const data = await readResponseJson<BulkSessionData>(res);
+      if (!data) return;
+      setSessionData(data);
+      setSessionNotFound(false);
+      if (data.status !== "running") {
+        stopPolling();
+        if (data.status === "completed" || data.status === "stopped") {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch { /* network hiccup, keep polling */ }
+  }, [stopPolling]);
 
-      const jobId = data.jobId;
-      updateQueueItem(uni.id, (prev) => ({
-        ...prev,
-        state: prev.state ? { ...prev.state, jobId, status: "running" } : { jobId, status: "running", logs: [], courseCount: 0 },
-      }));
+  const startPolling = useCallback((sid: string) => {
+    stopPolling();
+    pollActiveRef.current = true;
+    const loop = async () => {
+      if (!pollActiveRef.current) return;
+      await pollStatus(sid);
+      if (pollActiveRef.current) {
+        pollRef.current = setTimeout(loop, POLL_INTERVAL);
+      }
+    };
+    pollRef.current = setTimeout(loop, 0);
+  }, [pollStatus, stopPolling]);
 
-      await new Promise<void>((resolve) => {
-        const poll = async () => {
-          if (stopRef.current) {
-            updateQueueItem(uni.id, (prev) => ({
-              ...prev,
-              state: prev.state ? { ...prev.state, status: "stopped" } : null,
-            }));
-            resolve();
-            return;
-          }
-          const done = await pollJob(uni.id, jobId);
-          if (done) { resolve(); return; }
-          pollRef.current = setTimeout(poll, POLL_INTERVAL);
-        };
-        pollRef.current = setTimeout(poll, POLL_INTERVAL);
-      });
-    } catch (err) {
-      updateQueueItem(uni.id, (prev) => ({
-        ...prev,
-        state: { jobId: "", status: "error", logs: [], courseCount: 0, error: (err as Error).message },
-      }));
-    }
-    return true;
-  }, [pollJob, updateQueueItem]);
+  // ── On mount: check localStorage for a running session ───────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    setReconnecting(true);
+    fetch(`/api/scrape/bulk/status/${saved}`)
+      .then(async (res) => {
+        if (!res.ok) { localStorage.removeItem(STORAGE_KEY); setReconnecting(false); return; }
+        const data = await readResponseJson<BulkSessionData>(res);
+        if (!data) { setReconnecting(false); return; }
+        setSessionId(saved);
+        setSessionData(data);
+        setReconnecting(false);
+        if (data.status === "running") startPolling(saved);
+      })
+      .catch(() => { localStorage.removeItem(STORAGE_KEY); setReconnecting(false); });
 
+    return stopPolling;
+  }, []);
+
+  // ── Start bulk session ────────────────────────────────────────────────────
   const startQueue = useCallback(async () => {
-    stopRef.current = false;
-    setIsRunning(true);
+    const selected = scrapeable.filter((u) => selectedIds.has(u.id));
+    if (selected.length === 0) return;
 
-    const selected = queue.filter((item) => selectedIds.has(item.uni.id));
-    for (let i = 0; i < selected.length; i++) {
-      if (stopRef.current) break;
-      const globalIdx = queue.findIndex((q) => q.uni.id === selected[i].uni.id);
-      await runUniversity(selected[i], globalIdx);
-      await new Promise((r) => setTimeout(r, 500));
-    }
+    const res = await fetch("/api/scrape/bulk/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unis: selected.map((u) => ({ id: u.id, name: u.name, scrapeUrl: u.scrapeUrl })),
+      }),
+    });
+    if (!res.ok) return;
+    const data = await readResponseJson<{ sessionId: string }>(res);
+    if (!data?.sessionId) return;
 
-    setIsRunning(false);
-    setCurrentIdx(-1);
-  }, [queue, selectedIds, runUniversity]);
+    localStorage.setItem(STORAGE_KEY, data.sessionId);
+    setSessionId(data.sessionId);
+    setSessionData(null);
+    setSessionNotFound(false);
+    startPolling(data.sessionId);
+  }, [scrapeable, selectedIds, startPolling]);
 
-  const stopQueue = useCallback(() => {
-    stopRef.current = true;
-    if (pollRef.current) clearTimeout(pollRef.current);
-    setIsRunning(false);
-    setCurrentIdx(-1);
-  }, []);
+  // ── Stop bulk session ─────────────────────────────────────────────────────
+  const stopQueue = useCallback(async () => {
+    if (!sessionId) return;
+    await fetch(`/api/scrape/bulk/stop/${sessionId}`, { method: "POST" });
+    stopPolling();
+    localStorage.removeItem(STORAGE_KEY);
+  }, [sessionId, stopPolling]);
 
+  // ── Reset (clear session, go back to selection) ───────────────────────────
   const resetQueue = useCallback(() => {
-    stopQueue();
-    setQueue(scrapeable.map((u) => ({ uni: u, state: null })));
-    setSelectedIds(new Set(scrapeable.map((u) => u.id)));
-    logIndexRef.current = {};
-  }, [scrapeable, stopQueue]);
+    stopPolling();
+    setSessionId(null);
+    setSessionData(null);
+    setSessionNotFound(false);
+    localStorage.removeItem(STORAGE_KEY);
+  }, [stopPolling]);
 
-  const skipCurrent = useCallback(() => {
-    if (currentIdx >= 0) {
-      const item = queue[currentIdx];
-      if (item) {
-        updateQueueItem(item.uni.id, (prev) => ({
-          ...prev,
-          state: prev.state ? { ...prev.state, status: "stopped" } : null,
-          skipped: true,
-        }));
-      }
-      stopRef.current = true;
-    }
-  }, [currentIdx, queue, updateQueueItem]);
-
-  const doneCount = queue.filter((i) => i.state?.status === "done").length;
-  const errorCount = queue.filter((i) => i.state?.status === "error").length;
-  const selectedCount = selectedIds.size;
-  const total = selectedCount;
+  // ── Derived state ─────────────────────────────────────────────────────────
+  const isRunning = sessionData?.status === "running";
+  const isComplete = sessionData?.status === "completed";
+  const isStopped = sessionData?.status === "stopped";
+  const doneCount = sessionData?.unis.filter((u) => u.status === "done").length ?? 0;
+  const errorCount = sessionData?.unis.filter((u) => u.status === "error").length ?? 0;
+  const total = sessionData?.total ?? 0;
 
   const downloadRaw = (uniId: number, format: "json" | "csv") => {
     const url = `/api/scrape/export?universityId=${uniId}&format=${format}`;
-    const uni = queue.find((q) => q.uni.id === uniId)?.uni;
+    const uni = scrapeable.find((u) => u.id === uniId);
     const name = uni?.name.toLowerCase().replace(/\s+/g, "_") ?? `uni${uniId}`;
     const ts = new Date().toISOString().slice(0, 10);
     downloadFile(url, `courses_${name}_${ts}.${format}`);
@@ -322,6 +278,7 @@ export default function Bulk() {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5 max-w-4xl">
       <div>
@@ -349,35 +306,72 @@ export default function Bulk() {
       {/* ── Bulk Scrape Tab ─────────────────────────────────────────────────── */}
       {activeTab === "scrape" && (
         <div className="space-y-4">
+
+          {/* Reconnect notice */}
+          {reconnecting && (
+            <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              Reconnecting to previous bulk scrape session…
+            </div>
+          )}
+
+          {/* Session not found notice */}
+          {sessionNotFound && (
+            <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+              <WifiOff className="w-4 h-4 shrink-0" />
+              Previous session has expired (server was restarted). Start a new session to continue.
+              <button className="ml-auto underline hover:no-underline" onClick={resetQueue}>Dismiss</button>
+            </div>
+          )}
+
+          {/* Active / completed session banner */}
+          {sessionData && !sessionNotFound && (
+            <div className={`flex items-center gap-3 rounded-lg border p-3 text-sm ${
+              isRunning ? "border-blue-200 bg-blue-50 text-blue-700" :
+              isComplete ? "border-green-200 bg-green-50 text-green-700" :
+              "border-gray-200 bg-gray-50 text-gray-600"
+            }`}>
+              {isRunning ? (
+                <><Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                Running in the background — safe to close this tab and come back</>
+              ) : isComplete ? (
+                <><CheckCheck className="w-4 h-4 shrink-0" />
+                All universities scraped successfully</>
+              ) : (
+                <><Square className="w-4 h-4 shrink-0" />Scrape queue stopped</>
+              )}
+            </div>
+          )}
+
           {/* Controls */}
           <div className="flex flex-wrap items-center gap-2">
-            {!isRunning ? (
+            {!sessionId ? (
               <Button
                 onClick={startQueue}
-                disabled={selectedCount === 0 || isRunning}
+                disabled={selectedIds.size === 0 || reconnecting}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Play className="w-4 h-4 mr-2" />
-                Start Queue ({selectedCount} universities)
+                Start Queue ({selectedIds.size} universities)
               </Button>
-            ) : (
+            ) : isRunning ? (
               <Button onClick={stopQueue} variant="destructive">
                 <Square className="w-4 h-4 mr-2" />
                 Stop Queue
               </Button>
-            )}
-
-            {isRunning && (
-              <Button onClick={skipCurrent} variant="outline" size="sm">
-                <SkipForward className="w-4 h-4 mr-1" />
-                Skip Current
+            ) : (
+              <Button onClick={resetQueue} variant="outline">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Start New Queue
               </Button>
             )}
 
-            <Button onClick={resetQueue} variant="outline" size="sm" disabled={isRunning}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Reset
-            </Button>
+            {!isRunning && !sessionId && (
+              <Button onClick={resetQueue} variant="outline" size="sm" disabled={reconnecting}>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh List
+              </Button>
+            )}
 
             {doneCount > 0 && !isRunning && (
               <div className="flex gap-1 ml-auto">
@@ -393,12 +387,12 @@ export default function Bulk() {
             )}
           </div>
 
-          {/* Global progress */}
-          {(isRunning || doneCount > 0) && (
+          {/* Global progress (while session is active) */}
+          {sessionData && (
             <div className="rounded-xl border bg-gray-50 p-4 space-y-2">
               <div className="flex justify-between text-sm font-medium">
                 <span className="text-gray-700">
-                  {isRunning ? "Running…" : "Complete"}
+                  {isRunning ? "Running…" : isComplete ? "Complete" : "Stopped"}
                   {" "}&nbsp;
                   <span className="text-blue-600 font-bold">{doneCount}</span>
                   <span className="text-gray-400"> / {total} universities done</span>
@@ -411,51 +405,103 @@ export default function Bulk() {
             </div>
           )}
 
-          {/* University queue list */}
-          {queue.length === 0 ? (
-            <div className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-400">
-              <Globe className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No universities with a scrape URL configured</p>
-              <p className="text-sm mt-1">Add a Scrape URL to a university profile first.</p>
-            </div>
-          ) : (
+          {/* Session university list */}
+          {sessionData ? (
             <div className="space-y-2">
-              {/* Select all / deselect all */}
-              {!isRunning && (
-                <div className="flex gap-3 items-center text-sm text-gray-500 px-1">
-                  <button className="hover:text-blue-600 transition-colors" onClick={() => setSelectedIds(new Set(scrapeable.map((u) => u.id)))}>
-                    Select all
-                  </button>
-                  <span>·</span>
-                  <button className="hover:text-blue-600 transition-colors" onClick={() => setSelectedIds(new Set())}>
-                    Deselect all
-                  </button>
-                  <span className="ml-auto">{selectedCount} selected</span>
-                </div>
-              )}
-
-              {queue.map((item, idx) => {
-                const { uni, state } = item;
-                const isActive = currentIdx === idx;
-                const prog = state ? getLatestProgress(state.logs) : null;
-                const msg = state ? getLatestMessage(state.logs) : "";
-                const isExpanded = expandedId === uni.id;
-                const isDone = state?.status === "done";
-                const isError = state?.status === "error";
+              {sessionData.unis.map((entry, idx) => {
+                const isActive = sessionData.currentIndex === idx;
+                const isDone = entry.status === "done";
+                const isError = entry.status === "error";
+                const isExpanded = expandedId === entry.uniId;
+                const uni = scrapeable.find((u) => u.id === entry.uniId);
 
                 return (
                   <div
-                    key={uni.id}
+                    key={entry.uniId}
                     className={`rounded-xl border transition-all ${
                       isActive ? "border-blue-300 bg-blue-50 shadow-sm" :
                       isDone ? "border-green-200 bg-green-50/40" :
                       isError ? "border-red-200 bg-red-50/30" :
-                      "border-gray-200 bg-white hover:border-gray-300"
+                      "border-gray-200 bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3 p-3 pr-4">
-                      {/* Checkbox */}
-                      {!isRunning && (
+                      {/* Status icon */}
+                      <div className="shrink-0 w-7 h-7 flex items-center justify-center">
+                        {isDone ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        ) : isError ? (
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                        ) : isActive ? (
+                          <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                        ) : entry.status === "stopped" ? (
+                          <Square className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-gray-900 truncate">{entry.name}</span>
+                          <StatusBadge status={entry.status} />
+                        </div>
+                        {uni?.scrapeUrl && (
+                          <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrapeUrl}</p>
+                        )}
+                        {isDone && entry.staged > 0 && (
+                          <p className="text-xs text-green-600 mt-0.5">{entry.staged} courses staged for review</p>
+                        )}
+                        {isError && entry.error && (
+                          <p className="text-xs text-red-500 mt-0.5 truncate">{entry.error}</p>
+                        )}
+                        {isActive && (
+                          <p className="text-xs text-blue-500 mt-0.5">Scraping in progress…</p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      {isDone && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => downloadRaw(entry.uniId, "json")}>
+                            <FileJson className="w-3.5 h-3.5 mr-1" />JSON
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => downloadRaw(entry.uniId, "csv")}>
+                            <FileText className="w-3.5 h-3.5 mr-1" />CSV
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : !reconnecting && (
+            /* ── Selection list (no active session) ── */
+            <>
+              {scrapeable.length === 0 ? (
+                <div className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-400">
+                  <Globe className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="font-medium">No universities with a scrape URL configured</p>
+                  <p className="text-sm mt-1">Add a Scrape URL to a university profile first.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-3 items-center text-sm text-gray-500 px-1">
+                    <button className="hover:text-blue-600 transition-colors" onClick={() => setSelectedIds(new Set(scrapeable.map((u) => u.id)))}>
+                      Select all
+                    </button>
+                    <span>·</span>
+                    <button className="hover:text-blue-600 transition-colors" onClick={() => setSelectedIds(new Set())}>
+                      Deselect all
+                    </button>
+                    <span className="ml-auto">{selectedIds.size} selected</span>
+                  </div>
+
+                  {scrapeable.map((uni) => (
+                    <div key={uni.id} className="rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all">
+                      <div className="flex items-center gap-3 p-3 pr-4">
                         <input
                           type="checkbox"
                           checked={selectedIds.has(uni.id)}
@@ -466,94 +512,19 @@ export default function Bulk() {
                           }}
                           className="w-4 h-4 accent-blue-600 shrink-0"
                         />
-                      )}
-
-                      {/* Status icon */}
-                      <div className="shrink-0 w-7 h-7 flex items-center justify-center">
-                        {isDone ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        ) : isError ? (
-                          <AlertCircle className="w-5 h-5 text-red-400" />
-                        ) : isActive ? (
-                          <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                        ) : state?.status === "stopped" ? (
-                          <Square className="w-4 h-4 text-gray-400" />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm text-gray-900 truncate">{uni.name}</span>
-                          <StatusBadge state={state} />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-sm text-gray-900">{uni.name}</span>
+                          {uni.scrapeUrl && (
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrapeUrl}</p>
+                          )}
                         </div>
-                        {uni.scrapeUrl && (
-                          <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrapeUrl}</p>
-                        )}
-                        {isActive && prog && (
-                          <div className="mt-1.5 space-y-1">
-                            <Progress value={(prog.current / prog.total) * 100} className="h-1.5" />
-                            <p className="text-xs text-blue-600">{prog.current} / {prog.total} courses scraped</p>
-                          </div>
-                        )}
-                        {isActive && !prog && msg && (
-                          <p className="text-xs text-blue-500 mt-1 truncate">{msg}</p>
-                        )}
-                        {isDone && state?.courseCount !== undefined && state.courseCount > 0 && (
-                          <p className="text-xs text-green-600 mt-0.5">{state.courseCount} courses found</p>
-                        )}
-                        {isError && state?.error && (
-                          <p className="text-xs text-red-500 mt-0.5 truncate">{state.error}</p>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        {isDone && (
-                          <>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => downloadRaw(uni.id, "json")}>
-                              <FileJson className="w-3.5 h-3.5 mr-1" />JSON
-                            </Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => downloadRaw(uni.id, "csv")}>
-                              <FileText className="w-3.5 h-3.5 mr-1" />CSV
-                            </Button>
-                          </>
-                        )}
-                        {state && state.logs.length > 0 && (
-                          <button
-                            className="text-gray-400 hover:text-gray-600 ml-1"
-                            onClick={() => setExpandedId(isExpanded ? null : uni.id)}
-                          >
-                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          </button>
-                        )}
+                        <Badge variant="outline" className="text-gray-400 shrink-0">Queued</Badge>
                       </div>
                     </div>
-
-                    {/* Log expansion */}
-                    {isExpanded && state && state.logs.length > 0 && (
-                      <div className="border-t border-gray-100 bg-gray-900 rounded-b-xl p-3 max-h-40 overflow-y-auto">
-                        <div className="space-y-0.5 font-mono text-xs">
-                          {state.logs.filter((l) => l.message).slice(-30).map((log, i) => (
-                            <div key={i} className={`${
-                              log.event === "error" ? "text-red-400" :
-                              log.event === "status" ? "text-blue-300" :
-                              log.event === "progress" ? "text-green-400" :
-                              "text-gray-300"
-                            }`}>
-                              [{log.event}] {log.message}
-                              {log.current !== undefined && log.total ? ` (${log.current}/${log.total})` : ""}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Legend */}
