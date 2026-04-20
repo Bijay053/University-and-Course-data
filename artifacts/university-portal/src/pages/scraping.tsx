@@ -1873,16 +1873,6 @@ export default function Scraping() {
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="On Campus">On Campus</SelectItem>
-                    <SelectItem value="Online">Online</SelectItem>
-                    <SelectItem value="Blended">Blended</SelectItem>
-                    <SelectItem value="Hybrid">Hybrid</SelectItem>
-                    <SelectItem value="Distance">Distance</SelectItem>
-                    <SelectItem value="Mixed Mode">Mixed Mode</SelectItem>
-                    <SelectItem value="In Person">In Person</SelectItem>
-                    <SelectItem value="Off Campus">Off Campus</SelectItem>
-                    <SelectItem value="External">External</SelectItem>
-                    <SelectItem value="Internal">Internal</SelectItem>
-                    <SelectItem value="Multi-Mode">Multi-Mode</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
