@@ -7409,12 +7409,14 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     /(^|\.)torrens\.edu\.au$/.test(batchHost) ||
     /(^|\.)asahe\.edu\.au$/.test(batchHost) ||
     /(^|\.)koi\.edu\.au$/.test(batchHost);
-  // Heavy hosts (Torrens, VIT, ASA) MUST stay sequential — bumping them causes hung
-  // requests due to slow origin servers and aggressive bot-protection. ASA at
-  // concurrency=1 already completes in ~130s (under 3 min target). Do not raise.
-  const CONCURRENCY = isHeavyBatchHost ? 1 : 32;
+  // Torrens has ~100+ course pages and at concurrency=1 takes ~35 minutes. Browser is
+  // disabled for it (HTML is enough), so we can fan out HTTP fetches more aggressively.
+  // Other heavy hosts (VIT, ASA, KOI) keep concurrency=1 due to bot protection / small
+  // catalogs where parallelism doesn't help.
+  const isTorrensHost = /(^|\.)torrens\.edu\.au$/.test(batchHost);
+  const CONCURRENCY = isTorrensHost ? 8 : isHeavyBatchHost ? 1 : 32;
   const BROWSER_CONCURRENCY = isHeavyBatchHost ? 1 : 8;
-  const RETRY_CONCURRENCY = isHeavyBatchHost ? 1 : 12;
+  const RETRY_CONCURRENCY = isTorrensHost ? 4 : isHeavyBatchHost ? 1 : 12;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Reset the related-page dedup cache for this batch so stale responses from
