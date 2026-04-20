@@ -1,0 +1,107 @@
+Review Scraped Courses
+9 pending
+Remove duplicates
+Reject (9)
+Approve (9)
+Review each course below. Edit any details, then approve to save to the database or reject to discard. Existing courses with the same name will be updated.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business International Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business Hospitality Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business Technology Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Conflicts: intakeMonths, Needs review: duration, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	-	-	-	-	Jan, Apr, Jul	Sydney	Blended	
+
+
+
+
+	
+Master of Software Application Development
+Computer Science & IT
+Publish: rejected
+Eligibility: rejected
+⚠ Publish blocked: Eligibility: Online-only evidence found, Needs review: ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Project Management
+Business & Management
+Publish: rejected
+Eligibility: rejected
+⚠ Publish blocked: Eligibility: Online-only evidence found, Needs review: ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Information Technology (Cyber Security)
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Information Technology (Artificial Intelligence)
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: ieltsOverall, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+

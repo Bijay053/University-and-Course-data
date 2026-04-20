@@ -9410,7 +9410,7 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
          course_location, study_mode, degree_level, study_load, language, description, other_requirement,
          student_market, delivery_mode, international_eligible, on_campus_available, eligibility_status, eligibility_reason, eligibility_confidence,
          approval_status, approval_score, approved_at, last_reviewed_at, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'approved',$21,NOW(),NOW(),'active') RETURNING id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'approved',$22,NOW(),NOW(),'active') RETURNING id`,
         [
           course.universityId,
           course.courseName,
