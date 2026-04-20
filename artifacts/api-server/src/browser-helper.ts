@@ -23,15 +23,25 @@ export interface BrowserPageResult {
 // ── Selector lists ────────────────────────────────────────────────────────────
 
 const INTERNATIONAL_SELECTORS = [
-  'button:has-text("International")',
-  'a:has-text("International")',
-  'label:has-text("International")',
-  'li:has-text("International students")',
+  // Exact-text matchers FIRST so we hit the toggle radio/button, not body copy
+  // that contains substrings like "an International Student".
+  'input[type="radio"][value*="international" i]',
+  'input[type="radio"][id*="international" i]',
+  'label:text-is("International")',
+  'button:text-is("International")',
+  'a:text-is("International")',
   '[data-student-type="international"]',
   '[data-type="international"]',
+  '[data-tab="international"]',
+  '[data-value="international"]',
   '.international-toggle',
   '#international-btn',
-  '[aria-label*="International" i]',
+  '[aria-label="International" i]',
+  // Looser fallbacks
+  'label:has-text("International")',
+  'button:has-text("International")',
+  'a:has-text("International")',
+  'li:has-text("International students")',
 ];
 
 const ON_CAMPUS_SELECTORS = [
@@ -180,7 +190,11 @@ export async function fetchPageWithBrowser(
           const alreadyActive =
             classes.includes("active") || classes.includes("selected") || ariaSelected === "true";
           if (!alreadyActive) await el.click();
-          await page.waitForTimeout(2000);
+          // Wait for the page to re-render the international content (locations,
+          // intakes, fees often re-fetch). networkidle is best-effort and may
+          // time out on chatty sites — that's OK, we already waited 2s.
+          await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+          await page.waitForTimeout(1500);
           clicksPerformed.push("international_toggle");
           break;
         } catch {
