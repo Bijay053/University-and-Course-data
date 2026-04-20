@@ -9670,6 +9670,58 @@ router.post("/scrape/staged/reject-all", async (req: Request, res: Response): Pr
   }
 });
 
+router.get("/scrape/export", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const universityId = req.query.universityId ? parseInt(String(req.query.universityId), 10) : null;
+    const jobId = req.query.jobId ? String(req.query.jobId) : null;
+    const format = String(req.query.format || "json");
+
+    const params: unknown[] = [];
+    const conditions: string[] = [];
+    if (universityId && !isNaN(universityId)) {
+      params.push(universityId);
+      conditions.push(`sc.university_id = $${params.length}`);
+    }
+    if (jobId) {
+      params.push(jobId);
+      conditions.push(`sc.scrape_job_id = $${params.length}`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const result = await pool.query(
+      `SELECT sc.*, u.name as university_name
+       FROM scraped_courses sc
+       JOIN universities u ON sc.university_id = u.id
+       ${where}
+       ORDER BY sc.created_at DESC`,
+      params,
+    );
+
+    const uniSlug = universityId ? `uni${universityId}` : jobId ? `job_${jobId}` : "all";
+    const ts = new Date().toISOString().slice(0, 10);
+
+    if (format === "csv") {
+      const rows = result.rows;
+      if (!rows.length) { res.json([]); return; }
+      const headers = Object.keys(rows[0]);
+      const escape = (v: unknown) => {
+        if (v == null) return "";
+        const s = Array.isArray(v) ? v.join(";") : String(v);
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="courses_${uniSlug}_${ts}.csv"`);
+      res.send(csv);
+    } else {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="courses_${uniSlug}_${ts}.json"`);
+      res.json(result.rows);
+    }
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 router.post("/scrape/preview", async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body as { url: string };
   if (!url) { res.status(400).json({ error: "URL is required" }); return; }
