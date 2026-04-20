@@ -115,6 +115,25 @@ function snippetAroundIelts(rawText: string | null | undefined): string {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Strip noise elements (footer, nav, scripts, cookies, social links) from a
+ * cheerio document IN PLACE before calling .text(). Prevents footer boilerplate
+ * (ABN numbers, copyright notices, Google Maps JS, social-media links) from
+ * polluting extracted text and review-engine evidence snippets.
+ */
+function stripPageNoise($: ReturnType<typeof cheerio.load>): void {
+  $(
+    "footer, header > nav, nav, aside, script, style, noscript, " +
+    "[role='contentinfo'], [role='banner'], [role='navigation'], " +
+    ".footer, .site-footer, .page-footer, #footer, #site-footer, " +
+    ".cookie, .cookie-bar, .cookie-banner, .cookie-consent, " +
+    ".social, .social-links, .social-media, .share, .share-links, " +
+    ".breadcrumb, .breadcrumbs, .search, .search-bar, " +
+    ".newsletter, .subscribe, .popup, .modal-overlay, " +
+    ".google-maps, .map"
+  ).remove();
+}
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
 function geminiUrl(model: string) {
@@ -7468,6 +7487,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if (browserResult) {
             const renderedHtml = browserResult.requirementsHtml || browserResult.mainHtml;
             const $r = cheerio.load(renderedHtml);
+            stripPageNoise($r);
             const renderedText = $r("body").text();
             const renderedReq: Partial<CourseData> = {};
             extractEnglishFromHtml($r, renderedReq);
@@ -7686,6 +7706,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
         const extractionHtml = isHeavyBatchHost ? cHtml.slice(0, MAX_HEAVY_HOST_HTML_CHARS) : cHtml;
         const $page = cheerio.load(extractionHtml);
+        stripPageNoise($page);
         const pageText = $page("body").text().slice(0, isHeavyBatchHost ? MAX_HEAVY_HOST_TEXT_CHARS : MAX_EXTRACT_TEXT_CHARS);
         const pageTitle = ($page("h1").first().text() || $page("title").text() || link.name).trim();
         if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
@@ -8019,6 +8040,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               const renderedHtml = browserResult.requirementsHtml || browserResult.mainHtml;
               if (renderedHtml) {
                 const $r = cheerio.load(renderedHtml);
+                stripPageNoise($r);
                 const renderedText = $r("body").text();
                 const reqSupplement: Partial<CourseData> = {};
                 extractEnglishFromHtml($r, reqSupplement);
@@ -8378,6 +8400,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           const cHtml = await fetchPage(url);
           const extractionHtml = isHeavyBatchHost ? cHtml.slice(0, MAX_HEAVY_HOST_HTML_CHARS) : cHtml;
           const $page = cheerio.load(extractionHtml);
+          stripPageNoise($page);
           const pageText = $page("body").text().slice(0, isHeavyBatchHost ? MAX_HEAVY_HOST_TEXT_CHARS : MAX_EXTRACT_TEXT_CHARS);
           const pageTitle = ($page("h1").first().text() || $page("title").text() || name).trim();
           if (isHeavyBatchHost) await maybeYieldToEventLoop(retryDone, 1);
@@ -9538,6 +9561,7 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
           }
 
           const $page = cheerio.load(cHtml);
+          stripPageNoise($page);
           const pageText = $page("body").text();
           const pageTitle = ($page("h1").first().text() || $page("title").text() || link.name).trim();
           const obviousNonCourse =
