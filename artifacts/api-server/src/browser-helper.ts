@@ -178,29 +178,51 @@ export async function fetchPageWithBrowser(
     const snapshots: string[] = [];
 
     // ── Step 1: Click International toggle ───────────────────────────────────
-    // We try every plausible candidate AND verify after each click that the
-    // international content actually rendered. The verification looks for
-    // markers that appear only in international view on toggleable sites:
-    //   - "Locations:" label (VIT shows campuses only for international)
-    //   - "International student" fee headings
-    // If a click doesn't change the page, we try the next selector.
-    const internationalRendered = async (): Promise<boolean> => {
+    // Verify by COMPARING before vs after click: a real toggle changes the
+    // visible content (e.g. injects a "Locations:" block, swaps the fee value).
+    // A static body that always contains the word "International" must NOT
+    // count as verified — that was the bug giving false positives on
+    // VIT Diploma/Bachelor pages where the first click did nothing.
+    const fingerprintInternational = async (): Promise<{ hasLocations: boolean; cityCount: number; bodyLen: number; activeIntl: boolean }> => {
       try {
         return await page.evaluate(() => {
-          const body = (document.body?.innerText || "").toLowerCase();
-          // VIT-style: Locations list visible (only shows for international)
-          if (/\blocations?\s*:/i.test(body) && /melbourne|sydney|adelaide|brisbane|perth|geelong/i.test(body)) return true;
-          // Generic: explicit international fee callouts
-          if (/international\s+(student\s+)?(tuition|fee|fees)/i.test(body)) return true;
-          // Active state on a toggle labeled International
-          const active = document.querySelectorAll('[aria-selected="true"], .active, .selected');
+          const body = (document.body?.innerText || "");
+          const lower = body.toLowerCase();
+          const hasLocations = /\blocations?\s*:\s*\n?\s*[a-z]/i.test(body) || /\bcampus(?:es)?\s*:/i.test(body);
+          const cities = ["melbourne", "sydney", "adelaide", "brisbane", "perth", "canberra", "geelong", "gold coast", "hobart"];
+          const cityCount = cities.reduce((n, c) => n + (lower.includes(c) ? 1 : 0), 0);
+          let activeIntl = false;
+          const active = document.querySelectorAll('[aria-selected="true"], .active, .selected, input:checked');
           for (const el of Array.from(active)) {
             const t = (el.textContent || "").trim().toLowerCase();
-            if (t === "international" || t.startsWith("international ")) return true;
+            const v = ((el as HTMLInputElement).value || "").toLowerCase();
+            const id = (el.id || "").toLowerCase();
+            if (t === "international" || t.startsWith("international ") || v.includes("international") || id.includes("international")) {
+              activeIntl = true;
+              break;
+            }
+            // Walk up: parent label may carry the text
+            const parentText = (el.parentElement?.textContent || "").trim().toLowerCase();
+            if (parentText === "international" || parentText.startsWith("international ")) { activeIntl = true; break; }
           }
-          return false;
+          return { hasLocations, cityCount, bodyLen: body.length, activeIntl };
         });
-      } catch { return false; }
+      } catch { return { hasLocations: false, cityCount: 0, bodyLen: 0, activeIntl: false }; }
+    };
+
+    const renderedSinceBaseline = (
+      baseline: { hasLocations: boolean; cityCount: number; bodyLen: number; activeIntl: boolean },
+      now: { hasLocations: boolean; cityCount: number; bodyLen: number; activeIntl: boolean },
+    ): boolean => {
+      // Strongest signal: an "International" toggle is now active.
+      if (now.activeIntl && !baseline.activeIntl) return true;
+      // VIT-style: a Locations/Campus block appeared that wasn't visible before.
+      if (now.hasLocations && !baseline.hasLocations) return true;
+      // City count grew (international view added the campus list).
+      if (now.cityCount >= baseline.cityCount + 2) return true;
+      // Body text changed substantially (toggle injected a content panel).
+      if (Math.abs(now.bodyLen - baseline.bodyLen) > 200) return true;
+      return false;
     };
 
     if (clickInternational) {
@@ -241,6 +263,9 @@ export async function fetchPageWithBrowser(
       // Iterate candidates via index (handles is unused; we re-enumerate below for click)
       const candidateCount: number = await page.evaluate((els: any) => (els as Element[]).length, scriptedCandidates).catch(() => 0);
 
+      // Snapshot baseline BEFORE any click — verification compares against this.
+      const baseline = await fingerprintInternational();
+
       let toggled = false;
       for (let i = 0; i < candidateCount; i++) {
         if (toggled) break;
@@ -249,7 +274,6 @@ export async function fetchPageWithBrowser(
             ({ els, idx }: any) => {
               const el = (els as Element[])[idx] as HTMLElement;
               if (!el) return;
-              // Click the element OR its label/parent if it's a hidden radio
               const target = (el as HTMLInputElement).type === "radio" || (el as HTMLInputElement).type === "checkbox"
                 ? (el.closest("label") as HTMLElement) || el
                 : el;
@@ -259,7 +283,8 @@ export async function fetchPageWithBrowser(
           );
           await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
           await page.waitForTimeout(1200);
-          if (await internationalRendered()) {
+          const now = await fingerprintInternational();
+          if (renderedSinceBaseline(baseline, now)) {
             toggled = true;
             clicksPerformed.push(`international_toggle_scripted[${i}]`);
             break;
@@ -283,9 +308,10 @@ export async function fetchPageWithBrowser(
             if (!alreadyActive) await el.click();
             await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
             await page.waitForTimeout(1200);
-            if (await internationalRendered()) {
+            const now = await fingerprintInternational();
+            if (renderedSinceBaseline(baseline, now)) {
               toggled = true;
-              clicksPerformed.push(`international_toggle_css[${sel}]`);
+              clicksPerformed.push(`international_toggle_css[${sel.slice(0, 40)}]`);
               break;
             }
           } catch { /* try next */ }
