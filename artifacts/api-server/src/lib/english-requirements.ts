@@ -786,7 +786,7 @@ export function parseToefl(rawText: string, allowCefrFloor = false): BandScore {
 
 // ── CAE / Cambridge Parser ────────────────────────────────────────────────────
 
-export function parseCae(rawText: string): BandScore {
+export function parseCae(rawText: string, { allowCefrFloor = false } = {}): BandScore {
   const text = normalizeWhitespace(rawText);
   const lower = text.toLowerCase();
   if (!lower.includes("cae") && !lower.includes("cambridge")) return emptyBandScore();
@@ -805,7 +805,9 @@ export function parseCae(rawText: string): BandScore {
     // per-course CAE entry minimums are typically 176/180/185+. The 169 value
     // appears in policy tables across most AU unis as the absolute floor and
     // is never the actual entry requirement for a specific course.
-    if (overall >= 140 && overall <= 230 && overall !== 169)
+    // allowCefrFloor=true is passed for browser-rendered per-course pages where
+    // 169 IS the real published requirement (e.g. ASA bachelor courses).
+    if (overall >= 140 && overall <= 230 && (allowCefrFloor || overall !== 169))
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 70 };
   }
 
@@ -874,7 +876,7 @@ export function parseEnglishRequirementsFromText(
     ielts: parseIelts(rawText),
     pte: parsePte(rawText, allowCefrFloor),
     toefl: parseToefl(rawText, allowCefrFloor),
-    cae: parseCae(rawText),
+    cae: parseCae(rawText, { allowCefrFloor }),
     det: parseDet(rawText),
     otherTests: parseOtherTests(rawText),
   };
