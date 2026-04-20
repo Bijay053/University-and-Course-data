@@ -1875,6 +1875,14 @@ export default function Scraping() {
                     <SelectItem value="On Campus">On Campus</SelectItem>
                     <SelectItem value="Online">Online</SelectItem>
                     <SelectItem value="Blended">Blended</SelectItem>
+                    <SelectItem value="Hybrid">Hybrid</SelectItem>
+                    <SelectItem value="Distance">Distance</SelectItem>
+                    <SelectItem value="Mixed Mode">Mixed Mode</SelectItem>
+                    <SelectItem value="In Person">In Person</SelectItem>
+                    <SelectItem value="Off Campus">Off Campus</SelectItem>
+                    <SelectItem value="External">External</SelectItem>
+                    <SelectItem value="Internal">Internal</SelectItem>
+                    <SelectItem value="Multi-Mode">Multi-Mode</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1888,6 +1896,12 @@ export default function Scraping() {
                       <SelectItem value="Year">Year</SelectItem>
                       <SelectItem value="Month">Month</SelectItem>
                       <SelectItem value="Week">Week</SelectItem>
+                      <SelectItem value="Day">Day</SelectItem>
+                      <SelectItem value="Semester">Semester</SelectItem>
+                      <SelectItem value="Trimester">Trimester</SelectItem>
+                      <SelectItem value="Quarter">Quarter</SelectItem>
+                      <SelectItem value="Term">Term</SelectItem>
+                      <SelectItem value="Hour">Hour</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1915,10 +1929,30 @@ export default function Scraping() {
                   <Select value={editingCourse.currency || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, currency: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Currency" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AUD">AUD</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD — Australian Dollar</SelectItem>
+                      <SelectItem value="USD">USD — US Dollar</SelectItem>
+                      <SelectItem value="GBP">GBP — British Pound</SelectItem>
+                      <SelectItem value="EUR">EUR — Euro</SelectItem>
+                      <SelectItem value="NZD">NZD — New Zealand Dollar</SelectItem>
+                      <SelectItem value="CAD">CAD — Canadian Dollar</SelectItem>
+                      <SelectItem value="SGD">SGD — Singapore Dollar</SelectItem>
+                      <SelectItem value="HKD">HKD — Hong Kong Dollar</SelectItem>
+                      <SelectItem value="JPY">JPY — Japanese Yen</SelectItem>
+                      <SelectItem value="CNY">CNY — Chinese Yuan</SelectItem>
+                      <SelectItem value="INR">INR — Indian Rupee</SelectItem>
+                      <SelectItem value="NPR">NPR — Nepalese Rupee</SelectItem>
+                      <SelectItem value="MYR">MYR — Malaysian Ringgit</SelectItem>
+                      <SelectItem value="AED">AED — UAE Dirham</SelectItem>
+                      <SelectItem value="ZAR">ZAR — South African Rand</SelectItem>
+                      <SelectItem value="CHF">CHF — Swiss Franc</SelectItem>
+                      <SelectItem value="KRW">KRW — South Korean Won</SelectItem>
+                      <SelectItem value="THB">THB — Thai Baht</SelectItem>
+                      <SelectItem value="IDR">IDR — Indonesian Rupiah</SelectItem>
+                      <SelectItem value="PHP">PHP — Philippine Peso</SelectItem>
+                      <SelectItem value="VND">VND — Vietnamese Dong</SelectItem>
+                      <SelectItem value="BDT">BDT — Bangladeshi Taka</SelectItem>
+                      <SelectItem value="LKR">LKR — Sri Lankan Rupee</SelectItem>
+                      <SelectItem value="PKR">PKR — Pakistani Rupee</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1927,9 +1961,22 @@ export default function Scraping() {
                   <Select value={editingCourse.feeTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, feeTerm: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Term" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Annual">Annual</SelectItem>
+                      <SelectItem value="Annual">Annual (Per Year)</SelectItem>
+                      <SelectItem value="Full Course">Full Course (Total)</SelectItem>
                       <SelectItem value="Total">Total</SelectItem>
-                      <SelectItem value="Semester">Semester</SelectItem>
+                      <SelectItem value="Semester">Per Semester</SelectItem>
+                      <SelectItem value="Trimester">Per Trimester</SelectItem>
+                      <SelectItem value="Term">Per Term</SelectItem>
+                      <SelectItem value="Session">Per Session</SelectItem>
+                      <SelectItem value="Quarter">Per Quarter</SelectItem>
+                      <SelectItem value="Per Unit">Per Unit</SelectItem>
+                      <SelectItem value="Per Credit">Per Credit</SelectItem>
+                      <SelectItem value="Per Credit Hour">Per Credit Hour</SelectItem>
+                      <SelectItem value="Per Subject">Per Subject</SelectItem>
+                      <SelectItem value="Per Module">Per Module</SelectItem>
+                      <SelectItem value="Per Course">Per Course</SelectItem>
+                      <SelectItem value="Per Month">Per Month</SelectItem>
+                      <SelectItem value="Per Week">Per Week</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
