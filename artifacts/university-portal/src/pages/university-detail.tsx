@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
+  Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw,
 } from "lucide-react";
 import { CATEGORY_NAMES, DEGREE_LEVELS, STUDY_MODES, getSubCategories } from "@/lib/course-constants";
 
 const ALL = "__all__";
 
-type Tab = "courses" | "english" | "academic" | "scholarships";
+type Tab = "courses" | "english" | "academic" | "scholarships" | "rawdata";
 
 const DEGREE_COLORS: Record<string, string> = {
   Bachelor: "bg-blue-100 text-blue-700",
@@ -25,20 +31,235 @@ const DEGREE_COLORS: Record<string, string> = {
   "Associate Degree or Equivalent": "bg-orange-100 text-orange-700",
 };
 
-function num(v: number | null | undefined) {
-  return v != null ? v : "—";
+function num(v: number | null | undefined) { return v != null ? v : "—"; }
+function txt(v: string | null | undefined) { return v || "—"; }
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+type StagedCourse = {
+  id: number;
+  university_id: number;
+  course_name: string;
+  status: string;
+  degree_level?: string | null;
+  category?: string | null;
+  sub_category?: string | null;
+  course_website?: string | null;
+  duration?: number | null;
+  duration_term?: string | null;
+  study_mode?: string | null;
+  study_load?: string | null;
+  course_location?: string | null;
+  language?: string | null;
+  international_fee?: number | null;
+  fee_term?: string | null;
+  fee_year?: number | null;
+  currency?: string | null;
+  ielts_overall?: number | null;
+  ielts_listening?: number | null;
+  ielts_speaking?: number | null;
+  ielts_writing?: number | null;
+  ielts_reading?: number | null;
+  pte_overall?: number | null;
+  pte_listening?: number | null;
+  pte_speaking?: number | null;
+  pte_writing?: number | null;
+  pte_reading?: number | null;
+  toefl_overall?: number | null;
+  toefl_listening?: number | null;
+  toefl_speaking?: number | null;
+  toefl_writing?: number | null;
+  toefl_reading?: number | null;
+  cambridge_overall?: number | null;
+  duolingo_overall?: number | null;
+  intake_months?: string[] | null;
+  academic_level?: string | null;
+  academic_score?: number | null;
+  score_type?: string | null;
+  academic_country?: string | null;
+  other_requirement?: string | null;
+  scholarship?: string | null;
+  completeness?: number | null;
+  scrape_job_id?: string | null;
+  created_at?: string | null;
+};
+
+type EditForm = {
+  courseName: string;
+  degreeLevel: string;
+  category: string;
+  subCategory: string;
+  courseWebsite: string;
+  duration: string;
+  durationTerm: string;
+  studyMode: string;
+  studyLoad: string;
+  courseLocation: string;
+  language: string;
+  internationalFee: string;
+  feeTerm: string;
+  feeYear: string;
+  currency: string;
+  ieltsOverall: string;
+  ieltsListening: string;
+  ieltsSpeaking: string;
+  ieltsWriting: string;
+  ieltsReading: string;
+  pteOverall: string;
+  pteListening: string;
+  pteSpeaking: string;
+  pteWriting: string;
+  pteReading: string;
+  toeflOverall: string;
+  toeflListening: string;
+  toeflSpeaking: string;
+  toeflWriting: string;
+  toeflReading: string;
+  cambridgeOverall: string;
+  duolingoOverall: string;
+  intakeMonths: string;
+  academicLevel: string;
+  academicScore: string;
+  scoreType: string;
+  academicCountry: string;
+  otherRequirement: string;
+  scholarship: string;
+};
+
+function courseToForm(c: StagedCourse): EditForm {
+  return {
+    courseName: c.course_name ?? "",
+    degreeLevel: c.degree_level ?? "",
+    category: c.category ?? "",
+    subCategory: c.sub_category ?? "",
+    courseWebsite: c.course_website ?? "",
+    duration: c.duration != null ? String(c.duration) : "",
+    durationTerm: c.duration_term ?? "",
+    studyMode: c.study_mode ?? "",
+    studyLoad: c.study_load ?? "",
+    courseLocation: c.course_location ?? "",
+    language: c.language ?? "",
+    internationalFee: c.international_fee != null ? String(c.international_fee) : "",
+    feeTerm: c.fee_term ?? "",
+    feeYear: c.fee_year != null ? String(c.fee_year) : "",
+    currency: c.currency ?? "",
+    ieltsOverall: c.ielts_overall != null ? String(c.ielts_overall) : "",
+    ieltsListening: c.ielts_listening != null ? String(c.ielts_listening) : "",
+    ieltsSpeaking: c.ielts_speaking != null ? String(c.ielts_speaking) : "",
+    ieltsWriting: c.ielts_writing != null ? String(c.ielts_writing) : "",
+    ieltsReading: c.ielts_reading != null ? String(c.ielts_reading) : "",
+    pteOverall: c.pte_overall != null ? String(c.pte_overall) : "",
+    pteListening: c.pte_listening != null ? String(c.pte_listening) : "",
+    pteSpeaking: c.pte_speaking != null ? String(c.pte_speaking) : "",
+    pteWriting: c.pte_writing != null ? String(c.pte_writing) : "",
+    pteReading: c.pte_reading != null ? String(c.pte_reading) : "",
+    toeflOverall: c.toefl_overall != null ? String(c.toefl_overall) : "",
+    toeflListening: c.toefl_listening != null ? String(c.toefl_listening) : "",
+    toeflSpeaking: c.toefl_speaking != null ? String(c.toefl_speaking) : "",
+    toeflWriting: c.toefl_writing != null ? String(c.toefl_writing) : "",
+    toeflReading: c.toefl_reading != null ? String(c.toefl_reading) : "",
+    cambridgeOverall: c.cambridge_overall != null ? String(c.cambridge_overall) : "",
+    duolingoOverall: c.duolingo_overall != null ? String(c.duolingo_overall) : "",
+    intakeMonths: Array.isArray(c.intake_months) ? c.intake_months.join(", ") : (c.intake_months ?? ""),
+    academicLevel: c.academic_level ?? "",
+    academicScore: c.academic_score != null ? String(c.academic_score) : "",
+    scoreType: c.score_type ?? "",
+    academicCountry: c.academic_country ?? "",
+    otherRequirement: c.other_requirement ?? "",
+    scholarship: c.scholarship ?? "",
+  };
 }
-function txt(v: string | null | undefined) {
-  return v || "—";
+
+function formToPayload(f: EditForm) {
+  const n = (v: string) => v.trim() !== "" ? parseFloat(v) : null;
+  const s = (v: string) => v.trim() || null;
+  const months = f.intakeMonths.trim()
+    ? f.intakeMonths.split(",").map((m) => m.trim()).filter(Boolean)
+    : null;
+  return {
+    courseName: f.courseName.trim(),
+    degreeLevel: s(f.degreeLevel),
+    category: s(f.category),
+    subCategory: s(f.subCategory),
+    courseWebsite: s(f.courseWebsite),
+    duration: n(f.duration),
+    durationTerm: s(f.durationTerm),
+    studyMode: s(f.studyMode),
+    studyLoad: s(f.studyLoad),
+    courseLocation: s(f.courseLocation),
+    language: s(f.language),
+    internationalFee: n(f.internationalFee),
+    feeTerm: s(f.feeTerm),
+    feeYear: n(f.feeYear),
+    currency: s(f.currency),
+    ieltsOverall: n(f.ieltsOverall),
+    ieltsListening: n(f.ieltsListening),
+    ieltsSpeaking: n(f.ieltsSpeaking),
+    ieltsWriting: n(f.ieltsWriting),
+    ieltsReading: n(f.ieltsReading),
+    pteOverall: n(f.pteOverall),
+    pteListening: n(f.pteListening),
+    pteSpeaking: n(f.pteSpeaking),
+    pteWriting: n(f.pteWriting),
+    pteReading: n(f.pteReading),
+    toeflOverall: n(f.toeflOverall),
+    toeflListening: n(f.toeflListening),
+    toeflSpeaking: n(f.toeflSpeaking),
+    toeflWriting: n(f.toeflWriting),
+    toeflReading: n(f.toeflReading),
+    cambridgeOverall: n(f.cambridgeOverall),
+    duolingoOverall: n(f.duolingoOverall),
+    intakeMonths: months,
+    academicLevel: s(f.academicLevel),
+    academicScore: n(f.academicScore),
+    scoreType: s(f.scoreType),
+    academicCountry: s(f.academicCountry),
+    otherRequirement: s(f.otherRequirement),
+    scholarship: s(f.scholarship),
+  };
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "approved") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+      <CheckCircle2 className="w-3 h-3" /> Approved
+    </span>
+  );
+  if (status === "rejected") return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
+      <X className="w-3 h-3" /> Rejected
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+      <Clock className="w-3 h-3" /> Pending
+    </span>
+  );
+}
+
+function FldInput({ label, value, onChange, type = "text" }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 text-sm"
+      />
+    </div>
+  );
 }
 
 export default function UniversityDetail() {
   const [, params] = useRoute("/universities/:id");
   const id = params?.id ? parseInt(params.id) : 0;
+  const { toast } = useToast();
 
   const [tab, setTab] = useState<Tab>("courses");
 
-  // Courses tab state
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [subCategory, setSubCategory] = useState(ALL);
@@ -53,7 +274,6 @@ export default function UniversityDetail() {
     query: { enabled: !!id, queryKey: getGetUniversityQueryKey(id) },
   });
 
-  // Filtered + paginated for Courses tab
   const { data: coursesData, isLoading: coursesLoading } = useListCourses(
     {
       universityId: id,
@@ -68,10 +288,9 @@ export default function UniversityDetail() {
     { query: { enabled: !!id && tab === "courses" } },
   );
 
-  // All courses for the other tabs (no pagination)
   const { data: allCoursesData } = useListCourses(
     { universityId: id, limit: 500 },
-    { query: { enabled: !!id && tab !== "courses" } },
+    { query: { enabled: !!id && (tab === "english" || tab === "academic" || tab === "scholarships") } },
   );
 
   const courses = coursesData?.data ?? [];
@@ -80,28 +299,145 @@ export default function UniversityDetail() {
   const hasFilters = category !== ALL || subCategory !== ALL || degreeLevel !== ALL || studyMode !== ALL || search;
 
   const allCourses = allCoursesData?.data ?? [];
-
   const englishCourses = allCourses.filter(
-    (c) => c.ieltsOverall || c.pteOverall || c.toeflOverall ||
-      c.ieltsListening || c.pteListening || c.toeflListening,
+    (c) => c.ieltsOverall || c.pteOverall || c.toeflOverall || c.ieltsListening || c.pteListening || c.toeflListening,
   );
-  const academicCourses = allCourses.filter(
-    (c) => c.academicLevel || c.academicScore || c.academicCountry,
-  );
-  const scholarshipCourses = allCourses.filter(
-    (c) => c.scholarshipDetails,
-  );
+  const academicCourses = allCourses.filter((c) => c.academicLevel || c.academicScore || c.academicCountry);
+  const scholarshipCourses = allCourses.filter((c) => c.scholarshipDetails);
 
   function clearFilters() {
     setSearch(""); setCategory(ALL); setSubCategory(ALL); setDegreeLevel(ALL); setStudyMode(ALL); setPage(1);
   }
   function handleCategoryChange(val: string) { setCategory(val); setSubCategory(ALL); setPage(1); }
 
+  // ── Raw Data tab state ───────────────────────────────────────────────────
+  const [rawStatus, setRawStatus] = useState<"all" | "pending" | "approved">("pending");
+  const [rawSearch, setRawSearch] = useState("");
+  const [rawData, setRawData] = useState<StagedCourse[]>([]);
+  const [rawLoading, setRawLoading] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [importingAll, setImportingAll] = useState(false);
+
+  const fetchRawData = useCallback(async () => {
+    if (!id) return;
+    setRawLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged?universityId=${id}&status=${rawStatus}`);
+      const data = await res.json();
+      setRawData(Array.isArray(data) ? data : []);
+    } catch {
+      toast({ title: "Error", description: "Failed to load raw data", variant: "destructive" });
+    } finally {
+      setRawLoading(false);
+    }
+  }, [id, rawStatus, toast]);
+
+  useEffect(() => {
+    if (tab === "rawdata") fetchRawData();
+  }, [tab, fetchRawData]);
+
+  const filteredRaw = rawData.filter((c) =>
+    !rawSearch || c.course_name.toLowerCase().includes(rawSearch.toLowerCase()),
+  );
+
+  const pendingCount = rawData.filter((c) => c.status === "pending").length;
+
+  async function handleApprove(courseId: number) {
+    setApprovingId(courseId);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Approve failed");
+      toast({ title: "Approved", description: "Course imported to production." });
+      await fetchRawData();
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function handleDelete(courseId: number) {
+    if (!confirm("Delete this staged course?")) return;
+    setDeletingId(courseId);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/${courseId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast({ title: "Deleted", description: "Staged course removed." });
+      setRawData((prev) => prev.filter((c) => c.id !== courseId));
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleImportAll() {
+    const pending = rawData.filter((c) => c.status === "pending");
+    if (!pending.length) return;
+    if (!confirm(`Import all ${pending.length} pending courses to production?`)) return;
+    setImportingAll(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const c of pending) {
+      try {
+        const res = await fetch(`${BASE}/api/scrape/staged/${c.id}/approve`, { method: "POST" });
+        if (res.ok) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    toast({
+      title: "Import complete",
+      description: `${succeeded} imported${failed ? `, ${failed} failed` : ""}.`,
+    });
+    await fetchRawData();
+    setImportingAll(false);
+  }
+
+  function openEdit(c: StagedCourse) {
+    setEditingCourse(c);
+    setEditForm(courseToForm(c));
+  }
+
+  function setField<K extends keyof EditForm>(key: K, val: string) {
+    setEditForm((f) => f ? { ...f, [key]: val } : f);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingCourse || !editForm) return;
+    setSaving(true);
+    try {
+      const payload = formToPayload(editForm);
+      const res = await fetch(`${BASE}/api/scrape/staged/${editingCourse.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Save failed");
+      toast({ title: "Saved", description: "Course updated." });
+      setEditingCourse(null);
+      setEditForm(null);
+      await fetchRawData();
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const TABS: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "courses", label: "Courses", icon: <BookOpen className="w-4 h-4" />, count: uni ? total : undefined },
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
+    { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
   ];
 
   if (uniLoading) return <div className="py-16 text-center text-muted-foreground">Loading...</div>;
@@ -134,12 +470,12 @@ export default function UniversityDetail() {
       </div>
 
       {/* Tab Bar */}
-      <div className="border-b flex gap-0">
+      <div className="border-b flex gap-0 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               tab === t.key
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-200"
@@ -159,7 +495,6 @@ export default function UniversityDetail() {
       {/* ── COURSES TAB ── */}
       {tab === "courses" && (
         <div className="space-y-3">
-          {/* Filters */}
           <div className="flex flex-wrap gap-2 items-center">
             <div className="flex items-center gap-1.5 border rounded-md px-2 h-9 flex-1 min-w-[180px] max-w-xs bg-white">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -208,11 +543,9 @@ export default function UniversityDetail() {
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
           </div>
 
-          {/* Wide scrollable table */}
           <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
               <thead className="bg-gray-50 sticky top-0 z-20">
-                {/* Group headers */}
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
                   <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left" colSpan={2}>Course</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={7} style={{ background: "#f0fdf4", color: "#15803d" }}>Details</th>
@@ -225,12 +558,9 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#ecfeff", color: "#0e7490" }}>Academic Req.</th>
                   <th className="px-2 py-2 text-center" colSpan={2} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
                 </tr>
-                {/* Column headers */}
                 <tr className="border-b bg-gray-50">
-                  {/* Sticky cols */}
                   <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left font-semibold text-gray-700 min-w-[220px]">Course Name</th>
                   <th className="sticky bg-gray-50 border-r px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]" style={{ left: 220, zIndex: 29 }}>Category</th>
-                  {/* Details */}
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Sub Category</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Website</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[70px]">Duration</th>
@@ -239,46 +569,38 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[120px] border-r">Degree Level</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Study Load</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px] border-r">Language</th>
-                  {/* Intake */}
                   <th className="px-2 py-2 text-blue-700 font-medium min-w-[90px]">Month</th>
                   <th className="px-2 py-2 text-blue-700 font-medium min-w-[50px]">Day</th>
                   <th className="px-2 py-2 text-blue-700 font-medium min-w-[40px] border-r">City</th>
-                  {/* Fee */}
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[70px]">Int'l Fee</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[60px]">Fee Term</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[50px]">Year</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[55px] border-r">Currency</th>
-                  {/* IELTS */}
                   <th className="px-2 py-2 text-purple-700 font-medium min-w-[40px]">L</th>
                   <th className="px-2 py-2 text-purple-700 font-medium min-w-[40px]">S</th>
                   <th className="px-2 py-2 text-purple-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-purple-700 font-medium min-w-[40px]">R</th>
                   <th className="px-2 py-2 text-purple-700 font-medium min-w-[40px] border-r">O</th>
-                  {/* PTE */}
                   <th className="px-2 py-2 text-orange-700 font-medium min-w-[40px]">L</th>
                   <th className="px-2 py-2 text-orange-700 font-medium min-w-[40px]">S</th>
                   <th className="px-2 py-2 text-orange-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-orange-700 font-medium min-w-[40px]">R</th>
                   <th className="px-2 py-2 text-orange-700 font-medium min-w-[40px] border-r">O</th>
-                  {/* TOEFL */}
                   <th className="px-2 py-2 text-rose-700 font-medium min-w-[40px]">L</th>
                   <th className="px-2 py-2 text-rose-700 font-medium min-w-[40px]">S</th>
                   <th className="px-2 py-2 text-rose-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-rose-700 font-medium min-w-[40px]">R</th>
                   <th className="px-2 py-2 text-rose-700 font-medium min-w-[40px] border-r">O</th>
-                  {/* Other English */}
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[80px]">Other Test</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">R</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">L</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">S</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px] border-r">O</th>
-                  {/* Academic */}
                   <th className="px-2 py-2 text-cyan-700 font-medium min-w-[100px]">Acad. Level</th>
                   <th className="px-2 py-2 text-cyan-700 font-medium min-w-[60px]">Score</th>
                   <th className="px-2 py-2 text-cyan-700 font-medium min-w-[70px]">Score Type</th>
                   <th className="px-2 py-2 text-cyan-700 font-medium min-w-[80px] border-r">Country</th>
-                  {/* Other */}
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[120px]">Other Req.</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[120px]">Scholarship</th>
                 </tr>
@@ -290,14 +612,12 @@ export default function UniversityDetail() {
                   <tr><td colSpan={44} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
                 ) : courses.map((c) => (
                   <tr key={c.id} className="hover:bg-blue-50/30 transition-colors">
-                    {/* Sticky Course Name */}
                     <td className="sticky left-0 bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]">
-                      <Link href={`/courses/${c.id}`} className="line-clamp-2">{c.name}</Link>
+                      <span className="line-clamp-2">{c.name}</span>
                     </td>
                     <td className="sticky bg-white border-r px-2 py-2 text-gray-600 min-w-[80px]" style={{ left: 220 }}>
                       <span className="line-clamp-1">{txt(c.category)}</span>
                     </td>
-                    {/* Details */}
                     <td className="px-2 py-2 text-gray-500"><span className="line-clamp-1">{txt(c.subCategory)}</span></td>
                     <td className="px-2 py-2">
                       {c.courseWebsite ? (
@@ -318,59 +638,46 @@ export default function UniversityDetail() {
                     </td>
                     <td className="px-2 py-2 text-gray-500">{txt(c.studyLoad)}</td>
                     <td className="px-2 py-2 text-gray-500 border-r">{txt(c.language)}</td>
-                    {/* Intake */}
                     <td className="px-2 py-2 text-blue-600">{txt(c.intakeMonths)}</td>
                     <td className="px-2 py-2 text-blue-500">{num(c.intakeDays)}</td>
                     <td className="px-2 py-2 text-blue-500 border-r">{txt(c.city)}</td>
-                    {/* Fee */}
                     <td className="px-2 py-2 text-amber-700 font-medium">{c.internationalFee ? c.internationalFee.toLocaleString() : "—"}</td>
                     <td className="px-2 py-2 text-amber-600">{txt(c.feeTerm)}</td>
                     <td className="px-2 py-2 text-amber-600">{num(c.feeYear)}</td>
                     <td className="px-2 py-2 text-amber-600 border-r">{txt(c.currency)}</td>
-                    {/* IELTS */}
                     <td className="px-2 py-2 text-purple-700">{num(c.ieltsListening)}</td>
                     <td className="px-2 py-2 text-purple-700">{num(c.ieltsSpeaking)}</td>
                     <td className="px-2 py-2 text-purple-700">{num(c.ieltsWriting)}</td>
                     <td className="px-2 py-2 text-purple-700">{num(c.ieltsReading)}</td>
                     <td className="px-2 py-2 text-purple-700 font-semibold border-r">{num(c.ieltsOverall)}</td>
-                    {/* PTE */}
                     <td className="px-2 py-2 text-orange-600">{num(c.pteListening)}</td>
                     <td className="px-2 py-2 text-orange-600">{num(c.pteSpeaking)}</td>
                     <td className="px-2 py-2 text-orange-600">{num(c.pteWriting)}</td>
                     <td className="px-2 py-2 text-orange-600">{num(c.pteReading)}</td>
                     <td className="px-2 py-2 text-orange-600 font-semibold border-r">{num(c.pteOverall)}</td>
-                    {/* TOEFL */}
                     <td className="px-2 py-2 text-rose-600">{num(c.toeflListening)}</td>
                     <td className="px-2 py-2 text-rose-600">{num(c.toeflSpeaking)}</td>
                     <td className="px-2 py-2 text-rose-600">{num(c.toeflWriting)}</td>
                     <td className="px-2 py-2 text-rose-600">{num(c.toeflReading)}</td>
                     <td className="px-2 py-2 text-rose-600 font-semibold border-r">{num(c.toeflOverall)}</td>
-                    {/* Other English */}
                     <td className="px-2 py-2 text-pink-600">{txt(c.otherEnglishTestName)}</td>
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishReading)}</td>
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishListening)}</td>
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishSpeaking)}</td>
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishWriting)}</td>
                     <td className="px-2 py-2 text-pink-600 font-semibold border-r">{num(c.otherEnglishOverall)}</td>
-                    {/* Academic */}
                     <td className="px-2 py-2 text-cyan-700">{txt(c.academicLevel)}</td>
                     <td className="px-2 py-2 text-cyan-600">{num(c.academicScore)}</td>
                     <td className="px-2 py-2 text-cyan-600">{txt(c.scoreType)}</td>
                     <td className="px-2 py-2 text-cyan-600 border-r">{txt(c.academicCountry)}</td>
-                    {/* Other */}
-                    <td className="px-2 py-2 text-gray-500 max-w-[140px]">
-                      <span className="line-clamp-1">{txt(c.otherRequirement)}</span>
-                    </td>
-                    <td className="px-2 py-2 text-amber-700 max-w-[140px]">
-                      <span className="line-clamp-1">{txt(c.scholarshipDetails)}</span>
-                    </td>
+                    <td className="px-2 py-2 text-gray-500 max-w-[140px]"><span className="line-clamp-1">{txt(c.otherRequirement)}</span></td>
+                    <td className="px-2 py-2 text-amber-700 max-w-[140px]"><span className="line-clamp-1">{txt(c.scholarshipDetails)}</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-1">
               <p className="text-sm text-muted-foreground">
@@ -436,7 +743,7 @@ export default function UniversityDetail() {
                 ) : englishCourses.map((c) => (
                   <tr key={c.id} className="hover:bg-blue-50/30">
                     <td className="px-4 py-2 font-medium text-blue-700">
-                      <Link href={`/courses/${c.id}`} className="hover:underline line-clamp-1">{c.name}</Link>
+                      <span className="line-clamp-1">{c.name}</span>
                     </td>
                     <td className="px-2 py-2 border-r">
                       {c.degreeLevel ? (
@@ -497,7 +804,7 @@ export default function UniversityDetail() {
                 ) : academicCourses.map((c) => (
                   <tr key={c.id} className="hover:bg-blue-50/30">
                     <td className="px-4 py-2.5 font-medium text-blue-700">
-                      <Link href={`/courses/${c.id}`} className="hover:underline">{c.name}</Link>
+                      <span className="hover:underline">{c.name}</span>
                     </td>
                     <td className="px-3 py-2.5">
                       {c.degreeLevel ? (
@@ -536,7 +843,7 @@ export default function UniversityDetail() {
                 <div key={c.id} className="border rounded-xl p-4 hover:shadow-sm transition-shadow bg-white">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <Link href={`/courses/${c.id}`} className="font-semibold text-blue-700 hover:underline">{c.name}</Link>
+                      <span className="font-semibold text-blue-700">{c.name}</span>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {c.degreeLevel && (
                           <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${DEGREE_COLORS[c.degreeLevel] ?? "bg-gray-100 text-gray-600"}`}>
@@ -568,6 +875,388 @@ export default function UniversityDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── RAW DATA TAB ── */}
+      {tab === "rawdata" && (
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Status filter */}
+            <div className="flex rounded-lg border overflow-hidden text-sm font-medium">
+              {(["all", "pending", "approved"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setRawStatus(s)}
+                  className={`px-3 py-1.5 capitalize transition-colors ${
+                    rawStatus === s
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {s}
+                  {s === "pending" && pendingCount > 0 && (
+                    <span className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="flex items-center gap-1.5 border rounded-md px-2 h-9 flex-1 min-w-[180px] max-w-xs bg-white">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                placeholder="Search courses..."
+                value={rawSearch}
+                onChange={(e) => setRawSearch(e.target.value)}
+                className="border-0 focus-visible:ring-0 px-0 h-8 bg-transparent"
+              />
+            </div>
+
+            <span className="text-sm text-muted-foreground">
+              {filteredRaw.length} course{filteredRaw.length !== 1 ? "s" : ""}
+            </span>
+
+            <div className="ml-auto flex gap-2">
+              <Button variant="outline" size="sm" onClick={fetchRawData} disabled={rawLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1.5 ${rawLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              {pendingCount > 0 && (
+                <Button
+                  size="sm"
+                  onClick={handleImportAll}
+                  disabled={importingAll}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Upload className="h-4 w-4 mr-1.5" />
+                  {importingAll ? "Importing…" : `Import All (${pendingCount})`}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          {rawLoading ? (
+            <div className="border rounded-xl py-16 text-center text-muted-foreground">Loading raw data…</div>
+          ) : filteredRaw.length === 0 ? (
+            <div className="border rounded-xl py-16 text-center text-muted-foreground">
+              <Database className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p>No scraped courses found{rawStatus !== "all" ? ` with status "${rawStatus}"` : ""}.</p>
+              <p className="text-xs mt-1">Run a scrape job for this university to populate raw data.</p>
+            </div>
+          ) : (
+            <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+              <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 2400 }}>
+                <thead className="bg-gray-50 sticky top-0 z-20">
+                  <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
+                    <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left min-w-[32px]">#</th>
+                    <th className="sticky bg-gray-50 border-r px-3 py-2 text-left min-w-[220px]" style={{ left: 32 }}>Course Name</th>
+                    <th className="px-2 py-2 border-r text-center min-w-[80px]">Status</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[110px]">Degree Level</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Category</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[70px]">Duration</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Term</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[80px] border-r">Mode</th>
+                    <th className="px-2 py-2 text-amber-700 font-medium min-w-[80px]">Int'l Fee</th>
+                    <th className="px-2 py-2 text-amber-700 font-medium min-w-[55px]">Term</th>
+                    <th className="px-2 py-2 text-amber-700 font-medium min-w-[50px] border-r">Curr.</th>
+                    <th className="px-2 py-2 text-blue-700 font-medium min-w-[90px] border-r">Intakes</th>
+                    <th className="px-2 py-2 text-purple-700 font-medium min-w-[30px]">IL</th>
+                    <th className="px-2 py-2 text-purple-700 font-medium min-w-[30px]">IS</th>
+                    <th className="px-2 py-2 text-purple-700 font-medium min-w-[30px]">IW</th>
+                    <th className="px-2 py-2 text-purple-700 font-medium min-w-[30px]">IR</th>
+                    <th className="px-2 py-2 text-purple-700 font-semibold min-w-[30px] border-r">IO</th>
+                    <th className="px-2 py-2 text-orange-600 font-medium min-w-[30px]">PL</th>
+                    <th className="px-2 py-2 text-orange-600 font-medium min-w-[30px]">PS</th>
+                    <th className="px-2 py-2 text-orange-600 font-medium min-w-[30px]">PW</th>
+                    <th className="px-2 py-2 text-orange-600 font-medium min-w-[30px]">PR</th>
+                    <th className="px-2 py-2 text-orange-600 font-semibold min-w-[30px] border-r">PO</th>
+                    <th className="px-2 py-2 text-rose-600 font-medium min-w-[30px]">TL</th>
+                    <th className="px-2 py-2 text-rose-600 font-medium min-w-[30px]">TS</th>
+                    <th className="px-2 py-2 text-rose-600 font-medium min-w-[30px]">TW</th>
+                    <th className="px-2 py-2 text-rose-600 font-medium min-w-[30px]">TR</th>
+                    <th className="px-2 py-2 text-rose-600 font-semibold min-w-[30px] border-r">TO</th>
+                    <th className="px-2 py-2 text-pink-600 font-medium min-w-[30px] border-r">CAE</th>
+                    <th className="px-2 py-2 text-cyan-700 font-medium min-w-[100px]">Acad. Level</th>
+                    <th className="px-2 py-2 text-cyan-700 font-medium min-w-[55px] border-r">Score</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[50px]">%</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredRaw.map((c, idx) => (
+                    <tr
+                      key={c.id}
+                      className={`transition-colors ${
+                        c.status === "approved" ? "bg-green-50/30 hover:bg-green-50/50" :
+                        c.status === "rejected" ? "bg-red-50/30 hover:bg-red-50/50" :
+                        "hover:bg-blue-50/20"
+                      }`}
+                    >
+                      <td className="sticky left-0 bg-inherit border-r px-3 py-2 text-muted-foreground font-mono">{idx + 1}</td>
+                      <td className="sticky bg-inherit border-r px-3 py-2 font-medium text-gray-800 min-w-[220px]" style={{ left: 32 }}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="line-clamp-1 max-w-[200px]">{c.course_name}</span>
+                          {c.course_website && (
+                            <a href={c.course_website} target="_blank" rel="noreferrer" className="text-blue-400 shrink-0">
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 border-r text-center"><StatusBadge status={c.status} /></td>
+                      <td className="px-2 py-2">
+                        {c.degree_level ? (
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${DEGREE_COLORS[c.degree_level] ?? "bg-gray-100 text-gray-600"}`}>
+                            {c.degree_level}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-2 py-2 text-gray-500">{txt(c.category)}</td>
+                      <td className="px-2 py-2 text-gray-600">{num(c.duration)}</td>
+                      <td className="px-2 py-2 text-gray-500">{txt(c.duration_term)}</td>
+                      <td className="px-2 py-2 text-gray-500 border-r">{txt(c.study_mode)}</td>
+                      <td className="px-2 py-2 text-amber-700 font-medium">{c.international_fee ? c.international_fee.toLocaleString() : "—"}</td>
+                      <td className="px-2 py-2 text-amber-600">{txt(c.fee_term)}</td>
+                      <td className="px-2 py-2 text-amber-600 border-r">{txt(c.currency)}</td>
+                      <td className="px-2 py-2 text-blue-600 border-r">{Array.isArray(c.intake_months) ? c.intake_months.join(", ") : txt(c.intake_months as string | null)}</td>
+                      <td className="px-2 py-2 text-purple-600">{num(c.ielts_listening)}</td>
+                      <td className="px-2 py-2 text-purple-600">{num(c.ielts_speaking)}</td>
+                      <td className="px-2 py-2 text-purple-600">{num(c.ielts_writing)}</td>
+                      <td className="px-2 py-2 text-purple-600">{num(c.ielts_reading)}</td>
+                      <td className="px-2 py-2 text-purple-700 font-semibold border-r">{num(c.ielts_overall)}</td>
+                      <td className="px-2 py-2 text-orange-500">{num(c.pte_listening)}</td>
+                      <td className="px-2 py-2 text-orange-500">{num(c.pte_speaking)}</td>
+                      <td className="px-2 py-2 text-orange-500">{num(c.pte_writing)}</td>
+                      <td className="px-2 py-2 text-orange-500">{num(c.pte_reading)}</td>
+                      <td className="px-2 py-2 text-orange-600 font-semibold border-r">{num(c.pte_overall)}</td>
+                      <td className="px-2 py-2 text-rose-500">{num(c.toefl_listening)}</td>
+                      <td className="px-2 py-2 text-rose-500">{num(c.toefl_speaking)}</td>
+                      <td className="px-2 py-2 text-rose-500">{num(c.toefl_writing)}</td>
+                      <td className="px-2 py-2 text-rose-500">{num(c.toefl_reading)}</td>
+                      <td className="px-2 py-2 text-rose-600 font-semibold border-r">{num(c.toefl_overall)}</td>
+                      <td className="px-2 py-2 text-pink-600 font-semibold border-r">{num(c.cambridge_overall)}</td>
+                      <td className="px-2 py-2 text-cyan-700">{txt(c.academic_level)}</td>
+                      <td className="px-2 py-2 text-cyan-600 font-semibold border-r">{num(c.academic_score)}</td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {c.completeness != null ? (
+                          <span className={`font-semibold ${c.completeness >= 80 ? "text-green-600" : c.completeness >= 50 ? "text-amber-600" : "text-red-500"}`}>
+                            {c.completeness}%
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEdit(c)}
+                            title="Edit"
+                            className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          {c.status === "pending" && (
+                            <button
+                              onClick={() => handleApprove(c.id)}
+                              disabled={approvingId === c.id}
+                              title="Approve & Import"
+                              className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(c.id)}
+                            disabled={deletingId === c.id}
+                            title="Delete"
+                            className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Edit Course Dialog ── */}
+      {editingCourse && editForm && (
+        <Dialog open onOpenChange={() => { setEditingCourse(null); setEditForm(null); }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Course — {editingCourse.course_name}</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-5 py-2">
+              {/* Basic */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Basic Info</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <FldInput label="Course Name *" value={editForm.courseName} onChange={(v) => setField("courseName", v)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Degree Level</Label>
+                    <Select value={editForm.degreeLevel || "__none__"} onValueChange={(v) => setField("degreeLevel", v === "__none__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-sm mt-1"><SelectValue placeholder="Select level" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None —</SelectItem>
+                        {DEGREE_LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Category</Label>
+                    <Select value={editForm.category || "__none__"} onValueChange={(v) => setField("category", v === "__none__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-sm mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None —</SelectItem>
+                        {CATEGORY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <FldInput label="Course Website" value={editForm.courseWebsite} onChange={(v) => setField("courseWebsite", v)} />
+                  <FldInput label="Language" value={editForm.language} onChange={(v) => setField("language", v)} />
+                  <FldInput label="Duration (number)" value={editForm.duration} onChange={(v) => setField("duration", v)} type="number" />
+                  <FldInput label="Duration Term (Years/Semesters)" value={editForm.durationTerm} onChange={(v) => setField("durationTerm", v)} />
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Study Mode</Label>
+                    <Select value={editForm.studyMode || "__none__"} onValueChange={(v) => setField("studyMode", v === "__none__" ? "" : v)}>
+                      <SelectTrigger className="h-8 text-sm mt-1"><SelectValue placeholder="Select mode" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None —</SelectItem>
+                        {STUDY_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <FldInput label="Study Load" value={editForm.studyLoad} onChange={(v) => setField("studyLoad", v)} />
+                  <FldInput label="Location / Campus" value={editForm.courseLocation} onChange={(v) => setField("courseLocation", v)} />
+                  <FldInput label="Intake Months (comma-separated)" value={editForm.intakeMonths} onChange={(v) => setField("intakeMonths", v)} />
+                </div>
+              </div>
+
+              {/* Fee */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">International Fee</p>
+                <div className="grid grid-cols-4 gap-3">
+                  <FldInput label="Fee Amount" value={editForm.internationalFee} onChange={(v) => setField("internationalFee", v)} type="number" />
+                  <FldInput label="Fee Term" value={editForm.feeTerm} onChange={(v) => setField("feeTerm", v)} />
+                  <FldInput label="Fee Year" value={editForm.feeYear} onChange={(v) => setField("feeYear", v)} type="number" />
+                  <FldInput label="Currency" value={editForm.currency} onChange={(v) => setField("currency", v)} />
+                </div>
+              </div>
+
+              {/* IELTS */}
+              <div>
+                <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">IELTS</p>
+                <div className="grid grid-cols-5 gap-3">
+                  <FldInput label="Overall" value={editForm.ieltsOverall} onChange={(v) => setField("ieltsOverall", v)} type="number" />
+                  <FldInput label="Listening" value={editForm.ieltsListening} onChange={(v) => setField("ieltsListening", v)} type="number" />
+                  <FldInput label="Speaking" value={editForm.ieltsSpeaking} onChange={(v) => setField("ieltsSpeaking", v)} type="number" />
+                  <FldInput label="Writing" value={editForm.ieltsWriting} onChange={(v) => setField("ieltsWriting", v)} type="number" />
+                  <FldInput label="Reading" value={editForm.ieltsReading} onChange={(v) => setField("ieltsReading", v)} type="number" />
+                </div>
+              </div>
+
+              {/* PTE */}
+              <div>
+                <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-2">PTE</p>
+                <div className="grid grid-cols-5 gap-3">
+                  <FldInput label="Overall" value={editForm.pteOverall} onChange={(v) => setField("pteOverall", v)} type="number" />
+                  <FldInput label="Listening" value={editForm.pteListening} onChange={(v) => setField("pteListening", v)} type="number" />
+                  <FldInput label="Speaking" value={editForm.pteSpeaking} onChange={(v) => setField("pteSpeaking", v)} type="number" />
+                  <FldInput label="Writing" value={editForm.pteWriting} onChange={(v) => setField("pteWriting", v)} type="number" />
+                  <FldInput label="Reading" value={editForm.pteReading} onChange={(v) => setField("pteReading", v)} type="number" />
+                </div>
+              </div>
+
+              {/* TOEFL */}
+              <div>
+                <p className="text-xs font-semibold text-rose-600 uppercase tracking-wide mb-2">TOEFL</p>
+                <div className="grid grid-cols-5 gap-3">
+                  <FldInput label="Overall" value={editForm.toeflOverall} onChange={(v) => setField("toeflOverall", v)} type="number" />
+                  <FldInput label="Listening" value={editForm.toeflListening} onChange={(v) => setField("toeflListening", v)} type="number" />
+                  <FldInput label="Speaking" value={editForm.toeflSpeaking} onChange={(v) => setField("toeflSpeaking", v)} type="number" />
+                  <FldInput label="Writing" value={editForm.toeflWriting} onChange={(v) => setField("toeflWriting", v)} type="number" />
+                  <FldInput label="Reading" value={editForm.toeflReading} onChange={(v) => setField("toeflReading", v)} type="number" />
+                </div>
+              </div>
+
+              {/* Other English */}
+              <div>
+                <p className="text-xs font-semibold text-pink-600 uppercase tracking-wide mb-2">Other English Tests</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <FldInput label="Cambridge (CAE) Overall" value={editForm.cambridgeOverall} onChange={(v) => setField("cambridgeOverall", v)} type="number" />
+                  <FldInput label="Duolingo Overall" value={editForm.duolingoOverall} onChange={(v) => setField("duolingoOverall", v)} type="number" />
+                </div>
+              </div>
+
+              {/* Academic */}
+              <div>
+                <p className="text-xs font-semibold text-cyan-700 uppercase tracking-wide mb-2">Academic Requirements</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <FldInput label="Academic Level" value={editForm.academicLevel} onChange={(v) => setField("academicLevel", v)} />
+                  <FldInput label="Score" value={editForm.academicScore} onChange={(v) => setField("academicScore", v)} type="number" />
+                  <FldInput label="Score Type (GPA / WAM / ATAR)" value={editForm.scoreType} onChange={(v) => setField("scoreType", v)} />
+                  <FldInput label="Country" value={editForm.academicCountry} onChange={(v) => setField("academicCountry", v)} />
+                </div>
+              </div>
+
+              {/* Other */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other</p>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Other Requirement</Label>
+                    <textarea
+                      value={editForm.otherRequirement}
+                      onChange={(e) => setField("otherRequirement", e.target.value)}
+                      rows={2}
+                      className="w-full border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Scholarship Info</Label>
+                    <textarea
+                      value={editForm.scholarship}
+                      onChange={(e) => setField("scholarship", e.target.value)}
+                      rows={2}
+                      className="w-full border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setEditingCourse(null); setEditForm(null); }}>
+                Cancel
+              </Button>
+              {editingCourse.status === "pending" && (
+                <Button
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={saving || approvingId === editingCourse.id}
+                  onClick={async () => {
+                    await handleSaveEdit();
+                    await handleApprove(editingCourse.id);
+                  }}
+                >
+                  <Upload className="w-4 h-4 mr-1.5" />
+                  Save & Import
+                </Button>
+              )}
+              <Button onClick={handleSaveEdit} disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

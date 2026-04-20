@@ -9174,15 +9174,29 @@ router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise
   }
 });
 
-router.get("/scrape/staged", async (_req: Request, res: Response): Promise<void> => {
+router.get("/scrape/staged", async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await pool.query(`
-      SELECT sc.*, u.name as university_name 
-      FROM scraped_courses sc 
-      JOIN universities u ON sc.university_id = u.id 
-      WHERE sc.status = 'pending' 
-      ORDER BY sc.created_at DESC
-    `);
+    const universityId = req.query.universityId ? parseInt(String(req.query.universityId), 10) : null;
+    const statusFilter = req.query.status ? String(req.query.status) : "pending";
+    const params: unknown[] = [];
+    const conditions: string[] = [];
+    if (statusFilter !== "all") {
+      params.push(statusFilter);
+      conditions.push(`sc.status = $${params.length}`);
+    }
+    if (universityId && !isNaN(universityId)) {
+      params.push(universityId);
+      conditions.push(`sc.university_id = $${params.length}`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const result = await pool.query(
+      `SELECT sc.*, u.name as university_name 
+       FROM scraped_courses sc 
+       JOIN universities u ON sc.university_id = u.id 
+       ${where}
+       ORDER BY sc.created_at DESC`,
+      params,
+    );
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
