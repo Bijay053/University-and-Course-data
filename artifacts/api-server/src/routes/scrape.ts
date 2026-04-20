@@ -7618,15 +7618,15 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // we deliberately skipped browser on the first pass. ASA's per-course pages
         // are JS-rendered — without this escalation, every Master course inherits the
         // university-level UG cached values (IELTS=6/PTE=50/TOEFL=60/CAE=169), which
-        // are wrong for postgrad. Run browser ONCE per course, only when static found
-        // zero English values. At concurrency=1 this adds ~5-10s per affected course.
+        // are wrong for postgrad. Run browser ONCE per course whenever any English
+        // field is still missing (NOT all-four-populated). IMPORTANT: we guard on
+        // "not all four set" (De Morgan of the old all-empty guard) because Tier 3
+        // above may have already filled IELTS from the shared static page text, which
+        // would have made !ieltsOverall = false and skipped this block entirely.
         if (
           disableBrowserForHeavyHost &&
           !wasBrowserFetch &&
-          !cheerioData.ieltsOverall &&
-          !cheerioData.pteOverall &&
-          !cheerioData.toeflOverall &&
-          !(cheerioData as any).cambridgeOverall
+          !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && (cheerioData as any).cambridgeOverall)
         ) {
           try {
             const browserResult = await runBrowser();
@@ -7653,6 +7653,47 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                   message: `[per-course browser ✓] ${link.name.slice(0, 60)} — IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
                   phase: "fallback",
                 });
+
+                // Tier 3.5-V: Vision-AI image scan for sites that render their
+                // requirements as an image table (e.g. ASA, Newcastle).
+                // Only fires when text parsing still left PTE or TOEFL empty.
+                if (GEMINI_API_KEY && !(cheerioData.pteOverall && cheerioData.toeflOverall)) {
+                  const reqHtmlForImages = browserResult.requirementsHtml || renderedHtml;
+                  const $img = cheerio.load(reqHtmlForImages);
+                  const imgUrls: string[] = [];
+                  $img("img").each((_, el) => {
+                    const src = $img(el).attr("src") || $img(el).attr("data-src") || "";
+                    if (!src) return;
+                    if (/logo|icon|favicon|avatar|header|footer|social|banner|spinner|arrow|check|flag|bg-/i.test(src)) return;
+                    try {
+                      const abs = new URL(src, link.url).toString();
+                      if (!imgUrls.includes(abs)) imgUrls.push(abs);
+                    } catch {}
+                  });
+                  if (imgUrls.length > 0) {
+                    addLog(job, "status", {
+                      message: `[per-course vision] scanning ${Math.min(imgUrls.length, 4)} image(s) for ${link.name.slice(0, 40)}...`,
+                      phase: "fallback",
+                    });
+                    const visionMerged: Partial<CourseData> = {};
+                    for (const imgUrl of imgUrls.slice(0, 4)) {
+                      try {
+                        const vd = await analyzeImageWithGemini(imgUrl, `English language proficiency test score requirements table for: ${link.name}`);
+                        for (const [k, v] of Object.entries(vd)) {
+                          if (v != null && (visionMerged as any)[k] == null) (visionMerged as any)[k] = v;
+                        }
+                        if (visionMerged.pteOverall && visionMerged.toeflOverall) break;
+                      } catch {}
+                    }
+                    if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
+                      mergeEnglishRequirements(cheerioData, visionMerged);
+                      addLog(job, "status", {
+                        message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                        phase: "fallback",
+                      });
+                    }
+                  }
+                }
               }
             }
           } catch (e) {

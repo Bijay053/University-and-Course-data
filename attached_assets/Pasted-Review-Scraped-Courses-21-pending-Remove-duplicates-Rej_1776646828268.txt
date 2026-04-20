@@ -1,0 +1,234 @@
+Review Scraped Courses
+21 pending
+Remove duplicates
+Reject (21)
+Approve (21)
+Review each course below. Edit any details, then approve to save to the database or reject to discard. Existing courses with the same name will be updated.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business (Management & Finance)
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Bachelor	6 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Bachelor of Business (Accounting)
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Bachelor	6 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Master of Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	4 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Diploma of Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Graduate Certificate & Diploma	2 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Master of Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	3 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Diploma of Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Certificate & Diploma	2 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Diploma of Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Certificate & Diploma	2 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Certificate of Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Graduate Certificate & Diploma	1 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Certificate of TESOL
+Education & Social Work
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Graduate Certificate & Diploma	2 Trimester			-	-	-	-		Sydney, Newcastle	On Campus	
+
+
+
+
+	
+Graduate Diploma of TESOL
+Education & Social Work
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Graduate Certificate & Diploma	2 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Certificate & Diploma	2 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Master of Arts (TESOL) (Professional)
+Education & Social Work
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	4 Trimester			-	-	-	-		Sydney, Newcastle	On Campus	
+
+
+
+
+	
+Master of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	3 Year			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Master of Arts (TESOL)
+Education & Social Work
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	3 Trimester			-	-	-	-		Sydney, Newcastle	On Campus	
+
+
+
+
+	
+Master of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Master	4 Trimester			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+52%	Bachelor	2 Year			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Certificate in Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing duration, missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: duration, internationalFee, ieltsOverall, intakeMonths | Warnings: low completeness score
+38%	Graduate Certificate	-			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Certificate of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing duration, missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: duration, internationalFee, ieltsOverall, intakeMonths | Warnings: low completeness score
+38%	Graduate Certificate	-			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall, intakeMonths | Warnings: low completeness score
+52%	Graduate Certificate & Diploma	8 Month			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Graduate Diploma of Business
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing duration, missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: degreeLevel, duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: duration, internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, weak course description, low completeness score
+29%	Graduate Certificate & Diploma	-			-	-	-	-		Newcastle	On Campus	
+
+
+
+
+	
+Master of Business Administration
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing duration, missing international fee, missing intake, missing English requirement, Conflicts: studyMode, Needs review: duration, studyMode, internationalFee, intakeMonths, ieltsOverall, pteOverall, toeflOverall | Missing: duration, internationalFee, ieltsOverall, intakeMonths | Warnings: missing academic requirement, low completeness score
+38%	Master	-			-	-	-	-		Newcastle	On Campus

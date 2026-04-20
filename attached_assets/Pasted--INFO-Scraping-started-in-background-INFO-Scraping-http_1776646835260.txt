@@ -1,0 +1,72 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://koi.edu.au/...
+[INFO ] Using university: KOI (ID: 12)
+[INFO ] Cleared 27 older pending staged rows for KOI before starting fresh scrape
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://koi.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://koi.edu.au/courses/ (high-priority probe)
+[INFO ] Switched to course listing: https://koi.edu.au/courses/
+[DISCOVER] Using provided university-level pages: feePage: https://koi.edu.au/international/fees, requirementsPage: https://koi.edu.au/future-students/admission-requirements/
+[CLASSIFY] Page type: listing — 21 course links found
+[DISCOVER] [ENGINE] Testing Fast Static Scraper — 21 direct links found, sampling pages...
+[DISCOVER] [ENGINE] Sample result: 3/3 pages yielded data statically
+[DISCOVER] [ENGINE] Fast Static Scraper selected
+[DISCOVER] [FAST] Listing page resolved — 21 direct course links found
+[DISCOVER] [FAST] Skipping sitemap
+[DISCOVER] [FAST] Skipping deep candidate research
+[WAITING ] Research complete. Found 21 course pages to fetch. Please review and confirm.
+[EXTRACT ] User confirmed — starting bulk course fetch...
+[EXTRACT ] [FAST] Fetching 21 course pages (concurrency 8, static-first)... (21 courses)
+[INFO ] Using university requirements page: https://koi.edu.au/future-students/admission-requirements/
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Batch concurrency: HTTP 32, browser 8
+[ 1/21] Fetching 1/21: Bachelor of Business (Accounting)
+[ 2/21] Fetching 2/21: Diploma of Accounting
+[ 3/21] Fetching 3/21: Bachelor of Business (Management & Finance)
+[ 4/21] Fetching 4/21: Diploma of Management
+[ 5/21] Fetching 5/21: Bachelor of Information Technology
+[ 6/21] Fetching 6/21: Diploma of Information Technology
+[ 7/21] Fetching 7/21: Master of Accounting
+[ 8/21] Fetching 8/21: Master of Arts (TESOL)
+[ 9/21] Fetching 9/21: Master of Arts (TESOL) (Professional)
+[ 10/21] Fetching 10/21: Master of Business Administration
+[ 11/21] Fetching 11/21: Master of Information Systems
+[ 12/21] Fetching 12/21: Master of Information Technology
+[ 13/21] Fetching 13/21: Master of Professional Accounting
+[ 14/21] Fetching 14/21: Graduate Certificate in Business
+[ 15/21] Fetching 15/21: Graduate Certificate of Information Systems
+[ 16/21] Fetching 16/21: Graduate Certificate of Information Technology
+[ 17/21] Fetching 17/21: Graduate Certificate of TESOL
+[ 18/21] Fetching 18/21: Graduate Diploma of Business
+[ 19/21] Fetching 19/21: Graduate Diploma of Information Systems
+[ 20/21] Fetching 20/21: Graduate Diploma of Information Technology
+[ 21/21] Fetching 21/21: Graduate Diploma of TESOL
+[INFO ] Classifying 15 courses with AI (batched)...
+✓ Bachelor of Business (Management & Finance)
+✓ Bachelor of Business (Accounting)
+✓ Master of Information Systems
+✓ Graduate Diploma of Information Systems
+✓ Master of Accounting
+✓ Diploma of Accounting
+✓ Diploma of Management
+✓ Graduate Certificate of Information Systems
+✓ Graduate Certificate of TESOL
+✓ Graduate Diploma of TESOL
+✓ Diploma of Information Technology
+✓ Master of Arts (TESOL) (Professional)
+✓ Master of Information Technology
+✓ Master of Arts (TESOL)
+✓ Master of Professional Accounting
+[EXTRACT ] Running full AI extraction on 6 courses that need it...
+✓ Bachelor of Information Technology
+✓ Graduate Certificate in Business
+✓ Graduate Certificate of Information Technology
+✓ Graduate Diploma of Information Technology
+✓ Graduate Diploma of Business [staged (cheerio only)]
+✓ Master of Business Administration
+[EXTRACT ] [FAST] Static extraction success 21/21
+══ DONE ══ Found:21 | Staged:21 | Skipped:0 | Errors:0
+[INFO ] Recovered completed scrape job from staged course records.
+══ DONE ══ Found:21 | Staged:21 | Skipped:0 | Errors:0
