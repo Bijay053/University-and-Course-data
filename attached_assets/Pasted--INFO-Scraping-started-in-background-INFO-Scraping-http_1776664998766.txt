@@ -1,0 +1,46 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au/...
+[INFO ] Using university: VIT (ID: 16)
+[INFO ] Cleared 15 older pending staged rows for VIT before starting fresh scrape
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO ] Switched to course listing: https://vit.edu.au/course-list
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 16 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 13 candidates to identify genuine course pages...
+[DISCOVER] URL analysis: 7 candidate course pages identified, filtered out 6 non-course URLs
+[DISCOVER] Phase 2: Researching 7 candidates — sampling 7 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Diploma Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Information Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[DISCOVER] Research complete: 7/7 sampled pages are genuine course pages
+[DISCOVER] All 7 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (7 total).
+[DISCOVER] Category expansion found 23 additional course links (total: 30)
+[DISCOVER] High confidence: 7/7 samples valid (100%). Auto-proceeding with 30 courses (~1 min). (30 courses)
+[EXTRACT ] [SMART] Fetching 30 validated course pages (browser-first for JS-heavy, static-first for the rest)... (30 courses)
+[INFO ] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Rendering requirements page with browser (JS-heavy site)...
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...
+[INFO ] Batch concurrency: HTTP 1, browser 1 (heavy host: vit.edu.au)
+[ 1/30] Fetching 1/30: Bachelor Of Business
+[EXTRACT ] [browser ✓ intl] Bachelor Of Business — international_toggle_scripted[0]
+[ 2/30] Fetching 2/30: Diploma Of Business
+[EXTRACT ] [browser ✓ intl] Diploma Of Business — international_toggle_scripted[0]
+[ 3/30] Fetching 3/30: Mba Finance
+[EXTRACT ] [browser ✓ intl] Mba Finance — international_toggle_scripted[0]
+[ 4/30] Fetching 4/30: Mba Information Systems

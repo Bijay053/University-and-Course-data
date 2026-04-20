@@ -7262,7 +7262,25 @@ async function scrapeCourseBatch(
   // University-level English requirements (resolved ONCE, applied to every course in the batch).
   // Populated from the requirements page — first via static patterns, then AI if needed.
   let cachedEnglishReqs: Partial<CourseData> | null = null;
-  if (uniPages?.requirementsPage || uniPages?.entryPage) {
+
+  // Skip the shared university requirements page entirely for sites where the
+  // per-course page already contains every English test value (IELTS/PTE/TOEFL/
+  // CAE/DET) in the International view. Otherwise the shared page just adds
+  // noise and risks overwriting the per-course truth with a generic value.
+  const sampleHost = (() => {
+    try { return new URL(courseLinks[0]?.url || job.url || "").hostname.toLowerCase(); } catch { return ""; }
+  })();
+  const courseHasFullEnglishOnPage =
+    /(^|\.)vit\.edu\.au$/.test(sampleHost);
+
+  if (courseHasFullEnglishOnPage && (uniPages?.requirementsPage || uniPages?.entryPage)) {
+    addLog(job, "status", {
+      message: `Skipping shared university requirements page — ${sampleHost} course pages already contain full English requirements (per-course extraction is the source of truth).`,
+      phase: "fetch",
+    });
+  }
+
+  if (!courseHasFullEnglishOnPage && (uniPages?.requirementsPage || uniPages?.entryPage)) {
     try {
       const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
       const reqHtmlCandidate = await fetchPage(reqUrl);
