@@ -1,0 +1,55 @@
+
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://www.torrens.edu.au...
+[INFO ] Using university: Torrens University Australia (ID: 5)
+[INFO ] Cleared 1 older pending staged rows for Torrens University Australia before starting fresh scrape
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://www.torrens.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://www.torrens.edu.au/courses/course-guides (high-priority probe)
+[INFO ] Switched to course listing: https://www.torrens.edu.au/courses/course-guides
+[DISCOVER] Using provided university-level pages: feePage: https://www.torrens.edu.au/international-fees, feesPdf: https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule, entryPage: https://www.torrens.edu.au/courses/english, requirementsPage: https://www.torrens.edu.au/policies-and-forms
+[CLASSIFY] Page type: unknown — listing-style page without enough direct course links
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 1 sub-sitemaps...
+[DISCOVER] Sitemap: found 122 course URLs total
+[DISCOVER] [SMART] Sitemap found 122 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 122 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 122 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: www.torrens.edu.au)
+[SAMPLE✗] ✗ Online-only course with no physical campus: "Bachelor Of Architectural Technology"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Interior Design Residential"
+[SAMPLE✗] ✗ Online-only course with no physical campus: "Graduate Certificate Of Design"
+[SAMPLE✗] ✗ Online-only course with no physical campus: "Bachelor Of Nursing"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Graduate Certificate Of Public Health"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Applied Entrepreneurship Partnership With Ducere"
+[SAMPLE✗] ✗ Domestic-only course: "Diploma Of Business Sport Management"
+[SAMPLE✗] ✗ Domestic-only course: "Graduate Diploma Of Applied Business Partnership With Ducere"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master Of Business Administration Mba"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master Of Professional Accounting Advanced"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Diploma Of Cybersecurity"
+[SAMPLE✗] ✗ Domestic-only course: "Graduate Certificate In Autism And Neurodivergent Studies"
+[DISCOVER] Research complete: 6/12 sampled pages are genuine course pages
+[DISCOVER] Filtered out 19 non-course pages. Will fetch 103 validated course pages.
+[WAITING ] Research complete. Found 103 course pages to fetch. Please review and confirm.
+[EXTRACT ] User confirmed — starting bulk course fetch...
+[EXTRACT ] [SMART] Fetching 103 validated course pages (browser-first for JS-heavy, static-first for the rest)... (103 courses)
+[DISCOVER] Layout template from 3 sample page(s): course_card_panels (90% confidence) — template-first extraction when each page matches
+[INFO ] Saved university requirements page has NO English-test keywords — discarding to avoid wrong data: https://www.torrens.edu.au/policies-and-forms
+[INFO ] Batch concurrency: HTTP 8, browser 1 (heavy host: www.torrens.edu.au, browser disabled)
+[ 1/103] Fetching 1/103: Bachelor Of Architectural Technology
+[ 2/103] Fetching 2/103: Bachelor Of 3d Design And Animation
+[ 3/103] Fetching 3/103: Bachelor Of Game Design And Development
+[ 4/103] Fetching 4/103: Bachelor Of Game Programming
+[ 5/103] Fetching 5/103: Bachelor Of Branded Fashion Design
+[ 6/103] Fetching 6/103: Bachelor Of Communication Design
+[ 7/103] Fetching 7/103: Bachelor Of Media Production And Communication
+[ 8/103] Fetching 8/103: Diploma Of Media Production
+– Diploma Of Media Production [skipped]
+[ 9/103] Fetching 9/103: Bachelor Of Fashion Marketing And Enterprise
+– Bachelor Of Media Production And Communication [skipped]
+[ 10/103] Fetching 10/103: Bachelor Of Interior Design Commercial
+[FALLBACK] [per-course browser ✓] Bachelor Of Architectural Technology — IELTS=5.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 8 image(s) for Bachelor Of Architectural Technology...
