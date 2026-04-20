@@ -3087,31 +3087,49 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
   // one walks the DOM and pulls every <li> so all intake months are recorded.
   try {
     const $vit = cheerio.load(html);
-    const dateText = (n: AnyNode) => $vit(n).text().replace(/\s+/g, " ").trim();
-    let collected: string[] = [];
+    const cellText = (n: AnyNode) => $vit(n).text().replace(/\s+/g, " ").trim();
+
+    // Walk every label-like element once and collect <li> values from the next list,
+    // bucketed by which field the label refers to (intake / location / duration).
+    const buckets: { intake: string[]; location: string[]; duration: string[] } = {
+      intake: [], location: [], duration: [],
+    };
     $vit("p, h1, h2, h3, h4, h5, h6, strong, b, label, div").each((_, el) => {
-      if (collected.length > 0) return false;
-      const label = dateText(el);
-      if (!/^\s*(?:20\d{2}\s+)?intakes?\s*:?\s*$/i.test(label)) return undefined;
+      const label = cellText(el);
+      if (!label || label.length > 80) return;
+      let bucket: keyof typeof buckets | null = null;
+      if (/^\s*(?:20\d{2}\s+)?intakes?\s*:?\s*$/i.test(label)) bucket = "intake";
+      else if (/^\s*(?:campus(?:es)?|locations?|study\s+locations?|delivery\s+locations?)\s*:?\s*$/i.test(label)) bucket = "location";
+      else if (/^\s*(?:course\s+)?duration\s*:?\s*$/i.test(label)) bucket = "duration";
+      if (!bucket) return;
+      if (buckets[bucket].length > 0) return;
       const $next = $vit(el).nextAll("ul, ol").first();
-      if (!$next.length) return undefined;
-      const items = $next
-        .find("li")
-        .map((__, li) => dateText(li))
-        .get()
-        .filter(Boolean);
-      if (items.length > 0) collected = items;
-      return undefined;
+      if (!$next.length) return;
+      const items = $next.find("li").map((__, li) => cellText(li)).get().filter(Boolean);
+      if (items.length > 0) buckets[bucket] = items;
     });
-    if (collected.length > 0) {
-      const joined = collected.join(" ");
+
+    if (buckets.intake.length > 0) {
       const fresh: Partial<CourseData> = {};
-      extractIntakeMonths(joined, fresh);
+      extractIntakeMonths(buckets.intake.join(" "), fresh);
       if (fresh.intakeMonths?.length) {
-        // Override even if a previous path already set intakeMonths — VIT's
-        // explicit list is the source of truth here.
         data.intakeMonths = fresh.intakeMonths;
         if (fresh.intakeDays !== undefined) data.intakeDays = fresh.intakeDays;
+      }
+    }
+
+    if (buckets.location.length > 0) {
+      const vitCities = ["Melbourne", "Sydney", "Brisbane", "Adelaide", "Perth", "Canberra", "Geelong", "Gold Coast", "Hobart"];
+      const joined = buckets.location.join(" ");
+      const matched = vitCities.filter((c) => new RegExp(`\\b${c}\\b`, "i").test(joined));
+      if (matched.length > 0) data.courseLocation = matched.join(", ");
+      else if (!data.courseLocation) data.courseLocation = buckets.location.join(", ").slice(0, 200);
+    }
+
+    if (buckets.duration.length > 0 && (data.duration == null || !data.durationTerm)) {
+      for (const item of buckets.duration) {
+        const m = item.match(/(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)\b/i);
+        if (m) { applyDurationCandidate(data, m[1], m[2]); break; }
       }
     }
   } catch {}
