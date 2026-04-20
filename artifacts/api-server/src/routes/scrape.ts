@@ -7308,7 +7308,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       // Used by sites like asahe.edu.au where the requirements table is loaded by JS
       // and/or rendered as an image. We render with Playwright, re-parse the rendered
       // HTML, and as a last resort send any candidate images to Gemini Vision.
-      if (!cachedEnglishReqs && siteNeedsBrowser(reqUrl)) {
+      // NOTE: run even when cachedEnglishReqs is already set from AI — the AI text
+      // scan may have found IELTS only (e.g. from static page fragments), leaving
+      // PTE/TOEFL blank. The browser render fills those gaps and the result is merged.
+      if (siteNeedsBrowser(reqUrl) && !(cachedEnglishReqs?.pteOverall && cachedEnglishReqs?.toeflOverall)) {
         try {
           addLog(job, "status", { message: `Rendering requirements page with browser (JS-heavy site)...`, phase: "fetch" });
           const browserResult = await fetchPageWithBrowser(reqUrl, {
@@ -7329,7 +7332,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             applyEnglishResultToCourse(renderedReq, parseEnglishRequirementsFromText(renderedText, "browser"));
 
             if (renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall) {
-              cachedEnglishReqs = renderedReq;
+              // Merge: browser results fill slots the AI scan missed; AI values take
+              // precedence (they come from a more curated text extraction).
+              cachedEnglishReqs = { ...renderedReq, ...cachedEnglishReqs };
               addLog(job, "status", { message: `Browser-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall} CAE=${(renderedReq as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
             } else if (GEMINI_API_KEY) {
               // Still nothing — try vision-AI on every candidate image on the page.
