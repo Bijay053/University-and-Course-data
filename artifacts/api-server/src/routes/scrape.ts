@@ -7401,10 +7401,12 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const isHeavyBatchHost =
     /(^|\.)torrens\.edu\.au$/.test(batchHost) ||
     /(^|\.)vit\.edu\.au$/.test(batchHost) ||
-    /(^|\.)asahe\.edu\.au$/.test(batchHost);
+    /(^|\.)asahe\.edu\.au$/.test(batchHost) ||
+    /(^|\.)koi\.edu\.au$/.test(batchHost);
   const disableBrowserForHeavyHost =
     /(^|\.)torrens\.edu\.au$/.test(batchHost) ||
-    /(^|\.)asahe\.edu\.au$/.test(batchHost);
+    /(^|\.)asahe\.edu\.au$/.test(batchHost) ||
+    /(^|\.)koi\.edu\.au$/.test(batchHost);
   // Heavy hosts (Torrens, VIT, ASA) MUST stay sequential — bumping them causes hung
   // requests due to slow origin servers and aggressive bot-protection. ASA at
   // concurrency=1 already completes in ~130s (under 3 min target). Do not raise.

@@ -298,6 +298,7 @@ const JS_HEAVY_DOMAINS = [
   "newcastle.edu.au",
   "rmit.edu.au",
   "uts.edu.au",
+  "koi.edu.au",
 ];
 
 export function siteNeedsBrowser(url: string): boolean {
