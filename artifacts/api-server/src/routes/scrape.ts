@@ -7672,6 +7672,72 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // PROBE-B: after Tier-1/2 — what do we have before shared fallback?
         debugIelts(link.name, "B-after-tier1-2", { ieltsOverall: cheerioData.ieltsOverall, pteOverall: cheerioData.pteOverall });
 
+        // Tier 2.5-V: Per-course Vision-AI image scan when the browser-rendered
+        // page has IELTS but PTE/TOEFL/CAE are still missing. Many providers
+        // (VIT, ASA, Newcastle) put the full English-test matrix inside an image.
+        if (
+          GEMINI_API_KEY &&
+          wasBrowserFetch &&
+          !(cheerioData.pteOverall && cheerioData.toeflOverall)
+        ) {
+          const reqHtmlForImages = browserRequirementsHtml || cHtml;
+          const $img = cheerio.load(reqHtmlForImages);
+          const imgUrls: string[] = [];
+          $img("img").each((_, el) => {
+            const src = $img(el).attr("src") || $img(el).attr("data-src") || "";
+            if (!src) return;
+            if (/logo|icon|favicon|avatar|header|footer|social|banner|spinner|arrow|check|flag|bg-/i.test(src)) return;
+            try {
+              const abs = new URL(src, link.url).toString();
+              if (!imgUrls.includes(abs)) imgUrls.push(abs);
+            } catch {}
+          });
+          if (imgUrls.length > 0) {
+            const cap = Math.min(imgUrls.length, 8);
+            addLog(job, "status", {
+              message: `[course vision] scanning ${cap} image(s) for ${link.name.slice(0, 40)} (PTE/TOEFL still missing)`,
+              phase: "extract",
+            });
+            const visionMerged: Partial<CourseData> = {};
+            for (let vi = 0; vi < cap; vi++) {
+              try {
+                const vd = await analyzeImageWithGemini(
+                  imgUrls[vi],
+                  `English language proficiency test score requirements table for: ${link.name}. Look for IELTS, PTE Academic, TOEFL iBT, Cambridge CAE/C1 Advanced, and Duolingo bands and overall scores.`,
+                );
+                const found = Object.entries(vd).filter(([, v]) => v != null);
+                if (found.length > 0) {
+                  addLog(job, "status", {
+                    message: `[course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)}: ${found.map(([k, v]) => `${k}=${v}`).slice(0, 6).join(" ")}`,
+                    phase: "extract",
+                  });
+                }
+                for (const [k, v] of Object.entries(vd)) {
+                  if (v != null && (visionMerged as any)[k] == null) (visionMerged as any)[k] = v;
+                }
+                if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) break;
+              } catch (e) {
+                addLog(job, "status", {
+                  message: `[course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)} failed: ${(e as Error).message}`,
+                  phase: "extract",
+                });
+              }
+            }
+            if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
+              mergeEnglishRequirements(cheerioData, visionMerged);
+              addLog(job, "status", {
+                message: `[course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                phase: "extract",
+              });
+            } else {
+              addLog(job, "status", {
+                message: `[course vision ⚠] ${link.name.slice(0, 50)} — scanned ${cap} image(s), no English values found`,
+                phase: "extract",
+              });
+            }
+          }
+        }
+
         if (uniPages?.feesPdf && shouldRunSharedFeePdfWithHints(feedbackHints, cheerioData.internationalFee, cheerioData.currency, uniPages.feesPdf)) {
           try {
             const pdfData = await extractFeesFromPdf(uniPages.feesPdf, link.name, reviewSources);
