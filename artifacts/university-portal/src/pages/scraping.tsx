@@ -324,6 +324,8 @@ export default function Scraping() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [feePageUrl, setFeePageUrl] = useState("");
   const [requirementsPageUrl, setRequirementsPageUrl] = useState("");
+  const [scholarshipPageUrl, setScholarshipPageUrl] = useState("");
+  const [academicRequirementsPageUrl, setAcademicRequirementsPageUrl] = useState("");
   const [fastMode, setFastMode] = useState(false);
 
   const { data: uniData } = useListUniversities({ limit: 100 });
@@ -676,6 +678,8 @@ export default function Scraping() {
     }
     if (feePageUrl.trim()) uniBody.feePage = feePageUrl.trim();
     if (requirementsPageUrl.trim()) uniBody.requirementsPage = requirementsPageUrl.trim();
+    if (scholarshipPageUrl.trim()) uniBody.scholarshipPage = scholarshipPageUrl.trim();
+    if (academicRequirementsPageUrl.trim()) uniBody.academicRequirementsPage = academicRequirementsPageUrl.trim();
     if (fastMode) uniBody.fastMode = true;
     uniBodyRef.current = uniBody;
 
@@ -997,13 +1001,39 @@ export default function Scraping() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Entry Requirements Page URL
+                    English Requirements Page URL
                     <span className="ml-1 text-gray-400 font-normal">(optional — overrides auto-discovery)</span>
                   </label>
                   <Input
-                    placeholder="https://university.edu/entry-requirements"
+                    placeholder="https://university.edu/english-requirements"
                     value={requirementsPageUrl}
                     onChange={(e) => setRequirementsPageUrl(e.target.value)}
+                    className="bg-white h-9 text-sm"
+                    disabled={scraping}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Academic Requirements Page URL
+                    <span className="ml-1 text-gray-400 font-normal">(optional — academic/entry criteria)</span>
+                  </label>
+                  <Input
+                    placeholder="https://university.edu/academic-requirements"
+                    value={academicRequirementsPageUrl}
+                    onChange={(e) => setAcademicRequirementsPageUrl(e.target.value)}
+                    className="bg-white h-9 text-sm"
+                    disabled={scraping}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Scholarships Page URL
+                    <span className="ml-1 text-gray-400 font-normal">(optional — scholarship listings)</span>
+                  </label>
+                  <Input
+                    placeholder="https://university.edu/scholarships"
+                    value={scholarshipPageUrl}
+                    onChange={(e) => setScholarshipPageUrl(e.target.value)}
                     className="bg-white h-9 text-sm"
                     disabled={scraping}
                   />
@@ -1024,10 +1054,14 @@ export default function Scraping() {
                     setScrapeUrls([uni?.scrapeUrl || ""]);
                     setFeePageUrl(uni?.feePageUrl || "");
                     setRequirementsPageUrl(uni?.requirementsPageUrl || "");
-                    if (uni?.feePageUrl || uni?.requirementsPageUrl) setShowAdvanced(true);
+                    setScholarshipPageUrl((uni as { scholarshipPageUrl?: string })?.scholarshipPageUrl || "");
+                    setAcademicRequirementsPageUrl((uni as { academicRequirementsPageUrl?: string })?.academicRequirementsPageUrl || "");
+                    if (uni?.feePageUrl || uni?.requirementsPageUrl || (uni as { scholarshipPageUrl?: string })?.scholarshipPageUrl || (uni as { academicRequirementsPageUrl?: string })?.academicRequirementsPageUrl) setShowAdvanced(true);
                   } else {
                     setFeePageUrl("");
                     setRequirementsPageUrl("");
+                    setScholarshipPageUrl("");
+                    setAcademicRequirementsPageUrl("");
                   }
                 }}
                 universities={uniData?.data || []}
