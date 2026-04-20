@@ -3094,6 +3094,24 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
     const buckets: { intake: string[]; location: string[]; duration: string[] } = {
       intake: [], location: [], duration: [],
     };
+    // Strategy 0: <strong>/<b> label inside a <p>, value is the surrounding text.
+    //   <p><strong>Intake:</strong> Refer to Intake Dates</p>
+    //   <p><strong>Duration:</strong> Usually a 3 year course ...</p>
+    $vit("strong, b").each((_, el) => {
+      const labelText = cellText(el).replace(/:\s*$/, "");
+      if (!labelText || labelText.length > 40) return;
+      let bucket: keyof typeof buckets | null = null;
+      if (/^(?:20\d{2}\s+)?(?:intakes?|course\s+intakes?|start\s+dates?|commencement)$/i.test(labelText)) bucket = "intake";
+      else if (/^(?:campus(?:es)?|locations?|study\s+locations?|course\s+locations?|available\s+at)$/i.test(labelText)) bucket = "location";
+      else if (/^(?:course\s+)?(?:duration|course\s+length|program\s+length)$/i.test(labelText)) bucket = "duration";
+      if (!bucket || buckets[bucket].length > 0) return;
+      const $parent = $vit(el).parent();
+      const fullText = cellText($parent[0]);
+      const strongText = cellText(el);
+      const remainder = fullText.replace(strongText, "").replace(/^[\s:,-]+/, "").trim();
+      if (remainder && remainder.length < 400) buckets[bucket] = [remainder];
+    });
+
     $vit("p, h1, h2, h3, h4, h5, h6, strong, b, label, div, span").each((_, el) => {
       const label = cellText(el);
       if (!label || label.length > 120) return;
