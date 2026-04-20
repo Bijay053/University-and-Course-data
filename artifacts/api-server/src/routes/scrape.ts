@@ -6555,7 +6555,10 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
     } catch {}
   }
 
-  // Probe common university-level requirements paths (like the fee page probe above)
+  // Probe common university-level requirements paths (like the fee page probe above).
+  // Only accept a candidate if the page actually contains English-requirement keywords —
+  // generic /admissions or /policies pages must NOT be used as a requirements source,
+  // because they pollute every course with the wrong IELTS/TOEFL/PTE values.
   if (!result.requirementsPage && !result.entryPage) {
     const commonRequirementsPaths = [
       "/minimum-entry-requirement", "/minimum-entry-requirements",
@@ -6565,13 +6568,19 @@ async function discoverUniversityPages(siteUrl: string, job: ScrapeJob): Promise
       "/requirements", "/apply/requirements",
       "/study/entry-requirements", "/courses/entry-requirements",
       "/international-students/requirements",
-      "/policies-and-forms", "/policies", "/admissions", "/how-to-apply",
+      "/english-language-requirements", "/english-requirements",
     ];
     for (const path of commonRequirementsPaths) {
       try {
         const testUrl = `${origin}${path}`;
-        const resp = await fetch(testUrl, { method: "HEAD", headers: { "User-Agent": STEALTH_PROFILES[0]["User-Agent"], ...STEALTH_COMMON_HEADERS }, signal: AbortSignal.timeout(5000) });
-        if (resp.ok) {
+        const probeHtml = await fetchPage(testUrl);
+        if (!probeHtml) continue;
+        // Validate: must contain real English-requirement signals, not just be a generic page
+        const probeText = probeHtml.replace(/<[^>]+>/g, " ");
+        const hasEnglishSignals =
+          /\bIELTS\b/i.test(probeText) &&
+          (/\bTOEFL\b/i.test(probeText) || /\bPTE\b/i.test(probeText) || /english\s+(language\s+)?(requirement|proficiency)/i.test(probeText));
+        if (hasEnglishSignals) {
           result.requirementsPage = testUrl;
           addLog(job, "status", { message: `Found university requirements page via probe: ${testUrl}`, phase: "discover" });
           break;
