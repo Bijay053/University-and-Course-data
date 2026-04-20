@@ -1,0 +1,64 @@
+root@university-and-course-data:/opt/app# pm2 restart api-server --update-env
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 37   │ online    │ 0%       │ 16.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# sudo -u postgres psql -d university_portal << 'EOF'
+CREATE TABLE IF NOT EXISTS scrape_runtime_jobs (
+  runtime_job_id       TEXT PRIMARY KEY,
+  scraping_job_id      INTEGER REFERENCES scraping_jobs(id) ON DELETE SET NULL,
+  university_id        INTEGER REFERENCES universities(id) ON DELETE SET NULL,
+  university_name      TEXT,
+  url                  TEXT,
+  job_type             TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'queued',
+  request_payload      JSONB,
+  discovered_config    JSONB,
+  approval_summary     JSONB,
+  approval_decision    BOOLEAN,
+  stop_requested       BOOLEAN NOT NULL DEFAULT false,
+  fast_mode            BOOLEAN NOT NULL DEFAULT false,
+  imported             INTEGER NOT NULL DEFAULT 0,
+  skipped              INTEGER NOT NULL DEFAULT 0,
+  errors               INTEGER NOT NULL DEFAULT 0,
+  total_found          INTEGER NOT NULL DEFAULT 0,
+  current              INTEGER NOT NULL DEFAULT 0,
+  log_count            INTEGER NOT NULL DEFAULT 0,
+  claim_count          INTEGER NOT NULL DEFAULT 0,
+  worker_id            TEXT,
+  worker_pid           INTEGER,
+  heartbeat_at         TIMESTAMPTZ,
+  claimed_at           TIMESTAMPTZ,
+  started_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at         TIMESTAMPTZ,
+  error_message        TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS scrape_runtime_logs (
+  id              SERIAL PRIMARY KEY,
+  runtime_job_id  TEXT NOT NULL REFERENCES scrape_runtime_jobs(runtime_job_id) ON DELETE CASCADE,
+  sequence        INTEGER NOT NULL,
+  event           TEXT NOT NULL,
+  payload         JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS scrape_runtime_logs_runtime_job_sequence_idx
+  ON scrape_runtime_logs (runtime_job_id, sequence);
+GRANT ALL ON scrape_runtime_jobs TO uniportal;
+GRANT ALL ON scrape_runtime_logs TO uniportal;
+GRANT USAGE, SELECT ON SEQUENCE scrape_runtime_logs_id_seq TO uniportal;
+EOF
+NOTICE:  relation "scrape_runtime_jobs" already exists, skipping
+CREATE TABLE
+NOTICE:  relation "scrape_runtime_logs" already exists, skipping
+CREATE TABLE
+NOTICE:  relation "scrape_runtime_logs_runtime_job_sequence_idx" already exists, skipping
+CREATE INDEX
+GRANT
+GRANT
+GRANT
+root@university-and-course-data:/opt/app# 
