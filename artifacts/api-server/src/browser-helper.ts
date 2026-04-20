@@ -178,28 +178,122 @@ export async function fetchPageWithBrowser(
     const snapshots: string[] = [];
 
     // ── Step 1: Click International toggle ───────────────────────────────────
+    // We try every plausible candidate AND verify after each click that the
+    // international content actually rendered. The verification looks for
+    // markers that appear only in international view on toggleable sites:
+    //   - "Locations:" label (VIT shows campuses only for international)
+    //   - "International student" fee headings
+    // If a click doesn't change the page, we try the next selector.
+    const internationalRendered = async (): Promise<boolean> => {
+      try {
+        return await page.evaluate(() => {
+          const body = (document.body?.innerText || "").toLowerCase();
+          // VIT-style: Locations list visible (only shows for international)
+          if (/\blocations?\s*:/i.test(body) && /melbourne|sydney|adelaide|brisbane|perth|geelong/i.test(body)) return true;
+          // Generic: explicit international fee callouts
+          if (/international\s+(student\s+)?(tuition|fee|fees)/i.test(body)) return true;
+          // Active state on a toggle labeled International
+          const active = document.querySelectorAll('[aria-selected="true"], .active, .selected');
+          for (const el of Array.from(active)) {
+            const t = (el.textContent || "").trim().toLowerCase();
+            if (t === "international" || t.startsWith("international ")) return true;
+          }
+          return false;
+        });
+      } catch { return false; }
+    };
+
     if (clickInternational) {
-      for (const sel of INTERNATIONAL_SELECTORS) {
-        try {
-          const el = await page.$(sel);
-          if (!el) continue;
-          const visible = await el.isVisible();
-          if (!visible) continue;
-          const classes = (await el.getAttribute("class")) || "";
-          const ariaSelected = await el.getAttribute("aria-selected");
-          const alreadyActive =
-            classes.includes("active") || classes.includes("selected") || ariaSelected === "true";
-          if (!alreadyActive) await el.click();
-          // Wait for the page to re-render the international content (locations,
-          // intakes, fees often re-fetch). networkidle is best-effort and may
-          // time out on chatty sites — that's OK, we already waited 2s.
-          await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
-          await page.waitForTimeout(1500);
-          clicksPerformed.push("international_toggle");
-          break;
-        } catch {
-          // try next selector
+      // First, gather every candidate via a scripted scan — much more reliable
+      // than CSS :has-text on sites where "International" appears in body copy.
+      type Candidate = { kind: string; ref: any };
+      const scriptedCandidates = await page.evaluateHandle(() => {
+        const out: Element[] = [];
+        // 1) Radio inputs whose value/id mentions international
+        document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach((el) => {
+          const v = ((el as HTMLInputElement).value || "").toLowerCase();
+          const id = (el.id || "").toLowerCase();
+          const name = ((el as HTMLInputElement).name || "").toLowerCase();
+          if (v.includes("international") || id.includes("international") || name.includes("international")) out.push(el);
+        });
+        // 2) Elements whose direct text is exactly "International"
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+        let n: Node | null = walker.currentNode;
+        while ((n = walker.nextNode())) {
+          const el = n as HTMLElement;
+          const own = Array.from(el.childNodes)
+            .filter((c) => c.nodeType === 3)
+            .map((c) => (c.textContent || "").trim())
+            .join(" ")
+            .trim();
+          if (own.toLowerCase() === "international" && el.offsetParent !== null) {
+            out.push(el);
+          }
         }
+        // De-duplicate while preserving order
+        const seen = new Set<Element>();
+        const uniq: Element[] = [];
+        for (const el of out) { if (!seen.has(el)) { seen.add(el); uniq.push(el); } }
+        return uniq;
+      });
+
+      const handles = await scriptedCandidates.evaluateHandle((arr) => arr).then(() => null).catch(() => null);
+      // Iterate candidates via index (handles is unused; we re-enumerate below for click)
+      const candidateCount: number = await page.evaluate((els: any) => (els as Element[]).length, scriptedCandidates).catch(() => 0);
+
+      let toggled = false;
+      for (let i = 0; i < candidateCount; i++) {
+        if (toggled) break;
+        try {
+          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;
+              if (!el) return;
+              // Click the element OR its label/parent if it's a hidden radio
+              const target = (el as HTMLInputElement).type === "radio" || (el as HTMLInputElement).type === "checkbox"
+                ? (el.closest("label") as HTMLElement) || el
+                : el;
+              target.click();
+            },
+            { els: scriptedCandidates, idx: i },
+          );
+          await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+          await page.waitForTimeout(1200);
+          if (await internationalRendered()) {
+            toggled = true;
+            clicksPerformed.push(`international_toggle_scripted[${i}]`);
+            break;
+          }
+        } catch { /* try next */ }
+      }
+      void handles;
+
+      // Fallback to original CSS selector list
+      if (!toggled) {
+        for (const sel of INTERNATIONAL_SELECTORS) {
+          try {
+            const el = await page.$(sel);
+            if (!el) continue;
+            const visible = await el.isVisible();
+            if (!visible) continue;
+            const classes = (await el.getAttribute("class")) || "";
+            const ariaSelected = await el.getAttribute("aria-selected");
+            const alreadyActive =
+              classes.includes("active") || classes.includes("selected") || ariaSelected === "true";
+            if (!alreadyActive) await el.click();
+            await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+            await page.waitForTimeout(1200);
+            if (await internationalRendered()) {
+              toggled = true;
+              clicksPerformed.push(`international_toggle_css[${sel}]`);
+              break;
+            }
+          } catch { /* try next */ }
+        }
+      }
+
+      if (!toggled) {
+        clicksPerformed.push("international_toggle_NOT_VERIFIED");
       }
     }
 
