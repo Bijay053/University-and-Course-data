@@ -7501,8 +7501,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             cHtml = browserResult.mainHtml || browserResult.requirementsHtml;
             browserRequirementsHtml = browserResult.requirementsHtml || null;
             wasBrowserFetch = true;
-              addVerboseLog(job, "status", {
-              message: `[browser ✓] ${link.name.slice(0, 60)} (${browserResult.clicksPerformed.join(", ") || "no clicks"})`,
+            const clicks = browserResult.clicksPerformed.join(", ") || "no clicks";
+            const intlStatus = browserResult.clicksPerformed.find((c) => c.includes("international_toggle"))
+              || "international_toggle_NOT_TRIED";
+            const intlOk = intlStatus.includes("scripted") || intlStatus.includes("css");
+            addLog(job, "status", {
+              message: `[browser ${intlOk ? "✓ intl" : "⚠ NO intl"}] ${link.name.slice(0, 60)} — ${intlStatus}`,
+              phase: "extract",
+            });
+            addVerboseLog(job, "status", {
+              message: `[browser clicks] ${link.name.slice(0, 60)} → ${clicks}`,
               phase: "extract",
             });
           } else {
