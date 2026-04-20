@@ -446,7 +446,16 @@ function collectCandidatesForField(fieldKey: ReviewFieldKey, data: ReviewCourseD
 
 function resolveField(fieldKey: ReviewFieldKey, candidates: FieldCandidate[]): { resolution: FieldResolution; candidates: FieldCandidate[]; conflicts: FieldConflict[] } {
   const valid = candidates.filter((candidate) => candidate.validationStatus !== "rejected");
-  const sorted = [...valid].sort((a, b) => b.confidence - a.confidence);
+  // Course-page sources always take priority over related pages (fee_page,
+  // english_page, requirements_page, etc.). The user's rule: if the data is on
+  // the course page, use it — don't pull it from auto-discovered side pages.
+  // Within each tier the candidates are ranked by confidence.
+  const courseTier = valid.filter((c) => c.pageType === "course_page");
+  const otherTier  = valid.filter((c) => c.pageType !== "course_page");
+  const sortByConf = (a: FieldCandidate, b: FieldCandidate) => b.confidence - a.confidence;
+  const sorted = courseTier.length > 0
+    ? [...courseTier.sort(sortByConf), ...otherTier.sort(sortByConf)]
+    : otherTier.sort(sortByConf);
   const conflicts: FieldConflict[] = [];
 
   if (sorted.length === 0) {
@@ -458,13 +467,19 @@ function resolveField(fieldKey: ReviewFieldKey, candidates: FieldCandidate[]): {
   }
 
   const winner = sorted[0];
+  // Only flag a conflict when both candidates are from the same priority tier
+  // (both course_page, or both non-course-page). A course_page winner vs a
+  // fee_page/english_page with a different value is NOT a conflict — the course
+  // page is authoritative and we intentionally prefer it.
   const conflicting = sorted.find((candidate) =>
+    candidate !== winner &&
     candidate.normalizedValue &&
     winner.normalizedValue &&
     candidate.normalizedValue !== winner.normalizedValue &&
     candidate.sourceUrl &&
     winner.sourceUrl &&
-    candidate.sourceUrl !== winner.sourceUrl
+    candidate.sourceUrl !== winner.sourceUrl &&
+    candidate.pageType === winner.pageType  // same tier only
   );
   if (conflicting && Math.abs(conflicting.confidence - winner.confidence) < 0.15) {
     conflicts.push({
