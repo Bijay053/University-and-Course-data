@@ -184,6 +184,8 @@ type SharedUniversityPages = {
   requirementsPage?: string;
   entryPage?: string;
   requirementsPdf?: string;
+  scholarshipPage?: string;
+  academicRequirementsPage?: string;
 };
 
 interface CourseReviewContext {
@@ -8663,6 +8665,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     universityCity,
     feePage,
     requirementsPage,
+    scholarshipPage,
+    academicRequirementsPage,
     fastMode,
   } = req.body as {
     url: string;
@@ -8672,6 +8676,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     universityCity?: string;
     feePage?: string;
     requirementsPage?: string;
+    scholarshipPage?: string;
+    academicRequirementsPage?: string;
     fastMode?: boolean;
   };
 
@@ -8728,6 +8734,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     const universityUpdate: Partial<typeof universitiesTable.$inferInsert> = { scrapeUrl: url };
     if (feePage?.trim()) universityUpdate.feePageUrl = feePage.trim();
     if (requirementsPage?.trim()) universityUpdate.requirementsPageUrl = requirementsPage.trim();
+    if (scholarshipPage?.trim()) universityUpdate.scholarshipPageUrl = scholarshipPage.trim();
+    if (academicRequirementsPage?.trim()) universityUpdate.academicRequirementsPageUrl = academicRequirementsPage.trim();
     await db.update(universitiesTable).set(universityUpdate).where(eq(universitiesTable.id, uniId));
 
     const savedConfigRows = await db
@@ -8735,6 +8743,8 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
         scrapeConfig: universitiesTable.scrapeConfig,
         feePageUrl: universitiesTable.feePageUrl,
         requirementsPageUrl: universitiesTable.requirementsPageUrl,
+        scholarshipPageUrl: universitiesTable.scholarshipPageUrl,
+        academicRequirementsPageUrl: universitiesTable.academicRequirementsPageUrl,
       })
       .from(universitiesTable)
       .where(eq(universitiesTable.id, uniId));
@@ -8742,12 +8752,16 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     const savedUniversityPages: SharedUniversityPages = {
       ...(savedConfigRows[0]?.feePageUrl ? { feePage: savedConfigRows[0].feePageUrl } : {}),
       ...(savedConfigRows[0]?.requirementsPageUrl ? { requirementsPage: savedConfigRows[0].requirementsPageUrl } : {}),
+      ...(savedConfigRows[0]?.scholarshipPageUrl ? { scholarshipPage: savedConfigRows[0].scholarshipPageUrl } : {}),
+      ...(savedConfigRows[0]?.academicRequirementsPageUrl ? { academicRequirementsPage: savedConfigRows[0].academicRequirementsPageUrl } : {}),
     };
     const mergedManualPages: SharedUniversityPages = {
       ...(savedUniPages ?? {}),
       ...savedUniversityPages,
       ...(feePage ? { feePage } : {}),
       ...(requirementsPage ? { requirementsPage } : {}),
+      ...(scholarshipPage ? { scholarshipPage } : {}),
+      ...(academicRequirementsPage ? { academicRequirementsPage } : {}),
     };
     const manualPages = Object.values(mergedManualPages).some(Boolean) ? mergedManualPages : undefined;
     const initialLogs: PersistedRuntimeLogEvent[] = [{
