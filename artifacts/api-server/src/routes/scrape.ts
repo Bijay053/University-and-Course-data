@@ -218,6 +218,7 @@ interface ScrapeJob {
   url?: string;
   stopped?: boolean;
   fastMode?: boolean;
+  bulkMode?: boolean;
   discoveredConfig?: ScrapeConfig;
   approvalSummary?: ApprovalSummary;
   awaitingApproval?: { resolve?: (proceed: boolean) => void; summary: ApprovalSummary };
@@ -7206,6 +7207,14 @@ async function runFastStaticScrape(
     estimatedMinutes: Math.max(1, Math.ceil(directLinks.length / 6)),
   };
 
+  if (job.bulkMode) {
+    job.approvalSummary = approvalSummary;
+    addLog(job, "status", {
+      message: `[FAST] Bulk mode — auto-proceeding with ${directLinks.length} course pages (no manual confirmation).`,
+      phase: "discover",
+      totalCourses: directLinks.length,
+    });
+  } else {
   const proceed = await waitForApproval(job, approvalSummary);
   clearAwaitingApproval(job);
   if (!proceed || job.stopped) {
@@ -7213,6 +7222,7 @@ async function runFastStaticScrape(
     job.status = "stopped";
     job.completedAt = Date.now();
     return;
+  }
   }
 
   addLog(job, "status", {
@@ -9017,6 +9027,15 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
         });
         // Notify the UI about what was found (informational, not blocking)
         job.approvalSummary = approvalSummary;
+      } else if (job.bulkMode) {
+        // Bulk mode — bypass the user approval gate so the queue can proceed
+        // through every university unattended.
+        job.approvalSummary = approvalSummary;
+        addLog(job, "status", {
+          message: `[SMART] Bulk mode — auto-proceeding with ${courseLinks.length} courses (no manual confirmation).`,
+          phase: "discover",
+          totalCourses: courseLinks.length,
+        });
       } else {
         // Low confidence — ask user before committing
         const proceed = await waitForApproval(job, approvalSummary);
@@ -9110,6 +9129,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     scholarshipPage,
     academicRequirementsPage,
     fastMode,
+    bulkMode,
   } = req.body as {
     url: string;
     universityId?: number;
@@ -9121,6 +9141,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
     scholarshipPage?: string;
     academicRequirementsPage?: string;
     fastMode?: boolean;
+    bulkMode?: boolean;
   };
 
   if (!urlRaw) { res.status(400).json({ error: "URL is required" }); return; }
@@ -9247,6 +9268,7 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
         universityCountry,
         manualPages,
         fastMode: effectiveFastMode,
+        bulkMode: !!bulkMode,
       },
       initialLogs,
     });
@@ -9507,6 +9529,7 @@ type StartRuntimePayload = {
   universityCountry?: string;
   manualPages?: SharedUniversityPages;
   fastMode?: boolean;
+  bulkMode?: boolean;
 };
 
 type RescrapeRuntimePayload = {
@@ -9535,6 +9558,7 @@ export async function executeRuntimeScrapeJob(runtimeJobId: string): Promise<voi
     universityName: record.universityName ?? undefined,
     url: record.url ?? undefined,
     fastMode: record.fastMode ?? false,
+    bulkMode: !!(record.requestPayload as Record<string, unknown> | null)?.bulkMode,
   };
 
   scrapeJobs.set(runtimeJobId, job);

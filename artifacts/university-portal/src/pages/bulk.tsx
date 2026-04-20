@@ -181,7 +181,7 @@ export default function Bulk() {
       const res = await fetch("/api/scrape/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: uni.scrapeUrl, universityId: uni.id }),
+        body: JSON.stringify({ url: uni.scrapeUrl, universityId: uni.id, bulkMode: true }),
       });
       const data = await readResponseJson<{ jobId?: string; error?: string }>(res);
       if (!res.ok || !data?.jobId) {
