@@ -7265,9 +7265,27 @@ async function scrapeCourseBatch(
   if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
       const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
-      uniReqsHtml = await fetchPage(reqUrl);
-      uniReqsText = cheerio.load(uniReqsHtml)("body").text();
-      addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
+      const reqHtmlCandidate = await fetchPage(reqUrl);
+      const reqTextCandidate = cheerio.load(reqHtmlCandidate)("body").text();
+
+      // Guard: a saved requirements URL is worthless (and actively harmful — it
+      // pollutes every course with the wrong values) if the page doesn't actually
+      // contain English-test keywords. Discard it instead of trusting blindly.
+      const hasEnglishMarker =
+        /\bIELTS\b/i.test(reqTextCandidate) &&
+        (/\bTOEFL\b/i.test(reqTextCandidate) || /\bPTE\b/i.test(reqTextCandidate) || /english\s+(language\s+)?(requirement|proficiency)/i.test(reqTextCandidate));
+
+      if (!hasEnglishMarker) {
+        addLog(job, "status", {
+          message: `Saved university requirements page has NO English-test keywords — discarding to avoid wrong data: ${reqUrl}`,
+          phase: "fetch",
+        });
+        uniReqsHtml = null;
+        uniReqsText = null;
+      } else {
+        uniReqsHtml = reqHtmlCandidate;
+        uniReqsText = reqTextCandidate;
+        addLog(job, "status", { message: `Using university requirements page: ${reqUrl}`, phase: "fetch" });
 
       // Extract English requirements from the shared page using the universal engine.
       const tempReqData: Partial<CourseData> = {};
@@ -7401,6 +7419,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           addLog(job, "status", { message: `Browser+vision fallback failed: ${(e as Error).message}`, phase: "fetch" });
         }
       }
+      } // end of else (hasEnglishMarker)
     } catch {}
   }
   if (!cachedEnglishReqs && uniPages?.requirementsPdf) {
