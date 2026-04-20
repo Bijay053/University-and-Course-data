@@ -48,6 +48,10 @@ export type EnglishRequirementResult = {
 export interface EnglishParseContext {
   courseName?: string | null;
   degreeLevel?: string | null;
+  /** When true, allow values that are normally filtered as CEFR-floor boilerplate
+   * (PTE=50, TOEFL=60). Set this when parsing text from a per-course browser
+   * render — those pages legitimately carry entry-level (UG) requirements. */
+  allowCefrFloor?: boolean;
 }
 
 // ── Minimal CourseData interface (only the fields we touch) ───────────────────
@@ -481,15 +485,28 @@ export function parseIelts(rawText: string): BandScore {
       return { overall, listening: min, reading: min, writing: min, speaking: min, confidence: 95 };
   }
 
-  // P2: "IELTS X.X overall with Y.Y in each band/component/skill"
+  // P2: "IELTS X.X overall with Y.Y in each band/component/skill/sub-skill"
+  //     Handles ASA phrasing "IELTS 6.0 overall, with 5.5 in each sub-skill"
   m = text.match(
-    /ielts(?:\s+academic)?[^a-z0-9]{0,40}([\d.]+)\s*overall[^a-z0-9]{0,40}(?:with\s*)?([\d.]+)\s*(?:in\s+each\s+(?:band|component|skill)|each\s+(?:band|component|skill))/i,
+    /ielts(?:\s+academic)?[^a-z0-9]{0,40}([\d.]+)\s*overall[^a-z0-9]{0,40}(?:with\s*)?([\d.]+)\s*(?:in\s+each\s+(?:band|component|sub-?skill|skill)|each\s+(?:band|component|sub-?skill|skill))/i,
   );
   if (m) {
     const overall = Number(m[1]);
     const each = Number(m[2]);
     if (overall >= 4 && overall <= 9 && each >= 4 && each <= 9)
       return { overall, listening: each, reading: each, writing: each, speaking: each, confidence: 90 };
+  }
+
+  // P2b: ASA table format "IELTS (Academic) | 6.0 overall, with 5.5 in each sub-skill"
+  //      Uses .{0,60}? (dot-all) to cross parentheses/pipes between IELTS and the score.
+  m = text.match(
+    /ielts.{0,60}?([4-9](?:\.[05])?)\s*overall[^.]{0,80}?(?:with\s*)?([\d.]+)\s*(?:in\s+each\s+(?:band|component|sub-?skill|skill)|each\s+(?:band|component|sub-?skill|skill))/i,
+  );
+  if (m) {
+    const overall = Number(m[1]);
+    const each = Number(m[2]);
+    if (overall >= 4 && overall <= 9 && each >= 4 && each <= 9)
+      return { overall, listening: each, reading: each, writing: each, speaking: each, confidence: 88 };
   }
 
   // P3: "IELTS overall X with no score less than Y" (alternate phrasing)
@@ -584,7 +601,7 @@ export function parseIelts(rawText: string): BandScore {
 
 // ── PTE Parser ────────────────────────────────────────────────────────────────
 
-export function parsePte(rawText: string): BandScore {
+export function parsePte(rawText: string, allowCefrFloor = false): BandScore {
   const text = normalizeWhitespace(rawText);
   if (!text.toLowerCase().includes("pte")) return emptyBandScore();
 
@@ -649,25 +666,23 @@ export function parsePte(rawText: string): BandScore {
   const plainM = text.match(/pte(?:\s+academic)?[:\s]+([\d.]+)/i);
   if (plainM) {
     const overall = Number(plainM[1]);
-    // Reject CEFR-floor boilerplate value (50). Real per-course PTE entry
-    // requirements are typically 58/65/71 — never exactly 50.
-    if (overall >= 10 && overall <= 90 && overall !== 50)
+    // Reject CEFR-floor boilerplate value (50) UNLESS this text came from a
+    // per-course browser render (allowCefrFloor=true), where 50 is a genuine
+    // bachelor-level entry requirement (e.g. ASA undergraduate programmes).
+    if (overall >= 10 && overall <= 90 && (overall !== 50 || allowCefrFloor))
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
   // P6: policy-table wording — "PTE (Pearson Test of English Academic) Academic Score of N"
   // ONLY accept this loose match if the value is in a realistic per-course entry-requirement
-  // band (>=51). The wording "Academic Score of 50" is universal CEFR-floor boilerplate that
-  // almost every Australian university lists for ELICOS/foundation pathways — it is NOT the
-  // bachelor/master entry requirement and should NOT pollute every course's PTE field.
-  // For real per-course requirements we rely on P1–P5 (explicit "PTE 58 with no skill below 50"
-  // wording) or, on image-based pages like ASA, the vision-AI fallback.
+  // band (>=51) unless allowCefrFloor is set (per-course browser render, e.g. ASA bachelor).
   m = text.match(
     /pte(?:\s*\([^)]*\))?(?:\s+academic)?[^0-9]{0,120}?(?:academic\s+)?score\s+of\s+([\d.]+)/i,
   );
   if (m) {
     const overall = Number(m[1]);
-    if (overall >= 51 && overall <= 90)
+    const minAllowed = allowCefrFloor ? 10 : 51;
+    if (overall >= minAllowed && overall <= 90)
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 60 };
   }
 
@@ -676,20 +691,20 @@ export function parsePte(rawText: string): BandScore {
 
 // ── TOEFL Parser ──────────────────────────────────────────────────────────────
 
-export function parseToefl(rawText: string): BandScore {
+export function parseToefl(rawText: string, allowCefrFloor = false): BandScore {
   const text = normalizeWhitespace(rawText);
   if (!text.toLowerCase().includes("toefl")) return emptyBandScore();
 
   // P0: ASA-style policy table — "TOEFL (Test of English as a Foreign Language) Internet
   // Based Test (iBT) 60 Overall" — number is explicitly followed by the word "Overall".
-  // NOTE: Reject overall == 60. That exact value is the universal CEFR-floor TOEFL iBT
-  // boilerplate that AU unis publish in policy tables — never a real per-course entry
-  // requirement. Real per-course minimums are typically 78/79/80+. For pages where 60 is
-  // genuinely the requirement (rare ELICOS pathways), the vision-AI fallback handles it.
+  // NOTE: Reject overall == 60 for shared/static policy pages. That exact value is the
+  // universal CEFR-floor TOEFL iBT boilerplate AU unis publish in policy tables.
+  // However, when allowCefrFloor=true (per-course browser render), 60 IS the genuine
+  // bachelor-level entry requirement (e.g. ASA undergraduate programmes) — accept it.
   let m = text.match(/toefl[^a-z\d]{0,300}?(\d{2,3})\s+overall\b/i);
   if (m) {
     const overall = Number(m[1]);
-    if (overall >= 30 && overall <= 120 && overall !== 60)
+    if (overall >= 30 && overall <= 120 && (overall !== 60 || allowCefrFloor))
       return { overall, listening: null, reading: null, writing: null, speaking: null, confidence: 88 };
   }
 
@@ -850,11 +865,15 @@ export function parseEnglishRequirementsFromText(
   context: EnglishParseContext = {},
 ): EnglishRequirementResult {
   if (!rawText) return emptyEnglishResult(source);
+  // Per-course browser renders may legitimately carry CEFR-floor values (PTE=50,
+  // TOEFL=60) as the actual bachelor entry requirement (e.g. ASA programmes).
+  // Context can also explicitly opt in via allowCefrFloor.
+  const allowCefrFloor = source === "browser" || context.allowCefrFloor === true;
   const generic = {
     source,
     ielts: parseIelts(rawText),
-    pte: parsePte(rawText),
-    toefl: parseToefl(rawText),
+    pte: parsePte(rawText, allowCefrFloor),
+    toefl: parseToefl(rawText, allowCefrFloor),
     cae: parseCae(rawText),
     det: parseDet(rawText),
     otherTests: parseOtherTests(rawText),

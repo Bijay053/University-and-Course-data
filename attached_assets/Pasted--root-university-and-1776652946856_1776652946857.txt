@@ -1,0 +1,87 @@
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# cd /opt/app
+git fetch origin
+git merge origin/replit-updates --no-edit
+pnpm --filter @workspace/api-server run build
+pnpm --filter @workspace/db run push
+pm2 restart api-server
+remote: Enumerating objects: 425, done.
+remote: Counting objects: 100% (146/146), done.
+remote: Total 425 (delta 146), reused 146 (delta 146), pack-reused 279 (from 1)
+Receiving objects: 100% (425/425), 15.65 MiB | 11.20 MiB/s, done.
+Resolving deltas: 100% (291/291), completed with 15 local objects.
+From https://github.com/Bijay053/University-and-Course-data
+ * [new branch]      replit-updates -> origin/replit-updates
+Auto-merging .env.example
+CONFLICT (add/add): Merge conflict in .env.example
+Auto-merging artifacts/api-server/src/index.ts
+CONFLICT (content): Merge conflict in artifacts/api-server/src/index.ts
+Auto-merging artifacts/api-server/src/routes/scrape.ts
+CONFLICT (content): Merge conflict in artifacts/api-server/src/routes/scrape.ts
+Auto-merging artifacts/api-server/src/services/scrape-runtime-jobs.ts
+CONFLICT (add/add): Merge conflict in artifacts/api-server/src/services/scrape-runtime-jobs.ts
+Auto-merging artifacts/university-portal/src/pages/bulk.tsx
+CONFLICT (content): Merge conflict in artifacts/university-portal/src/pages/bulk.tsx
+Auto-merging artifacts/university-portal/src/pages/scraping.tsx
+CONFLICT (content): Merge conflict in artifacts/university-portal/src/pages/scraping.tsx
+Auto-merging artifacts/university-portal/vite.config.ts
+CONFLICT (content): Merge conflict in artifacts/university-portal/vite.config.ts
+Auto-merging lib/db/src/schema/scraping.ts
+CONFLICT (content): Merge conflict in lib/db/src/schema/scraping.ts
+Automatic merge failed; fix conflicts and then commit the result.
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+✘ [ERROR] Unexpected "<<"
+
+    src/index.ts:90:0:
+      90 │ <<<<<<< HEAD
+         ╵ ~~
+
+✘ [ERROR] Unexpected "<<"
+
+    src/routes/scrape.ts:388:0:
+      388 │ <<<<<<< HEAD
+          ╵ ~~
+
+✘ [ERROR] Expected "}" but found ";"
+
+    src/services/scrape-runtime-jobs.ts:363:24:
+      363 │     runtimeJobId: string;
+          │                         ^
+          ╵                         }
+
+3 errors
+Error: Build failed with 3 errors:
+src/index.ts:90:0: ERROR: Unexpected "<<"
+src/routes/scrape.ts:388:0: ERROR: Unexpected "<<"
+src/services/scrape-runtime-jobs.ts:363:24: ERROR: Expected "}" but found ";"
+    at failureErrorWithLog (/opt/app/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1467:15)
+    at /opt/app/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:926:25
+    at /opt/app/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1345:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+/opt/app/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 build: `node ./build.mjs`
+Exit status 1
+
+> @workspace/db@0.0.0 push /opt/app/lib/db
+> drizzle-kit push --config ./drizzle.config.ts
+
+Reading config file '/opt/app/lib/db/drizzle.config.ts'
+DATABASE_URL, ensure the database is provisioned
+/opt/app/lib/db:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/db@0.0.0 push: `drizzle-kit push --config ./drizzle.config.ts`
+Exit status 1
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 31   │ online    │ 0%       │ 25.1mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# 
