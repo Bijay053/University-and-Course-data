@@ -7737,8 +7737,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
                 // Tier 3.5-V: Vision-AI image scan for sites that render their
                 // requirements as an image table (e.g. ASA, Newcastle).
-                // Only fires when text parsing still left PTE or TOEFL empty.
-                if (GEMINI_API_KEY && !(cheerioData.pteOverall && cheerioData.toeflOverall)) {
+                // Fires when ANY of these is true:
+                //   - PTE or TOEFL still empty
+                //   - IELTS overall present but band scores (L/R/W/S) all missing
+                //     (the bands are commonly only in the image table)
+                const ieltsBandsMissing = cheerioData.ieltsOverall != null && !(
+                  cheerioData.ieltsListening || cheerioData.ieltsReading ||
+                  cheerioData.ieltsWriting || cheerioData.ieltsSpeaking
+                );
+                const ptOrTofMissing = !(cheerioData.pteOverall && cheerioData.toeflOverall);
+                if (GEMINI_API_KEY && (ptOrTofMissing || ieltsBandsMissing)) {
                   const reqHtmlForImages = browserResult.requirementsHtml || renderedHtml;
                   const $img = cheerio.load(reqHtmlForImages);
                   const imgUrls: string[] = [];
