@@ -7697,6 +7697,39 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const cheerioData = extractWithCheerio(extractionHtml, link.url, link.name, universityCountry, batchPageTemplate, feedbackHints);
         if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
 
+        // Heavy-host full-text English scan: the truncated HTML (180 KB) and
+        // text (12 K chars) limits are set for performance, but English
+        // requirements are often deep in the page body — e.g. Torrens has
+        // IELTS at byte 471 K, well beyond both limits. When static extraction
+        // leaves IELTS blank on a heavy host, do a cheap second pass over the
+        // full raw HTML body text (no cheerio DOM parse, just a plain text
+        // scan) to recover the correct overall IELTS score before the
+        // expensive per-course browser escalation fires and may latch on to the
+        // minimum sub-band value instead.
+        if (isHeavyBatchHost && !wasBrowserFetch && !cheerioData.ieltsOverall && cHtml.length > MAX_HEAVY_HOST_HTML_CHARS) {
+          try {
+            const fullBodyText = cHtml
+              .replace(/<script[^]*?<\/script>/gi, " ")
+              .replace(/<style[^]*?<\/style>/gi, " ")
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ");
+            const englishSupplement: Partial<CourseData> = {};
+            const fullResult = parseEnglishRequirementsFromText(fullBodyText, "browser", {
+              courseName: cheerioData.courseName || link.name,
+              degreeLevel: cheerioData.degreeLevel,
+            });
+            applyEnglishResultToCourse(englishSupplement, fullResult);
+            if (englishSupplement.ieltsOverall) {
+              mergeEnglishRequirements(cheerioData, englishSupplement);
+              addLog(job, "status", {
+                message: `[heavy-host full-text scan ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"}`,
+                phase: "extract",
+              });
+            }
+          } catch { /* best-effort */ }
+        }
+        if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
+
         // VIT supplementary static fetch: when the browser fetched the page and
         // clicked the "International students" toggle, the international panel
         // sometimes does NOT contain a duration/intake/locations table — and
