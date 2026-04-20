@@ -1,0 +1,132 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au/...
+[INFO ] Using university: VIT (ID: 16)
+[INFO ] Cleared 30 older pending staged rows for VIT before starting fresh scrape
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO ] Switched to course listing: https://vit.edu.au/course-list
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 16 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 13 candidates to identify genuine course pages...
+[DISCOVER] URL analysis: 7 candidate course pages identified, filtered out 6 non-course URLs
+[DISCOVER] Phase 2: Researching 7 candidates — sampling 7 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Diploma Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Information Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[DISCOVER] Research complete: 7/7 sampled pages are genuine course pages
+[DISCOVER] All 7 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (7 total).
+[DISCOVER] Category expansion found 23 additional course links (total: 30)
+[DISCOVER] High confidence: 7/7 samples valid (100%). Auto-proceeding with 30 courses (~1 min). (30 courses)
+[EXTRACT ] [SMART] Fetching 30 validated course pages (browser-first for JS-heavy, static-first for the rest)... (30 courses)
+[INFO ] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Rendering requirements page with browser (JS-heavy site)...
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...
+[INFO ] Batch concurrency: HTTP 1, browser 1 (heavy host: vit.edu.au)
+[ 1/30] Fetching 1/30: Bachelor Of Business
+[EXTRACT ] [browser ✓ intl] Bachelor Of Business — international_toggle_scripted[0]
+[ 2/30] Fetching 2/30: Diploma Of Business
+[EXTRACT ] [browser ✓ intl] Diploma Of Business — international_toggle_scripted[0]
+[ 3/30] Fetching 3/30: Mba Finance
+[EXTRACT ] [browser ✓ intl] Mba Finance — international_toggle_scripted[0]
+[ 4/30] Fetching 4/30: Mba Information Systems
+[EXTRACT ] [browser ✓ intl] Mba Information Systems — international_toggle_css[li:has-text("International students")]
+[ 5/30] Fetching 5/30: Mba Leadership And Management
+[EXTRACT ] [browser ✓ intl] Mba Leadership And Management — international_toggle_scripted[0]
+[ 6/30] Fetching 6/30: Mba Project Management
+[EXTRACT ] [browser ✓ intl] Mba Project Management — international_toggle_scripted[0]
+[ 7/30] Fetching 7/30: Mba Tourism And Hospitality Management
+[EXTRACT ] [browser ✓ intl] Mba Tourism And Hospitality Management — international_toggle_css[li:has-text("International students")]
+[ 8/30] Fetching 8/30: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [browser ✓ intl] Bachelor of Information Technology and Systems (BITS) — international_toggle_scripted[0]
+[ 9/30] Fetching 9/30: Master of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] Master of Information Technology and Systems — international_toggle_scripted[0]
+[ 10/30] Fetching 10/30: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] GDITS-Graduate Diploma of Information Technology and Systems — international_toggle_scripted[0]
+[ 11/30] Fetching 11/30: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] GCITS-Graduate Certificate of Information Technology and Sys — international_toggle_scripted[0]
+[ 12/30] Fetching 12/30: Master of Business Administration
+[EXTRACT ] [browser ✓ intl] Master of Business Administration — international_toggle_scripted[0]
+[ 13/30] Fetching 13/30: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [browser ✓ intl] GDBA - Graduate Diploma of Business Administration — international_toggle_scripted[0]
+[ 14/30] Fetching 14/30: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [browser ✓ intl] GCBA - Graduate Certificate of Business Administration — international_toggle_scripted[0]
+[ 15/30] Fetching 15/30: BBus - International Business Management Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - International Business Management Specialisation — international_toggle_scripted[0]
+[ 16/30] Fetching 16/30: BBus - Tourism and Hospitality Management Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - Tourism and Hospitality Management Specialisation — international_toggle_scripted[0]
+[ 17/30] Fetching 17/30: BBus - Accounting Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - Accounting Specialisation — international_toggle_scripted[0]
+[ 18/30] Fetching 18/30: BBus - Human Resource Management Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - Human Resource Management Specialisation — international_toggle_scripted[0]
+[ 19/30] Fetching 19/30: BBus - Marketing Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - Marketing Specialisation — international_toggle_scripted[0]
+[ 20/30] Fetching 20/30: BBus - Business Technology Specialisation
+[EXTRACT ] [browser ✓ intl] BBus - Business Technology Specialisation — international_toggle_scripted[0]
+[ 21/30] Fetching 21/30: Certificate III in Commercial Cookery
+[EXTRACT ] [browser ✓ intl] Certificate III in Commercial Cookery — international_toggle_css[li:has-text("International students")]
+[ 22/30] Fetching 22/30: Certificate IV in Kitchen Management
+[EXTRACT ] [browser ✓ intl] Certificate IV in Kitchen Management — international_toggle_css[li:has-text("International students")]
+[ 23/30] Fetching 23/30: Certificate III in Patisserie
+[EXTRACT ] [browser ✓ intl] Certificate III in Patisserie — international_toggle_css[li:has-text("International students")]
+[ 24/30] Fetching 24/30: Certificate IV in Patisserie
+[EXTRACT ] [browser ✓ intl] Certificate IV in Patisserie — international_toggle_css[li:has-text("International students")]
+[ 25/30] Fetching 25/30: Diploma of Hospitality Management
+[EXTRACT ] [browser ✓ intl] Diploma of Hospitality Management — international_toggle_css[li:has-text("International students")]
+[ 26/30] Fetching 26/30: Advanced Diploma of Hospitality Management
+[EXTRACT ] [browser ✓ intl] Advanced Diploma of Hospitality Management — international_toggle_css[li:has-text("International students")]
+[ 27/30] Fetching 27/30: Certificate IV in Information Technology
+[EXTRACT ] [browser ✓ intl] Certificate IV in Information Technology — international_toggle_css[li:has-text("International students")]
+[ 28/30] Fetching 28/30: Diploma of Information Technology
+[EXTRACT ] [browser ✓ intl] Diploma of Information Technology — international_toggle_css[li:has-text("International students")]
+[ 29/30] Fetching 29/30: Advanced Diploma of Information Technology
+[EXTRACT ] [browser ✓ intl] Advanced Diploma of Information Technology — international_toggle_css[li:has-text("International students")]
+[ 30/30] Fetching 30/30: Certificate III in Carpentry
+[EXTRACT ] [browser ✓ intl] Certificate III in Carpentry — international_toggle_css[li:has-text("International students")]
+[INFO ] Classifying 30 courses with AI (batched)...
+✓ Bachelor Of Business
+✓ Diploma Of Business
+✓ Mba Finance
+✓ Mba Information Systems
+✓ Mba Leadership And Management
+✓ Mba Project Management
+✓ Mba Tourism And Hospitality Management
+✓ Bachelor of Information Technology and Systems (BITS)
+✓ Master of Information Technology and Systems
+✓ GDITS-Graduate Diploma of Information Technology and Systems
+✓ GCITS-Graduate Certificate of Information Technology and Systems
+✓ Master of Business Administration
+✓ GDBA - Graduate Diploma of Business Administration
+✓ GCBA - Graduate Certificate of Business Administration
+✓ BBus - International Business Management Specialisation
+✓ BBus - Tourism and Hospitality Management Specialisation
+✓ BBus - Accounting Specialisation
+✓ BBus - Human Resource Management Specialisation
+✓ BBus - Marketing Specialisation
+✓ BBus - Business Technology Specialisation
+✓ Certificate III in Commercial Cookery
+✓ Certificate IV in Kitchen Management
+✓ Certificate III in Patisserie
+✓ Certificate IV in Patisserie
+✓ Diploma of Hospitality Management
+✓ Advanced Diploma of Hospitality Management
+✓ Certificate IV in Information Technology
+✓ Diploma of Information Technology
+✓ Advanced Diploma of Information Technology
+✓ Certificate III in Carpentry
+══ DONE ══ Found:30 | Staged:30 | Skipped:0 | Errors:0
+[INFO ] Saved scraping config (30 links) for future no-AI re-scrapes
