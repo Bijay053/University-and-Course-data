@@ -3219,6 +3219,33 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
       applyDurationCandidate(data, durationMatch[1], durationMatch[2]);
     }
   }
+
+  // VIT campus-card fallback: when no inline "Locations:" label exists, the
+  // page renders campuses as <h4 class="rbt-card-title"><a>City</a></h4> cards
+  // under an "Our campus locations" heading (e.g. Bachelor Of Business,
+  // Diploma Of Business, MBA Finance pages). Walk those cards and collect
+  // the city names directly.
+  if (!data.courseLocation) {
+    try {
+      const $vit2 = cheerio.load(html);
+      const KNOWN_VIT_CAMPUSES = ["Sydney", "Melbourne", "Adelaide", "Geelong", "Brisbane", "Perth", "Hobart"];
+      const cardCities = new Set<string>();
+      $vit2("h4.rbt-card-title, .rbt-card-title").each((_, el) => {
+        const t = $vit2(el).text().replace(/\s+/g, " ").trim();
+        for (const city of KNOWN_VIT_CAMPUSES) {
+          if (new RegExp(`^${city}$`, "i").test(t) || new RegExp(`^${city}\\b`, "i").test(t)) {
+            cardCities.add(city);
+            break;
+          }
+        }
+      });
+      if (cardCities.size > 0) {
+        const order = ["Melbourne", "Sydney", "Adelaide", "Geelong", "Brisbane", "Perth", "Hobart"];
+        const ordered = order.filter((c) => cardCities.has(c));
+        data.courseLocation = ordered.join(", ");
+      }
+    } catch { /* best-effort */ }
+  }
 }
 
 async function analyzeImageWithGemini(imageUrl: string, context: string): Promise<Partial<CourseData>> {
