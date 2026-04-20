@@ -7263,24 +7263,7 @@ async function scrapeCourseBatch(
   // Populated from the requirements page — first via static patterns, then AI if needed.
   let cachedEnglishReqs: Partial<CourseData> | null = null;
 
-  // Skip the shared university requirements page entirely for sites where the
-  // per-course page already contains every English test value (IELTS/PTE/TOEFL/
-  // CAE/DET) in the International view. Otherwise the shared page just adds
-  // noise and risks overwriting the per-course truth with a generic value.
-  const sampleHost = (() => {
-    try { return new URL(courseLinks[0]?.url || job.url || "").hostname.toLowerCase(); } catch { return ""; }
-  })();
-  const courseHasFullEnglishOnPage =
-    /(^|\.)vit\.edu\.au$/.test(sampleHost);
-
-  if (courseHasFullEnglishOnPage && (uniPages?.requirementsPage || uniPages?.entryPage)) {
-    addLog(job, "status", {
-      message: `Skipping shared university requirements page — ${sampleHost} course pages already contain full English requirements (per-course extraction is the source of truth).`,
-      phase: "fetch",
-    });
-  }
-
-  if (!courseHasFullEnglishOnPage && (uniPages?.requirementsPage || uniPages?.entryPage)) {
+  if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
       const reqUrl = uniPages.requirementsPage || uniPages.entryPage!;
       const reqHtmlCandidate = await fetchPage(reqUrl);
@@ -7673,11 +7656,20 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         debugIelts(link.name, "B-after-tier1-2", { ieltsOverall: cheerioData.ieltsOverall, pteOverall: cheerioData.pteOverall });
 
         // Tier 2.5-V: Per-course Vision-AI image scan when the browser-rendered
-        // page has IELTS but PTE/TOEFL/CAE are still missing. Many providers
-        // (VIT, ASA, Newcastle) put the full English-test matrix inside an image.
+        // page has IELTS but PTE/TOEFL/CAE are still missing. Restricted to
+        // hosts known to render the English-test matrix as an image (ASA,
+        // Newcastle). Other hosts (VIT, Torrens, KOI) put English requirements
+        // in text — scanning their decorative images just wastes Gemini calls.
+        const linkHostForVision = (() => {
+          try { return new URL(link.url).hostname.toLowerCase(); } catch { return ""; }
+        })();
+        const hostUsesImageEnglishTable =
+          /(^|\.)asahe\.edu\.au$/.test(linkHostForVision) ||
+          /(^|\.)newcastle\.edu\.au$/.test(linkHostForVision);
         if (
           GEMINI_API_KEY &&
           wasBrowserFetch &&
+          hostUsesImageEnglishTable &&
           !(cheerioData.pteOverall && cheerioData.toeflOverall)
         ) {
           const reqHtmlForImages = browserRequirementsHtml || cHtml;
