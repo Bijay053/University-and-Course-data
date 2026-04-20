@@ -1,0 +1,232 @@
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1085ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 32   │ online    │ 0%       │ 19.1mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# git rm --cached University-and-Course-data
+rm -rf University-and-Course-data
+git commit -m "Remove nested git repo"
+rm 'University-and-Course-data'
+[main 27ee322] Remove nested git repo
+ 1 file changed, 1 deletion(-)
+ delete mode 160000 University-and-Course-data
+root@university-and-course-data:/opt/app# cd /opt/app
+# Update the key in your .env file
+sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk/' .env
+pm2 restart api-server
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 33   │ online    │ 0%       │ 17.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# cd /opt/app
+pnpm --filter @workspace/university-portal run build
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1853 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-CTETbxVd.css  115.73 kB │ gzip:  19.21 kB
+dist/public/assets/index-BMzrw9gX.js   616.08 kB │ gzip: 180.47 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.30s
+root@university-and-course-data:/opt/app# # Check what's serving the frontend
+pm2 list
+nginx -t && systemctl reload nginx   # if nginx is involved
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 33   │ online    │ 0%       │ 331.9mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+root@university-and-course-data:/opt/app# # Full deploy command going forward:
+pnpm --filter @workspace/api-server run build
+pnpm --filter @workspace/university-portal run build
+pm2 restart api-server
+nginx -t && systemctl reload nginx   # only if nginx serves the frontend
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.7mb ⚠️
+  dist/workers/scrape-worker.mjs        4.6mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.0kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.0mb
+  dist/workers/scrape-worker.mjs.map    7.6mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.0kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1134ms
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1853 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-CTETbxVd.css  115.73 kB │ gzip:  19.21 kB
+dist/public/assets/index-BMzrw9gX.js   616.08 kB │ gzip: 180.47 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.68s
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 34   │ online    │ 0%       │ 18.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+root@university-and-course-data:/opt/app# cd /opt/app
+# Connect to the production database and run the migration
+psql "$DATABASE_URL" << 'EOF'
+CREATE TABLE IF NOT EXISTS scrape_runtime_jobs (
+  runtime_job_id       TEXT PRIMARY KEY,
+  scraping_job_id      INTEGER REFERENCES scraping_jobs(id) ON DELETE SET NULL,
+  university_id        INTEGER REFERENCES universities(id) ON DELETE SET NULL,
+  university_name      TEXT,
+  url                  TEXT,
+  job_type             TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'queued',
+  request_payload      JSONB,
+  discovered_config    JSONB,
+  approval_summary     JSONB,
+  approval_decision    BOOLEAN,
+  stop_requested       BOOLEAN NOT NULL DEFAULT false,
+  fast_mode            BOOLEAN NOT NULL DEFAULT false,
+  imported             INTEGER NOT NULL DEFAULT 0,
+  skipped              INTEGER NOT NULL DEFAULT 0,
+  errors               INTEGER NOT NULL DEFAULT 0,
+  total_found          INTEGER NOT NULL DEFAULT 0,
+  current              INTEGER NOT NULL DEFAULT 0,
+  log_count            INTEGER NOT NULL DEFAULT 0,
+  claim_count          INTEGER NOT NULL DEFAULT 0,
+  worker_id            TEXT,
+  worker_pid           INTEGER,
+  heartbeat_at         TIMESTAMPTZ,
+  claimed_at           TIMESTAMPTZ,
+  started_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at         TIMESTAMPTZ,
+  error_message        TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS scrape_runtime_logs (
+  id              SERIAL PRIMARY KEY,
+  runtime_job_id  TEXT NOT NULL REFERENCES scrape_runtime_jobs(runtime_job_id) ON DELETE CASCADE,
+  sequence        INTEGER NOT NULL,
+  event           TEXT NOT NULL,
+  payload         JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS scrape_runtime_logs_runtime_job_sequence_idx
+  ON scrape_runtime_logs (runtime_job_id, sequence);
+EOF
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:/opt/app# ^C
+root@university-and-course-data:/opt/app# # Option 1: use the DATABASE_URL from your .env
+export $(grep DATABASE_URL /opt/app/.env | xargs)
+psql "$DATABASE_URL" -c "\dt scrape_runtime*"
+                List of relations
+ Schema |        Name         | Type  |   Owner   
+--------+---------------------+-------+-----------
+ public | scrape_runtime_jobs | table | uniportal
+ public | scrape_runtime_logs | table | uniportal
+(2 rows)
+
+root@university-and-course-data:/opt/app# psql "$DATABASE_URL" << 'EOF'
+CREATE TABLE IF NOT EXISTS scrape_runtime_jobs (
+  runtime_job_id       TEXT PRIMARY KEY,
+  scraping_job_id      INTEGER REFERENCES scraping_jobs(id) ON DELETE SET NULL,
+  university_id        INTEGER REFERENCES universities(id) ON DELETE SET NULL,
+  university_name      TEXT,
+  url                  TEXT,
+  job_type             TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'queued',
+  request_payload      JSONB,
+  discovered_config    JSONB,
+  approval_summary     JSONB,
+  approval_decision    BOOLEAN,
+  stop_requested       BOOLEAN NOT NULL DEFAULT false,
+  fast_mode            BOOLEAN NOT NULL DEFAULT false,
+  imported             INTEGER NOT NULL DEFAULT 0,
+  skipped              INTEGER NOT NULL DEFAULT 0,
+  errors               INTEGER NOT NULL DEFAULT 0,
+  total_found          INTEGER NOT NULL DEFAULT 0,
+  current              INTEGER NOT NULL DEFAULT 0,
+  log_count            INTEGER NOT NULL DEFAULT 0,
+  claim_count          INTEGER NOT NULL DEFAULT 0,
+  worker_id            TEXT,
+  worker_pid           INTEGER,
+  heartbeat_at         TIMESTAMPTZ,
+  claimed_at           TIMESTAMPTZ,
+  started_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at         TIMESTAMPTZ,
+  error_message        TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS scrape_runtime_logs (
+  id              SERIAL PRIMARY KEY,
+  runtime_job_id  TEXT NOT NULL REFERENCES scrape_runtime_jobs(runtime_job_id) ON DELETE CASCADE,
+  sequence        INTEGER NOT NULL,
+  event           TEXT NOT NULL,
+  payload         JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS scrape_runtime_logs_runtime_job_sequence_idx
+  ON scrape_runtime_logs (runtime_job_id, sequence);
+EOF
+NOTICE:  relation "scrape_runtime_jobs" already exists, skipping
+CREATE TABLE
+NOTICE:  relation "scrape_runtime_logs" already exists, skipping
+CREATE TABLE
+NOTICE:  relation "scrape_runtime_logs_runtime_job_sequence_idx" already exists, skipping
+CREATE INDEX
+root@university-and-course-data:/opt/app# # Option 2: switch to postgres unix user
+sudo -u postgres psql -c "\l"
+# then run the SQL above replacing psql "$DATABASE_URL" with: sudo -u postgres psql -d your_db_name
+
+[1]+  Stopped                 sudo -u postgres psql -c "\l"
+root@university-and-course-data:/opt/app# 
