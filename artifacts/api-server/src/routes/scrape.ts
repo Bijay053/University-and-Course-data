@@ -7797,24 +7797,43 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                     } catch {}
                   });
                   if (imgUrls.length > 0) {
+                    const cap = Math.min(imgUrls.length, 8);
                     addLog(job, "status", {
-                      message: `[per-course vision] scanning ${Math.min(imgUrls.length, 4)} image(s) for ${link.name.slice(0, 40)}...`,
+                      message: `[per-course vision] scanning ${cap} image(s) for ${link.name.slice(0, 40)}...`,
                       phase: "fallback",
                     });
                     const visionMerged: Partial<CourseData> = {};
-                    for (const imgUrl of imgUrls.slice(0, 4)) {
+                    for (let vi = 0; vi < cap; vi++) {
+                      const imgUrl = imgUrls[vi];
                       try {
-                        const vd = await analyzeImageWithGemini(imgUrl, `English language proficiency test score requirements table for: ${link.name}`);
+                        const vd = await analyzeImageWithGemini(imgUrl, `English language proficiency test score requirements table for: ${link.name}. Look for IELTS, PTE Academic, TOEFL iBT, Cambridge CAE/C1 Advanced, and Duolingo bands and overall scores.`);
+                        const found = Object.entries(vd).filter(([, v]) => v != null);
+                        if (found.length > 0) {
+                          addLog(job, "status", {
+                            message: `[per-course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)}: ${found.map(([k, v]) => `${k}=${v}`).slice(0, 6).join(" ")}`,
+                            phase: "fallback",
+                          });
+                        }
                         for (const [k, v] of Object.entries(vd)) {
                           if (v != null && (visionMerged as any)[k] == null) (visionMerged as any)[k] = v;
                         }
-                        if (visionMerged.pteOverall && visionMerged.toeflOverall) break;
-                      } catch {}
+                        if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) break;
+                      } catch (e) {
+                        addLog(job, "status", {
+                          message: `[per-course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)} failed: ${(e as Error).message}`,
+                          phase: "fallback",
+                        });
+                      }
                     }
                     if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
                       mergeEnglishRequirements(cheerioData, visionMerged);
                       addLog(job, "status", {
                         message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                        phase: "fallback",
+                      });
+                    } else {
+                      addLog(job, "status", {
+                        message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${cap} image(s), none contained IELTS/PTE/TOEFL/CAE values`,
                         phase: "fallback",
                       });
                     }
