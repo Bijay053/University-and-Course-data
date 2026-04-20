@@ -1,0 +1,70 @@
+root@university-and-course-data:/opt/app# cd /opt/app
+
+# Take Replit branch's version for all conflicted files
+git checkout --theirs .env.example
+git checkout --theirs artifacts/api-server/src/index.ts
+git checkout --theirs artifacts/api-server/src/routes/scrape.ts
+git checkout --theirs artifacts/api-server/src/services/scrape-runtime-jobs.ts
+git checkout --theirs artifacts/university-portal/src/pages/bulk.tsx
+git checkout --theirs artifacts/university-portal/src/pages/scraping.tsx
+git checkout --theirs artifacts/university-portal/vite.config.ts
+git checkout --theirs lib/db/src/schema/scraping.ts
+
+# Mark all conflicts resolved and commit
+git add .
+git commit --no-edit -m "Merge replit-updates (conflict resolution: take theirs)"
+
+# Build and restart
+pnpm --filter @workspace/api-server run build
+pm2 restart api-server
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+Updated 1 path from the index
+warning: adding embedded git repository: University-and-Course-data
+hint: You've added another git repository inside your current repository.
+hint: Clones of the outer repository will not contain the contents of
+hint: the embedded repository and will not know how to obtain it.
+hint: If you meant to add a submodule, use:
+hint: 
+hint:   git submodule add <url> University-and-Course-data
+hint: 
+hint: If you added this path by mistake, you can remove it from the
+hint: index with:
+hint: 
+hint:   git rm --cached University-and-Course-data
+hint: 
+hint: See "git help submodule" for more information.
+[main 4451e4e] Merge replit-updates (conflict resolution: take theirs)
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.7mb ⚠️
+  dist/workers/scrape-worker.mjs        4.6mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.0kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.0mb
+  dist/workers/scrape-worker.mjs.map    7.6mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.0kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1085ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 32   │ online    │ 0%       │ 19.1mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:/opt/app# 
