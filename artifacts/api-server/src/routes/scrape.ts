@@ -8749,17 +8749,20 @@ router.post("/scrape/start", async (req: Request, res: Response): Promise<void> 
       .from(universitiesTable)
       .where(eq(universitiesTable.id, uniId));
     const savedUniPages = (savedConfigRows[0]?.scrapeConfig as Partial<ScrapeConfig> | null)?.uniPages;
+    const isPdfUrl = (u?: string | null) => !!u && /\.pdf(\?|#|$)/i.test(u);
+    const savedFeeRaw = savedConfigRows[0]?.feePageUrl ?? undefined;
+    const savedReqRaw = savedConfigRows[0]?.requirementsPageUrl ?? undefined;
     const savedUniversityPages: SharedUniversityPages = {
-      ...(savedConfigRows[0]?.feePageUrl ? { feePage: savedConfigRows[0].feePageUrl } : {}),
-      ...(savedConfigRows[0]?.requirementsPageUrl ? { requirementsPage: savedConfigRows[0].requirementsPageUrl } : {}),
+      ...(savedFeeRaw ? (isPdfUrl(savedFeeRaw) ? { feesPdf: savedFeeRaw } : { feePage: savedFeeRaw }) : {}),
+      ...(savedReqRaw ? (isPdfUrl(savedReqRaw) ? { requirementsPdf: savedReqRaw } : { requirementsPage: savedReqRaw }) : {}),
       ...(savedConfigRows[0]?.scholarshipPageUrl ? { scholarshipPage: savedConfigRows[0].scholarshipPageUrl } : {}),
       ...(savedConfigRows[0]?.academicRequirementsPageUrl ? { academicRequirementsPage: savedConfigRows[0].academicRequirementsPageUrl } : {}),
     };
     const mergedManualPages: SharedUniversityPages = {
       ...(savedUniPages ?? {}),
       ...savedUniversityPages,
-      ...(feePage ? { feePage } : {}),
-      ...(requirementsPage ? { requirementsPage } : {}),
+      ...(feePage ? (isPdfUrl(feePage) ? { feesPdf: feePage } : { feePage }) : {}),
+      ...(requirementsPage ? (isPdfUrl(requirementsPage) ? { requirementsPdf: requirementsPage } : { requirementsPage }) : {}),
       ...(scholarshipPage ? { scholarshipPage } : {}),
       ...(academicRequirementsPage ? { academicRequirementsPage } : {}),
     };
