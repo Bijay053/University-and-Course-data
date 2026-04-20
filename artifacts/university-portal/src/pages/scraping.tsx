@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useListUniversities } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -279,6 +280,7 @@ function fmtDate(s: string) {
 }
 
 export default function Scraping() {
+  const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -750,7 +752,11 @@ export default function Scraping() {
       ).then(setUniStats);
     }
     if (failedMessages.length > 0) {
-      window.alert(failedMessages.slice(0, 3).join("\n"));
+      toast({
+        title: `${failedIds.size} course(s) could not be published`,
+        description: failedMessages.slice(0, 3).join(" · "),
+        variant: "destructive",
+      });
     }
   };
 
@@ -767,7 +773,7 @@ export default function Scraping() {
         setStagedCourses((prev) => prev.filter((c) => c.id !== id));
         setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
       } else {
-        window.alert(await getFetchErrorMessage(res));
+        toast({ title: "Could not publish", description: await getFetchErrorMessage(res), variant: "destructive" });
       }
     } catch {}
     setApprovingId(null);
@@ -796,12 +802,12 @@ export default function Scraping() {
             return Array.from(byName.values());
           });
         }
-        window.alert(`Removed ${deleted} duplicate course(s). The list now shows only the newest copy of each course.`);
+        toast({ title: `Removed ${deleted} duplicate course(s)`, description: "The list now shows only the newest copy of each course." });
       } else {
-        window.alert(await getFetchErrorMessage(res));
+        toast({ title: "Dedup failed", description: await getFetchErrorMessage(res), variant: "destructive" });
       }
     } catch {
-      window.alert("Failed to clean up duplicates");
+      toast({ title: "Dedup failed", description: "Could not clean up duplicates. Please try again.", variant: "destructive" });
     }
   };
 
@@ -819,7 +825,7 @@ export default function Scraping() {
           }),
         });
         if (!res.ok) {
-          window.alert(await getFetchErrorMessage(res));
+          toast({ title: "Reject failed", description: await getFetchErrorMessage(res), variant: "destructive" });
           return;
         }
         succeededIds.add(id);
@@ -840,7 +846,7 @@ export default function Scraping() {
     try {
       const res = await fetch(`/api/scrape/staged/${id}/review`);
       if (!res.ok) {
-        window.alert(await getFetchErrorMessage(res));
+        toast({ title: "Could not load review", description: await getFetchErrorMessage(res), variant: "destructive" });
         return;
       }
       const data = await readResponseJson<CourseReviewPayload>(res);
@@ -857,7 +863,7 @@ export default function Scraping() {
         body: JSON.stringify(editingCourse),
       });
       if (!res.ok) {
-        window.alert(await getFetchErrorMessage(res));
+        toast({ title: "Save failed", description: await getFetchErrorMessage(res), variant: "destructive" });
         return;
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
