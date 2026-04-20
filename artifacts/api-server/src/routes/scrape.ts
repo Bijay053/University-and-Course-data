@@ -573,6 +573,12 @@ const MAX_RESEARCH_HTML_CHARS = 250000;
 const MAX_HEAVY_HOST_HTML_CHARS = 180000;
 const MAX_HEAVY_HOST_TEXT_CHARS = 12000;
 
+// ── Related-page dedup cache ─────────────────────────────────────────────────
+// Shared across all concurrent enrichFromRelatedPages calls within one batch
+// so that e.g. 32 KOI courses all pointing at the same /fees page result in
+// exactly ONE HTTP request, not 32.  Cleared at the start of each batch run.
+let _relatedPageCache: Map<string, Promise<string | null>> = new Map();
+
 function decodeBasicHtmlEntities(text: string): string {
   return text
     .replace(/&nbsp;/gi, " ")
@@ -3690,103 +3696,129 @@ async function enrichFromRelatedPages(
     !courseData.courseLocation ||
     !courseData.intakeMonths?.length;
 
+  // Wrapper: fetch a related page with a short per-page timeout (6s) so one
+  // slow sub-page does not hold up the entire batch.
+  // Uses the module-level dedup cache so that concurrent courses pointing at
+  // the same URL (e.g., all KOI courses → /fees) make only ONE HTTP request.
+  const fetchRelatedPage = (url: string): Promise<string | null> => {
+    const cached = _relatedPageCache.get(url);
+    if (cached) return cached;
+    const p = Promise.race([
+      fetchPage(url).catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]);
+    _relatedPageCache.set(url, p);
+    return p;
+  };
+
   const pagesToFetch: { url: string; type: string }[] = [];
-
-  // Prefer a dedicated international fee PDF before generic fee pages.
-  if (needsFees && relatedPages.feesPdf && !courseData.internationalFee) {
-    try {
-      const _pdfT0 = Date.now();
-      const pdfData = await extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "", evidenceCollector);
-      const _pdfMs = Date.now() - _pdfT0;
-      if (_pdfMs > 5000) process.stdout.write(`[enrich] feePdf ${_pdfMs}ms course="${courseData.courseName?.slice(0, 40)}"\n`);
-      if (pdfData.internationalFee) {
-        courseData.internationalFee = pdfData.internationalFee;
-        courseData.currency = pdfData.currency || "AUD";
-        courseData.feeTerm = pdfData.feeTerm || "Annual";
-        courseData.feeYear = pdfData.feeYear || undefined;
-      }
-    } catch {}
-  }
-
   if (needsFees && relatedPages.fees) pagesToFetch.push({ url: relatedPages.fees, type: "fees" });
   if ((needsAnyEnglish || needsFacts) && relatedPages.entry) pagesToFetch.push({ url: relatedPages.entry, type: "english" });
   if ((needsFees || needsAnyEnglish || needsFacts) && relatedPages.requirements) pagesToFetch.push({ url: relatedPages.requirements, type: "requirements" });
 
-  for (const page of pagesToFetch) {
-    try {
-      const pHtml = await fetchPage(page.url);
-      const text = cheerio.load(pHtml)("body").text();
-      const relatedCheerioData = extractWithCheerio(pHtml, page.url, courseData.courseName || "");
-      const pageLooksSpecific = relatedPageLooksCourseSpecific(pHtml, courseData.courseName);
-      if (evidenceCollector) {
-        evidenceCollector.push({
-          url: page.url,
-          pageType: page.type === "fees" ? "fee_page" : (page.type === "english" ? "english_page" : "requirements_page"),
-          extractionMethod: "cheerio",
-          content: text,
-        });
-      }
+  // ── Batch 1: ALL IO in parallel ──────────────────────────────────────────
+  // Fire every page fetch and PDF extraction simultaneously instead of
+  // sequentially. For KOI (and similar sites), this collapses 5–12s serial
+  // work to the duration of the single slowest call (~2s).
+  const [pageResults, feePdfData, reqPdfEnglish, reqPdfFacts] = await Promise.all([
+    // HTML pages
+    Promise.all(pagesToFetch.map((page) =>
+      fetchRelatedPage(page.url).then((pHtml) => (pHtml ? { page, pHtml } : null)),
+    )),
+    // Fee PDF (highest priority for fees)
+    needsFees && relatedPages.feesPdf
+      ? extractFeesFromPdf(relatedPages.feesPdf, courseData.courseName || "", evidenceCollector).catch(() => null)
+      : Promise.resolve(null),
+    // Requirements PDF — English
+    needsAnyEnglish && relatedPages.requirementsPdf
+      ? extractEnglishFromPdf(relatedPages.requirementsPdf).catch(() => null)
+      : Promise.resolve(null),
+    // Requirements PDF — course facts
+    needsFacts && relatedPages.requirementsPdf
+      ? extractCourseFactsFromPdf(relatedPages.requirementsPdf).catch(() => null)
+      : Promise.resolve(null),
+  ]);
 
-      if (page.type === "fees" || page.type === "requirements") {
+  // Apply fee PDF result (takes priority over page-scraped fee)
+  if (feePdfData?.internationalFee) {
+    const _pdfMs = Date.now() - _enrichT0;
+    if (_pdfMs > 5000) process.stdout.write(`[enrich] feePdf ${_pdfMs}ms course="${courseData.courseName?.slice(0, 40)}"\n`);
+    courseData.internationalFee = feePdfData.internationalFee;
+    courseData.currency = feePdfData.currency || "AUD";
+    courseData.feeTerm = feePdfData.feeTerm || "Annual";
+    courseData.feeYear = feePdfData.feeYear || undefined;
+  }
+
+  // Apply page results
+  for (const result of pageResults) {
+    if (!result) continue;
+    const { page, pHtml } = result;
+    const text = cheerio.load(pHtml)("body").text();
+    const relatedCheerioData = extractWithCheerio(pHtml, page.url, courseData.courseName || "");
+    const pageLooksSpecific = relatedPageLooksCourseSpecific(pHtml, courseData.courseName);
+    if (evidenceCollector) {
+      evidenceCollector.push({
+        url: page.url,
+        pageType: page.type === "fees" ? "fee_page" : (page.type === "english" ? "english_page" : "requirements_page"),
+        extractionMethod: "cheerio",
+        content: text,
+      });
+    }
+
+    if (page.type === "fees" || page.type === "requirements") {
+      if (!courseData.internationalFee) {
+        extractInternationalFees(text, courseData);
         if (!courseData.internationalFee) {
-          extractInternationalFees(text, courseData);
-          if (!courseData.internationalFee) {
-            const $pg = cheerio.load(pHtml);
-            extractFeeFromHtmlTables($pg, courseData);
-          }
-          if (!courseData.internationalFee && relatedCheerioData.internationalFee) {
-            courseData.internationalFee = relatedCheerioData.internationalFee;
-            courseData.currency = relatedCheerioData.currency || courseData.currency || "AUD";
-            courseData.feeTerm = relatedCheerioData.feeTerm || courseData.feeTerm;
-            courseData.feeYear = relatedCheerioData.feeYear || courseData.feeYear;
-          }
+          const $pg = cheerio.load(pHtml);
+          extractFeeFromHtmlTables($pg, courseData);
+        }
+        if (!courseData.internationalFee && relatedCheerioData.internationalFee) {
+          courseData.internationalFee = relatedCheerioData.internationalFee;
+          courseData.currency = relatedCheerioData.currency || courseData.currency || "AUD";
+          courseData.feeTerm = relatedCheerioData.feeTerm || courseData.feeTerm;
+          courseData.feeYear = relatedCheerioData.feeYear || courseData.feeYear;
         }
       }
-      if (page.type === "english" || page.type === "requirements") {
-        extractEnglishRequirements(text, courseData);
-        mergeEnglishRequirements(courseData, relatedCheerioData);
-      }
-      if (pageLooksSpecific) {
-        mergeMissingCourseFacts(courseData, relatedCheerioData);
-      }
-      // Intake months are course-specific; do not infer them from generic fee/requirements pages.
-    } catch {}
+    }
+    if (page.type === "english" || page.type === "requirements") {
+      extractEnglishRequirements(text, courseData);
+      mergeEnglishRequirements(courseData, relatedCheerioData);
+    }
+    if (pageLooksSpecific) {
+      mergeMissingCourseFacts(courseData, relatedCheerioData);
+    }
   }
 
-  if (needsAnyEnglish && relatedPages.requirementsPdf) {
-    try {
-      const pdfEnglish = await extractEnglishFromPdf(relatedPages.requirementsPdf);
-      mergeEnglishRequirements(courseData, pdfEnglish);
-    } catch {}
-  }
-  if (relatedPages.requirementsPdf && (!courseData.duration || !courseData.intakeMonths?.length || !courseData.courseLocation)) {
-    try {
-      const pdfFacts = await extractCourseFactsFromPdf(relatedPages.requirementsPdf);
-      if (!courseData.duration && pdfFacts.duration != null) courseData.duration = pdfFacts.duration;
-      if (!courseData.durationTerm && pdfFacts.durationTerm) courseData.durationTerm = pdfFacts.durationTerm;
-      if (!courseData.intakeMonths?.length && pdfFacts.intakeMonths?.length) courseData.intakeMonths = pdfFacts.intakeMonths;
-      if (!courseData.courseLocation && pdfFacts.courseLocation) courseData.courseLocation = pdfFacts.courseLocation;
-    } catch {}
+  // Apply requirements PDF results
+  if (reqPdfEnglish) mergeEnglishRequirements(courseData, reqPdfEnglish);
+  if (reqPdfFacts) {
+    if (!courseData.duration && reqPdfFacts.duration != null) courseData.duration = reqPdfFacts.duration;
+    if (!courseData.durationTerm && reqPdfFacts.durationTerm) courseData.durationTerm = reqPdfFacts.durationTerm;
+    if (!courseData.intakeMonths?.length && reqPdfFacts.intakeMonths?.length) courseData.intakeMonths = reqPdfFacts.intakeMonths;
+    if (!courseData.courseLocation && reqPdfFacts.courseLocation) courseData.courseLocation = reqPdfFacts.courseLocation;
   }
 
   if (needsAnyEnglish && html && courseUrl) {
     const validVisibleAmounts = new Set<number>(
       extractAllFeeAmounts(cheerio.load(html)("body").text()).map((n) => Math.round(n)),
     );
-    if (relatedPages.brochurePdf && !(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall)) {
-      try {
-        const pdfEnglish = await extractEnglishFromPdf(relatedPages.brochurePdf);
-        mergeEnglishRequirements(courseData, pdfEnglish);
-      } catch {}
-    }
-    if (relatedPages.brochurePdf && (!courseData.duration || !courseData.intakeMonths?.length || !courseData.courseLocation)) {
-      try {
-        const pdfFacts = await extractCourseFactsFromPdf(relatedPages.brochurePdf);
-        if (!courseData.duration && pdfFacts.duration != null) courseData.duration = pdfFacts.duration;
-        if (!courseData.durationTerm && pdfFacts.durationTerm) courseData.durationTerm = pdfFacts.durationTerm;
-        if (!courseData.intakeMonths?.length && pdfFacts.intakeMonths?.length) courseData.intakeMonths = pdfFacts.intakeMonths;
-        if (!courseData.courseLocation && pdfFacts.courseLocation) courseData.courseLocation = pdfFacts.courseLocation;
-      } catch {}
+
+    // ── Batch 2: brochure PDF (conditional on no English found) ──────────────
+    // Run English + facts extractions in parallel rather than sequentially.
+    const noEnglishYet = !(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall);
+    const needsFactsStill = !courseData.duration || !courseData.intakeMonths?.length || !courseData.courseLocation;
+    if (relatedPages.brochurePdf && (noEnglishYet || needsFactsStill)) {
+      const [brochureEnglish, brochureFacts] = await Promise.all([
+        noEnglishYet ? extractEnglishFromPdf(relatedPages.brochurePdf).catch(() => null) : Promise.resolve(null),
+        needsFactsStill ? extractCourseFactsFromPdf(relatedPages.brochurePdf).catch(() => null) : Promise.resolve(null),
+      ]);
+      if (brochureEnglish) mergeEnglishRequirements(courseData, brochureEnglish);
+      if (brochureFacts) {
+        if (!courseData.duration && brochureFacts.duration != null) courseData.duration = brochureFacts.duration;
+        if (!courseData.durationTerm && brochureFacts.durationTerm) courseData.durationTerm = brochureFacts.durationTerm;
+        if (!courseData.intakeMonths?.length && brochureFacts.intakeMonths?.length) courseData.intakeMonths = brochureFacts.intakeMonths;
+        if (!courseData.courseLocation && brochureFacts.courseLocation) courseData.courseLocation = brochureFacts.courseLocation;
+      }
     }
 
     // Only analyze images if NO English requirements were found via text/PDF extraction.
@@ -7376,6 +7408,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   const RETRY_CONCURRENCY = isHeavyBatchHost ? 1 : 12;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
+  // Reset the related-page dedup cache for this batch so stale responses from
+  // a previous run are never reused.
+  _relatedPageCache = new Map();
   // Courses that time out on the first pass are retried here.
   const retryQueue: { url: string; name: string; index: number }[] = [];
 
