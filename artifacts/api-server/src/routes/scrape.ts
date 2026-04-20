@@ -3094,18 +3094,53 @@ function applyVitSummaryExtraction(url: string, html: string, data: Partial<Cour
     const buckets: { intake: string[]; location: string[]; duration: string[] } = {
       intake: [], location: [], duration: [],
     };
-    $vit("p, h1, h2, h3, h4, h5, h6, strong, b, label, div").each((_, el) => {
+    $vit("p, h1, h2, h3, h4, h5, h6, strong, b, label, div, span").each((_, el) => {
       const label = cellText(el);
-      if (!label || label.length > 80) return;
+      if (!label || label.length > 120) return;
       let bucket: keyof typeof buckets | null = null;
-      if (/^\s*(?:20\d{2}\s+)?intakes?\s*:?\s*$/i.test(label)) bucket = "intake";
-      else if (/^\s*(?:campus(?:es)?|locations?|study\s+locations?|delivery\s+locations?)\s*:?\s*$/i.test(label)) bucket = "location";
-      else if (/^\s*(?:course\s+)?duration\s*:?\s*$/i.test(label)) bucket = "duration";
+      // Loosened label patterns — VIT pages use a mix of these across course types.
+      if (/^\s*(?:20\d{2}\s+)?(?:intakes?|course\s+intakes?|available\s+intakes?|start\s+dates?|class\s+start\s+dates?|commencement\s+dates?|next\s+intakes?)\s*:?\s*$/i.test(label)) bucket = "intake";
+      else if (/^\s*(?:campus(?:es)?|locations?|study\s+locations?|delivery\s+locations?|course\s+locations?|available\s+at)\s*:?\s*$/i.test(label)) bucket = "location";
+      else if (/^\s*(?:course\s+)?(?:duration|course\s+length|program\s+length|study\s+duration)\s*:?\s*$/i.test(label)) bucket = "duration";
       if (!bucket) return;
       if (buckets[bucket].length > 0) return;
-      const $next = $vit(el).nextAll("ul, ol").first();
-      if (!$next.length) return;
-      const items = $next.find("li").map((__, li) => cellText(li)).get().filter(Boolean);
+
+      // Strategy 1: next ul/ol sibling.
+      let items: string[] = [];
+      const $nextList = $vit(el).nextAll("ul, ol").first();
+      if ($nextList.length) {
+        items = $nextList.find("li").map((__, li) => cellText(li)).get().filter(Boolean);
+      }
+
+      // Strategy 2: parent's next ul/ol (label sits inside its own wrapper).
+      if (items.length === 0) {
+        const $parentNextList = $vit(el).parent().nextAll("ul, ol").first();
+        if ($parentNextList.length) {
+          items = $parentNextList.find("li").map((__, li) => cellText(li)).get().filter(Boolean);
+        }
+      }
+
+      // Strategy 3: any ul/ol inside the same parent container.
+      if (items.length === 0) {
+        const $siblingList = $vit(el).parent().find("ul, ol").first();
+        if ($siblingList.length && $siblingList.children("li").length) {
+          items = $siblingList.find("li").map((__, li) => cellText(li)).get().filter(Boolean);
+        }
+      }
+
+      // Strategy 4: next sibling text paragraph/div (no list at all).
+      if (items.length === 0) {
+        const $nextText = $vit(el).next("p, div, span");
+        const txt = cellText($nextText[0]);
+        if (txt && txt.length < 240 && txt !== label) items = [txt];
+      }
+
+      // Strategy 5: same-element inline value, e.g. "Duration: 3 Years".
+      if (items.length === 0) {
+        const inline = label.match(/^[^:]+:\s*(.{1,200})$/);
+        if (inline && inline[1].trim()) items = [inline[1].trim()];
+      }
+
       if (items.length > 0) buckets[bucket] = items;
     });
 
