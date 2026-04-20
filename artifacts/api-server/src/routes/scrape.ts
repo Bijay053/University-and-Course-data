@@ -7644,6 +7644,56 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
         const cheerioData = extractWithCheerio(extractionHtml, link.url, link.name, universityCountry, batchPageTemplate, feedbackHints);
         if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
+
+        // VIT supplementary static fetch: when the browser fetched the page and
+        // clicked the "International students" toggle, the international panel
+        // sometimes does NOT contain a duration/intake/locations table — and
+        // the toggle action removed the static `<p><strong>Duration:</strong>
+        // Usually a 3 year course...</p>` narrative paragraph from the rendered
+        // DOM. As a result, courses like Bachelor Of Business, Diploma Of
+        // Business, MBA Finance, and BBus - HR Specialisation lose ALL three
+        // fields. Fix: when extraction yields none of duration/intake/location
+        // for a VIT course, do one extra plain-HTTP GET of the same URL and
+        // re-run the bucketed extractor on the raw (pre-toggle) HTML, then
+        // merge any newly found values into cheerioData.
+        if (
+          wasBrowserFetch &&
+          /vit\.edu\.au/i.test(link.url) &&
+          (cheerioData.duration == null || !cheerioData.intakeMonths?.length || !cheerioData.courseLocation)
+        ) {
+          try {
+            const staticHtml = await fetchPage(link.url);
+            const staticOnly: Partial<CourseData> = {};
+            applyVitSummaryExtraction(link.url, staticHtml, staticOnly);
+            let merged: string[] = [];
+            if (cheerioData.duration == null && staticOnly.duration != null) {
+              cheerioData.duration = staticOnly.duration;
+              cheerioData.durationTerm = staticOnly.durationTerm;
+              merged.push(`duration=${staticOnly.duration} ${staticOnly.durationTerm}`);
+            }
+            if (!cheerioData.intakeMonths?.length && staticOnly.intakeMonths?.length) {
+              cheerioData.intakeMonths = staticOnly.intakeMonths;
+              if (staticOnly.intakeDays !== undefined) cheerioData.intakeDays = staticOnly.intakeDays;
+              merged.push(`intakes=${staticOnly.intakeMonths.join(",")}`);
+            }
+            if (!cheerioData.courseLocation && staticOnly.courseLocation) {
+              cheerioData.courseLocation = staticOnly.courseLocation;
+              merged.push(`location=${staticOnly.courseLocation}`);
+            }
+            if (merged.length > 0) {
+              addLog(job, "status", {
+                message: `[VIT static fallback ✓] ${link.name.slice(0, 50)} — recovered ${merged.join(", ")}`,
+                phase: "extract",
+              });
+            }
+          } catch (e) {
+            addLog(job, "status", {
+              message: `[VIT static fallback ⚠] ${link.name.slice(0, 50)}: ${(e as Error).message}`,
+              phase: "extract",
+            });
+          }
+        }
+
         const reviewSources: ReviewSource[] = [{
           url: link.url,
           pageType: "course_page",
