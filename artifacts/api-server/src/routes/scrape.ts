@@ -7535,6 +7535,17 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     addLog(job, "status", { message: "FAST MODE — browser automation disabled, using HTTP fetch only", phase: "fetch" });
   }
 
+  // Per-host cache of image URLs (and URL patterns) that yielded English-test
+  // values. ASA, Newcastle, etc. reuse the same requirements image across many
+  // courses; once we find a winning image on course 1, we should try it (and
+  // sibling URLs sharing the same path stem) FIRST on course 2..N to avoid the
+  // "sometimes works, sometimes doesn't" lottery from scanning only the first
+  // 8 page images.
+  const visionImageWinners = new Set<string>();
+  // Path-stem prefixes (e.g. "https://cdn.x.com/.../entry-requirements") of
+  // winning image URLs — used to prioritise sibling images on later courses.
+  const visionImageStemPrefixes = new Set<string>();
+
   const tasks = courseLinks.slice(0, max).map((link, i) =>
     sem(async () => {
       if (job.stopped) return;
@@ -7897,57 +7908,102 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 if (GEMINI_API_KEY && (ptOrTofMissing || ieltsBandsMissing)) {
                   const reqHtmlForImages = browserResult.requirementsHtml || renderedHtml;
                   const $img = cheerio.load(reqHtmlForImages);
-                  const imgUrls: string[] = [];
+                  const allImgUrls: string[] = [];
                   $img("img").each((_, el) => {
-                    const src = $img(el).attr("src") || $img(el).attr("data-src") || "";
+                    const src = $img(el).attr("src") || $img(el).attr("data-src") || $img(el).attr("data-lazy-src") || "";
                     if (!src) return;
-                    if (/logo|icon|favicon|avatar|header|footer|social|banner|spinner|arrow|check|flag|bg-/i.test(src)) return;
                     try {
                       const abs = new URL(src, link.url).toString();
-                      if (!imgUrls.includes(abs)) imgUrls.push(abs);
+                      if (!allImgUrls.includes(abs)) allImgUrls.push(abs);
                     } catch {}
                   });
-                  if (imgUrls.length > 0) {
-                    const cap = Math.min(imgUrls.length, 8);
+                  // Filtered list (drop obvious decorative chrome).
+                  const filteredImgUrls = allImgUrls.filter((u) =>
+                    !/logo|icon|favicon|avatar|header|footer|social|banner|spinner|arrow|check|flag|bg-/i.test(u)
+                  );
+                  // Build the prioritised scan order:
+                  //   1. Cached winning URLs from earlier courses on this host.
+                  //   2. URLs whose path-stem prefix matches a winning prefix.
+                  //   3. Remaining filtered URLs (first 8).
+                  const priority: string[] = [];
+                  const seen = new Set<string>();
+                  const push = (u: string) => { if (u && !seen.has(u)) { seen.add(u); priority.push(u); } };
+                  for (const w of visionImageWinners) if (filteredImgUrls.includes(w)) push(w);
+                  for (const u of filteredImgUrls) {
+                    for (const stem of visionImageStemPrefixes) {
+                      if (u.startsWith(stem)) { push(u); break; }
+                    }
+                  }
+                  for (const u of filteredImgUrls.slice(0, 8)) push(u);
+                  let scanList = priority;
+                  // If priority pass yields nothing, broaden to ALL images on the
+                  // page (unfiltered) — defends against requirements images that
+                  // are loaded via uncommon attributes / odd paths.
+                  const visionMerged: Partial<CourseData> = {};
+                  const recordWinner = (u: string) => {
+                    visionImageWinners.add(u);
+                    try {
+                      const parsed = new URL(u);
+                      const segs = parsed.pathname.split("/").filter(Boolean);
+                      if (segs.length > 0) {
+                        const stem = `${parsed.origin}/${segs.slice(0, Math.max(1, segs.length - 1)).join("/")}/`;
+                        visionImageStemPrefixes.add(stem);
+                      }
+                    } catch {}
+                  };
+                  const scanOnce = async (urls: string[], label: string) => {
                     addLog(job, "status", {
-                      message: `[per-course vision] scanning ${cap} image(s) for ${link.name.slice(0, 40)}...`,
+                      message: `[per-course vision${label}] scanning ${urls.length} image(s) for ${link.name.slice(0, 40)}...`,
                       phase: "fallback",
                     });
-                    const visionMerged: Partial<CourseData> = {};
-                    for (let vi = 0; vi < cap; vi++) {
-                      const imgUrl = imgUrls[vi];
+                    for (let vi = 0; vi < urls.length; vi++) {
+                      const imgUrl = urls[vi];
                       try {
                         const vd = await analyzeImageWithGemini(imgUrl, `English language proficiency test score requirements table for: ${link.name}. Look for IELTS, PTE Academic, TOEFL iBT, Cambridge CAE/C1 Advanced, and Duolingo bands and overall scores.`);
                         const found = Object.entries(vd).filter(([, v]) => v != null);
                         if (found.length > 0) {
+                          recordWinner(imgUrl);
                           addLog(job, "status", {
-                            message: `[per-course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)}: ${found.map(([k, v]) => `${k}=${v}`).slice(0, 6).join(" ")}`,
+                            message: `[per-course vision${label} img ${vi + 1}/${urls.length}] ${link.name.slice(0, 30)}: ${found.map(([k, v]) => `${k}=${v}`).slice(0, 6).join(" ")}`,
                             phase: "fallback",
                           });
                         }
                         for (const [k, v] of Object.entries(vd)) {
                           if (v != null && (visionMerged as any)[k] == null) (visionMerged as any)[k] = v;
                         }
-                        if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) break;
+                        if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) return true;
                       } catch (e) {
                         addLog(job, "status", {
-                          message: `[per-course vision img ${vi + 1}/${cap}] ${link.name.slice(0, 30)} failed: ${(e as Error).message}`,
+                          message: `[per-course vision${label} img ${vi + 1}/${urls.length}] ${link.name.slice(0, 30)} failed: ${(e as Error).message}`,
                           phase: "fallback",
                         });
                       }
                     }
-                    if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
-                      mergeEnglishRequirements(cheerioData, visionMerged);
-                      addLog(job, "status", {
-                        message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
-                        phase: "fallback",
-                      });
-                    } else {
-                      addLog(job, "status", {
-                        message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${cap} image(s), none contained IELTS/PTE/TOEFL/CAE values`,
-                        phase: "fallback",
-                      });
-                    }
+                    return false;
+                  };
+                  if (scanList.length > 0) {
+                    await scanOnce(scanList, "");
+                  }
+                  // Second pass: if we still have nothing, scan EVERY image on
+                  // the page (no decorative filter, no cap). This catches the
+                  // ASA case where the requirements PNG sits past index 8 or
+                  // matches the decorative-filter regex by coincidence.
+                  const stillEmpty = !(visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall);
+                  if (stillEmpty && allImgUrls.length > scanList.length) {
+                    const remaining = allImgUrls.filter((u) => !seen.has(u));
+                    if (remaining.length > 0) await scanOnce(remaining, " full-scan");
+                  }
+                  if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
+                    mergeEnglishRequirements(cheerioData, visionMerged);
+                    addLog(job, "status", {
+                      message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                      phase: "fallback",
+                    });
+                  } else if (allImgUrls.length > 0) {
+                    addLog(job, "status", {
+                      message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${allImgUrls.length} image(s), none contained IELTS/PTE/TOEFL/CAE values`,
+                      phase: "fallback",
+                    });
                   }
                 }
               }
@@ -8755,9 +8811,24 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
       ) {
         const before = courseLinks.length;
         courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);
+        // Re-dedupe after expansion: category probes often return the same course
+        // under different casings ("Bachelor of Business" vs "Bachelor Of Business")
+        // or trailing-slash URL variants, which sanitizeCourseLinks collapses by
+        // normalised name + URL. Without this, 9 ASA courses become 18.
+        const beforeDedupe = courseLinks.length;
+        const seenUrl = new Set<string>();
+        courseLinks = sanitizeCourseLinks(courseLinks).filter((l) => {
+          const u = l.url.replace(/\/+$/, "").toLowerCase();
+          if (seenUrl.has(u)) return false;
+          seenUrl.add(u);
+          return true;
+        });
+        const dropped = beforeDedupe - courseLinks.length;
         const added = courseLinks.length - before;
         if (added > 0) {
-          addLog(job, "status", { message: `Category expansion found ${added} additional course links (total: ${courseLinks.length})`, phase: "discover" });
+          addLog(job, "status", { message: `Category expansion found ${added} additional course links (total: ${courseLinks.length}${dropped > 0 ? `, deduped ${dropped}` : ""})`, phase: "discover" });
+        } else if (dropped > 0) {
+          addLog(job, "status", { message: `Deduped ${dropped} duplicate course link(s) after category expansion (total: ${courseLinks.length})`, phase: "discover" });
         }
       }
     }
