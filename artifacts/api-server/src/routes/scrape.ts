@@ -7352,6 +7352,11 @@ async function scrapeCourseBatch(
   // University-level English requirements (resolved ONCE, applied to every course in the batch).
   // Populated from the requirements page — first via static patterns, then AI if needed.
   let cachedEnglishReqs: Partial<CourseData> | null = null;
+  // Source URL and page-type for cachedEnglishReqs — used to create a proper
+  // reviewSource when the cached values are applied to individual courses, so
+  // the review engine can locate the evidence instead of creating a "derived"
+  // placeholder with no URL and confidence 0.45.
+  let cachedEnglishReqsSource: { url: string; pageType: ReviewSource["pageType"] } | null = null;
 
   if (uniPages?.requirementsPage || uniPages?.entryPage) {
     try {
@@ -7422,6 +7427,7 @@ async function scrapeCourseBatch(
         });
       } else if (tempReqData.ieltsOverall || tempReqData.pteOverall || tempReqData.toeflOverall) {
         cachedEnglishReqs = tempReqData;
+        cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
         addLog(job, "status", { message: `University requirements page: IELTS=${tempReqData.ieltsOverall} PTE=${tempReqData.pteOverall} TOEFL=${tempReqData.toeflOverall}`, phase: "fetch" });
       }
       if (!cachedEnglishReqs && GEMINI_API_KEY) {
@@ -7437,6 +7443,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           const enParsed = JSON.parse(enResult);
           if (enParsed.ieltsOverall || enParsed.pteOverall || enParsed.toeflOverall) {
             cachedEnglishReqs = enParsed;
+            cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
             addLog(job, "status", { message: `AI extracted university IELTS=${enParsed.ieltsOverall} PTE=${enParsed.pteOverall} TOEFL=${enParsed.toeflOverall}`, phase: "fetch" });
           }
         } catch {}
@@ -7473,6 +7480,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               // Merge: browser results fill slots the AI scan missed; AI values take
               // precedence (they come from a more curated text extraction).
               cachedEnglishReqs = { ...renderedReq, ...cachedEnglishReqs };
+              if (!cachedEnglishReqsSource) cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
               addLog(job, "status", { message: `Browser-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall} CAE=${(renderedReq as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
             } else if (GEMINI_API_KEY) {
               // Still nothing — try vision-AI on every candidate image on the page.
@@ -7501,6 +7509,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 }
                 if (merged.ieltsOverall || merged.pteOverall || merged.toeflOverall || (merged as any).cambridgeOverall) {
                   cachedEnglishReqs = merged;
+                  if (!cachedEnglishReqsSource) cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
                   addLog(job, "status", { message: `Vision-AI extracted from image: IELTS=${merged.ieltsOverall} PTE=${merged.pteOverall} TOEFL=${merged.toeflOverall} CAE=${(merged as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
                 }
               }
@@ -7518,6 +7527,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       const pdfEnglish = await extractEnglishFromPdf(uniPages.requirementsPdf);
       if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
         cachedEnglishReqs = pdfEnglish;
+        cachedEnglishReqsSource = { url: uniPages.requirementsPdf, pageType: "requirements_page" };
         addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
       }
     } catch {}
@@ -8199,24 +8209,44 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
         // Per-field: fills only slots still empty after the three tiers above.
         if (cachedEnglishReqs) {
+          let cachedApplied = false;
           if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
             cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
             cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || undefined;
             cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || undefined;
             cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
             cheerioData.ieltsSpeaking  = cachedEnglishReqs.ieltsSpeaking  || undefined;
+            cachedApplied = true;
             addVerboseLog(job, "status", { message: `[IELTS] cached hit: overall=${cachedEnglishReqs.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
           if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) {
             cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            cachedApplied = true;
             addVerboseLog(job, "status", { message: `[PTE] cached hit: overall=${cachedEnglishReqs.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
           if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) {
             cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            cachedApplied = true;
             addVerboseLog(job, "status", { message: `[TOEFL] cached hit: overall=${cachedEnglishReqs.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
-          if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
+          if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
           if (!(cheerioData as any).duolingoOverall && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
+          // Push a proper review source so the review engine can locate these
+          // values and assign course_page-level (or requirements_page-level)
+          // confidence instead of creating a "derived / derived" placeholder.
+          if (cachedApplied && cachedEnglishReqsSource) {
+            const sl: string[] = [];
+            if (cheerioData.ieltsOverall != null) sl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
+            if (cheerioData.pteOverall   != null) sl.push(`PTE ${cheerioData.pteOverall}`);
+            if (cheerioData.toeflOverall != null) sl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+            if (cheerioData.cambridgeOverall != null) sl.push(`Cambridge CAE ${cheerioData.cambridgeOverall}`);
+            reviewSources.push({
+              url: cachedEnglishReqsSource.url,
+              pageType: cachedEnglishReqsSource.pageType,
+              extractionMethod: "cheerio",
+              content: sl.join("\n"),
+            });
+          }
         }
 
         // Final summary log for this course (one clean line covering all tests)
@@ -8406,15 +8436,31 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }
           // Per-field cache fill (same logic as main batch)
           if (cachedEnglishReqs) {
+            let cachedAppliedRetry = false;
             if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
               cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
               cheerioData.ieltsReading = cachedEnglishReqs.ieltsReading || undefined;
               cheerioData.ieltsWriting = cachedEnglishReqs.ieltsWriting || undefined;
               cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
               cheerioData.ieltsSpeaking = cachedEnglishReqs.ieltsSpeaking || undefined;
+              cachedAppliedRetry = true;
             }
-            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
-            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) { cheerioData.pteOverall = cachedEnglishReqs.pteOverall; cachedAppliedRetry = true; }
+            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) { cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall; cachedAppliedRetry = true; }
+            if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedAppliedRetry = true; }
+            if (cachedAppliedRetry && cachedEnglishReqsSource) {
+              const sl: string[] = [];
+              if (cheerioData.ieltsOverall != null) sl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
+              if (cheerioData.pteOverall   != null) sl.push(`PTE ${cheerioData.pteOverall}`);
+              if (cheerioData.toeflOverall != null) sl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+              if (cheerioData.cambridgeOverall != null) sl.push(`Cambridge CAE ${cheerioData.cambridgeOverall}`);
+              reviewSources.push({
+                url: cachedEnglishReqsSource.url,
+                pageType: cachedEnglishReqsSource.pageType,
+                extractionMethod: "cheerio",
+                content: sl.join("\n"),
+              });
+            }
           }
           const courseData = cheerioToCourseData(cheerioData, name, url);
           if (uniReqsText && hasEnglishTestKeyword(uniReqsText)) {
