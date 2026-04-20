@@ -491,12 +491,32 @@ function resolveField(fieldKey: ReviewFieldKey, candidates: FieldCandidate[]): {
     });
   }
 
+  // If the only candidate is a derived (sourceless) fallback, we have no
+  // verifiable evidence. Reject it: show nothing rather than an unsourced value.
+  if (winner.pageType === "derived" || !winner.sourceUrl) {
+    for (const candidate of candidates) {
+      candidate.selected = false;
+      candidate.decisionStatus = "needs_review";
+    }
+    return {
+      resolution: {
+        fieldKey,
+        finalValue: null,
+        status: "needs_review",
+        decisionScore: 0,
+        reason: "No source link — derived value suppressed",
+      },
+      candidates,
+      conflicts,
+    };
+  }
+
   let status: FieldResolution["status"] = "accepted";
   let reason: string | null = null;
   if (conflicts.length > 0) {
     status = "needs_review";
     reason = conflicts[0].reason;
-  } else if (winner.confidence < 0.72 || winner.pageType === "derived") {
+  } else if (winner.confidence < 0.72) {
     status = "needs_review";
     reason = "Evidence is too weak for auto-publish";
   }
