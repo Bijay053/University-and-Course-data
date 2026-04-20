@@ -3445,7 +3445,7 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string, evidenceCo
       if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return null;
 
       const arrayBuffer = await resp.arrayBuffer();
-      if (arrayBuffer.byteLength > 5 * 1024 * 1024) return null;
+      if (arrayBuffer.byteLength > 25 * 1024 * 1024) return null;
       const buffer = Buffer.from(arrayBuffer);
 
       const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
