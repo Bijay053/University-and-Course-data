@@ -1,0 +1,87 @@
+Email Notification Check-list
+
+Application submition: Email must send to admin
+ 
+If document upload in application after submiting the application in stundent profile by agent: Email must send to admin 
+
+If admin staff upload document: Email must send to agent
+
+IF agent add chatter: Email must send to admin 
+if admin staff add cahtter: Email must send to agent
+
+if Task is assign in task managnet: Email must send to admin user who has been added to assign list
+
+if Task follower is added in task managnet: Email must send to admin user who is in follower list in every status change
+
+If annoucment is addedd: Email must send to agent
+
+If event is added: Email must send to agent
+
+If Payments is added: Email must send to agent
+
+If Payment Release Requests is added: Email must send to admin user who has permission 
+
+if Payment Release Requests uploaded invoice status is change: : Email must send to agent
+
+If Support Tickets is attached:  Email must send to admin user who has permission 
+
+If admin user add comment in support ticktes:  Email must send to agent
+
+If agents add comment in support tickets: Email must send to admin user who has permission 
+
+If event form is fillup: Email must send to admin user who has permission 
+
+If survery is release: Email must send to agent
+
+If agreement is sign up agent: Email must send to admin user who has permission 
+
+
+
+Portal Notification: Check list
+
+Application submition: Email must send to admin
+If document upload in application after submiting the application in stundent profile by agent: Email must send to admin 
+If admin staff upload document: Email must send to agent
+IF agent add chatter: Email must send to admin 
+if admin staff add cahtter: Email must send to agent
+if Task is assign in task managnet: Email must send to admin user who has been added to assign list
+if Task follower is added in task managnet: Email must send to admin user who is in follower list in every status change
+If annoucment is addedd: Email must send to agent
+If event is added: Email must send to agent
+If Payments is added: Email must send to agent
+If Payment Release Requests is added: Email must send to admin user who has permission 
+if Payment Release Requests uploaded invoice status is change: : Email must send to agent
+If Support Tickets is attached:  Email must send to admin user who has permission 
+If admin user add comment in support ticktes:  Email must send to agent
+If agents add comment in support tickets: Email must send to admin user who has permission 
+If event form is fillup: Email must send to admin user who has permission 
+If survery is release: Email must send to agent
+If agreement is sign up agent: Email must send to admin user who has permission
+If any feedback is submited: Email must send to admin user who has permission 
+If any report issue is submited: Email must send to admin user who has permission 
+
+
+Fix notification click redirection
+Check all notifications and make sure each one is clickable and redirects to the exact page and exact tab related to that notification, not just to a generic page.
+Example:
+ If the notification is for an agreement signature, clicking it should open the Settings page and automatically show the Agreement tab, not just redirect to the main Settings page.
+Requirement:
+ Each notification type must redirect users to its correct destination page, tab, section, or record based on the notification content.
+Expected behavior:
+Notification must be clickable
+Redirect must go to the correct module
+Correct tab should open automatically
+If needed, the related record or detail view should also open
+Do not send users to a generic landing page when a specific destination exists
+Examples:
+Agreement sign notification → Settings > Agreement tab
+Payment release request notification → Payment section with related request
+Task notification → Related task detail or correct task tab
+Application notification → Related application page with correct section open
+Event notification → Related event detail page
+Testing:
+ Review all notification types one by one and confirm:
+click works
+route is correct
+correct tab opens
+related data is shown properly

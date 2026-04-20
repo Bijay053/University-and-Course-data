@@ -7545,6 +7545,21 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // Path-stem prefixes (e.g. "https://cdn.x.com/.../entry-requirements") of
   // winning image URLs — used to prioritise sibling images on later courses.
   const visionImageStemPrefixes = new Set<string>();
+  // Per-degree-level English requirements cache. Universities like ASA publish
+  // identical IELTS/PTE/TOEFL/CAE bands across every undergraduate course and a
+  // separate identical set across every postgraduate course. Once vision has
+  // recovered values for one Bachelor (or one Master), reuse them on sibling
+  // courses where vision misses — instead of leaving 5 of 9 cards blank.
+  const englishByDegreeLevel = new Map<string, Partial<CourseData>>();
+  const degreeLevelKey = (degreeLevel?: string | null): string | null => {
+    if (!degreeLevel) return null;
+    const d = degreeLevel.toLowerCase();
+    if (/master|postgrad|graduate diploma|graduate cert/.test(d)) return "postgraduate";
+    if (/bachelor|undergrad|associate degree/.test(d)) return "undergraduate";
+    if (/diploma|certificate/.test(d)) return "vocational";
+    if (/doctor|phd/.test(d)) return "doctoral";
+    return d.slice(0, 32);
+  };
 
   const tasks = courseLinks.slice(0, max).map((link, i) =>
     sem(async () => {
@@ -8045,15 +8060,48 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                   }
                   if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
                     mergeEnglishRequirements(cheerioData, visionMerged);
+                    // Cache the recovered values at host+degreeLevel for sister
+                    // courses whose vision pass misses the requirements image.
+                    const dlk = degreeLevelKey(cheerioData.degreeLevel);
+                    if (dlk) {
+                      try {
+                        const ck = `${new URL(link.url).host.toLowerCase()}|${dlk}`;
+                        const prev = englishByDegreeLevel.get(ck) || {};
+                        const next: any = { ...prev };
+                        for (const k of ["ieltsOverall", "ieltsListening", "ieltsReading", "ieltsWriting", "ieltsSpeaking", "pteOverall", "pteListening", "pteReading", "pteWriting", "pteSpeaking", "toeflOverall", "toeflListening", "toeflReading", "toeflWriting", "toeflSpeaking", "cambridgeOverall", "duolingoOverall"]) {
+                          if (next[k] == null && (visionMerged as any)[k] != null) next[k] = (visionMerged as any)[k];
+                        }
+                        englishByDegreeLevel.set(ck, next);
+                      } catch {}
+                    }
                     addLog(job, "status", {
                       message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
                       phase: "fallback",
                     });
                   } else if (allImgUrls.length > 0) {
-                    addLog(job, "status", {
-                      message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${allImgUrls.length} image(s), none contained IELTS/PTE/TOEFL/CAE values`,
-                      phase: "fallback",
-                    });
+                    // Try the degree-level sibling cache before giving up.
+                    let siblingApplied = false;
+                    const dlk = degreeLevelKey(cheerioData.degreeLevel);
+                    if (dlk) {
+                      try {
+                        const ck = `${new URL(link.url).host.toLowerCase()}|${dlk}`;
+                        const cached = englishByDegreeLevel.get(ck);
+                        if (cached) {
+                          mergeEnglishRequirements(cheerioData, cached);
+                          siblingApplied = true;
+                          addLog(job, "status", {
+                            message: `[per-course vision ↻ sibling cache ${dlk}] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+                            phase: "fallback",
+                          });
+                        }
+                      } catch {}
+                    }
+                    if (!siblingApplied) {
+                      addLog(job, "status", {
+                        message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${allImgUrls.length} image(s), no sibling cache for ${dlk ?? "unknown degreeLevel"}`,
+                        phase: "fallback",
+                      });
+                    }
                   }
                 }
               }
@@ -8816,6 +8864,40 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
         for (const c of sitemapCandidates) {
           if (!seen.has(c.url)) { seen.add(c.url); rawCandidates.push(c); }
         }
+      }
+      // Dedupe by host + last-path-slug. The listing page often returns
+      // `/our-courses/bachelor-of-business` while the sitemap returns
+      // `/bachelor-of-business` — same course, different prefix paths. Plain
+      // URL comparison treats them as distinct and inflates the candidate
+      // pool (e.g. 9 ASA courses became 18). Slug comparison collapses them.
+      const slugDedup = new Map<string, { url: string; name: string }>();
+      const slugOf = (u: string): string | null => {
+        try {
+          const parsed = new URL(u);
+          const segs = parsed.pathname.replace(/\/+$/, "").split("/").filter(Boolean);
+          const last = segs[segs.length - 1] || "";
+          if (!last || /^index(\.html?)?$/i.test(last)) return null;
+          return `${parsed.host.toLowerCase()}|${last.toLowerCase()}`;
+        } catch { return null; }
+      };
+      const beforeSlug = rawCandidates.length;
+      for (const c of rawCandidates) {
+        const k = slugOf(c.url);
+        if (!k) { slugDedup.set(`__nokey__${c.url}`, c); continue; }
+        const existing = slugDedup.get(k);
+        if (!existing) { slugDedup.set(k, c); continue; }
+        // Prefer the URL whose path is shorter (typically the canonical one
+        // — sitemap entries are usually canonical, listing-page anchors often
+        // include a category prefix like /our-courses/).
+        if (c.url.length < existing.url.length) slugDedup.set(k, c);
+      }
+      rawCandidates = [...slugDedup.values()];
+      const slugDropped = beforeSlug - rawCandidates.length;
+      if (slugDropped > 0) {
+        addLog(job, "status", {
+          message: `[SMART] Slug dedupe collapsed ${slugDropped} duplicate URL(s) — ${rawCandidates.length} unique candidate(s) remain`,
+          phase: "discover",
+        });
       }
     }
 
