@@ -127,33 +127,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
     </div>
 
-    {/* Scroll-to-top: portal into body so overflow:hidden ancestors can't clip it */}
+    {/* Scroll-to-top: two-panel widget, portal into body */}
     {createPortal(
       <button
         onClick={scrollToTop}
         title="Back to top"
         aria-label="Back to top"
         className={cn(
-          "fixed bottom-20 right-10 z-[9999] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg",
-          "flex items-center justify-center transition-all duration-200",
-          "hover:bg-primary/90 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0",
-          showScrollTop ? "opacity-100 scale-100" : "opacity-40 scale-95"
+          "fixed bottom-6 right-6 z-[9999] flex items-stretch shadow-md rounded-sm overflow-hidden",
+          "transition-opacity duration-200 hover:shadow-lg",
+          showScrollTop ? "opacity-100" : "opacity-50"
         )}
       >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M5 10l7-7m0 0l7 7m-7-7v18"
-          />
-        </svg>
+        {/* Left panel – highlighted (active) */}
+        <div className="flex items-center justify-center gap-[3px] px-3 py-2 bg-white border-2 border-blue-400">
+          {[0,1,2,3].map((i) => (
+            <div key={i} className="w-[3px] h-5 bg-blue-300 rounded-full" />
+          ))}
+        </div>
+        {/* Right panel – muted */}
+        <div className="flex items-center justify-center gap-[3px] px-3 py-2 bg-gray-100 border border-gray-300 border-l-0">
+          {[0,1,2,3].map((i) => (
+            <div key={i} className="w-[3px] h-5 bg-gray-300 rounded-full" />
+          ))}
+        </div>
       </button>,
       document.body
     )}
