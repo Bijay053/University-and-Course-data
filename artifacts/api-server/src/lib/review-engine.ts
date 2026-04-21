@@ -563,24 +563,28 @@ function assessEligibility(data: ReviewCourseData, sources: ReviewSource[]): Eli
     };
   }
   if (data.onlineOnly || /\b(online only|fully online|distance education only|external only)\b/i.test(combined)) {
+    const intlEligible = !data.domesticOnly;
     return {
       studentMarket: /\b(international students|cricos|student visa)\b/i.test(combined) ? "international" : "unknown",
       deliveryMode: "online_only",
-      internationalEligible: !data.domesticOnly,
+      internationalEligible: intlEligible,
       onCampusAvailable: false,
-      eligibilityStatus: "rejected",
+      // Only hard-reject if domestic-only; online-only + internationally eligible = needs_review
+      eligibilityStatus: intlEligible ? "needs_review" : "rejected",
       reason: "Online-only evidence found",
       confidence: 0.94,
       evidenceText: evidence,
     };
   }
   if ((data.studyMode || "").trim().toLowerCase() === "online" && !data.courseLocation) {
+    const intlEligible = !data.domesticOnly;
     return {
       studentMarket: /\b(international students|cricos|student visa)\b/i.test(combined) ? "international" : "unknown",
       deliveryMode: "online_only",
-      internationalEligible: !data.domesticOnly,
+      internationalEligible: intlEligible,
       onCampusAvailable: false,
-      eligibilityStatus: "rejected",
+      // Only hard-reject if domestic-only; online-only + internationally eligible = needs_review
+      eligibilityStatus: intlEligible ? "needs_review" : "rejected",
       reason: "Study mode is online with no physical campus evidence",
       confidence: 0.93,
       evidenceText: evidence,
