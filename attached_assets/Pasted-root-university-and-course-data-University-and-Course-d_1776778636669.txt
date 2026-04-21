@@ -1,0 +1,103 @@
+root@university-and-course-data:~/University-and-Course-data# sed -n '400,500p' /root/University-and-Course-data/artifacts/api-server/src/browser-helper.ts
+    for (const sel of FEES_TAB_SELECTORS) {
+      try {
+        const el = await page.$(sel);
+        if (!el) continue;
+        const visible = await el.isVisible();
+        if (!visible) continue;
+        await el.click();
+        await page.waitForTimeout(1500);
+        clicksPerformed.push("fees_tab");
+        snapshots.push(await page.content());
+        break;
+      } catch {
+        // try next selector
+      }
+    }
+
+    // ── Step 5: Click English-test equivalence modals/links ─────────────────
+    try {
+      const ENGLISH_MODAL_PATTERNS_SRC = [
+        "another approved english",
+        "equivalent english(?:\\s+language)?\\s+test",
+        "english (?:test )?(?:score )?equivalen",
+        "accepted english (?:language\\s+)?tests?",
+        "alternative english (?:language\\s+)?tests?",
+        "english language (?:test\\s+)?scores?",
+        "english proficiency (?:tests?|requirements?)",
+        "view (?:full )?english (?:test\\s+)?(?:requirements?|scores?)",
+      ];
+      const triggerHandles = await page.evaluateHandle((patternStrs: string[]) => {
+        const patterns = patternStrs.map((s) => new RegExp(s, "i"));
+        const out: Element[] = [];
+        const sel = "a, button, span, summary, div[role='button'], [data-toggle='modal'], [data-bs-toggle='modal'], [data-target], [data-bs-target]";
+        document.querySelectorAll(sel).forEach((el) => {
+          const txt = (el.textContent || "").trim().slice(0, 250);
+          if (txt && patterns.some((p) => p.test(txt))) out.push(el);
+        });
+        return out;
+      }, ENGLISH_MODAL_PATTERNS_SRC);
+      const triggerCount: number = await page.evaluate(
+        (els: any) => (els as Element[]).length,
+        triggerHandles,
+      ).catch(() => 0);
+      clicksPerformed.push(`english_modal_scan[triggers=${triggerCount}]`);
+      console.log(`[BROWSER] english_modal_scan url=${url} triggers=${triggerCount}`);
+      let modalsOpened = 0;
+      for (let i = 0; i < Math.min(triggerCount, 6); i++) {
+        try {
+          const beforeLen = await page.evaluate(() => document.body.innerHTML.length).catch(() => 0);
+          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;
+              if (!el) return;
+              try { el.scrollIntoView({ block: "center" }); } catch {}
+              // Force-show any ancestor tab-pane / collapse so the click takes effect
+              let p: HTMLElement | null = el;
+              while (p) {
+                const cl = p.classList;
+                if (cl.contains("tab-pane") || cl.contains("collapse")) {
+                  cl.add("active", "show", "in"); cl.remove("fade");
+                  (p as HTMLElement).style.display = "block";
+                }
+                p = p.parentElement;
+              }
+              // Resolve modal by data-target / href="#id" and force-show it directly
+              const targetSel = el.getAttribute("data-bs-target") || el.getAttribute("data-target") || el.getAttribute("href") || "";
+              if (targetSel.startsWith("#") && targetSel.length > 1) {
+                const modal = document.querySelector(targetSel) as HTMLElement | null;
+                if (modal) {
+                  modal.classList.add("show", "in");
+                  modal.style.display = "block";
+                  modal.removeAttribute("aria-hidden");
+                }
+              }
+              try { el.click(); } catch {}
+              try { (el as any).dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); } catch {}
+            },
+            { els: triggerHandles, idx: i },
+          );
+          await page.waitForTimeout(1200);
+          const afterLen = await page.evaluate(() => document.body.innerHTML.length).catch(() => 0);
+          snapshots.push(await page.content());
+          modalsOpened++;
+          clicksPerformed.push(`english_modal[${i}] dom +${afterLen - beforeLen}`);
+          console.log(`[BROWSER] english_modal[${i}] url=${url} dom +${afterLen - beforeLen}`);
+          try {
+            await page.evaluate(() => {
+              const closeSel = "[data-dismiss='modal'], [data-bs-dismiss='modal'], .modal.show .close, .modal.show button[aria-label='Close']";
+              const btn = document.querySelector(closeSel) as HTMLElement | null;
+              if (btn) btn.click();
+            });
+            await page.waitForTimeout(400);
+          } catch {}
+        } catch { /* try next */ }
+      }
+      if (modalsOpened > 0) clicksPerformed.push(`english_modals_${modalsOpened}`);
+    } catch { /* ignore */ }
+
+    requirementsHtml = mergeSnapshots(snapshots);
+
+    await browser.close();
+    return { mainHtml, requirementsHtml, clicksPerformed };
+root@university-and-course-data:~/University-and-Course-data# 
