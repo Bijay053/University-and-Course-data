@@ -400,6 +400,7 @@ export default function UniversityDetail() {
   const [editScholAmount, setEditScholAmount] = useState("");
   const [editScholPercentage, setEditScholPercentage] = useState("");
   const [editScholCurrency, setEditScholCurrency] = useState("");
+  const [editScholValueType, setEditScholValueType] = useState<"none" | "fixed" | "percent">("none");
 
   const openBulk = (mode: BulkMode) => {
     setBulkMode(mode);
@@ -1060,7 +1061,7 @@ export default function UniversityDetail() {
   const openScholEdit = async (courseId: number, courseName: string) => {
     setEditScholCourse({ courseId, courseName, scholarshipId: null });
     setEditScholName(""); setEditScholDetails(""); setEditScholEligibility("");
-    setEditScholAmount(""); setEditScholPercentage(""); setEditScholCurrency("");
+    setEditScholAmount(""); setEditScholPercentage(""); setEditScholCurrency(""); setEditScholValueType("none");
     try {
       const res = await fetch(`${BASE}/api/courses/${courseId}/scholarships`);
       if (res.ok) {
@@ -1069,7 +1070,13 @@ export default function UniversityDetail() {
         if (row) {
           setEditScholCourse({ courseId, courseName, scholarshipId: row.id });
           setEditScholName(row.name ?? ""); setEditScholDetails(row.details ?? ""); setEditScholEligibility(row.eligibilityCriteria ?? "");
-          setEditScholAmount(row.amount != null ? String(row.amount) : ""); setEditScholPercentage(row.percentage != null ? String(row.percentage) : ""); setEditScholCurrency(row.currency ?? "");
+          if (row.percentage != null) {
+            setEditScholValueType("percent"); setEditScholPercentage(String(row.percentage)); setEditScholAmount(""); setEditScholCurrency("");
+          } else if (row.amount != null) {
+            setEditScholValueType("fixed"); setEditScholAmount(String(row.amount)); setEditScholCurrency(row.currency ?? "AUD"); setEditScholPercentage("");
+          } else {
+            setEditScholValueType("none"); setEditScholAmount(""); setEditScholPercentage(""); setEditScholCurrency("");
+          }
         }
       }
     } catch { /* ignore */ }
@@ -1078,7 +1085,14 @@ export default function UniversityDetail() {
     if (!editScholCourse) return;
     setScholActionLoading(true);
     try {
-      const body = { name: editScholName || null, details: editScholDetails || null, eligibilityCriteria: editScholEligibility || null, amount: editScholAmount.trim() ? Number(editScholAmount) : null, percentage: editScholPercentage.trim() ? Number(editScholPercentage) : null, currency: editScholCurrency.trim() || null };
+      const body = {
+        name: editScholName || null,
+        details: editScholDetails || null,
+        eligibilityCriteria: editScholEligibility || null,
+        amount: editScholValueType === "fixed" && editScholAmount.trim() ? Number(editScholAmount) : null,
+        percentage: editScholValueType === "percent" && editScholPercentage.trim() ? Number(editScholPercentage) : null,
+        currency: editScholValueType === "fixed" ? (editScholCurrency.trim() || "AUD") : null,
+      };
       let res: Response;
       if (editScholCourse.scholarshipId) {
         res = await fetch(`${BASE}/api/scholarships/${editScholCourse.scholarshipId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1653,20 +1667,18 @@ export default function UniversityDetail() {
                     </div>
                   </div>
                   <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <Award className="w-3.5 h-3.5 text-amber-600" />
-                        <span className="text-xs font-semibold text-amber-700">Scholarship</span>
-                      </div>
-                      {(c.scholarshipAmount != null || c.scholarshipPercentage != null) && (
-                        <div className="text-right shrink-0">
-                          {c.scholarshipAmount != null && (
-                            <span className="font-semibold text-amber-700 text-sm">{c.scholarshipCurrency ?? "AUD"} {c.scholarshipAmount.toLocaleString()}</span>
-                          )}
-                          {c.scholarshipPercentage != null && (
-                            <span className={`font-semibold text-amber-700 text-sm${c.scholarshipAmount != null ? " ml-1.5" : ""}`}>{c.scholarshipPercentage}%</span>
-                          )}
-                        </div>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="text-xs font-semibold text-amber-700">Scholarship</span>
+                      {c.scholarshipPercentage != null && (
+                        <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                          {c.scholarshipPercentage}% off
+                        </span>
+                      )}
+                      {c.scholarshipAmount != null && (
+                        <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                          {c.scholarshipCurrency ?? "AUD"} {c.scholarshipAmount.toLocaleString()}
+                        </span>
                       )}
                     </div>
                     <p className="text-sm text-amber-800">{c.scholarshipDetails}</p>
@@ -2883,10 +2895,28 @@ export default function UniversityDetail() {
               <div><Label>Scholarship Name</Label><Input className="mt-1" value={editScholName} onChange={(e) => setEditScholName(e.target.value)} placeholder="e.g. International Student Merit Award" /></div>
               <div><Label>Details</Label><textarea className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none" rows={3} value={editScholDetails} onChange={(e) => setEditScholDetails(e.target.value)} placeholder="Scholarship details…" /></div>
               <div><Label>Eligibility Criteria</Label><Input className="mt-1" value={editScholEligibility} onChange={(e) => setEditScholEligibility(e.target.value)} placeholder="e.g. International students only" /></div>
-              <div className="grid grid-cols-3 gap-2">
-                <div><Label>Amount</Label><Input className="mt-1" type="number" step="any" min="0" value={editScholAmount} onChange={(e) => setEditScholAmount(e.target.value)} placeholder="e.g. 5000" /></div>
-                <div><Label>Percentage (%)</Label><Input className="mt-1" type="number" step="any" min="0" max="100" value={editScholPercentage} onChange={(e) => setEditScholPercentage(e.target.value)} placeholder="e.g. 20" /></div>
-                <div><Label>Currency</Label><Input className="mt-1" value={editScholCurrency} onChange={(e) => setEditScholCurrency(e.target.value)} placeholder="AUD" /></div>
+              <div className="space-y-2">
+                <Label>Scholarship Value</Label>
+                <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg w-fit mt-1">
+                  {(["none", "fixed", "percent"] as const).map((t) => (
+                    <button key={t} onClick={() => { setEditScholValueType(t); setEditScholAmount(""); setEditScholPercentage(""); setEditScholCurrency("AUD"); }}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${editScholValueType === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+                      {t === "none" ? "None" : t === "fixed" ? "Fixed Amount" : "Percentage (%)"}
+                    </button>
+                  ))}
+                </div>
+                {editScholValueType === "fixed" && (
+                  <div className="flex gap-2 mt-2">
+                    <div className="flex-1"><Label className="text-xs text-gray-500">Amount</Label><Input className="mt-1" type="number" step="any" min="0" value={editScholAmount} onChange={(e) => setEditScholAmount(e.target.value)} placeholder="e.g. 5000" /></div>
+                    <div className="w-24"><Label className="text-xs text-gray-500">Currency</Label><Input className="mt-1" value={editScholCurrency} onChange={(e) => setEditScholCurrency(e.target.value)} placeholder="AUD" /></div>
+                  </div>
+                )}
+                {editScholValueType === "percent" && (
+                  <div className="flex items-end gap-2 mt-2">
+                    <div className="w-32"><Label className="text-xs text-gray-500">Percentage</Label><Input className="mt-1" type="number" step="any" min="0" max="100" value={editScholPercentage} onChange={(e) => setEditScholPercentage(e.target.value)} placeholder="e.g. 20" /></div>
+                    <span className="text-sm text-gray-500 pb-2.5">% off tuition</span>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
