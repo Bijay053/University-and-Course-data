@@ -42,10 +42,10 @@ Group content into these cards (use whichever apply). Each section has STRICT ru
 "Under 18 / relatives" → ONLY: age-related (under 18 rule), CAAW requirement, relatives living in Australia/destination country. NEVER put marriage or spouse fields here.
 "Sponsors"           → sponsor types, income requirements, bank statements, tax documents, income type caps
 "Loan assessment"    → loan calculations, travel costs, tuition breakdown, education loan rules
+"Deadlines"          → ALL date/deadline information: GS (GTE submission) deadline, offer acceptance deadline, CoE deadline, payment deadline, enrollment deadline, intake cutoff dates, application closing dates
 "Scholarship"        → scholarship criteria, GPA requirements, deduction rules
 "Spouse / dependent" → ALL marriage-related rules: married applicants (UG/PG), marriage duration, spouse qualification, spouse joining or not, age gap rules. "Married for UG" belongs HERE.
 "Turnaround times"   → offer/GTE/CoE processing times only
-"Deadlines"          → ALL date/deadline information: GS (GTE submission) deadline, offer acceptance deadline, CoE deadline, payment deadline, enrollment deadline, intake cutoff dates, application closing dates
 "Other requirements" → visa refusal history, gap explanation, age limits, cash salary, interview requirements — anything not fitting above sections
 
 JSON structure:
