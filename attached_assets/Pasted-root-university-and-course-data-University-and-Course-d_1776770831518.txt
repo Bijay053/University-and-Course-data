@@ -1,0 +1,32 @@
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# pm2 logs 1 --lines 5 --nostream | head -20 && \
+ss -tlnp | grep -E 'node|LISTEN' | head -10 && \
+grep -rn "router\.\(post\|get\).*scrape\|app\.\(post\|get\).*scrape" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -5
+[TAILING] Tailing last 5 lines for [1] process (change the value with --lines option)
+/root/.pm2/logs/uni-api-error-1.log last 5 lines:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+
+/root/.pm2/logs/uni-api-out-1.log last 5 lines:
+1|uni-api  | "pid":21193,"hostname":"university-and-course-data","req":{"id":4,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":4,"msg":"request completed"}
+1|uni-api  | {"level":30,"time":1776770718764,"pid":21193,"hostname":"university-and-course-data","req":{"id":7,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":5,"msg":"request completed"}
+1|uni-api  | {"level":30,"time":1776770718780,"pid":21193,"hostname":"university-and-course-data","req":{"id":6,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":22,"msg":"request completed"}
+1|uni-api  | {"level":30,"time":1776770718782,"pid":21193,"hostname":"university-and-course-data","req":{"id":5,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":27,"msg":"request completed"}
+1|uni-api  | {"level":30,"time":1776770798524,"pid":21193,"hostname":"university-and-course-data","req":{"id":8,"method":"GET","url":"/api/universities"},"res":{"statusCode":304},"responseTime":16,"msg":"request completed"}
+
+LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=556,fd=17))                                                                                 
+LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=556,fd=15))                                                                                 
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=901,fd=5),("nginx",pid=900,fd=5),("nginx",pid=899,fd=5),("nginx",pid=898,fd=5),("nginx",pid=892,fd=5))
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=939,fd=3),("systemd",pid=1,fd=91))                                                                     
+LISTEN 0      511          0.0.0.0:8080      0.0.0.0:*    users:(("PM2 v6.0.14: Go",pid=1039,fd=26))                                                                                
+LISTEN 0      200        127.0.0.1:5432      0.0.0.0:*    users:(("postgres",pid=936,fd=7))                                                                                         
+LISTEN 0      4096            [::]:22           [::]:*    users:(("sshd",pid=939,fd=4),("systemd",pid=1,fd=92))                                                                     
+LISTEN 0      200            [::1]:5432         [::]:*    users:(("postgres",pid=936,fd=6))                                                                                         
+9585:router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
+10059:router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<void> => {
+10123:router.get("/scrape/status/:jobId", async (req: Request, res: Response): Promise<void> => {
+10135:router.post("/scrape/stop/:jobId", async (req: Request, res: Response): Promise<void> => {
+10141:router.post("/scrape/approve/:jobId", async (req: Request, res: Response): Promise<void> => {
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
