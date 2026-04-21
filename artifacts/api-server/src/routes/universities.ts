@@ -33,7 +33,7 @@ router.get("/universities", async (req, res): Promise<void> => {
 
   const [rowsResult, countResult] = await Promise.all([
     pool.query<Record<string, unknown>>(
-      `SELECT u.*, (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id)::int AS "courseCount"
+      `SELECT u.*, u.scrape_url AS "scrapeUrl", (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id)::int AS "courseCount"
        FROM universities u ${whereSQL} ORDER BY u.name LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params,
     ),
