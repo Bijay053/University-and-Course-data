@@ -590,6 +590,70 @@ export default function UniversityDetail() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [confirmImportAllOpen, setConfirmImportAllOpen] = useState(false);
 
+  // ── Raw data row selection ───────────────────────────────────────────────
+  const [rawSelectedIds, setRawSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkMapRunning, setBulkMapRunning] = useState(false);
+  const [bulkApproveRunning, setBulkApproveRunning] = useState(false);
+
+  const toggleRawSelect = (id: number) =>
+    setRawSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const toggleSelectAllRaw = () => {
+    const pendingIds = filteredRaw.filter(c => c.status === "pending").map(c => c.id);
+    const allSelected = pendingIds.every(id => rawSelectedIds.has(id));
+    setRawSelectedIds(allSelected ? new Set() : new Set(pendingIds));
+  };
+
+  const handleBulkMap = async (forceOverwrite: boolean) => {
+    if (rawSelectedIds.size === 0) return;
+    setBulkMapRunning(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/bulk-apply-backup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...rawSelectedIds], forceOverwrite }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Bulk map failed");
+      const { matched, noMatch, failed } = json.summary as { matched: number; noMatch: number; failed: number };
+      toast({
+        title: "Bulk backup map complete",
+        description: `${matched} mapped, ${noMatch} no backup match, ${failed} errors`,
+      });
+      setMappedIds(prev => {
+        const next = new Set(prev);
+        (json.results as { id: number; ok: boolean; noMatch?: boolean }[])
+          .filter(r => r.ok && !r.noMatch).forEach(r => next.add(r.id));
+        return next;
+      });
+      setRawSelectedIds(new Set());
+      await fetchRawData();
+    } catch (err) {
+      toast({ title: "Bulk map failed", description: String(err), variant: "destructive" });
+    } finally {
+      setBulkMapRunning(false);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (rawSelectedIds.size === 0) return;
+    setBulkApproveRunning(true);
+    let approved = 0; let failed = 0;
+    for (const courseId of rawSelectedIds) {
+      try {
+        const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
+        if (res.ok) approved++; else failed++;
+      } catch { failed++; }
+    }
+    toast({
+      title: "Bulk approve complete",
+      description: `${approved} approved${failed > 0 ? `, ${failed} failed` : ""}`,
+    });
+    setRawSelectedIds(new Set());
+    await fetchRawData();
+    setBulkApproveRunning(false);
+  };
+
   // ── Backup mapping state ────────────────────────────────────────────────
   type BackupMatch = {
     matched: boolean;
@@ -1370,6 +1434,54 @@ export default function UniversityDetail() {
             </div>
           </div>
 
+          {/* Bulk actions bar */}
+          {rawSelectedIds.size > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
+              <span className="font-medium text-indigo-700">
+                {rawSelectedIds.size} course{rawSelectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <div className="flex items-center gap-1 ml-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkMapRunning || bulkApproveRunning}
+                  onClick={() => handleBulkMap(false)}
+                  className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                >
+                  <GitMerge className="h-3.5 w-3.5 mr-1" />
+                  {bulkMapRunning ? "Mapping…" : "Map Backup (Fill Empty)"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkMapRunning || bulkApproveRunning}
+                  onClick={() => handleBulkMap(true)}
+                  className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                >
+                  <GitMerge className="h-3.5 w-3.5 mr-1" />
+                  {bulkMapRunning ? "Mapping…" : "Map Backup (Overwrite)"}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={bulkMapRunning || bulkApproveRunning}
+                  onClick={handleBulkApprove}
+                  className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                  {bulkApproveRunning ? "Approving…" : `Approve (${rawSelectedIds.size})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setRawSelectedIds(new Set())}
+                  className="h-7 text-xs text-muted-foreground"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           {rawLoading ? (
             <div className="border rounded-xl py-16 text-center text-muted-foreground">Loading raw data…</div>
@@ -1384,7 +1496,21 @@ export default function UniversityDetail() {
               <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 2400 }}>
                 <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
-                    <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left min-w-[32px]">#</th>
+                    <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left min-w-[52px]">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          className="cursor-pointer rounded"
+                          checked={
+                            filteredRaw.filter(c => c.status === "pending").length > 0 &&
+                            filteredRaw.filter(c => c.status === "pending").every(c => rawSelectedIds.has(c.id))
+                          }
+                          onChange={toggleSelectAllRaw}
+                          title="Select all pending"
+                        />
+                        <span>#</span>
+                      </div>
+                    </th>
                     <th className="sticky bg-gray-50 border-r px-3 py-2 text-left min-w-[220px]" style={{ left: 32 }}>Course Name</th>
                     <th className="px-2 py-2 border-r text-center min-w-[80px]">Status</th>
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[110px]">Degree Level</th>
@@ -1430,7 +1556,21 @@ export default function UniversityDetail() {
                         "hover:bg-blue-50/20"
                       }`}
                     >
-                      <td className="sticky left-0 bg-inherit border-r px-3 py-2 text-muted-foreground font-mono">{idx + 1}</td>
+                      <td className="sticky left-0 bg-inherit border-r px-3 py-2 text-muted-foreground font-mono">
+                        <div className="flex items-center gap-1.5">
+                          {c.status === "pending" ? (
+                            <input
+                              type="checkbox"
+                              className="cursor-pointer rounded shrink-0"
+                              checked={rawSelectedIds.has(c.id)}
+                              onChange={() => toggleRawSelect(c.id)}
+                            />
+                          ) : (
+                            <span className="inline-block w-3.5" />
+                          )}
+                          <span>{idx + 1}</span>
+                        </div>
+                      </td>
                       <td className="sticky bg-inherit border-r px-3 py-2 font-medium text-gray-800 min-w-[220px]" style={{ left: 32 }}>
                         <div className="flex items-center gap-1.5">
                           <span className="line-clamp-1 max-w-[200px]">{c.course_name}</span>
