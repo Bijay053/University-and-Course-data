@@ -10,6 +10,7 @@ import Universities from "@/pages/universities";
 import UniversityDetail from "@/pages/university-detail";
 import Scraping from "@/pages/scraping";
 import Bulk from "@/pages/bulk";
+import Backup from "@/pages/backup";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/universities/:id" component={UniversityDetail} />
         <Route path="/scraping" component={Scraping} />
         <Route path="/bulk" component={Bulk} />
+        <Route path="/backup" component={Backup} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

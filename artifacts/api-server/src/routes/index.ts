@@ -12,6 +12,7 @@ import dashboardRouter from "./dashboard";
 import bulkRouter from "./bulk";
 import importRouter from "./import";
 import scrapeRouter from "./scrape";
+import backupRouter from "./backup";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(dashboardRouter);
 router.use(bulkRouter);
 router.use(importRouter);
 router.use(scrapeRouter);
+router.use(backupRouter);
 
 export default router;
