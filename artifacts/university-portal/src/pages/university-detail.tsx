@@ -390,6 +390,21 @@ export default function UniversityDetail() {
   const [editAcadType, setEditAcadType] = useState("");
   const [editAcadCountry, setEditAcadCountry] = useState("");
 
+  // ── Scholarship tab data ───────────────────────────────────────────────────
+  type ScholEntry = { id: number; name: string; details: string | null; eligibilityCriteria: string | null; amount: number | null; percentage: number | null; currency: string | null };
+  type ScholCourse = { id: number; name: string; degreeLevel: string | null; category: string | null; scholarships: ScholEntry[] };
+  const [scholCourses, setScholCourses] = useState<ScholCourse[]>([]);
+  const [scholLoading, setScholLoading] = useState(false);
+  const loadScholarshipCourses = useCallback(async () => {
+    if (!id) return;
+    setScholLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/scholarship-courses`);
+      if (res.ok) setScholCourses(await res.json());
+    } finally { setScholLoading(false); }
+  }, [id]);
+  useEffect(() => { if (tab === "scholarships") loadScholarshipCourses(); }, [tab]);
+
   // ── Scholarship edit / delete ──────────────────────────────────────────────
   const [editScholCourse, setEditScholCourse] = useState<{ courseId: number; courseName: string; scholarshipId: number | null } | null>(null);
   const [deleteScholInfo, setDeleteScholInfo] = useState<{ courseId: number; courseName: string; scholarshipId: number } | null>(null);
@@ -1003,11 +1018,10 @@ export default function UniversityDetail() {
       const data = await res.json() as { updated: number };
       toast({ title: "Bulk update applied", description: `${data.updated} requirement${data.updated !== 1 ? "s" : ""} added` });
       setBulkMode(null);
-      // Refresh data
       if (bulkMode === "academic") {
         await loadAcademicReqs();
-      } else {
-        setTimeout(() => window.location.reload(), 500);
+      } else if (bulkMode === "scholarships") {
+        await loadScholarshipCourses();
       }
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
@@ -1138,11 +1152,15 @@ export default function UniversityDetail() {
       if (!res.ok) throw new Error(await res.text());
       toast({ title: "Scholarship updated" });
       setEditScholCourse(null);
-      setTimeout(() => window.location.reload(), 300);
+      await loadScholarshipCourses();
     } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
     finally { setScholActionLoading(false); }
   };
-  const openScholDelete = async (courseId: number, courseName: string) => {
+  const openScholDelete = async (courseId: number, courseName: string, scholarshipId?: number) => {
+    if (scholarshipId != null) {
+      setDeleteScholInfo({ courseId, courseName, scholarshipId });
+      return;
+    }
     try {
       const res = await fetch(`${BASE}/api/courses/${courseId}/scholarships`);
       if (res.ok) {
@@ -1158,7 +1176,7 @@ export default function UniversityDetail() {
       await fetch(`${BASE}/api/scholarships/${deleteScholInfo.scholarshipId}`, { method: "DELETE" });
       toast({ title: "Scholarship deleted" });
       setDeleteScholInfo(null);
-      setTimeout(() => window.location.reload(), 300);
+      await loadScholarshipCourses();
     } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
     finally { setScholActionLoading(false); }
   };
@@ -1671,19 +1689,21 @@ export default function UniversityDetail() {
       {tab === "scholarships" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{scholarshipCourses.length} course{scholarshipCourses.length !== 1 ? "s" : ""} with scholarship information</p>
+            <p className="text-sm text-muted-foreground">
+              {scholLoading ? "Loading…" : `${scholCourses.length} course${scholCourses.length !== 1 ? "s" : ""} with scholarship information`}
+            </p>
             <Button size="sm" variant="outline" onClick={() => openBulk("scholarships")} className="gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50">
               <Pencil className="w-3.5 h-3.5" /> Bulk Add Scholarship
             </Button>
           </div>
-          {scholarshipCourses.length === 0 ? (
+          {scholCourses.length === 0 && !scholLoading ? (
             <div className="border rounded-xl p-12 text-center text-muted-foreground">
               <Award className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p>No scholarship information available for this university.</p>
             </div>
           ) : (
             <div className="grid gap-3">
-              {scholarshipCourses.map((c) => (
+              {scholCourses.map((c) => (
                 <div key={c.id} className="border rounded-xl p-4 hover:shadow-sm transition-shadow bg-white">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -1697,30 +1717,38 @@ export default function UniversityDetail() {
                         {c.category && <Badge variant="secondary" className="text-xs">{c.category}</Badge>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => openScholEdit(c.id, c.name)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600 cursor-pointer" title="Edit scholarship"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => openScholDelete(c.id, c.name)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete scholarship"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
+                    <button onClick={() => openScholEdit(c.id, c.name)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600 cursor-pointer shrink-0" title="Add / edit scholarship">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span className="text-xs font-semibold text-amber-700">Scholarship</span>
-                      {c.scholarshipPercentage != null && (
-                        <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                          {c.scholarshipPercentage}% off
-                        </span>
-                      )}
-                      {c.scholarshipAmount != null && (
-                        <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                          {c.scholarshipCurrency ?? "AUD"} {c.scholarshipAmount.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-amber-800">{c.scholarshipDetails}</p>
-                    {c.scholarshipEligibility && (
-                      <p className="text-xs text-amber-600 mt-1">Eligibility: {c.scholarshipEligibility}</p>
-                    )}
+                  <div className="mt-3 space-y-2">
+                    {c.scholarships.map((s) => (
+                      <div key={s.id} className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span className="text-xs font-semibold text-amber-700">{s.name}</span>
+                              {s.percentage != null && (
+                                <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                                  {s.percentage}% off
+                                </span>
+                              )}
+                              {s.amount != null && (
+                                <span className="inline-flex items-center gap-0.5 bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
+                                  {s.currency ?? "AUD"} {s.amount.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                            {s.details && <p className="text-sm text-amber-800">{s.details}</p>}
+                            {s.eligibilityCriteria && <p className="text-xs text-amber-600 mt-1">Eligibility: {s.eligibilityCriteria}</p>}
+                          </div>
+                          <button onClick={() => openScholDelete(c.id, c.name, s.id)} className="p-1 rounded hover:bg-red-50 text-red-400 shrink-0" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
