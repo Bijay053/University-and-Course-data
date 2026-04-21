@@ -1,0 +1,12 @@
+
+ id |               name               | website |                                                                                                                                                                                                                 pages                                                                                                                                                                                                                 
+----+----------------------------------+---------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  1 | University of Southern Queenland |         | {"feePage": "https://www.unisq.edu.au/fees", "entryPage": "https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements", "requirementsPage": "https://www.unisq.edu.au/international/apply/entry-requirements"}
+  2 | asa                              |         | {"feePage": "https://asahe.edu.au/fees-and-charges", "feesPdf": "https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf", "requirementsPdf": "https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf", "requirementsPage": "https://asahe.edu.au/policies-and-forms"}
+  3 | torrens                          |         | {"feePage": "https://www.torrens.edu.au/international-fees", "feesPdf": "https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule", "entryPage": "https://www.torrens.edu.au/courses/english", "requirementsPage": "https://www.torrens.edu.au/policies-and-forms"}
+  4 | Charles Sturt university         |         | {"feePage": "https://study.csu.edu.au/fees", "requirementsPage": "https://study.csu.edu.au/international/entry-requirements"}
+  5 | University of Tasmania           |         | 
+  6 | vit                              |         | {"feePage": "https://vit.edu.au/international/fees", "requirementsPage": "https://vit.edu.au/resources/course-entry-requirements"}
+(6 rows)
+
+(END)
