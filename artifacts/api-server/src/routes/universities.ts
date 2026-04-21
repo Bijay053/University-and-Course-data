@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, type SQL } from "drizzle-orm";
-import { db, universitiesTable } from "@workspace/db";
+import { eq, ilike, and, type SQL, sql } from "drizzle-orm";
+import { db, pool, universitiesTable } from "@workspace/db";
 import {
   ListUniversitiesQueryParams,
   CreateUniversityBody,
@@ -19,22 +19,31 @@ router.get("/universities", async (req, res): Promise<void> => {
     return;
   }
   const { search, country, city, page = 1, limit = 20 } = query.data;
-  const conditions: SQL[] = [];
-  if (search) conditions.push(ilike(universitiesTable.name, `%${search}%`));
-  if (country) conditions.push(ilike(universitiesTable.country, `%${country}%`));
-  if (city) conditions.push(ilike(universitiesTable.city, `%${city}%`));
-
   const offset = ((page ?? 1) - 1) * (limit ?? 20);
-  const [rows, countRows] = await Promise.all([
-    db
-      .select()
-      .from(universitiesTable)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .limit(limit ?? 20)
-      .offset(offset),
-    db.select({ id: universitiesTable.id }).from(universitiesTable).where(conditions.length ? and(...conditions) : undefined),
+
+  const whereParts: string[] = [];
+  const params: unknown[] = [];
+  if (search) { params.push(`%${search}%`); whereParts.push(`u.name ILIKE $${params.length}`); }
+  if (country) { params.push(`%${country}%`); whereParts.push(`u.country ILIKE $${params.length}`); }
+  if (city) { params.push(`%${city}%`); whereParts.push(`u.city ILIKE $${params.length}`); }
+  const whereSQL = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  params.push(limit ?? 20);
+  params.push(offset);
+
+  const [rowsResult, countResult] = await Promise.all([
+    pool.query<Record<string, unknown>>(
+      `SELECT u.*, (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id)::int AS "courseCount"
+       FROM universities u ${whereSQL} ORDER BY u.name LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    ),
+    pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM universities u ${whereSQL}`,
+      params.slice(0, params.length - 2),
+    ),
   ]);
-  res.json({ data: rows, total: countRows.length, page: page ?? 1, limit: limit ?? 20 });
+
+  res.json({ data: rowsResult.rows, total: parseInt(countResult.rows[0]?.count ?? "0"), page: page ?? 1, limit: limit ?? 20 });
 });
 
 router.post("/universities", async (req, res): Promise<void> => {
