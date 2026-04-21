@@ -1,0 +1,13 @@
+root@university-and-course-data:~# grep "scrape_1776760393110_frsm95\|ERROR\|error\|failed\|WARN\|dedup\|skip\|block\|already" /root/.pm2/logs/uni-api-out-1.log | grep -v "request completed" | tail -50
+{"level":30,"time":1776760327659,"pid":3449,"hostname":"university-and-course-data","triggerSource":"startup","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+{"level":50,"time":1776760337506,"pid":3449,"hostname":"university-and-course-data","err":{"type":"DatabaseError2","message":"relation \"courses_backup\" does not exist","stack":"error: relation \"courses_backup\" does not exist\n    at file:///root/University-and-Course-data/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at todayBackupDone (file:///root/University-and-Course-data/artifacts/api-server/src/services/daily-backup.ts:110:17)\n    at Timeout._onTimeout (file:///root/University-and-Course-data/artifacts/api-server/src/services/daily-backup.ts:128:20)","length":113,"name":"error","severity":"ERROR","code":"42P01","position":"27","file":"parse_relation.c","line":"1449","routine":"parserOpenTable"},"msg":"Daily backup: startup check failed"}
+{"level":30,"time":1776761227509,"pid":3449,"hostname":"university-and-course-data","triggerSource":"scheduler","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+{"level":30,"time":1776762127508,"pid":3449,"hostname":"university-and-course-data","triggerSource":"scheduler","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+{"level":30,"time":1776763027511,"pid":3449,"hostname":"university-and-course-data","triggerSource":"scheduler","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+root@university-and-course-data:~# set -a; source /root/.env.backup; set +a
+psql $DATABASE_URL -c "SELECT id, name, status FROM courses WHERE university_id=2 ORDER BY status, name;"
+ id | name | status 
+----+------+--------
+(0 rows)
+
+root@university-and-course-data:~# 
