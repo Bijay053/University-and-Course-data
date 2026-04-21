@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, ChevronUp } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -134,13 +134,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
         title="Back to top"
         aria-label="Back to top"
         className={cn(
-          "fixed bottom-6 right-6 z-[9999] w-9 h-9 rounded-full bg-primary text-primary-foreground shadow-md",
+          "fixed bottom-20 right-10 z-[9999] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg",
           "flex items-center justify-center transition-all duration-200",
-          "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-          showScrollTop ? "opacity-100 shadow-lg scale-100" : "opacity-40 scale-95"
+          "hover:bg-primary/90 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0",
+          showScrollTop ? "opacity-100 scale-100" : "opacity-40 scale-95"
         )}
       >
-        <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M5 10l7-7m0 0l7 7m-7-7v18"
+          />
+        </svg>
       </button>,
       document.body
     )}
