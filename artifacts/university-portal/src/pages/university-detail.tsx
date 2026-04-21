@@ -1818,13 +1818,13 @@ export default function UniversityDetail() {
                   };
 
                   return (
-                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                    <div className="p-5" style={{ columns:"2 280px", gap:"16px" }}>
                       {note.parsed_data!.map((card, ci) => {
                         const t = T(card.emoji ?? "ℹ️");
                         const totalFields = (card.fields?.length ?? 0) + (card.sections?.reduce((a, s) => a + (s.fields?.length ?? 0), 0) ?? 0);
                         return (
-                          <div key={ci} className="rounded-2xl overflow-hidden flex flex-col"
-                            style={{ boxShadow:`0 4px 24px -4px ${t.glow},0 1px 3px rgba(0,0,0,0.08)`, border:"1px solid rgba(0,0,0,0.07)" }}>
+                          <div key={ci} className="rounded-2xl overflow-hidden"
+                            style={{ breakInside:"avoid", marginBottom:"16px", boxShadow:`0 4px 24px -4px ${t.glow},0 1px 3px rgba(0,0,0,0.08)`, border:"1px solid rgba(0,0,0,0.07)" }}>
                             {/* ── Gradient header ── */}
                             <div className="relative overflow-hidden px-4 py-4 flex items-center gap-3"
                               style={{ background:`linear-gradient(135deg,${t.a} 0%,${t.b} 100%)` }}>
@@ -1841,7 +1841,7 @@ export default function UniversityDetail() {
                               </div>
                             </div>
                             {/* ── Body ── */}
-                            <div className="flex-1 bg-white">
+                            <div className="bg-white">
                               {card.fields?.map((f, fi) => (
                                 <div key={fi} className="flex justify-between items-center gap-4 px-4 py-2.5"
                                   style={{ borderBottom:"1px solid #f1f5f9" }}>
