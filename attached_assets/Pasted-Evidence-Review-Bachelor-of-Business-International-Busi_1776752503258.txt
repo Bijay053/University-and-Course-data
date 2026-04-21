@@ -1,0 +1,79 @@
+Evidence Review
+Bachelor of Business International Business
+Eligibility: eligible - International and on-campus evidence found
+courseName
+accepted
+selected
+course_page / cheerio
+confidence 97%
+Bachelor of Business International Business
+Bachelor of Business International BusinessCRICOS Course Code 108859G | AQF Level 7LocationSydney, Online DeliveryFace to Face on campus Course Duration3 years Full Time Intake Options‍January, April, July, October See Key Dates ‍AQF LevelAQF Level 7 delivered by ASA Institute of Higher Education Downl
+https://asahe.edu.au/courses/bachelor-of-business-international-business
+degreeLevel
+accepted
+selected
+course_page / cheerio
+confidence 97%
+Bachelor
+Bachelor of Business International BusinessCRICOS Course Code 108859G | AQF Level 7LocationSydney, Online DeliveryFace to Face on campus Course Duration3 years Full Time Intake Options‍January, April, July, October See Key Dates ‍AQF LevelAQF Level 7 delivered by ASA
+https://asahe.edu.au/courses/bachelor-of-business-international-business
+duration
+needs_review
+derived / derived
+confidence 45%
+3 Year
+3 Year
+studyMode
+accepted
+selected
+course_page / cheerio
+confidence 97%
+On Campus
+sinessCRICOS Course Code 108859G | AQF Level 7LocationSydney, Online DeliveryFace to Face on campus Course Duration3 years Full Time Intake Options‍January, April, July, October See Key Dates ‍AQF LevelAQF Level 7 delivered by ASA Institute of Higher Education Download course brochure Course OverviewEntry RequirementsFees and ScholarshipsCourse StructureCou
+https://asahe.edu.au/courses/bachelor-of-business-international-business
+needs_review
+fee_page / cheerio
+confidence 99%
+On Campus
+throughout their studies. This includes but is not limited to IT resources and equipment on campus, learning resources, updates to e-library, virtual laboratory and ongoing maintenance to Canvas.Financial AssistanceStudents who are experiencing financial hardship or extenuating circumstances can reach out to seek out support for payment plans or extensions
+https://asahe.edu.au/fees-and-charges
+courseLocation
+accepted
+selected
+course_page / cheerio
+confidence 97%
+Sydney
+achelor of Business International BusinessCRICOS Course Code 108859G | AQF Level 7LocationSydney, Online DeliveryFace to Face on campus Course Duration3 years Full Time Intake Options‍January, April, July, October See Key Dates ‍AQF LevelAQF Level 7 delivered by ASA Institute of Higher Education Download course brochure Course OverviewEntry RequirementsF
+https://asahe.edu.au/courses/bachelor-of-business-international-business
+needs_review
+fee_page / cheerio
+confidence 99%
+Sydney
+ment ‍‍Apply NowApplyContact us+1300 672 076info@asahe.edu.auLevel 5, 540 George Street, Sydney, NSW 2000USEFUL LINKSStudent SupportContact usCoursesAbout usPolicies and FormsStarting from July 1, 2024, the Australian School of Accounting Pty Ltd has expanded its scope and is now known as the ASA Institute of Higher Education.ASA acknowledges and pays r
+https://asahe.edu.au/fees-and-charges
+needs_review
+requirements_page / cheerio
+confidence 95%
+Sydney
++"."+k)}delete e.start;if(a)for(var m in a)c+="&"+m+"="+a[m];(a=g)||(a="https:"==document.location.protocol?"https://csi.gstatic.com/csi":"http://csi.gstatic.com/csi"); return b=[a,"?v=3","&s="+(window.tactilecsi.sn||"tactile")+"&action=",b.name,"",c,"&rt=",d.join(",")].join("")};window.tactilecsi.getReportUri=n;var p=function(b,a,g){b=n(b,a,g);if(!b)return"";a=new Image;var c=window.tactilecsi.h++;window.tactilecsi.g[c]=a;a.onload=a.onerror=function(){window.tactilecsi&&de
+https://www.google.com/maps/@-33.8773308,151.2097621,3a,15y,197.51h,88.19t/data=!3m7!1e1!3m5!1sA-GHUhxCh3s7S4tojuac9g!2e0!6shttps:%2F%2Fstreetviewpixels-pa.googleapis.com%2Fv1%2Fthumbnail%3Fpanoid%3DA-GHUhxCh3s7S4tojuac9g%26cb_client%3Dmaps_sv.share%26w%3D900%26h%3D600%26yaw%3D197.50693165898986%26pitch%3D1.8128341208561807%26thumbfov%3D90!7i16384!8i8192?coh=205410&entry=ttu
+intakeMonths
+accepted
+selected
+course_page / cheerio
+confidence 97%
+January, April, July, October
+l 7LocationSydney, Online DeliveryFace to Face on campus Course Duration3 years Full Time Intake Options‍January, April, July, October See Key Dates ‍AQF LevelAQF Level 7 delivered by ASA Institute of Higher Education Download course brochure Course OverviewEntry RequirementsFees and ScholarshipsCourse StructureCourse OverviewThe Bachelor of Business with a major in International Business prepares students to thrive in the global marketplace by equipping them with the skills, knowledge, and
+https://asahe.edu.au/courses/bachelor-of-business-international-business
+needs_review
+fee_page / cheerio
+confidence 99%
+January, April, July, October
+FormsPricing InformationContact usFees and ChargesAll students, including those about to start with ASA Institute of Higher Education or student continuing to study will incur tuition fees each quarter of enrolment. Tuition fees vary between courses and from year to year. All tuition fees must be paid by the deadline outlined in a student's Letter of Offer in advance of each quarter starting.All fees and charges outlined on this page and the include documents are presented in Australian Do
+https://asahe.edu.au/fees-and-charges
+needs_review
+requirements_page / cheerio
+confidence 95%
+January, April, July, October
+.connection,e=d.type;for(f in d)if(f!="type"&&d[f]==e){c+="&conn="+f;break}}e=b.t;var f=e.start;d=[];for(var h in e)if(h!="start"&&f){var k=b.t[h];var l=b.t.start;k&&l?(k-=l,k=Math.round(k)):k=void 0;d.push(h+"."+k)}delete e.start;if(a)for(var m in a)c+="&"+m+"="+a[m];(a=g)||(a="https:"==document.location.protocol?"https://csi.gstatic.com/csi":"http://csi.gstatic.com/csi"); return b=[a,"?v=3","&s="+(window.tactilecsi.sn||"tactile")+"&action=",b.name,"",c,"&rt=",d.join(",")].join("")};window
+https://www.google.com/maps/@-33.8773308,151.2097621,3a,15y,197.51h,88.19t/data=!3m7!1e1!3m5!1sA-GHUhxCh3s7S4tojuac9g!2e0!6shttps:%2F%2Fstreetviewpixels-pa.googleapis.com%2Fv1%2Fthumbnail%3Fpanoid%3DA-GHUhxCh3s7S4tojuac9g%26cb_client%3Dmaps_sv.share%26w%3D900%26h%3D600%26yaw%3D197.50693165898986%26pitch%3D1.8128341208561807%26thumbfov%3D90!7i16384!8i8192?coh=205410&entry=ttu

@@ -1,0 +1,91 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business International Business
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Bachelor	3 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business Hospitality Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Bachelor	3 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business Technology Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Bachelor	3 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Business
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Bachelor	3 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Bachelor of Professional Accounting
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Bachelor	3 Year			-	-	-	-	Jan, Apr, Jul	Sydney	Blended	
+
+
+
+
+	
+Master of Software Application Development
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: missing international fee, missing English requirement, Eligibility: Online-only evidence found, Needs review: internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Master	2 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Project Management
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: missing international fee, missing English requirement, Eligibility: Online-only evidence found, Needs review: internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Master	2 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Information Technology (Cyber Security)
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Master	2 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
+	
+Master of Information Technology (Artificial Intelligence)
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, missing English requirement, Needs review: internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee, ieltsOverall | Warnings: missing academic requirement, low completeness score
+57%	Master	2 Year			-	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+
