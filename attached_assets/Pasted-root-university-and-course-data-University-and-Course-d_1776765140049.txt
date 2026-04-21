@@ -1,0 +1,74 @@
+root@university-and-course-data:~/University-and-Course-data# # Check if pdftotext is installed
+pdftotext -v 2>&1
+
+# Download and check the requirements PDF for IELTS keywords
+curl -sL "https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf" -o /tmp/req.pdf && \
+  pdftotext /tmp/req.pdf - 2>/dev/null | grep -i "IELTS\|PTE\|TOEFL\|english" | head -10 || echo "pdftotext failed"
+
+# Also check the FEES PDF (may also contain English requirements)  
+curl -sL "https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf" -o /tmp/fees.pdf && \
+  pdftotext /tmp/fees.pdf - 2>/dev/null | grep -i "IELTS\|PTE\|TOEFL\|english" | head -10 || echo "fees pdf pdftotext failed"
+Command 'pdftotext' not found, but can be installed with:
+apt install poppler-utils
+root@university-and-course-data:~/University-and-Course-data# apt-get install -y poppler-utils && \
+  pdftotext /tmp/req.pdf - | grep -i "IELTS\|PTE\|TOEFL" | head -10
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  libopenjp2-7 libpoppler134 poppler-data
+Suggested packages:
+  ghostscript fonts-japanese-mincho | fonts-ipafont-mincho fonts-japanese-gothic | fonts-ipafont-gothic fonts-arphic-ukai fonts-arphic-uming fonts-nanum
+The following NEW packages will be installed:
+  libopenjp2-7 libpoppler134 poppler-data poppler-utils
+0 upgraded, 4 newly installed, 0 to remove and 2 not upgraded.
+Need to get 3563 kB of archives.
+After this operation, 18.3 MB of additional disk space will be used.
+Get:1 http://mirrors.digitalocean.com/ubuntu noble/main amd64 poppler-data all 0.4.12-1 [2060 kB]
+Get:2 http://mirrors.digitalocean.com/ubuntu noble-updates/main amd64 libopenjp2-7 amd64 2.5.0-2ubuntu0.4 [173 kB]
+Get:3 http://mirrors.digitalocean.com/ubuntu noble-updates/main amd64 libpoppler134 amd64 24.02.0-1ubuntu9.8 [1118 kB]
+Get:4 http://mirrors.digitalocean.com/ubuntu noble-updates/main amd64 poppler-utils amd64 24.02.0-1ubuntu9.8 [212 kB]
+Fetched 3563 kB in 7s (535 kB/s)        
+Selecting previously unselected package poppler-data.
+(Reading database ... 128381 files and directories currently installed.)
+Preparing to unpack .../poppler-data_0.4.12-1_all.deb ...
+Unpacking poppler-data (0.4.12-1) ...
+Selecting previously unselected package libopenjp2-7:amd64.
+Preparing to unpack .../libopenjp2-7_2.5.0-2ubuntu0.4_amd64.deb ...
+Unpacking libopenjp2-7:amd64 (2.5.0-2ubuntu0.4) ...
+Selecting previously unselected package libpoppler134:amd64.
+Preparing to unpack .../libpoppler134_24.02.0-1ubuntu9.8_amd64.deb ...
+Unpacking libpoppler134:amd64 (24.02.0-1ubuntu9.8) ...
+Selecting previously unselected package poppler-utils.
+Preparing to unpack .../poppler-utils_24.02.0-1ubuntu9.8_amd64.deb ...
+Unpacking poppler-utils (24.02.0-1ubuntu9.8) ...
+Setting up poppler-data (0.4.12-1) ...
+Setting up libopenjp2-7:amd64 (2.5.0-2ubuntu0.4) ...
+Setting up libpoppler134:amd64 (24.02.0-1ubuntu9.8) ...
+Setting up poppler-utils (24.02.0-1ubuntu9.8) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Processing triggers for fontconfig (2.15.0-1.1ubuntu2) ...
+Scanning processes...                                                                                                                                                 
+Scanning linux images...                                                                                                                                              
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+IELTS
+TOEFL
+English proficiency must be an IELTs score of 0.5 bands (or equivalent) higher than stated
+Academic IELTS
+PTE (Pearson Test of
+TOEFL iBT (Test of
+Exempted countries - English Speaking:
+Exempted countries - English as the medium of instruction for high school and higher:
+Must provide PTE or IELTS or evidence of English language skills which were accumulated within
+The admissions process ensures that, prior to enrolment and before fees are accepted,
+root@university-and-course-data:~/University-and-Course-data# 
