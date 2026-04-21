@@ -1,0 +1,132 @@
+^Z
+[1]+  Stopped                 pm2 logs uni-api --lines 20
+root@university-and-course-data:~/University-and-Course-data# ^[[200~# Delete the conflicting uni-api — it's a duplicate
+> pm2 delete uni-api
+> 
+> # Check what the existing api-server is running
+> pm2 show api-server
+> 
+> # Update it to use the freshly built code from the new clone
+> pm2 stop api-server
+> export $(grep -v '^#' /root/University-and-Course-data/.env | sed 's/#.*//' | xargs)
+> pm2 start /root/University-and-Course-data/artifacts/api-server/dist/index.mjs \
+>   --name "api-server" --update-env
+> pm2 save~
+> ^C
+root@university-and-course-data:~/University-and-Course-data# # Delete the conflicting uni-api — it's a duplicate 
+pm2 delete uni-api
+
+# Check what the existing api-server is running
+pm2 show api-server
+
+# Update it to use the freshly built code from the new clone
+pm2 stop api-server
+export $(grep -v '^#' /root/University-and-Course-data/.env | sed 's/#.*//' | xargs)
+pm2 start /root/University-and-Course-data/artifacts/api-server/dist/index.mjs \
+  --name "api-server" --update-env
+pm2 save
+[PM2] Applying action deleteProcessId on app [uni-api](ids: [ 1 ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ online    │ 0%       │ 266.7mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+ Describing process with id 0 - name api-server 
+┌───────────────────┬──────────────────────────────────────────────┐
+│ status            │ online                                       │
+│ name              │ api-server                                   │
+│ namespace         │ default                                      │
+│ version           │ 0.0.0                                        │
+│ restarts          │ 38                                           │
+│ uptime            │ 26h                                          │
+│ script path       │ /opt/app/artifacts/api-server/dist/index.mjs │
+│ script args       │ N/A                                          │
+│ error log path    │ /root/.pm2/logs/api-server-error.log         │
+│ out log path      │ /root/.pm2/logs/api-server-out.log           │
+│ pid path          │ /root/.pm2/pids/api-server-0.pid             │
+│ interpreter       │ /usr/bin/node                                │
+│ interpreter args  │ --enable-source-maps                         │
+│ script id         │ 0                                            │
+│ exec cwd          │ /opt/app                                     │
+│ exec mode         │ fork_mode                                    │
+│ node.js version   │ 24.14.1                                      │
+│ node env          │ production                                   │
+│ watch & reload    │ ✘                                            │
+│ unstable restarts │ 0                                            │
+│ created at        │ 2026-04-20T03:14:05.042Z                     │
+└───────────────────┴──────────────────────────────────────────────┘
+ Actions available 
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+ Trigger via: pm2 trigger api-server <action_name>
+
+ Code metrics value 
+┌────────────────────────┬────────────┐
+│ Used Heap Size         │ 143.07 MiB │
+│ Heap Usage             │ 93.83 %    │
+│ Heap Size              │ 152.48 MiB │
+│ Event Loop Latency p95 │ 1.65 ms    │
+│ Event Loop Latency     │ 0.58 ms    │
+│ Active handles         │ 4          │
+│ Active requests        │ 0          │
+│ HTTP                   │ 0 req/min  │
+│ HTTP P95 Latency       │ 25 ms      │
+│ HTTP Mean Latency      │ 1 ms       │
+└────────────────────────┴────────────┘
+ Divergent env variables from local env 
+┌────────────────┬───────────────────────────────────────────────────────┐
+│ DATABASE_URL   │ postgresql://uniportal:Bij%40y12345@localhost:5432/un │
+│ GEMINI_API_KEY │ AQ.Ab8RN6LKEO3UAm_chl8KWIpqtvSYtC9b1MaVanRiYgWDCpCD1g │
+│ PWD            │ /root                                                 │
+│ SSH_CONNECTION │ 198.211.111.194 61343 159.65.152.72 22                │
+│ XDG_SESSION_ID │ 531                                                   │
+│ SSH_CLIENT     │ 198.211.111.194 61343 22                              │
+│ OLDPWD         │ /opt/app                                              │
+└────────────────┴───────────────────────────────────────────────────────┘
+
+ Add your own code metrics: http://bit.ly/code-metrics
+ Use `pm2 logs api-server [--lines 1000]` to display logs
+ Use `pm2 env 0` to display environment variables
+ Use `pm2 monit` to monitor CPU and Memory usage api-server
+[PM2] Applying action stopProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Starting /root/University-and-Course-data/artifacts/api-server/dist/index.mjs in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+│ 2  │ api-server         │ fork     │ 0    │ online    │ 0%       │ 19.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+root@university-and-course-data:~/University-and-Course-data# pm2 status
+curl http://159.65.152.72/api/universities | head -c 300
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+│ 2  │ api-server         │ fork     │ 0    │ online    │ 0%       │ 268.2mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   580  100   580    0     0  19465      0 --:--:-- --:--:-- --:--:-- 20000
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>error: password authentication failed for user &quot;user&quot;<br> &nbsp; &nbsp;at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.jroot@university-and-course-data:~/University-and-Course-data# 
