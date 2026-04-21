@@ -1,0 +1,88 @@
+Review Scraped Courses
+9 pending
+Remove duplicates
+Reject (9)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business Technology Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Professional Accounting
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	50	-	-	-	Jan, Apr, Jul	Sydney	Blended	
+
+
+
+	
+Master of Software Application Development
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: Eligibility: Online-only evidence found, Needs review: toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Project Management
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: Eligibility: Online-only evidence found, Needs review: toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Information Technology (Cyber Security)
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Information Technology (Artificial Intelligence)
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$52,800/Full Course	6.5	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business International Business
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business Hospitality Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: duration, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$58,080/Full Course	6	50	-	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
