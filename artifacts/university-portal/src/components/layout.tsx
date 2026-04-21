@@ -137,7 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           "fixed bottom-20 right-10 z-[9999] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg",
           "flex items-center justify-center transition-all duration-200",
           "hover:bg-primary/90 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0",
-          showScrollTop ? "opacity-100 scale-100" : "opacity-0 pointer-events-none scale-95"
+          showScrollTop ? "opacity-100" : "opacity-40"
         )}
       >
         <svg
