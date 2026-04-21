@@ -331,6 +331,11 @@ export default function UniversityDetail() {
     setBSchAmount("");
   };
 
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    setHasOverflow(false);
+  };
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [subCategory, setSubCategory] = useState(ALL);
@@ -345,6 +350,7 @@ export default function UniversityDetail() {
   const TRACK_INNER = 118; // 122px widget width - 4px total padding
   const [thumbLeft, setThumbLeft] = useState(2);
   const [thumbWidth, setThumbWidth] = useState(38);
+  const [hasOverflow, setHasOverflow] = useState(false);
 
   const computeThumb = useCallback(() => {
     const viewport = tableScrollRef.current;
@@ -352,10 +358,12 @@ export default function UniversityDetail() {
     const visible = viewport.clientWidth;
     const total = viewport.scrollWidth;
     if (total <= visible) {
+      setHasOverflow(false);
       setThumbWidth(TRACK_INNER);
       setThumbLeft(2);
       return;
     }
+    setHasOverflow(true);
     const tw = Math.max(20, Math.floor(TRACK_INNER * (visible / total)));
     const maxLeft = TRACK_INNER - tw;
     const ratio = viewport.scrollLeft / (total - visible);
@@ -699,7 +707,7 @@ export default function UniversityDetail() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => switchTab(t.key)}
             className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               tab === t.key
                 ? "border-primary text-primary"
@@ -1329,7 +1337,7 @@ export default function UniversityDetail() {
       )}
 
       {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}
-      {tab !== "scholarships" && (
+      {tab !== "scholarships" && hasOverflow && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
           <div
             ref={miniScrollbarRef}
