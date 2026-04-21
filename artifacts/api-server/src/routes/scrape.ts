@@ -10494,7 +10494,7 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       );
     }
 
-    await client.query("UPDATE scraped_courses SET status='approved', reviewed_at=NOW() WHERE id=$1", [course.id]);
+    await client.query("UPDATE scraped_courses SET status='approved', reviewed_at=NOW(), course_id=$2 WHERE id=$1", [course.id, courseId]);
     await client.query("COMMIT");
     return { success: true, courseId };
   } catch (err) {

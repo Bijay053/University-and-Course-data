@@ -1,5 +1,6 @@
 import { pgTable, text, serial, timestamp, integer, real, jsonb, boolean } from "drizzle-orm/pg-core";
 import { universitiesTable } from "./universities";
+import { coursesTable } from "./courses";
 
 export const scrapedCoursesTable = pgTable("scraped_courses", {
   id: serial("id").primaryKey(),
@@ -56,6 +57,7 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   autoPublishStatus: text("auto_publish_status").notNull().default("pending_review"),
   decisionScore: real("decision_score"),
   status: text("status").notNull().default("pending"),
+  courseId: integer("course_id").references(() => coursesTable.id, { onDelete: "set null" }),
   notes: text("notes"),
   completeness: integer("completeness"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),

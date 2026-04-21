@@ -34,7 +34,10 @@ router.get("/courses", async (req, res): Promise<void> => {
   let pIdx = 1;
 
   if (search) { whereClauses.push(`c.name ILIKE $${pIdx++}`); params.push(`%${search}%`); }
-  if (universityId) { whereClauses.push(`c.university_id = $${pIdx++}`); params.push(universityId); }
+  if (universityId) {
+    whereClauses.push(`c.university_id = $${pIdx++}`); params.push(universityId);
+    whereClauses.push(`EXISTS (SELECT 1 FROM scraped_courses sc WHERE sc.course_id = c.id AND sc.status = 'approved')`);
+  }
   if (category) { whereClauses.push(`c.category ILIKE $${pIdx++}`); params.push(`%${category}%`); }
   if (subCategory) { whereClauses.push(`c.sub_category ILIKE $${pIdx++}`); params.push(`%${subCategory}%`); }
   if (degreeLevel) { whereClauses.push(`c.degree_level = $${pIdx++}`); params.push(degreeLevel); }
