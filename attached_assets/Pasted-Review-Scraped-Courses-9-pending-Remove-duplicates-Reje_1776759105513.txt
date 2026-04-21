@@ -1,0 +1,97 @@
+Review Scraped Courses
+9 pending
+Remove duplicates
+Reject (9)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business International Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: duration, internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Bachelor	3 Year		6	50	60	169	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business Hospitality Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: duration, internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Bachelor	3 Year		6	50	60	169	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business Technology Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: duration, internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Bachelor	3 Year		6	50	60	169	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: duration, internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Bachelor	3 Year		6	50	60	169	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: duration, internationalFee, ieltsOverall, pteOverall, toeflOverall | Missing: internationalFee | Warnings: missing academic requirement
+81%	Bachelor	3 Year		6	50	60	169	-	Jan, Apr, Jul	Sydney	Blended	
+
+
+
+	
+Master of Software Application Development
+Computer Science & IT
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: missing international fee, Eligibility: Online-only evidence found, Needs review: internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Master	2 Year		6.5	58	85	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Project Management
+Business & Management
+Publish: review
+Eligibility: needs_review
+⚠ Publish blocked: missing international fee, Eligibility: Online-only evidence found, Needs review: internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Master	2 Year		6.5	58	85	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Information Technology (Cyber Security)
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Master	2 Year		6.5	58	85	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Information Technology (Artificial Intelligence)
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: missing international fee, Needs review: internationalFee | Missing: internationalFee | Warnings: missing academic requirement
+81%	Master	2 Year		6.5	58	85	-	-	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
