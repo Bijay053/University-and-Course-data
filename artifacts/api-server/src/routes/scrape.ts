@@ -8586,6 +8586,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           ieltsOverall: cheerioData.ieltsOverall,
           cachedIelts: cachedEnglishReqs?.ieltsOverall ?? null,
         });
+        addLog(job, "status", {
+          message: `[POST-CACHE] ${link.name.slice(0, 40)} → IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "—"} P=${cachedEnglishReqs?.pteOverall ?? "—"} T=${cachedEnglishReqs?.toeflOverall ?? "—"}`,
+          phase: "extract",
+        });
 
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
