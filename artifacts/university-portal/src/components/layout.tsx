@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -45,6 +45,18 @@ function NavLinks({ onNav }: { onNav?: () => void }) {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => setShowScrollTop(el.scrollTop > 240);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToTop = () => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
     <div className="min-h-[100dvh] flex w-full bg-muted/40">
@@ -107,8 +119,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
           {children}
+
+          {/* Scroll-to-top button — appears after scrolling 240px */}
+          <button
+            onClick={scrollToTop}
+            title="Back to top"
+            aria-label="Back to top"
+            className={cn(
+              "fixed bottom-6 right-6 z-50 w-9 h-9 rounded-full bg-primary text-primary-foreground shadow-md",
+              "flex items-center justify-center transition-all duration-200",
+              "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
+              showScrollTop ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            )}
+          >
+            <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+          </button>
         </main>
       </div>
     </div>
