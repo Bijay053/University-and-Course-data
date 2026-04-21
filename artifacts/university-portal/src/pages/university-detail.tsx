@@ -1132,6 +1132,7 @@ export default function UniversityDetail() {
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[80px] border-r">Mode</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[80px]">Int'l Fee</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[55px]">Term</th>
+                    <th className="px-2 py-2 text-amber-700 font-medium min-w-[45px]">Year</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[50px] border-r">Curr.</th>
                     <th className="px-2 py-2 text-blue-700 font-medium min-w-[90px] border-r">Intakes</th>
                     <th className="px-2 py-2 text-purple-700 font-medium min-w-[30px]">IL</th>
@@ -1191,6 +1192,7 @@ export default function UniversityDetail() {
                       <td className="px-2 py-2 text-gray-500 border-r">{txt(c.study_mode)}</td>
                       <td className="px-2 py-2 text-amber-700 font-medium">{c.international_fee ? c.international_fee.toLocaleString() : "—"}</td>
                       <td className="px-2 py-2 text-amber-600">{txt(c.fee_term)}</td>
+                      <td className="px-2 py-2 text-amber-600">{c.fee_year ?? "—"}</td>
                       <td className="px-2 py-2 text-amber-600 border-r">{txt(c.currency)}</td>
                       <td className="px-2 py-2 text-blue-600 border-r">{Array.isArray(c.intake_months) ? c.intake_months.join(", ") : txt(c.intake_months as string | null)}</td>
                       <td className="px-2 py-2 text-purple-600">{num(c.ielts_listening)}</td>
