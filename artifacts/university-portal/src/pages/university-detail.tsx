@@ -1334,7 +1334,7 @@ export default function UniversityDetail() {
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
           </div>
 
-          <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+          <div ref={tableScrollRef} className="border border-gray-100 rounded-xl overflow-auto [&_th]:border-gray-100 [&_td]:border-gray-100" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
