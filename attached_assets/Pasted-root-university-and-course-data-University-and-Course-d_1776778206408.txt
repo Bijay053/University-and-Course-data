@@ -1,0 +1,77 @@
+root@university-and-course-data:~/University-and-Course-data# grep -E "8el45q|english_modal|MBA|\[English\]|browser|FALLBACK" ~/.pm2/logs/uni-api-out-1.log | tail -120
+{"level":30,"time":1776777364850,"pid":61456,"hostname":"university-and-course-data","req":{"id":160,"method":"GET","url":"/api/scrape/status/scrape_1776777081284_8el45q"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+root@university-and-course-data:~/University-and-Course-data# grep -n "english_modal\|TRIGGER_PATTERNS\|another approved\|equivalent english" \
+  /root/University-and-Course-data/artifacts/api-server/src/browser-helper.ts | head -30
+419:        "another approved english",
+420:        "equivalent english(?:\\s+language)?\\s+test",
+442:      clicksPerformed.push(`english_modal_scan[triggers=${triggerCount}]`);
+481:          clicksPerformed.push(`english_modal[${i}] dom +${afterLen - beforeLen}`);
+492:      if (modalsOpened > 0) clicksPerformed.push(`english_modals_${modalsOpened}`);
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/browser-helper.ts"
+s = open(p).read()
+
+old1 = 'clicksPerformed.push(`english_modal_scan[triggers=${triggerCount}]`);'
+new1 = ('clicksPerformed.push(`english_modal_scan[triggers=${triggerCount}]`);\n'
+        '      console.log(`[BROWSER] english_modal_scan url=${url} triggers=${triggerCount}`);')
+
+old2 = 'clicksPerformed.push(`english_modal[${i}] dom +${afterLen - beforeLen}`);'
+new2 = ('clicksPerformed.push(`english_modal[${i}] dom +${afterLen - beforeLen}`);\n'
+        '          console.log(`[BROWSER] english_modal[${i}] url=${url} dom +${afterLen - beforeLen}`);')
+
+ok = 0
+for old, new in [(old1, new1), (old2, new2)]:
+    if old in s and new not in s:
+        s = s.replace(old, new); ok += 1
+    else:
+        print("SKIP:", old[:50])
+open(p, "w").write(s)
+print(f"Patched {ok}/2")
+PYEOF
+
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env
+
+sleep 5
+
+# Re-run the single VIT URL
+curl -s -X POST "http://localhost/api/scrape/start" -H "Content-Type: application/json" \
+  -d '{"url":"https://vit.edu.au/mba","universityId":6,"fastMode":false}'
+echo
+
+# Wait then grep the new logs
+sleep 90
+grep -E "BROWSER\] english_modal|english_modal_scan|english_modals_" \
+  ~/.pm2/logs/uni-api-out-1.log | tail -40
+Patched 2/2
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 641ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 62747    │ 0s     │ 27   │ online    │ 0%       │ 46.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+{"jobId":"scrape_1776777903969_0hbhuv","message":"Scraping started in background"}
+root@university-and-course-data:~/University-and-Course-data# 
