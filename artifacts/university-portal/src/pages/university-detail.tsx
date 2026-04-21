@@ -1797,40 +1797,42 @@ export default function UniversityDetail() {
 
                 {/* Cards grid */}
                 {note.parsed_data && note.parsed_data.length > 0 ? (
-                  <div className="p-4 grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {note.parsed_data.map((card, ci) => (
-                      <div key={ci} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                      <div key={ci} className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
                         {/* Card header */}
-                        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
-                          <div className="w-6 h-6 rounded-md flex items-center justify-center text-sm shrink-0"
-                            style={{ background: card.bg ?? "#F1EFE8", color: card.color ?? "#5F5E5A" }}>
+                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-base shrink-0"
+                            style={{ background: card.bg ?? "#F1EFE8" }}>
                             {card.emoji ?? "ℹ️"}
                           </div>
-                          <span className="text-xs font-semibold text-gray-800">{card.title}</span>
+                          <span className="text-sm font-semibold text-gray-800">{card.title}</span>
                         </div>
                         {/* Card body */}
-                        <div className="px-3 py-2">
+                        <div className="px-4 divide-y divide-gray-100">
                           {card.fields?.map((f, fi) => (
-                            <div key={fi} className={`flex justify-between items-start gap-2 py-1 ${fi < card.fields.length - 1 || (card.sections?.length ?? 0) > 0 ? "border-b border-gray-50" : ""}`}>
-                              <span className="text-[11px] text-gray-500 shrink-0 max-w-[48%]">{f.label}</span>
-                              {f.badge === "yes" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">Yes</span>}
-                              {f.badge === "no" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">No</span>}
-                              {f.badge === "case" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">Case by case</span>}
-                              {!f.badge && <span className="text-[11px] text-gray-800 text-right max-w-[52%]">{f.value}</span>}
+                            <div key={fi} className="flex justify-between items-center gap-3 py-2.5 min-h-[40px]">
+                              <span className="text-sm text-gray-500 shrink-0 max-w-[46%] leading-snug">{f.label}</span>
+                              {f.badge === "yes" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500 text-white whitespace-nowrap">Yes</span>}
+                              {f.badge === "no"  && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500 text-white whitespace-nowrap">No</span>}
+                              {f.badge === "case" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-400 text-white whitespace-nowrap">Case by case</span>}
+                              {!f.badge && <span className="text-sm text-gray-800 font-medium text-right leading-snug">{f.value}</span>}
                             </div>
                           ))}
                           {card.sections?.map((sec, si) => (
-                            <div key={si}>
-                              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">{sec.label}</div>
-                              {sec.fields?.map((f, fi) => (
-                                <div key={fi} className={`flex justify-between items-start gap-2 py-1 ${fi < sec.fields.length - 1 ? "border-b border-gray-50" : ""}`}>
-                                  <span className="text-[11px] text-gray-500 shrink-0 max-w-[48%]">{f.label}</span>
-                                  {f.badge === "yes" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">Yes</span>}
-                                  {f.badge === "no" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">No</span>}
-                                  {f.badge === "case" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">Case by case</span>}
-                                  {!f.badge && <span className="text-[11px] text-gray-800 text-right max-w-[52%]">{f.value}</span>}
-                                </div>
-                              ))}
+                            <div key={si} className="py-2">
+                              <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">{sec.label}</div>
+                              <div className="divide-y divide-gray-100">
+                                {sec.fields?.map((f, fi) => (
+                                  <div key={fi} className="flex justify-between items-center gap-3 py-2 min-h-[36px]">
+                                    <span className="text-sm text-gray-500 shrink-0 max-w-[46%] leading-snug">{f.label}</span>
+                                    {f.badge === "yes" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500 text-white whitespace-nowrap">Yes</span>}
+                                    {f.badge === "no"  && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500 text-white whitespace-nowrap">No</span>}
+                                    {f.badge === "case" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-400 text-white whitespace-nowrap">Case by case</span>}
+                                    {!f.badge && <span className="text-sm text-gray-800 font-medium text-right leading-snug">{f.value}</span>}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           ))}
                         </div>
