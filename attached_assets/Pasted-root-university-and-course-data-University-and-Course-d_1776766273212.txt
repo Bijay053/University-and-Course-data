@@ -1,0 +1,48 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && pdftotext /tmp/req.pdf /tmp/req.txt && node --experimental-vm-modules -e "
+import('./artifacts/api-server/dist/index.mjs').then(async () => {
+  // Re-import the parseEnglishRequirementsFromText from compiled bundle won't work easily
+  // So test directly with regex matching
+  const fs = await import('fs');
+  const text = fs.readFileSync('/tmp/req.txt', 'utf8').replace(/\s+/g, ' ');
+  
+  // Find PTE row
+  const startMatch = text.match(/pte\s*\(\s*pearson\s+test\s+of\s+english\s+academic\s*\)/i);
+  console.log('PTE marker found:', !!startMatch, startMatch ? 'at pos ' + startMatch.index : '');
+  
+  if (startMatch) {
+    const after = text.substring(startMatch.index, startMatch.index + 500);
+    console.log('Next 200 chars after PTE marker:', after.substring(0, 200));
+    
+    const score50 = after.match(/academic\s+score\s+of\s+50/i);
+    const scoreAny = after.match(/academic\s+score\s+of\s+(\\d{2,3})/i);
+    console.log('Match score=50:', !!score50);
+    console.log('Match any score:', scoreAny ? scoreAny[1] : 'NONE');
+  }
+});
+" 2>&1 | tail -20
+  console.log('PTE marker found:', pnpm --filter @workspace/api-server run build 2>&1 | tail -3 &&   set -a && source /root/.env.backup && set +a &&   pm2 restart 1 --update-env && echo "=== Done ==="startMatch, startMatch ? 'at pos ' + startMatch.index : '');
+    console.log('Match score=50:', pnpm --filter @workspace/api-server run build 2>&1 | tail -3 &&   set -a && source /root/.env.backup && set +a &&   pm2 restart 1 --update-env && echo "=== Done ==="score50);
+[eval]:10
+  console.log('PTE marker found:', pnpm --filter @workspace/api-server run build 2>&1 | tail -3 &&   set -a && source /root/.env.backup && set +a &&   pm2 restart 1 --update-env && echo ===
+                                        ^^
+Expected ',', got 'ident'
+
+SyntaxError: missing ) after argument list
+    at makeContextifyScript (node:internal/vm:194:14)
+    at compileScript (node:internal/process/execution:388:10)
+    at evalTypeScript (node:internal/process/execution:260:22)
+    at node:internal/main/eval_string:71:3
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# grep -A3 "pteTarget50" /root/University-and-Course-data/artifacts/api-server/src/lib/english-requirements.ts | head -10
+    const pteTarget50 = pteRow.match(/academic\s+score\s+of\s+50/i);
+    const pteTarget46 = pteRow.match(/academic\s+score\s+of\s+46/i);
+    const pteTargetAny = pteRow.match(/academic\s+score\s+of\s+(\d{2,3})/i);
+    const pteTarget = track === "bachelor_postgraduate"
+      ? pteTarget50
+      : track === "shared"
+        ? (pteTarget50 || pteTarget46 || pteTargetAny)
+        : pteTarget46;
+    if (pteTarget) {
+      const score = track === "bachelor_postgraduate"
+root@university-and-course-data:~/University-and-Course-data# 
