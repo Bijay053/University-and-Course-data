@@ -1,0 +1,137 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://asahe.edu.au/...
+[INFO ] Using university: asa (ID: 2)
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://asahe.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing found at https://asahe.edu.au/our-courses/courses-grid-view
+[INFO ] Switched to course listing: https://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Using provided university-level pages: feePage: https://asahe.edu.au/fees-and-charges, feesPdf: https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf, requirementsPdf: https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf, requirementsPage: https://asahe.edu.au/policies-and-forms
+[CLASSIFY] Page type: listing — 9 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap: found 9 course URLs total
+[DISCOVER] [SMART] Sampling candidate pages — researching 18 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 18 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: asahe.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business International Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Technology Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Professional Accounting"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Software Application Development"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Cyber Security)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Artificial Intelligence)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business International Business"
+[DISCOVER] Research complete: 12/12 sampled pages are genuine course pages
+[DISCOVER] All 12 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (18 total).
+[DISCOVER] High confidence: 12/12 samples valid (100%). Auto-proceeding with 18 courses (~1 min). (18 courses)
+[EXTRACT ] [SMART] Fetching 18 validated course pages (browser-first for JS-heavy, static-first for the rest)... (18 courses)
+[INFO ] Saved university requirements page has NO English-test keywords — discarding to avoid wrong data: https://asahe.edu.au/policies-and-forms
+[INFO ] Batch concurrency: HTTP 1, browser 1 (heavy host: asahe.edu.au, browser disabled)
+[ 1/18] Fetching 1/18: Bachelor of Business International Business
+[FALLBACK] [per-course browser ✓] Bachelor of Business International Business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor of Business International Busin...
+[FALLBACK] [per-course vision img 1/6] Bachelor of Business Internati: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor of Business International Business: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 2/18] Fetching 2/18: Bachelor of Business Hospitality Management
+[FALLBACK] [per-course browser ✓] Bachelor of Business Hospitality Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor of Business Hospitality Managem...
+[FALLBACK] [per-course vision img 1/6] Bachelor of Business Hospitali: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor of Business Hospitality Management: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 3/18] Fetching 3/18: Bachelor of Business Technology Management
+[FALLBACK] [per-course browser ✓] Bachelor of Business Technology Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor of Business Technology Manageme...
+[FALLBACK] [per-course vision img 1/6] Bachelor of Business Technolog: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor of Business Technology Management: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 4/18] Fetching 4/18: Bachelor of Business
+[FALLBACK] [per-course browser ✓] Bachelor of Business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor of Business...
+[FALLBACK] [per-course vision img 1/6] Bachelor of Business: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor of Business: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 5/18] Fetching 5/18: Bachelor of Professional Accounting
+[ 6/18] Fetching 6/18: Master of Software Application Development
+[FALLBACK] [per-course browser ✓] Master of Software Application Development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 5 image(s) for Master of Software Application Developme...
+[FALLBACK] [per-course vision img 1/5] Master of Software Application: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master of Software Application Development: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 7/18] Fetching 7/18: Master of Project Management
+[FALLBACK] [per-course browser ✓] Master of Project Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Master of Project Management...
+[FALLBACK] [per-course vision img 1/6] Master of Project Management: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master of Project Management: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 8/18] Fetching 8/18: Master of Information Technology (Cyber Security)
+[FALLBACK] [per-course browser ✓] Master of Information Technology (Cyber Security) — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 5 image(s) for Master of Information Technology (Cyber ...
+[FALLBACK] [per-course vision img 1/5] Master of Information Technolo: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master of Information Technology (Cyber Security): IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 9/18] Fetching 9/18: Master of Information Technology (Artificial Intelligence)
+[FALLBACK] [per-course browser ✓] Master of Information Technology (Artificial Intelligence) — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Master of Information Technology (Artifi...
+[FALLBACK] [per-course vision img 1/6] Master of Information Technolo: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master of Information Technology (Artificial Intel: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 10/18] Fetching 10/18: Bachelor Of Business
+[FALLBACK] [per-course browser ✓] Bachelor Of Business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor Of Business...
+[FALLBACK] [per-course vision img 1/6] Bachelor Of Business: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor Of Business: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 11/18] Fetching 11/18: Bachelor Of Business Hospitality Management
+[FALLBACK] [per-course browser ✓] Bachelor Of Business Hospitality Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor Of Business Hospitality Managem...
+[FALLBACK] [per-course vision img 1/6] Bachelor Of Business Hospitali: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor Of Business Hospitality Management: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 12/18] Fetching 12/18: Bachelor Of Business International Business
+[FALLBACK] [per-course browser ✓] Bachelor Of Business International Business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor Of Business International Busin...
+[FALLBACK] [per-course vision img 1/6] Bachelor Of Business Internati: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor Of Business International Business: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 13/18] Fetching 13/18: Bachelor Of Business Technology Management
+[FALLBACK] [per-course browser ✓] Bachelor Of Business Technology Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor Of Business Technology Manageme...
+[FALLBACK] [per-course vision img 1/6] Bachelor Of Business Technolog: ieltsOverall=6 ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 pteOverall=50
+[FALLBACK] [per-course vision ✓] Bachelor Of Business Technology Management: IELTS=6 PTE=50 TOEFL=60 CAE=169
+[ 14/18] Fetching 14/18: Bachelor Of Professional Accounting
+[ 15/18] Fetching 15/18: Master Of Information Technology Artificial Intelligence
+[FALLBACK] [per-course browser ✓] Master Of Information Technology Artificial Intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Master Of Information Technology Artific...
+[FALLBACK] [per-course vision img 1/6] Master Of Information Technolo: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master Of Information Technology Artificial Intell: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 16/18] Fetching 16/18: Master Of Information Technology Cyber Security
+[FALLBACK] [per-course browser ✓] Master Of Information Technology Cyber Security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 5 image(s) for Master Of Information Technology Cyber S...
+[FALLBACK] [per-course vision img 1/5] Master Of Information Technolo: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master Of Information Technology Cyber Security: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 17/18] Fetching 17/18: Master Of Project Management
+[FALLBACK] [per-course browser ✓] Master Of Project Management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Master Of Project Management...
+[FALLBACK] [per-course vision img 1/6] Master Of Project Management: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master Of Project Management: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[ 18/18] Fetching 18/18: Master Of Software Application Development
+[FALLBACK] [per-course browser ✓] Master Of Software Application Development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 5 image(s) for Master Of Software Application Developme...
+[FALLBACK] [per-course vision img 1/5] Master Of Software Application: ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 ieltsWriting=6 ieltsReading=6 pteOverall=58
+[FALLBACK] [per-course vision ✓] Master Of Software Application Development: IELTS=6.5 PTE=58 TOEFL=85 CAE=—
+[INFO ] Classifying 18 courses with AI (batched)...
+– Bachelor of Business International Business [skipped]
+– Bachelor of Business Hospitality Management [skipped]
+– Bachelor of Business Technology Management [skipped]
+– Bachelor of Business [skipped]
+– Bachelor of Professional Accounting [skipped]
+– Master of Software Application Development [skipped]
+– Master of Project Management [skipped]
+– Master of Information Technology (Cyber Security) [skipped]
+– Master of Information Technology (Artificial Intelligence) [skipped]
+– Bachelor Of Business [skipped]
+– Bachelor Of Business Hospitality Management [skipped]
+– Bachelor Of Business International Business [skipped]
+– Bachelor Of Business Technology Management [skipped]
+– Bachelor Of Professional Accounting [skipped]
+– Master Of Information Technology Artificial Intelligence [skipped]
+– Master Of Information Technology Cyber Security [skipped]
+– Master Of Project Management [skipped]
+– Master Of Software Application Development [skipped]
+══ DONE ══ Found:18 | Staged:0 | Skipped:18 | Errors:0
