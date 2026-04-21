@@ -1,0 +1,66 @@
+root@university-and-course-data:~/University-and-Course-data# # 1. Deploy the discovery fix
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env
+
+# 2. Check how many courses the full listing returns
+curl -s "https://vit.edu.au/course-list" | grep -oP '(?<=href=")[^"]*(?=")' | grep -v "^#\|^http\|javascript\|mailto" | grep -iE "course|degree|bachelor|master|mba|diploma|cert|graduate" | head -30
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 639ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 65519    │ 0s     │ 30   │ online    │ 0%       │ 46.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+/mba
+/mba
+/mba/mba-finance
+/mba/mba-information-systems
+/mba/mba-leadership-and-management
+/mba/mba-tourism-and-hospitality-management
+/mba/mba-project-management
+/mba/gdba
+/mba/gcba
+/bachelor-of-business
+/bachelor-of-business
+/bachelor-of-business/bbus-international-business-management
+/bachelor-of-business/bbus-tourism-and-hospitality-management
+/bachelor-of-business/bbus-accounting
+/bachelor-of-business/bbus-human-resource-management
+/bachelor-of-business/bbus-marketing
+/bachelor-of-business/bbus-business-technology
+/diploma-of-business
+/vocational/sit30821-certificate-iii-in-commercial-cookery
+/vocational/sit40521-certificate-iv-in-kitchen-management
+/vocational/sit31021-certificate-iii-in-patisserie
+/vocational/sit40721-certificate-iv-in-patisserie
+/vocational/sit50422-diploma-of-hospitality-management
+/vocational/sit60322-advanced-diploma-of-hospitality-management
+/vocational/ict40120-certificate-iv-in-information-technology
+/vocational/ict50220-diploma-of-information-technology
+/vocational/ict60220-advanced-diploma-of-information-technology
+/vocational/cpc30220-certificate-iii-in-carpentry
+/resources/course-entry-requirements
+/mba
+root@university-and-course-data:~/University-and-Course-data# 
