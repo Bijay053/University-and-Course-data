@@ -4636,6 +4636,24 @@ async function stageCourse(
     return false;
   }
 
+  // Infer degree level from course name when extraction missed it (e.g. JS-rendered pages
+  // where HTTP-only fetch returns a skeleton). This prevents valid courses from being
+  // rejected just because the renderer couldn't see degree info on the page.
+  if (!courseData.degreeLevel && courseData.courseName) {
+    const cn = courseData.courseName.toLowerCase();
+    if (/\bdoctor(ate)?\b|\bphd\b|\bd\.?phil\b/.test(cn)) courseData.degreeLevel = "Doctorate";
+    else if (/\bmaster('?s)?\b|\bmba\b|\bm\.sc\b|\bm\.eng\b|\bm\.ed\b/.test(cn)) courseData.degreeLevel = "Master's";
+    else if (/\bgraduate\s+(certificate|diploma)\b/.test(cn)) courseData.degreeLevel = "Graduate Certificate";
+    else if (/\bpostgraduate\s+(certificate|diploma)\b/.test(cn)) courseData.degreeLevel = "Graduate Certificate";
+    else if (/\bbachelor('?s)?\b|\bb\.sc\b|\bb\.eng\b|\bb\.ed\b|\bb\.?a\.?\b/.test(cn)) courseData.degreeLevel = "Bachelor's";
+    else if (/\bassociate\s+degree\b/.test(cn)) courseData.degreeLevel = "Associate Degree";
+    else if (/\bdiploma\b/.test(cn)) courseData.degreeLevel = "Diploma";
+    else if (/\bcertificate\b/.test(cn)) courseData.degreeLevel = "Certificate";
+    if (courseData.degreeLevel) {
+      if (job) addLog(job, "status", { message: `[INFER] Degree level "${courseData.degreeLevel}" inferred from name: "${courseData.courseName.slice(0, 50)}"`, phase: "validate" });
+    }
+  }
+
   // Reject pages with no course data at all — likely category/landing pages that slipped through
   const hasDegreeLevel = !!courseData.degreeLevel;
   const hasDuration = !!courseData.duration;
