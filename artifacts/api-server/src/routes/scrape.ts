@@ -3835,16 +3835,19 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
       const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
       const courseData: Partial<CourseData> = {};
       applyEnglishResultToCourse(courseData, parsed);
-      if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;
-      // Text parsed but no hits — also try Gemini on the raw text as a fallback
+      if (courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall) return courseData;
+      // Partial or no hits — use Gemini on the raw text to fill any gaps
       if (GEMINI_API_KEY && pdfText.length > 50) {
         try {
           const prompt = `Extract ALL English language proficiency requirements from this PDF text. Return JSON only: {"ieltsOverall":null,"pteOverall":null,"toeflOverall":null,"cambridgeOverall":null,"duolingoOverall":null}`;
           const result = await geminiChat(prompt, pdfText.slice(0, 12000), 150);
           const parsed2 = JSON.parse(result);
-          const cd2: Partial<CourseData> = {};
-          applyEnglishResultToCourse(cd2, { ielts: { overall: parsed2.ieltsOverall }, pte: { overall: parsed2.pteOverall }, toefl: { overall: parsed2.toeflOverall } });
-          if (cd2.ieltsOverall || cd2.pteOverall || cd2.toeflOverall) return cd2;
+          // Merge: Gemini fills missing slots, regex values take precedence
+          if (parsed2.ieltsOverall && !courseData.ieltsOverall) courseData.ieltsOverall = parsed2.ieltsOverall;
+          if (parsed2.pteOverall && !courseData.pteOverall) courseData.pteOverall = parsed2.pteOverall;
+          if (parsed2.toeflOverall && !courseData.toeflOverall) courseData.toeflOverall = parsed2.toeflOverall;
+          if ((parsed2 as any).cambridgeOverall && !(courseData as any).cambridgeOverall) (courseData as any).cambridgeOverall = (parsed2 as any).cambridgeOverall;
+          if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;
         } catch {}
       }
       return courseData;
