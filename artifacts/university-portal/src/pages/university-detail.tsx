@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
-  Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw,
+  Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
   ChevronsUpDown, Check, AlertTriangle,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -280,6 +280,24 @@ function FldInput({ label, value, onChange, type = "text" }: {
   );
 }
 
+function BkSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
+      <div className="rounded-lg border bg-white divide-y">{children}</div>
+    </div>
+  );
+}
+function BkRow({ label, val }: { label: string; val: unknown }) {
+  const display = val == null || val === "" ? <span className="text-muted-foreground italic">—</span> : <span className="font-medium text-gray-800">{String(val)}</span>;
+  return (
+    <div className="flex items-center justify-between px-3 py-1.5 text-xs">
+      <span className="text-gray-500 shrink-0 mr-3">{label}</span>
+      {display}
+    </div>
+  );
+}
+
 export default function UniversityDetail() {
   const [, params] = useRoute("/universities/:id");
   const id = params?.id ? parseInt(params.id) : 0;
@@ -531,6 +549,67 @@ export default function UniversityDetail() {
   const [importingAll, setImportingAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [confirmImportAllOpen, setConfirmImportAllOpen] = useState(false);
+
+  // ── Backup mapping state ────────────────────────────────────────────────
+  type BackupMatch = {
+    matched: boolean;
+    stagedCourseId: number;
+    stagedCourseName: string;
+    backedUpAt?: string;
+    course?: Record<string, unknown>;
+    fees?: Record<string, unknown> | null;
+    intakes?: Record<string, unknown>[];
+    english?: Record<string, unknown>[];
+    academic?: Record<string, unknown>[];
+    scholarships?: Record<string, unknown>[];
+  };
+  const [backupMapOpen, setBackupMapOpen] = useState(false);
+  const [backupMapData, setBackupMapData] = useState<BackupMatch | null>(null);
+  const [backupMapLoading, setBackupMapLoading] = useState(false);
+  const [backupMapApplying, setBackupMapApplying] = useState(false);
+  // track which staged course IDs have been successfully mapped this session
+  const [mappedIds, setMappedIds] = useState<Set<number>>(new Set());
+
+  const openBackupMap = async (c: StagedCourse) => {
+    setBackupMapOpen(true);
+    setBackupMapData(null);
+    setBackupMapLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/${c.id}/backup-match`);
+      const json = await res.json();
+      setBackupMapData(json);
+    } catch {
+      setBackupMapData({ matched: false, stagedCourseId: c.id, stagedCourseName: c.course_name });
+    } finally {
+      setBackupMapLoading(false);
+    }
+  };
+
+  const applyBackupMap = async (forceOverwrite: boolean) => {
+    if (!backupMapData?.stagedCourseId) return;
+    setBackupMapApplying(true);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/staged/${backupMapData.stagedCourseId}/apply-backup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceOverwrite }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Apply failed");
+      toast({
+        title: "Backup data applied",
+        description: `${json.appliedFields.length} fields mapped from backup`,
+      });
+      setMappedIds((prev) => new Set(prev).add(backupMapData.stagedCourseId));
+      setBackupMapOpen(false);
+      // refresh the raw data to reflect updated values
+      await fetchRawData();
+    } catch (err) {
+      toast({ title: "Apply failed", description: String(err), variant: "destructive" });
+    } finally {
+      setBackupMapApplying(false);
+    }
+  };
 
   const fetchRawData = useCallback(async () => {
     if (!id) return;
@@ -1369,25 +1448,34 @@ export default function UniversityDetail() {
                           <button
                             onClick={() => openEdit(c)}
                             title="Edit"
-                            className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                            className="p-1 rounded hover:bg-blue-100 text-blue-600 cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           {c.status === "pending" && (
-                            <button
-                              onClick={() => handleApprove(c.id)}
-                              disabled={approvingId === c.id}
-                              title="Approve & Import"
-                              className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => openBackupMap(c)}
+                                title={mappedIds.has(c.id) ? "Backup mapped — map again" : "Map from Backup"}
+                                className={`p-1 rounded cursor-pointer ${mappedIds.has(c.id) ? "text-teal-600 hover:bg-teal-100 bg-teal-50" : "text-indigo-500 hover:bg-indigo-100"}`}
+                              >
+                                <GitMerge className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleApprove(c.id)}
+                                disabled={approvingId === c.id}
+                                title="Approve & Import"
+                                className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => handleDelete(c.id)}
                             disabled={deletingId === c.id}
                             title="Delete"
-                            className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40"
+                            className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1526,6 +1614,135 @@ export default function UniversityDetail() {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setConfirmImportAllOpen(false)}>Cancel</Button>
             <Button onClick={performImportAll}>Import All</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Backup Map Dialog ── */}
+      <Dialog open={backupMapOpen} onOpenChange={(o) => { if (!backupMapApplying) setBackupMapOpen(o); }}>
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="w-5 h-5 text-indigo-500" />
+              Map from Backup
+            </DialogTitle>
+            {backupMapData && (
+              <p className="text-sm text-muted-foreground pt-1 font-medium">{backupMapData.stagedCourseName}</p>
+            )}
+          </DialogHeader>
+
+          {backupMapLoading && (
+            <div className="py-10 text-center text-muted-foreground text-sm">Searching backup…</div>
+          )}
+
+          {!backupMapLoading && backupMapData && !backupMapData.matched && (
+            <div className="py-8 text-center">
+              <Database className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="font-medium text-gray-700">No backup match found</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                No backed-up course with the exact same name was found for this university.
+              </p>
+            </div>
+          )}
+
+          {!backupMapLoading && backupMapData?.matched && (
+            <div className="space-y-4 py-1">
+              {backupMapData.backedUpAt && (
+                <p className="text-xs text-muted-foreground">
+                  Backup snapshot taken: <span className="font-medium text-gray-600">{new Date(backupMapData.backedUpAt).toLocaleString()}</span>
+                </p>
+              )}
+
+              {/* Course core fields */}
+              {backupMapData.course && (
+                <BkSection title="Course Details">
+                  <BkRow label="Duration" val={[backupMapData.course.duration, backupMapData.course.duration_term].filter(Boolean).join(" ")} />
+                  <BkRow label="Study Mode" val={backupMapData.course.study_mode} />
+                  <BkRow label="Course Location" val={backupMapData.course.course_location} />
+                </BkSection>
+              )}
+
+              {/* Fees */}
+              {backupMapData.fees && (
+                <BkSection title="Fees">
+                  <BkRow label="International Fee" val={backupMapData.fees.international_fee != null ? `${backupMapData.fees.currency ?? ""} ${Number(backupMapData.fees.international_fee).toLocaleString()} / ${backupMapData.fees.fee_term ?? ""} (${backupMapData.fees.fee_year ?? ""})`.trim() : null} />
+                </BkSection>
+              )}
+
+              {/* Intakes */}
+              {backupMapData.intakes && backupMapData.intakes.length > 0 && (
+                <BkSection title="Intakes">
+                  <BkRow label="Intake Months" val={(backupMapData.intakes as Record<string, unknown>[]).map((r) => r.intake_month as string).join(", ")} />
+                </BkSection>
+              )}
+
+              {/* English Requirements */}
+              {backupMapData.english && backupMapData.english.length > 0 && (
+                <BkSection title="English Requirements">
+                  {(backupMapData.english as Record<string, unknown>[]).map((er, i) => (
+                    <BkRow key={i} label={String(er.test_type ?? "Test")} val={
+                      [
+                        er.overall != null && `Overall: ${er.overall}`,
+                        er.listening != null && `L: ${er.listening}`,
+                        er.speaking != null && `S: ${er.speaking}`,
+                        er.writing != null && `W: ${er.writing}`,
+                        er.reading != null && `R: ${er.reading}`,
+                      ].filter(Boolean).join("  ")
+                    } />
+                  ))}
+                </BkSection>
+              )}
+
+              {/* Academic Requirements */}
+              {backupMapData.academic && backupMapData.academic.length > 0 && (
+                <BkSection title="Academic Requirements">
+                  {(backupMapData.academic as Record<string, unknown>[]).map((ar, i) => (
+                    <BkRow key={i} label={`${ar.academic_country ?? "Any"}`} val={
+                      [ar.academic_level, ar.academic_score != null && `${ar.academic_score}${ar.score_type ? ` (${ar.score_type})` : ""}`].filter(Boolean).join(" — ")
+                    } />
+                  ))}
+                </BkSection>
+              )}
+
+              {/* Scholarships */}
+              {backupMapData.scholarships && backupMapData.scholarships.length > 0 && (
+                <BkSection title="Scholarships">
+                  {(backupMapData.scholarships as Record<string, unknown>[]).map((s, i) => (
+                    <BkRow key={i} label={String(s.name ?? `Scholarship ${i + 1}`)} val={String(s.details ?? s.amount ?? "")} />
+                  ))}
+                </BkSection>
+              )}
+
+              <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2.5 text-xs text-indigo-700">
+                <strong>Fill Empty Fields Only</strong> — backup values are written only where the staged course has no data.<br />
+                <strong>Overwrite All</strong> — backup values replace all matched fields even if they already exist.
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button variant="outline" onClick={() => setBackupMapOpen(false)} disabled={backupMapApplying} className="cursor-pointer">
+              Cancel
+            </Button>
+            {backupMapData?.matched && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => applyBackupMap(false)}
+                  disabled={backupMapApplying}
+                  className="cursor-pointer border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                >
+                  {backupMapApplying ? "Applying…" : "Fill Empty Fields Only"}
+                </Button>
+                <Button
+                  onClick={() => applyBackupMap(true)}
+                  disabled={backupMapApplying}
+                  className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {backupMapApplying ? "Applying…" : "Overwrite All"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

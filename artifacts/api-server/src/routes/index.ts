@@ -13,6 +13,7 @@ import bulkRouter from "./bulk";
 import importRouter from "./import";
 import scrapeRouter from "./scrape";
 import backupRouter from "./backup";
+import backupMappingRouter from "./backup_mapping";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(bulkRouter);
 router.use(importRouter);
 router.use(scrapeRouter);
 router.use(backupRouter);
+router.use(backupMappingRouter);
 
 export default router;
