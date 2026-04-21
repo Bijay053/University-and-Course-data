@@ -7807,7 +7807,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
         cachedEnglishReqs = pdfEnglish;
         cachedEnglishReqsSource = { url: uniPages.requirementsPdf, pageType: "requirements_page" };
-        addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
+        addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf} → IELTS=${pdfEnglish.ieltsOverall ?? "—"} PTE=${pdfEnglish.pteOverall ?? "—"} TOEFL=${pdfEnglish.toeflOverall ?? "—"} CAE=${(pdfEnglish as any).cambridgeOverall ?? "—"}`, phase: "fetch" });
       }
     } catch {}
   }
@@ -9178,7 +9178,7 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
             const pdfEnglish = await extractEnglishFromPdf(uniPages.requirementsPdf);
             if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
               sharedEnglish = pdfEnglish;
-              addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
+              addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf} → IELTS=${pdfEnglish.ieltsOverall ?? "—"} PTE=${pdfEnglish.pteOverall ?? "—"} TOEFL=${pdfEnglish.toeflOverall ?? "—"} CAE=${(pdfEnglish as any).cambridgeOverall ?? "—"}`, phase: "fetch" });
             }
           } catch {}
         }
@@ -9790,7 +9790,7 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
         const pdfEnglish = await extractEnglishFromPdf(uniPages.requirementsPdf);
         if (pdfEnglish.ieltsOverall || pdfEnglish.pteOverall || pdfEnglish.toeflOverall || pdfEnglish.cambridgeOverall || pdfEnglish.duolingoOverall) {
           cachedEnglishReqs = pdfEnglish;
-          addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf}`, phase: "fetch" });
+          addLog(job, "status", { message: `Using university requirements PDF: ${uniPages.requirementsPdf} → IELTS=${pdfEnglish.ieltsOverall ?? "—"} PTE=${pdfEnglish.pteOverall ?? "—"} TOEFL=${pdfEnglish.toeflOverall ?? "—"} CAE=${(pdfEnglish as any).cambridgeOverall ?? "—"}`, phase: "fetch" });
         }
       } catch {}
     }
