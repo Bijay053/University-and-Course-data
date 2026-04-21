@@ -378,11 +378,21 @@ function buildKbsContextualResult(
     /toefl\s+ibt/i,
   );
   if (pteRow) {
+    // For "shared" track, try bachelor score (50) first, then diploma score (46), then any number
+    const pteTarget50 = pteRow.match(/academic\s+score\s+of\s+50/i);
+    const pteTarget46 = pteRow.match(/academic\s+score\s+of\s+46/i);
+    const pteTargetAny = pteRow.match(/academic\s+score\s+of\s+(\d{2,3})/i);
     const pteTarget = track === "bachelor_postgraduate"
-      ? pteRow.match(/academic\s+score\s+of\s+50/i)
-      : pteRow.match(/academic\s+score\s+of\s+46/i);
+      ? pteTarget50
+      : track === "shared"
+        ? (pteTarget50 || pteTarget46 || pteTargetAny)
+        : pteTarget46;
     if (pteTarget) {
-      const score = track === "bachelor_postgraduate" ? 50 : 46;
+      const score = track === "bachelor_postgraduate"
+        ? 50
+        : track === "shared"
+          ? (pteTarget50 ? 50 : pteTarget46 ? 46 : Number(pteTargetAny![1]))
+          : 46;
       result.pte = {
         overall: score,
         listening: null,
