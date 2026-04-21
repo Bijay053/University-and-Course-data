@@ -2086,6 +2086,83 @@ function extractCountryAcademicRequirements(
  *   1. Find "Entry Requirements" section by ID, class, or heading → try table → try text
  *   2. Fall back to full-page text extraction
  */
+// Column-header English equivalence table parser:
+//   | IELTS | PTE | TOEFL | CAE | DET |
+//   | 6.5   | 55  | 81    | 176 | 110 |
+// Returns true if at least one overall score was extracted into `data`.
+// Used by the modal/popup tables triggered by "another approved English language test"
+// links across VIT, KOI, ASA, Torrens, and similar AU university sites.
+function tryParseColumnHeaderEnglishTable(
+  $table: ReturnType<ReturnType<typeof cheerio.load>>,
+  $: ReturnType<typeof cheerio.load>,
+  data: Partial<CourseData>,
+): boolean {
+  const rows = $table.find("tr").toArray();
+  if (rows.length < 2) return false;
+
+  for (let h = 0; h < Math.min(rows.length, 2); h++) {
+    const headerCells = $(rows[h])
+      .find("th,td")
+      .toArray()
+      .map((c) => $(c).text().trim());
+    if (headerCells.length < 2) continue;
+
+    const colMap: { ielts?: number; pte?: number; toefl?: number; cae?: number; duo?: number } = {};
+    headerCells.forEach((cell, idx) => {
+      const t = cell.toLowerCase();
+      if (/\bielts\b/.test(t) && colMap.ielts == null) colMap.ielts = idx;
+      else if ((/\bpte\b/.test(t) || /pearson/.test(t)) && colMap.pte == null) colMap.pte = idx;
+      else if (/\btoefl\b/.test(t) && colMap.toefl == null) colMap.toefl = idx;
+      else if ((/\bcae\b/.test(t) || /cambridge/.test(t) || /c1\s*advanced/.test(t)) && colMap.cae == null) colMap.cae = idx;
+      else if ((/duolingo/.test(t) || /\bdet\b/.test(t)) && colMap.duo == null) colMap.duo = idx;
+    });
+    const colsFound = Object.values(colMap).filter((v) => v != null).length;
+    if (colsFound < 2) continue;
+
+    for (let r = h + 1; r < rows.length; r++) {
+      const cells = $(rows[r])
+        .find("th,td")
+        .toArray()
+        .map((c) => $(c).text().trim());
+      if (cells.length < 2) continue;
+
+      // Skip rows that look like sub-skill labels (Listening / Reading / Writing / Speaking)
+      const firstCell = (cells[0] || "").toLowerCase();
+      if (/^(listening|reading|writing|speaking)$/.test(firstCell)) continue;
+
+      const pickNum = (idx: number | undefined): number | null => {
+        if (idx == null || cells[idx] == null) return null;
+        const m = cells[idx].match(/(\d+(?:\.\d+)?)/);
+        if (!m) return null;
+        const n = parseFloat(m[1]);
+        return isFinite(n) ? n : null;
+      };
+
+      const ielts = pickNum(colMap.ielts);
+      const pte = pickNum(colMap.pte);
+      const toefl = pickNum(colMap.toefl);
+      const cae = pickNum(colMap.cae);
+      const duo = pickNum(colMap.duo);
+
+      // Plausibility band-checks (rejects sub-skill rows that slipped through)
+      const ok = (v: number | null, lo: number, hi: number) => v == null || (v >= lo && v <= hi);
+      if (!(ok(ielts, 4, 9) && ok(pte, 30, 90) && ok(toefl, 30, 120) && ok(cae, 140, 230) && ok(duo, 60, 160))) continue;
+
+      const values = [ielts, pte, toefl, cae, duo].filter((v) => v != null);
+      if (values.length < 2) continue;
+
+      let applied = false;
+      if (ielts != null && data.ieltsOverall == null) { data.ieltsOverall = ielts; applied = true; }
+      if (pte != null && data.pteOverall == null) { data.pteOverall = pte; applied = true; }
+      if (toefl != null && data.toeflOverall == null) { data.toeflOverall = toefl; applied = true; }
+      if (cae != null && (data as any).cambridgeOverall == null) { (data as any).cambridgeOverall = cae; applied = true; }
+      if (duo != null && (data as any).duolingoOverall == null) { (data as any).duolingoOverall = duo; applied = true; }
+      if (applied) return true;
+    }
+  }
+  return false;
+}
+
 function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partial<CourseData>) {
   const bodyText = $("body").text();
   const contextualResult = parseEnglishRequirementsFromText(bodyText, "browser", {
@@ -2155,6 +2232,11 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
     let foundInTable = false;
     reqContainer.find("table").each((_, table) => {
       const $table = $(table);
+      // First, try column-header layout (modal/popup equivalence tables)
+      if (tryParseColumnHeaderEnglishTable($table, $, data)) {
+        foundInTable = true;
+        return;
+      }
       $table.find("tr").each((_, row) => {
         const cells = $(row).find("td,th");
         if (cells.length < 2) return;
@@ -2185,6 +2267,11 @@ function extractEnglishFromHtml($: ReturnType<typeof cheerio.load>, data: Partia
   $("table").each((_, table) => {
     if (data.ieltsOverall && data.pteOverall && data.toeflOverall) return false;
     const $table = $(table);
+    // First, try column-header layout (modal/popup equivalence tables anywhere on the page)
+    if (tryParseColumnHeaderEnglishTable($table, $, data)) {
+      foundInPageTable = true;
+      return undefined;
+    }
     $table.find("tr").each((_, row) => {
       const cells = $(row).find("td,th");
       if (cells.length < 2) return;
