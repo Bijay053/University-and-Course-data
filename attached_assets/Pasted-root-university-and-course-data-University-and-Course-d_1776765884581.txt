@@ -1,0 +1,119 @@
+root@university-and-course-data:~/University-and-Course-data# sed -n '3840,3852p' /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts
+          const prompt = `Extract ALL English language proficiency requirements from this PDF text. Return JSON only: {"ieltsOverall":null,"pteOverall":null,"toeflOverall":null,"cambridgeOverall":null,"duolingoOverall":null}`;
+          const result = await geminiChat(prompt, pdfText.slice(0, 12000), 150);
+          const parsed2 = JSON.parse(result);
+          const cd2: Partial<CourseData> = {};
+          if (parsed2.ieltsOverall) cd2.ieltsOverall = parsed2.ieltsOverall;
+          if (parsed2.pteOverall) cd2.pteOverall = parsed2.pteOverall;
+          if (parsed2.toeflOverall) cd2.toeflOverall = parsed2.toeflOverall;
+          if (cd2.ieltsOverall || cd2.pteOverall || cd2.toeflOverall) return cd2;
+        } catch {}
+      }
+      return courseData;
+    }
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - << 'EOF'
+path = "artifacts/api-server/src/routes/scrape.ts"
+with open(path, "r") as f:
+    src = f.read()
+
+old = """          const cd2: Partial<CourseData> = {};
+          if (parsed2.ieltsOverall) cd2.ieltsOverall = parsed2.ieltsOverall;
+          if (parsed2.pteOverall) cd2.pteOverall = parsed2.pteOverall;
+          if (parsed2.toeflOverall) cd2.toeflOverall = parsed2.toeflOverall;
+          if (cd2.ieltsOverall || cd2.pteOverall || cd2.toeflOverall) return cd2;"""
+
+new = """          if (parsed2.ieltsOverall && !courseData.ieltsOverall) courseData.ieltsOverall = parsed2.ieltsOverall;
+          if (parsed2.pteOverall && !courseData.pteOverall) courseData.pteOverall = parsed2.pteOverall;
+          if (parsed2.toeflOverall && !courseData.toeflOverall) courseData.toeflOverall = parsed2.toeflOverall;
+          if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;"""
+
+if old in src:
+    src = src.replace(old, new, 1)
+    with open(path, "w") as f:
+        f.write(src)
+    print("Fix2 applied OK")
+else:
+    print("ERROR: still not matching — dumping lines 3842-3848:")
+    lines = src.split('\n')
+    for i, l in enumerate(lines[3841:3848], 3842):
+        print(repr(f"L{i}: {l}"))
+EOF
+
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+  set -a && source /root/.env.backup && set +a && \
+  pm2 restart 1 --update-env && echo "=== Done ==="
+Fix2 applied OK
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 564ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 10099    │ 0s     │ 10   │ online    │ 0%       │ 46.1mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+=== Done ===
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - << 'EOF'
+path = "artifacts/api-server/src/routes/scrape.ts"
+with open(path, "r") as f:
+    src = f.read()
+
+old = """  // Pattern 4: overall near "PTE", bands individually
+  const overallM = text.match(/pte(?:\\s+academic)?.{0,120}?overall\\s*([0-9]+(?:\\.[0-9]+)?)/i);"""
+
+new = """  // Pattern 3.5: "PTE (Pearson Test of English Academic) Academic Score of 50"
+  const acadScoreM = text.match(/pte[\\s\\S]{0,120}?academic\\s+score\\s+of\\s+([0-9]+)/i);
+  if (acadScoreM) {
+    const overall = Number(acadScoreM[1]);
+    if (overall >= 10 && overall <= 90) return { overall, listening: null, reading: null, writing: null, speaking: null };
+  }
+  // Pattern 3.6: plain "PTE Academic N" (e.g. "PTE Academic 50")
+  const pteAcadPlain = text.match(/pte\\s+academic\\s*:?\\s*([0-9]+)/i);
+  if (pteAcadPlain) {
+    const overall = Number(pteAcadPlain[1]);
+    if (overall >= 10 && overall <= 90) return { overall, listening: null, reading: null, writing: null, speaking: null };
+  }
+
+  // Pattern 4: overall near "PTE", bands individually
+  const overallM = text.match(/pte(?:\\s+academic)?.{0,120}?overall\\s*([0-9]+(?:\\.[0-9]+)?)/i);"""
+
+if old in src:
+    src = src.replace(old, new, 1)
+    with open(path, "w") as f:
+        f.write(src)
+    print("PTE pattern 3.5+3.6 applied OK")
+else:
+    print("Pattern not found — checking line:")
+    for i,l in enumerate(src.split('\n')):
+        if 'Pattern 4: overall near' in l:
+            print(f"  L{i+1}: {repr(l)}")
+EOF
+
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+  set -a && source /root/.env.backup && set +a && \
+  pm2 restart 1 --update-env && echo "=== Done ==="
+PTE pattern 3.5+3.6 applied OK
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 600ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 10879    │ 0s     │ 11   │ online    │ 0%       │ 45.9mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+=== Done ===
+root@university-and-course-data:~/University-and-Course-data# pdftotext /tmp/req.pdf - | python3 -c "
+import sys, re
+text = sys.stdin.read().replace('\n', ' ')
+m = re.search(r'pte.{0,120}?academic\s+score\s+of\s+([0-9]+)', text, re.I)
+print('PTE match:', m.group(1) if m else 'NOT FOUND')
+m2 = re.search(r'toefl.{0,200}?([4-9][0-9])\b', text, re.I)
+print('TOEFL match:', m2.group(1) if m2 else 'NOT FOUND — need to check TOEFL score format')
+"
+PTE match: 50
+TOEFL match: NOT FOUND — need to check TOEFL score format
+root@university-and-course-data:~/University-and-Course-data# 
