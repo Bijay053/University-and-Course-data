@@ -18,26 +18,6 @@ const formSchema = z.object({
   website: z.string().url().optional().or(z.literal("")),
 });
 
-const AVATAR_COLORS = [
-  "from-blue-500 to-blue-700",
-  "from-violet-500 to-violet-700",
-  "from-emerald-500 to-emerald-700",
-  "from-orange-500 to-orange-700",
-  "from-rose-500 to-rose-700",
-  "from-cyan-500 to-cyan-700",
-  "from-amber-500 to-amber-700",
-  "from-indigo-500 to-indigo-700",
-];
-
-function avatarColor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffff;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
-}
 
 const COUNTRY_FLAGS: Record<string, string> = {
   Australia: "🇦🇺", "United Kingdom": "🇬🇧", UK: "🇬🇧", USA: "🇺🇸",
@@ -158,8 +138,6 @@ export default function Universities() {
             <div className="divide-y divide-gray-50">
               {universities.map((uni, idx) => {
                 const flag = COUNTRY_FLAGS[uni.country] ?? "🏫";
-                const grad = avatarColor(uni.name);
-                const init = initials(uni.name);
                 const isUnknown = uni.city === "Unknown" || uni.country === "Unknown";
 
                 return (
@@ -169,11 +147,8 @@ export default function Universities() {
                     {/* SN. */}
                     <div className="hidden md:block text-xs text-gray-400 font-mono">{idx + 1}</div>
 
-                    {/* Name + avatar */}
+                    {/* Name */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`hidden md:flex shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br ${grad} items-center justify-center text-white text-xs font-bold shadow-sm`}>
-                        {init}
-                      </div>
                       <div className="min-w-0">
                         <Link href={`/universities/${uni.id}`}>
                           <span className="font-semibold text-gray-900 text-sm hover:text-blue-600 transition-colors cursor-pointer leading-tight line-clamp-1">
