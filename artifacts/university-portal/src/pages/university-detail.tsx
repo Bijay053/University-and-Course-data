@@ -268,53 +268,80 @@ export default function UniversityDetail() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
-  // Mini scrollbar — state-driven so React always re-renders the thumb position
+  // Mini scrollbar — pure state-driven, no miniScrollbarRef dependency needed
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const miniScrollbarRef = useRef<HTMLDivElement>(null);
+  const TRACK_INNER = 118; // 122px widget width - 4px total padding
   const [thumbLeft, setThumbLeft] = useState(2);
   const [thumbWidth, setThumbWidth] = useState(38);
 
   const computeThumb = useCallback(() => {
     const viewport = tableScrollRef.current;
-    const scrollbar = miniScrollbarRef.current;
-    if (!viewport || !scrollbar) return;
+    if (!viewport) return;
     const visible = viewport.clientWidth;
     const total = viewport.scrollWidth;
-    const trackWidth = scrollbar.clientWidth - 4;
-    const tw = Math.max(32, trackWidth * (visible / total));
-    const maxLeft = trackWidth - tw;
-    const ratio = total > visible ? viewport.scrollLeft / (total - visible) : 0;
+    if (total <= visible) {
+      setThumbWidth(TRACK_INNER);
+      setThumbLeft(2);
+      return;
+    }
+    const tw = Math.max(20, Math.floor(TRACK_INNER * (visible / total)));
+    const maxLeft = TRACK_INNER - tw;
+    const ratio = viewport.scrollLeft / (total - visible);
     setThumbWidth(tw);
-    setThumbLeft(2 + maxLeft * ratio);
+    setThumbLeft(2 + Math.round(maxLeft * ratio));
   }, []);
 
   useEffect(() => {
-    const viewport = tableScrollRef.current;
-    if (!viewport) return;
-    viewport.addEventListener("scroll", computeThumb, { passive: true });
-    window.addEventListener("resize", computeThumb);
-    const t = setTimeout(computeThumb, 60);
+    if (tab !== "courses") return;
+    // Poll until the table ref is set (data may load async)
+    let cleanupCalled = false;
+    let removeListeners: (() => void) | null = null;
+    const attach = () => {
+      const viewport = tableScrollRef.current;
+      if (!viewport) return false;
+      const onScroll = () => computeThumb();
+      viewport.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", computeThumb);
+      removeListeners = () => {
+        viewport.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", computeThumb);
+      };
+      computeThumb();
+      return true;
+    };
+    // Retry attaching until the DOM ref exists (covers async data render)
+    if (!attach()) {
+      const id = setInterval(() => {
+        if (cleanupCalled || attach()) clearInterval(id);
+      }, 50);
+    }
     return () => {
-      viewport.removeEventListener("scroll", computeThumb);
-      window.removeEventListener("resize", computeThumb);
-      clearTimeout(t);
+      cleanupCalled = true;
+      removeListeners?.();
     };
   }, [tab, computeThumb]);
 
+  // Re-sync thumb whenever course data changes (new page, filter, etc.)
+  useEffect(() => {
+    const t = setTimeout(computeThumb, 80);
+    return () => clearTimeout(t);
+  }, [page, search, category, subCategory, degreeLevel, studyMode, computeThumb]);
+
   const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     const viewport = tableScrollRef.current;
-    const scrollbar = miniScrollbarRef.current;
-    if (!viewport || !scrollbar) return;
+    if (!viewport) return;
     const dragStartX = e.clientX;
-    const startThumbLeft = thumbLeft;
-    const trackWidth = scrollbar.clientWidth - 4;
-    const maxLeft = trackWidth - thumbWidth;
+    const startScrollLeft = viewport.scrollLeft;
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+    const tw = Math.max(20, Math.floor(TRACK_INNER * (viewport.clientWidth / viewport.scrollWidth)));
+    const maxLeft = TRACK_INNER - tw;
     const onMouseMove = (ev: MouseEvent) => {
-      let newLeft = startThumbLeft + (ev.clientX - dragStartX);
-      newLeft = Math.max(2, Math.min(2 + maxLeft, newLeft));
-      const ratio = maxLeft > 0 ? (newLeft - 2) / maxLeft : 0;
-      viewport.scrollLeft = ratio * (viewport.scrollWidth - viewport.clientWidth);
+      const dx = ev.clientX - dragStartX;
+      const scrollRatio = maxLeft > 0 ? dx / maxLeft : 0;
+      viewport.scrollLeft = Math.max(0, Math.min(maxScroll, startScrollLeft + scrollRatio * maxScroll));
     };
     const onMouseUp = () => {
       document.body.style.userSelect = "";
@@ -328,15 +355,15 @@ export default function UniversityDetail() {
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const viewport = tableScrollRef.current;
-    const scrollbar = miniScrollbarRef.current;
-    if (!viewport || !scrollbar) return;
-    const rect = scrollbar.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const trackWidth = scrollbar.clientWidth - 4;
-    const maxLeft = trackWidth - thumbWidth;
-    let targetLeft = clickX - thumbWidth / 2;
-    targetLeft = Math.max(2, Math.min(2 + maxLeft, targetLeft));
-    const ratio = maxLeft > 0 ? (targetLeft - 2) / maxLeft : 0;
+    const track = miniScrollbarRef.current;
+    if (!viewport || !track) return;
+    const rect = track.getBoundingClientRect();
+    const clickX = e.clientX - rect.left - 2; // relative to inner track
+    const tw = thumbWidth;
+    const maxLeft = TRACK_INNER - tw;
+    let targetLeft = clickX - tw / 2;
+    targetLeft = Math.max(0, Math.min(maxLeft, targetLeft));
+    const ratio = maxLeft > 0 ? targetLeft / maxLeft : 0;
     viewport.scrollLeft = ratio * (viewport.scrollWidth - viewport.clientWidth);
   };
 
