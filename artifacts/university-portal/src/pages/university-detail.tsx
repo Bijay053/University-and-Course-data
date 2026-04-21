@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -268,6 +269,11 @@ export default function UniversityDetail() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const scrollTable = (dir: "left" | "right") => {
+    tableScrollRef.current?.scrollBy({ left: dir === "left" ? -400 : 400, behavior: "smooth" });
+  };
+
   const subCategories = category !== ALL ? getSubCategories(category) : [];
 
   const { data: uni, isLoading: uniLoading } = useGetUniversity(id, {
@@ -465,6 +471,7 @@ export default function UniversityDetail() {
   if (!uni) return <div className="py-16 text-center text-muted-foreground">University not found</div>;
 
   return (
+    <>
     <div className="space-y-6">
       {/* University Header */}
       <div className="flex items-start gap-4">
@@ -564,7 +571,7 @@ export default function UniversityDetail() {
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
           </div>
 
-          <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+          <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
@@ -1314,5 +1321,68 @@ export default function UniversityDetail() {
         </Dialog>
       )}
     </div>
+
+    {/* Trello-style horizontal scroll widget — only visible on Courses tab */}
+    {tab === "courses" && createPortal(
+      <div
+        style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "stretch",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          borderRadius: 4,
+          overflow: "hidden",
+          cursor: "pointer",
+        }}
+        aria-label="Horizontal scroll controls"
+      >
+        {/* Left panel — scroll left */}
+        <button
+          onClick={() => scrollTable("left")}
+          title="Scroll left"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 3,
+            padding: "8px 12px",
+            background: "#fff",
+            border: "2px solid #4A90D9",
+            borderRadius: "4px 0 0 4px",
+            cursor: "pointer",
+          }}
+        >
+          {[0,1,2,3].map((i) => (
+            <div key={i} style={{ width: 3, height: 20, background: "#93C5FD", borderRadius: 2 }} />
+          ))}
+        </button>
+        {/* Right panel — scroll right */}
+        <button
+          onClick={() => scrollTable("right")}
+          title="Scroll right"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 3,
+            padding: "8px 12px",
+            background: "#F3F4F6",
+            border: "1px solid #D1D5DB",
+            borderLeft: "none",
+            borderRadius: "0 4px 4px 0",
+            cursor: "pointer",
+          }}
+        >
+          {[0,1,2,3].map((i) => (
+            <div key={i} style={{ width: 3, height: 20, background: "#D1D5DB", borderRadius: 2 }} />
+          ))}
+        </button>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }

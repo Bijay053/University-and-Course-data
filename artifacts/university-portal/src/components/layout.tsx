@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,21 +45,8 @@ function NavLinks({ onNav }: { onNav?: () => void }) {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    const onScroll = () => setShowScrollTop(el.scrollTop > 100);
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const scrollToTop = () => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
-    <>
     <div className="min-h-[100dvh] flex w-full bg-muted/40">
       {/* Desktop Sidebar */}
       <div className="w-64 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col flex-shrink-0">
@@ -121,45 +107,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>
     </div>
-
-    {/* Scroll-to-top: two-panel widget — portal so it's never clipped by overflow */}
-    {createPortal(
-      <button
-        onClick={scrollToTop}
-        title="Back to top"
-        aria-label="Back to top"
-        style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 9999 }}
-        className={cn(
-          "flex items-stretch shadow-md cursor-pointer transition-opacity duration-200",
-          showScrollTop ? "opacity-100" : "opacity-50"
-        )}
-      >
-        {/* Left panel — active (blue border, white bg) */}
-        <div
-          style={{ border: "2px solid #4A90D9", background: "#fff", borderRadius: "4px 0 0 4px" }}
-          className="flex items-center justify-center gap-[3px] px-3 py-2"
-        >
-          {[0,1,2,3].map((i) => (
-            <div key={i} style={{ width: 3, height: 20, background: "#93C5FD", borderRadius: 2 }} />
-          ))}
-        </div>
-        {/* Right panel — muted (gray) */}
-        <div
-          style={{ border: "1px solid #D1D5DB", borderLeft: "none", background: "#F3F4F6", borderRadius: "0 4px 4px 0" }}
-          className="flex items-center justify-center gap-[3px] px-3 py-2"
-        >
-          {[0,1,2,3].map((i) => (
-            <div key={i} style={{ width: 3, height: 20, background: "#D1D5DB", borderRadius: 2 }} />
-          ))}
-        </div>
-      </button>,
-      document.body
-    )}
-    </>
   );
 }
