@@ -127,33 +127,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
     </div>
 
-    {/* Scroll-to-top: portal into body so overflow:hidden ancestors can't clip it */}
+    {/* Scroll-to-top: two-panel widget — portal so it's never clipped by overflow */}
     {createPortal(
       <button
         onClick={scrollToTop}
         title="Back to top"
         aria-label="Back to top"
+        style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 9999 }}
         className={cn(
-          "fixed bottom-20 right-10 z-[9999] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg",
-          "flex items-center justify-center transition-all duration-200",
-          "hover:bg-primary/90 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0",
-          showScrollTop ? "opacity-100" : "opacity-40"
+          "flex items-stretch shadow-md cursor-pointer transition-opacity duration-200",
+          showScrollTop ? "opacity-100" : "opacity-50"
         )}
       >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
+        {/* Left panel — active (blue border, white bg) */}
+        <div
+          style={{ border: "2px solid #4A90D9", background: "#fff", borderRadius: "4px 0 0 4px" }}
+          className="flex items-center justify-center gap-[3px] px-3 py-2"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M5 10l7-7m0 0l7 7m-7-7v18"
-          />
-        </svg>
+          {[0,1,2,3].map((i) => (
+            <div key={i} style={{ width: 3, height: 20, background: "#93C5FD", borderRadius: 2 }} />
+          ))}
+        </div>
+        {/* Right panel — muted (gray) */}
+        <div
+          style={{ border: "1px solid #D1D5DB", borderLeft: "none", background: "#F3F4F6", borderRadius: "0 4px 4px 0" }}
+          className="flex items-center justify-center gap-[3px] px-3 py-2"
+        >
+          {[0,1,2,3].map((i) => (
+            <div key={i} style={{ width: 3, height: 20, background: "#D1D5DB", borderRadius: 2 }} />
+          ))}
+        </div>
       </button>,
       document.body
     )}
