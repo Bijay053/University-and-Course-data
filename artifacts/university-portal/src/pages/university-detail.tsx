@@ -318,6 +318,7 @@ export default function UniversityDetail() {
   const [bSchEligibility, setBSchEligibility] = useState("");
   const [bSchAmount, setBSchAmount] = useState("");
   const [bSchCurrency, setBSchCurrency] = useState("AUD");
+  const [bSchAmountType, setBSchAmountType] = useState<"fixed" | "percent">("fixed");
   const [bSchReplace, setBSchReplace] = useState(false);
 
   const openBulk = (mode: BulkMode) => {
@@ -326,6 +327,8 @@ export default function UniversityDetail() {
     setBulkFilter("all");
     setSelectedIds(new Set());
     setBacadOutOf("");
+    setBSchAmountType("fixed");
+    setBSchAmount("");
   };
 
   const [search, setSearch] = useState("");
@@ -645,7 +648,8 @@ export default function UniversityDetail() {
         body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry: bAcadCountry || null };
       } else if (bulkMode === "scholarships") {
         endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
-        body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: bSchCurrency || null, replaceExisting: bSchReplace };
+        const schCurrency = bSchAmountType === "percent" ? "%" : (bSchCurrency || null);
+        body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: schCurrency, replaceExisting: bSchReplace };
       }
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(await res.text());
@@ -1803,20 +1807,49 @@ export default function UniversityDetail() {
                         <Label className="text-xs text-muted-foreground">Eligibility Criteria</Label>
                         <textarea value={bSchEligibility} onChange={(e) => setBSchEligibility(e.target.value)} rows={2} placeholder="Who is eligible…" className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Amount</Label>
-                          <Input type="number" value={bSchAmount} onChange={(e) => setBSchAmount(e.target.value)} placeholder="e.g. 5000" className="h-9" />
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Amount</Label>
+                        <div className="flex rounded-md border overflow-hidden w-fit text-xs">
+                          <button
+                            type="button"
+                            onClick={() => { setBSchAmountType("fixed"); setBSchAmount(""); }}
+                            className={`px-3 py-1.5 font-medium transition-colors ${bSchAmountType === "fixed" ? "bg-amber-600 text-white" : "bg-white text-muted-foreground hover:bg-muted"}`}
+                          >
+                            Fixed Amount
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBSchAmountType("percent"); setBSchAmount(""); }}
+                            className={`px-3 py-1.5 font-medium transition-colors ${bSchAmountType === "percent" ? "bg-amber-600 text-white" : "bg-white text-muted-foreground hover:bg-muted"}`}
+                          >
+                            Percentage (%)
+                          </button>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Currency</Label>
-                          <Select value={bSchCurrency} onValueChange={setBSchCurrency}>
-                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {["AUD", "GBP", "USD", "NZD", "CAD", "EUR"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {bSchAmountType === "fixed" ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input type="number" value={bSchAmount} onChange={(e) => setBSchAmount(e.target.value)} placeholder="e.g. 5000" className="h-9" />
+                            <Select value={bSchCurrency} onValueChange={setBSchCurrency}>
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {["AUD", "GBP", "USD", "NZD", "CAD", "EUR"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={bSchAmount}
+                              onChange={(e) => setBSchAmount(e.target.value)}
+                              placeholder="e.g. 50"
+                              className="h-9 w-32"
+                            />
+                            <span className="text-sm font-semibold text-amber-700">%</span>
+                            {bSchAmount && <span className="text-xs text-muted-foreground">of tuition fee</span>}
+                          </div>
+                        )}
                       </div>
                       <label className="flex items-center gap-2 text-xs cursor-pointer">
                         <input type="checkbox" checked={bSchReplace} onChange={(e) => setBSchReplace(e.target.checked)} />
