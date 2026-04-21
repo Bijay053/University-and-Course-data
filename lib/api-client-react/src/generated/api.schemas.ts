@@ -79,6 +79,8 @@ export interface Course {
   /** @nullable */
   courseWebsite?: string | null;
   /** @nullable */
+  courseLocation?: string | null;
+  /** @nullable */
   duration?: number | null;
   /** @nullable */
   durationTerm?: string | null;
