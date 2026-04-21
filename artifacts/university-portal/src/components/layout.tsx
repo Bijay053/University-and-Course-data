@@ -137,7 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           "fixed bottom-6 right-6 z-[9999] w-9 h-9 rounded-full bg-primary text-primary-foreground shadow-md",
           "flex items-center justify-center transition-all duration-200",
           "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-          showScrollTop ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          showScrollTop ? "opacity-100 shadow-lg scale-100" : "opacity-40 scale-95"
         )}
       >
         <ChevronUp className="w-4 h-4 stroke-[2.5]" />
