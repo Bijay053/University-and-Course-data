@@ -14,6 +14,7 @@ import importRouter from "./import";
 import scrapeRouter from "./scrape";
 import backupRouter from "./backup";
 import backupMappingRouter from "./backup_mapping";
+import assessmentNotesRouter from "./assessment_notes";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(importRouter);
 router.use(scrapeRouter);
 router.use(backupRouter);
 router.use(backupMappingRouter);
+router.use(assessmentNotesRouter);
 
 export default router;

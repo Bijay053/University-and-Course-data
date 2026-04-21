@@ -14,7 +14,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -46,7 +46,7 @@ const COUNTRIES = [
 ];
 
 
-type Tab = "courses" | "english" | "academic" | "scholarships" | "rawdata";
+type Tab = "courses" | "english" | "academic" | "scholarships" | "assessment" | "rawdata";
 
 const DEGREE_COLORS: Record<string, string> = {
   Bachelor: "bg-blue-100 text-blue-700",
@@ -402,6 +402,37 @@ export default function UniversityDetail() {
   const [editScholCurrency, setEditScholCurrency] = useState("");
   const [editScholValueType, setEditScholValueType] = useState<"none" | "fixed" | "percent">("none");
 
+  // ── Assessment Notes state ─────────────────────────────────────────────────
+  type CardField = { label: string; value: string; badge: "yes" | "no" | "case" | null };
+  type CardSection = { label: string; fields: CardField[] };
+  type AssessCard = { title: string; emoji?: string; bg?: string; color?: string; fields: CardField[]; sections: CardSection[] };
+  type AssessNote = { id: number; country: string; raw_text: string; parsed_data: AssessCard[] | null; created_at: string };
+
+  const [assessNotes, setAssessNotes] = useState<AssessNote[]>([]);
+  const [assessLoading, setAssessLoading] = useState(false);
+  const [assessCountry, setAssessCountry] = useState<string>("__all__");
+  const [assessShowAdd, setAssessShowAdd] = useState(false);
+  const [assessAddCountry, setAssessAddCountry] = useState("");
+  const [assessAddText, setAssessAddText] = useState("");
+  const [assessAdding, setAssessAdding] = useState(false);
+  const [assessEditNote, setAssessEditNote] = useState<AssessNote | null>(null);
+  const [assessEditCountry, setAssessEditCountry] = useState("");
+  const [assessEditText, setAssessEditText] = useState("");
+  const [assessEditing, setAssessEditing] = useState(false);
+  const [assessDeleteNote, setAssessDeleteNote] = useState<AssessNote | null>(null);
+  const [assessDeleting, setAssessDeleting] = useState(false);
+
+  const loadAssessNotes = useCallback(async () => {
+    if (!id) return;
+    setAssessLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/assessment-notes`);
+      if (!res.ok) throw new Error(await res.text());
+      setAssessNotes(await res.json() as AssessNote[]);
+    } catch { /* silent */ }
+    finally { setAssessLoading(false); }
+  }, [id]);
+
   const openBulk = (mode: BulkMode) => {
     setBulkMode(mode);
     setBulkSearch("");
@@ -601,6 +632,10 @@ export default function UniversityDetail() {
   useEffect(() => {
     if (tab === "academic" || tab === "courses") loadAcademicReqs();
   }, [tab, loadAcademicReqs]);
+
+  useEffect(() => {
+    if (tab === "assessment") loadAssessNotes();
+  }, [tab, loadAssessNotes]);
 
   function clearFilters() {
     setSearch(""); setCategory(ALL); setSubCategory(ALL); setDegreeLevel(ALL); setStudyMode(ALL); setPage(1);
@@ -913,6 +948,7 @@ export default function UniversityDetail() {
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
+    { key: "assessment", label: "Assessment Notes", icon: <ClipboardList className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
   ];
 
@@ -1690,6 +1726,254 @@ export default function UniversityDetail() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ASSESSMENT NOTES TAB ── */}
+      {tab === "assessment" && (
+        <div className="space-y-4">
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              {assessNotes.length} note{assessNotes.length !== 1 ? "s" : ""} across {new Set(assessNotes.map(n => n.country)).size} countr{new Set(assessNotes.map(n => n.country)).size !== 1 ? "ies" : "y"}
+            </p>
+            <Button size="sm" onClick={() => { setAssessAddCountry(""); setAssessAddText(""); setAssessShowAdd(true); }}
+              className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Plus className="w-3.5 h-3.5" /> Add Assessment Note
+            </Button>
+          </div>
+
+          {/* Country filter pills */}
+          {assessNotes.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setAssessCountry("__all__")}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === "__all__" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                All countries
+              </button>
+              {Array.from(new Set(assessNotes.map(n => n.country))).sort().map(c => (
+                <button key={c}
+                  onClick={() => setAssessCountry(c)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === c ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Loading */}
+          {assessLoading && <div className="py-12 text-center text-muted-foreground text-sm">Loading...</div>}
+
+          {/* Empty state */}
+          {!assessLoading && assessNotes.length === 0 && (
+            <div className="border rounded-xl p-12 text-center text-muted-foreground">
+              <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p>No assessment notes yet. Click "Add Assessment Note" to get started.</p>
+            </div>
+          )}
+
+          {/* Notes list */}
+          {!assessLoading && assessNotes
+            .filter(n => assessCountry === "__all__" || n.country === assessCountry)
+            .map(note => (
+              <div key={note.id} className="border rounded-xl overflow-hidden bg-white">
+                {/* Note header */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-indigo-600" />
+                    <span className="font-semibold text-sm text-indigo-800">{note.country}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { setAssessEditNote(note); setAssessEditCountry(note.country); setAssessEditText(note.raw_text); }}
+                      className="p-1.5 rounded hover:bg-indigo-100 text-indigo-600 cursor-pointer" title="Edit note">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setAssessDeleteNote(note)}
+                      className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete note">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cards grid */}
+                {note.parsed_data && note.parsed_data.length > 0 ? (
+                  <div className="p-4 grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
+                    {note.parsed_data.map((card, ci) => (
+                      <div key={ci} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                        {/* Card header */}
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+                          <div className="w-6 h-6 rounded-md flex items-center justify-center text-sm shrink-0"
+                            style={{ background: card.bg ?? "#F1EFE8", color: card.color ?? "#5F5E5A" }}>
+                            {card.emoji ?? "ℹ️"}
+                          </div>
+                          <span className="text-xs font-semibold text-gray-800">{card.title}</span>
+                        </div>
+                        {/* Card body */}
+                        <div className="px-3 py-2">
+                          {card.fields?.map((f, fi) => (
+                            <div key={fi} className={`flex justify-between items-start gap-2 py-1 ${fi < card.fields.length - 1 || (card.sections?.length ?? 0) > 0 ? "border-b border-gray-50" : ""}`}>
+                              <span className="text-[11px] text-gray-500 shrink-0 max-w-[48%]">{f.label}</span>
+                              {f.badge === "yes" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">Yes</span>}
+                              {f.badge === "no" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">No</span>}
+                              {f.badge === "case" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">Case by case</span>}
+                              {!f.badge && <span className="text-[11px] text-gray-800 text-right max-w-[52%]">{f.value}</span>}
+                            </div>
+                          ))}
+                          {card.sections?.map((sec, si) => (
+                            <div key={si}>
+                              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-2 mb-1">{sec.label}</div>
+                              {sec.fields?.map((f, fi) => (
+                                <div key={fi} className={`flex justify-between items-start gap-2 py-1 ${fi < sec.fields.length - 1 ? "border-b border-gray-50" : ""}`}>
+                                  <span className="text-[11px] text-gray-500 shrink-0 max-w-[48%]">{f.label}</span>
+                                  {f.badge === "yes" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100">Yes</span>}
+                                  {f.badge === "no" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">No</span>}
+                                  {f.badge === "case" && <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">Case by case</span>}
+                                  {!f.badge && <span className="text-[11px] text-gray-800 text-right max-w-[52%]">{f.value}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground italic">
+                    <p className="font-medium text-gray-700 mb-1">Raw notes:</p>
+                    <pre className="whitespace-pre-wrap text-xs text-gray-600 font-mono bg-gray-50 rounded p-3 border">{note.raw_text}</pre>
+                  </div>
+                )}
+              </div>
+            ))}
+
+          {/* ── Add Note Dialog ── */}
+          <Dialog open={assessShowAdd} onOpenChange={setAssessShowAdd}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Add Assessment Note</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Country</Label>
+                  <select value={assessAddCountry} onChange={e => setAssessAddCountry(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer">
+                    <option value="">Select country...</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Assessment Notes (plain text)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">Paste your plain text notes. AI will automatically parse them into structured cards.</p>
+                  <textarea value={assessAddText} onChange={e => setAssessAddText(e.target.value)}
+                    rows={12} placeholder={"Example:\nAcceptable banks:\nAll A-class banks — accepted\n\nUnder 18:\nNot allowed\n\nSponsor requirements:\nTypes: Parents, Siblings, Grandparents\nMin income: AUD 30,000/yr\nBank statement: 1 year\n\nTurnaround times:\nOffer: 48 hours\nGTE: 4 days\nCoE: 4 days"}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAssessShowAdd(false)} disabled={assessAdding}>Cancel</Button>
+                <Button disabled={!assessAddCountry || !assessAddText.trim() || assessAdding}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={async () => {
+                    setAssessAdding(true);
+                    try {
+                      const res = await fetch(`${BASE}/api/universities/${id}/assessment-notes`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ country: assessAddCountry, rawText: assessAddText }),
+                      });
+                      if (!res.ok) throw new Error(await res.text());
+                      toast({ title: "Assessment note added", description: `Note for ${assessAddCountry} saved and parsed.` });
+                      setAssessShowAdd(false);
+                      await loadAssessNotes();
+                    } catch (err) {
+                      toast({ title: "Error", description: String(err), variant: "destructive" });
+                    } finally { setAssessAdding(false); }
+                  }}>
+                  {assessAdding ? "Saving & parsing..." : "Save & Parse"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* ── Edit Note Dialog ── */}
+          <Dialog open={!!assessEditNote} onOpenChange={v => { if (!v) setAssessEditNote(null); }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-indigo-600" /> Edit Assessment Note</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Country</Label>
+                  <select value={assessEditCountry} onChange={e => setAssessEditCountry(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer">
+                    <option value="">Select country...</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Assessment Notes (plain text)</Label>
+                  <textarea value={assessEditText} onChange={e => setAssessEditText(e.target.value)}
+                    rows={12}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAssessEditNote(null)} disabled={assessEditing}>Cancel</Button>
+                <Button disabled={!assessEditCountry || !assessEditText.trim() || assessEditing}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={async () => {
+                    if (!assessEditNote) return;
+                    setAssessEditing(true);
+                    try {
+                      const res = await fetch(`${BASE}/api/assessment-notes/${assessEditNote.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ country: assessEditCountry, rawText: assessEditText }),
+                      });
+                      if (!res.ok) throw new Error(await res.text());
+                      toast({ title: "Note updated", description: `Note for ${assessEditCountry} re-parsed successfully.` });
+                      setAssessEditNote(null);
+                      await loadAssessNotes();
+                    } catch (err) {
+                      toast({ title: "Error", description: String(err), variant: "destructive" });
+                    } finally { setAssessEditing(false); }
+                  }}>
+                  {assessEditing ? "Saving & re-parsing..." : "Save & Re-parse"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* ── Delete Note Dialog ── */}
+          <Dialog open={!!assessDeleteNote} onOpenChange={v => { if (!v) setAssessDeleteNote(null); }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="w-4 h-4" /> Delete Note</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-gray-600 py-2">
+                Are you sure you want to delete the assessment note for <strong>{assessDeleteNote?.country}</strong>? This cannot be undone.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAssessDeleteNote(null)} disabled={assessDeleting}>Cancel</Button>
+                <Button variant="destructive" disabled={assessDeleting}
+                  onClick={async () => {
+                    if (!assessDeleteNote) return;
+                    setAssessDeleting(true);
+                    try {
+                      const res = await fetch(`${BASE}/api/assessment-notes/${assessDeleteNote.id}`, { method: "DELETE" });
+                      if (!res.ok) throw new Error(await res.text());
+                      toast({ title: "Note deleted" });
+                      setAssessDeleteNote(null);
+                      await loadAssessNotes();
+                    } catch (err) {
+                      toast({ title: "Error", description: String(err), variant: "destructive" });
+                    } finally { setAssessDeleting(false); }
+                  }}>
+                  {assessDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
