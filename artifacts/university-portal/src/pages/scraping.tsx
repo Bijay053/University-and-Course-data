@@ -1483,19 +1483,10 @@ export default function Scraping() {
                   <XCircle className="w-4 h-4 mr-1" />
                   Reject ({selectedIds.size})
                 </Button>
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleApproveSelected}
-                  disabled={selectedIds.size === 0 || approving}
-                >
-                  {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCheck className="w-4 h-4 mr-1" />}
-                  Approve ({selectedIds.size})
-                </Button>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Review each course below. Edit any details, then approve to save to the database or reject to discard. Existing courses with the same name will be updated.
+              Review each course below. Edit any details or reject to discard. To approve and import, go to the university's <strong>Raw Data</strong> tab.
             </p>
           </CardHeader>
           <CardContent>
@@ -1677,16 +1668,6 @@ export default function Scraping() {
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-green-600 hover:bg-green-50"
-                              onClick={() => handleApproveSingle(course.id)}
-                              disabled={approvingId === course.id}
-                              title="Approve"
-                            >
-                              {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                             </Button>
                             <Button
                               size="icon"
