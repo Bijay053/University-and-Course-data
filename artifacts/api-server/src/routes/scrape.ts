@@ -9442,6 +9442,24 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
           }
         }
       });
+      // Slug-dedup: collapse /our-courses/bachelor-x and /bachelor-x into one
+      const _slugDedup2 = new Map<string, { url: string; name: string }>();
+      const _slugOf2 = (u: string): string | null => {
+        try {
+          const parsed = new URL(u);
+          const segs = parsed.pathname.replace(/\/+$/, "").split("/").filter(Boolean);
+          const last = segs[segs.length - 1] || "";
+          if (!last || /^index(\.html?)?$/i.test(last)) return null;
+          return `${parsed.host.toLowerCase()}|${last.toLowerCase()}`;
+        } catch { return null; }
+      };
+      for (const c of rawCandidates) {
+        const k = _slugOf2(c.url);
+        if (!k) { _slugDedup2.set(`__nokey__${c.url}`, c); continue; }
+        const existing = _slugDedup2.get(k);
+        if (!existing || c.url.length < existing.url.length) _slugDedup2.set(k, c);
+      }
+      rawCandidates = [..._slugDedup2.values()];
     } else {
       // Fallback: extract links from listing page HTML (AI-identified + HTML scraping)
       let listingLinks: { url: string; name: string }[] = [];
