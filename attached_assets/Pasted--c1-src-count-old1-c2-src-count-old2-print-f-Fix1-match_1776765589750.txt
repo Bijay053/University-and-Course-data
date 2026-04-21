@@ -1,0 +1,113 @@
+
+c1 = src.count(old1)
+c2 = src.count(old2)
+print(f"Fix1 matches: {c1}, Fix2 matches: {c2}")
+
+if c1 == 1:
+    src = src.replace(old1, new1, 1)
+    print("Fix1 applied")
+else:
+    print("Fix1 NOT found — may already be patched or differs")
+
+if c2 == 1:
+    src = src.replace(old2, new2, 1)
+    print("Fix2 applied")
+else:
+    print("Fix2 NOT found — may already be patched or differs")
+
+with open(path, "w") as f:
+    f.write(src)
+PATCH
+
+  echo "Deploy complete"-env && pm2 save && \a && \
+Fix1 matches: 0, Fix2 matches: 0
+Fix1 NOT found — may already be patched or differs
+Fix2 NOT found — may already be patched or differs
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.1mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 571ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 9017     │ 0s     │ 7    │ online    │ 0%       │ 46.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+Deploy complete
+root@university-and-course-data:~/University-and-Course-data# # Check if old code is still present
+grep -n "courseData.ieltsOverall || courseData.pteOverall" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -3
+3837:      if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;
+4122:    const noEnglishYet = !(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall);
+4141:    const foundAnyEnglish = !!(courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall || courseData.cambridgeOverall || courseData.duolingoOverall);
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+sed -i '3837s/courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall/courseData.ieltsOverall \&\& courseData.pteOverall \&\& courseData.toeflOverall/' artifacts/api-server/src/routes/scrape.ts && \
+grep -n "courseData.ieltsOverall && courseData.pteOverall" artifacts/api-server/src/routes/scrape.ts | head -1 && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env && pm2 save && \
+echo "=== Done ==="
+3837:      if (courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall) return courseData;
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 826ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 9681     │ 0s     │ 8    │ online    │ 0%       │ 47.6mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+=== Done ===
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && python3 - << 'EOF'
+path = "artifacts/api-server/src/routes/scrape.ts"
+with open(path, "r") as f:
+    src = f.read()
+
+old = "          const cd2: Partial<CourseData> = {};\n          applyEnglishResultToCourse(cd2, { ielts: { overall: parsed2.ieltsOverall }, pte: { overall: parsed2.pteOverall }, toefl: { overall: parsed2.toeflOverall } });\n          if (cd2.ieltsOverall || cd2.pteOverall || cd2.toeflOverall) return cd2;"
+new = "          if (parsed2.ieltsOverall && !courseData.ieltsOverall) courseData.ieltsOverall = parsed2.ieltsOverall;\n          if (parsed2.pteOverall && !courseData.pteOverall) courseData.pteOverall = parsed2.pteOverall;\n          if (parsed2.toeflOverall && !courseData.toeflOverall) courseData.toeflOverall = parsed2.toeflOverall;\n          if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;"
+
+if old in src:
+    src = src.replace(old, new, 1)
+    print("Fix2 applied")
+    with open(path, "w") as f: f.write(src)
+else:
+    print("Fix2 not found - checking nearby lines:")
+    for i,l in enumerate(src.split('\n')):
+        if 'cd2' in l and 'Partial' in l: print(f"  L{i+1}: {l}")
+EOF
+Fix2 not found - checking nearby lines:
+  L3843:           const cd2: Partial<CourseData> = {};
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \ 
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env && echo "Done"
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 609ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 9890     │ 0s     │ 9    │ online    │ 0%       │ 46.1mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+Done
