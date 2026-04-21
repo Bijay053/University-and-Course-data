@@ -228,7 +228,7 @@ export default function Universities() {
                     <div className="flex justify-end items-center gap-2">
                       <button
                         onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
-                        className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer"
+                        className="flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-600 bg-white hover:bg-red-50 border border-red-100 hover:border-red-300 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
                         title="Delete university"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
