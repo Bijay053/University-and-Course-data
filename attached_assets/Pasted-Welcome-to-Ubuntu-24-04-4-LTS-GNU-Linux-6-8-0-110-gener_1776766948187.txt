@@ -1,0 +1,87 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 21 10:22:07 UTC 2026
+
+  System load:           0.0
+  Usage of /:            2.2% of 231.44GB
+  Memory usage:          13%
+  Swap usage:            0%
+  Processes:             178
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+2 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 21 09:23:09 2026 from 162.243.188.66
+root@university-and-course-data:~# cd /root/University-and-Course-data && \
+echo "=== Source has fix? ===" && \
+grep -n 'allowCefrFloor: true' artifacts/api-server/src/routes/scrape.ts | head -3 && \
+echo "" && \
+echo "=== Compiled bundle has fix? ===" && \
+grep -c 'allowCefrFloor' artifacts/api-server/dist/index.mjs && \
+echo "" && \
+echo "=== Direct test of extractEnglishFromPdf logic ===" && \
+cat > /tmp/test-full.mjs << 'EOF'
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+const execFileAsync = promisify(execFile);
+
+const PDF_URL = "https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf";
+
+const resp = await fetch(PDF_URL, { signal: AbortSignal.timeout(45000) });
+console.log("HTTP:", resp.status, "Content-Type:", resp.headers.get('content-type'));
+const buffer = await resp.arrayBuffer();
+console.log("Size:", buffer.byteLength, "bytes");
+
+const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'test-'));
+const pdfPath = path.join(tmpDir, 's.pdf');
+const txtPath = path.join(tmpDir, 's.txt');
+await fs.writeFile(pdfPath, Buffer.from(buffer));
+await execFileAsync('pdftotext', [pdfPath, txtPath], { timeout: 30000 });
+const text = await fs.readFile(txtPath, 'utf8');
+console.log("Text length:", text.length);
+console.log("Has 'Academic Score of 50':", text.includes('Academic Score of 50'));
+
+// Now import the actual parser from compiled bundle
+const mod = await import('/root/University-and-Course-data/artifacts/api-server/dist/index.mjs').catch(e => { console.log("Import err:", e.message); return null; });
+EOF
+node /tmp/test-full.mjs 2>&1 | tail -20
+=== Source has fix? ===
+3847:      const parsed = parseEnglishRequirementsFromText(pdfText, "shared", { allowCefrFloor: true });
+
+=== Compiled bundle has fix? ===
+0
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module '/tmp/test-full.mjs'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# 
