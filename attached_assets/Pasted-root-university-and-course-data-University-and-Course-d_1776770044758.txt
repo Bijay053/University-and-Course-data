@@ -1,0 +1,58 @@
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# cd /root/University-and-Course-data/artifacts/api-server && \
+node --input-type=module -e "
+import { chromium } from 'playwright';
+const url = 'https://www.asahe.edu.au/courses/bachelor-of-business-international-business';
+const b = await chromium.launch({ headless: true, args:['--no-sandbox'] });
+const ctx = await b.newContext();
+const p = await ctx.newPage();
+const imgRequests = [];
+p.on('request', r => { if (r.resourceType() === 'image') imgRequests.push(r.url()); });
+await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+for (const sel of ['a:has-text(\"Entry Requirements\")','button:has-text(\"Entry Requirements\")','[href*=\"entry-requirements\"]']) { try { const el = await p.\$(sel); if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(2000); console.log('CLICKED:', sel); break; } } catch{} }
+await p.waitForTimeout(2000);
+const html = await p.content();
+const textOnly = html.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ');
+console.log('=== title:', (html.match(/<title>([^<]+)/i)||[])[1] || '?');
+['IELTS','PTE','TOEFL','Cambridge','English Language'].forEach(n => { const m = textOnly.match(new RegExp(n+'[^\\\\.\\\\!]{0,150}','gi')); console.log(n+':', m ? m.slice(0,2) : '— not found —'); });
+const imgs = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/gi)].map(m=>m[1]);
+console.log('=== <img> srcs ('+imgs.length+') ===');
+imgs.forEach((u,i)=>console.log(i, u));
+console.log('=== ALL image network requests ('+imgRequests.length+') ===');
+imgRequests.forEach((u,i)=>console.log(i, u));
+await b.close();
+" 2>&1 | head -80
+CLICKED: a:has-text("Entry Requirements")
+=== title: Bachelor of Business International Business
+IELTS: — not found —
+PTE: — not found —
+TOEFL: — not found —
+Cambridge: — not found —
+English Language: [
+  'English Language Requirements Along with the above admissions criteria, international applicants also must demonstrate and meet one of the following minimum English L',
+  'English Language Requirements of the Student Admission Policy'
+]
+=== <img> srcs (10) ===
+0 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/6878647ddd233925e7ef7601_ASA%20square%20logo.jpeg
+1 https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png
+2 https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696f7901812fa05452c7d6c6_BBUSIM.png
+3 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae208f7be235b1e267beb6_website%20phone.png
+4 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae21ecde879dc6d1b5bc8c_website%20email.png
+5 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3e1299c177b30f7cc009c_map-marker-2-256.png
+6 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+7 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3dc9254324a7fcc22ec67_Insta%20white%20200.png
+8 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec4a_Icon-linkedin.png
+9 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69015830b712e00c84dd5fc4_ASA%20LOGO%20WHITE%20AND%20COLOR%20DASH%20VERSION-01-01.png
+=== ALL image network requests (12) ===
+0 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/6878647ddd233925e7ef7601_ASA%20square%20logo.jpeg
+1 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae208f7be235b1e267beb6_website%20phone-p-500.png
+2 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae21ecde879dc6d1b5bc8c_website%20email.png
+3 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3e1299c177b30f7cc009c_map-marker-2-256.png
+4 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+5 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3dc9254324a7fcc22ec67_Insta%20white%20200.png
+6 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec4a_Icon-linkedin.png
+7 https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d8543160760949e9819d1_Screenshot%202026-01-16%20095257.png
+8 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69659d354b911b0c2b11de1b_Gradient.png
+9 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69015830b712e00c84dd5fc4_ASA%20LOGO%20WHITE%20AND%20COLOR%20DASH%20VERSION-01-01.png
+10 https://www.google.co.in/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&tid=G-BC1QZE9DX5&cid=939598137.1776770018&gtm=45je64h1v9116141206z8892651664za20gzb892651664zd892651664&rcb=7&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=0~115616986~115938466~115938469~117266400~117884344&z=1118680492
+11 https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
