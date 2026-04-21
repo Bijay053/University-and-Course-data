@@ -796,7 +796,7 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px] border-r">Language</th>
                   <th className="px-2 py-2 text-blue-700 font-medium min-w-[90px]">Month</th>
                   <th className="px-2 py-2 text-blue-700 font-medium min-w-[50px]">Day</th>
-                  <th className="px-2 py-2 text-blue-700 font-medium min-w-[40px] border-r">City</th>
+                  <th className="px-2 py-2 text-blue-700 font-medium min-w-[120px] border-r">Course Location</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[70px]">Int'l Fee</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[60px]">Fee Term</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[50px]">Year</th>
@@ -865,7 +865,7 @@ export default function UniversityDetail() {
                     <td className="px-2 py-2 text-gray-500 border-r">{txt(c.language)}</td>
                     <td className="px-2 py-2 text-blue-600">{txt(c.intakeMonths)}</td>
                     <td className="px-2 py-2 text-blue-500">{num(c.intakeDays)}</td>
-                    <td className="px-2 py-2 text-blue-500 border-r">{txt(c.city)}</td>
+                    <td className="px-2 py-2 text-blue-500 border-r">{txt(c.courseLocation)}</td>
                     <td className="px-2 py-2 text-amber-700 font-medium">{c.internationalFee ? c.internationalFee.toLocaleString() : "—"}</td>
                     <td className="px-2 py-2 text-amber-600">{txt(c.feeTerm)}</td>
                     <td className="px-2 py-2 text-amber-600">{num(c.feeYear)}</td>
@@ -1197,7 +1197,8 @@ export default function UniversityDetail() {
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Category</th>
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[70px]">Duration</th>
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Term</th>
-                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[80px] border-r">Mode</th>
+                    <th className="px-2 py-2 text-gray-600 font-medium min-w-[80px]">Mode</th>
+                    <th className="px-2 py-2 text-blue-600 font-medium min-w-[120px] border-r">Course Location</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[80px]">Int'l Fee</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[55px]">Term</th>
                     <th className="px-2 py-2 text-amber-700 font-medium min-w-[45px]">Year</th>
@@ -1257,7 +1258,8 @@ export default function UniversityDetail() {
                       <td className="px-2 py-2 text-gray-500">{txt(c.category)}</td>
                       <td className="px-2 py-2 text-gray-600">{num(c.duration)}</td>
                       <td className="px-2 py-2 text-gray-500">{txt(c.duration_term)}</td>
-                      <td className="px-2 py-2 text-gray-500 border-r">{txt(c.study_mode)}</td>
+                      <td className="px-2 py-2 text-gray-500">{txt(c.study_mode)}</td>
+                      <td className="px-2 py-2 text-blue-600 border-r">{txt(c.course_location)}</td>
                       <td className="px-2 py-2 text-amber-700 font-medium">{c.international_fee ? c.international_fee.toLocaleString() : "—"}</td>
                       <td className="px-2 py-2 text-amber-600">{txt(c.fee_term)}</td>
                       <td className="px-2 py-2 text-amber-600">{c.fee_year ?? "—"}</td>
