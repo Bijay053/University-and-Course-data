@@ -945,10 +945,10 @@ export default function UniversityDetail() {
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "courses", label: "Courses", icon: <BookOpen className="w-4 h-4" />, count: uni ? total : undefined },
+    { key: "assessment", label: "Assessment Notes", icon: <ClipboardList className="w-4 h-4" /> },
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
-    { key: "assessment", label: "Assessment Notes", icon: <ClipboardList className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
   ];
 
