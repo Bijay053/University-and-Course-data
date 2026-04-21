@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, scholarshipsTable } from "@workspace/db";
 import {
   ListCourseScholarshipsParams,
@@ -68,6 +68,30 @@ router.delete("/scholarships/:id", async (req, res): Promise<void> => {
     return;
   }
   res.sendStatus(204);
+});
+
+// Bulk add: add a scholarship to many courses at once
+router.post("/universities/:universityId/bulk-scholarships", async (req, res): Promise<void> => {
+  const universityId = Number(req.params.universityId);
+  if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
+  const { courseIds, name, details, eligibilityCriteria, amount, currency, replaceExisting } = req.body as {
+    courseIds: number[];
+    name: string;
+    details?: string | null;
+    eligibilityCriteria?: string | null;
+    amount?: number | null;
+    currency?: string | null;
+    replaceExisting?: boolean;
+  };
+  if (!Array.isArray(courseIds) || courseIds.length === 0) { res.status(400).json({ error: "courseIds required" }); return; }
+  if (!name) { res.status(400).json({ error: "name required" }); return; }
+  if (replaceExisting) {
+    await db.delete(scholarshipsTable).where(inArray(scholarshipsTable.courseId, courseIds));
+  }
+  const rows = await db.insert(scholarshipsTable).values(
+    courseIds.map((courseId) => ({ courseId, name, details: details ?? null, eligibilityCriteria: eligibilityCriteria ?? null, amount: amount ?? null, currency: currency ?? null }))
+  ).returning();
+  res.json({ updated: rows.length });
 });
 
 export default router;

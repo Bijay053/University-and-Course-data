@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import { db, englishRequirementsTable } from "@workspace/db";
 import {
   ListCourseEnglishRequirementsParams,
@@ -68,6 +68,32 @@ router.delete("/english-requirements/:id", async (req, res): Promise<void> => {
     return;
   }
   res.sendStatus(204);
+});
+
+// Bulk upsert: apply one test-type entry to many courses at once
+router.post("/universities/:universityId/bulk-english", async (req, res): Promise<void> => {
+  const universityId = Number(req.params.universityId);
+  if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
+  const { courseIds, testType, listening, speaking, writing, reading, overall, testName } = req.body as {
+    courseIds: number[];
+    testType: string;
+    listening?: number | null;
+    speaking?: number | null;
+    writing?: number | null;
+    reading?: number | null;
+    overall?: number | null;
+    testName?: string | null;
+  };
+  if (!Array.isArray(courseIds) || courseIds.length === 0) { res.status(400).json({ error: "courseIds required" }); return; }
+  if (!testType) { res.status(400).json({ error: "testType required" }); return; }
+  // Delete existing records for these courses + this testType, then insert new ones
+  await db.delete(englishRequirementsTable).where(
+    and(inArray(englishRequirementsTable.courseId, courseIds), eq(englishRequirementsTable.testType, testType))
+  );
+  const rows = await db.insert(englishRequirementsTable).values(
+    courseIds.map((courseId) => ({ courseId, testType, listening: listening ?? null, speaking: speaking ?? null, writing: writing ?? null, reading: reading ?? null, overall: overall ?? null, testName: testName ?? null }))
+  ).returning();
+  res.json({ updated: rows.length });
 });
 
 export default router;
