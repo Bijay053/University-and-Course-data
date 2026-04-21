@@ -169,6 +169,12 @@ export interface Course {
   scholarshipDetails?: string | null;
   /** @nullable */
   scholarshipEligibility?: string | null;
+  /** @nullable */
+  scholarshipAmount?: number | null;
+  /** @nullable */
+  scholarshipPercentage?: number | null;
+  /** @nullable */
+  scholarshipCurrency?: string | null;
   createdAt: string;
   updatedAt: string;
 }

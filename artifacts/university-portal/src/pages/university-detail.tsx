@@ -397,6 +397,9 @@ export default function UniversityDetail() {
   const [editScholName, setEditScholName] = useState("");
   const [editScholDetails, setEditScholDetails] = useState("");
   const [editScholEligibility, setEditScholEligibility] = useState("");
+  const [editScholAmount, setEditScholAmount] = useState("");
+  const [editScholPercentage, setEditScholPercentage] = useState("");
+  const [editScholCurrency, setEditScholCurrency] = useState("");
 
   const openBulk = (mode: BulkMode) => {
     setBulkMode(mode);
@@ -938,8 +941,17 @@ export default function UniversityDetail() {
         body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry };
       } else if (bulkMode === "scholarships") {
         endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
-        const schCurrency = bSchAmountType === "percent" ? "%" : (bSchCurrency || null);
-        body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: schCurrency, replaceExisting: bSchReplace };
+        const isPercent = bSchAmountType === "percent";
+        body = {
+          courseIds,
+          name: bSchName,
+          details: bSchDetails || null,
+          eligibilityCriteria: bSchEligibility || null,
+          amount: !isPercent && bSchAmount ? Number(bSchAmount) : null,
+          percentage: isPercent && bSchAmount ? Number(bSchAmount) : null,
+          currency: !isPercent ? (bSchCurrency || null) : null,
+          replaceExisting: bSchReplace,
+        };
       }
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
@@ -1048,14 +1060,16 @@ export default function UniversityDetail() {
   const openScholEdit = async (courseId: number, courseName: string) => {
     setEditScholCourse({ courseId, courseName, scholarshipId: null });
     setEditScholName(""); setEditScholDetails(""); setEditScholEligibility("");
+    setEditScholAmount(""); setEditScholPercentage(""); setEditScholCurrency("");
     try {
       const res = await fetch(`${BASE}/api/courses/${courseId}/scholarships`);
       if (res.ok) {
-        const rows = await res.json() as { id: number; name: string | null; details: string | null; eligibilityCriteria: string | null }[];
+        const rows = await res.json() as { id: number; name: string | null; details: string | null; eligibilityCriteria: string | null; amount: number | null; percentage: number | null; currency: string | null }[];
         const row = rows[0];
         if (row) {
           setEditScholCourse({ courseId, courseName, scholarshipId: row.id });
           setEditScholName(row.name ?? ""); setEditScholDetails(row.details ?? ""); setEditScholEligibility(row.eligibilityCriteria ?? "");
+          setEditScholAmount(row.amount != null ? String(row.amount) : ""); setEditScholPercentage(row.percentage != null ? String(row.percentage) : ""); setEditScholCurrency(row.currency ?? "");
         }
       }
     } catch { /* ignore */ }
@@ -1064,7 +1078,7 @@ export default function UniversityDetail() {
     if (!editScholCourse) return;
     setScholActionLoading(true);
     try {
-      const body = { name: editScholName || null, details: editScholDetails || null, eligibilityCriteria: editScholEligibility || null };
+      const body = { name: editScholName || null, details: editScholDetails || null, eligibilityCriteria: editScholEligibility || null, amount: editScholAmount.trim() ? Number(editScholAmount) : null, percentage: editScholPercentage.trim() ? Number(editScholPercentage) : null, currency: editScholCurrency.trim() || null };
       let res: Response;
       if (editScholCourse.scholarshipId) {
         res = await fetch(`${BASE}/api/scholarships/${editScholCourse.scholarshipId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1637,17 +1651,23 @@ export default function UniversityDetail() {
                       <button onClick={() => openScholEdit(c.id, c.name)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600 cursor-pointer" title="Edit scholarship"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => openScholDelete(c.id, c.name)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete scholarship"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
-                    {c.internationalFee && (
-                      <div className="text-right shrink-0">
-                        <div className="font-semibold text-amber-700">{c.currency ?? "AUD"} {c.internationalFee.toLocaleString()}</div>
-                        <div className="text-xs text-gray-400">per {c.feeTerm ?? "year"}</div>
-                      </div>
-                    )}
                   </div>
                   <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Award className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="text-xs font-semibold text-amber-700">Scholarship</span>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-xs font-semibold text-amber-700">Scholarship</span>
+                      </div>
+                      {(c.scholarshipAmount != null || c.scholarshipPercentage != null) && (
+                        <div className="text-right shrink-0">
+                          {c.scholarshipAmount != null && (
+                            <span className="font-semibold text-amber-700 text-sm">{c.scholarshipCurrency ?? "AUD"} {c.scholarshipAmount.toLocaleString()}</span>
+                          )}
+                          {c.scholarshipPercentage != null && (
+                            <span className={`font-semibold text-amber-700 text-sm${c.scholarshipAmount != null ? " ml-1.5" : ""}`}>{c.scholarshipPercentage}%</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <p className="text-sm text-amber-800">{c.scholarshipDetails}</p>
                     {c.scholarshipEligibility && (
@@ -2863,6 +2883,11 @@ export default function UniversityDetail() {
               <div><Label>Scholarship Name</Label><Input className="mt-1" value={editScholName} onChange={(e) => setEditScholName(e.target.value)} placeholder="e.g. International Student Merit Award" /></div>
               <div><Label>Details</Label><textarea className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none" rows={3} value={editScholDetails} onChange={(e) => setEditScholDetails(e.target.value)} placeholder="Scholarship details…" /></div>
               <div><Label>Eligibility Criteria</Label><Input className="mt-1" value={editScholEligibility} onChange={(e) => setEditScholEligibility(e.target.value)} placeholder="e.g. International students only" /></div>
+              <div className="grid grid-cols-3 gap-2">
+                <div><Label>Amount</Label><Input className="mt-1" type="number" step="any" min="0" value={editScholAmount} onChange={(e) => setEditScholAmount(e.target.value)} placeholder="e.g. 5000" /></div>
+                <div><Label>Percentage (%)</Label><Input className="mt-1" type="number" step="any" min="0" max="100" value={editScholPercentage} onChange={(e) => setEditScholPercentage(e.target.value)} placeholder="e.g. 20" /></div>
+                <div><Label>Currency</Label><Input className="mt-1" value={editScholCurrency} onChange={(e) => setEditScholCurrency(e.target.value)} placeholder="AUD" /></div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditScholCourse(null)}>Cancel</Button>

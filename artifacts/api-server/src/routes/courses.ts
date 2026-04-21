@@ -96,7 +96,10 @@ router.get("/courses", async (req, res): Promise<void> => {
       (SELECT ar.score_type FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "scoreType",
       (SELECT ar.academic_country FROM academic_requirements ar WHERE ar.course_id = c.id LIMIT 1) AS "academicCountry",
       (SELECT s.details FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipDetails",
-      (SELECT s.eligibility_criteria FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipEligibility"
+      (SELECT s.eligibility_criteria FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipEligibility",
+      (SELECT s.amount FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipAmount",
+      (SELECT s.percentage FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipPercentage",
+      (SELECT s.currency FROM scholarships s WHERE s.course_id = c.id LIMIT 1) AS "scholarshipCurrency"
     FROM courses c
     LEFT JOIN universities u ON c.university_id = u.id
     ${whereSQL}

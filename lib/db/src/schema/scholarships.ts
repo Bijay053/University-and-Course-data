@@ -10,6 +10,7 @@ export const scholarshipsTable = pgTable("scholarships", {
   details: text("details"),
   eligibilityCriteria: text("eligibility_criteria"),
   amount: real("amount"),
+  percentage: real("percentage"),
   currency: text("currency"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
