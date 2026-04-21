@@ -1049,7 +1049,7 @@ export default function UniversityDetail() {
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
                   <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left" colSpan={3}>Course</th>
-                  <th className="px-2 py-2 border-r text-center" colSpan={7} style={{ background: "#f0fdf4", color: "#15803d" }}>Details</th>
+                  <th className="px-2 py-2 border-r text-center" colSpan={8} style={{ background: "#f0fdf4", color: "#15803d" }}>Details</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={3} style={{ background: "#eff6ff", color: "#1d4ed8" }}>Intake</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#fefce8", color: "#a16207" }}>Fee</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={5} style={{ background: "#fdf4ff", color: "#7e22ce" }}>IELTS</th>
