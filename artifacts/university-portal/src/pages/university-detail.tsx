@@ -1863,7 +1863,7 @@ export default function UniversityDetail() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Assessment Notes (plain text)</Label>
-                  <p className="text-xs text-muted-foreground mb-2">Paste your plain text notes. AI will automatically parse them into structured cards.</p>
+                  <p className="text-xs text-muted-foreground mb-2">Paste your notes using the format below. Each blank-line-separated block becomes a card. Lines with <code className="font-mono bg-gray-100 px-1 rounded">Label: Value</code> become rows. Values like <em>Accepted</em>, <em>Excluded</em>, <em>Case by case</em> auto-become colour badges.</p>
                   <textarea value={assessAddText} onChange={e => setAssessAddText(e.target.value)}
                     rows={12} placeholder={"Example:\nAcceptable banks:\nAll A-class banks — accepted\n\nUnder 18:\nNot allowed\n\nSponsor requirements:\nTypes: Parents, Siblings, Grandparents\nMin income: AUD 30,000/yr\nBank statement: 1 year\n\nTurnaround times:\nOffer: 48 hours\nGTE: 4 days\nCoE: 4 days"}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
@@ -1882,14 +1882,14 @@ export default function UniversityDetail() {
                         body: JSON.stringify({ country: assessAddCountry, rawText: assessAddText }),
                       });
                       if (!res.ok) throw new Error(await res.text());
-                      toast({ title: "Assessment note added", description: `Note for ${assessAddCountry} saved and parsed.` });
+                      toast({ title: "Assessment note added", description: `Note for ${assessAddCountry} saved successfully.` });
                       setAssessShowAdd(false);
                       await loadAssessNotes();
                     } catch (err) {
                       toast({ title: "Error", description: String(err), variant: "destructive" });
                     } finally { setAssessAdding(false); }
                   }}>
-                  {assessAdding ? "Saving & parsing..." : "Save & Parse"}
+                  {assessAdding ? "Saving..." : "Save"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1931,14 +1931,14 @@ export default function UniversityDetail() {
                         body: JSON.stringify({ country: assessEditCountry, rawText: assessEditText }),
                       });
                       if (!res.ok) throw new Error(await res.text());
-                      toast({ title: "Note updated", description: `Note for ${assessEditCountry} re-parsed successfully.` });
+                      toast({ title: "Note updated", description: `Note for ${assessEditCountry} updated successfully.` });
                       setAssessEditNote(null);
                       await loadAssessNotes();
                     } catch (err) {
                       toast({ title: "Error", description: String(err), variant: "destructive" });
                     } finally { setAssessEditing(false); }
                   }}>
-                  {assessEditing ? "Saving & re-parsing..." : "Save & Re-parse"}
+                  {assessEditing ? "Saving..." : "Save"}
                 </Button>
               </DialogFooter>
             </DialogContent>

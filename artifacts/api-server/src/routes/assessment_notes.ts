@@ -3,110 +3,138 @@ import { pool } from "@workspace/db";
 
 const router = Router();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
-const geminiUrl = (model: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-
+// ── Icon map ────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, { emoji: string; bg: string; color: string }> = {
-  bank: { emoji: "🏦", bg: "#E6F1FB", color: "#185FA5" },
-  minor: { emoji: "👤", bg: "#EAF3DE", color: "#3B6D11" },
-  under18: { emoji: "👤", bg: "#EAF3DE", color: "#3B6D11" },
-  sponsor: { emoji: "👨‍👩‍👧", bg: "#FAEEDA", color: "#854F0B" },
+  bank:        { emoji: "🏦", bg: "#E6F1FB", color: "#185FA5" },
+  under18:     { emoji: "👤", bg: "#EAF3DE", color: "#3B6D11" },
+  sponsor:     { emoji: "👨‍👩‍👧", bg: "#FAEEDA", color: "#854F0B" },
   scholarship: { emoji: "🎓", bg: "#EEEDFE", color: "#534AB7" },
-  spouse: { emoji: "💍", bg: "#E1F5EE", color: "#0F6E56" },
-  dependent: { emoji: "💍", bg: "#E1F5EE", color: "#0F6E56" },
-  turnaround: { emoji: "⏱", bg: "#FAECE7", color: "#993C1D" },
-  loan: { emoji: "💳", bg: "#FAECE7", color: "#993C1D" },
-  other: { emoji: "ℹ️", bg: "#F1EFE8", color: "#5F5E5A" },
+  spouse:      { emoji: "💍", bg: "#E1F5EE", color: "#0F6E56" },
+  turnaround:  { emoji: "⏱",  bg: "#FAECE7", color: "#993C1D" },
+  loan:        { emoji: "💳", bg: "#FAECE7", color: "#993C1D" },
+  other:       { emoji: "ℹ️", bg: "#F1EFE8", color: "#5F5E5A" },
 };
 
 function resolveIcon(title: string) {
-  const lower = title.toLowerCase();
-  if (lower.includes("bank")) return ICON_MAP.bank;
-  if (lower.includes("under 18") || lower.includes("minor") || lower.includes("relative")) return ICON_MAP.under18;
-  if (lower.includes("sponsor")) return ICON_MAP.sponsor;
-  if (lower.includes("scholarship")) return ICON_MAP.scholarship;
-  if (lower.includes("spouse") || lower.includes("dependent")) return ICON_MAP.spouse;
-  if (lower.includes("turnaround") || lower.includes("processing time")) return ICON_MAP.turnaround;
-  if (lower.includes("loan") || lower.includes("assessment")) return ICON_MAP.loan;
+  const t = title.toLowerCase();
+  if (t.includes("bank"))                                       return ICON_MAP.bank;
+  if (t.includes("under 18") || t.includes("minor") || t.includes("relative") || t.includes("dependent")) return ICON_MAP.under18;
+  if (t.includes("sponsor"))                                    return ICON_MAP.sponsor;
+  if (t.includes("scholarship"))                                return ICON_MAP.scholarship;
+  if (t.includes("spouse"))                                     return ICON_MAP.spouse;
+  if (t.includes("turnaround") || t.includes("processing"))    return ICON_MAP.turnaround;
+  if (t.includes("loan") || t.includes("assessment"))          return ICON_MAP.loan;
   return ICON_MAP.other;
 }
 
-const PARSE_PROMPT = `You are an expert at converting plain text assessment notes for student visa applications into structured JSON cards.
+// ── Badge detection ──────────────────────────────────────────────────────────
+const YES_WORDS  = /^(yes|accepted|allowed|ok|required|mandatory|applicable)$/i;
+const NO_WORDS   = /^(no|not accepted|excluded|not allowed|rejected|not acceptable|not applicable|not required)$/i;
+const CASE_WORDS = /^(case by case|conditional|depends|sometimes|may be considered|considered|discretionary)$/i;
 
-Parse the following plain text into an array of cards. Each card represents a logical section (e.g. "Acceptable banks", "Sponsors", "Scholarship", "Turnaround times", "Spouse", "Under 18", "Other requirements").
+function detectBadge(val: string): "yes" | "no" | "case" | null {
+  const v = val.trim();
+  if (YES_WORDS.test(v))  return "yes";
+  if (NO_WORDS.test(v))   return "no";
+  if (CASE_WORDS.test(v)) return "case";
+  return null;
+}
 
-Return ONLY valid JSON (no markdown fences, no explanations) in this exact structure:
-[
-  {
-    "title": "Card title",
-    "fields": [
-      { "label": "Field label", "value": "Field value", "badge": null },
-      { "label": "Accepted", "value": "Yes", "badge": "yes" },
-      { "label": "Excluded", "value": "No", "badge": "no" },
-      { "label": "Status", "value": "Case by case", "badge": "case" }
-    ],
-    "sections": [
-      {
-        "label": "Sub-section heading",
-        "fields": [
-          { "label": "Label", "value": "Value", "badge": null }
-        ]
+// ── Deterministic plain-text → card parser ───────────────────────────────────
+//
+// Format the user should enter:
+//
+//   Acceptable banks:
+//   All A-class banks: Accepted
+//   Laxmi Sunrise: Excluded
+//
+//   Under 18 / relatives:
+//   Under 18: No
+//   Real siblings in Australia: Yes
+//
+//   Sponsors:
+//   Types: Parents, Siblings
+//   Min income: AUD 30,000/yr
+//     Excluded banks:              ← indented line = sub-section header when ends with ":"
+//     Kumari Bank: Excluded
+//
+// Rules:
+//   - Blank line separates cards
+//   - First non-blank line of a block ending with ":" is the card title
+//   - Indented line ending with ":" starts a sub-section within a card
+//   - "label: value" lines are field rows
+//   - Values matching YES/NO/CASE keywords become badge fields
+//
+type ParsedField   = { label: string; value: string; badge: "yes" | "no" | "case" | null };
+type ParsedSection = { label: string; fields: ParsedField[] };
+type ParsedCard    = { title: string; emoji: string; bg: string; color: string; fields: ParsedField[]; sections: ParsedSection[] };
+
+function parseNotes(rawText: string): ParsedCard[] {
+  const cards: ParsedCard[] = [];
+
+  // Split into blocks by one or more blank lines
+  const blocks = rawText.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+
+  for (const block of blocks) {
+    const lines = block.split("\n");
+    if (lines.length === 0) continue;
+
+    // First line must end with ":" to be a card title; if not, treat it as a title anyway
+    const titleLine = lines[0].trim().replace(/:$/, "").trim();
+    if (!titleLine) continue;
+
+    const icon = resolveIcon(titleLine);
+    const card: ParsedCard = { title: titleLine, ...icon, fields: [], sections: [] };
+
+    let currentSection: ParsedSection | null = null;
+
+    for (let i = 1; i < lines.length; i++) {
+      const raw = lines[i];
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+
+      const isIndented = /^\s{2,}/.test(raw);
+
+      // Sub-section header: indented line ending with ":"
+      if (isIndented && trimmed.endsWith(":")) {
+        currentSection = { label: trimmed.replace(/:$/, "").trim(), fields: [] };
+        card.sections.push(currentSection);
+        continue;
       }
-    ]
-  }
-]
 
-Rules:
-- badge must be "yes", "no", "case", or null (for plain text)
-- Use badge "yes" for: Yes, Accepted, Allowed, Required, OK
-- Use badge "no" for: No, Not accepted, Excluded, Not allowed, Rejected, Not acceptable
-- Use badge "case" for: Case by case, Conditional, Depends, Sometimes, May be considered
-- sections array may be empty []
-- Keep field values concise but complete — preserve all details from the text
-- Group related fields logically into cards
-- Do NOT lose any information from the source text
+      // Card-level section header (non-indented line ending ":", no colon elsewhere = header)
+      const colonIdx = trimmed.indexOf(":");
+      if (colonIdx !== -1) {
+        const label = trimmed.slice(0, colonIdx).trim();
+        const value = trimmed.slice(colonIdx + 1).trim();
 
-Plain text to parse:
-`;
+        if (!value) {
+          // Line is "Something:" with no value — treat as sub-section header
+          currentSection = { label, fields: [] };
+          card.sections.push(currentSection);
+          continue;
+        }
 
-async function parseWithGemini(rawText: string): Promise<unknown[]> {
-  if (!GEMINI_API_KEY) return [];
+        const badge = detectBadge(value);
+        const field: ParsedField = { label, value, badge };
 
-  for (const model of GEMINI_MODELS) {
-    try {
-      const resp = await fetch(geminiUrl(model), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: PARSE_PROMPT + rawText }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
-        }),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.text();
-        if (resp.status === 429 || resp.status === 503 || resp.status === 404) continue;
-        throw new Error(err);
+        if (currentSection) {
+          currentSection.fields.push(field);
+        } else {
+          card.fields.push(field);
+        }
+      } else {
+        // No colon at all — treat as a plain note field with empty label
+        const field: ParsedField = { label: "", value: trimmed, badge: detectBadge(trimmed) };
+        if (currentSection) currentSection.fields.push(field);
+        else card.fields.push(field);
       }
-
-      const json = await resp.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-      const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-      const parsed = JSON.parse(cleaned) as unknown[];
-
-      return (parsed as { title?: string; fields?: unknown[]; sections?: unknown[] }[]).map((card) => {
-        const icon = resolveIcon(card.title ?? "");
-        return { ...card, ...icon };
-      });
-    } catch {
-      continue;
     }
+
+    cards.push(card);
   }
 
-  return [];
+  return cards;
 }
 
 router.get("/universities/:id/assessment-notes", async (req, res): Promise<void> => {
@@ -126,7 +154,7 @@ router.post("/universities/:id/assessment-notes", async (req, res): Promise<void
   const { country, rawText } = req.body as { country?: string; rawText?: string };
   if (!country || !rawText) { res.status(400).json({ error: "country and rawText are required" }); return; }
 
-  const parsedData = await parseWithGemini(rawText);
+  const parsedData = parseNotes(rawText);
 
   const result = await pool.query<{ id: number }>(
     `INSERT INTO assessment_notes (university_id, country, raw_text, parsed_data)
@@ -155,7 +183,7 @@ router.put("/assessment-notes/:noteId", async (req, res): Promise<void> => {
 
   const finalText = rawText ?? existing.rows[0].raw_text;
   const finalCountry = country ?? existing.rows[0].country;
-  const parsedData = await parseWithGemini(finalText);
+  const parsedData = parseNotes(finalText);
 
   await pool.query(
     `UPDATE assessment_notes SET country=$1, raw_text=$2, parsed_data=$3, updated_at=NOW() WHERE id=$4`,
