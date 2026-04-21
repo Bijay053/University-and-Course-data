@@ -1,0 +1,1008 @@
+ dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1032ms
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1860 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-BzAcWX-K.css  124.16 kB │ gzip:  20.66 kB
+dist/public/assets/index-BekHkYuk.js   739.34 kB │ gzip: 211.81 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.02s
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace uni-api not found
+2026/04/21 05:42:32 [notice] 251268#251268: signal process started
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+# Pull the updated ecosystem config
+git pull origin main
+
+# Remove the broken (never-started) process
+pm2 delete uni-api 2>/dev/null; true
+
+# Load .env vars and start the API server
+export $(grep -v '^#' .env | sed 's/#.*//' | xargs)
+pm2 start /root/University-and-Course-data/artifacts/api-server/dist/index.mjs --name "uni-api"
+pm2 save
+remote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2), pack-reused 0 (from 0)
+Unpacking objects: 100% (4/4), 2.68 KiB | 1.34 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   1450930..b1a91e4  main       -> origin/main
+Updating 1450930..b1a91e4
+Fast-forward
+ ...me-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-71-generi_1776750002258.txt | 113 +++++++++++++++++++++++++++++++++
+ 1 file changed, 113 insertions(+)
+ create mode 100644 attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-71-generi_1776750002258.txt
+[PM2] Starting /root/University-and-Course-data/artifacts/api-server/dist/index.mjs in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ online    │ 0%       │ 266.7mb  │
+│ 1  │ uni-api            │ fork     │ 0    │ online    │ 0%       │ 17.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+root@university-and-course-data:~/University-and-Course-data# pm2 status
+pm2 logs uni-api --lines 20
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ online    │ 0%       │ 266.7mb  │
+│ 1  │ uni-api            │ fork     │ 8    │ online    │ 0%       │ 93.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 20 lines for [uni-api] process (change the value with --lines option)
+/root/.pm2/logs/uni-api-error.log last 20 lines:
+/root/.pm2/logs/uni-api-out.log last 20 lines:
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:51.147] ERROR (251428): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+
+1|uni-api  | [05:44:52.083] ERROR (251441): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:53.042] ERROR (251474): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:53.962] ERROR (251487): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:54.891] ERROR (251500): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:55.851] ERROR (251513): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:56.801] ERROR (251526): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:57.654] ERROR (251539): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:58.756] ERROR (251552): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:44:59.661] ERROR (251565): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:00.643] ERROR (251578): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:01.795] ERROR (251591): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:03.311] ERROR (251608): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:04.430] ERROR (251621): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:05.475] ERROR (251634): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:06.410] ERROR (251647): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:07.530] ERROR (251660): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:08.701] ERROR (251673): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:09.859] ERROR (251686): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:10.799] ERROR (251699): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:11.889] ERROR (251712): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:12.802] ERROR (251725): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:13.981] ERROR (251738): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:14.966] ERROR (251751): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:15.927] ERROR (251764): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:16.935] ERROR (251777): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:18.090] ERROR (251790): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:18.960] ERROR (251803): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:19.973] ERROR (251816): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:21.168] ERROR (251829): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:22.102] ERROR (251842): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:23.036] ERROR (251856): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:23.885] ERROR (251869): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:24.844] ERROR (251882): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:25.708] ERROR (251895): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:26.692] ERROR (251908): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:27.542] ERROR (251921): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:28.533] ERROR (251934): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:29.571] ERROR (251947): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:30.486] ERROR (251960): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:31.575] ERROR (251973): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:32.453] ERROR (251986): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:33.416] ERROR (251999): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:34.364] ERROR (252012): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:35.412] ERROR (252027): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:36.594] ERROR (252040): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:37.724] ERROR (252053): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:38.583] ERROR (252066): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:39.718] ERROR (252079): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:40.595] ERROR (252092): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:41.565] ERROR (252105): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:42.521] ERROR (252119): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:43.517] ERROR (252132): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:44.419] ERROR (252145): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:45.379] ERROR (252158): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:46.235] ERROR (252171): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:47.349] ERROR (252184): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:48.325] ERROR (252197): Error listening on port
+1|uni-api  |     err: {
+1|uni-api  |       "type": "Error",
+1|uni-api  |       "message": "listen EADDRINUSE: address already in use 0.0.0.0:8080",
+1|uni-api  |       "stack":
+1|uni-api  |           Error: listen EADDRINUSE: address already in use 0.0.0.0:8080
+1|uni-api  |               at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+1|uni-api  |               at listenInCluster (node:net:2005:12)
+1|uni-api  |               at node:net:2214:7
+1|uni-api  |               at processTicksAndRejections (node:internal/process/task_queues:90:21)
+1|uni-api  |       "code": "EADDRINUSE",
+1|uni-api  |       "errno": -98,
+1|uni-api  |       "syscall": "listen",
+1|uni-api  |       "address": "0.0.0.0",
+1|uni-api  |       "port": 8080
+1|uni-api  |     }
+1|uni-api  | [05:45:49.490] ERROR (252210): Error listening on port
