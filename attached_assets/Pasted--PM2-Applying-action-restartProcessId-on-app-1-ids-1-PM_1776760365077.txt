@@ -1,0 +1,25 @@
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ uni-api            │ cluster  │ 2    │ online    │ 0%       │ 45.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+[TAILING] Tailing last 5 lines for [1] process (change the value with --lines option)
+/root/.pm2/logs/uni-api-out-1.log last 5 lines:
+/root/.pm2/logs/uni-api-error-1.log last 5 lines:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+
+1|uni-api  | {"level":30,"time":1776760327464,"pid":3449,"hostname":"university-and-course-data","port":8080,"host":"0.0.0.0","msg":"Server listening"}
+1|uni-api  | {"level":40,"time":1776760327503,"pid":3449,"hostname":"university-and-course-data","count":1,"runtimeJobIds":["scrape_1776759314009_3e1ex0"],"msg":"Stopped orphaned active scrape jobs on startup"}
+1|uni-api  | {"level":30,"time":1776760327503,"pid":3449,"hostname":"university-and-course-data","intervalMinutes":15,"dayOfMonth":1,"hourUtc":2,"msg":"Monthly scraping scheduler started"}
+1|uni-api  | {"level":30,"time":1776760327504,"pid":3449,"hostname":"university-and-course-data","checkIntervalMinutes":60,"msg":"Daily backup scheduler started"}
+1|uni-api  | {"level":30,"time":1776760327659,"pid":3449,"hostname":"university-and-course-data","triggerSource":"startup","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+1|uni-api  | {"level":30,"time":1776760331985,"pid":3449,"hostname":"university-and-course-data","req":{"id":1,"method":"GET","url":"/api/scrape/status/scrape_1776759314009_3e1ex0"},"res":{"statusCode":200},"responseTime":19,"msg":"request completed"}
+1|uni-api  | {"level":50,"time":1776760337506,"pid":3449,"hostname":"university-and-course-data","err":{"type":"DatabaseError2","message":"relation \"courses_backup\" does not exist","stack":"error: relation \"courses_backup\" does not exist\n    at file:///root/University-and-Course-data/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at todayBackupDone (file:///root/University-and-Course-data/artifacts/api-server/src/services/daily-backup.ts:110:17)\n    at Timeout._onTimeout (file:///root/University-and-Course-data/artifacts/api-server/src/services/daily-backup.ts:128:20)","length":113,"name":"error","severity":"ERROR","code":"42P01","position":"27","file":"parse_relation.c","line":"1449","routine":"parserOpenTable"},"msg":"Daily backup: startup check failed"}
