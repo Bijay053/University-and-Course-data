@@ -34,8 +34,16 @@ function resolveIcon(title: string) {
 // ── Gemini parser ────────────────────────────────────────────────────────────
 const PROMPT = `You are converting student visa assessment notes into structured JSON cards. Return ONLY valid JSON, no markdown.
 
-Group content into cards using these titles (use whichever apply):
-"Acceptable banks", "Under 18 / relatives", "Sponsors", "Loan assessment", "Scholarship", "Spouse / dependent", "Turnaround times", "Other requirements"
+Group content into these cards (use whichever apply). Each section has STRICT rules on what belongs inside it:
+
+"Acceptable banks"   → accepted/excluded bank names only
+"Under 18 / relatives" → ONLY: age-related (under 18 rule), CAAW requirement, relatives living in Australia/destination country. NEVER put marriage or spouse fields here.
+"Sponsors"           → sponsor types, income requirements, bank statements, tax documents, income type caps
+"Loan assessment"    → loan calculations, travel costs, tuition breakdown, education loan rules
+"Scholarship"        → scholarship criteria, GPA requirements, deduction rules
+"Spouse / dependent" → ALL marriage-related rules: married applicants (UG/PG), marriage duration, spouse qualification, spouse joining or not, age gap rules. "Married for UG" belongs HERE.
+"Turnaround times"   → offer/GTE/CoE processing times only
+"Other requirements" → visa refusal history, gap explanation, age limits, cash salary, tuition deposit, interview requirements — anything not fitting above sections
 
 JSON structure:
 [
