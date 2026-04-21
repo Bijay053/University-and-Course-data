@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -269,69 +268,53 @@ export default function UniversityDetail() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
-  // Mini scrollbar refs & state
+  // Mini scrollbar — state-driven so React always re-renders the thumb position
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const miniScrollbarRef = useRef<HTMLDivElement>(null);
-  const miniThumbRef = useRef<HTMLDivElement>(null);
+  const [thumbLeft, setThumbLeft] = useState(2);
+  const [thumbWidth, setThumbWidth] = useState(38);
 
-  const updateThumb = useCallback(() => {
+  const computeThumb = useCallback(() => {
     const viewport = tableScrollRef.current;
     const scrollbar = miniScrollbarRef.current;
-    const thumb = miniThumbRef.current;
-    if (!viewport || !scrollbar || !thumb) return;
-
+    if (!viewport || !scrollbar) return;
     const visible = viewport.clientWidth;
     const total = viewport.scrollWidth;
-    const scrollLeft = viewport.scrollLeft;
-
     const trackWidth = scrollbar.clientWidth - 4;
-    const ratio = visible / total;
-    const thumbWidth = Math.max(32, trackWidth * ratio);
-    const maxThumbLeft = trackWidth - thumbWidth;
-
-    const scrollRatio = total > visible ? scrollLeft / (total - visible) : 0;
-    const thumbLeft = 2 + maxThumbLeft * scrollRatio;
-
-    thumb.style.width = `${thumbWidth}px`;
-    thumb.style.left = `${thumbLeft}px`;
+    const tw = Math.max(32, trackWidth * (visible / total));
+    const maxLeft = trackWidth - tw;
+    const ratio = total > visible ? viewport.scrollLeft / (total - visible) : 0;
+    setThumbWidth(tw);
+    setThumbLeft(2 + maxLeft * ratio);
   }, []);
 
   useEffect(() => {
     const viewport = tableScrollRef.current;
     if (!viewport) return;
-    viewport.addEventListener("scroll", updateThumb, { passive: true });
-    window.addEventListener("resize", updateThumb);
-    // Init after a tick so layout is settled
-    const t = setTimeout(updateThumb, 50);
+    viewport.addEventListener("scroll", computeThumb, { passive: true });
+    window.addEventListener("resize", computeThumb);
+    const t = setTimeout(computeThumb, 60);
     return () => {
-      viewport.removeEventListener("scroll", updateThumb);
-      window.removeEventListener("resize", updateThumb);
+      viewport.removeEventListener("scroll", computeThumb);
+      window.removeEventListener("resize", computeThumb);
       clearTimeout(t);
     };
-  }, [tab, updateThumb]);
+  }, [tab, computeThumb]);
 
   const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     const viewport = tableScrollRef.current;
     const scrollbar = miniScrollbarRef.current;
-    const thumb = miniThumbRef.current;
-    if (!viewport || !scrollbar || !thumb) return;
-
+    if (!viewport || !scrollbar) return;
     const dragStartX = e.clientX;
-    const thumbStartLeft = parseFloat(thumb.style.left || "2");
-
+    const startThumbLeft = thumbLeft;
+    const trackWidth = scrollbar.clientWidth - 4;
+    const maxLeft = trackWidth - thumbWidth;
     const onMouseMove = (ev: MouseEvent) => {
-      const visible = viewport.clientWidth;
-      const total = viewport.scrollWidth;
-      const trackWidth = scrollbar.clientWidth - 4;
-      const thumbWidth = thumb.offsetWidth;
-      const maxThumbLeft = trackWidth - thumbWidth;
-
-      let newLeft = thumbStartLeft + (ev.clientX - dragStartX);
-      newLeft = Math.max(2, Math.min(2 + maxThumbLeft, newLeft));
-
-      const scrollRatio = maxThumbLeft > 0 ? (newLeft - 2) / maxThumbLeft : 0;
-      viewport.scrollLeft = scrollRatio * (total - visible);
+      let newLeft = startThumbLeft + (ev.clientX - dragStartX);
+      newLeft = Math.max(2, Math.min(2 + maxLeft, newLeft));
+      const ratio = maxLeft > 0 ? (newLeft - 2) / maxLeft : 0;
+      viewport.scrollLeft = ratio * (viewport.scrollWidth - viewport.clientWidth);
     };
     const onMouseUp = () => {
       document.body.style.userSelect = "";
@@ -344,25 +327,17 @@ export default function UniversityDetail() {
   };
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const thumb = miniThumbRef.current;
-    if (!thumb || thumb === e.target || thumb.contains(e.target as Node)) return;
     const viewport = tableScrollRef.current;
     const scrollbar = miniScrollbarRef.current;
     if (!viewport || !scrollbar) return;
-
     const rect = scrollbar.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    const visible = viewport.clientWidth;
-    const total = viewport.scrollWidth;
     const trackWidth = scrollbar.clientWidth - 4;
-    const thumbWidth = thumb.offsetWidth;
-    const maxThumbLeft = trackWidth - thumbWidth;
-
+    const maxLeft = trackWidth - thumbWidth;
     let targetLeft = clickX - thumbWidth / 2;
-    targetLeft = Math.max(2, Math.min(2 + maxThumbLeft, targetLeft));
-
-    const scrollRatio = maxThumbLeft > 0 ? (targetLeft - 2) / maxThumbLeft : 0;
-    viewport.scrollLeft = scrollRatio * (total - visible);
+    targetLeft = Math.max(2, Math.min(2 + maxLeft, targetLeft));
+    const ratio = maxLeft > 0 ? (targetLeft - 2) / maxLeft : 0;
+    viewport.scrollLeft = ratio * (viewport.scrollWidth - viewport.clientWidth);
   };
 
   const subCategories = category !== ALL ? getSubCategories(category) : [];
@@ -795,6 +770,57 @@ export default function UniversityDetail() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mini Trello-style horizontal scroll indicator */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+            <div
+              ref={miniScrollbarRef}
+              onClick={handleTrackClick}
+              style={{
+                position: "relative",
+                width: 122,
+                height: 42,
+                borderRadius: 8,
+                background: "#f7f7f8",
+                border: "1px solid #e3e5e8",
+                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
+                overflow: "hidden",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+              aria-label="Drag to scroll table horizontally"
+            >
+              {/* Track background stripes */}
+              <div style={{ position: "absolute", inset: 0, display: "flex", gap: 4, padding: 6, pointerEvents: "none" }}>
+                {[0,1,2,3,4,5].map((i) => (
+                  <div key={i} style={{ flex: 1, background: "#e7e7e8", borderRadius: 3, opacity: 0.9 }} />
+                ))}
+              </div>
+              {/* Draggable thumb */}
+              <div
+                onMouseDown={handleThumbMouseDown}
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: thumbLeft,
+                  height: "calc(100% - 4px)",
+                  width: thumbWidth,
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,0.3)",
+                  border: "2px solid #4e73b8",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6)",
+                  overflow: "hidden",
+                  cursor: "grab",
+                }}
+              >
+                <div style={{ display: "flex", gap: 4, height: "100%", padding: 4 }}>
+                  {[0,1,2,3].map((i) => (
+                    <div key={i} style={{ flex: 1, background: "#dcdcdc", borderRadius: 2 }} />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {totalPages > 1 && (
@@ -1413,69 +1439,6 @@ export default function UniversityDetail() {
       )}
     </div>
 
-    {/* Mini Trello-style horizontal scroll indicator — only on Courses tab */}
-    {tab === "courses" && createPortal(
-      <div
-        ref={miniScrollbarRef}
-        onClick={handleTrackClick}
-        style={{
-          position: "fixed",
-          bottom: 24,
-          right: 24,
-          zIndex: 9999,
-          width: 122,
-          height: 42,
-          borderRadius: 8,
-          background: "#f7f7f8",
-          border: "1px solid #e3e5e8",
-          boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
-          overflow: "hidden",
-          cursor: "pointer",
-        }}
-        aria-label="Drag to scroll table"
-      >
-        {/* Track pattern — background stripes */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          gap: 4,
-          padding: 6,
-          pointerEvents: "none",
-        }}>
-          {[0,1,2,3,4,5].map((i) => (
-            <div key={i} style={{ flex: 1, background: "#e7e7e8", borderRadius: 3, opacity: 0.9 }} />
-          ))}
-        </div>
-
-        {/* Draggable thumb */}
-        <div
-          ref={miniThumbRef}
-          onMouseDown={handleThumbMouseDown}
-          style={{
-            position: "absolute",
-            top: 2,
-            left: 2,
-            height: "calc(100% - 4px)",
-            width: 38,
-            borderRadius: 6,
-            background: "rgba(255,255,255,0.3)",
-            border: "2px solid #4e73b8",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6)",
-            overflow: "hidden",
-            cursor: "grab",
-          }}
-        >
-          {/* Thumb inner stripes */}
-          <div style={{ display: "flex", gap: 4, height: "100%", padding: 4 }}>
-            {[0,1,2,3].map((i) => (
-              <div key={i} style={{ flex: 1, background: "#dcdcdc", borderRadius: 2 }} />
-            ))}
-          </div>
-        </div>
-      </div>,
-      document.body
-    )}
     </>
   );
 }
