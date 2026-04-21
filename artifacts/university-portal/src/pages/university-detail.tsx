@@ -270,8 +270,54 @@ export default function UniversityDetail() {
   const limit = 50;
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
-  const scrollTable = (dir: "left" | "right") => {
-    tableScrollRef.current?.scrollBy({ left: dir === "left" ? -400 : 400, behavior: "smooth" });
+  const [scrollRatio, setScrollRatio] = useState(0);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartScrollLeft = useRef(0);
+  const PANEL_COUNT = 5;
+  const activePanel = Math.min(PANEL_COUNT - 1, Math.round(scrollRatio * (PANEL_COUNT - 1)));
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setScrollRatio(max > 0 ? el.scrollLeft / max : 0);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [tab]);
+
+  const scrollToPanel = (panelIndex: number) => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    el.scrollTo({ left: (panelIndex / (PANEL_COUNT - 1)) * max, behavior: "smooth" });
+  };
+
+  const handleWidgetMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartScrollLeft.current = el.scrollLeft;
+    e.preventDefault();
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dx = ev.clientX - dragStartX.current;
+      const widgetEl = e.currentTarget as HTMLDivElement;
+      const widgetWidth = widgetEl?.offsetWidth ?? 160;
+      const max = el.scrollWidth - el.clientWidth;
+      el.scrollLeft = Math.max(0, Math.min(max, dragStartScrollLeft.current + (dx / widgetWidth) * max));
+    };
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   };
 
   const subCategories = category !== ALL ? getSubCategories(category) : [];
@@ -1322,9 +1368,11 @@ export default function UniversityDetail() {
       )}
     </div>
 
-    {/* Trello-style horizontal scroll widget — only visible on Courses tab */}
+    {/* Draggable horizontal scroll indicator — only visible on Courses tab */}
     {tab === "courses" && createPortal(
       <div
+        onMouseDown={handleWidgetMouseDown}
+        title="Drag to scroll table horizontally"
         style={{
           position: "fixed",
           bottom: 24,
@@ -1332,54 +1380,50 @@ export default function UniversityDetail() {
           zIndex: 9999,
           display: "flex",
           alignItems: "stretch",
+          gap: 3,
+          padding: "6px 8px",
+          background: "#f1f5f9",
+          borderRadius: 8,
           boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-          borderRadius: 4,
-          overflow: "hidden",
-          cursor: "pointer",
+          cursor: isDragging.current ? "grabbing" : "grab",
+          userSelect: "none",
         }}
-        aria-label="Horizontal scroll controls"
+        aria-label="Horizontal scroll indicator — drag to scroll"
       >
-        {/* Left panel — scroll left */}
-        <button
-          onClick={() => scrollTable("left")}
-          title="Scroll left"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 3,
-            padding: "8px 12px",
-            background: "#fff",
-            border: "2px solid #4A90D9",
-            borderRadius: "4px 0 0 4px",
-            cursor: "pointer",
-          }}
-        >
-          {[0,1,2,3].map((i) => (
-            <div key={i} style={{ width: 3, height: 20, background: "#93C5FD", borderRadius: 2 }} />
-          ))}
-        </button>
-        {/* Right panel — scroll right */}
-        <button
-          onClick={() => scrollTable("right")}
-          title="Scroll right"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 3,
-            padding: "8px 12px",
-            background: "#F3F4F6",
-            border: "1px solid #D1D5DB",
-            borderLeft: "none",
-            borderRadius: "0 4px 4px 0",
-            cursor: "pointer",
-          }}
-        >
-          {[0,1,2,3].map((i) => (
-            <div key={i} style={{ width: 3, height: 20, background: "#D1D5DB", borderRadius: 2 }} />
-          ))}
-        </button>
+        {Array.from({ length: PANEL_COUNT }).map((_, i) => {
+          const isActive = i === activePanel;
+          return (
+            <div
+              key={i}
+              onClick={() => scrollToPanel(i)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+                padding: "6px 8px",
+                background: isActive ? "#fff" : "#e2e8f0",
+                border: isActive ? "2px solid #3B82F6" : "1px solid #cbd5e1",
+                borderRadius: 5,
+                transition: "all 0.15s ease",
+                cursor: "pointer",
+              }}
+            >
+              {[0,1,2,3].map((j) => (
+                <div
+                  key={j}
+                  style={{
+                    width: 3,
+                    height: 18,
+                    background: isActive ? "#93C5FD" : "#94a3b8",
+                    borderRadius: 2,
+                    transition: "background 0.15s ease",
+                  }}
+                />
+              ))}
+            </div>
+          );
+        })}
       </div>,
       document.body
     )}
