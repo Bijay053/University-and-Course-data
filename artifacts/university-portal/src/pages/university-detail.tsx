@@ -281,6 +281,7 @@ export default function UniversityDetail() {
   const [bAcadLevel, setBacadLevel] = useState("");
   const [bAcadScore, setBacadScore] = useState("");
   const [bAcadScoreType, setBacadScoreType] = useState("%");
+  const [bAcadOutOf, setBacadOutOf] = useState("");
   const [bAcadCountry, setBacadCountry] = useState("");
 
   // Scholarship form state
@@ -296,6 +297,7 @@ export default function UniversityDetail() {
     setBulkSearch("");
     setBulkFilter("all");
     setSelectedIds(new Set());
+    setBacadOutOf("");
   };
 
   const [search, setSearch] = useState("");
@@ -611,7 +613,8 @@ export default function UniversityDetail() {
         body = { courseIds, testType: bEngTestType, listening: bEngL ? Number(bEngL) : null, speaking: bEngS ? Number(bEngS) : null, writing: bEngW ? Number(bEngW) : null, reading: bEngR ? Number(bEngR) : null, overall: bEngO ? Number(bEngO) : null, testName: bEngTestName || null };
       } else if (bulkMode === "academic") {
         endpoint = `${BASE}/api/universities/${id}/bulk-academic`;
-        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: bAcadScoreType || null, academicCountry: bAcadCountry || null };
+        const combinedScoreType = bAcadScoreType ? (bAcadOutOf ? `${bAcadScoreType}/${bAcadOutOf}` : bAcadScoreType) : null;
+        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry: bAcadCountry || null };
       } else if (bulkMode === "scholarships") {
         endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
         body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: bSchCurrency || null, replaceExisting: bSchReplace };
@@ -1681,12 +1684,27 @@ export default function UniversityDetail() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Score Type</Label>
-                        <Select value={bAcadScoreType} onValueChange={setBacadScoreType}>
+                        <Select value={bAcadScoreType} onValueChange={(v) => { setBacadScoreType(v); if (!["GPA","CGPA"].includes(v)) setBacadOutOf(""); }}>
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {["%", "GPA", "WAM", "ATAR", "CGPA", "Other"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            {["%", "GPA", "CGPA", "WAM", "ATAR", "Other"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Out of <span className="text-gray-400 font-normal">(e.g. 4, 5, 7)</span></Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="0.5"
+                          value={bAcadOutOf}
+                          onChange={(e) => setBacadOutOf(e.target.value)}
+                          placeholder={["GPA","CGPA"].includes(bAcadScoreType) ? "e.g. 4" : "optional"}
+                          className="h-9"
+                        />
+                        {bAcadOutOf && (
+                          <p className="text-[10px] text-muted-foreground">Will save as: <strong>{bAcadScoreType}/{bAcadOutOf}</strong></p>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Country</Label>
