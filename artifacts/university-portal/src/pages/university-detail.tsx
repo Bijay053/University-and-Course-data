@@ -413,6 +413,15 @@ export default function UniversityDetail() {
     } finally { setScholLoading(false); }
   }, [id]);
   useEffect(() => { if (tab === "scholarships") loadScholarshipCourses(); }, [tab]);
+  // Also load eagerly on mount so the Courses table can show scholarship info
+  useEffect(() => { loadScholarshipCourses(); }, [loadScholarshipCourses]);
+
+  // Build a courseId → scholarships lookup for use in the Courses table
+  const scholByCourseId = useMemo(() => {
+    const map = new Map<number, ScholEntry[]>();
+    for (const sc of scholCourses) map.set(sc.id, sc.scholarships);
+    return map;
+  }, [scholCourses]);
 
   // ── Scholarship edit / delete ──────────────────────────────────────────────
   const [editScholCourse, setEditScholCourse] = useState<{ courseId: number; courseName: string; scholarshipId: number | null } | null>(null);
@@ -1525,7 +1534,26 @@ export default function UniversityDetail() {
                       </>
                     )}
                     <td className="px-2 py-2 text-gray-500 max-w-[140px]"><span className="line-clamp-1">{txt(c.otherRequirement)}</span></td>
-                    <td className="px-2 py-2 text-amber-700 max-w-[140px]"><span className="line-clamp-1">{txt(c.scholarshipDetails)}</span></td>
+                    <td className="px-2 py-2 text-amber-700 max-w-[160px]">
+                      {(() => {
+                        const entries = scholByCourseId.get(c.id);
+                        if (!entries || entries.length === 0) return <span className="text-muted-foreground">—</span>;
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            {entries.map(s => (
+                              <span key={s.id} className="flex items-center gap-1 text-xs leading-tight">
+                                <span className="font-medium line-clamp-1">{s.name}</span>
+                                {(s.amount != null || s.percentage != null) && (
+                                  <span className="shrink-0 bg-amber-100 text-amber-800 rounded px-1 py-0.5 text-[10px] font-semibold">
+                                    {s.percentage != null ? `${s.percentage}% off` : `${s.currency ?? ""} ${s.amount}`.trim()}
+                                  </span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
