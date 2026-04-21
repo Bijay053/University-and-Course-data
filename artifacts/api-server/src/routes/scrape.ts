@@ -4690,11 +4690,15 @@ async function stageCourse(
   );
   if (dup.rows.length > 0) return false;
 
-  // Also skip if this course is already published in the main courses table.
+  // Skip if course is already published AND already has English data (IELTS/PTE/TOEFL).
+  // If published but missing English scores, allow re-staging so it gets updated with
+  // freshly scraped data — this fixes courses approved before vision/Gemini was working.
   const published = await pool.query(
-    `SELECT id FROM courses
-     WHERE university_id=$1
-       AND TRIM(REGEXP_REPLACE(LOWER(name), '[^a-z0-9]+', ' ', 'g'))=$2
+    `SELECT c.id FROM courses c
+     LEFT JOIN scraped_courses sc ON sc.course_id = c.id AND sc.status = 'approved'
+     WHERE c.university_id = $1
+       AND TRIM(REGEXP_REPLACE(LOWER(c.name), '[^a-z0-9]+', ' ', 'g')) = $2
+       AND (sc.ielts_overall IS NOT NULL OR sc.pte_overall IS NOT NULL OR sc.toefl_overall IS NOT NULL)
      LIMIT 1`,
     [uniId, fingerprint],
   );
