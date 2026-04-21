@@ -3401,36 +3401,54 @@ async function analyzeImageWithGemini(imageUrl: string, context: string): Promis
     const base64 = Buffer.from(buffer).toString("base64");
     const mimeType = resp.headers.get("content-type") || "image/png";
 
-    const prompt = `Extract ALL English language requirements and/or fees from this image. ${context}
-Return JSON with ONLY the fields you find:
-{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>"}
-Extract ALL test types: IELTS Academic, TOEFL iBT, PTE Academic, Cambridge CAE/C1 Advanced, Duolingo. Use null for missing fields. Only include INTERNATIONAL student fees.`;
+    // Two prompts: first is concise; second is a richer retry used when the
+    // first attempt returns zero non-null fields (model may need more nudging).
+    const prompts = [
+      `You are a university data extractor. This image is from a university course page. ${context}
+Find ANY of these score requirements in the image: IELTS Overall score, IELTS band scores (Listening/Speaking/Writing/Reading), PTE Academic Overall, TOEFL iBT score, Cambridge CAE/C1 Advanced score, Duolingo score, or international tuition fee.
+Return ONLY valid JSON — omit fields you cannot see:
+{"ieltsOverall":<number>,"ieltsListening":<number>,"ieltsSpeaking":<number>,"ieltsWriting":<number>,"ieltsReading":<number>,"pteOverall":<number>,"pteListening":<number>,"pteSpeaking":<number>,"pteWriting":<number>,"pteReading":<number>,"toeflOverall":<number>,"toeflListening":<number>,"toeflSpeaking":<number>,"toeflWriting":<number>,"toeflReading":<number>,"cambridgeOverall":<number>,"duolingoOverall":<number>,"internationalFee":<number>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>"}`,
+      `University admissions requirements image. ${context}
+Carefully look for a table or list showing minimum English test scores. Common values: IELTS 6.0–7.5 overall, PTE 50–65, TOEFL iBT 60–100, Cambridge CAE 169–185, Duolingo 95–130.
+Even if hard to read, provide your best estimate for any visible numbers next to these test names.
+Return JSON (use null ONLY if completely absent from the image):
+{"ieltsOverall":null,"ieltsListening":null,"ieltsSpeaking":null,"ieltsWriting":null,"ieltsReading":null,"pteOverall":null,"pteListening":null,"pteSpeaking":null,"pteWriting":null,"pteReading":null,"toeflOverall":null,"toeflListening":null,"toeflSpeaking":null,"toeflWriting":null,"toeflReading":null,"cambridgeOverall":null,"duolingoOverall":null,"internationalFee":null,"currency":null,"feeTerm":null}`,
+    ];
 
-    const body = JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mimeType, data: base64 } },
-        ],
-      }],
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-    });
+    const countFields = (obj: Partial<CourseData>) =>
+      Object.values(obj).filter((v) => v != null).length;
 
-    for (const model of GEMINI_MODELS) {
-      try {
-        const apiResp = await fetch(geminiUrl(model), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-          signal: AbortSignal.timeout(45_000),
-        });
-        if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
-        if (!apiResp.ok) continue;
-        const data = await apiResp.json() as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (text) return JSON.parse(text) as Partial<CourseData>;
-      } catch { continue; }
+    let best: Partial<CourseData> = {};
+    for (const prompt of prompts) {
+      if (countFields(best) > 0) break; // already have data — no need for retry prompt
+      const body = JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
+      });
+      for (const model of GEMINI_MODELS) {
+        try {
+          const apiResp = await fetch(geminiUrl(model), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+            signal: AbortSignal.timeout(45_000),
+          });
+          if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
+          if (!apiResp.ok) continue;
+          const data = await apiResp.json() as any;
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+          if (!text) continue;
+          const parsed = JSON.parse(text) as Partial<CourseData>;
+          // Keep this result if it has MORE non-null fields than the best so far.
+          if (countFields(parsed) > countFields(best)) {
+            best = parsed;
+            // If we have meaningful English data, stop trying other models.
+            if (best.ieltsOverall != null || best.pteOverall != null || best.toeflOverall != null) break;
+          }
+        } catch { continue; }
+      }
     }
+    return best;
   } catch {}
   return {};
 }
