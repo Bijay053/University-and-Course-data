@@ -309,8 +309,9 @@ export default function UniversityDetail() {
   const [bAcadScore, setBacadScore] = useState("");
   const [bAcadScoreType, setBacadScoreType] = useState("%");
   const [bAcadOutOf, setBacadOutOf] = useState("");
-  const [bAcadCountry, setBacadCountry] = useState("");
+  const [bAcadCountries, setBacadCountries] = useState<string[]>([]);
   const [bAcadCountryOpen, setBacadCountryOpen] = useState(false);
+  const [bAcadError, setBacadError] = useState("");
 
   // Scholarship form state
   const [bSchName, setBSchName] = useState("");
@@ -327,6 +328,8 @@ export default function UniversityDetail() {
     setBulkFilter("all");
     setSelectedIds(new Set());
     setBacadOutOf("");
+    setBacadCountries([]);
+    setBacadError("");
     setBSchAmountType("fixed");
     setBSchAmount("");
   };
@@ -650,9 +653,18 @@ export default function UniversityDetail() {
         endpoint = `${BASE}/api/universities/${id}/bulk-english`;
         body = { courseIds, testType: bEngTestType, listening: bEngL ? Number(bEngL) : null, speaking: bEngS ? Number(bEngS) : null, writing: bEngW ? Number(bEngW) : null, reading: bEngR ? Number(bEngR) : null, overall: bEngO ? Number(bEngO) : null, testName: bEngTestName || null };
       } else if (bulkMode === "academic") {
+        // Validation
+        if (bAcadScore) {
+          const n = Number(bAcadScore);
+          if (isNaN(n) || n < 0) { setBacadError("Score must be a positive number."); return; }
+          if (bAcadScoreType === "%" && n > 100) { setBacadError("Score cannot exceed 100 for %."); return; }
+        }
+        if (bAcadOutOf && Number(bAcadOutOf) < 1) { setBacadError("'Out of' must be at least 1."); return; }
+        setBacadError("");
         endpoint = `${BASE}/api/universities/${id}/bulk-academic`;
         const combinedScoreType = bAcadScoreType ? (bAcadOutOf ? `${bAcadScoreType}/${bAcadOutOf}` : bAcadScoreType) : null;
-        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry: bAcadCountry || null };
+        const academicCountry = bAcadCountries.length > 0 ? bAcadCountries.join(", ") : null;
+        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry };
       } else if (bulkMode === "scholarships") {
         endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
         const schCurrency = bSchAmountType === "percent" ? "%" : (bSchCurrency || null);
@@ -1750,7 +1762,9 @@ export default function UniversityDetail() {
                         </div>
                       )}
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Country</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          Country <span className="text-gray-400 font-normal">(multi-select)</span>
+                        </Label>
                         <Popover open={bAcadCountryOpen} onOpenChange={setBacadCountryOpen}>
                           <PopoverTrigger asChild>
                             <Button
@@ -1759,41 +1773,78 @@ export default function UniversityDetail() {
                               aria-expanded={bAcadCountryOpen}
                               className="w-full h-9 justify-between font-normal text-sm"
                             >
-                              <span className={bAcadCountry ? "text-foreground" : "text-muted-foreground"}>
-                                {bAcadCountry || "Select country…"}
+                              <span className={bAcadCountries.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                                {bAcadCountries.length === 0
+                                  ? "Select countries…"
+                                  : bAcadCountries.length === 1
+                                  ? bAcadCountries[0]
+                                  : `${bAcadCountries.length} countries selected`}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[280px] p-0" align="start">
+                          <PopoverContent className="w-[300px] p-0" align="start">
                             <Command>
                               <CommandInput placeholder="Search country…" />
-                              <CommandList>
+                              <CommandList className="max-h-52 overflow-y-auto">
                                 <CommandEmpty>No country found.</CommandEmpty>
                                 <CommandGroup>
-                                  <CommandItem
-                                    value=""
-                                    onSelect={() => { setBacadCountry(""); setBacadCountryOpen(false); }}
-                                  >
-                                    <Check className={`mr-2 h-4 w-4 ${!bAcadCountry ? "opacity-100" : "opacity-0"}`} />
-                                    <span className="text-muted-foreground">— None —</span>
-                                  </CommandItem>
-                                  {COUNTRIES.map((c) => (
-                                    <CommandItem
-                                      key={c}
-                                      value={c}
-                                      onSelect={(val) => { setBacadCountry(val === bAcadCountry ? "" : val); setBacadCountryOpen(false); }}
-                                    >
-                                      <Check className={`mr-2 h-4 w-4 ${bAcadCountry === c ? "opacity-100" : "opacity-0"}`} />
-                                      {c}
-                                    </CommandItem>
-                                  ))}
+                                  {COUNTRIES.map((c) => {
+                                    const selected = bAcadCountries.includes(c);
+                                    return (
+                                      <CommandItem
+                                        key={c}
+                                        value={c}
+                                        onSelect={() => {
+                                          setBacadCountries((prev) =>
+                                            selected ? prev.filter((x) => x !== c) : [...prev, c]
+                                          );
+                                        }}
+                                      >
+                                        <Check className={`mr-2 h-4 w-4 shrink-0 ${selected ? "opacity-100 text-cyan-600" : "opacity-0"}`} />
+                                        {c}
+                                      </CommandItem>
+                                    );
+                                  })}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
+                            {bAcadCountries.length > 0 && (
+                              <div className="border-t p-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setBacadCountries([])}
+                                  className="text-xs text-red-500 hover:text-red-700 w-full text-center"
+                                >
+                                  Clear all ({bAcadCountries.length})
+                                </button>
+                              </div>
+                            )}
                           </PopoverContent>
                         </Popover>
+                        {bAcadCountries.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {bAcadCountries.map((c) => (
+                              <span
+                                key={c}
+                                className="inline-flex items-center gap-1 bg-cyan-50 border border-cyan-200 text-cyan-700 text-[11px] px-2 py-0.5 rounded-full"
+                              >
+                                {c}
+                                <button
+                                  type="button"
+                                  onClick={() => setBacadCountries((prev) => prev.filter((x) => x !== c))}
+                                  className="hover:text-red-500 leading-none"
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      {bAcadError && (
+                        <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded px-2 py-1">{bAcadError}</p>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground bg-cyan-50 border border-cyan-100 rounded p-2">
                       This will <strong>replace</strong> any existing academic requirement for each selected course.
