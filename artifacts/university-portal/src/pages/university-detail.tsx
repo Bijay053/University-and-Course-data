@@ -14,10 +14,37 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw,
+  ChevronsUpDown, Check,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { CATEGORY_NAMES, DEGREE_LEVELS, STUDY_MODES, getSubCategories } from "@/lib/course-constants";
 
 const ALL = "__all__";
+
+const COUNTRIES = [
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria",
+  "Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan",
+  "Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia",
+  "Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica",
+  "Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt",
+  "El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon",
+  "Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana",
+  "Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel",
+  "Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan","Laos",
+  "Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi",
+  "Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova",
+  "Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands",
+  "New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau",
+  "Palestine","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania",
+  "Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal",
+  "Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea",
+  "South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan",
+  "Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu",
+  "Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela",
+  "Vietnam","Yemen","Zambia","Zimbabwe",
+];
+
 
 type Tab = "courses" | "english" | "academic" | "scholarships" | "rawdata";
 
@@ -283,6 +310,7 @@ export default function UniversityDetail() {
   const [bAcadScoreType, setBacadScoreType] = useState("%");
   const [bAcadOutOf, setBacadOutOf] = useState("");
   const [bAcadCountry, setBacadCountry] = useState("");
+  const [bAcadCountryOpen, setBacadCountryOpen] = useState(false);
 
   // Scholarship form state
   const [bSchName, setBSchName] = useState("");
@@ -1708,7 +1736,48 @@ export default function UniversityDetail() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Country</Label>
-                        <Input value={bAcadCountry} onChange={(e) => setBacadCountry(e.target.value)} placeholder="e.g. Australia, India" className="h-9" />
+                        <Popover open={bAcadCountryOpen} onOpenChange={setBacadCountryOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={bAcadCountryOpen}
+                              className="w-full h-9 justify-between font-normal text-sm"
+                            >
+                              <span className={bAcadCountry ? "text-foreground" : "text-muted-foreground"}>
+                                {bAcadCountry || "Select country…"}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[280px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search country…" />
+                              <CommandList>
+                                <CommandEmpty>No country found.</CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem
+                                    value=""
+                                    onSelect={() => { setBacadCountry(""); setBacadCountryOpen(false); }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${!bAcadCountry ? "opacity-100" : "opacity-0"}`} />
+                                    <span className="text-muted-foreground">— None —</span>
+                                  </CommandItem>
+                                  {COUNTRIES.map((c) => (
+                                    <CommandItem
+                                      key={c}
+                                      value={c}
+                                      onSelect={(val) => { setBacadCountry(val === bAcadCountry ? "" : val); setBacadCountryOpen(false); }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${bAcadCountry === c ? "opacity-100" : "opacity-0"}`} />
+                                      {c}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground bg-cyan-50 border border-cyan-100 rounded p-2">
