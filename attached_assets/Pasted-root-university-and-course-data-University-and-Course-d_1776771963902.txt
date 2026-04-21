@@ -1,0 +1,31 @@
+root@university-and-course-data:~/University-and-Course-data# sleep 5 && curl -s "http://localhost/api/universities?limit=100" | python3 -c "import json,sys; d=json.load(sys.stdin); [print(u.get('id'),u.get('name'),'scrapeUrl=',u.get('scrapeUrl')) for u in (d.get('data') or d)]"
+4 Charles Sturt university scrapeUrl= None
+1 University of Southern Queenland scrapeUrl= None
+5 University of Tasmania scrapeUrl= None
+2 asa scrapeUrl= None
+3 torrens scrapeUrl= None
+6 vit scrapeUrl= None
+root@university-and-course-data:~/University-and-Course-data# grep -c 'scrape_url AS' /root/University-and-Course-data/artifacts/api-server/dist/index.mjs && \
+echo "--- PM2 process started time ---" && \
+pm2 jlist | python3 -c "import json,sys; p=[x for x in json.load(sys.stdin) if x['name']=='uni-api'][0]; print('uptime:',p['pm2_env']['pm_uptime'],'restarts:',p['pm2_env']['restart_time'])" && \
+echo "--- Try API again ---" && \
+curl -s "http://localhost/api/universities?limit=100" | python3 -c "import json,sys; d=json.load(sys.stdin); u=[x for x in d['data'] if x['id']==2][0]; print(json.dumps(u,indent=2,default=str))"
+0
+root@university-and-course-data:~/University-and-Course-data# grep -n "scrape_url AS\|scrapeUrl" /root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts
+root@university-and-course-data:~/University-and-Course-data# grep -n "scrape_url AS\|scrapeUrl" /root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts"
+s = open(p).read()
+old = 'SELECT u.*, (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id)::int AS "courseCount"'
+new = 'SELECT u.*, u.scrape_url AS "scrapeUrl", u.scrape_config AS "scrapeConfig", (SELECT COUNT(*) FROM courses c WHERE c.university_id = u.id)::int AS "courseCount"'
+if old in s:
+    open(p,"w").write(s.replace(old, new))
+    print("PATCHED")
+else:
+    print("OLD STRING NOT FOUND — paste the SELECT line so I can adjust:")
+    import re
+    for m in re.finditer(r'SELECT u\.\*.*', s):
+        print(repr(m.group(0)[:200]))
+PYEOF
+PATCHED
+root@university-and-course-data:~/University-and-Course-data# 
