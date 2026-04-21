@@ -6895,8 +6895,10 @@ interface UniversityFeeCache {
 
 function shouldPreferSharedFeePdf(existingFee?: number, currency?: string | null, pdfUrl?: string): boolean {
   if (!pdfUrl) return false;
-  const lowerPdfUrl = pdfUrl.toLowerCase();
-  if (/\binternational\b/.test(lowerPdfUrl)) return true;
+  // Decode %20-style encoding before testing so "%20international%20student.pdf"
+  // still matches even though the raw "0i" sequence blocks the \b word boundary.
+  const testUrl = (() => { try { return decodeURIComponent(pdfUrl).toLowerCase(); } catch { return pdfUrl.toLowerCase(); } })();
+  if (/\binternational\b/.test(testUrl)) return true;
   if (!existingFee) return true;
   if (currency && currency !== "AUD") return true;
   return false;
@@ -6905,7 +6907,8 @@ function shouldPreferSharedFeePdf(existingFee?: number, currency?: string | null
 function shouldOverrideWithSharedFeePdf(existingFee: number | undefined, pdfFee: number, currency?: string | null, pdfUrl?: string): boolean {
   if (!existingFee) return true;
   if (currency && currency !== "AUD") return true;
-  if (pdfUrl && /\binternational\b/.test(pdfUrl.toLowerCase())) {
+  const testUrl = pdfUrl ? (() => { try { return decodeURIComponent(pdfUrl).toLowerCase(); } catch { return pdfUrl.toLowerCase(); } })() : "";
+  if (pdfUrl && /\binternational\b/.test(testUrl)) {
     return Math.abs(pdfFee - existingFee) / Math.max(pdfFee, existingFee) >= 0.05;
   }
   if (existingFee < 10000 && pdfFee > existingFee) return true;
@@ -7742,6 +7745,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // recovered values for one Bachelor (or one Master), reuse them on sibling
   // courses where vision misses — instead of leaving 5 of 9 cards blank.
   const englishByDegreeLevel = new Map<string, Partial<CourseData>>();
+  // Parallel map: the course-page URL where vision first found data for a given degreeLevel key.
+  // Used so sibling-cache reviewSources can point to a real page rather than the sibling's own URL.
+  const englishByDegreeLevelSourceUrl = new Map<string, string>();
   const degreeLevelKey = (degreeLevel?: string | null): string | null => {
     if (!degreeLevel) return null;
     const d = degreeLevel.toLowerCase();
@@ -8310,7 +8316,24 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                           if (next[k] == null && (visionMerged as any)[k] != null) next[k] = (visionMerged as any)[k];
                         }
                         englishByDegreeLevel.set(ck, next);
+                        // Store the source URL the first time vision finds data for this degree level
+                        if (!englishByDegreeLevelSourceUrl.has(ck)) englishByDegreeLevelSourceUrl.set(ck, link.url);
                       } catch {}
+                    }
+                    // Push a proper review source so the review engine finds evidence
+                    // (confidence 0.9 "course_page") instead of falling to "derived" (0.45).
+                    const vsl: string[] = [];
+                    if (cheerioData.ieltsOverall != null) vsl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
+                    if (cheerioData.pteOverall   != null) vsl.push(`PTE ${cheerioData.pteOverall}`);
+                    if (cheerioData.toeflOverall != null) vsl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+                    if ((cheerioData as any).cambridgeOverall != null) vsl.push(`Cambridge CAE ${(cheerioData as any).cambridgeOverall}`);
+                    if (vsl.length) {
+                      reviewSources.push({
+                        url: link.url,
+                        pageType: "course_page",
+                        extractionMethod: "ai",
+                        content: vsl.join("\n"),
+                      });
                     }
                     addLog(job, "status", {
                       message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
@@ -8327,6 +8350,23 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                         if (cached) {
                           mergeEnglishRequirements(cheerioData, cached);
                           siblingApplied = true;
+                          // Push a proper review source so the review engine treats these as
+                          // course_page evidence (0.9) rather than "derived" (0.45).
+                          const ssl: string[] = [];
+                          if (cheerioData.ieltsOverall != null) ssl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
+                          if (cheerioData.pteOverall   != null) ssl.push(`PTE ${cheerioData.pteOverall}`);
+                          if (cheerioData.toeflOverall != null) ssl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+                          if ((cheerioData as any).cambridgeOverall != null) ssl.push(`Cambridge CAE ${(cheerioData as any).cambridgeOverall}`);
+                          if (ssl.length) {
+                            // Use the original vision-source URL if available, fall back to current course URL
+                            const siblingSourceUrl = englishByDegreeLevelSourceUrl.get(ck) || link.url;
+                            reviewSources.push({
+                              url: siblingSourceUrl,
+                              pageType: "course_page",
+                              extractionMethod: "ai",
+                              content: ssl.join("\n"),
+                            });
+                          }
                           addLog(job, "status", {
                             message: `[per-course vision ↻ sibling cache ${dlk}] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
                             phase: "fallback",
