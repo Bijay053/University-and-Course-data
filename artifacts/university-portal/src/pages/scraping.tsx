@@ -783,6 +783,26 @@ export default function Scraping() {
     setRejectingIds([id]);
   };
 
+  const [clearingRejected, setClearingRejected] = useState(false);
+  const handleClearRejected = async () => {
+    if (!selectedUni || selectedUni === ALL) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    setClearingRejected(true);
+    try {
+      const res = await fetch(`/api/scrape/staged/clear-rejected/${uniId}`, { method: "POST" });
+      if (res.ok) {
+        const { deleted } = await res.json();
+        toast({ title: `Cleared ${deleted} rejected course(s)`, description: "You can now re-scrape and they will appear in staging again." });
+      } else {
+        toast({ title: "Failed to clear rejected courses", description: await getFetchErrorMessage(res), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to clear rejected courses", description: "Network error", variant: "destructive" });
+    }
+    setClearingRejected(false);
+  };
+
   const handleDedupPending = async () => {
     if (!selectedUni || selectedUni === ALL) return;
     const uniId = parseInt(selectedUni);
@@ -1452,6 +1472,32 @@ export default function Scraping() {
         </CardContent>
       </Card>
 
+      {showReview && stagedCourses.length === 0 && selectedUni && selectedUni !== ALL && (
+        <Card className="border border-amber-200 bg-amber-50">
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">No pending courses — scrape returned 0 results</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Previously rejected courses block re-staging for 30 days. Click <strong>Clear rejected</strong> to remove that block, then scrape again.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-purple-600 border-purple-200 hover:bg-purple-50 shrink-0"
+              onClick={handleClearRejected}
+              disabled={clearingRejected}
+            >
+              {clearingRejected ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />}
+              Clear rejected
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {showReview && stagedCourses.length > 0 && (
         <Card className="border-2 border-green-100">
           <CardHeader className="pb-3">
@@ -1471,6 +1517,19 @@ export default function Scraping() {
                     title="Remove duplicate courses from previous scrape runs — keeps the newest copy of each course name"
                   >
                     Remove duplicates
+                  </Button>
+                )}
+                {selectedUni && selectedUni !== ALL && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                    onClick={handleClearRejected}
+                    disabled={clearingRejected}
+                    title="Delete all rejected staged courses for this university so they can be re-staged on the next scrape"
+                  >
+                    {clearingRejected ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />}
+                    Clear rejected
                   </Button>
                 )}
                 <Button
