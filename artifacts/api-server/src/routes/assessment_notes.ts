@@ -105,6 +105,23 @@ Do NOT lose any information. Preserve ALL details exactly as stated in the sourc
 Text to parse:
 `;
 
+const CARD_ORDER: string[] = [
+  "acceptable banks",
+  "deadlines",
+  "under 18",
+  "sponsor",
+  "loan",
+  "scholarship",
+  "spouse",
+  "turnaround",
+  "other",
+];
+function cardSortIndex(title: string): number {
+  const t = (title ?? "").toLowerCase();
+  const idx = CARD_ORDER.findIndex(k => t.includes(k));
+  return idx === -1 ? 999 : idx;
+}
+
 async function parseWithGemini(rawText: string): Promise<unknown[]> {
   if (!GEMINI_API_KEY) return [];
   for (const model of GEMINI_MODELS) {
@@ -123,7 +140,9 @@ async function parseWithGemini(rawText: string): Promise<unknown[]> {
       const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
       const cards = JSON.parse(cleaned) as { title?: string }[];
-      return cards.map(card => ({ ...card, ...resolveIcon(card.title ?? "") }));
+      const enriched = cards.map(card => ({ ...card, ...resolveIcon(card.title ?? "") }));
+      enriched.sort((a, b) => cardSortIndex(a.title ?? "") - cardSortIndex(b.title ?? ""));
+      return enriched;
     } catch { continue; }
   }
   return [];
