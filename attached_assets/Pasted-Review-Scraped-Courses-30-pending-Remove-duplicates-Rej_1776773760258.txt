@@ -1,0 +1,304 @@
+Review Scraped Courses
+30 pending
+Remove duplicates
+Reject (30)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+GCITS-Graduate Certificate of Information Technology and Systems
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$9,000/Annual	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Master of Business Administration
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+GDBA - Graduate Diploma of Business Administration
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	1 Year	A$14,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Bachelor Of Business
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Diploma Of Business
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$12,000/Full Course	5.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Finance
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Leadership And Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Tourism And Hospitality Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems (BITS)
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$51,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Master of Information Technology and Systems
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+GDITS-Graduate Diploma of Information Technology and Systems
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	12 Month	A$18,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+GCBA - Graduate Certificate of Business Administration
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Graduate Certificate & Diploma	6 Month	A$7,000/Annual	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - International Business Management Specialisation
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - Tourism and Hospitality Management Specialisation
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - Accounting Specialisation
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - Human Resource Management Specialisation
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - Marketing Specialisation
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+BBus - Business Technology Specialisation
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Certificate III in Commercial Cookery
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, toeflOverall | Warnings: missing academic requirement
+95%	Certificate & Diploma	64 Week	A$12,169/Annual	5.5	42	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Certificate IV in Kitchen Management
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	100 Week	A$14,919/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Certificate III in Patisserie
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, toeflOverall | Warnings: missing academic requirement
+95%	Certificate & Diploma	52 Week	A$13,169/Annual	5.5	42	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne	On Campus	
+
+
+
+	
+Certificate IV in Patisserie
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	88 Week	A$15,919/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul	Melbourne	On Campus	
+
+
+
+	
+Diploma of Hospitality Management
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, toeflOverall | Warnings: missing academic requirement
+95%	Certificate & Diploma	88 Week	A$16,219/Annual	5.5	42	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Advanced Diploma of Hospitality Management
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	107 Week	A$17,219/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Certificate IV in Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	52 Week	A$12,000/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Diploma of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	66 Week	A$15,500/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Advanced Diploma of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	104 Week	A$28,000/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide	On Campus	
+
+
+
+	
+Certificate III in Carpentry
+Architecture, Building & Design
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	104 Week	A$24,000/Annual	5.5	-	-	-	-	Feb, Mar, May, Jun, Jul, Aug	Melbourne	On Campus
