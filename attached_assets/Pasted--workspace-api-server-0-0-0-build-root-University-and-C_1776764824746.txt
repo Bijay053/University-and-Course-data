@@ -1,0 +1,105 @@
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.1mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 577ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 6526     │ 0s     │ 4    │ online    │ 0%       │ 46.1mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+✅ Deployed
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+python3 << 'PATCH'
+path = "artifacts/api-server/src/routes/scrape.ts"
+with open(path, "r") as f:
+    src = f.read()
+
+old = '''async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData>> {
+  try {
+    const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(45_000) });
+    if (!resp.ok) return {};
+    const ct = resp.headers.get("content-type") || "";
+    if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return {};
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > 10 * 1024 * 1024) return {};
+
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
+    const pdfPath = path.join(tmpDir, "source.pdf");
+    const txtPath = path.join(tmpDir, "source.txt");
+    await writeFile(pdfPath, Buffer.from(buffer));
+    await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
+    const pdfText = await readFile(txtPath, "utf8");
+    await rm(tmpDir, { recursive: true, force: true });
+
+    const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
+    const courseData: Partial<CourseData> = {};
+    applyEnglishResultToCourse(courseData, parsed);
+    return courseData;
+  } catch {}
+  return {};
+}'''
+
+if old not in src:
+    print("Already patched or file differs — skipping")
+    exit(0)
+
+new = '''async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData>> {
+  try {
+    const resp = await fetch(pdfUrl, { signal: AbortSignal.timeout(45_000) });
+    if (!resp.ok) return {};
+    const ct = resp.headers.get("content-type") || "";
+    if (!ct.includes("pdf") && !pdfUrl.toLowerCase().includes(".pdf")) return {};
+
+    const buffer = await resp.arrayBuffer();
+  echo "Done — server restarted"pm2 save && \a && \|| cd3.toeflOverall) return cd3;(parsed3 as any).cambridgeOverall;geOverall":null,"duolingoOverall":null}`;FL iBT, 
+Already patched or file differs — skipping
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.1mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 624ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 7341     │ 0s     │ 5    │ online    │ 0%       │ 46.0mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+Done — server restarted
+root@university-and-course-data:~/University-and-Course-data# 
