@@ -1712,28 +1712,30 @@ export default function UniversityDetail() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Score Type</Label>
-                        <Select value={bAcadScoreType} onValueChange={(v) => { setBacadScoreType(v); if (!["GPA","CGPA"].includes(v)) setBacadOutOf(""); }}>
+                        <Select value={bAcadScoreType} onValueChange={(v) => { setBacadScoreType(v); if (v === "%" || !["GPA","CGPA"].includes(v)) setBacadOutOf(""); }}>
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {["%", "GPA", "CGPA", "WAM", "ATAR", "Other"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Out of <span className="text-gray-400 font-normal">(e.g. 4, 5, 7)</span></Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          step="0.5"
-                          value={bAcadOutOf}
-                          onChange={(e) => setBacadOutOf(e.target.value)}
-                          placeholder={["GPA","CGPA"].includes(bAcadScoreType) ? "e.g. 4" : "optional"}
-                          className="h-9"
-                        />
-                        {bAcadOutOf && (
-                          <p className="text-[10px] text-muted-foreground">Will save as: <strong>{bAcadScoreType}/{bAcadOutOf}</strong></p>
-                        )}
-                      </div>
+                      {bAcadScoreType !== "%" && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Out of <span className="text-gray-400 font-normal">(e.g. 4, 5, 7)</span></Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="0.5"
+                            value={bAcadOutOf}
+                            onChange={(e) => setBacadOutOf(e.target.value)}
+                            placeholder={["GPA","CGPA"].includes(bAcadScoreType) ? "e.g. 4" : "optional"}
+                            className="h-9"
+                          />
+                          {bAcadOutOf && (
+                            <p className="text-[10px] text-muted-foreground">Will save as: <strong>{bAcadScoreType}/{bAcadOutOf}</strong></p>
+                          )}
+                        </div>
+                      )}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Country</Label>
                         <Popover open={bAcadCountryOpen} onOpenChange={setBacadCountryOpen}>
