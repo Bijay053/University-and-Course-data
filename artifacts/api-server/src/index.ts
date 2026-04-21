@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startMonthlyScrapingScheduler } from "./services/monthly-scraping";
+import { startDailyBackupScheduler } from "./services/daily-backup";
 import { stopRunningRuntimeJobs, requeueStaleRuntimeJobs } from "./services/scrape-runtime-jobs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -82,6 +83,7 @@ app.listen(port, host, async (err) => {
     logger.warn({ count: stoppedJobs.length, runtimeJobIds: stoppedJobs }, "Stopped orphaned active scrape jobs on startup");
   }
   startMonthlyScrapingScheduler();
+  startDailyBackupScheduler();
   for (let i = 0; i < scrapeWorkerCount; i++) {
     startScrapeWorker();
   }
