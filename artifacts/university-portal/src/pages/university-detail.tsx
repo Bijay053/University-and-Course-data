@@ -14,7 +14,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw,
-  ChevronsUpDown, Check,
+  ChevronsUpDown, Check, AlertTriangle,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -322,6 +322,19 @@ export default function UniversityDetail() {
   const [bSchAmountType, setBSchAmountType] = useState<"fixed" | "percent">("fixed");
   const [bSchReplace, setBSchReplace] = useState(false);
 
+  // ── All academic requirements (one row per course × country) ──────────────
+  type AcadReqRow = {
+    id: number; courseId: number; courseName: string; degreeLevel: string | null;
+    academicLevel: string | null; academicScore: number | null;
+    scoreType: string | null; academicCountry: string | null;
+  };
+  const [allAcademicReqs, setAllAcademicReqs] = useState<AcadReqRow[]>([]);
+  const [acadReqsLoading, setAcadReqsLoading] = useState(false);
+
+  // ── Conflict warning from 409 duplicate check ─────────────────────────────
+  type ConflictItem = { courseId: number; courseName: string; country: string | null };
+  const [conflictWarning, setConflictWarning] = useState<ConflictItem[] | null>(null);
+
   const openBulk = (mode: BulkMode) => {
     setBulkMode(mode);
     setBulkSearch("");
@@ -482,8 +495,23 @@ export default function UniversityDetail() {
   const englishCourses = allCourses.filter(
     (c) => c.ieltsOverall || c.pteOverall || c.toeflOverall || c.ieltsListening || c.pteListening || c.toeflListening,
   );
-  const academicCourses = allCourses.filter((c) => c.academicLevel || c.academicScore || c.academicCountry);
   const scholarshipCourses = allCourses.filter((c) => c.scholarshipDetails);
+
+  // Load all academic requirements whenever academic tab is opened or after bulk save
+  const loadAcademicReqs = useCallback(async () => {
+    if (!id) return;
+    setAcadReqsLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/academic-requirements`);
+      if (res.ok) setAllAcademicReqs(await res.json());
+    } finally {
+      setAcadReqsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (tab === "academic") loadAcademicReqs();
+  }, [tab, loadAcademicReqs]);
 
   function clearFilters() {
     setSearch(""); setCategory(ALL); setSubCategory(ALL); setDegreeLevel(ALL); setStudyMode(ALL); setPage(1);
@@ -671,12 +699,24 @@ export default function UniversityDetail() {
         body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: schCurrency, replaceExisting: bSchReplace };
       }
       const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+      // Duplicate-country conflict — show warning dialog, do NOT save
+      if (res.status === 409 && bulkMode === "academic") {
+        const json = await res.json() as { error: string; conflicts: ConflictItem[] };
+        setConflictWarning(json.conflicts);
+        return;
+      }
+
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json() as { updated: number };
-      toast({ title: "Bulk update applied", description: `Updated ${data.updated} course${data.updated !== 1 ? "s" : ""}` });
+      toast({ title: "Bulk update applied", description: `${data.updated} requirement${data.updated !== 1 ? "s" : ""} added` });
       setBulkMode(null);
-      // Refresh course data
-      setTimeout(() => window.location.reload(), 500);
+      // Refresh data
+      if (bulkMode === "academic") {
+        await loadAcademicReqs();
+      } else {
+        setTimeout(() => window.location.reload(), 500);
+      }
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
     } finally {
@@ -1035,9 +1075,19 @@ export default function UniversityDetail() {
       {tab === "academic" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{academicCourses.length} course{academicCourses.length !== 1 ? "s" : ""} with academic requirements</p>
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {acadReqsLoading ? "Loading…" : (
+                  <>
+                    <strong>{allAcademicReqs.length}</strong> requirement{allAcademicReqs.length !== 1 ? "s" : ""} across{" "}
+                    <strong>{new Set(allAcademicReqs.map((r) => r.courseId)).size}</strong> course{new Set(allAcademicReqs.map((r) => r.courseId)).size !== 1 ? "s" : ""}
+                  </>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Each country shows as a separate row. Same course + same country cannot be added twice.</p>
+            </div>
             <Button size="sm" variant="outline" onClick={() => openBulk("academic")} className="gap-1.5 text-cyan-700 border-cyan-200 hover:bg-cyan-50">
-              <Pencil className="w-3.5 h-3.5" /> Bulk Edit Academic
+              <Pencil className="w-3.5 h-3.5" /> Bulk Add Academic
             </Button>
           </div>
           <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
@@ -1050,30 +1100,34 @@ export default function UniversityDetail() {
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[80px]">Score</th>
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[90px]">Score Type</th>
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[120px]">Country</th>
-                  <th className="text-left px-3 py-3 font-semibold text-gray-600 min-w-[200px]">Other Requirement</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {academicCourses.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
-                ) : academicCourses.map((c) => (
-                  <tr key={c.id} className="hover:bg-blue-50/30">
+                {acadReqsLoading ? (
+                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">Loading requirements…</td></tr>
+                ) : allAcademicReqs.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
+                ) : allAcademicReqs.map((r) => (
+                  <tr key={r.id} className="hover:bg-blue-50/30">
                     <td className="px-4 py-2.5 font-medium text-blue-700">
-                      <span className="hover:underline">{c.name}</span>
+                      <span>{r.courseName}</span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {c.degreeLevel ? (
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${DEGREE_COLORS[c.degreeLevel] ?? "bg-gray-100 text-gray-600"}`}>
-                          {c.degreeLevel}
+                      {r.degreeLevel ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${DEGREE_COLORS[r.degreeLevel] ?? "bg-gray-100 text-gray-600"}`}>
+                          {r.degreeLevel}
                         </span>
                       ) : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-cyan-700">{txt(c.academicLevel)}</td>
-                    <td className="px-3 py-2.5 text-cyan-700 font-semibold">{num(c.academicScore)}</td>
-                    <td className="px-3 py-2.5 text-cyan-600">{txt(c.scoreType)}</td>
-                    <td className="px-3 py-2.5 text-cyan-600">{txt(c.academicCountry)}</td>
-                    <td className="px-3 py-2.5 text-gray-500 max-w-[200px]">
-                      <span className="line-clamp-2">{txt(c.otherRequirement)}</span>
+                    <td className="px-3 py-2.5 text-cyan-700">{txt(r.academicLevel)}</td>
+                    <td className="px-3 py-2.5 text-cyan-700 font-semibold">{r.academicScore != null ? String(r.academicScore) : "—"}</td>
+                    <td className="px-3 py-2.5 text-cyan-600">{txt(r.scoreType)}</td>
+                    <td className="px-3 py-2.5">
+                      {r.academicCountry ? (
+                        <span className="inline-flex items-center bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs px-2 py-0.5 rounded-full">
+                          {r.academicCountry}
+                        </span>
+                      ) : <span className="text-gray-400">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -1397,6 +1451,49 @@ export default function UniversityDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Duplicate Country Conflict Warning ── */}
+      {conflictWarning && (
+        <Dialog open onOpenChange={() => setConflictWarning(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="w-5 h-5" /> Duplicate Requirements Detected
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              The following course + country combinations already have a requirement.
+              <strong className="text-foreground"> Nothing was saved.</strong> Please remove these
+              countries from your selection or choose different courses.
+            </p>
+            <div className="border rounded-lg overflow-hidden mt-1">
+              <table className="w-full text-sm">
+                <thead className="bg-amber-50 border-b">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-amber-800">Course</th>
+                    <th className="text-left px-3 py-2 font-semibold text-amber-800">Country</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {conflictWarning.map((c, i) => (
+                    <tr key={i} className="bg-white">
+                      <td className="px-3 py-2 text-gray-800 max-w-[220px] truncate">{c.courseName}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center bg-amber-50 border border-amber-200 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                          {c.country ?? "No country"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <DialogFooter className="mt-2">
+              <Button onClick={() => setConflictWarning(null)} className="cursor-pointer">OK, go back</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* ── Confirm Delete Dialog ── */}
