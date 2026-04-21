@@ -32,20 +32,17 @@ function resolveIcon(title: string) {
 }
 
 // ── Gemini parser ────────────────────────────────────────────────────────────
-const PROMPT = `You are an expert at converting student visa assessment notes into structured JSON cards.
+const PROMPT = `You are converting student visa assessment notes into structured JSON cards. Return ONLY valid JSON, no markdown.
 
-Parse the following text into an array of cards. Group content into these sections (use whichever apply):
-"Acceptable banks", "Under 18 / relatives", "Sponsors", "Loan assessment", "Scholarship", "Spouse / dependent", "Turnaround times", "Other requirements".
+Group content into cards using these titles (use whichever apply):
+"Acceptable banks", "Under 18 / relatives", "Sponsors", "Loan assessment", "Scholarship", "Spouse / dependent", "Turnaround times", "Other requirements"
 
-Return ONLY valid JSON — no markdown, no explanation:
+JSON structure:
 [
   {
     "title": "Card title",
     "fields": [
-      { "label": "Field label", "value": "Full value text here", "badge": null },
-      { "label": "Under 18 allowed", "value": "Yes", "badge": "yes" },
-      { "label": "Visa refusal accepted", "value": "No", "badge": "no" },
-      { "label": "Interview required", "value": "Case by case", "badge": "case" }
+      { "label": "Field label", "value": "Complete value text", "badge": null }
     ],
     "sections": [
       { "label": "Sub-section heading", "fields": [{ "label": "Label", "value": "Value", "badge": null }] }
@@ -53,22 +50,46 @@ Return ONLY valid JSON — no markdown, no explanation:
   }
 ]
 
-BADGE RULES — badge is determined ONLY by the VALUE text, never by the label:
-- badge "yes"  → value is exactly or essentially: Yes / Allowed / Accepted / OK / Required / Mandatory / Applicable
-- badge "no"   → value is exactly or essentially: No / Not allowed / Not accepted / Not applicable / Not required
-- badge "case" → value is exactly or essentially: Case by case / Conditional / Depends / Discretionary
-- badge null   → EVERYTHING ELSE — any value that is a name, number, list, sentence, amount, bank name, or longer phrase MUST use badge: null and preserve the full text as value
+══ BADGE RULES (READ CAREFULLY) ══
 
-CRITICAL: If the value contains bank names, a list of items, an amount, a percentage, or any descriptive text longer than 3 words — badge MUST be null and the full text MUST appear in "value". NEVER discard content.
+badge is set on the VALUE only — the label text has zero influence on badge.
 
-EXAMPLES OF CORRECT badge: null:
-- label: "Excluded banks", value: "Laxmi Sunrise Bank, Kumari Bank, Prabu Bank, Prime Bank", badge: null
-- label: "Accepted banks", value: "All banks except Laxmi Sunrise, Kumari, Prabu, Prime", badge: null
-- label: "Min income", value: "AUD 30,000 per year", badge: null
-- label: "Bank statement", value: "Last 1 year", badge: null
+badge "yes"  — ONLY when value is literally just one of: Yes / Allowed / Accepted / OK
+badge "no"   — ONLY when value is literally just one of: No / Not allowed / Not accepted / Not applicable
+badge "case" — ONLY when value is literally just one of: Case by case / Depends
+badge null   — FOR EVERYTHING ELSE (default — when in doubt, always use null)
 
-sections array may be empty [].
-Preserve ALL details from the source text. Do NOT lose any information.
+══ THE MOST IMPORTANT RULE ══
+If the value contains ANY of the following, badge MUST be null and the FULL text must be in "value":
+• A number or currency amount (e.g. AUD 21,000, 1 year, 40%)
+• A bank name or list of names
+• A conditional explanation (e.g. "accepted if age below 60, not accepted if 60 or above")
+• The word "required", "needed", "mandatory", "necessary", "conditional", "considered"
+• Any sentence longer than 2 words
+
+══ EXAMPLES OF WRONG vs CORRECT ══
+
+WRONG: { "label": "Required Annual Income", "value": "Yes", "badge": "yes" }
+RIGHT: { "label": "Required Annual Income", "value": "AUD 21,000 per year", "badge": null }
+
+WRONG: { "label": "Marriage Duration", "value": "Yes", "badge": "yes" }
+RIGHT: { "label": "Marriage Duration", "value": "Minimum 1 year old marriage", "badge": null }
+
+WRONG: { "label": "Pension Income", "value": "Case by case", "badge": "case" }
+RIGHT: { "label": "Pension Income", "value": "Not accepted if age 60+; can be considered if below 60", "badge": null }
+
+WRONG: { "label": "Excluded Banks", "value": "No", "badge": "no" }
+RIGHT: { "label": "Excluded Banks", "value": "Laxmi Sunrise Bank, Kumari Bank, Prabu Bank, Prime Bank", "badge": null }
+
+WRONG: { "label": "Income Requirement", "value": "Yes", "badge": "yes" }
+RIGHT: { "label": "Income Requirement", "value": "AUD 30,000 per year for single or with dependent", "badge": null }
+
+CORRECT badge usage (pure boolean answers only):
+{ "label": "Under 18 allowed", "value": "No", "badge": "no" }
+{ "label": "Real siblings in Australia", "value": "Yes", "badge": "yes" }
+{ "label": "CAAW from provider", "value": "Yes", "badge": "yes" }
+
+Do NOT lose any information. Preserve ALL details exactly as stated in the source text.
 
 Text to parse:
 `;
