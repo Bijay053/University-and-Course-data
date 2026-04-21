@@ -1,0 +1,83 @@
+ Use `pm2 logs api-server [--lines 1000]` to display logs
+ Use `pm2 env 0` to display environment variables
+ Use `pm2 monit` to monitor CPU and Memory usage api-server
+[PM2] Applying action stopProcessId on app [api-server](ids: [ 0 ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Starting /root/University-and-Course-data/artifacts/api-server/dist/index.mjs in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+│ 2  │ api-server         │ fork     │ 0    │ online    │ 0%       │ 19.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+root@university-and-course-data:~/University-and-Course-data# pm2 status
+curl http://159.65.152.72/api/universities | head -c 300
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+│ 2  │ api-server         │ fork     │ 0    │ online    │ 0%       │ 268.2mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   580  100   580    0     0  19465      0 --:--:-- --:--:-- --:--:-- 20000
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>error: password authentication failed for user &quot;user&quot;<br> &nbsp; &nbsp;at file:///root/University-root@university-and-course-data:~/University-and-Course-data# # Step 1: Get the real DATABASE_URL from the old process environmentty-and-Course-data# # Step 1: Get the real DATABASE_URL from the old process environment
+pm2 env 0 | grep DATABASE_URL
+DATABASE_URL: postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal
+root@university-and-course-data:~/University-and-Course-data# # Update .env with the correct database URL
+sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal|' /root/University-and-Course-data/.env
+
+# Reload env and restart the new api-server
+export DATABASE_URL="postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal"
+pm2 restart 2 --update-env
+
+# Delete the old stopped process (id 0)
+pm2 delete 0
+pm2 save
+
+# Verify
+sleep 3
+pm2 status
+curl http://159.65.152.72/api/universities | head -c 300
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 38   │ stopped   │ 0%       │ 0b       │
+│ 2  │ api-server         │ fork     │ 1    │ online    │ 0%       │ 18.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Applying action deleteProcessId on app [0](ids: [ '0' ])
+[PM2] [api-server](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 1    │ online    │ 100%     │ 82.7mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 1    │ online    │ 0%       │ 285.3mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0{"data":[{"id":4,"name":"Charles Sturt university","country":"Unknown","city":"Unknown","website":null,"description":null,"logo_url":null,"scrape_url":"https://study.csu.edu.au/","scrape_config":{"uniPages":{"feePage":"https://study.csu.edu.au/fees","requiremen  0  111k    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+curl: (23) Failure writing output to destination
+root@university-and-course-data:~/University-and-Course-data# 
