@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useListUniversities, useCreateUniversity, getListUniversitiesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, MapPin, Globe, ArrowRight, Building2 } from "lucide-react";
+import { Plus, Search, Globe, ArrowRight, Building2, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,7 +32,12 @@ const COUNTRY_FLAGS: Record<string, string> = {
 export default function Universities() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteName, setDeleteName] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data, isLoading } = useListUniversities({ search: search || undefined });
   const createUniversity = useCreateUniversity();
@@ -47,6 +55,22 @@ export default function Universities() {
         form.reset();
       },
     });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "University deleted" });
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: getListUniversitiesQueryKey() });
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const universities = data?.data ?? [];
@@ -201,7 +225,14 @@ export default function Universities() {
                     </div>
 
                     {/* Action */}
-                    <div className="flex justify-end">
+                    <div className="flex justify-end items-center gap-2">
+                      <button
+                        onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
+                        className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer"
+                        title="Delete university"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                       <Link href={`/universities/${uni.id}`}>
                         <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-600 group-hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg px-3 py-1.5 transition-all cursor-pointer">
                           View
@@ -222,6 +253,25 @@ export default function Universities() {
           </>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete University</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <span className="font-semibold text-foreground">{deleteName}</span>?
+            This will permanently remove the university and all its associated courses, scholarships, and requirements.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
