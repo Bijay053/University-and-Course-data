@@ -364,8 +364,7 @@ export default function UniversityDetail() {
   }, []);
 
   useEffect(() => {
-    if (tab !== "courses") return;
-    // Poll until the table ref is set (data may load async)
+    // Poll until the active tab's table ref is set (data may load async)
     let cleanupCalled = false;
     let removeListeners: (() => void) | null = null;
     const attach = () => {
@@ -904,57 +903,6 @@ export default function UniversityDetail() {
             </table>
           </div>
 
-          {/* Mini Trello-style horizontal scroll indicator */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-            <div
-              ref={miniScrollbarRef}
-              onClick={handleTrackClick}
-              style={{
-                position: "relative",
-                width: 122,
-                height: 42,
-                borderRadius: 8,
-                background: "#f7f7f8",
-                border: "1px solid #e3e5e8",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
-                overflow: "hidden",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-              aria-label="Drag to scroll table horizontally"
-            >
-              {/* Track background stripes */}
-              <div style={{ position: "absolute", inset: 0, display: "flex", gap: 4, padding: 6, pointerEvents: "none" }}>
-                {[0,1,2,3,4,5].map((i) => (
-                  <div key={i} style={{ flex: 1, background: "#e7e7e8", borderRadius: 3, opacity: 0.9 }} />
-                ))}
-              </div>
-              {/* Draggable thumb */}
-              <div
-                onMouseDown={handleThumbMouseDown}
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: thumbLeft,
-                  height: "calc(100% - 4px)",
-                  width: thumbWidth,
-                  borderRadius: 6,
-                  background: "rgba(255,255,255,0.3)",
-                  border: "2px solid #4e73b8",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6)",
-                  overflow: "hidden",
-                  cursor: "grab",
-                }}
-              >
-                <div style={{ display: "flex", gap: 4, height: "100%", padding: 4 }}>
-                  {[0,1,2,3].map((i) => (
-                    <div key={i} style={{ flex: 1, background: "#dcdcdc", borderRadius: 2 }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-1">
               <p className="text-sm text-muted-foreground">
@@ -983,7 +931,7 @@ export default function UniversityDetail() {
               <Pencil className="w-3.5 h-3.5" /> Bulk Edit English
             </Button>
           </div>
-          <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+          <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
@@ -1072,7 +1020,7 @@ export default function UniversityDetail() {
               <Pencil className="w-3.5 h-3.5" /> Bulk Edit Academic
             </Button>
           </div>
-          <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+          <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-sm border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                 <tr>
@@ -1238,7 +1186,7 @@ export default function UniversityDetail() {
               <p className="text-xs mt-1">Run a scrape job for this university to populate raw data.</p>
             </div>
           ) : (
-            <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
+            <div ref={tableScrollRef} className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
               <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 2400 }}>
                 <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
@@ -1375,6 +1323,57 @@ export default function UniversityDetail() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}
+      {tab !== "scholarships" && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+          <div
+            ref={miniScrollbarRef}
+            onClick={handleTrackClick}
+            style={{
+              position: "relative",
+              width: 122,
+              height: 42,
+              borderRadius: 8,
+              background: "#f7f7f8",
+              border: "1px solid #e3e5e8",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
+              overflow: "hidden",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+            aria-label="Drag to scroll table horizontally"
+          >
+            <div style={{ position: "absolute", inset: 0, display: "flex", gap: 4, padding: 6, pointerEvents: "none" }}>
+              {[0,1,2,3,4,5].map((i) => (
+                <div key={i} style={{ flex: 1, background: "#e7e7e8", borderRadius: 3, opacity: 0.9 }} />
+              ))}
+            </div>
+            <div
+              onMouseDown={handleThumbMouseDown}
+              style={{
+                position: "absolute",
+                top: 2,
+                left: thumbLeft,
+                height: "calc(100% - 4px)",
+                width: thumbWidth,
+                borderRadius: 6,
+                background: "rgba(255,255,255,0.3)",
+                border: "2px solid #4e73b8",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6)",
+                overflow: "hidden",
+                cursor: "grab",
+              }}
+            >
+              <div style={{ display: "flex", gap: 4, height: "100%", padding: 4 }}>
+                {[0,1,2,3].map((i) => (
+                  <div key={i} style={{ flex: 1, background: "#dcdcdc", borderRadius: 2 }} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
