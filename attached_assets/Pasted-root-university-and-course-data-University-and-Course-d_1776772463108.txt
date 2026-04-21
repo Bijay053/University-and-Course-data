@@ -1,0 +1,57 @@
+root@university-and-course-data:~/University-and-Course-data# psql "$DATABASE_URL" <<'SQL'
+CREATE TABLE IF NOT EXISTS courses_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, university_id integer, name text, category text, sub_category text,
+  course_website text, course_location text, duration text, duration_term text, study_mode text,
+  degree_level text, study_load text, language text, description text, course_structure text,
+  career_outcomes text, other_test text, other_test_score text, other_requirement text,
+  student_market text, delivery_mode text, international_eligible boolean, on_campus_available boolean,
+  eligibility_status text, eligibility_reason text, eligibility_confidence text,
+  approval_status text, approval_score numeric, approved_at timestamptz, last_reviewed_at timestamptz,
+  status text, created_at timestamptz, updated_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS fees_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, course_id integer, international_fee numeric, fee_term text, fee_year integer, currency text, created_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS intakes_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, course_id integer, intake_month integer, intake_day integer, intake_year integer, is_open boolean, created_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS english_requirements_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, course_id integer, test_type text, listening numeric, speaking numeric, writing numeric, reading numeric, overall numeric, test_name text, created_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS academic_requirements_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, course_id integer, academic_level text, academic_score text, score_type text, academic_country text, created_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS scholarships_backup (
+  backed_up_at timestamptz NOT NULL DEFAULT now(),
+  id integer, course_id integer, name text, details text, eligibility_criteria text, amount numeric, currency text, created_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_courses_backup_uni ON courses_backup(university_id);
+CREATE INDEX IF NOT EXISTS idx_courses_backup_date ON courses_backup(backed_up_at);
+SQL
+echo "--- Trigger backup ---"
+curl -X POST "http://localhost/api/backup/run" -H "Content-Type: application/json" -d '{}'
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+--- Trigger backup ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot POST /api/backup/run</pre>
+</body>
+</html>
+root@university-and-course-data:~/University-and-Course-data# 
