@@ -34,7 +34,7 @@ function resolveIcon(title: string) {
 // ── Gemini parser ────────────────────────────────────────────────────────────
 const PROMPT = `You are an expert at converting student visa assessment notes into structured JSON cards.
 
-Parse the following text into an array of cards. Group content into logical sections:
+Parse the following text into an array of cards. Group content into these sections (use whichever apply):
 "Acceptable banks", "Under 18 / relatives", "Sponsors", "Loan assessment", "Scholarship", "Spouse / dependent", "Turnaround times", "Other requirements".
 
 Return ONLY valid JSON — no markdown, no explanation:
@@ -42,10 +42,10 @@ Return ONLY valid JSON — no markdown, no explanation:
   {
     "title": "Card title",
     "fields": [
-      { "label": "Field label", "value": "Value text", "badge": null },
-      { "label": "Accepted", "value": "Yes", "badge": "yes" },
-      { "label": "Excluded", "value": "No", "badge": "no" },
-      { "label": "Status", "value": "Case by case", "badge": "case" }
+      { "label": "Field label", "value": "Full value text here", "badge": null },
+      { "label": "Under 18 allowed", "value": "Yes", "badge": "yes" },
+      { "label": "Visa refusal accepted", "value": "No", "badge": "no" },
+      { "label": "Interview required", "value": "Case by case", "badge": "case" }
     ],
     "sections": [
       { "label": "Sub-section heading", "fields": [{ "label": "Label", "value": "Value", "badge": null }] }
@@ -53,11 +53,19 @@ Return ONLY valid JSON — no markdown, no explanation:
   }
 ]
 
-badge rules:
-- "yes"  → Yes / Accepted / Allowed / OK / Required
-- "no"   → No / Not accepted / Excluded / Not allowed / Not acceptable / Not applicable
-- "case" → Case by case / Conditional / Depends / Discretionary / Considered
-- null   → everything else (plain text value)
+BADGE RULES — badge is determined ONLY by the VALUE text, never by the label:
+- badge "yes"  → value is exactly or essentially: Yes / Allowed / Accepted / OK / Required / Mandatory / Applicable
+- badge "no"   → value is exactly or essentially: No / Not allowed / Not accepted / Not applicable / Not required
+- badge "case" → value is exactly or essentially: Case by case / Conditional / Depends / Discretionary
+- badge null   → EVERYTHING ELSE — any value that is a name, number, list, sentence, amount, bank name, or longer phrase MUST use badge: null and preserve the full text as value
+
+CRITICAL: If the value contains bank names, a list of items, an amount, a percentage, or any descriptive text longer than 3 words — badge MUST be null and the full text MUST appear in "value". NEVER discard content.
+
+EXAMPLES OF CORRECT badge: null:
+- label: "Excluded banks", value: "Laxmi Sunrise Bank, Kumari Bank, Prabu Bank, Prime Bank", badge: null
+- label: "Accepted banks", value: "All banks except Laxmi Sunrise, Kumari, Prabu, Prime", badge: null
+- label: "Min income", value: "AUD 30,000 per year", badge: null
+- label: "Bank statement", value: "Last 1 year", badge: null
 
 sections array may be empty [].
 Preserve ALL details from the source text. Do NOT lose any information.
