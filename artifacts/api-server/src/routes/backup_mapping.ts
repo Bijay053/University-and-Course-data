@@ -46,27 +46,40 @@ router.get("/scrape/staged/:id/backup-match", async (req, res) => {
     const courseBack = matchRes.rows[0] as Record<string, unknown>;
     const backedCourseId = courseBack.id as number;
 
-    // 3. Load related backup tables for this course
-    const [feesRes, intakesRes, englishRes, academicRes, schRes] = await Promise.all([
+    // 3. Load related backup tables — deduplicate each by logical key, newest snapshot wins
+    const [feesRes, intakesRes, englishRes, academicRes, schRes, stagFullRes] = await Promise.all([
       client.query(
         `SELECT * FROM fees_backup WHERE course_id = $1 ORDER BY backed_up_at DESC LIMIT 1`,
         [backedCourseId]
       ),
+      // One row per unique intake_month
       client.query(
-        `SELECT * FROM intakes_backup WHERE course_id = $1 ORDER BY backed_up_at DESC`,
+        `SELECT DISTINCT ON (intake_month) * FROM intakes_backup
+         WHERE course_id = $1 ORDER BY intake_month, backed_up_at DESC`,
         [backedCourseId]
       ),
+      // One row per unique test_type (IELTS/PTE/TOEFL etc)
       client.query(
-        `SELECT * FROM english_requirements_backup WHERE course_id = $1 ORDER BY backed_up_at DESC`,
+        `SELECT DISTINCT ON (LOWER(test_type)) * FROM english_requirements_backup
+         WHERE course_id = $1 ORDER BY LOWER(test_type), backed_up_at DESC`,
         [backedCourseId]
       ),
+      // One row per unique country
       client.query(
-        `SELECT * FROM academic_requirements_backup WHERE course_id = $1 ORDER BY backed_up_at DESC`,
+        `SELECT DISTINCT ON (COALESCE(academic_country,'__ANY__')) * FROM academic_requirements_backup
+         WHERE course_id = $1 ORDER BY COALESCE(academic_country,'__ANY__'), backed_up_at DESC`,
         [backedCourseId]
       ),
+      // One row per scholarship name
       client.query(
-        `SELECT * FROM scholarships_backup WHERE course_id = $1 ORDER BY backed_up_at DESC`,
+        `SELECT DISTINCT ON (COALESCE(name,'__UNNAMED__')) * FROM scholarships_backup
+         WHERE course_id = $1 ORDER BY COALESCE(name,'__UNNAMED__'), backed_up_at DESC`,
         [backedCourseId]
+      ),
+      // Also return the full staged course so the UI can do side-by-side comparison
+      client.query(
+        `SELECT * FROM scraped_courses WHERE id = $1`,
+        [id]
       ),
     ]);
 
@@ -75,6 +88,7 @@ router.get("/scrape/staged/:id/backup-match", async (req, res) => {
       stagedCourseId: id,
       stagedCourseName: stag.course_name,
       backedUpAt: courseBack.backed_up_at,
+      stagedCourse: stagFullRes.rows[0] ?? null,
       course: courseBack,
       fees: feesRes.rows[0] ?? null,
       intakes: intakesRes.rows,

@@ -280,20 +280,38 @@ function FldInput({ label, value, onChange, type = "text" }: {
   );
 }
 
-function BkSection({ title, children }: { title: string; children: React.ReactNode }) {
+// ── Backup map comparison helpers ────────────────────────────────────────────
+function CmpSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
-      <div className="rounded-lg border bg-white divide-y">{children}</div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1 mb-1">{title}</p>
+      <div className="rounded-lg border bg-white overflow-hidden divide-y text-xs">{children}</div>
     </div>
   );
 }
-function BkRow({ label, val }: { label: string; val: unknown }) {
-  const display = val == null || val === "" ? <span className="text-muted-foreground italic">—</span> : <span className="font-medium text-gray-800">{String(val)}</span>;
+function CmpRow({ label, raw, bak }: { label: string; raw: unknown; bak: unknown }) {
+  const rawStr = raw == null || raw === "" ? null : String(raw);
+  const bakStr = bak == null || bak === "" ? null : String(bak);
+  const isEmpty = !rawStr && !bakStr;
+  const isNew   = !rawStr && !!bakStr;
+  const isSame  = rawStr && bakStr && rawStr === bakStr;
+  const isDiff  = rawStr && bakStr && rawStr !== bakStr;
+  const rowCls  = isNew  ? "bg-green-50/70" :
+                  isDiff ? "bg-amber-50/70" :
+                  isEmpty? "opacity-40"    : "";
+  const bakCls  = isNew  ? "text-green-700 font-semibold" :
+                  isDiff ? "text-amber-700 font-semibold" : "text-gray-700";
+  const fmtVal  = (v: string | null) => v
+    ? <span>{v}</span>
+    : <span className="text-muted-foreground italic">—</span>;
   return (
-    <div className="flex items-center justify-between px-3 py-1.5 text-xs">
-      <span className="text-gray-500 shrink-0 mr-3">{label}</span>
-      {display}
+    <div className={`grid grid-cols-[160px_1fr_1fr] gap-2 px-3 py-1.5 items-start ${rowCls}`}>
+      <span className="text-gray-500 shrink-0 truncate">{label}</span>
+      <span className={isSame ? "text-gray-600" : "text-gray-600"}>{fmtVal(rawStr)}</span>
+      <span className={bakCls}>{fmtVal(bakStr)}
+        {isNew  && <span className="ml-1.5 text-[9px] bg-green-100 text-green-700 rounded px-1 py-0.5 font-bold uppercase tracking-wide">new</span>}
+        {isDiff && <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-700 rounded px-1 py-0.5 font-bold uppercase tracking-wide">diff</span>}
+      </span>
     </div>
   );
 }
@@ -578,6 +596,7 @@ export default function UniversityDetail() {
     stagedCourseId: number;
     stagedCourseName: string;
     backedUpAt?: string;
+    stagedCourse?: Record<string, unknown> | null;
     course?: Record<string, unknown>;
     fees?: Record<string, unknown> | null;
     intakes?: Record<string, unknown>[];
@@ -1667,80 +1686,109 @@ export default function UniversityDetail() {
             </div>
           )}
 
-          {!backupMapLoading && backupMapData?.matched && (
-            <div className="space-y-4 py-1">
-              {backupMapData.backedUpAt && (
-                <p className="text-xs text-muted-foreground">
-                  Backup snapshot taken: <span className="font-medium text-gray-600">{new Date(backupMapData.backedUpAt).toLocaleString()}</span>
-                </p>
-              )}
+          {!backupMapLoading && backupMapData?.matched && (() => {
+            const sc = backupMapData.stagedCourse ?? {};
+            const cb = backupMapData.course ?? {};
+            const fb = backupMapData.fees ?? {};
+            const intakes = (backupMapData.intakes ?? []) as Record<string, unknown>[];
+            const english = (backupMapData.english ?? []) as Record<string, unknown>[];
+            const academic = (backupMapData.academic ?? []) as Record<string, unknown>[];
+            const scholarships = (backupMapData.scholarships ?? []) as Record<string, unknown>[];
 
-              {/* Course core fields */}
-              {backupMapData.course && (
-                <BkSection title="Course Details">
-                  <BkRow label="Duration" val={[backupMapData.course.duration, backupMapData.course.duration_term].filter(Boolean).join(" ")} />
-                  <BkRow label="Study Mode" val={backupMapData.course.study_mode} />
-                  <BkRow label="Course Location" val={backupMapData.course.course_location} />
-                </BkSection>
-              )}
+            const rawFee = sc.international_fee != null
+              ? `${sc.currency ?? ""} ${Number(sc.international_fee).toLocaleString()} / ${sc.fee_term ?? ""} (${sc.fee_year ?? ""})`.trim()
+              : null;
+            const bakFee = (fb as Record<string, unknown>).international_fee != null
+              ? `${(fb as Record<string, unknown>).currency ?? ""} ${Number((fb as Record<string, unknown>).international_fee).toLocaleString()} / ${(fb as Record<string, unknown>).fee_term ?? ""} (${(fb as Record<string, unknown>).fee_year ?? ""})`.trim()
+              : null;
 
-              {/* Fees */}
-              {backupMapData.fees && (
-                <BkSection title="Fees">
-                  <BkRow label="International Fee" val={backupMapData.fees.international_fee != null ? `${backupMapData.fees.currency ?? ""} ${Number(backupMapData.fees.international_fee).toLocaleString()} / ${backupMapData.fees.fee_term ?? ""} (${backupMapData.fees.fee_year ?? ""})`.trim() : null} />
-                </BkSection>
-              )}
+            const rawIntakes = Array.isArray(sc.intake_months) ? (sc.intake_months as string[]).join(", ") : null;
+            const bakIntakes = intakes.length > 0 ? [...new Set(intakes.map(r => r.intake_month as string))].join(", ") : null;
 
-              {/* Intakes */}
-              {backupMapData.intakes && backupMapData.intakes.length > 0 && (
-                <BkSection title="Intakes">
-                  <BkRow label="Intake Months" val={(backupMapData.intakes as Record<string, unknown>[]).map((r) => r.intake_month as string).join(", ")} />
-                </BkSection>
-              )}
+            const rawEng = (testKey: string) => {
+              const k = testKey.toLowerCase();
+              const o = k === "ielts" ? sc.ielts_overall   : k === "pte" ? sc.pte_overall   : k === "toefl" ? sc.toefl_overall   : null;
+              const l = k === "ielts" ? sc.ielts_listening : k === "pte" ? sc.pte_listening : k === "toefl" ? sc.toefl_listening : null;
+              const s = k === "ielts" ? sc.ielts_speaking  : k === "pte" ? sc.pte_speaking  : k === "toefl" ? sc.toefl_speaking  : null;
+              const w = k === "ielts" ? sc.ielts_writing   : k === "pte" ? sc.pte_writing   : k === "toefl" ? sc.toefl_writing   : null;
+              const r = k === "ielts" ? sc.ielts_reading   : k === "pte" ? sc.pte_reading   : k === "toefl" ? sc.toefl_reading   : null;
+              return [o != null && `O:${o}`, l != null && `L:${l}`, s != null && `S:${s}`, w != null && `W:${w}`, r != null && `R:${r}`].filter(Boolean).join(" ") || null;
+            };
+            const bakEng = (er: Record<string, unknown>) =>
+              [er.overall != null && `O:${er.overall}`, er.listening != null && `L:${er.listening}`, er.speaking != null && `S:${er.speaking}`, er.writing != null && `W:${er.writing}`, er.reading != null && `R:${er.reading}`].filter(Boolean).join(" ") || null;
 
-              {/* English Requirements */}
-              {backupMapData.english && backupMapData.english.length > 0 && (
-                <BkSection title="English Requirements">
-                  {(backupMapData.english as Record<string, unknown>[]).map((er, i) => (
-                    <BkRow key={i} label={String(er.test_type ?? "Test")} val={
-                      [
-                        er.overall != null && `Overall: ${er.overall}`,
-                        er.listening != null && `L: ${er.listening}`,
-                        er.speaking != null && `S: ${er.speaking}`,
-                        er.writing != null && `W: ${er.writing}`,
-                        er.reading != null && `R: ${er.reading}`,
-                      ].filter(Boolean).join("  ")
-                    } />
-                  ))}
-                </BkSection>
-              )}
+            return (
+              <div className="space-y-3 py-1">
+                {backupMapData.backedUpAt && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Backup taken: <span className="font-medium text-gray-600">{new Date(backupMapData.backedUpAt).toLocaleString()}</span>
+                  </p>
+                )}
 
-              {/* Academic Requirements */}
-              {backupMapData.academic && backupMapData.academic.length > 0 && (
-                <BkSection title="Academic Requirements">
-                  {(backupMapData.academic as Record<string, unknown>[]).map((ar, i) => (
-                    <BkRow key={i} label={`${ar.academic_country ?? "Any"}`} val={
-                      [ar.academic_level, ar.academic_score != null && `${ar.academic_score}${ar.score_type ? ` (${ar.score_type})` : ""}`].filter(Boolean).join(" — ")
-                    } />
-                  ))}
-                </BkSection>
-              )}
+                {/* Column header */}
+                <div className="grid grid-cols-[160px_1fr_1fr] gap-2 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border rounded-lg bg-gray-50">
+                  <span>Field</span>
+                  <span>Raw Data (scraped)</span>
+                  <span>Backup</span>
+                </div>
 
-              {/* Scholarships */}
-              {backupMapData.scholarships && backupMapData.scholarships.length > 0 && (
-                <BkSection title="Scholarships">
-                  {(backupMapData.scholarships as Record<string, unknown>[]).map((s, i) => (
-                    <BkRow key={i} label={String(s.name ?? `Scholarship ${i + 1}`)} val={String(s.details ?? s.amount ?? "")} />
-                  ))}
-                </BkSection>
-              )}
+                <CmpSection title="Course Details">
+                  <CmpRow label="Duration"
+                    raw={[sc.duration, sc.duration_term].filter(Boolean).join(" ") || null}
+                    bak={[cb.duration, cb.duration_term].filter(Boolean).join(" ") || null} />
+                  <CmpRow label="Study Mode"       raw={sc.study_mode}       bak={cb.study_mode} />
+                  <CmpRow label="Course Location"  raw={sc.course_location}  bak={cb.course_location} />
+                </CmpSection>
 
-              <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2.5 text-xs text-indigo-700">
-                <strong>Fill Empty Fields Only</strong> — backup values are written only where the staged course has no data.<br />
-                <strong>Overwrite All</strong> — backup values replace all matched fields even if they already exist.
+                <CmpSection title="Fees">
+                  <CmpRow label="International Fee" raw={rawFee} bak={bakFee} />
+                </CmpSection>
+
+                <CmpSection title="Intakes">
+                  <CmpRow label="Intake Months" raw={rawIntakes} bak={bakIntakes} />
+                </CmpSection>
+
+                {english.length > 0 && (
+                  <CmpSection title="English Requirements">
+                    {english.map((er, i) => (
+                      <CmpRow key={i}
+                        label={String(er.test_type ?? "Test")}
+                        raw={rawEng(String(er.test_type ?? ""))}
+                        bak={bakEng(er)} />
+                    ))}
+                  </CmpSection>
+                )}
+
+                {academic.length > 0 && (
+                  <CmpSection title="Academic Requirements">
+                    {academic.map((ar, i) => (
+                      <CmpRow key={i}
+                        label={`${ar.academic_country ?? "Any country"}`}
+                        raw={[sc.academic_level, sc.academic_score != null && `${sc.academic_score}${sc.score_type ? ` (${sc.score_type})` : ""}`].filter(Boolean).join(" — ") || null}
+                        bak={[ar.academic_level, ar.academic_score != null && `${ar.academic_score}${ar.score_type ? ` (${ar.score_type})` : ""}`].filter(Boolean).join(" — ") || null} />
+                    ))}
+                  </CmpSection>
+                )}
+
+                {scholarships.length > 0 && (
+                  <CmpSection title="Scholarships">
+                    {scholarships.map((s, i) => (
+                      <CmpRow key={i}
+                        label={String(s.name ?? `Scholarship ${i + 1}`)}
+                        raw={sc.scholarship as string | null}
+                        bak={[s.name, s.details].filter(Boolean).join(" — ") || null} />
+                    ))}
+                  </CmpSection>
+                )}
+
+                {/* Legend */}
+                <div className="flex gap-3 text-[10px] text-muted-foreground px-1">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-100 border border-green-300 inline-block" /> New — backup fills empty field</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300 inline-block" /> Diff — values differ</span>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <DialogFooter className="gap-2 sm:gap-0 pt-2">
             <Button variant="outline" onClick={() => setBackupMapOpen(false)} disabled={backupMapApplying} className="cursor-pointer">
