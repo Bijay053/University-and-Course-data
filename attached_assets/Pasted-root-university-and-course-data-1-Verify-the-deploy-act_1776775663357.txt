@@ -1,0 +1,86 @@
+root@university-and-course-data:~# # 1. Verify the deploy actually went through
+grep -c "english_modals_" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+grep -c "tryParseColumnHeaderEnglishTable" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+# Both should print > 0. If 0, the build/restart never ran.
+
+# 2. Check what Entry Requirements tab actually does on VIT
+curl -s "https://vit.edu.au/mba" | grep -oE "another approved[^<]{0,50}" | head -3
+1
+3
+another approved English language test.
+another approved English course at the required IELTS-equivalent l
+root@university-and-course-data:~# cat > /tmp/modal_debug_patch.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/browser-helper.ts"
+s = open(p).read()
+
+old = '''      const triggerCount: number = await page.evaluate(
+        (els: any) => (els as Element[]).length,
+        triggerHandles,
+      ).catch(() => 0);
+      let modalsOpened = 0;
+      for (let i = 0; i < Math.min(triggerCount, 4); i++) {
+        try {
+          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;
+              if (!el) return;
+              try { el.scrollIntoView({ block: "center" }); } catch {}
+              el.click();
+            },
+            { els: triggerHandles, idx: i },
+          );
+          await page.waitForTimeout(1500);
+          snapshots.push(await page.content());
+          modalsOpened++;'''
+
+new = '''      const triggerCount: number = await page.evaluate(
+        (els: any) => (els as Element[]).length,
+        triggerHandles,
+      ).catch(() => 0);
+      clicksPerformed.push(`english_modal_scan[triggers=${triggerCount}]`);
+      let modalsOpened = 0;
+      for (let i = 0; i < Math.min(triggerCount, 6); i++) {
+        try {
+          const beforeLen = await page.evaluate(() => document.body.innerHTML.length).catch(() => 0);
+          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;
+              if (!el) return;
+              try { el.scrollIntoView({ block: "center" }); } catch {}
+              // Force-show any ancestor tab-pane / collapse so the click takes effect
+              let p: HTMLElement | null = el;
+              while (p) {
+                const cl = p.classList;
+                if (cl.contains("tab-pane") || cl.contains("collapse")) {
+                  cl.add("active", "show", "in"); cl.remove("fade");
+                  (p as HTMLElement).style.display = "block";
+echo "=== DEPLOYED ==="env && \kup && set +a && \\] dom +${afterLen - beforeLen}`);'''atch(() => 0);rue })); } catch {}"href") || "";
+Applied
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 709ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 60478    │ 0s     │ 25   │ online    │ 0%       │ 45.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+=== DEPLOYED ===
+root@university-and-course-data:~/University-and-Course-data# 
