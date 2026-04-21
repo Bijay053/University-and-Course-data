@@ -1,0 +1,44 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+python3 - <<'EOF'
+import re
+p = "artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+needle = '''debugIelts(link.name, "D-after-all-tiers-and-cache", {
+          ieltsOverall: cheerioData.ieltsOverall,
+          cachedIelts: cachedEnglishReqs?.ieltsOverall ?? null,
+        });'''
+add = '''debugIelts(link.name, "D-after-all-tiers-and-cache", {
+          ieltsOverall: cheerioData.ieltsOverall,
+          cachedIelts: cachedEnglishReqs?.ieltsOverall ?? null,
+        });
+        addLog(job, "status", {
+          message: `[POST-CACHE] ${link.name.slice(0, 40)} -> IELTS=${cheerioData.ieltsOverall ?? "-"} PTE=${cheerioData.pteOverall ?? "-"} TOEFL=${cheerioData.toeflOverall ?? "-"} CAE=${(cheerioData as any).cambridgeOverall ?? "-"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "-"} P=${cachedEnglishReqs?.pteOverall ?? "-"} T=${cachedEnglishReqs?.toeflOverall ?? "-"}`,
+          phase: "extract",
+        });'''
+if "POST-CACHE" in s:
+    print("ALREADY PATCHED")
+elif needle not in s:
+    print("NEEDLE NOT FOUND - aborting")
+    raise SystemExit(1)
+else:
+    open(p, "w").write(s.replace(needle, add, 1))
+    print("PATCHED")
+EOF
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+echo "POST-CACHE count in bundle: $(grep -c POST-CACHE artifacts/api-server/dist/workers/scrape-worker.mjs)" && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env
+PATCHED
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 640ms
+POST-CACHE count in bundle: 1
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 16100    │ 0s     │ 16   │ online    │ 0%       │ 43.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# 
