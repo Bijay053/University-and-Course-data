@@ -55,7 +55,7 @@ router.get("/courses", async (req, res): Promise<void> => {
   const dataQuery = `
     SELECT
       c.id, c.university_id AS "universityId", u.name AS "universityName", u.city,
-      c.name, c.category, c.sub_category AS "subCategory", c.course_website AS "courseWebsite",
+      c.name, c.category, c.sub_category AS "subCategory", c.course_website AS "courseWebsite", c.course_location AS "courseLocation",
       c.duration, c.duration_term AS "durationTerm", c.study_mode AS "studyMode",
       c.degree_level AS "degreeLevel", c.study_load AS "studyLoad", c.language,
       c.description, c.course_structure AS "courseStructure", c.career_outcomes AS "careerOutcomes",
