@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -568,7 +568,7 @@ export default function UniversityDetail() {
   }, [id]);
 
   useEffect(() => {
-    if (tab === "academic") loadAcademicReqs();
+    if (tab === "academic" || tab === "courses") loadAcademicReqs();
   }, [tab, loadAcademicReqs]);
 
   function clearFilters() {
@@ -845,6 +845,29 @@ export default function UniversityDetail() {
     }
   }
 
+  // ── Academic requirements lookup for Courses tab ─────────────────────────
+  // Map: courseId → Map<country, AcadReqRow>
+  const acadByCountry = useMemo(() => {
+    const map = new Map<number, Map<string, AcadReqRow>>();
+    for (const r of allAcademicReqs) {
+      const key = r.academicCountry ?? "Any";
+      if (!map.has(r.courseId)) map.set(r.courseId, new Map());
+      if (!map.get(r.courseId)!.has(key)) map.get(r.courseId)!.set(key, r);
+    }
+    return map;
+  }, [allAcademicReqs]);
+
+  const distinctAcadCountries = useMemo(() => {
+    const countries = new Set<string>();
+    for (const r of allAcademicReqs) countries.add(r.academicCountry ?? "Any");
+    const sorted = Array.from(countries).sort((a, b) => {
+      if (a === "Any") return -1;
+      if (b === "Any") return 1;
+      return a.localeCompare(b);
+    });
+    return sorted;
+  }, [allAcademicReqs]);
+
   const TABS: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "courses", label: "Courses", icon: <BookOpen className="w-4 h-4" />, count: uni ? total : undefined },
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
@@ -1024,7 +1047,20 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 border-r text-center" colSpan={5} style={{ background: "#fff7ed", color: "#c2410c" }}>PTE</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={5} style={{ background: "#fef2f2", color: "#be123c" }}>TOEFL</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={6} style={{ background: "#fdf2f8", color: "#be185d" }}>Other English</th>
-                  <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#ecfeff", color: "#0e7490" }}>Academic Req.</th>
+                  {distinctAcadCountries.length > 0 ? (
+                    distinctAcadCountries.map((country, i) => (
+                      <th
+                        key={country}
+                        colSpan={3}
+                        className={`px-2 py-2 text-center${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}
+                        style={{ background: "#ecfeff", color: "#0e7490" }}
+                      >
+                        {country}
+                      </th>
+                    ))
+                  ) : (
+                    <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#ecfeff", color: "#0e7490" }}>Academic Req.</th>
+                  )}
                   <th className="px-2 py-2 text-center" colSpan={2} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
                 </tr>
                 <tr className="border-b bg-gray-50">
@@ -1066,19 +1102,31 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">S</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px] border-r">O</th>
-                  <th className="px-2 py-2 text-cyan-700 font-medium min-w-[100px]">Acad. Level</th>
-                  <th className="px-2 py-2 text-cyan-700 font-medium min-w-[60px]">Score</th>
-                  <th className="px-2 py-2 text-cyan-700 font-medium min-w-[70px]">Score Type</th>
-                  <th className="px-2 py-2 text-cyan-700 font-medium min-w-[80px] border-r">Country</th>
+                  {distinctAcadCountries.length > 0 ? (
+                    distinctAcadCountries.map((country, i) => (
+                      <React.Fragment key={country}>
+                        <th className="px-2 py-2 text-cyan-700 font-medium min-w-[110px]">Level</th>
+                        <th className="px-2 py-2 text-cyan-700 font-medium min-w-[55px]">Score</th>
+                        <th className={`px-2 py-2 text-cyan-700 font-medium min-w-[70px]${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}>Type</th>
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <>
+                      <th className="px-2 py-2 text-cyan-700 font-medium min-w-[100px]">Acad. Level</th>
+                      <th className="px-2 py-2 text-cyan-700 font-medium min-w-[60px]">Score</th>
+                      <th className="px-2 py-2 text-cyan-700 font-medium min-w-[70px]">Score Type</th>
+                      <th className="px-2 py-2 text-cyan-700 font-medium min-w-[80px] border-r">Country</th>
+                    </>
+                  )}
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[120px]">Other Req.</th>
                   <th className="px-2 py-2 text-amber-700 font-medium min-w-[120px]">Scholarship</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {coursesLoading ? (
-                  <tr><td colSpan={44} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
+                  <tr><td colSpan={40 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
                 ) : courses.length === 0 ? (
-                  <tr><td colSpan={44} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
+                  <tr><td colSpan={40 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
                 ) : courses.map((c) => (
                   <tr key={c.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="sticky left-0 bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]">
@@ -1135,10 +1183,25 @@ export default function UniversityDetail() {
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishSpeaking)}</td>
                     <td className="px-2 py-2 text-pink-500">{num(c.otherEnglishWriting)}</td>
                     <td className="px-2 py-2 text-pink-600 font-semibold border-r">{num(c.otherEnglishOverall)}</td>
-                    <td className="px-2 py-2 text-cyan-700">{txt(c.academicLevel)}</td>
-                    <td className="px-2 py-2 text-cyan-600">{num(c.academicScore)}</td>
-                    <td className="px-2 py-2 text-cyan-600">{txt(c.scoreType)}</td>
-                    <td className="px-2 py-2 text-cyan-600 border-r">{txt(c.academicCountry)}</td>
+                    {distinctAcadCountries.length > 0 ? (
+                      distinctAcadCountries.map((country, i) => {
+                        const req = acadByCountry.get(c.id)?.get(country);
+                        return (
+                          <React.Fragment key={country}>
+                            <td className="px-2 py-2 text-cyan-700">{txt(req?.academicLevel ?? null)}</td>
+                            <td className="px-2 py-2 text-cyan-600 font-semibold">{req?.academicScore != null ? String(req.academicScore) : "—"}</td>
+                            <td className={`px-2 py-2 text-cyan-600${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}>{txt(req?.scoreType ?? null)}</td>
+                          </React.Fragment>
+                        );
+                      })
+                    ) : (
+                      <>
+                        <td className="px-2 py-2 text-cyan-700">{txt(c.academicLevel)}</td>
+                        <td className="px-2 py-2 text-cyan-600">{num(c.academicScore)}</td>
+                        <td className="px-2 py-2 text-cyan-600">{txt(c.scoreType)}</td>
+                        <td className="px-2 py-2 text-cyan-600 border-r">{txt(c.academicCountry)}</td>
+                      </>
+                    )}
                     <td className="px-2 py-2 text-gray-500 max-w-[140px]"><span className="line-clamp-1">{txt(c.otherRequirement)}</span></td>
                     <td className="px-2 py-2 text-amber-700 max-w-[140px]"><span className="line-clamp-1">{txt(c.scholarshipDetails)}</span></td>
                   </tr>
