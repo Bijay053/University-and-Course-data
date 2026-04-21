@@ -260,6 +260,44 @@ export default function UniversityDetail() {
 
   const [tab, setTab] = useState<Tab>("courses");
 
+  // ── Bulk edit state ──────────────────────────────────────────────
+  type BulkMode = "english" | "academic" | "scholarships" | null;
+  const [bulkMode, setBulkMode] = useState<BulkMode>(null);
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [bulkFilter, setBulkFilter] = useState<"all" | "missing" | "hasData">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkApplying, setBulkApplying] = useState(false);
+
+  // English form state
+  const [bEngTestType, setBEngTestType] = useState("IELTS");
+  const [bEngL, setBEngL] = useState("");
+  const [bEngS, setBEngS] = useState("");
+  const [bEngW, setBEngW] = useState("");
+  const [bEngR, setBEngR] = useState("");
+  const [bEngO, setBEngO] = useState("");
+  const [bEngTestName, setBEngTestName] = useState("");
+
+  // Academic form state
+  const [bAcadLevel, setBacadLevel] = useState("");
+  const [bAcadScore, setBacadScore] = useState("");
+  const [bAcadScoreType, setBacadScoreType] = useState("%");
+  const [bAcadCountry, setBacadCountry] = useState("");
+
+  // Scholarship form state
+  const [bSchName, setBSchName] = useState("");
+  const [bSchDetails, setBSchDetails] = useState("");
+  const [bSchEligibility, setBSchEligibility] = useState("");
+  const [bSchAmount, setBSchAmount] = useState("");
+  const [bSchCurrency, setBSchCurrency] = useState("AUD");
+  const [bSchReplace, setBSchReplace] = useState(false);
+
+  const openBulk = (mode: BulkMode) => {
+    setBulkMode(mode);
+    setBulkSearch("");
+    setBulkFilter("all");
+    setSelectedIds(new Set());
+  };
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [subCategory, setSubCategory] = useState(ALL);
@@ -559,6 +597,38 @@ export default function UniversityDetail() {
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
     { key: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
   ];
+
+  // ── Bulk apply handler ──────────────────────────────────────────
+  const applyBulk = async () => {
+    if (selectedIds.size === 0 || !bulkMode) return;
+    const courseIds = Array.from(selectedIds);
+    setBulkApplying(true);
+    try {
+      let endpoint = "";
+      let body: Record<string, unknown> = { courseIds };
+      if (bulkMode === "english") {
+        endpoint = `${BASE}/api/universities/${id}/bulk-english`;
+        body = { courseIds, testType: bEngTestType, listening: bEngL ? Number(bEngL) : null, speaking: bEngS ? Number(bEngS) : null, writing: bEngW ? Number(bEngW) : null, reading: bEngR ? Number(bEngR) : null, overall: bEngO ? Number(bEngO) : null, testName: bEngTestName || null };
+      } else if (bulkMode === "academic") {
+        endpoint = `${BASE}/api/universities/${id}/bulk-academic`;
+        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: bAcadScoreType || null, academicCountry: bAcadCountry || null };
+      } else if (bulkMode === "scholarships") {
+        endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
+        body = { courseIds, name: bSchName, details: bSchDetails || null, eligibilityCriteria: bSchEligibility || null, amount: bSchAmount ? Number(bSchAmount) : null, currency: bSchCurrency || null, replaceExisting: bSchReplace };
+      }
+      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json() as { updated: number };
+      toast({ title: "Bulk update applied", description: `Updated ${data.updated} course${data.updated !== 1 ? "s" : ""}` });
+      setBulkMode(null);
+      // Refresh course data
+      setTimeout(() => window.location.reload(), 500);
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setBulkApplying(false);
+    }
+  };
 
   if (uniLoading) return <div className="py-16 text-center text-muted-foreground">Loading...</div>;
   if (!uni) return <div className="py-16 text-center text-muted-foreground">University not found</div>;
@@ -872,7 +942,12 @@ export default function UniversityDetail() {
       {/* ── ENGLISH PROFICIENCY TAB ── */}
       {tab === "english" && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{englishCourses.length} course{englishCourses.length !== 1 ? "s" : ""} with English test requirements</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{englishCourses.length} course{englishCourses.length !== 1 ? "s" : ""} with English test requirements</p>
+            <Button size="sm" variant="outline" onClick={() => openBulk("english")} className="gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50">
+              <Pencil className="w-3.5 h-3.5" /> Bulk Edit English
+            </Button>
+          </div>
           <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
@@ -956,7 +1031,12 @@ export default function UniversityDetail() {
       {/* ── ACADEMIC REQUIREMENTS TAB ── */}
       {tab === "academic" && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{academicCourses.length} course{academicCourses.length !== 1 ? "s" : ""} with academic requirements</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{academicCourses.length} course{academicCourses.length !== 1 ? "s" : ""} with academic requirements</p>
+            <Button size="sm" variant="outline" onClick={() => openBulk("academic")} className="gap-1.5 text-cyan-700 border-cyan-200 hover:bg-cyan-50">
+              <Pencil className="w-3.5 h-3.5" /> Bulk Edit Academic
+            </Button>
+          </div>
           <div className="border rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-sm border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10 border-b">
@@ -1003,7 +1083,12 @@ export default function UniversityDetail() {
       {/* ── SCHOLARSHIPS TAB ── */}
       {tab === "scholarships" && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{scholarshipCourses.length} course{scholarshipCourses.length !== 1 ? "s" : ""} with scholarship information</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{scholarshipCourses.length} course{scholarshipCourses.length !== 1 ? "s" : ""} with scholarship information</p>
+            <Button size="sm" variant="outline" onClick={() => openBulk("scholarships")} className="gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50">
+              <Pencil className="w-3.5 h-3.5" /> Bulk Add Scholarship
+            </Button>
+          </div>
           {scholarshipCourses.length === 0 ? (
             <div className="border rounded-xl p-12 text-center text-muted-foreground">
               <Award className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -1467,6 +1552,208 @@ export default function UniversityDetail() {
         </Dialog>
       )}
     </div>
+
+    {/* ── BULK EDIT DIALOG ── */}
+    {bulkMode && (() => {
+      const courseHasData = (c: typeof allCourses[0]) => {
+        if (bulkMode === "english") return !!(c.ieltsOverall || c.ieltsSpeaking || c.ieltsListening || c.ieltsWriting || c.ieltsReading || c.pteOverall || c.toeflOverall);
+        if (bulkMode === "academic") return !!(c.academicLevel || c.academicScore);
+        if (bulkMode === "scholarships") return !!(c.scholarshipDetails);
+        return false;
+      };
+      const filtered = allCourses.filter((c) => {
+        if (bulkSearch && !c.name.toLowerCase().includes(bulkSearch.toLowerCase())) return false;
+        if (bulkFilter === "missing") return !courseHasData(c);
+        if (bulkFilter === "hasData") return courseHasData(c);
+        return true;
+      });
+      const allFilteredIds = filtered.map((c) => c.id);
+      const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id_) => selectedIds.has(id_));
+      const toggleAll = () => {
+        if (allSelected) {
+          const next = new Set(selectedIds);
+          allFilteredIds.forEach((id_) => next.delete(id_));
+          setSelectedIds(next);
+        } else {
+          const next = new Set(selectedIds);
+          allFilteredIds.forEach((id_) => next.add(id_));
+          setSelectedIds(next);
+        }
+      };
+      const toggle = (id_: number) => {
+        const next = new Set(selectedIds);
+        if (next.has(id_)) next.delete(id_); else next.add(id_);
+        setSelectedIds(next);
+      };
+      const title = bulkMode === "english" ? "Bulk Edit English Proficiency" : bulkMode === "academic" ? "Bulk Edit Academic Requirements" : "Bulk Add Scholarship";
+      const accentColor = bulkMode === "english" ? "#7e22ce" : bulkMode === "academic" ? "#0e7490" : "#b45309";
+
+      return (
+        <Dialog open onOpenChange={() => setBulkMode(null)}>
+          <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0">
+            <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
+              <DialogTitle style={{ color: accentColor }}>{title}</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">{selectedIds.size} course{selectedIds.size !== 1 ? "s" : ""} selected · fill in the form and click Apply</p>
+            </DialogHeader>
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left: course selector */}
+              <div className="w-72 shrink-0 border-r flex flex-col">
+                <div className="p-3 border-b space-y-2">
+                  <Input placeholder="Search courses…" value={bulkSearch} onChange={(e) => setBulkSearch(e.target.value)} className="h-8 text-xs" />
+                  <div className="flex gap-1">
+                    {(["all", "missing", "hasData"] as const).map((f) => (
+                      <button key={f} onClick={() => setBulkFilter(f)} className={`flex-1 text-[10px] py-1 rounded border transition-colors ${bulkFilter === f ? "bg-primary text-white border-primary" : "border-gray-200 hover:bg-gray-50"}`}>
+                        {f === "all" ? "All" : f === "missing" ? "Missing" : "Has Data"}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+                    <span>{allSelected ? "Deselect all" : `Select all (${filtered.length})`}</span>
+                  </label>
+                </div>
+                <div className="flex-1 overflow-y-auto divide-y text-xs">
+                  {filtered.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No courses match</p>
+                  ) : filtered.map((c) => (
+                    <label key={c.id} className={`flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-blue-50/40 ${selectedIds.has(c.id) ? "bg-blue-50/60" : ""}`}>
+                      <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c.id)} className="mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-800 line-clamp-1">{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{c.degreeLevel ?? "—"}</p>
+                        {courseHasData(c) && <span className="inline-flex items-center gap-0.5 text-[9px] text-green-600 font-medium"><CheckCircle2 className="w-2.5 h-2.5" /> has data</span>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right: form */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {bulkMode === "english" && (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">Test Type</Label>
+                      <Select value={bEngTestType} onValueChange={setBEngTestType}>
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="IELTS">IELTS</SelectItem>
+                          <SelectItem value="PTE">PTE</SelectItem>
+                          <SelectItem value="TOEFL">TOEFL</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {bEngTestType === "Other" && (
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Test Name</Label><Input value={bEngTestName} onChange={(e) => setBEngTestName(e.target.value)} placeholder="e.g. Cambridge, Duolingo" /></div>
+                    )}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[["Listening", bEngL, setBEngL], ["Speaking", bEngS, setBEngS], ["Writing", bEngW, setBEngW], ["Reading", bEngR, setBEngR], ["Overall", bEngO, setBEngO]] .map(([label, val, setter]) => (
+                        <div key={label as string} className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">{label as string}</Label>
+                          <Input type="number" step="0.5" value={val as string} onChange={(e) => (setter as (v: string) => void)(e.target.value)} placeholder="—" className="h-9" />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground bg-purple-50 border border-purple-100 rounded p-2">
+                      This will <strong>replace</strong> any existing {bEngTestType} entry for each selected course.
+                    </p>
+                  </>
+                )}
+
+                {bulkMode === "academic" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Academic Level</Label>
+                        <Select value={bAcadLevel} onValueChange={setBacadLevel}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Select level" /></SelectTrigger>
+                          <SelectContent>
+                            {["Bachelor", "Master", "PhD", "Doctor/Doctorate", "Graduate Certificate & Diploma", "Certificate & Diploma", "Associate Degree or Equivalent"].map((l) => (
+                              <SelectItem key={l} value={l}>{l}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Score</Label>
+                        <Input type="number" value={bAcadScore} onChange={(e) => setBacadScore(e.target.value)} placeholder="e.g. 65" className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Score Type</Label>
+                        <Select value={bAcadScoreType} onValueChange={setBacadScoreType}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {["%", "GPA", "WAM", "ATAR", "CGPA", "Other"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Country</Label>
+                        <Input value={bAcadCountry} onChange={(e) => setBacadCountry(e.target.value)} placeholder="e.g. Australia, India" className="h-9" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground bg-cyan-50 border border-cyan-100 rounded p-2">
+                      This will <strong>replace</strong> any existing academic requirement for each selected course.
+                    </p>
+                  </>
+                )}
+
+                {bulkMode === "scholarships" && (
+                  <>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Scholarship Name <span className="text-red-500">*</span></Label>
+                        <Input value={bSchName} onChange={(e) => setBSchName(e.target.value)} placeholder="e.g. Merit Scholarship" className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Details</Label>
+                        <textarea value={bSchDetails} onChange={(e) => setBSchDetails(e.target.value)} rows={2} placeholder="Scholarship description…" className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Eligibility Criteria</Label>
+                        <textarea value={bSchEligibility} onChange={(e) => setBSchEligibility(e.target.value)} rows={2} placeholder="Who is eligible…" className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Amount</Label>
+                          <Input type="number" value={bSchAmount} onChange={(e) => setBSchAmount(e.target.value)} placeholder="e.g. 5000" className="h-9" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Currency</Label>
+                          <Select value={bSchCurrency} onValueChange={setBSchCurrency}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {["AUD", "GBP", "USD", "NZD", "CAD", "EUR"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs cursor-pointer">
+                        <input type="checkbox" checked={bSchReplace} onChange={(e) => setBSchReplace(e.target.checked)} />
+                        Replace existing scholarships on selected courses (instead of adding alongside)
+                      </label>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-3 border-t shrink-0">
+              <Button variant="outline" onClick={() => setBulkMode(null)}>Cancel</Button>
+              <Button
+                disabled={selectedIds.size === 0 || bulkApplying || (bulkMode === "scholarships" && !bSchName)}
+                onClick={applyBulk}
+                style={{ backgroundColor: accentColor }}
+                className="text-white"
+              >
+                {bulkApplying ? "Applying…" : `Apply to ${selectedIds.size} Course${selectedIds.size !== 1 ? "s" : ""}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      );
+    })()}
 
     </>
   );

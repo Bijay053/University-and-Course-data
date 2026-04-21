@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, academicRequirementsTable } from "@workspace/db";
 import {
   ListCourseAcademicRequirementsParams,
@@ -68,6 +68,26 @@ router.delete("/academic-requirements/:id", async (req, res): Promise<void> => {
     return;
   }
   res.sendStatus(204);
+});
+
+// Bulk upsert: apply academic requirements to many courses at once
+router.post("/universities/:universityId/bulk-academic", async (req, res): Promise<void> => {
+  const universityId = Number(req.params.universityId);
+  if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
+  const { courseIds, academicLevel, academicScore, scoreType, academicCountry } = req.body as {
+    courseIds: number[];
+    academicLevel?: string | null;
+    academicScore?: number | null;
+    scoreType?: string | null;
+    academicCountry?: string | null;
+  };
+  if (!Array.isArray(courseIds) || courseIds.length === 0) { res.status(400).json({ error: "courseIds required" }); return; }
+  // Delete existing then insert
+  await db.delete(academicRequirementsTable).where(inArray(academicRequirementsTable.courseId, courseIds));
+  const rows = await db.insert(academicRequirementsTable).values(
+    courseIds.map((courseId) => ({ courseId, academicLevel: academicLevel ?? null, academicScore: academicScore ?? null, scoreType: scoreType ?? null, academicCountry: academicCountry ?? null }))
+  ).returning();
+  res.json({ updated: rows.length });
 });
 
 export default router;
