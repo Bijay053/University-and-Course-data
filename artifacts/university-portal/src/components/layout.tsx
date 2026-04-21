@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
-    const onScroll = () => setShowScrollTop(el.scrollTop > 240);
+    const onScroll = () => setShowScrollTop(el.scrollTop > 100);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
@@ -59,6 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const scrollToTop = () => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
+    <>
     <div className="min-h-[100dvh] flex w-full bg-muted/40">
       {/* Desktop Sidebar */}
       <div className="w-64 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col flex-shrink-0">
@@ -119,25 +121,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
-
-          {/* Scroll-to-top button — appears after scrolling 240px */}
-          <button
-            onClick={scrollToTop}
-            title="Back to top"
-            aria-label="Back to top"
-            className={cn(
-              "fixed bottom-6 right-6 z-50 w-9 h-9 rounded-full bg-primary text-primary-foreground shadow-md",
-              "flex items-center justify-center transition-all duration-200",
-              "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-              showScrollTop ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-            )}
-          >
-            <ChevronUp className="w-4 h-4 stroke-[2.5]" />
-          </button>
         </main>
       </div>
     </div>
+
+    {/* Scroll-to-top: portal into body so overflow:hidden ancestors can't clip it */}
+    {createPortal(
+      <button
+        onClick={scrollToTop}
+        title="Back to top"
+        aria-label="Back to top"
+        className={cn(
+          "fixed bottom-6 right-6 z-[9999] w-9 h-9 rounded-full bg-primary text-primary-foreground shadow-md",
+          "flex items-center justify-center transition-all duration-200",
+          "hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
+          showScrollTop ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+      </button>,
+      document.body
+    )}
+    </>
   );
 }
