@@ -9983,6 +9983,30 @@ router.get("/scrape/jobs", async (_req: Request, res: Response): Promise<void> =
   })));
 });
 
+// Returns the most-recent completed/stopped scrape job per university
+router.get("/scrape/last-runs", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query<{
+      university_id: number;
+      university_name: string;
+      status: string;
+      imported: number;
+      total_found: number;
+      runtime_job_id: string;
+    }>(`
+      SELECT DISTINCT ON (university_id)
+        university_id, university_name, status, imported, total_found, runtime_job_id
+      FROM scrape_runtime_jobs
+      WHERE status IN ('completed', 'stopped', 'error')
+        AND university_id IS NOT NULL
+      ORDER BY university_id, runtime_job_id DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // ─── Bulk Session Endpoints ───────────────────────────────────────────────────
 router.get("/scrape/bulk/active", (_req: Request, res: Response): void => {
   const active = Array.from(bulkSessions.values())

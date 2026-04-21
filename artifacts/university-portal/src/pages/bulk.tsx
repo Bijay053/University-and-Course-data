@@ -27,8 +27,17 @@ type University = {
   name: string;
   country: string;
   city: string;
-  scrapeUrl?: string | null;
+  scrape_url?: string | null;
   website?: string | null;
+};
+
+type LastRun = {
+  university_id: number;
+  university_name: string;
+  status: string;
+  imported: number;
+  total_found: number;
+  runtime_job_id: string;
 };
 
 type BulkUniStatus = "pending" | "running" | "done" | "error" | "skipped" | "stopped";
@@ -110,7 +119,19 @@ export default function Bulk() {
 
   const { data: uniData } = useListUniversities({ limit: 200 });
   const universities = (uniData?.data ?? []) as University[];
-  const scrapeable = universities.filter((u) => u.scrapeUrl);
+  const scrapeable = universities.filter((u) => u.scrape_url);
+
+  const [lastRuns, setLastRuns] = useState<Record<number, LastRun>>({});
+  useEffect(() => {
+    fetch("/api/scrape/last-runs")
+      .then(r => r.json())
+      .then((rows: LastRun[]) => {
+        const map: Record<number, LastRun> = {};
+        rows.forEach(r => { map[r.university_id] = r; });
+        setLastRuns(map);
+      })
+      .catch(() => {});
+  }, []);
 
   // Initialise selectedIds when universities load
   useEffect(() => {
@@ -499,7 +520,9 @@ export default function Bulk() {
                     <span className="ml-auto">{selectedIds.size} selected</span>
                   </div>
 
-                  {scrapeable.map((uni) => (
+                  {scrapeable.map((uni) => {
+                    const lr = lastRuns[uni.id];
+                    return (
                     <div key={uni.id} className="rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all">
                       <div className="flex items-center gap-3 p-3 pr-4">
                         <input
@@ -514,14 +537,30 @@ export default function Bulk() {
                         />
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-sm text-gray-900">{uni.name}</span>
-                          {uni.scrapeUrl && (
-                            <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrapeUrl}</p>
+                          {uni.scrape_url && (
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrape_url}</p>
+                          )}
+                          {lr && (
+                            <p className="text-xs mt-0.5 flex items-center gap-2">
+                              <span className={lr.status === "completed" ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                                {lr.status === "completed" ? "✓ Last scraped" : "⚠ Last stopped"}
+                              </span>
+                              <span className="text-gray-400">·</span>
+                              <span className="text-gray-500">{lr.imported} imported / {lr.total_found} found</span>
+                            </p>
                           )}
                         </div>
-                        <Badge variant="outline" className="text-gray-400 shrink-0">Queued</Badge>
+                        {lr ? (
+                          <Badge variant="outline" className={lr.status === "completed" ? "text-green-600 border-green-200 bg-green-50 shrink-0" : "text-amber-600 border-amber-200 bg-amber-50 shrink-0"}>
+                            {lr.status === "completed" ? "Done" : "Stopped"}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-400 shrink-0">Never scraped</Badge>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
