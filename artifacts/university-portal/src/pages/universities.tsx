@@ -145,7 +145,8 @@ export default function Universities() {
         ) : (
           <>
             {/* Table header */}
-            <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_2fr_auto] items-center px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50/40">
+            <div className="hidden md:grid grid-cols-[40px_2.5fr_1.5fr_2fr_auto] items-center px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50/40">
+              <span>SN.</span>
               <span>Institution</span>
               <span>Location</span>
               <span>Website</span>
@@ -162,7 +163,10 @@ export default function Universities() {
 
                 return (
                   <div key={uni.id}
-                    className="group grid md:grid-cols-[2.5fr_1.5fr_2fr_auto] items-center px-5 py-3.5 hover:bg-blue-50/40 transition-colors">
+                    className="group grid md:grid-cols-[40px_2.5fr_1.5fr_2fr_auto] items-center px-5 py-3.5 hover:bg-blue-50/40 transition-colors">
+
+                    {/* SN. */}
+                    <div className="hidden md:block text-xs text-gray-400 font-mono">{idx + 1}</div>
 
                     {/* Name + avatar */}
                     <div className="flex items-center gap-3 min-w-0">
