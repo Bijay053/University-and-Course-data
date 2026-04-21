@@ -3846,7 +3846,7 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
     }
 
     if (pdfText) {
-      const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
+      const parsed = parseEnglishRequirementsFromText(pdfText, "shared", { allowCefrFloor: true });
       const courseData: Partial<CourseData> = {};
       applyEnglishResultToCourse(courseData, parsed);
       if (courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall) return courseData;
