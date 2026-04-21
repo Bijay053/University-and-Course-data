@@ -10312,7 +10312,21 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
     );
 
     if (dup.rows.length === 0) {
-      const missingRequired = REQUIRED_PUBLISH_FIELDS.filter((fieldKey) => !acceptedFields.has(fieldKey));
+      // A field is considered "accepted" if there is formal evidence OR the course itself
+      // already carries a non-null value for that field (e.g. scraped directly without review).
+      const courseValuePresent = (fieldKey: ReviewFieldKey): boolean => {
+        switch (fieldKey) {
+          case "courseName":      return !!course.courseName;
+          case "duration":        return course.duration != null;
+          case "internationalFee": return course.internationalFee != null;
+          case "intakeMonths":    return !!(course.intakeMonths && (Array.isArray(course.intakeMonths) ? course.intakeMonths.length > 0 : String(course.intakeMonths).length > 0));
+          case "ieltsOverall":    return course.ieltsOverall != null;
+          default:                return false;
+        }
+      };
+      const missingRequired = REQUIRED_PUBLISH_FIELDS.filter(
+        (fieldKey) => !acceptedFields.has(fieldKey) && !courseValuePresent(fieldKey),
+      );
       if (missingRequired.length > 0) {
         await client.query("ROLLBACK");
         return {

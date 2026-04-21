@@ -321,6 +321,8 @@ export default function UniversityDetail() {
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [importingAll, setImportingAll] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmImportAllOpen, setConfirmImportAllOpen] = useState(false);
 
   const fetchRawData = useCallback(async () => {
     if (!id) return;
@@ -361,8 +363,12 @@ export default function UniversityDetail() {
     }
   }
 
-  async function handleDelete(courseId: number) {
-    if (!confirm("Delete this staged course?")) return;
+  function handleDelete(courseId: number) {
+    setConfirmDeleteId(courseId);
+  }
+
+  async function performDelete(courseId: number) {
+    setConfirmDeleteId(null);
     setDeletingId(courseId);
     try {
       const res = await fetch(`${BASE}/api/scrape/staged/${courseId}`, { method: "DELETE" });
@@ -376,25 +382,40 @@ export default function UniversityDetail() {
     }
   }
 
-  async function handleImportAll() {
+  function handleImportAll() {
     const pending = rawData.filter((c) => c.status === "pending");
     if (!pending.length) return;
-    if (!confirm(`Import all ${pending.length} pending courses to production?`)) return;
+    setConfirmImportAllOpen(true);
+  }
+
+  async function performImportAll() {
+    setConfirmImportAllOpen(false);
+    const pending = rawData.filter((c) => c.status === "pending");
     setImportingAll(true);
     let succeeded = 0;
     let failed = 0;
+    const errors: string[] = [];
     for (const c of pending) {
       try {
         const res = await fetch(`${BASE}/api/scrape/staged/${c.id}/approve`, { method: "POST" });
-        if (res.ok) succeeded++;
-        else failed++;
-      } catch {
+        if (res.ok) {
+          succeeded++;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          errors.push(data.error || "Unknown error");
+          failed++;
+        }
+      } catch (e) {
+        errors.push((e as Error).message);
         failed++;
       }
     }
     toast({
       title: "Import complete",
-      description: `${succeeded} imported${failed ? `, ${failed} failed` : ""}.`,
+      description: failed
+        ? `${succeeded} imported, ${failed} failed${errors.length ? `: ${errors[0]}` : ""}.`
+        : `${succeeded} course${succeeded !== 1 ? "s" : ""} imported successfully.`,
+      variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
     });
     await fetchRawData();
     setImportingAll(false);
@@ -1083,6 +1104,40 @@ export default function UniversityDetail() {
           )}
         </div>
       )}
+
+      {/* ── Confirm Delete Dialog ── */}
+      {confirmDeleteId !== null && (
+        <Dialog open onOpenChange={() => setConfirmDeleteId(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete staged course?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground py-2">
+              This will permanently remove the staged course from the review queue. This cannot be undone.
+            </p>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => performDelete(confirmDeleteId)}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Confirm Import All Dialog ── */}
+      <Dialog open={confirmImportAllOpen} onOpenChange={setConfirmImportAllOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Import all pending courses?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            This will import all <strong>{pendingCount}</strong> pending course{pendingCount !== 1 ? "s" : ""} to production. Each course's current staged data will be published.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmImportAllOpen(false)}>Cancel</Button>
+            <Button onClick={performImportAll}>Import All</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Edit Course Dialog ── */}
       {editingCourse && editForm && (
