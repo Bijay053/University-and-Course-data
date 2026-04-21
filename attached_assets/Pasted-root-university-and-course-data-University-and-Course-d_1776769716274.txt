@@ -1,0 +1,48 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+node --input-type=module -e "
+import { chromium } from 'playwright';
+const url = 'https://www.asahe.edu.au/our-courses/master-of-information-technology-cyber-security';
+const b = await chromium.launch({ headless: true, args:['--no-sandbox'] });
+const p = await (await b.newContext()).newPage();
+await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+// Click Entry Requirements tab if it exists
+for (const sel of ['text=Entry Requirements','text=Entry requirements','text=Admission requirements','text=English Requirements']) {
+  try { const el = await p.\$(sel); if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(2000); console.log('Clicked:', sel); break; } } catch{} 
+}
+const html = await p.content();
+// Find the requirements zone
+const idx = html.toLowerCase().indexOf('english');
+const slice = idx >= 0 ? html.slice(Math.max(0, idx-200), idx+4000) : html.slice(0, 4000);
+console.log('=== HTML around English keyword (', slice.length, 'chars) ===');
+console.log(slice);
+console.log('=== ALL <img> tags ===');
+const imgs = [...html.matchAll(/<img[^>]+>/gi)].map(m=>m[0]);
+imgs.forEach((t,i)=>console.log(i, t.slice(0,300)));
+console.log('=== mentions of test names in TEXT ===');
+const textOnly = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+['IELTS','PTE','TOEFL','Cambridge','CAE','Duolingo'].forEach(n => {
+  const m = textOnly.match(new RegExp(n+'[^\\\\.\\\\!]{0,150}','gi'));
+  console.log(n+':', m ? m.slice(0,3) : '— not found —');
+});
+await b.close();
+" 2>&1 | head -200
+node:internal/modules/package_json_reader:301
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'playwright' imported from /root/University-and-Course-data/[eval1]
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:859:18)
+    at defaultResolve (node:internal/modules/esm/resolve:991:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+    at #resolve (node:internal/modules/esm/loader:701:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# 
