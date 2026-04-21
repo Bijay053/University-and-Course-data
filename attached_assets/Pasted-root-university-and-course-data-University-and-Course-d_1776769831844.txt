@@ -1,0 +1,65 @@
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# cd /root/University-and-Course-data/artifacts/api-server && \
+node --input-type=module -e "
+import { chromium } from 'playwright';
+const url = 'https://www.asahe.edu.au/our-courses/master-of-information-technology-cyber-security';
+const b = await chromium.launch({ headless: true, args:['--no-sandbox'] });
+const ctx = await b.newContext();
+const p = await ctx.newPage();
+const imgRequests = [];
+p.on('request', r => { if (r.resourceType() === 'image') imgRequests.push(r.url()); });
+await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+const REQ_TABS = ['a:has-text(\"Entry Requirements\")','button:has-text(\"Entry Requirements\")','[href*=\"entry-requirements\"]','[href*=\"entryrequirements\"]','a:has-text(\"Admission Requirements\")','li:has-text(\"Entry Requirements\") a','li:has-text(\"Entry Requirements\") button'];
+let clicked = false;
+for (const sel of REQ_TABS) { try { const el = await p.\$(sel); if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(1500); clicked = true; console.log('CLICKED TAB:', sel); break; } } catch{} }
+if (!clicked) console.log('NO TAB CLICKED');
+const ACC = ['Minimum English Language Requirement','English Language Requirements','English Proficiency','Language Requirements','English Requirements'];
+for (const pattern of ACC) { try { const els = await p.\$\$('text=\"'+pattern+'\"'); for (const el of els) { if (!(await el.isVisible())) continue; await el.click(); await p.waitForTimeout(600); console.log('CLICKED ACCORDION:', pattern); } } catch{} }
+await p.waitForTimeout(2000);
+const html = await p.content();
+const textOnly = html.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ');
+console.log('=== mentions of test names in TEXT (after clicks) ===');
+['IELTS','PTE','TOEFL','Cambridge','CAE','Duolingo'].forEach(n => {
+  const m = textOnly.match(new RegExp(n+'[^\\\\.\\\\!]{0,200}','gi'));
+  console.log(n+':', m ? m.slice(0,3) : '— not found —');
+});
+const imgs = [...html.matchAll(/<img[^>]+>/gi)].map(m=>m[0]);
+console.log('=== <img> tags after clicks ('+imgs.length+') ===');
+imgs.forEach((t,i)=>console.log(i, t.slice(0,250)));
+console.log('=== ALL image network requests ('+imgRequests.length+') ===');
+imgRequests.forEach((u,i)=>console.log(i, u));
+const idx = textOnly.toLowerCase().indexOf('english');
+console.log('=== text around \"english\" ===');
+console.log(idx >=0 ? textOnly.slice(Math.max(0,idx-100), idx+1500) : 'NOT FOUND');
+await b.close();
+" 2>&1 | head -300
+-bash: !clicked: event not found
+=== mentions of test names in TEXT (after clicks) ===
+IELTS: — not found —
+PTE: — not found —
+TOEFL: — not found —
+Cambridge: — not found —
+CAE: — not found —
+Duolingo: — not found —
+=== <img> tags after clicks (8) ===
+0 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/6878647ddd233925e7ef7601_ASA%20square%20logo.jpeg" sizes="(max-width: 767px) 98vw, (max-width: 991px) 728px, 940px" srcset="https://cdn.prod.website-files.com/68660d9286e56f070b7be
+1 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae208f7be235b1e267beb6_website%20phone.png" width="14" sizes="(max-width: 991px) 14px, 1vw" alt="" srcset="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae208f7be
+2 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae21ecde879dc6d1b5bc8c_website%20email.png" width="14" alt="" class="footer-contact-title icon">
+3 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3e1299c177b30f7cc009c_map-marker-2-256.png" width="14" alt="" class="footer-contact-title icon">
+4 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png" alt="" class="footer-social-icon">
+5 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3dc9254324a7fcc22ec67_Insta%20white%20200.png" alt="" class="footer-social-icon">
+6 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec4a_Icon-linkedin.png" alt="" class="footer-social-icon">
+7 <img src="https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69015830b712e00c84dd5fc4_ASA%20LOGO%20WHITE%20AND%20COLOR%20DASH%20VERSION-01-01.png" loading="lazy" alt="" class="image-5">
+=== ALL image network requests (10) ===
+0 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/6878647ddd233925e7ef7601_ASA%20square%20logo.jpeg
+1 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae208f7be235b1e267beb6_website%20phone-p-500.png
+2 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69ae21ecde879dc6d1b5bc8c_website%20email.png
+3 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3e1299c177b30f7cc009c_map-marker-2-256.png
+4 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+5 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68e3dc9254324a7fcc22ec67_Insta%20white%20200.png
+6 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec4a_Icon-linkedin.png
+7 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68d52fb33a9cd1643e922ac9_ASA%20Gradient.png
+8 https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/69015830b712e00c84dd5fc4_ASA%20LOGO%20WHITE%20AND%20COLOR%20DASH%20VERSION-01-01.png
+9 https://www.google.co.in/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&tid=G-BC1QZE9DX5&cid=318313658.1776769814&gtm=45je64h1v9116141206z8892651664za20gzb892651664zd892651664&rcb=12&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=0~115616985~115938465~115938469~117266400~117884344&z=398545438
+=== text around "english" ===
+NOT FOUND
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
