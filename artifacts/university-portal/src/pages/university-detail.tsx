@@ -269,55 +269,100 @@ export default function UniversityDetail() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
+  // Mini scrollbar refs & state
   const tableScrollRef = useRef<HTMLDivElement>(null);
-  const [scrollRatio, setScrollRatio] = useState(0);
-  const isDragging = useRef(false);
-  const dragStartX = useRef(0);
-  const dragStartScrollLeft = useRef(0);
-  const PANEL_COUNT = 5;
-  const activePanel = Math.min(PANEL_COUNT - 1, Math.round(scrollRatio * (PANEL_COUNT - 1)));
+  const miniScrollbarRef = useRef<HTMLDivElement>(null);
+  const miniThumbRef = useRef<HTMLDivElement>(null);
+
+  const updateThumb = useCallback(() => {
+    const viewport = tableScrollRef.current;
+    const scrollbar = miniScrollbarRef.current;
+    const thumb = miniThumbRef.current;
+    if (!viewport || !scrollbar || !thumb) return;
+
+    const visible = viewport.clientWidth;
+    const total = viewport.scrollWidth;
+    const scrollLeft = viewport.scrollLeft;
+
+    const trackWidth = scrollbar.clientWidth - 4;
+    const ratio = visible / total;
+    const thumbWidth = Math.max(32, trackWidth * ratio);
+    const maxThumbLeft = trackWidth - thumbWidth;
+
+    const scrollRatio = total > visible ? scrollLeft / (total - visible) : 0;
+    const thumbLeft = 2 + maxThumbLeft * scrollRatio;
+
+    thumb.style.width = `${thumbWidth}px`;
+    thumb.style.left = `${thumbLeft}px`;
+  }, []);
 
   useEffect(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const max = el.scrollWidth - el.clientWidth;
-      setScrollRatio(max > 0 ? el.scrollLeft / max : 0);
+    const viewport = tableScrollRef.current;
+    if (!viewport) return;
+    viewport.addEventListener("scroll", updateThumb, { passive: true });
+    window.addEventListener("resize", updateThumb);
+    // Init after a tick so layout is settled
+    const t = setTimeout(updateThumb, 50);
+    return () => {
+      viewport.removeEventListener("scroll", updateThumb);
+      window.removeEventListener("resize", updateThumb);
+      clearTimeout(t);
     };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [tab]);
+  }, [tab, updateThumb]);
 
-  const scrollToPanel = (panelIndex: number) => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    el.scrollTo({ left: (panelIndex / (PANEL_COUNT - 1)) * max, behavior: "smooth" });
-  };
-
-  const handleWidgetMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragStartScrollLeft.current = el.scrollLeft;
+  const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    const viewport = tableScrollRef.current;
+    const scrollbar = miniScrollbarRef.current;
+    const thumb = miniThumbRef.current;
+    if (!viewport || !scrollbar || !thumb) return;
+
+    const dragStartX = e.clientX;
+    const thumbStartLeft = parseFloat(thumb.style.left || "2");
 
     const onMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current) return;
-      const dx = ev.clientX - dragStartX.current;
-      const widgetEl = e.currentTarget as HTMLDivElement;
-      const widgetWidth = widgetEl?.offsetWidth ?? 160;
-      const max = el.scrollWidth - el.clientWidth;
-      el.scrollLeft = Math.max(0, Math.min(max, dragStartScrollLeft.current + (dx / widgetWidth) * max));
+      const visible = viewport.clientWidth;
+      const total = viewport.scrollWidth;
+      const trackWidth = scrollbar.clientWidth - 4;
+      const thumbWidth = thumb.offsetWidth;
+      const maxThumbLeft = trackWidth - thumbWidth;
+
+      let newLeft = thumbStartLeft + (ev.clientX - dragStartX);
+      newLeft = Math.max(2, Math.min(2 + maxThumbLeft, newLeft));
+
+      const scrollRatio = maxThumbLeft > 0 ? (newLeft - 2) / maxThumbLeft : 0;
+      viewport.scrollLeft = scrollRatio * (total - visible);
     };
     const onMouseUp = () => {
-      isDragging.current = false;
+      document.body.style.userSelect = "";
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
+    document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
+  };
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const thumb = miniThumbRef.current;
+    if (!thumb || thumb === e.target || thumb.contains(e.target as Node)) return;
+    const viewport = tableScrollRef.current;
+    const scrollbar = miniScrollbarRef.current;
+    if (!viewport || !scrollbar) return;
+
+    const rect = scrollbar.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const visible = viewport.clientWidth;
+    const total = viewport.scrollWidth;
+    const trackWidth = scrollbar.clientWidth - 4;
+    const thumbWidth = thumb.offsetWidth;
+    const maxThumbLeft = trackWidth - thumbWidth;
+
+    let targetLeft = clickX - thumbWidth / 2;
+    targetLeft = Math.max(2, Math.min(2 + maxThumbLeft, targetLeft));
+
+    const scrollRatio = maxThumbLeft > 0 ? (targetLeft - 2) / maxThumbLeft : 0;
+    viewport.scrollLeft = scrollRatio * (total - visible);
   };
 
   const subCategories = category !== ALL ? getSubCategories(category) : [];
@@ -1368,62 +1413,66 @@ export default function UniversityDetail() {
       )}
     </div>
 
-    {/* Draggable horizontal scroll indicator — only visible on Courses tab */}
+    {/* Mini Trello-style horizontal scroll indicator — only on Courses tab */}
     {tab === "courses" && createPortal(
       <div
-        onMouseDown={handleWidgetMouseDown}
-        title="Drag to scroll table horizontally"
+        ref={miniScrollbarRef}
+        onClick={handleTrackClick}
         style={{
           position: "fixed",
           bottom: 24,
           right: 24,
           zIndex: 9999,
-          display: "flex",
-          alignItems: "stretch",
-          gap: 3,
-          padding: "6px 8px",
-          background: "#f1f5f9",
+          width: 122,
+          height: 42,
           borderRadius: 8,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-          cursor: isDragging.current ? "grabbing" : "grab",
-          userSelect: "none",
+          background: "#f7f7f8",
+          border: "1px solid #e3e5e8",
+          boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
+          overflow: "hidden",
+          cursor: "pointer",
         }}
-        aria-label="Horizontal scroll indicator — drag to scroll"
+        aria-label="Drag to scroll table"
       >
-        {Array.from({ length: PANEL_COUNT }).map((_, i) => {
-          const isActive = i === activePanel;
-          return (
-            <div
-              key={i}
-              onClick={() => scrollToPanel(i)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
-                padding: "6px 8px",
-                background: isActive ? "#fff" : "#e2e8f0",
-                border: isActive ? "2px solid #3B82F6" : "1px solid #cbd5e1",
-                borderRadius: 5,
-                transition: "all 0.15s ease",
-                cursor: "pointer",
-              }}
-            >
-              {[0,1,2,3].map((j) => (
-                <div
-                  key={j}
-                  style={{
-                    width: 3,
-                    height: 18,
-                    background: isActive ? "#93C5FD" : "#94a3b8",
-                    borderRadius: 2,
-                    transition: "background 0.15s ease",
-                  }}
-                />
-              ))}
-            </div>
-          );
-        })}
+        {/* Track pattern — background stripes */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          gap: 4,
+          padding: 6,
+          pointerEvents: "none",
+        }}>
+          {[0,1,2,3,4,5].map((i) => (
+            <div key={i} style={{ flex: 1, background: "#e7e7e8", borderRadius: 3, opacity: 0.9 }} />
+          ))}
+        </div>
+
+        {/* Draggable thumb */}
+        <div
+          ref={miniThumbRef}
+          onMouseDown={handleThumbMouseDown}
+          style={{
+            position: "absolute",
+            top: 2,
+            left: 2,
+            height: "calc(100% - 4px)",
+            width: 38,
+            borderRadius: 6,
+            background: "rgba(255,255,255,0.3)",
+            border: "2px solid #4e73b8",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6)",
+            overflow: "hidden",
+            cursor: "grab",
+          }}
+        >
+          {/* Thumb inner stripes */}
+          <div style={{ display: "flex", gap: 4, height: "100%", padding: 4 }}>
+            {[0,1,2,3].map((i) => (
+              <div key={i} style={{ flex: 1, background: "#dcdcdc", borderRadius: 2 }} />
+            ))}
+          </div>
+        </div>
       </div>,
       document.body
     )}

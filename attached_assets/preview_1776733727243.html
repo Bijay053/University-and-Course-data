@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Trello Style Scroll Indicator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: Arial, sans-serif;
+      background: #f4f5f7;
+    }
+
+    .demo-wrap {
+      width: 900px;
+      margin: 0 auto;
+      background: #e9edf3;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .pager-btn {
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 8px;
+      background: #7d95bc;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .board-viewport {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      margin-bottom: 18px;
+    }
+
+    .board-viewport::-webkit-scrollbar {
+      display: none;
+    }
+
+    .board {
+      display: flex;
+      gap: 16px;
+      width: max-content;
+      min-width: 1400px;
+    }
+
+    .col {
+      width: 260px;
+      min-height: 180px;
+      border-radius: 10px;
+      background: #d8dee8;
+      padding: 14px;
+    }
+
+    .col h4 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      font-size: 13px;
+      color: #334155;
+    }
+
+    .mini-scroll-wrap {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .mini-scrollbar {
+      position: relative;
+      width: 122px;
+      height: 42px;
+      border-radius: 8px;
+      background: #f7f7f8;
+      border: 1px solid #e3e5e8;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+
+    .mini-track-pattern {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      gap: 4px;
+      padding: 6px;
+      pointer-events: none;
+    }
+
+    .mini-track-pattern span {
+      flex: 1;
+      background: #e7e7e8;
+      border-radius: 3px;
+      opacity: 0.9;
+    }
+
+    .mini-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      height: calc(100% - 4px);
+      width: 38px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.3);
+      border: 2px solid #4e73b8;
+      box-shadow:
+        0 2px 6px rgba(0,0,0,0.18),
+        inset 0 0 0 1px rgba(255,255,255,0.6);
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    .mini-thumb:active {
+      cursor: grabbing;
+    }
+
+    .mini-thumb-pattern {
+      display: flex;
+      gap: 4px;
+      height: 100%;
+      padding: 4px;
+    }
+
+    .mini-thumb-pattern span {
+      flex: 1;
+      background: #dcdcdc;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-wrap">
+    <div class="topbar">
+      <span>Row per page</span>
+      <span>10</span>
+      <span>1-3 of 3</span>
+      <button class="pager-btn">‹</button>
+      <button class="pager-btn">›</button>
+    </div>
+
+    <div class="board-viewport" id="boardViewport">
+      <div class="board">
+        <div class="col">
+          <h4>Column 1</h4>
+          <div class="card">Task 1</div>
+          <div class="card">Task 2</div>
+        </div>
+        <div class="col">
+          <h4>Column 2</h4>
+          <div class="card">Task 3</div>
+          <div class="card">Task 4</div>
+        </div>
+        <div class="col">
+          <h4>Column 3</h4>
+          <div class="card">Task 5</div>
+          <div class="card">Task 6</div>
+        </div>
+        <div class="col">
+          <h4>Column 4</h4>
+          <div class="card">Task 7</div>
+          <div class="card">Task 8</div>
+        </div>
+        <div class="col">
+          <h4>Column 5</h4>
+          <div class="card">Task 9</div>
+          <div class="card">Task 10</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mini-scroll-wrap">
+      <div class="mini-scrollbar" id="miniScrollbar">
+        <div class="mini-track-pattern">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="mini-thumb" id="miniThumb">
+          <div class="mini-thumb-pattern">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const viewport = document.getElementById("boardViewport");
+    const scrollbar = document.getElementById("miniScrollbar");
+    const thumb = document.getElementById("miniThumb");
+
+    function updateThumb() {
+      const visible = viewport.clientWidth;
+      const total = viewport.scrollWidth;
+      const scrollLeft = viewport.scrollLeft;
+
+      const trackWidth = scrollbar.clientWidth - 4;
+      const ratio = visible / total;
+      const thumbWidth = Math.max(32, trackWidth * ratio);
+      const maxThumbLeft = trackWidth - thumbWidth;
+
+      const scrollRatio = total > visible ? scrollLeft / (total - visible) : 0;
+      const thumbLeft = 2 + maxThumbLeft * scrollRatio;
+
+      thumb.style.width = `${thumbWidth}px`;
+      thumb.style.left = `${thumbLeft}px`;
+    }
+
+    viewport.addEventListener("scroll", updateThumb);
+    window.addEventListener("resize", updateThumb);
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let thumbStartLeft = 0;
+
+    thumb.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      dragStartX = e.clientX;
+      thumbStartLeft = parseFloat(getComputedStyle(thumb).left);
+      document.body.style.userSelect = "none";
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+
+      const visible = viewport.clientWidth;
+      const total = viewport.scrollWidth;
+
+      const trackWidth = scrollbar.clientWidth - 4;
+      const thumbWidth = thumb.offsetWidth;
+      const maxThumbLeft = trackWidth - thumbWidth;
+
+      let newLeft = thumbStartLeft + (e.clientX - dragStartX);
+      newLeft = Math.max(2, Math.min(2 + maxThumbLeft, newLeft));
+
+      const scrollRatio = maxThumbLeft > 0 ? (newLeft - 2) / maxThumbLeft : 0;
+      viewport.scrollLeft = scrollRatio * (total - visible);
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+      document.body.style.userSelect = "";
+    });
+
+    scrollbar.addEventListener("click", (e) => {
+      if (e.target === thumb || thumb.contains(e.target)) return;
+
+      const rect = scrollbar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+
+      const visible = viewport.clientWidth;
+      const total = viewport.scrollWidth;
+
+      const trackWidth = scrollbar.clientWidth - 4;
+      const thumbWidth = thumb.offsetWidth;
+      const maxThumbLeft = trackWidth - thumbWidth;
+
+      let targetLeft = clickX - thumbWidth / 2;
+      targetLeft = Math.max(2, Math.min(2 + maxThumbLeft, targetLeft));
+
+      const scrollRatio = maxThumbLeft > 0 ? (targetLeft - 2) / maxThumbLeft : 0;
+      viewport.scrollLeft = scrollRatio * (total - visible);
+    });
+
+    updateThumb();
+  </script>
+</body>
+</html>
