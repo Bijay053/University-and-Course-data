@@ -1,0 +1,152 @@
+
+<style>
+  body { font-family: monospace; }
+  pre { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem; font-size: 12px; overflow-x: auto; color: var(--color-text-primary); line-height: 1.6; white-space: pre; }
+  .kw { color: #7F77DD; }
+  .str { color: #1D9E75; }
+  .cm { color: var(--color-text-tertiary); }
+</style>
+
+<pre><span class="cm">&lt;!-- STYLES — paste once in &lt;style&gt; --&gt;</span>
+
+<span class="kw">.cat-card</span> {
+  background: <span class="str">var(--color-background-primary)</span>;
+  border: <span class="str">0.5px solid var(--color-border-tertiary)</span>;
+  border-radius: <span class="str">var(--border-radius-lg)</span>;
+  overflow: <span class="str">hidden</span>;
+}
+<span class="kw">.cat-header</span> {
+  padding: <span class="str">9px 13px</span>;
+  display: <span class="str">flex</span>;
+  align-items: <span class="str">center</span>;
+  gap: <span class="str">8px</span>;
+  border-bottom: <span class="str">0.5px solid var(--color-border-tertiary)</span>;
+}
+<span class="kw">.cat-icon</span> {
+  width: <span class="str">26px</span>; height: <span class="str">26px</span>;
+  border-radius: <span class="str">6px</span>;
+  display: <span class="str">flex</span>;
+  align-items: <span class="str">center</span>;
+  justify-content: <span class="str">center</span>;
+  font-size: <span class="str">13px</span>;
+  flex-shrink: <span class="str">0</span>;
+}
+<span class="kw">.cat-title</span> {
+  font-size: <span class="str">12px</span>;
+  font-weight: <span class="str">500</span>;
+  color: <span class="str">var(--color-text-primary)</span>;
+}
+<span class="kw">.cat-body</span>  { padding: <span class="str">8px 13px</span>; }
+
+<span class="kw">.field-row</span> {
+  display: <span class="str">flex</span>;
+  justify-content: <span class="str">space-between</span>;
+  align-items: <span class="str">flex-start</span>;
+  padding: <span class="str">4px 0</span>;
+  border-bottom: <span class="str">0.5px solid var(--color-border-tertiary)</span>;
+  gap: <span class="str">8px</span>;
+}
+<span class="kw">.field-row:last-child</span> { border-bottom: <span class="str">none</span>; }
+
+<span class="kw">.field-label</span> {
+  font-size: <span class="str">11px</span>;
+  color: <span class="str">var(--color-text-secondary)</span>;
+  flex-shrink: <span class="str">0</span>;
+  max-width: <span class="str">48%</span>;
+}
+<span class="kw">.field-val</span> {
+  font-size: <span class="str">11px</span>;
+  color: <span class="str">var(--color-text-primary)</span>;
+  text-align: <span class="str">right</span>;
+  max-width: <span class="str">52%</span>;
+}
+
+<span class="cm">/* Badge variants */</span>
+<span class="kw">.badge</span> {
+  display: <span class="str">inline-block</span>;
+  font-size: <span class="str">10px</span>;
+  padding: <span class="str">2px 6px</span>;
+  border-radius: <span class="str">4px</span>;
+  font-weight: <span class="str">500</span>;
+}
+<span class="kw">.badge-yes</span>  { background: <span class="str">var(--color-background-success)</span>; color: <span class="str">var(--color-text-success)</span>; }
+<span class="kw">.badge-no</span>   { background: <span class="str">var(--color-background-danger)</span>;  color: <span class="str">var(--color-text-danger)</span>;  }
+<span class="kw">.badge-case</span> { background: <span class="str">var(--color-background-warning)</span>; color: <span class="str">var(--color-text-warning)</span>; }
+
+<span class="cm">/* Section sub-label */</span>
+<span class="kw">.sec-label</span> {
+  font-size: <span class="str">10px</span>;
+  font-weight: <span class="str">500</span>;
+  color: <span class="str">var(--color-text-tertiary)</span>;
+  text-transform: <span class="str">uppercase</span>;
+  letter-spacing: <span class="str">0.05em</span>;
+  margin: <span class="str">8px 0 3px</span>;
+}
+
+<span class="cm">/* Grid wrapper */</span>
+<span class="kw">.cat-grid</span> {
+  display: <span class="str">grid</span>;
+  grid-template-columns: <span class="str">repeat(auto-fit, minmax(290px, 1fr))</span>;
+  gap: <span class="str">14px</span>;
+  padding: <span class="str">1rem</span>;
+}
+</pre>
+
+<pre style="margin-top:12px"><span class="cm">&lt;!-- HTML TEMPLATE — repeat for each card --&gt;</span>
+
+&lt;<span class="kw">div</span> class=<span class="str">"cat-grid"</span>&gt;
+
+  &lt;<span class="kw">div</span> class=<span class="str">"cat-card"</span>&gt;
+    &lt;<span class="kw">div</span> class=<span class="str">"cat-header"</span>&gt;
+      &lt;<span class="kw">div</span> class=<span class="str">"cat-icon"</span> style=<span class="str">"background:#E6F1FB;color:#185FA5"</span>&gt;🏦&lt;/<span class="kw">div</span>&gt;
+      &lt;<span class="kw">span</span> class=<span class="str">"cat-title"</span>&gt;Card title here&lt;/<span class="kw">span</span>&gt;
+    &lt;/<span class="kw">div</span>&gt;
+    &lt;<span class="kw">div</span> class=<span class="str">"cat-body"</span>&gt;
+
+      <span class="cm">&lt;!-- Plain text value --&gt;</span>
+      &lt;<span class="kw">div</span> class=<span class="str">"field-row"</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-label"</span>&gt;Label&lt;/<span class="kw">span</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-val"</span>&gt;Value text&lt;/<span class="kw">span</span>&gt;
+      &lt;/<span class="kw">div</span>&gt;
+
+      <span class="cm">&lt;!-- Green YES badge --&gt;</span>
+      &lt;<span class="kw">div</span> class=<span class="str">"field-row"</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-label"</span>&gt;Accepted&lt;/<span class="kw">span</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"badge badge-yes"</span>&gt;Yes&lt;/<span class="kw">span</span>&gt;
+      &lt;/<span class="kw">div</span>&gt;
+
+      <span class="cm">&lt;!-- Red NO badge --&gt;</span>
+      &lt;<span class="kw">div</span> class=<span class="str">"field-row"</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-label"</span>&gt;Excluded&lt;/<span class="kw">span</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"badge badge-no"</span>&gt;No&lt;/<span class="kw">span</span>&gt;
+      &lt;/<span class="kw">div</span>&gt;
+
+      <span class="cm">&lt;!-- Yellow CASE BY CASE badge --&gt;</span>
+      &lt;<span class="kw">div</span> class=<span class="str">"field-row"</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-label"</span>&gt;Status&lt;/<span class="kw">span</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"badge badge-case"</span>&gt;Case by case&lt;/<span class="kw">span</span>&gt;
+      &lt;/<span class="kw">div</span>&gt;
+
+      <span class="cm">&lt;!-- Sub-section label --&gt;</span>
+      &lt;<span class="kw">div</span> class=<span class="str">"sec-label"</span>&gt;Sub-section&lt;/<span class="kw">div</span>&gt;
+      &lt;<span class="kw">div</span> class=<span class="str">"field-row"</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-label"</span>&gt;Label&lt;/<span class="kw">span</span>&gt;
+        &lt;<span class="kw">span</span> class=<span class="str">"field-val"</span>&gt;Value&lt;/<span class="kw">span</span>&gt;
+      &lt;/<span class="kw">div</span>&gt;
+
+    &lt;/<span class="kw">div</span>&gt;
+  &lt;/<span class="kw">div</span>&gt;
+
+&lt;/<span class="kw">div</span>&gt;
+</pre>
+
+<div style="margin:12px 1rem 0;font-size:12px;color:var(--color-text-secondary)">Icon background colours used in the cards above:</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 1rem 1rem">
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#E6F1FB;color:#185FA5">🏦 Banks — #E6F1FB / #185FA5</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#EAF3DE;color:#3B6D11">👤 Under 18 — #EAF3DE / #3B6D11</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#FAEEDA;color:#854F0B">👨‍👩‍👧 Sponsors — #FAEEDA / #854F0B</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#EEEDFE;color:#534AB7">🎓 Scholarship — #EEEDFE / #534AB7</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#E1F5EE;color:#0F6E56">💍 Spouse — #E1F5EE / #0F6E56</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#FAECE7;color:#993C1D">⏱ Turnaround — #FAECE7 / #993C1D</span>
+  <span style="font-size:11px;padding:4px 10px;border-radius:6px;background:#F1EFE8;color:#5F5E5A">ℹ️ Other — #F1EFE8 / #5F5E5A</span>
+</div>
