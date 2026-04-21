@@ -1,0 +1,27 @@
+root@university-and-course-data:~# DB_URL=$(grep -oP '^DATABASE_URL=\K.*' /root/.env.backup | tr -d '"') && \
+psql "$DB_URL" -c "SELECT id, course_name, ielts_overall, pte_overall, toefl_overall, scraped_at FROM scraped_courses WHERE university_id = 2 ORDER BY scraped_at DESC NULLS LAST LIMIT 9;"
+ERROR:  column "scraped_at" does not exist
+LINE 1: ..._name, ielts_overall, pte_overall, toefl_overall, scraped_at...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "scraped_courses.created_at".
+root@university-and-course-data:~# pm2 logs 1 --lines 3000 --nostream 2>&1 | grep -E '"phase":|"message":' | grep -iE "asa|pdf|english|ielts|pte|toefl|cached|requirements" | tail -50
+root@university-and-course-data:~# DB_URL=$(grep -oP '^DATABASE_URL=\K.*' /root/.env.backup | tr -d '"') && \
+psql "$DB_URL" -c "SELECT id, course_name, ielts_overall, pte_overall, toefl_overall, created_at FROM scraped_courses WHERE university_id = 2 ORDER BY created_at DESC NULLS LAST LIMIT 9;"
+  id  |                        course_name                         | ielts_overall | pte_overall | toefl_overall |          created_at           
+------+------------------------------------------------------------+---------------+-------------+---------------+-------------------------------
+ 2767 | Master of Information Technology (Artificial Intelligence) |               |             |               | 2026-04-21 09:43:09.648142+00
+ 2766 | Master of Information Technology (Cyber Security)          |               |             |               | 2026-04-21 09:43:09.640195+00
+ 2765 | Master of Project Management                               |               |             |               | 2026-04-21 09:43:09.632045+00
+ 2764 | Master of Software Application Development                 |               |             |               | 2026-04-21 09:43:09.624665+00
+ 2763 | Bachelor of Professional Accounting                        |               |             |               | 2026-04-21 09:43:09.617633+00
+ 2762 | Bachelor of Business                                       |               |             |               | 2026-04-21 09:43:09.610308+00
+ 2761 | Bachelor of Business Technology Management                 |               |             |               | 2026-04-21 09:43:09.603365+00
+ 2760 | Bachelor of Business Hospitality Management                |               |             |               | 2026-04-21 09:43:09.596378+00
+ 2759 | Bachelor of Business International Business                |               |             |               | 2026-04-21 09:43:09.587069+00
+(9 rows)
+
+root@university-and-course-data:~# psql "$DB_URL" -c "SELECT logs FROM scrape_jobs WHERE university_id = 2 ORDER BY created_at DESC LIMIT 1;" | grep -iE "pdf|english|ielts|pte|toefl|cached|requirements" | head -40
+ERROR:  relation "scrape_jobs" does not exist
+LINE 1: SELECT logs FROM scrape_jobs WHERE university_id = 2 ORDER B...
+                         ^
+root@university-and-course-data:~# 
