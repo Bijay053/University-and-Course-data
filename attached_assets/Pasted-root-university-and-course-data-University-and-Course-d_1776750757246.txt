@@ -1,0 +1,107 @@
+root@university-and-course-data:~/University-and-Course-data# pm2 logs 2 --lines 50 --nostream
+[TAILING] Tailing last 50 lines for [2] process (change the value with --lines option)
+/root/.pm2/logs/api-server-error.log last 50 lines:
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts:65:17
+2|api-serv | error: column sc.course_id does not exist
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at async Promise.all (index 1)
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/courses.ts:111:32
+2|api-serv | error: column s.percentage does not exist
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at async Promise.all (index 0)
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/courses.ts:111:32
+2|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scholarship_page_url", "academic_requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" where "universities"."id" = $1
+2|api-serv | params: 2
+2|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts:65:17
+2|api-serv | error: column s.percentage does not exist
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at async Promise.all (index 0)
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/courses.ts:111:32
+2|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scholarship_page_url", "academic_requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" where "universities"."id" = $1
+2|api-serv | params: 2
+2|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts:65:17
+2|api-serv | error: column sc.course_id does not exist
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at async Promise.all (index 1)
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/courses.ts:111:32
+2|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scholarship_page_url", "academic_requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" where "universities"."id" = $1
+2|api-serv | params: 2
+2|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts:65:17
+2|api-serv | error: column s.percentage does not exist
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at async Promise.all (index 0)
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/courses.ts:111:32
+2|api-serv | Error: Failed query: select "id", "name", "country", "city", "website", "description", "logo_url", "scrape_url", "fee_page_url", "requirements_page_url", "scholarship_page_url", "academic_requirements_page_url", "scrape_config", "created_at", "updated_at" from "universities" where "universities"."id" = $1
+2|api-serv | params: 2
+2|api-serv |     at NodePgPreparedQuery.queryWithCache (file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)
+2|api-serv |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+2|api-serv |     at file:///root/University-and-Course-data/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19
+2|api-serv |     at file:///root/University-and-Course-data/artifacts/api-server/src/routes/universities.ts:65:17
+
+/root/.pm2/logs/api-server-out.log last 50 lines:
+2|api-serv |               at processTicksAndRejections (node:internal/process/task_queues:89:21)
+2|api-serv |     }
+2|api-serv | [05:51:37.393] INFO (253150): request errored
+2|api-serv |     req: {
+2|api-serv |       "id": 94,
+2|api-serv |       "method": "GET",
+2|api-serv |       "url": "/api/courses"
+2|api-serv |     }
+2|api-serv |     res: {
+2|api-serv |       "statusCode": 500
+2|api-serv |     }
+2|api-serv |     responseTime: 22
+2|api-serv |     err: {
+2|api-serv |       "type": "Error",
+2|api-serv |       "message": "failed with status code 500",
+2|api-serv |       "stack":
+2|api-serv |           Error: failed with status code 500
+2|api-serv |               at onResFinished (file:///root/University-and-Course-data/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+2|api-serv |               at ServerResponse.onResponseComplete (file:///root/University-and-Course-data/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+2|api-serv |               at ServerResponse.emit (node:events:520:35)
+2|api-serv |               at onFinish (node:_http_outgoing:1026:10)
+2|api-serv |               at callback (node:internal/streams/writable:764:21)
+2|api-serv |               at afterWrite (node:internal/streams/writable:708:5)
+2|api-serv |               at afterWriteTick (node:internal/streams/writable:694:10)
+2|api-serv |               at processTicksAndRejections (node:internal/process/task_queues:89:21)
+2|api-serv |     }
+2|api-serv | [05:51:37.395] INFO (253150): request errored
+2|api-serv |     req: {
+2|api-serv |       "id": 95,
+2|api-serv |       "method": "GET",
+2|api-serv |       "url": "/api/universities/2"
+2|api-serv |     }
+2|api-serv |     res: {
+2|api-serv |       "statusCode": 500
+2|api-serv |     }
+2|api-serv |     responseTime: 22
+2|api-serv |     err: {
+2|api-serv |       "type": "Error",
+2|api-serv |       "message": "failed with status code 500",
+2|api-serv |       "stack":
+2|api-serv |           Error: failed with status code 500
+2|api-serv |               at onResFinished (file:///root/University-and-Course-data/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+2|api-serv |               at ServerResponse.onResponseComplete (file:///root/University-and-Course-data/node_modules/.pnpm/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+2|api-serv |               at ServerResponse.emit (node:events:520:35)
+2|api-serv |               at onFinish (node:_http_outgoing:1026:10)
+2|api-serv |               at callback (node:internal/streams/writable:764:21)
+2|api-serv |               at afterWrite (node:internal/streams/writable:708:5)
+2|api-serv |               at afterWriteTick (node:internal/streams/writable:694:10)
+2|api-serv |               at processTicksAndRejections (node:internal/process/task_queues:89:21)
+2|api-serv |     }
+
+root@university-and-course-data:~/University-and-Course-data# 
