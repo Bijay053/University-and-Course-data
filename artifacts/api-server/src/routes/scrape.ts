@@ -10265,7 +10265,11 @@ function acceptedFieldMap(rows: Array<{ id: number; fieldKey: string; candidateV
 async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSelect): Promise<{ success: boolean; courseId?: number; error?: string; blocked?: boolean }> {
   const client = await pool.connect();
   try {
-    if (course.eligibilityStatus === "rejected" || course.internationalEligible === false || course.onCampusAvailable === false) {
+    // Hard block only on explicit rejection or international ineligibility.
+    // onCampusAvailable=false is a scraper inference (not a definitive fact) and
+    // should not prevent the user from publishing — the studyMode field already
+    // carries the authoritative on-campus/online value.
+    if (course.eligibilityStatus === "rejected" || course.internationalEligible === false) {
       return {
         success: false,
         blocked: true,
