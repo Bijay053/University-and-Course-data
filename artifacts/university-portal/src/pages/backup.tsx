@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, RefreshCw, CheckCircle2, AlertTriangle, Clock, Database } from "lucide-react";
+import { Shield, RefreshCw, CheckCircle2, AlertTriangle, Clock, Database, CalendarCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -11,6 +11,14 @@ interface TableBackupInfo {
   totalBackedUpRows: number;
   lastBackedUp: string | null;
   snapshots: { snap_date: string; rows: string }[];
+}
+
+interface SchedulerInfo {
+  enabled: boolean;
+  checkIntervalMinutes: number;
+  todayBackupDone: boolean;
+  lastBackupAt: string | null;
+  nextRunAt: string;
 }
 
 const TABLE_LABELS: Record<string, { label: string; fields: string[] }> = {
@@ -48,9 +56,15 @@ function fmt(iso: string | null) {
   });
 }
 
+function fmtNext(val: string) {
+  if (val === "pending (within the hour)") return val;
+  return fmt(val);
+}
+
 export default function BackupPage() {
   const { toast } = useToast();
   const [data, setData] = useState<TableBackupInfo[]>([]);
+  const [scheduler, setScheduler] = useState<SchedulerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
@@ -59,7 +73,10 @@ export default function BackupPage() {
     try {
       const res = await fetch(`${BASE}/api/backup`);
       const json = await res.json();
-      if (json.ok) setData(json.backups);
+      if (json.ok) {
+        setData(json.backups);
+        setScheduler(json.scheduler ?? null);
+      }
     } catch {
       toast({ title: "Failed to load backup info", variant: "destructive" });
     } finally {
@@ -91,10 +108,6 @@ export default function BackupPage() {
     }
   };
 
-  const latestSnap = data.length > 0
-    ? data.map(d => d.lastBackedUp).filter(Boolean).sort().pop()
-    : null;
-
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -111,20 +124,50 @@ export default function BackupPage() {
         </div>
         <Button onClick={triggerBackup} disabled={running || loading} className="shrink-0 cursor-pointer">
           {running ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-          {running ? "Backing up…" : "Create New Backup"}
+          {running ? "Backing up…" : "Create Manual Backup"}
         </Button>
       </div>
 
-      {/* Last snapshot banner */}
-      {latestSnap && (
-        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+      {/* Auto-schedule status card */}
+      <div className="rounded-xl border bg-white overflow-hidden shadow-sm">
+        <div className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-cyan-50 to-white border-b">
+          <CalendarCheck className="w-5 h-5 text-cyan-600 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-green-800">Last backup: {fmt(latestSnap)}</p>
-            <p className="text-xs text-green-600">All 6 protected tables have a stored snapshot. Safe to import new scraping data.</p>
+            <p className="font-semibold text-sm text-cyan-900">Automatic Daily Backup</p>
+            <p className="text-xs text-cyan-700">Runs once every day automatically — no manual action required</p>
           </div>
+          <span className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-100 border border-green-200 rounded-full px-2.5 py-0.5">
+            <Zap className="w-3 h-3" /> Active
+          </span>
         </div>
-      )}
+
+        {loading ? (
+          <div className="px-5 py-4 text-sm text-muted-foreground">Loading…</div>
+        ) : scheduler ? (
+          <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+            <div className="px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Last Backup</p>
+              <p className="text-sm font-medium text-gray-800">{fmt(scheduler.lastBackupAt)}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Today's Backup</p>
+              {scheduler.todayBackupDone ? (
+                <p className="text-sm font-medium text-green-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                </p>
+              ) : (
+                <p className="text-sm font-medium text-amber-600 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> Pending
+                </p>
+              )}
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Next Scheduled Run</p>
+              <p className="text-sm font-medium text-gray-800">{fmtNext(scheduler.nextRunAt)}</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* Protected fields notice */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex gap-3">
