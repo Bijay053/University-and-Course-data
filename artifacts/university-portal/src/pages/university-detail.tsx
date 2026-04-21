@@ -845,6 +845,15 @@ export default function UniversityDetail() {
     }
   }
 
+  // ── Country group colour palette (cycles if > 5 countries) ──────────────
+  const ACAD_PALETTES = [
+    { hdr: { background: "#ecfeff", color: "#0e7490" }, sub: { background: "#f0feff", color: "#0891b2" }, cell: "#f7feff", border: "#67e8f9" },
+    { hdr: { background: "#eef2ff", color: "#3730a3" }, sub: { background: "#f5f7ff", color: "#4338ca" }, cell: "#f8f9ff", border: "#a5b4fc" },
+    { hdr: { background: "#ecfdf5", color: "#065f46" }, sub: { background: "#f0fdf9", color: "#059669" }, cell: "#f6fefb", border: "#6ee7b7" },
+    { hdr: { background: "#fffbeb", color: "#92400e" }, sub: { background: "#fffef5", color: "#d97706" }, cell: "#fffef8", border: "#fcd34d" },
+    { hdr: { background: "#fff1f2", color: "#9f1239" }, sub: { background: "#fff8f9", color: "#e11d48" }, cell: "#fff9fa", border: "#fda4af" },
+  ] as const;
+
   // ── Academic requirements lookup for Courses tab ─────────────────────────
   // Map: courseId → Map<country, AcadReqRow>
   const acadByCountry = useMemo(() => {
@@ -1048,16 +1057,20 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 border-r text-center" colSpan={5} style={{ background: "#fef2f2", color: "#be123c" }}>TOEFL</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={6} style={{ background: "#fdf2f8", color: "#be185d" }}>Other English</th>
                   {distinctAcadCountries.length > 0 ? (
-                    distinctAcadCountries.map((country, i) => (
-                      <th
-                        key={country}
-                        colSpan={3}
-                        className={`px-2 py-2 text-center${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}
-                        style={{ background: "#ecfeff", color: "#0e7490" }}
-                      >
-                        {country}
-                      </th>
-                    ))
+                    distinctAcadCountries.map((country, i) => {
+                      const pal = ACAD_PALETTES[i % ACAD_PALETTES.length];
+                      const isLast = i === distinctAcadCountries.length - 1;
+                      return (
+                        <th
+                          key={country}
+                          colSpan={3}
+                          className={`px-2 py-2 text-center font-bold${isLast ? " border-r" : ""}`}
+                          style={{ ...pal.hdr, borderLeft: `2px solid ${pal.border}` }}
+                        >
+                          {country}
+                        </th>
+                      );
+                    })
                   ) : (
                     <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#ecfeff", color: "#0e7490" }}>Academic Req.</th>
                   )}
@@ -1103,13 +1116,26 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px]">W</th>
                   <th className="px-2 py-2 text-pink-700 font-medium min-w-[40px] border-r">O</th>
                   {distinctAcadCountries.length > 0 ? (
-                    distinctAcadCountries.map((country, i) => (
-                      <React.Fragment key={country}>
-                        <th className="px-2 py-2 text-cyan-700 font-medium min-w-[110px]">Level</th>
-                        <th className="px-2 py-2 text-cyan-700 font-medium min-w-[55px]">Score</th>
-                        <th className={`px-2 py-2 text-cyan-700 font-medium min-w-[70px]${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}>Type</th>
-                      </React.Fragment>
-                    ))
+                    distinctAcadCountries.map((country, i) => {
+                      const pal = ACAD_PALETTES[i % ACAD_PALETTES.length];
+                      const isLast = i === distinctAcadCountries.length - 1;
+                      return (
+                        <React.Fragment key={country}>
+                          <th
+                            className="px-2 py-2 font-medium min-w-[110px]"
+                            style={{ background: pal.sub.background, color: pal.sub.color, borderLeft: `2px solid ${pal.border}` }}
+                          >Level</th>
+                          <th
+                            className="px-2 py-2 font-medium min-w-[55px]"
+                            style={{ background: pal.sub.background, color: pal.sub.color }}
+                          >Score</th>
+                          <th
+                            className={`px-2 py-2 font-medium min-w-[70px]${isLast ? " border-r" : ""}`}
+                            style={{ background: pal.sub.background, color: pal.sub.color }}
+                          >Type</th>
+                        </React.Fragment>
+                      );
+                    })
                   ) : (
                     <>
                       <th className="px-2 py-2 text-cyan-700 font-medium min-w-[100px]">Acad. Level</th>
@@ -1186,11 +1212,22 @@ export default function UniversityDetail() {
                     {distinctAcadCountries.length > 0 ? (
                       distinctAcadCountries.map((country, i) => {
                         const req = acadByCountry.get(c.id)?.get(country);
+                        const pal = ACAD_PALETTES[i % ACAD_PALETTES.length];
+                        const isLast = i === distinctAcadCountries.length - 1;
                         return (
                           <React.Fragment key={country}>
-                            <td className="px-2 py-2 text-cyan-700">{txt(req?.academicLevel ?? null)}</td>
-                            <td className="px-2 py-2 text-cyan-600 font-semibold">{req?.academicScore != null ? String(req.academicScore) : "—"}</td>
-                            <td className={`px-2 py-2 text-cyan-600${i === distinctAcadCountries.length - 1 ? " border-r" : ""}`}>{txt(req?.scoreType ?? null)}</td>
+                            <td
+                              className={`px-2 py-2 font-medium`}
+                              style={{ background: pal.cell, color: pal.sub.color, borderLeft: `2px solid ${pal.border}` }}
+                            >{txt(req?.academicLevel ?? null)}</td>
+                            <td
+                              className="px-2 py-2 font-semibold"
+                              style={{ background: pal.cell, color: pal.sub.color }}
+                            >{req?.academicScore != null ? String(req.academicScore) : "—"}</td>
+                            <td
+                              className={isLast ? "px-2 py-2 border-r" : "px-2 py-2"}
+                              style={{ background: pal.cell, color: pal.sub.color }}
+                            >{txt(req?.scoreType ?? null)}</td>
                           </React.Fragment>
                         );
                       })
