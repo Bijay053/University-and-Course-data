@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useListUniversities } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, X,
   Play, Square, Download, RefreshCw, Globe, ChevronDown, ChevronRight,
-  FileJson, FileText, CheckCheck, WifiOff, RotateCcw,
+  FileJson, FileText, CheckCheck, WifiOff, RotateCcw, Search, ChevronsUpDown,
 } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
 
@@ -87,6 +87,100 @@ function StatusBadge({ status }: { status?: BulkUniStatus }) {
     case "pending":  return <Badge variant="outline" className="text-gray-400">Queued</Badge>;
     default:         return <Badge variant="outline" className="text-gray-400">Queued</Badge>;
   }
+}
+
+// ─── Searchable university combobox ───────────────────────────────────────────
+function UniCombobox({ universities, value, onChange }: {
+  universities: University[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = universities.find((u) => String(u.id) === value);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return universities.filter((u) =>
+      u.name.toLowerCase().includes(q) ||
+      (u.country ?? "").toLowerCase().includes(q) ||
+      (u.city ?? "").toLowerCase().includes(q)
+    );
+  }, [universities, search]);
+
+  const locationLabel = (u: University) => {
+    const parts = [u.city, u.country].filter((p) => p && p !== "Unknown");
+    return parts.length ? parts.join(", ") : null;
+  };
+
+  return (
+    <div>
+      <Label>Select University</Label>
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setTimeout(() => inputRef.current?.focus(), 50); }}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="mt-1 w-full flex items-center justify-between rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          >
+            {selected ? (
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="font-medium text-gray-900 truncate">{selected.name}</span>
+                {locationLabel(selected) && (
+                  <span className="text-xs text-gray-400 shrink-0">{locationLabel(selected)}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Choose a university...</span>
+            )}
+            <ChevronsUpDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)] max-h-72 flex flex-col shadow-lg" align="start" sideOffset={4}>
+          {/* Search */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search universities…"
+              className="flex-1 text-sm outline-none bg-transparent placeholder:text-muted-foreground"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-gray-400 hover:text-gray-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {/* List */}
+          <div className="overflow-y-auto flex-1">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-6">No universities match</p>
+            ) : filtered.map((u) => {
+              const loc = locationLabel(u);
+              const isSelected = String(u.id) === value;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => { onChange(String(u.id)); setOpen(false); setSearch(""); }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-sm text-left hover:bg-blue-50 transition-colors ${isSelected ? "bg-blue-50" : ""}`}
+                >
+                  <span className="min-w-0">
+                    <span className="font-medium text-gray-900 block truncate">{u.name}</span>
+                    {loc && <span className="text-xs text-gray-400">{loc}</span>}
+                  </span>
+                  {isSelected && <CheckCheck className="w-4 h-4 text-blue-600 shrink-0 ml-2" />}
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -624,21 +718,11 @@ export default function Bulk() {
               <Button variant={uniMode === "new" ? "default" : "outline"} size="sm" onClick={() => setUniMode("new")}>New University</Button>
             </div>
             {uniMode === "existing" ? (
-              <div>
-                <Label>Select University</Label>
-                <Select value={universityId} onValueChange={setUniversityId}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Choose a university..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {universities.map((u) => (
-                      <SelectItem key={u.id} value={String(u.id)}>
-                        {u.name} — {u.city}, {u.country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <UniCombobox
+                universities={universities}
+                value={universityId}
+                onChange={setUniversityId}
+              />
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
