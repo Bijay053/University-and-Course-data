@@ -413,6 +413,68 @@ export async function fetchPageWithBrowser(
       }
     }
 
+    // ── Step 5: Click English-test equivalence modals/links ─────────────────
+    // Many universities (VIT, KOI, ASA, Torrens, Newcastle, etc.) hide
+    // PTE/TOEFL/CAE/Duolingo behind a link/button such as
+    //   "another approved English language test"
+    //   "equivalent English test scores"
+    //   "accepted English language tests"
+    // that opens a modal or expands an inline panel. The modal table contains
+    // the full equivalence row, so we must trigger it before snapshotting.
+    try {
+      const ENGLISH_MODAL_PATTERNS_SRC = [
+        "another approved english",
+        "equivalent english(?:\\s+language)?\\s+test",
+        "english (?:test )?(?:score )?equivalen",
+        "accepted english (?:language\\s+)?tests?",
+        "alternative english (?:language\\s+)?tests?",
+        "english language (?:test\\s+)?scores?",
+        "english proficiency (?:tests?|requirements?)",
+        "view (?:full )?english (?:test\\s+)?(?:requirements?|scores?)",
+      ];
+      const triggerHandles = await page.evaluateHandle((patternStrs: string[]) => {
+        const patterns = patternStrs.map((s) => new RegExp(s, "i"));
+        const out: Element[] = [];
+        const sel = "a, button, span, summary, div[role='button'], [data-toggle='modal'], [data-bs-toggle='modal'], [data-target], [data-bs-target]";
+        document.querySelectorAll(sel).forEach((el) => {
+          const txt = (el.textContent || "").trim().slice(0, 250);
+          if (txt && patterns.some((p) => p.test(txt))) out.push(el);
+        });
+        return out;
+      }, ENGLISH_MODAL_PATTERNS_SRC);
+      const triggerCount: number = await page.evaluate(
+        (els: any) => (els as Element[]).length,
+        triggerHandles,
+      ).catch(() => 0);
+      let modalsOpened = 0;
+      for (let i = 0; i < Math.min(triggerCount, 4); i++) {
+        try {
+          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;
+              if (!el) return;
+              try { el.scrollIntoView({ block: "center" }); } catch {}
+              el.click();
+            },
+            { els: triggerHandles, idx: i },
+          );
+          await page.waitForTimeout(1500);
+          snapshots.push(await page.content());
+          modalsOpened++;
+          // Try to close any open modal so the next click isn't blocked
+          try {
+            await page.evaluate(() => {
+              const closeSel = "[data-dismiss='modal'], [data-bs-dismiss='modal'], .modal.show .close, .modal.show button[aria-label='Close']";
+              const btn = document.querySelector(closeSel) as HTMLElement | null;
+              if (btn) btn.click();
+            });
+            await page.waitForTimeout(400);
+          } catch {}
+        } catch { /* try next */ }
+      }
+      if (modalsOpened > 0) clicksPerformed.push(`english_modals_${modalsOpened}`);
+    } catch { /* ignore */ }
+
     requirementsHtml = mergeSnapshots(snapshots);
 
     await browser.close();
