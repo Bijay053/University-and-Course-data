@@ -1048,7 +1048,7 @@ export default function UniversityDetail() {
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
-                  <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left" colSpan={2}>Course</th>
+                  <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left" colSpan={3}>Course</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={7} style={{ background: "#f0fdf4", color: "#15803d" }}>Details</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={3} style={{ background: "#eff6ff", color: "#1d4ed8" }}>Intake</th>
                   <th className="px-2 py-2 border-r text-center" colSpan={4} style={{ background: "#fefce8", color: "#a16207" }}>Fee</th>
@@ -1077,8 +1077,9 @@ export default function UniversityDetail() {
                   <th className="px-2 py-2 text-center" colSpan={2} style={{ background: "#fefce8", color: "#a16207" }}>Other</th>
                 </tr>
                 <tr className="border-b bg-gray-50">
-                  <th className="sticky left-0 z-30 bg-gray-50 border-r px-3 py-2 text-left font-semibold text-gray-700 min-w-[220px]">Course Name</th>
-                  <th className="sticky bg-gray-50 border-r px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]" style={{ left: 220, zIndex: 29 }}>Category</th>
+                  <th className="sticky left-0 z-30 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
+                  <th className="sticky bg-gray-50 border-r px-3 py-2 text-left font-semibold text-gray-700 min-w-[220px]" style={{ left: 40, zIndex: 30 }}>Course Name</th>
+                  <th className="sticky bg-gray-50 border-r px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px]" style={{ left: 260, zIndex: 29 }}>Category</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Sub Category</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[60px]">Website</th>
                   <th className="px-2 py-2 text-gray-600 font-medium min-w-[70px]">Duration</th>
@@ -1150,15 +1151,18 @@ export default function UniversityDetail() {
               </thead>
               <tbody className="divide-y">
                 {coursesLoading ? (
-                  <tr><td colSpan={40 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
+                  <tr><td colSpan={41 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">Loading courses...</td></tr>
                 ) : courses.length === 0 ? (
-                  <tr><td colSpan={40 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
-                ) : courses.map((c) => (
+                  <tr><td colSpan={41 + (distinctAcadCountries.length > 0 ? distinctAcadCountries.length * 3 : 4)} className="text-center py-12 text-muted-foreground">No courses found</td></tr>
+                ) : courses.map((c, idx) => (
                   <tr key={c.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="sticky left-0 bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]">
+                    <td className="sticky left-0 bg-white px-2 py-2 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">
+                      {(page - 1) * limit + idx + 1}
+                    </td>
+                    <td className="sticky bg-white border-r px-3 py-2 font-medium text-blue-700 hover:underline cursor-pointer min-w-[220px]" style={{ left: 40 }}>
                       <span className="line-clamp-2">{c.name}</span>
                     </td>
-                    <td className="sticky bg-white border-r px-2 py-2 text-gray-600 min-w-[80px]" style={{ left: 220 }}>
+                    <td className="sticky bg-white border-r px-2 py-2 text-gray-600 min-w-[80px]" style={{ left: 260 }}>
                       <span className="line-clamp-1">{txt(c.category)}</span>
                     </td>
                     <td className="px-2 py-2 text-gray-500"><span className="line-clamp-1">{txt(c.subCategory)}</span></td>
