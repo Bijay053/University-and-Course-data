@@ -1,0 +1,39 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+echo "=== Find which file has parseEnglishRequirementsFromText ===" && \
+grep -lE 'parseEnglishRequirementsFromText|allowCefrFloor' artifacts/api-server/dist/*.mjs artifacts/api-server/dist/workers/*.mjs 2>/dev/null && \
+echo "" && \
+echo "=== Check the call signature in worker ===" && \
+grep -oE 'parseEnglishRequirementsFromText\([^)]{0,120}' artifacts/api-server/dist/workers/scrape-worker.mjs | sort -u && \
+echo "" && \
+echo "=== allowCefrFloor count in worker ===" && \
+grep -c 'allowCefrFloor' artifacts/api-server/dist/workers/scrape-worker.mjs && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env && \
+echo "=== RESTARTED ==="
+=== Find which file has parseEnglishRequirementsFromText ===
+artifacts/api-server/dist/workers/scrape-worker.mjs
+
+=== Check the call signature in worker ===
+parseEnglishRequirementsFromText(bodyText, "browser", {
+parseEnglishRequirementsFromText(bodyText, fetchType, {
+parseEnglishRequirementsFromText(fullBodyText, "browser", {
+parseEnglishRequirementsFromText(pageText, fetchType, {
+parseEnglishRequirementsFromText(pdfText, "shared", { allowCefrFloor: true }
+parseEnglishRequirementsFromText(rawText, source, context = {}
+parseEnglishRequirementsFromText(renderedText, "browser"
+parseEnglishRequirementsFromText(renderedText, "browser", {
+parseEnglishRequirementsFromText(reqText, "shared"
+parseEnglishRequirementsFromText(uniReqsText, "shared"
+parseEnglishRequirementsFromText(uniReqsText, "shared", {
+
+=== allowCefrFloor count in worker ===
+12
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 13096    │ 0s     │ 14   │ online    │ 0%       │ 46.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+=== RESTARTED ===
+root@university-and-course-data:~/University-and-Course-data# 
