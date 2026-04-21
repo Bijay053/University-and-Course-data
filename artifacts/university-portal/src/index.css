@@ -181,3 +181,9 @@
     cursor: not-allowed;
   }
 }
+
+/* Light borders for the courses data table */
+.courses-table th,
+.courses-table td {
+  border-color: #e9eaec !important;
+}
