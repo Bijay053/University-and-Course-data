@@ -1,0 +1,76 @@
+root@university-and-course-data:~/University-and-Course-data# # Step 1: Patch production source
+python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+OLD = '''    if (sitemapCandidates.length >= 10) {
+      // Sitemap is the best source — use it exclusively to avoid listing page navigation pollution
+      addLog(job, "status", {
+        message: `[SMART] Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
+        phase: "discover",
+      });
+      rawCandidates = sitemapCandidates;
+    } else {'''
+
+NEW = '''    if (sitemapCandidates.length >= 10) {
+      // Sitemap is primary source — also merge listing page links to avoid missing courses
+      addLog(job, "status", {
+        message: `[SMART] Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
+        phase: "discover",
+      });
+      rawCandidates = [...sitemapCandidates];
+      if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
+        const seen = new Set(rawCandidates.map((l) => l.url));
+        for (const l of analysis.courseLinks) {
+          if (l.url && l.name && !isJunkCourseName(l.name) && !seen.has(l.url)) {
+            seen.add(l.url); rawCandidates.push(l);
+          }
+        }
+      }
+      const $2 = cheerio.load(html);
+      $2("a[href]").each((_: any, el: any) => {
+        const href = $2(el).attr("href") || "";
+        const text = $2(el).text().trim().replace(/\s+/g, " ");
+        const fullUrl = resolveDiscoverableUrl(href, resolvedUrl, activeOrigin);
+        if (!fullUrl) return;
+        if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+          if (!rawCandidates.find((c: any) => c.url === fullUrl)) {
+            rawCandidates.push({ url: fullUrl, name: text });
+          }
+        }
+      });
+    } else {'''
+
+if OLD in s:
+    s = s.replace(OLD, NEW)
+echo "Done. Now update VIT scrape URL in the UI to: https://vit.edu.au/course-list"
+<stdin>:13: SyntaxWarning: invalid escape sequence '\s'
+PASS: discovery merge patched
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 588ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 65729    │ 0s     │ 31   │ online    │ 0%       │ 46.4mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+Done. Now update VIT scrape URL in the UI to: https://vit.edu.au/course-list
+root@university-and-course-data:~/University-and-Course-data# 
