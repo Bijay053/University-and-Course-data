@@ -1283,13 +1283,14 @@ export default function UniversityDetail() {
             <table className="text-xs whitespace-nowrap border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
-                  <th className="text-left px-4 py-2 border-r" colSpan={2}>Course</th>
+                  <th className="text-left px-4 py-2 border-r" colSpan={3}>Course</th>
                   <th className="text-center px-2 py-2 border-r" colSpan={5} style={{ background: "#fdf4ff", color: "#7e22ce" }}>IELTS</th>
                   <th className="text-center px-2 py-2 border-r" colSpan={5} style={{ background: "#fff7ed", color: "#c2410c" }}>PTE</th>
                   <th className="text-center px-2 py-2 border-r" colSpan={5} style={{ background: "#fef2f2", color: "#be123c" }}>TOEFL</th>
                   <th className="text-center px-2 py-2" colSpan={6} style={{ background: "#fdf2f8", color: "#be185d" }}>Other English Test</th>
                 </tr>
                 <tr className="border-b bg-gray-50">
+                  <th className="px-2 py-2 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
                   <th className="text-left px-4 py-2 font-semibold text-gray-700 min-w-[240px]">Course Name</th>
                   <th className="text-left px-2 py-2 font-semibold text-gray-600 min-w-[100px] border-r">Degree Level</th>
                   <th className="px-3 py-2 text-purple-700 font-semibold">L</th>
@@ -1317,9 +1318,10 @@ export default function UniversityDetail() {
               </thead>
               <tbody className="divide-y">
                 {englishCourses.length === 0 ? (
-                  <tr><td colSpan={23} className="text-center py-12 text-muted-foreground">No English test requirements found</td></tr>
-                ) : englishCourses.map((c) => (
+                  <tr><td colSpan={24} className="text-center py-12 text-muted-foreground">No English test requirements found</td></tr>
+                ) : englishCourses.map((c, idx) => (
                   <tr key={c.id} className="hover:bg-blue-50/30">
+                    <td className="px-2 py-2 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">{idx + 1}</td>
                     <td className="px-4 py-2 font-medium text-blue-700">
                       <span className="line-clamp-1">{c.name}</span>
                     </td>
@@ -1382,6 +1384,7 @@ export default function UniversityDetail() {
             <table className="text-sm border-collapse w-full">
               <thead className="bg-gray-50 sticky top-0 z-10 border-b">
                 <tr>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-700 min-w-[260px]">Course Name</th>
                   <th className="text-left px-3 py-3 font-semibold text-gray-700 min-w-[110px]">Degree Level</th>
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[140px]">Academic Level</th>
@@ -1392,11 +1395,12 @@ export default function UniversityDetail() {
               </thead>
               <tbody className="divide-y">
                 {acadReqsLoading ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">Loading requirements…</td></tr>
+                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Loading requirements…</td></tr>
                 ) : allAcademicReqs.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
-                ) : allAcademicReqs.map((r) => (
+                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
+                ) : allAcademicReqs.map((r, idx) => (
                   <tr key={r.id} className="hover:bg-blue-50/30">
+                    <td className="px-2 py-2.5 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">{idx + 1}</td>
                     <td className="px-4 py-2.5 font-medium text-blue-700">
                       <span>{r.courseName}</span>
                     </td>
