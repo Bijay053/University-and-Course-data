@@ -1511,7 +1511,7 @@ export default function UniversityDetail() {
                         <span>#</span>
                       </div>
                     </th>
-                    <th className="sticky bg-gray-50 border-r px-3 py-2 text-left min-w-[220px]" style={{ left: 32 }}>Course Name</th>
+                    <th className="sticky bg-gray-50 border-r px-3 py-2 text-left min-w-[220px]" style={{ left: 52 }}>Course Name</th>
                     <th className="px-2 py-2 border-r text-center min-w-[80px]">Status</th>
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[110px]">Degree Level</th>
                     <th className="px-2 py-2 text-gray-600 font-medium min-w-[100px]">Category</th>
@@ -1571,7 +1571,7 @@ export default function UniversityDetail() {
                           <span>{idx + 1}</span>
                         </div>
                       </td>
-                      <td className="sticky bg-inherit border-r px-3 py-2 font-medium text-gray-800 min-w-[220px]" style={{ left: 32 }}>
+                      <td className="sticky bg-inherit border-r px-3 py-2 font-medium text-gray-800 min-w-[220px]" style={{ left: 52 }}>
                         <div className="flex items-center gap-1.5">
                           <span className="line-clamp-1 max-w-[200px]">{c.course_name}</span>
                           {c.course_website && (
