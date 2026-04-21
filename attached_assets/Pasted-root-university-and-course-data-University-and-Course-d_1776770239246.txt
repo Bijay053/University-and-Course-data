@@ -1,0 +1,30 @@
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# cd /root/University-and-Course-data/artifacts/api-server && \
+set -a && source /root/.env.backup && set +a && \
+node --input-type=module -e "
+const imgUrl = 'https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png';
+const r = await fetch(imgUrl, { signal: AbortSignal.timeout(20_000) });
+console.log('fetch:', r.status, 'content-type:', r.headers.get('content-type'), 'size:', (await r.clone().arrayBuffer()).byteLength);
+const buf = Buffer.from(await r.arrayBuffer());
+const b64 = buf.toString('base64');
+const mime = r.headers.get('content-type') || 'image/png';
+const prompt = 'You are a university data extractor. Find IELTS, PTE, TOEFL, Cambridge CAE bands in this image. Return ONLY valid JSON: {\"ieltsOverall\":<number>,\"pteOverall\":<number>,\"toeflOverall\":<number>,\"cambridgeOverall\":<number>}. Omit fields not visible.';
+const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: b64 } }] }], generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024 } });
+const models = ['gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-exp','gemini-1.5-flash'];
+for (const m of models) {
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+process.env.GEMINI_API_KEY;
+  const ar = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body });
+  const j = await ar.json();
+  console.log('---', m, ar.status, '---');
+  console.log(JSON.stringify(j).slice(0, 800));
+}
+" 2>&1 | head -60
+fetch: 200 content-type: image/png size: 22657
+--- gemini-2.5-flash 401 ---
+{"error":{"code":401,"message":"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.","status":"UNAUTHENTICATED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED","metadata":{"service":"generativelanguage.googleapis.com","method":"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent"}}]}}
+--- gemini-2.0-flash 401 ---
+{"error":{"code":401,"message":"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.","status":"UNAUTHENTICATED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED","metadata":{"method":"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent","service":"generativelanguage.googleapis.com"}}]}}
+--- gemini-2.0-flash-exp 401 ---
+{"error":{"code":401,"message":"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.","status":"UNAUTHENTICATED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED","metadata":{"service":"generativelanguage.googleapis.com","method":"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent"}}]}}
+--- gemini-1.5-flash 401 ---
+{"error":{"code":401,"message":"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.","status":"UNAUTHENTICATED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED","metadata":{"method":"google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent","service":"generativelanguage.googleapis.com"}}]}}
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
