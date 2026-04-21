@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -320,6 +321,14 @@ export default function UniversityDetail() {
   const [, params] = useRoute("/universities/:id");
   const id = params?.id ? parseInt(params.id) : 0;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // ── University edit state ─────────────────────────────────────────────────
+  const [editUniOpen, setEditUniOpen] = useState(false);
+  const [editUniName, setEditUniName] = useState("");
+  const [editUniCity, setEditUniCity] = useState("");
+  const [editUniCountry, setEditUniCountry] = useState("");
+  const [editUniSaving, setEditUniSaving] = useState(false);
 
   const [tab, setTab] = useState<Tab>("courses");
 
@@ -1181,6 +1190,32 @@ export default function UniversityDetail() {
     finally { setScholActionLoading(false); }
   };
 
+  const openEditUni = () => {
+    setEditUniName(uni?.name ?? "");
+    setEditUniCity(uni?.city ?? "");
+    setEditUniCountry(uni?.country ?? "");
+    setEditUniOpen(true);
+  };
+  const saveEditUni = async () => {
+    if (!id) return;
+    setEditUniSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editUniName, city: editUniCity, country: editUniCountry }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "University updated" });
+      setEditUniOpen(false);
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setEditUniSaving(false);
+    }
+  };
+
   if (uniLoading) return <div className="py-16 text-center text-muted-foreground">Loading...</div>;
   if (!uni) return <div className="py-16 text-center text-muted-foreground">University not found</div>;
 
@@ -1192,8 +1227,13 @@ export default function UniversityDetail() {
         <div className="h-14 w-14 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
           <Building2 className="h-7 w-7 text-primary" />
         </div>
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">{uni.name}</h1>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{uni.name}</h1>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={openEditUni} title="Edit university">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-muted-foreground mt-1">
             <span className="flex items-center gap-1 text-sm">
               <MapPin className="h-4 w-4 shrink-0" /> {uni.city}, {uni.country}
@@ -3303,6 +3343,35 @@ export default function UniversityDetail() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Edit University Dialog ──────────────────────────────────────── */}
+      <Dialog open={editUniOpen} onOpenChange={setEditUniOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit University</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Name</Label>
+              <Input value={editUniName} onChange={e => setEditUniName(e.target.value)} placeholder="University name" />
+            </div>
+            <div className="space-y-1">
+              <Label>City</Label>
+              <Input value={editUniCity} onChange={e => setEditUniCity(e.target.value)} placeholder="City" />
+            </div>
+            <div className="space-y-1">
+              <Label>Country</Label>
+              <Input value={editUniCountry} onChange={e => setEditUniCountry(e.target.value)} placeholder="Country" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUniOpen(false)}>Cancel</Button>
+            <Button onClick={saveEditUni} disabled={editUniSaving}>
+              {editUniSaving ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </>
   );
