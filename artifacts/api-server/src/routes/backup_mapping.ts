@@ -260,4 +260,141 @@ router.post("/scrape/staged/:id/apply-backup", async (req, res) => {
   }
 });
 
+// ── POST /api/scrape/staged/bulk-apply-backup ─────────────────────────────────
+// Applies backup data to multiple staged courses in one request.
+// Body: { ids: number[], forceOverwrite?: boolean }
+// Returns per-course results so the UI can show a summary.
+router.post("/scrape/staged/bulk-apply-backup", async (req, res) => {
+  const { ids, forceOverwrite = false } = req.body as { ids?: number[]; forceOverwrite?: boolean };
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: "ids must be a non-empty array" });
+    return;
+  }
+
+  type PerResult = { id: number; ok: boolean; appliedFields: string[]; courseName?: string; error?: string; noMatch?: boolean };
+  const results: PerResult[] = [];
+
+  for (const id of ids) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const stagRes = await client.query(`SELECT * FROM scraped_courses WHERE id = $1`, [id]);
+      if (stagRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        results.push({ id, ok: false, appliedFields: [], error: "Not found" });
+        continue;
+      }
+      const stag = stagRes.rows[0] as Record<string, unknown>;
+
+      const matchRes = await client.query(
+        `SELECT * FROM courses_backup WHERE university_id = $1 AND LOWER(TRIM(name)) = LOWER(TRIM($2))
+         ORDER BY backed_up_at DESC LIMIT 1`,
+        [stag.university_id, stag.course_name]
+      );
+      if (matchRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        results.push({ id, ok: true, appliedFields: [], courseName: stag.course_name as string, noMatch: true });
+        continue;
+      }
+      const cb = matchRes.rows[0] as Record<string, unknown>;
+      const backedCourseId = cb.id as number;
+
+      const pick = (backupVal: unknown, stagedVal: unknown) =>
+        forceOverwrite ? backupVal : (stagedVal ?? backupVal);
+
+      const updates: Record<string, unknown> = {
+        duration:        pick(cb.duration,        stag.duration),
+        duration_term:   pick(cb.duration_term,   stag.duration_term),
+        study_mode:      pick(cb.study_mode,      stag.study_mode),
+        course_location: pick(cb.course_location, stag.course_location),
+      };
+
+      const feesRes = await client.query(
+        `SELECT * FROM fees_backup WHERE course_id = $1 ORDER BY backed_up_at DESC LIMIT 1`, [backedCourseId]);
+      if (feesRes.rows.length > 0) {
+        const fb = feesRes.rows[0] as Record<string, unknown>;
+        updates.international_fee = pick(fb.international_fee, stag.international_fee);
+        updates.fee_term          = pick(fb.fee_term,          stag.fee_term);
+        updates.fee_year          = pick(fb.fee_year,          stag.fee_year);
+        updates.currency          = pick(fb.currency,          stag.currency);
+      }
+
+      const intakesRes = await client.query(
+        `SELECT DISTINCT ON (intake_month) intake_month FROM intakes_backup
+         WHERE course_id = $1 ORDER BY intake_month, backed_up_at DESC`, [backedCourseId]);
+      if (intakesRes.rows.length > 0 && (forceOverwrite || !stag.intake_months)) {
+        const months = intakesRes.rows.map((r: Record<string, unknown>) => r.intake_month as string);
+        updates.intake_months = JSON.stringify(months);
+      }
+
+      const ieltsRes = await client.query(
+        `SELECT DISTINCT ON (LOWER(test_type)) * FROM english_requirements_backup
+         WHERE course_id = $1 AND LOWER(test_type) LIKE '%ielts%'
+         ORDER BY LOWER(test_type), backed_up_at DESC LIMIT 1`, [backedCourseId]);
+      if (ieltsRes.rows.length > 0) {
+        const er = ieltsRes.rows[0] as Record<string, unknown>;
+        updates.ielts_overall   = pick(er.overall,   stag.ielts_overall);
+        updates.ielts_listening = pick(er.listening, stag.ielts_listening);
+        updates.ielts_speaking  = pick(er.speaking,  stag.ielts_speaking);
+        updates.ielts_writing   = pick(er.writing,   stag.ielts_writing);
+        updates.ielts_reading   = pick(er.reading,   stag.ielts_reading);
+      }
+
+      const pteRes = await client.query(
+        `SELECT DISTINCT ON (LOWER(test_type)) * FROM english_requirements_backup
+         WHERE course_id = $1 AND LOWER(test_type) LIKE '%pte%'
+         ORDER BY LOWER(test_type), backed_up_at DESC LIMIT 1`, [backedCourseId]);
+      if (pteRes.rows.length > 0) {
+        const pr = pteRes.rows[0] as Record<string, unknown>;
+        updates.pte_overall   = pick(pr.overall,   stag.pte_overall);
+        updates.pte_listening = pick(pr.listening, stag.pte_listening);
+        updates.pte_speaking  = pick(pr.speaking,  stag.pte_speaking);
+        updates.pte_writing   = pick(pr.writing,   stag.pte_writing);
+        updates.pte_reading   = pick(pr.reading,   stag.pte_reading);
+      }
+
+      const acadRes = await client.query(
+        `SELECT DISTINCT ON (COALESCE(academic_country,'__ANY__')) * FROM academic_requirements_backup
+         WHERE course_id = $1 ORDER BY COALESCE(academic_country,'__ANY__'), backed_up_at DESC LIMIT 1`,
+        [backedCourseId]);
+      if (acadRes.rows.length > 0) {
+        const ar = acadRes.rows[0] as Record<string, unknown>;
+        updates.academic_level   = pick(ar.academic_level,   stag.academic_level);
+        updates.academic_score   = pick(ar.academic_score,   stag.academic_score);
+        updates.score_type       = pick(ar.score_type,       stag.score_type);
+        updates.academic_country = pick(ar.academic_country, stag.academic_country);
+      }
+
+      const schRes = await client.query(
+        `SELECT DISTINCT ON (COALESCE(name,'__UNNAMED__')) * FROM scholarships_backup
+         WHERE course_id = $1 ORDER BY COALESCE(name,'__UNNAMED__'), backed_up_at DESC LIMIT 1`,
+        [backedCourseId]);
+      if (schRes.rows.length > 0) {
+        const sr = schRes.rows[0] as Record<string, unknown>;
+        const schText = [sr.name, sr.details].filter(Boolean).join(" – ");
+        updates.scholarship = pick(schText, stag.scholarship);
+      }
+
+      const keys = Object.keys(updates);
+      const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
+      const values = keys.map((k) => updates[k]);
+      await client.query(`UPDATE scraped_courses SET ${setClauses} WHERE id = $1`, [id, ...values]);
+      await client.query("COMMIT");
+
+      results.push({ id, ok: true, appliedFields: keys, courseName: stag.course_name as string });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      results.push({ id, ok: false, appliedFields: [], error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      client.release();
+    }
+  }
+
+  const matched   = results.filter(r => r.ok && !r.noMatch).length;
+  const noMatch   = results.filter(r => r.noMatch).length;
+  const failed    = results.filter(r => !r.ok).length;
+  res.json({ ok: true, results, summary: { total: ids.length, matched, noMatch, failed } });
+});
+
 export default router;
