@@ -4674,11 +4674,31 @@ async function stageCourse(
   //   "Master of IT (Cyber Security)" == "Master Of IT Cyber Security" == "master-of-it cyber security"
   const displayName = courseData.courseName.trim().replace(/\s+/g, " ");
   const fingerprint = displayName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  // Also skip if a course with this name was rejected within the last 30 days —
+  // prevents the same incomplete courses from reappearing on every re-scrape.
   const dup = await pool.query(
-    "SELECT id FROM scraped_courses WHERE university_id=$1 AND TRIM(REGEXP_REPLACE(LOWER(course_name), '[^a-z0-9]+', ' ', 'g'))=$2 AND status='pending' LIMIT 1",
+    `SELECT id FROM scraped_courses
+     WHERE university_id=$1
+       AND TRIM(REGEXP_REPLACE(LOWER(course_name), '[^a-z0-9]+', ' ', 'g'))=$2
+       AND (
+         status='pending'
+         OR (status='rejected' AND reviewed_at > NOW() - INTERVAL '30 days')
+       )
+     LIMIT 1`,
     [uniId, fingerprint],
   );
   if (dup.rows.length > 0) return false;
+
+  // Also skip if this course is already published in the main courses table.
+  const published = await pool.query(
+    `SELECT id FROM courses
+     WHERE university_id=$1
+       AND TRIM(REGEXP_REPLACE(LOWER(name), '[^a-z0-9]+', ' ', 'g'))=$2
+     LIMIT 1`,
+    [uniId, fingerprint],
+  );
+  if (published.rows.length > 0) return false;
   // Use the cleaned display form when storing so future dedup checks match consistently.
   courseData.courseName = displayName;
 
@@ -10310,7 +10330,11 @@ router.post("/scrape/staged/:id/reject", async (req: Request, res: Response): Pr
       status: "active",
     });
 
-    await db.delete(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    // Mark as rejected (keep the row so the next scrape dedup can skip it)
+    // rather than deleting it, which caused the same courses to reappear on every re-scrape.
+    await db.update(scrapedCoursesTable)
+      .set({ status: "rejected", reviewedAt: new Date() })
+      .where(eq(scrapedCoursesTable.id, id));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -10631,7 +10655,10 @@ router.post("/scrape/staged/approve-all", async (req: Request, res: Response): P
 router.post("/scrape/staged/reject-all", async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.body as { jobId: string };
-    await db.delete(scrapedCoursesTable)
+    // Mark as rejected instead of deleting — this prevents the same courses from
+    // being re-staged on the very next scrape run.
+    await db.update(scrapedCoursesTable)
+      .set({ status: "rejected", reviewedAt: new Date() })
       .where(and(eq(scrapedCoursesTable.scrapeJobId, jobId), eq(scrapedCoursesTable.status, "pending")));
     res.json({ success: true });
   } catch (err) {
