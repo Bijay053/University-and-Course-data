@@ -371,6 +371,33 @@ export default function UniversityDetail() {
   type ConflictItem = { courseId: number; courseName: string; country: string | null };
   const [conflictWarning, setConflictWarning] = useState<ConflictItem[] | null>(null);
 
+  // ── English edit / delete ──────────────────────────────────────────────────
+  type EngEditVals = { l: string; s: string; w: string; r: string; o: string };
+  const [editEngCourse, setEditEngCourse] = useState<{ id: number; name: string } | null>(null);
+  const [engEditIelts, setEngEditIelts] = useState<EngEditVals>({ l: "", s: "", w: "", r: "", o: "" });
+  const [engEditPte, setEngEditPte] = useState<EngEditVals>({ l: "", s: "", w: "", r: "", o: "" });
+  const [engEditToefl, setEngEditToefl] = useState<EngEditVals>({ l: "", s: "", w: "", r: "", o: "" });
+  const [engEditOther, setEngEditOther] = useState<EngEditVals & { name: string }>({ name: "", l: "", s: "", w: "", r: "", o: "" });
+  const [deleteEngCourse, setDeleteEngCourse] = useState<{ id: number; name: string } | null>(null);
+  const [engActionLoading, setEngActionLoading] = useState(false);
+
+  // ── Academic edit / delete ─────────────────────────────────────────────────
+  const [editAcadRow, setEditAcadRow] = useState<AcadReqRow | null>(null);
+  const [deleteAcadRow, setDeleteAcadRow] = useState<AcadReqRow | null>(null);
+  const [acadActionLoading, setAcadActionLoading] = useState(false);
+  const [editAcadLevel, setEditAcadLevel] = useState("");
+  const [editAcadScore, setEditAcadScore] = useState("");
+  const [editAcadType, setEditAcadType] = useState("");
+  const [editAcadCountry, setEditAcadCountry] = useState("");
+
+  // ── Scholarship edit / delete ──────────────────────────────────────────────
+  const [editScholCourse, setEditScholCourse] = useState<{ courseId: number; courseName: string; scholarshipId: number | null } | null>(null);
+  const [deleteScholInfo, setDeleteScholInfo] = useState<{ courseId: number; courseName: string; scholarshipId: number } | null>(null);
+  const [scholActionLoading, setScholActionLoading] = useState(false);
+  const [editScholName, setEditScholName] = useState("");
+  const [editScholDetails, setEditScholDetails] = useState("");
+  const [editScholEligibility, setEditScholEligibility] = useState("");
+
   const openBulk = (mode: BulkMode) => {
     setBulkMode(mode);
     setBulkSearch("");
@@ -940,6 +967,138 @@ export default function UniversityDetail() {
     }
   };
 
+  // ── English handlers ─────────────────────────────────────────────────────
+  const openEngEdit = (c: typeof allCourses[0]) => {
+    setEditEngCourse({ id: c.id, name: c.name });
+    const n = (v: number | null | undefined) => v != null ? String(v) : "";
+    setEngEditIelts({ l: n(c.ieltsListening), s: n(c.ieltsSpeaking), w: n(c.ieltsWriting), r: n(c.ieltsReading), o: n(c.ieltsOverall) });
+    setEngEditPte({ l: n(c.pteListening), s: n(c.pteSpeaking), w: n(c.pteWriting), r: n(c.pteReading), o: n(c.pteOverall) });
+    setEngEditToefl({ l: n(c.toeflListening), s: n(c.toeflSpeaking), w: n(c.toeflWriting), r: n(c.toeflReading), o: n(c.toeflOverall) });
+    setEngEditOther({ name: c.otherEnglishTestName ?? "", l: n(c.otherEnglishListening), s: n(c.otherEnglishSpeaking), w: n(c.otherEnglishWriting), r: n(c.otherEnglishReading), o: n(c.otherEnglishOverall) });
+  };
+  const saveEngEdit = async () => {
+    if (!editEngCourse) return;
+    setEngActionLoading(true);
+    const p = (v: string) => v.trim() === "" ? null : Number(v);
+    const tests = [
+      { testType: "IELTS", listening: p(engEditIelts.l), speaking: p(engEditIelts.s), writing: p(engEditIelts.w), reading: p(engEditIelts.r), overall: p(engEditIelts.o) },
+      { testType: "PTE", listening: p(engEditPte.l), speaking: p(engEditPte.s), writing: p(engEditPte.w), reading: p(engEditPte.r), overall: p(engEditPte.o) },
+      { testType: "TOEFL", listening: p(engEditToefl.l), speaking: p(engEditToefl.s), writing: p(engEditToefl.w), reading: p(engEditToefl.r), overall: p(engEditToefl.o) },
+      { testType: "Other", listening: p(engEditOther.l), speaking: p(engEditOther.s), writing: p(engEditOther.w), reading: p(engEditOther.r), overall: p(engEditOther.o), testName: engEditOther.name.trim() || null },
+    ];
+    try {
+      for (const t of tests) {
+        const res = await fetch(`${BASE}/api/universities/${id}/bulk-english`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseIds: [editEngCourse.id], ...t }) });
+        if (!res.ok) throw new Error(await res.text());
+      }
+      toast({ title: "English requirements updated" });
+      setEditEngCourse(null);
+      setTimeout(() => window.location.reload(), 300);
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setEngActionLoading(false); }
+  };
+  const confirmDeleteEng = async () => {
+    if (!deleteEngCourse) return;
+    setEngActionLoading(true);
+    try {
+      await fetch(`${BASE}/api/courses/${deleteEngCourse.id}/english-requirements`, { method: "DELETE" });
+      toast({ title: "English requirements deleted" });
+      setDeleteEngCourse(null);
+      setTimeout(() => window.location.reload(), 300);
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setEngActionLoading(false); }
+  };
+
+  // ── Academic handlers ─────────────────────────────────────────────────────
+  const openAcadEdit = (r: AcadReqRow) => {
+    setEditAcadRow(r);
+    setEditAcadLevel(r.academicLevel ?? "");
+    setEditAcadScore(r.academicScore != null ? String(r.academicScore) : "");
+    setEditAcadType(r.scoreType ?? "");
+    setEditAcadCountry(r.academicCountry ?? "");
+  };
+  const saveAcadEdit = async () => {
+    if (!editAcadRow) return;
+    setAcadActionLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/academic-requirements/${editAcadRow.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ academicLevel: editAcadLevel || null, academicScore: editAcadScore.trim() ? Number(editAcadScore) : null, scoreType: editAcadType || null, academicCountry: editAcadCountry || null }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "Academic requirement updated" });
+      setEditAcadRow(null);
+      await loadAcademicReqs();
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setAcadActionLoading(false); }
+  };
+  const confirmDeleteAcad = async () => {
+    if (!deleteAcadRow) return;
+    setAcadActionLoading(true);
+    try {
+      await fetch(`${BASE}/api/academic-requirements/${deleteAcadRow.id}`, { method: "DELETE" });
+      toast({ title: "Academic requirement deleted" });
+      setDeleteAcadRow(null);
+      await loadAcademicReqs();
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setAcadActionLoading(false); }
+  };
+
+  // ── Scholarship handlers ──────────────────────────────────────────────────
+  const openScholEdit = async (courseId: number, courseName: string) => {
+    setEditScholCourse({ courseId, courseName, scholarshipId: null });
+    setEditScholName(""); setEditScholDetails(""); setEditScholEligibility("");
+    try {
+      const res = await fetch(`${BASE}/api/courses/${courseId}/scholarships`);
+      if (res.ok) {
+        const rows = await res.json() as { id: number; name: string | null; details: string | null; eligibilityCriteria: string | null }[];
+        const row = rows[0];
+        if (row) {
+          setEditScholCourse({ courseId, courseName, scholarshipId: row.id });
+          setEditScholName(row.name ?? ""); setEditScholDetails(row.details ?? ""); setEditScholEligibility(row.eligibilityCriteria ?? "");
+        }
+      }
+    } catch { /* ignore */ }
+  };
+  const saveScholEdit = async () => {
+    if (!editScholCourse) return;
+    setScholActionLoading(true);
+    try {
+      const body = { name: editScholName || null, details: editScholDetails || null, eligibilityCriteria: editScholEligibility || null };
+      let res: Response;
+      if (editScholCourse.scholarshipId) {
+        res = await fetch(`${BASE}/api/scholarships/${editScholCourse.scholarshipId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      } else {
+        res = await fetch(`${BASE}/api/courses/${editScholCourse.courseId}/scholarships`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      }
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "Scholarship updated" });
+      setEditScholCourse(null);
+      setTimeout(() => window.location.reload(), 300);
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setScholActionLoading(false); }
+  };
+  const openScholDelete = async (courseId: number, courseName: string) => {
+    try {
+      const res = await fetch(`${BASE}/api/courses/${courseId}/scholarships`);
+      if (res.ok) {
+        const rows = await res.json() as { id: number }[];
+        if (rows[0]) setDeleteScholInfo({ courseId, courseName, scholarshipId: rows[0].id });
+      }
+    } catch { /* ignore */ }
+  };
+  const confirmDeleteSchol = async () => {
+    if (!deleteScholInfo) return;
+    setScholActionLoading(true);
+    try {
+      await fetch(`${BASE}/api/scholarships/${deleteScholInfo.scholarshipId}`, { method: "DELETE" });
+      toast({ title: "Scholarship deleted" });
+      setDeleteScholInfo(null);
+      setTimeout(() => window.location.reload(), 300);
+    } catch (err) { toast({ title: "Error", description: String(err), variant: "destructive" }); }
+    finally { setScholActionLoading(false); }
+  };
+
   if (uniLoading) return <div className="py-16 text-center text-muted-foreground">Loading...</div>;
   if (!uni) return <div className="py-16 text-center text-muted-foreground">University not found</div>;
 
@@ -1288,6 +1447,7 @@ export default function UniversityDetail() {
                   <th className="text-center px-2 py-2 border-r" colSpan={5} style={{ background: "#fff7ed", color: "#c2410c" }}>PTE</th>
                   <th className="text-center px-2 py-2 border-r" colSpan={5} style={{ background: "#fef2f2", color: "#be123c" }}>TOEFL</th>
                   <th className="text-center px-2 py-2" colSpan={6} style={{ background: "#fdf2f8", color: "#be185d" }}>Other English Test</th>
+                  <th className="px-2 py-2" />
                 </tr>
                 <tr className="border-b bg-gray-50">
                   <th className="px-2 py-2 text-center font-semibold text-gray-500 min-w-[40px]">SN.</th>
@@ -1314,11 +1474,12 @@ export default function UniversityDetail() {
                   <th className="px-3 py-2 text-pink-500 font-semibold">S</th>
                   <th className="px-3 py-2 text-pink-500 font-semibold">W</th>
                   <th className="px-3 py-2 text-pink-600 font-bold">Overall</th>
+                  <th className="px-2 py-2 text-gray-500 font-semibold min-w-[80px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {englishCourses.length === 0 ? (
-                  <tr><td colSpan={24} className="text-center py-12 text-muted-foreground">No English test requirements found</td></tr>
+                  <tr><td colSpan={25} className="text-center py-12 text-muted-foreground">No English test requirements found</td></tr>
                 ) : englishCourses.map((c, idx) => (
                   <tr key={c.id} className="hover:bg-blue-50/30">
                     <td className="px-2 py-2 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">{idx + 1}</td>
@@ -1353,6 +1514,12 @@ export default function UniversityDetail() {
                     <td className="px-3 py-2 text-center text-pink-500">{num(c.otherEnglishSpeaking)}</td>
                     <td className="px-3 py-2 text-center text-pink-500">{num(c.otherEnglishWriting)}</td>
                     <td className="px-3 py-2 text-center text-pink-600 font-bold">{num(c.otherEnglishOverall)}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex gap-1">
+                        <button onClick={() => openEngEdit(c)} className="p-1 rounded hover:bg-blue-50 text-blue-600 cursor-pointer" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setDeleteEngCourse({ id: c.id, name: c.name })} className="p-1 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1391,13 +1558,14 @@ export default function UniversityDetail() {
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[80px]">Score</th>
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[90px]">Score Type</th>
                   <th className="text-left px-3 py-3 font-semibold text-cyan-700 min-w-[120px]">Country</th>
+                  <th className="px-3 py-3 font-semibold text-gray-500 min-w-[80px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {acadReqsLoading ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Loading requirements…</td></tr>
+                  <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Loading requirements…</td></tr>
                 ) : allAcademicReqs.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
+                  <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No academic requirements found</td></tr>
                 ) : allAcademicReqs.map((r, idx) => (
                   <tr key={r.id} className="hover:bg-blue-50/30">
                     <td className="px-2 py-2.5 text-center text-gray-400 font-mono text-[11px] min-w-[40px]">{idx + 1}</td>
@@ -1420,6 +1588,12 @@ export default function UniversityDetail() {
                           {r.academicCountry}
                         </span>
                       ) : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex gap-1">
+                        <button onClick={() => openAcadEdit(r)} className="p-1 rounded hover:bg-blue-50 text-blue-600 cursor-pointer" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setDeleteAcadRow(r)} className="p-1 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1458,6 +1632,10 @@ export default function UniversityDetail() {
                         )}
                         {c.category && <Badge variant="secondary" className="text-xs">{c.category}</Badge>}
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => openScholEdit(c.id, c.name)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600 cursor-pointer" title="Edit scholarship"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => openScholDelete(c.id, c.name)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer" title="Delete scholarship"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                     {c.internationalFee && (
                       <div className="text-right shrink-0">
@@ -2574,6 +2752,139 @@ export default function UniversityDetail() {
         </Dialog>
       );
     })()}
+
+      {/* ── ENGLISH EDIT DIALOG ── */}
+      {editEngCourse && (() => {
+        const ScoreRow = ({ label, color, vals, set }: { label: string; color: string; vals: EngEditVals; set: (v: EngEditVals) => void }) => (
+          <div className="space-y-1.5">
+            <p className={`text-xs font-semibold uppercase tracking-wide ${color}`}>{label}</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {(["l","s","w","r","o"] as const).map((k, i) => (
+                <div key={k}>
+                  <Label className="text-[10px] text-gray-500">{["L","S","W","R","Overall"][i]}</Label>
+                  <Input className="h-7 text-xs" value={vals[k]} onChange={(e) => set({ ...vals, [k]: e.target.value })} placeholder="—" />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        return (
+          <Dialog open onOpenChange={() => setEditEngCourse(null)}>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Edit English Proficiency — {editEngCourse.name}</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-2">
+                <ScoreRow label="IELTS" color="text-purple-700" vals={engEditIelts} set={setEngEditIelts} />
+                <ScoreRow label="PTE" color="text-orange-600" vals={engEditPte} set={setEngEditPte} />
+                <ScoreRow label="TOEFL" color="text-rose-600" vals={engEditToefl} set={setEngEditToefl} />
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-pink-600">Other English Test</p>
+                  <div className="space-y-1.5">
+                    <div><Label className="text-[10px] text-gray-500">Test Name</Label><Input className="h-7 text-xs" value={engEditOther.name} onChange={(e) => setEngEditOther({ ...engEditOther, name: e.target.value })} placeholder="e.g. Cambridge" /></div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {(["l","s","w","r","o"] as const).map((k, i) => (
+                        <div key={k}>
+                          <Label className="text-[10px] text-gray-500">{["L","S","W","R","Overall"][i]}</Label>
+                          <Input className="h-7 text-xs" value={engEditOther[k]} onChange={(e) => setEngEditOther({ ...engEditOther, [k]: e.target.value })} placeholder="—" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditEngCourse(null)}>Cancel</Button>
+                <Button onClick={saveEngEdit} disabled={engActionLoading}>{engActionLoading ? "Saving…" : "Save"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* ── ENGLISH DELETE CONFIRM ── */}
+      {deleteEngCourse && (
+        <Dialog open onOpenChange={() => setDeleteEngCourse(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Delete English Requirements</DialogTitle></DialogHeader>
+            <p className="text-sm text-gray-600 py-2">Delete all English proficiency requirements for <strong>{deleteEngCourse.name}</strong>? This cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteEngCourse(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteEng} disabled={engActionLoading}>{engActionLoading ? "Deleting…" : "Delete"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── ACADEMIC EDIT DIALOG ── */}
+      {editAcadRow && (
+        <Dialog open onOpenChange={() => setEditAcadRow(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Edit Academic Requirement</DialogTitle></DialogHeader>
+            <div className="space-y-3 py-2 text-sm">
+              <p className="text-gray-500">{editAcadRow.courseName}</p>
+              <div><Label>Academic Level</Label><Input className="mt-1" value={editAcadLevel} onChange={(e) => setEditAcadLevel(e.target.value)} placeholder="e.g. Associate Degree or Equivalent" /></div>
+              <div><Label>Score</Label><Input className="mt-1" type="number" step="0.1" value={editAcadScore} onChange={(e) => setEditAcadScore(e.target.value)} placeholder="e.g. 4" /></div>
+              <div><Label>Score Type</Label><Input className="mt-1" value={editAcadType} onChange={(e) => setEditAcadType(e.target.value)} placeholder="e.g. GPA/5" /></div>
+              <div>
+                <Label>Country</Label>
+                <select className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-white" value={editAcadCountry} onChange={(e) => setEditAcadCountry(e.target.value)}>
+                  <option value="">— Any —</option>
+                  {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditAcadRow(null)}>Cancel</Button>
+              <Button onClick={saveAcadEdit} disabled={acadActionLoading}>{acadActionLoading ? "Saving…" : "Save"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── ACADEMIC DELETE CONFIRM ── */}
+      {deleteAcadRow && (
+        <Dialog open onOpenChange={() => setDeleteAcadRow(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Delete Academic Requirement</DialogTitle></DialogHeader>
+            <p className="text-sm text-gray-600 py-2">Delete the <strong>{deleteAcadRow.academicCountry ?? "Any"}</strong> requirement for <strong>{deleteAcadRow.courseName}</strong>? This cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteAcadRow(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteAcad} disabled={acadActionLoading}>{acadActionLoading ? "Deleting…" : "Delete"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── SCHOLARSHIP EDIT DIALOG ── */}
+      {editScholCourse && (
+        <Dialog open onOpenChange={() => setEditScholCourse(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Edit Scholarship — {editScholCourse.courseName}</DialogTitle></DialogHeader>
+            <div className="space-y-3 py-2 text-sm">
+              <div><Label>Scholarship Name</Label><Input className="mt-1" value={editScholName} onChange={(e) => setEditScholName(e.target.value)} placeholder="e.g. International Student Merit Award" /></div>
+              <div><Label>Details</Label><textarea className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none" rows={3} value={editScholDetails} onChange={(e) => setEditScholDetails(e.target.value)} placeholder="Scholarship details…" /></div>
+              <div><Label>Eligibility Criteria</Label><Input className="mt-1" value={editScholEligibility} onChange={(e) => setEditScholEligibility(e.target.value)} placeholder="e.g. International students only" /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditScholCourse(null)}>Cancel</Button>
+              <Button onClick={saveScholEdit} disabled={scholActionLoading}>{scholActionLoading ? "Saving…" : "Save"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── SCHOLARSHIP DELETE CONFIRM ── */}
+      {deleteScholInfo && (
+        <Dialog open onOpenChange={() => setDeleteScholInfo(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Delete Scholarship</DialogTitle></DialogHeader>
+            <p className="text-sm text-gray-600 py-2">Delete the scholarship for <strong>{deleteScholInfo.courseName}</strong>? This cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteScholInfo(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteSchol} disabled={scholActionLoading}>{scholActionLoading ? "Deleting…" : "Delete"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
     </>
   );

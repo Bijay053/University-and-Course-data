@@ -56,6 +56,13 @@ router.patch("/english-requirements/:id", async (req, res): Promise<void> => {
   res.json(row);
 });
 
+router.delete("/courses/:courseId/english-requirements", async (req, res): Promise<void> => {
+  const courseId = Number(req.params.courseId);
+  if (!Number.isFinite(courseId)) { res.status(400).json({ error: "Invalid courseId" }); return; }
+  await db.delete(englishRequirementsTable).where(eq(englishRequirementsTable.courseId, courseId));
+  res.sendStatus(204);
+});
+
 router.delete("/english-requirements/:id", async (req, res): Promise<void> => {
   const params = DeleteEnglishRequirementParams.safeParse(req.params);
   if (!params.success) {
