@@ -3817,18 +3817,73 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
     const buffer = await resp.arrayBuffer();
     if (buffer.byteLength > 10 * 1024 * 1024) return {};
 
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
-    const pdfPath = path.join(tmpDir, "source.pdf");
-    const txtPath = path.join(tmpDir, "source.txt");
-    await writeFile(pdfPath, Buffer.from(buffer));
-    await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
-    const pdfText = await readFile(txtPath, "utf8");
-    await rm(tmpDir, { recursive: true, force: true });
+    // ── pdftotext path ───────────────────────────────────────────────────────
+    let pdfText: string | null = null;
+    try {
+      const tmpDir = await mkdtemp(path.join(os.tmpdir(), "cursor-pdf-"));
+      const pdfPath = path.join(tmpDir, "source.pdf");
+      const txtPath = path.join(tmpDir, "source.txt");
+      await writeFile(pdfPath, Buffer.from(buffer));
+      await execFileAsync("pdftotext", [pdfPath, txtPath], { timeout: 30_000 });
+      pdfText = await readFile(txtPath, "utf8");
+      await rm(tmpDir, { recursive: true, force: true });
+    } catch {
+      // pdftotext not available — will fall through to Gemini
+    }
 
-    const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
-    const courseData: Partial<CourseData> = {};
-    applyEnglishResultToCourse(courseData, parsed);
-    return courseData;
+    if (pdfText) {
+      const parsed = parseEnglishRequirementsFromText(pdfText, "shared");
+      const courseData: Partial<CourseData> = {};
+      applyEnglishResultToCourse(courseData, parsed);
+      if (courseData.ieltsOverall || courseData.pteOverall || courseData.toeflOverall) return courseData;
+      // Text parsed but no hits — also try Gemini on the raw text as a fallback
+      if (GEMINI_API_KEY && pdfText.length > 50) {
+        try {
+          const prompt = `Extract ALL English language proficiency requirements from this PDF text. Return JSON only: {"ieltsOverall":null,"pteOverall":null,"toeflOverall":null,"cambridgeOverall":null,"duolingoOverall":null}`;
+          const result = await geminiChat(prompt, pdfText.slice(0, 12000), 150);
+          const parsed2 = JSON.parse(result);
+          const cd2: Partial<CourseData> = {};
+          applyEnglishResultToCourse(cd2, { ielts: { overall: parsed2.ieltsOverall }, pte: { overall: parsed2.pteOverall }, toefl: { overall: parsed2.toeflOverall } });
+          if (cd2.ieltsOverall || cd2.pteOverall || cd2.toeflOverall) return cd2;
+        } catch {}
+      }
+      return courseData;
+    }
+
+    // ── Gemini Vision fallback when pdftotext is unavailable ────────────────
+    // Send the PDF as base64 inline_data to Gemini (same REST pattern as analyzeImageWithGemini).
+    if (GEMINI_API_KEY) {
+      try {
+        const base64 = Buffer.from(buffer).toString("base64");
+        const prompt = `This is a university admissions policy PDF. Extract ALL English language proficiency test score requirements (IELTS, PTE Academic, TOEFL iBT, Cambridge CAE, Duolingo). There may be different values for undergraduate vs postgraduate. Return ONLY valid JSON: {"ieltsOverall":null,"pteOverall":null,"toeflOverall":null,"cambridgeOverall":null,"duolingoOverall":null}`;
+        const body = JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "application/pdf", data: base64 } }] }],
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 256 },
+        });
+        for (const model of GEMINI_MODELS) {
+          try {
+            const apiResp = await fetch(geminiUrl(model), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body,
+              signal: AbortSignal.timeout(60_000),
+            });
+            if (!apiResp.ok || apiResp.status === 429 || apiResp.status === 404) continue;
+            const data = await apiResp.json() as any;
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (!text) continue;
+            const parsed3 = JSON.parse(text);
+            const cd3: Partial<CourseData> = {};
+            if (parsed3.ieltsOverall) cd3.ieltsOverall = parsed3.ieltsOverall;
+            if (parsed3.pteOverall) cd3.pteOverall = parsed3.pteOverall;
+            if (parsed3.toeflOverall) cd3.toeflOverall = parsed3.toeflOverall;
+            if ((parsed3 as any).cambridgeOverall) (cd3 as any).cambridgeOverall = (parsed3 as any).cambridgeOverall;
+            if ((parsed3 as any).duolingoOverall) (cd3 as any).duolingoOverall = (parsed3 as any).duolingoOverall;
+            if (cd3.ieltsOverall || cd3.pteOverall || cd3.toeflOverall) return cd3;
+          } catch { continue; }
+        }
+      } catch {}
+    }
   } catch {}
   return {};
 }
