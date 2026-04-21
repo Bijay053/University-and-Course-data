@@ -1806,6 +1806,7 @@ export default function UniversityDetail() {
                     "🎓": { a:"#0e4786", b:"#4ea8ff", glow:"#4ea8ff30", tint:"#eef6ff", accent:"#4ea8ff" },
                     "💍": { a:"#9b1b6e", b:"#ff6eb4", glow:"#ff6eb430", tint:"#fff0f8", accent:"#ff6eb4" },
                     "⏱":  { a:"#0b5c73", b:"#00c8e0", glow:"#00c8e030", tint:"#f0fdff", accent:"#00c8e0" },
+                    "📅": { a:"#92400e", b:"#f97316", glow:"#f9731630", tint:"#fff7ed", accent:"#f97316" },
                     "ℹ️": { a:"#2d3748", b:"#718096", glow:"#71809630", tint:"#f7f8fa", accent:"#718096" },
                   };
                   const T = (e: string) => THEMES[e] ?? THEMES["ℹ️"];

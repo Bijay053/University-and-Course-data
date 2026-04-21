@@ -17,6 +17,7 @@ const ICON_MAP: Record<string, { emoji: string; bg: string; color: string }> = {
   spouse:      { emoji: "💍", bg: "#E1F5EE", color: "#0F6E56" },
   turnaround:  { emoji: "⏱",  bg: "#FAECE7", color: "#993C1D" },
   loan:        { emoji: "💳", bg: "#FAECE7", color: "#993C1D" },
+  deadline:    { emoji: "📅", bg: "#FFF0E6", color: "#C2410C" },
   other:       { emoji: "ℹ️", bg: "#F1EFE8", color: "#5F5E5A" },
 };
 function resolveIcon(title: string) {
@@ -28,6 +29,7 @@ function resolveIcon(title: string) {
   if (t.includes("spouse"))                                                                 return ICON_MAP.spouse;
   if (t.includes("turnaround") || t.includes("processing time"))                           return ICON_MAP.turnaround;
   if (t.includes("loan") || t.includes("assessment"))                                      return ICON_MAP.loan;
+  if (t.includes("deadline") || t.includes("intake") || t.includes("due date"))           return ICON_MAP.deadline;
   return ICON_MAP.other;
 }
 
@@ -43,7 +45,8 @@ Group content into these cards (use whichever apply). Each section has STRICT ru
 "Scholarship"        → scholarship criteria, GPA requirements, deduction rules
 "Spouse / dependent" → ALL marriage-related rules: married applicants (UG/PG), marriage duration, spouse qualification, spouse joining or not, age gap rules. "Married for UG" belongs HERE.
 "Turnaround times"   → offer/GTE/CoE processing times only
-"Other requirements" → visa refusal history, gap explanation, age limits, cash salary, tuition deposit, interview requirements — anything not fitting above sections
+"Deadlines"          → ALL date/deadline information: GS (GTE submission) deadline, offer acceptance deadline, CoE deadline, payment deadline, enrollment deadline, intake cutoff dates, application closing dates
+"Other requirements" → visa refusal history, gap explanation, age limits, cash salary, interview requirements — anything not fitting above sections
 
 JSON structure:
 [
