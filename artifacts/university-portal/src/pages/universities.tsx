@@ -4,12 +4,14 @@ import { useListUniversities, useCreateUniversity, getListUniversitiesQueryKey }
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Globe, ArrowRight, Building2, Trash2 } from "lucide-react";
+import { Plus, Search, Globe, ArrowRight, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -20,7 +22,6 @@ const formSchema = z.object({
   city: z.string().min(1, "City is required"),
   website: z.string().url().optional().or(z.literal("")),
 });
-
 
 const COUNTRY_FLAGS: Record<string, string> = {
   Australia: "🇦🇺", "United Kingdom": "🇬🇧", UK: "🇬🇧", USA: "🇺🇸",
@@ -35,6 +36,13 @@ export default function Universities() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editCountry, setEditCountry] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -55,6 +63,33 @@ export default function Universities() {
         form.reset();
       },
     });
+  };
+
+  const openEdit = (uni: { id: number; name: string; city: string; country: string }) => {
+    setEditId(uni.id);
+    setEditName(uni.name);
+    setEditCity(uni.city === "Unknown" ? "" : uni.city);
+    setEditCountry(uni.country === "Unknown" ? "" : uni.country);
+  };
+
+  const saveEdit = async () => {
+    if (!editId) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${editId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, city: editCity || "Unknown", country: editCountry || "Unknown" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: "University updated" });
+      setEditId(null);
+      queryClient.invalidateQueries({ queryKey: getListUniversitiesQueryKey() });
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -179,7 +214,6 @@ export default function Universities() {
                             {uni.name}
                           </span>
                         </Link>
-                        {/* Mobile location */}
                         <div className="flex items-center gap-1 mt-0.5 md:hidden">
                           <span className="text-xs">{flag}</span>
                           <span className="text-xs text-gray-500">{isUnknown ? uni.country : `${uni.city}, ${uni.country}`}</span>
@@ -224,21 +258,51 @@ export default function Universities() {
                       )}
                     </div>
 
-                    {/* Action */}
+                    {/* Actions */}
                     <div className="flex justify-end items-center gap-2">
-                      <button
-                        onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
-                        className="flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-600 bg-white hover:bg-red-50 border border-red-100 hover:border-red-300 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
-                        title="Delete university"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Quick View button — always visible */}
                       <Link href={`/universities/${uni.id}`}>
                         <button className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-600 group-hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg px-3 py-1.5 transition-all cursor-pointer">
                           View
                           <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                         </button>
                       </Link>
+
+                      {/* More options — kebab menu, visible on hover */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => navigate(`/universities/${uni.id}`)} className="gap-2 cursor-pointer">
+                            <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                            View Details
+                          </DropdownMenuItem>
+                          {uni.website && (
+                            <DropdownMenuItem asChild>
+                              <a href={uni.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 cursor-pointer">
+                                <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                                Open Website
+                              </a>
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openEdit(uni)} className="gap-2 cursor-pointer">
+                            <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => { setDeleteId(uni.id); setDeleteName(uni.name); }}
+                            className="gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 );
@@ -253,6 +317,37 @@ export default function Universities() {
           </>
         )}
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={editId !== null} onOpenChange={(o) => { if (!o) setEditId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit University</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1">
+              <Label>Name</Label>
+              <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="University name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>City</Label>
+                <Input value={editCity} onChange={e => setEditCity(e.target.value)} placeholder="City" />
+              </div>
+              <div className="space-y-1">
+                <Label>Country</Label>
+                <Input value={editCountry} onChange={e => setEditCountry(e.target.value)} placeholder="Country" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
