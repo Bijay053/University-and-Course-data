@@ -1,0 +1,80 @@
+
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au/mba...
+[INFO ] Using university: vit (ID: 6)
+[INFO ] Stopped previous running scrape job (scrape_1776777081284_8el45q) for vit before starting a fresh run
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/mba...
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 15 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 13 candidates to identify genuine course pages...
+[DISCOVER] URL analysis: 7 candidate course pages identified, filtered out 6 non-course URLs
+[DISCOVER] Phase 2: Researching 7 candidates — sampling 7 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Diploma Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Information Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[DISCOVER] Research complete: 7/7 sampled pages are genuine course pages
+[DISCOVER] All 7 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (7 total).
+[DISCOVER] High confidence: 7/7 samples valid (100%). Auto-proceeding with 7 courses (~1 min). (7 courses)
+[EXTRACT ] [SMART] Fetching 7 validated course pages (browser-first for JS-heavy, static-first for the rest)... (7 courses)
+[INFO ] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Rendering requirements page with browser (JS-heavy site)...
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...
+[INFO ] Batch concurrency: HTTP 3, browser 2 (heavy host: vit.edu.au)
+[ 1/7] Fetching 1/7: Bachelor Of Business
+[ 2/7] Fetching 2/7: Diploma Of Business
+[ 3/7] Fetching 3/7: Mba Finance
+[EXTRACT ] [browser ✓ intl] Bachelor Of Business — international_toggle_scripted[0]
+[EXTRACT ] [VIT static fallback ✓] Bachelor Of Business — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 4/7] Fetching 4/7: Mba Information Systems
+[EXTRACT ] [browser ✓ intl] Diploma Of Business — international_toggle_scripted[0]
+[EXTRACT ] [VIT static fallback ✓] Diploma Of Business — recovered duration=1 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Diploma Of Business -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 5/7] Fetching 5/7: Mba Leadership And Management
+[EXTRACT ] [browser ✓ intl] Mba Finance — international_toggle_scripted[0]
+[EXTRACT ] [VIT static fallback ✓] Mba Finance — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Mba Finance -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 6/7] Fetching 6/7: Mba Project Management
+[EXTRACT ] [browser ✓ intl] Mba Information Systems — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Mba Information Systems — recovered duration=2 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Mba Information Systems -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 7/7] Fetching 7/7: Mba Tourism And Hospitality Management
+[EXTRACT ] [browser ✓ intl] Mba Leadership And Management — international_toggle_scripted[0]
+[EXTRACT ] [VIT static fallback ✓] Mba Leadership And Management — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Mba Leadership And Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[EXTRACT ] [browser ✓ intl] Mba Project Management — international_toggle_scripted[0]
+[EXTRACT ] [VIT static fallback ✓] Mba Project Management — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Mba Project Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[EXTRACT ] [browser ✓ intl] Mba Tourism And Hospitality Management — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Mba Tourism And Hospitality Management — recovered duration=2 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Mba Tourism And Hospitality Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[INFO ] Classifying 7 courses with AI (batched)...
+[VALIDATE] [PRE-INSERT] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=-
+✓ Bachelor Of Business
+[VALIDATE] [PRE-INSERT] Diploma Of Business -> IELTS=5.5 PTE=- TOEFL=- CAE=-
+✓ Diploma Of Business
+[VALIDATE] [PRE-INSERT] Mba Finance -> IELTS=6.5 PTE=- TOEFL=- CAE=-
+✓ Mba Finance
+[VALIDATE] [PRE-INSERT] Mba Information Systems -> IELTS=6.5 PTE=- TOEFL=- CAE=-
+✓ Mba Information Systems
+[VALIDATE] [PRE-INSERT] Mba Leadership And Management -> IELTS=6.5 PTE=- TOEFL=- CAE=-
+✓ Mba Leadership And Management
+[VALIDATE] [PRE-INSERT] Mba Project Management -> IELTS=6.5 PTE=- TOEFL=- CAE=-
+✓ Mba Project Management
+[VALIDATE] [PRE-INSERT] Mba Tourism And Hospitality Management -> IELTS=6.5 PTE=- TOEFL=- CAE=-
+[INFO ] Recovered completed scrape job from staged course records.
+══ DONE ══ Found:7 | Staged:7 | Skipped:0 | Errors:0

@@ -1,0 +1,77 @@
+Review Scraped Courses
+7 pending
+Remove duplicates
+Reject (7)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor Of Business
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Bachelor	3 Year	A$48,000/Full Course	6	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Diploma Of Business
+Business & Management
+Publish: ready
+Eligibility: eligible
+⚠ Publish blocked: Needs review: degreeLevel, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Certificate & Diploma	1 Year	A$12,000/Full Course	5.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Finance
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Leadership And Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Project Management
+Business & Management
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Jan, Mar, May, Jun, Aug, Oct	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
+	
+Mba Tourism And Hospitality Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: eligible
+⚠ Publish blocked: Needs review: courseName, pteOverall, toeflOverall | Warnings: missing academic requirement
+90%	Master	2 Year	A$48,000/Full Course	6.5	-	-	-	-	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong	On Campus	
+
+
+
