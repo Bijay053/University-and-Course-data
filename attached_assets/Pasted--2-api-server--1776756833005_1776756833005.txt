@@ -1,0 +1,186 @@
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 4    │ online    │ 0%       │ 18.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && \
+  pnpm --filter @workspace/api-server run build && \
+  pm2 restart 2
+remote: Enumerating objects: 30, done.
+remote: Counting objects: 100% (30/30), done.
+remote: Compressing objects: 100% (12/12), done.
+remote: Total 23 (delta 14), reused 20 (delta 11), pack-reused 0 (from 0)
+Unpacking objects: 100% (23/23), 356.93 KiB | 3.02 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   3a73808..e5411de  main       -> origin/main
+Updating 3a73808..e5411de
+Fast-forward
+ artifacts/api-server/src/routes/scrape.ts                               | 120 ++++++++++++++++++++-------
+ ...se-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TO_1776751429418.txt |  79 ++++++++++++++++++
+ ...-Scraping-started-in-background-INFO-Scraping-http_1776751413818.txt | 147 +++++++++++++++++++++++++++++++++
+ ...-Scraping-started-in-background-INFO-Scraping-http_1776752468941.txt | 147 +++++++++++++++++++++++++++++++++
+ ...e-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TOE_1776752487917.txt |  91 ++++++++++++++++++++
+ ...nce-Review-Bachelor-of-Business-International-Busi_1776752503258.txt |  79 ++++++++++++++++++
+ attached_assets/image_1776751476901.png                                 | Bin 0 -> 169681 bytes
+ attached_assets/image_1776752605792.png                                 | Bin 0 -> 222667 bytes
+ 8 files changed, 632 insertions(+), 31 deletions(-)
+ create mode 100644 attached_assets/Pasted--Course-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TO_1776751429418.txt
+ create mode 100644 attached_assets/Pasted--INFO-Scraping-started-in-background-INFO-Scraping-http_1776751413818.txt
+ create mode 100644 attached_assets/Pasted--INFO-Scraping-started-in-background-INFO-Scraping-http_1776752468941.txt
+ create mode 100644 attached_assets/Pasted-Course-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TOE_1776752487917.txt
+ create mode 100644 attached_assets/Pasted-Evidence-Review-Bachelor-of-Business-International-Busi_1776752503258.txt
+ create mode 100644 attached_assets/image_1776751476901.png
+ create mode 100644 attached_assets/image_1776752605792.png
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.6mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.1mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1036ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 5    │ online    │ 0%       │ 10.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && \
+  pnpm --filter @workspace/api-server run build && pm2 restart 2
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 7 (delta 5), reused 7 (delta 5), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.53 KiB | 97.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   e5411de..2ae33b2  main       -> origin/main
+Updating e5411de..2ae33b2
+Fast-forward
+ artifacts/api-server/src/routes/scrape.ts | 33 ++++++++++++++++++++++++++++++---
+ 1 file changed, 30 insertions(+), 3 deletions(-)
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.6mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.1mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1073ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 6    │ online    │ 0%       │ 19.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# echo "GEMINI_API_KEY=REDACTED_LEAKED_KEY_1" > /root/University-and-Course-data/.env
+pm2 restart 2
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 7    │ online    │ 0%       │ 12.8mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# # On 159.65.152.72, edit the env file PM2 loads, then restart:
+pm2 restart 2 --update-env
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 8    │ online    │ 0%       │ 18.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_1
+pm2 restart 2 --update-env
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 9    │ online    │ 0%       │ 14.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
+GEMINI_API_KEY: REDACTED_LEAKED_KEY_1
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=REDACTED_LEAKED_KEY_1" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
+{
+  "error": {
+    "code": 403,
+root@university-and-course-data:~/University-and-Course-data# read -rs GEMINI_API_KEY
+# (type/paste the key here — it won't be echoed)
+export GEMINI_API_KEY
+pm2 restart 2 --update-env
+
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 10   │ online    │ 0%       │ 17.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# 
+root@university-and-course-data:~/University-and-Course-data# 
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_2
+root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
+GEMINI_API_KEY: 
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_2
+pm2 restart 2 --update-env
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 11   │ online    │ 0%       │ 17.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
+GEMINI_API_KEY: REDACTED_LEAKED_KEY_2
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=REDACTED_LEAKED_KEY_1" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
+{
+  "error": {
+    "code": 403,
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key= REDACTED_LEAKED_KEY_2" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
+root@university-and-course-data:~/University-and-Course-data# read -rs GEMINI_API_KEY
+# (type/paste the key here — it won't be echoed)
+export GEMINI_API_KEY
+pm2 restart 2 --update-env
+[PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
+[PM2] [api-server](2) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 2  │ api-server         │ fork     │ 12   │ online    │ 0%       │ 17.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# 

@@ -10652,6 +10652,19 @@ router.post("/scrape/staged/approve-all", async (req: Request, res: Response): P
   }
 });
 
+router.post("/scrape/staged/clear-rejected/:uniId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uniId = parseInt(req.params.uniId, 10);
+    if (isNaN(uniId)) { res.status(400).json({ error: "Invalid university id" }); return; }
+    const result = await db.delete(scrapedCoursesTable)
+      .where(and(eq(scrapedCoursesTable.universityId, uniId), eq(scrapedCoursesTable.status, "rejected")));
+    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    res.json({ success: true, deleted });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 router.post("/scrape/staged/reject-all", async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.body as { jobId: string };
