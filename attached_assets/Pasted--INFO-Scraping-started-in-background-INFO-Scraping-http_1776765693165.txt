@@ -1,0 +1,40 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://www.asahe.edu.au/...
+[INFO ] Using university: asa (ID: 2)
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing found at https://www.asahe.edu.au/our-courses/courses-grid-view
+[INFO ] Switched to course listing: https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Using provided university-level pages: feePage: https://asahe.edu.au/fees-and-charges, feesPdf: https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf, requirementsPdf: https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf, requirementsPage: https://asahe.edu.au/policies-and-forms
+[CLASSIFY] Page type: listing — 9 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap: found 9 course URLs total
+[DISCOVER] [SMART] Sampling candidate pages — researching 9 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 9 candidates — sampling 9 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: www.asahe.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business International Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business Technology Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Professional Accounting"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Software Application Development"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Project Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Cyber Security)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Master of Information Technology (Artificial Intelligence)"
+[DISCOVER] Research complete: 9/9 sampled pages are genuine course pages
+[DISCOVER] All 9 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (9 total).
+[DISCOVER] High confidence: 9/9 samples valid (100%). Auto-proceeding with 9 courses (~1 min). (9 courses)
+[EXTRACT ] [SMART] Fetching 9 validated course pages (browser-first for JS-heavy, static-first for the rest)... (9 courses)
+[INFO ] [feedback] 9 active rejection(s) for this university — issue types: generic; preferring fee PDF / schedule when available
+[INFO ] Saved university requirements page has NO English-test keywords — discarding to avoid wrong data: https://asahe.edu.au/policies-and-forms
+[INFO ] Using university requirements PDF: https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+[INFO ] Batch concurrency: HTTP 1, browser 1 (heavy host: www.asahe.edu.au, browser disabled)
+[ 1/9] Fetching 1/9: Bachelor of Business International Business
+[FALLBACK] [per-course browser ✓] Bachelor of Business International Business — IELTS=6 PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision] scanning 6 image(s) for Bachelor of Business International Busin...
+[FALLBACK] [per-course vision full-scan] scanning 4 image(s) for Bachelor of Business International Busin...
+[FALLBACK] [per-course vision ⚠ no English data] Bachelor of Business International Business — scanned 10 image(s), no sibling cache for undergraduate
+[ 2/9] Fetching 2/9: Bachelor of Business Hospitality Management

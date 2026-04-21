@@ -2345,6 +2345,20 @@ function extractPteFromText(rawText: string): PteResult {
     };
   }
 
+  // Pattern 3.5: "PTE (Pearson Test of English Academic) Academic Score of 50"
+  // Handles multi-line PDF tables where "Academic Score of N" appears after the test name
+  const acadScoreM = text.match(/pte[\s\S]{0,120}?academic\s+score\s+of\s+([0-9]+)/i);
+  if (acadScoreM) {
+    const overall = Number(acadScoreM[1]);
+    if (overall >= 10 && overall <= 90) return { overall, listening: null, reading: null, writing: null, speaking: null };
+  }
+  // Pattern 3.6: plain "PTE Academic N" or "PTE Academic: N" (e.g. "PTE Academic 50")
+  const pteAcadPlain = text.match(/pte\s+academic\s*:?\s*([0-9]+)/i);
+  if (pteAcadPlain) {
+    const overall = Number(pteAcadPlain[1]);
+    if (overall >= 10 && overall <= 90) return { overall, listening: null, reading: null, writing: null, speaking: null };
+  }
+
   // Pattern 4: overall near "PTE", bands individually
   const overallM = text.match(/pte(?:\s+academic)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)/i);
   if (!overallM) {
