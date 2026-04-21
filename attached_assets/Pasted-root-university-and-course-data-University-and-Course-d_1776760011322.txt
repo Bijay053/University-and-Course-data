@@ -1,0 +1,34 @@
+root@university-and-course-data:~/University-and-Course-data# pm2 status
+pm2 logs 1 --lines 30
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ uni-api            │ cluster  │ 1    │ online    │ 0%       │ 205.6mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 30 lines for [1] process (change the value with --lines option)
+/root/.pm2/logs/uni-api-out-1.log last 30 lines:
+/root/.pm2/logs/uni-api-error-1.log last 30 lines:
+1|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+1|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+1|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+1|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+1|uni-api  | Error: DATABASE_URL must be set. Did you forget to provision a database?
+1|uni-api  |     at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+1|uni-api  |     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+1|uni-api  |     at processTicksAndRejections (node:internal/process/task_queues:104:5)
+1|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
