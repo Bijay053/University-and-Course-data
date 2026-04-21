@@ -1619,7 +1619,10 @@ export default function UniversityDetail() {
                         "hover:bg-blue-50/20"
                       }`}
                     >
-                      <td className="sticky left-0 bg-inherit border-r px-3 py-2 text-muted-foreground font-mono">
+                      <td className={`sticky left-0 border-r px-3 py-2 text-muted-foreground font-mono ${
+                        c.status === "approved" ? "bg-green-50" :
+                        c.status === "rejected" ? "bg-red-50" : "bg-white"
+                      }`}>
                         <div className="flex items-center gap-1.5">
                           {c.status === "pending" ? (
                             <input
@@ -1634,7 +1637,10 @@ export default function UniversityDetail() {
                           <span>{idx + 1}</span>
                         </div>
                       </td>
-                      <td className="sticky bg-inherit border-r px-3 py-2 font-medium text-gray-800 min-w-[220px]" style={{ left: 52 }}>
+                      <td className={`sticky border-r px-3 py-2 font-medium text-gray-800 min-w-[220px] ${
+                        c.status === "approved" ? "bg-green-50" :
+                        c.status === "rejected" ? "bg-red-50" : "bg-white"
+                      }`} style={{ left: 52 }}>
                         <div className="flex items-center gap-1.5">
                           <span className="line-clamp-1 max-w-[200px]">{c.course_name}</span>
                           {c.course_website && (
