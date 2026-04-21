@@ -9414,12 +9414,34 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
     }
 
     if (sitemapCandidates.length >= 10) {
-      // Sitemap is the best source — use it exclusively to avoid listing page navigation pollution
+      // Sitemap is primary source — also merge in listing page links to avoid missing courses
       addLog(job, "status", {
         message: `[SMART] Sitemap found ${sitemapCandidates.length} candidate URLs. Analyzing to identify real course pages...`,
         phase: "discover",
       });
-      rawCandidates = sitemapCandidates;
+      rawCandidates = [...sitemapCandidates];
+      // Supplement with listing page links that sitemap may have missed
+      if (analysis.pageType === "listing" && analysis.courseLinks?.length) {
+        const seen = new Set(rawCandidates.map((l) => l.url));
+        for (const l of analysis.courseLinks) {
+          if (l.url && l.name && !isJunkCourseName(l.name) && !seen.has(l.url)) {
+            seen.add(l.url); rawCandidates.push(l);
+          }
+        }
+      }
+      // Also scrape href links from the listing HTML
+      const $2 = cheerio.load(html);
+      $2("a[href]").each((_, el) => {
+        const href = $2(el).attr("href") || "";
+        const text = $2(el).text().trim().replace(/\s+/g, " ");
+        const fullUrl = resolveDiscoverableUrl(href, resolvedUrl, activeOrigin);
+        if (!fullUrl) return;
+        if ((isCourseUrl(fullUrl) || isCourseText(text)) && !isJunkCourseName(text)) {
+          if (!rawCandidates.find((c) => c.url === fullUrl)) {
+            rawCandidates.push({ url: fullUrl, name: text });
+          }
+        }
+      });
     } else {
       // Fallback: extract links from listing page HTML (AI-identified + HTML scraping)
       let listingLinks: { url: string; name: string }[] = [];
