@@ -946,11 +946,11 @@ export default function UniversityDetail() {
 
   // ── Country group colour palette (cycles if > 5 countries) ──────────────
   const ACAD_PALETTES = [
-    { hdr: { background: "#ecfeff", color: "#0e7490" }, sub: { background: "#f0feff", color: "#0891b2" }, cell: "#f7feff", border: "#67e8f9" },
-    { hdr: { background: "#eef2ff", color: "#3730a3" }, sub: { background: "#f5f7ff", color: "#4338ca" }, cell: "#f8f9ff", border: "#a5b4fc" },
-    { hdr: { background: "#ecfdf5", color: "#065f46" }, sub: { background: "#f0fdf9", color: "#059669" }, cell: "#f6fefb", border: "#6ee7b7" },
-    { hdr: { background: "#fffbeb", color: "#92400e" }, sub: { background: "#fffef5", color: "#d97706" }, cell: "#fffef8", border: "#fcd34d" },
-    { hdr: { background: "#fff1f2", color: "#9f1239" }, sub: { background: "#fff8f9", color: "#e11d48" }, cell: "#fff9fa", border: "#fda4af" },
+    { hdr: { background: "#ecfeff", color: "#0e7490" }, sub: { background: "#f0feff", color: "#0891b2" }, cell: "#f7feff", border: "#bae6fd" },
+    { hdr: { background: "#eef2ff", color: "#3730a3" }, sub: { background: "#f5f7ff", color: "#4338ca" }, cell: "#f8f9ff", border: "#c7d2fe" },
+    { hdr: { background: "#ecfdf5", color: "#065f46" }, sub: { background: "#f0fdf9", color: "#059669" }, cell: "#f6fefb", border: "#a7f3d0" },
+    { hdr: { background: "#fffbeb", color: "#92400e" }, sub: { background: "#fffef5", color: "#d97706" }, cell: "#fffef8", border: "#fde68a" },
+    { hdr: { background: "#fff1f2", color: "#9f1239" }, sub: { background: "#fff8f9", color: "#e11d48" }, cell: "#fff9fa", border: "#fecdd3" },
   ] as const;
 
   // ── Academic requirements lookup for Courses tab ─────────────────────────
@@ -1334,7 +1334,7 @@ export default function UniversityDetail() {
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
           </div>
 
-          <div ref={tableScrollRef} className="border border-gray-100 rounded-xl overflow-auto [&_th]:border-gray-100 [&_td]:border-gray-100" style={{ maxHeight: "70vh" }}>
+          <div ref={tableScrollRef} className="courses-table border border-gray-100 rounded-xl overflow-auto" style={{ maxHeight: "70vh" }}>
             <table className="text-xs whitespace-nowrap border-collapse" style={{ minWidth: 3000 }}>
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-wide border-b">
@@ -1355,7 +1355,7 @@ export default function UniversityDetail() {
                           key={country}
                           colSpan={3}
                           className={`px-2 py-2 text-center font-bold${isLast ? " border-r" : ""}`}
-                          style={{ ...pal.hdr, borderLeft: `2px solid ${pal.border}` }}
+                          style={{ ...pal.hdr, borderLeft: `1px solid ${pal.border}` }}
                         >
                           {country}
                         </th>
@@ -1414,7 +1414,7 @@ export default function UniversityDetail() {
                         <React.Fragment key={country}>
                           <th
                             className="px-2 py-2 font-medium min-w-[110px]"
-                            style={{ background: pal.sub.background, color: pal.sub.color, borderLeft: `2px solid ${pal.border}` }}
+                            style={{ background: pal.sub.background, color: pal.sub.color, borderLeft: `1px solid ${pal.border}` }}
                           >Level</th>
                           <th
                             className="px-2 py-2 font-medium min-w-[55px]"
@@ -1512,7 +1512,7 @@ export default function UniversityDetail() {
                           <React.Fragment key={country}>
                             <td
                               className={`px-2 py-2 font-medium`}
-                              style={{ background: pal.cell, color: pal.sub.color, borderLeft: `2px solid ${pal.border}` }}
+                              style={{ background: pal.cell, color: pal.sub.color, borderLeft: `1px solid ${pal.border}` }}
                             >{txt(req?.academicLevel ?? null)}</td>
                             <td
                               className="px-2 py-2 font-semibold"
