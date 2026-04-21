@@ -1796,50 +1796,72 @@ export default function UniversityDetail() {
                 </div>
 
                 {/* Cards grid */}
-                {note.parsed_data && note.parsed_data.length > 0 ? (
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {note.parsed_data.map((card, ci) => (
-                      <div key={ci} className="border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden">
-                        {/* Card header */}
-                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100">
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-base shrink-0"
-                            style={{ background: card.bg ?? "#F1EFE8" }}>
-                            {card.emoji ?? "ℹ️"}
-                          </div>
-                          <span className="text-sm font-semibold text-gray-800">{card.title}</span>
-                        </div>
-                        {/* Card body */}
-                        <div className="px-4 divide-y divide-gray-100">
-                          {card.fields?.map((f, fi) => (
-                            <div key={fi} className="flex justify-between items-center gap-3 py-2.5 min-h-[40px]">
-                              <span className="text-sm text-gray-500 shrink-0 max-w-[46%] leading-snug">{f.label}</span>
-                              {f.badge === "yes" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500 text-white whitespace-nowrap">Yes</span>}
-                              {f.badge === "no"  && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500 text-white whitespace-nowrap">No</span>}
-                              {f.badge === "case" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-400 text-white whitespace-nowrap">Case by case</span>}
-                              {!f.badge && <span className="text-sm text-gray-800 font-medium text-right leading-snug">{f.value}</span>}
-                            </div>
-                          ))}
-                          {card.sections?.map((sec, si) => (
-                            <div key={si} className="py-2">
-                              <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">{sec.label}</div>
-                              <div className="divide-y divide-gray-100">
-                                {sec.fields?.map((f, fi) => (
-                                  <div key={fi} className="flex justify-between items-center gap-3 py-2 min-h-[36px]">
-                                    <span className="text-sm text-gray-500 shrink-0 max-w-[46%] leading-snug">{f.label}</span>
-                                    {f.badge === "yes" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500 text-white whitespace-nowrap">Yes</span>}
-                                    {f.badge === "no"  && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500 text-white whitespace-nowrap">No</span>}
-                                    {f.badge === "case" && <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-400 text-white whitespace-nowrap">Case by case</span>}
-                                    {!f.badge && <span className="text-sm text-gray-800 font-medium text-right leading-snug">{f.value}</span>}
-                                  </div>
-                                ))}
+                {note.parsed_data && note.parsed_data.length > 0 ? (() => {
+                  const CARD_THEMES: Record<string, { grad: string; shadow: string; light: string }> = {
+                    "🏦": { grad: "linear-gradient(135deg,#1e40af,#3b82f6)", shadow: "0 8px 32px -4px #3b82f640", light: "#eff6ff" },
+                    "👤": { grad: "linear-gradient(135deg,#065f46,#10b981)", shadow: "0 8px 32px -4px #10b98140", light: "#ecfdf5" },
+                    "👨‍👩‍👧": { grad: "linear-gradient(135deg,#92400e,#f59e0b)", shadow: "0 8px 32px -4px #f59e0b40", light: "#fffbeb" },
+                    "💳": { grad: "linear-gradient(135deg,#9f1239,#f43f5e)", shadow: "0 8px 32px -4px #f43f5e40", light: "#fff1f2" },
+                    "🎓": { grad: "linear-gradient(135deg,#4c1d95,#8b5cf6)", shadow: "0 8px 32px -4px #8b5cf640", light: "#f5f3ff" },
+                    "💍": { grad: "linear-gradient(135deg,#831843,#ec4899)", shadow: "0 8px 32px -4px #ec489940", light: "#fdf2f8" },
+                    "⏱":  { grad: "linear-gradient(135deg,#312e81,#6366f1)", shadow: "0 8px 32px -4px #6366f140", light: "#eef2ff" },
+                    "ℹ️": { grad: "linear-gradient(135deg,#1e293b,#64748b)", shadow: "0 8px 32px -4px #64748b40", light: "#f8fafc" },
+                  };
+                  const getTheme = (emoji: string) => CARD_THEMES[emoji] ?? CARD_THEMES["ℹ️"];
+
+                  const FieldBadge = ({ badge, value }: { badge: string | null; value: string }) => {
+                    if (badge === "yes")  return <span style={{ background: "#22c55e" }} className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full text-white tracking-wide whitespace-nowrap shadow-sm">✓ Yes</span>;
+                    if (badge === "no")   return <span style={{ background: "#ef4444" }} className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full text-white tracking-wide whitespace-nowrap shadow-sm">✕ No</span>;
+                    if (badge === "case") return <span style={{ background: "#f97316" }} className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full text-white tracking-wide whitespace-nowrap shadow-sm">⚡ Case by case</span>;
+                    return <span className="text-sm font-semibold text-gray-900 text-right leading-snug max-w-[54%]">{value}</span>;
+                  };
+
+                  return (
+                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      {note.parsed_data!.map((card, ci) => {
+                        const theme = getTheme(card.emoji ?? "ℹ️");
+                        return (
+                          <div key={ci} className="rounded-2xl overflow-hidden" style={{ boxShadow: theme.shadow, border: "1px solid rgba(0,0,0,0.06)" }}>
+                            {/* Gradient header */}
+                            <div className="px-5 py-4 flex items-center gap-3" style={{ background: theme.grad }}>
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(6px)" }}>
+                                {card.emoji ?? "ℹ️"}
+                              </div>
+                              <div>
+                                <p className="text-white font-bold text-[15px] leading-tight">{card.title}</p>
+                                <p className="text-white/60 text-[11px] mt-0.5">{(card.fields?.length ?? 0) + (card.sections?.reduce((a, s) => a + (s.fields?.length ?? 0), 0) ?? 0)} details</p>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
+                            {/* Body */}
+                            <div style={{ background: "#fff" }}>
+                              {card.fields?.map((f, fi) => (
+                                <div key={fi} className="flex justify-between items-center gap-3 px-5 py-3" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <span className="text-[13px] text-slate-500 shrink-0 max-w-[44%] leading-snug">{f.label}</span>
+                                  <FieldBadge badge={f.badge} value={f.value} />
+                                </div>
+                              ))}
+                              {card.sections?.map((sec, si) => (
+                                <div key={si}>
+                                  <div className="px-5 py-2 flex items-center gap-2" style={{ background: theme.light }}>
+                                    <div className="h-px flex-1" style={{ background: "rgba(0,0,0,0.08)" }} />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>{sec.label}</span>
+                                    <div className="h-px flex-1" style={{ background: "rgba(0,0,0,0.08)" }} />
+                                  </div>
+                                  {sec.fields?.map((f, fi) => (
+                                    <div key={fi} className="flex justify-between items-center gap-3 px-5 py-3" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                      <span className="text-[13px] text-slate-500 shrink-0 max-w-[44%] leading-snug">{f.label}</span>
+                                      <FieldBadge badge={f.badge} value={f.value} />
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })() : (
                   <div className="p-4 text-sm text-muted-foreground italic">
                     <p className="font-medium text-gray-700 mb-1">Raw notes:</p>
                     <pre className="whitespace-pre-wrap text-xs text-gray-600 font-mono bg-gray-50 rounded p-3 border">{note.raw_text}</pre>
