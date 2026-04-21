@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, inArray } from "drizzle-orm";
-import { db, scholarshipsTable } from "@workspace/db";
+import { db, scholarshipsTable, pool } from "@workspace/db";
 import {
   ListCourseScholarshipsParams,
   CreateCourseScholarshipParams,
@@ -71,6 +71,45 @@ router.delete("/scholarships/:id", async (req, res): Promise<void> => {
 });
 
 // Bulk add: add a scholarship to many courses at once
+// Returns all courses that have at least one row in scholarships table for a university
+router.get("/universities/:universityId/scholarship-courses", async (req, res): Promise<void> => {
+  const universityId = Number(req.params.universityId);
+  if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
+  try {
+    const result = await pool.query<{
+      course_id: number; course_name: string; degree_level: string | null; category: string | null;
+      scholarship_id: number; name: string; details: string | null; eligibility_criteria: string | null;
+      amount: number | null; percentage: number | null; currency: string | null;
+    }>(`
+      SELECT c.id AS course_id, c.name AS course_name, c.degree_level, c.category,
+             s.id AS scholarship_id, s.name, s.details, s.eligibility_criteria,
+             s.amount, s.percentage, s.currency
+      FROM scholarships s
+      JOIN courses c ON c.id = s.course_id
+      WHERE c.university_id = $1
+      ORDER BY c.name, s.id
+    `, [universityId]);
+
+    // Group by course
+    const courseMap = new Map<number, {
+      id: number; name: string; degreeLevel: string | null; category: string | null;
+      scholarships: { id: number; name: string; details: string | null; eligibilityCriteria: string | null; amount: number | null; percentage: number | null; currency: string | null }[];
+    }>();
+    for (const row of result.rows) {
+      if (!courseMap.has(row.course_id)) {
+        courseMap.set(row.course_id, { id: row.course_id, name: row.course_name, degreeLevel: row.degree_level, category: row.category, scholarships: [] });
+      }
+      courseMap.get(row.course_id)!.scholarships.push({
+        id: row.scholarship_id, name: row.name, details: row.details,
+        eligibilityCriteria: row.eligibility_criteria, amount: row.amount, percentage: row.percentage, currency: row.currency,
+      });
+    }
+    res.json(Array.from(courseMap.values()));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 router.post("/universities/:universityId/bulk-scholarships", async (req, res): Promise<void> => {
   const universityId = Number(req.params.universityId);
   if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid universityId" }); return; }
