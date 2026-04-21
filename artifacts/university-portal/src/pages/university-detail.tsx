@@ -358,11 +358,33 @@ export default function UniversityDetail() {
     setBulkSearch("");
     setBulkFilter("all");
     setSelectedIds(new Set());
+
+    // Reset ALL academic fields
+    setBacadLevel("");
+    setBacadScore("");
+    setBacadScoreType("%");
     setBacadOutOf("");
     setBacadCountries([]);
+    setBacadCountryOpen(false);
     setBacadError("");
-    setBSchAmountType("fixed");
+
+    // Reset ALL English fields
+    setBEngTestType("IELTS");
+    setBEngL("");
+    setBEngS("");
+    setBEngW("");
+    setBEngR("");
+    setBEngO("");
+    setBEngTestName("");
+
+    // Reset ALL scholarship fields
+    setBSchName("");
+    setBSchDetails("");
+    setBSchEligibility("");
     setBSchAmount("");
+    setBSchCurrency("AUD");
+    setBSchAmountType("fixed");
+    setBSchReplace(false);
   };
 
   const switchTab = (t: Tab) => {
