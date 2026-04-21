@@ -22,6 +22,7 @@ export interface University {
   logoUrl?: string | null;
   /** @nullable */
   scrapeUrl?: string | null;
+  courseCount?: number;
   createdAt: string;
   updatedAt: string;
 }
