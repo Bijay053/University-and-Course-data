@@ -1,0 +1,78 @@
+Done. Now update VIT scrape URL in the UI to: https://vit.edu.au/course-list
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+OLD = '      });\n    } else {\n      // Fallback: extract links from listing page HTML (AI-identified + HTML scraping)'
+
+NEW = '''      });
+      // Slug-dedup: collapse /our-courses/bachelor-x and /bachelor-x into one
+      const _slugDedup2 = new Map();
+      const _slugOf2 = (u) => {
+        try {
+          const parsed = new URL(u);
+          const segs = parsed.pathname.replace(/\\/+$/, "").split("/").filter(Boolean);
+          const last = segs[segs.length - 1] || "";
+          if (!last || /^index(\\.html?)?$/i.test(last)) return null;
+          return `${parsed.host.toLowerCase()}|${last.toLowerCase()}`;
+        } catch { return null; }
+      };
+      for (const c of rawCandidates) {
+        const k = _slugOf2(c.url);
+        if (!k) { _slugDedup2.set(`__nokey__${c.url}`, c); continue; }
+        const existing = _slugDedup2.get(k);
+        if (!existing || c.url.length < existing.url.length) _slugDedup2.set(k, c);
+      }
+      rawCandidates = [..._slugDedup2.values()];
+    } else {
+      // Fallback: extract links from listing page HTML (AI-identified + HTML scraping)'''
+
+# Check if already patched
+if '_slugDedup2' in s:
+    print("SKIP: already patched")
+elif OLD in s:
+    s = s.replace(OLD, NEW)
+    open(p, "w").write(s)
+    print("PASS: slug-dedup added to sitemap branch")
+else:
+    print("MISS: anchor not found")
+PYEOF
+
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart 1 --update-env && echo "DEPLOYED OK"
+PASS: slug-dedup added to sitemap branch
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 570ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 66038    │ 0s     │ 32   │ online    │ 0%       │ 45.9mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# # Deploy slug-dedup if not done yet
+python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+if '_slugDedup2' in s:
+    print("SKIP: already patched")
+else:
+    print("NEEDS PATCH - run previous command first")
+PYEOF
+SKIP: already patched
+root@university-and-course-data:~/University-and-Course-data# curl -s -X POST "http://localhost/api/scrape/start" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://vit.edu.au/mba/mba-finance","universityId":6,"fastMode":false}'; echo
+
+sleep 60
+
+# Check modal fired AND English scores
+grep -E "\[BROWSER\] english_modal|POST-CACHE.*IELTS|PRE-INSERT" \
+  ~/.pm2/logs/uni-api-out-1.log | tail -20
+{"jobId":"scrape_1776779216330_jxa4ft","message":"Scraping started in background"}
+root@university-and-course-data:~/University-and-Course-data# 
