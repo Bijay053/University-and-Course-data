@@ -1,0 +1,74 @@
+p = "/root/University-and-Course-data/artifacts/api-server/src/browser-helper.ts"
+s = open(p).read()
+
+OLD = '''      const triggerHandles = await page.evaluateHandle((patternStrs: string[]) => {
+        const patterns = patternStrs.map((s) => new RegExp(s, "i"));
+        const out: Element[] = [];
+        const sel = "a, button, span, summary, div[role='button'], [data-toggle='modal'], [data-bs-toggle='modal'], [data-target], [data-bs-target]";
+        document.querySelectorAll(sel).forEach((el) => {
+          const txt = (el.textContent || "").trim().slice(0, 250);
+          if (txt && patterns.some((p) => p.test(txt))) out.push(el);
+        });
+        return out;
+      }, ENGLISH_MODAL_PATTERNS_SRC);
+      const triggerCount: number = await page.evaluate(
+        (els: any) => (els as Element[]).length,
+        triggerHandles,
+      ).catch(() => 0);'''
+
+NEW = '''      const triggerCount: number = await page.evaluate((patternStrs: string[]) => {
+        const patterns = patternStrs.map((s) => new RegExp(s, "i"));
+        const sel = "a, button, span, summary, div[role=\\'button\\'], [data-toggle=\\'modal\\'], [data-bs-toggle=\\'modal\\'], [data-target], [data-bs-target]";
+        let n = 0;
+        document.querySelectorAll(sel).forEach((el) => {
+          const txt = (el.textContent || "").trim().slice(0, 250);
+          if (txt && patterns.some((p) => p.test(txt))) n++;
+        });
+        return n;
+      }, ENGLISH_MODAL_PATTERNS_SRC).catch(() => 0);'''
+
+if OLD in s:
+    s = s.replace(OLD, NEW)
+    print("PASS: triggerCount replaced")
+else:
+    print("MISS: block not found")
+
+OLD2 = '''          await page.evaluate(
+            ({ els, idx }: any) => {
+              const el = (els as Element[])[idx] as HTMLElement;'''
+
+NEW2 = '''          await page.evaluate(
+            ({ patternStrs, idx }: { patternStrs: string[]; idx: number }) => {
+              const patterns = patternStrs.map((s: string) => new RegExp(s, "i"));
+              const sel = "a, button, span, summary, div[role=\\'button\\'], [data-toggle=\\'modal\\'], [data-bs-toggle=\\'modal\\'], [data-target], [data-bs-target]";
+grep -E "\[BROWSER\] english_modal" ~/.pm2/logs/uni-api-out-1.log | tail -30cho && \ as HTMLElement);
+PASS: triggerCount replaced
+PASS: click-loop replaced
+PASS: args replaced
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.7mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 846ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ uni-api    │ default     │ 0.0.0   │ cluster │ 64825    │ 0s     │ 28   │ online    │ 0%       │ 46.2mb   │ root     │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+{"jobId":"scrape_1776778740136_01yw4w","message":"Scraping started in background"}
