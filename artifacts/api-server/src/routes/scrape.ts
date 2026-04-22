@@ -9117,11 +9117,25 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     for (const item of classifyQueue) {
       const dlk = degreeLevelKey(item.data.degreeLevel);
       if (!dlk) continue;
-      const cached = englishByDegreeLevel.get(dlk);
+      // Cache key includes host (matches englishByDegreeLevel.set at the
+      // per-course-vision step). Falling back to dlk-only for legacy callers.
+      let cached: Partial<CourseData> | undefined;
+      try {
+        const host = item.data.courseWebsite ? new URL(item.data.courseWebsite).host.toLowerCase() : "";
+        if (host) cached = englishByDegreeLevel.get(`${host}|${dlk}`);
+      } catch {}
+      if (!cached) cached = englishByDegreeLevel.get(dlk);
       if (!cached) continue;
-      const hadPte = item.data.pteOverall != null;
-      const hadToefl = item.data.toeflOverall != null;
-      const hadCae = (item.data as any).cambridgeOverall != null;
+      // If the existing PTE/TOEFL/CAE/IELTS-bands came from the university
+      // PDF cache (`requirements_page` reviewSource), the sibling cache —
+      // which is course-page-derived (vision) — is more specific and MUST
+      // override. Otherwise just fill empty slots.
+      const fromPdfCache = item.reviewSources.some(
+        (rs) => rs.pageType === "requirements_page" && rs.extractionMethod === "cheerio",
+      );
+      const hadPte = item.data.pteOverall != null && !fromPdfCache;
+      const hadToefl = item.data.toeflOverall != null && !fromPdfCache;
+      const hadCae = (item.data as any).cambridgeOverall != null && !fromPdfCache;
       const hadIeltsBands = item.data.ieltsListening != null;
       let changed = false;
       if (!hadPte && cached.pteOverall != null)         { (item.data as any).pteOverall = cached.pteOverall; changed = true; }
