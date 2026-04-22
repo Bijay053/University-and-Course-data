@@ -1,0 +1,25 @@
+root@university-and-course-data:~/University-and-Course-data# tail -f ~/.pm2/logs/uni-api-out-0.log | grep -v "request completed"
+{"level":30,"time":1776819394838,"pid":152902,"hostname":"university-and-course-data","port":3001,"host":"0.0.0.0","msg":"Server listening"}
+{"level":40,"time":1776819394875,"pid":152902,"hostname":"university-and-course-data","count":1,"runtimeJobIds":["scrape_1776819251706_9l822g"],"msg":"Stopped orphaned active scrape jobs on startup"}
+{"level":30,"time":1776819394876,"pid":152902,"hostname":"university-and-course-data","intervalMinutes":15,"dayOfMonth":1,"hourUtc":2,"msg":"Monthly scraping scheduler started"}
+{"level":30,"time":1776819394876,"pid":152902,"hostname":"university-and-course-data","checkIntervalMinutes":60,"msg":"Daily backup scheduler started"}
+{"level":30,"time":1776819395039,"pid":152902,"hostname":"university-and-course-data","triggerSource":"startup","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+{"level":30,"time":1776819404878,"pid":152902,"hostname":"university-and-course-data","msg":"Daily backup: today's backup already exists, skipping startup run"}
+
+^C
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 567ms
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 1    │ online    │ 0%       │ 45.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
