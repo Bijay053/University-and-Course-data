@@ -1,0 +1,428 @@
+T","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819278277,"pid":152696,"hostname":"university-and-course-data","req":{"id":19,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819279928,"pid":152696,"hostname":"university-and-course-data","req":{"id":20,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819281577,"pid":152696,"hostname":"university-and-course-data","req":{"id":21,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819283228,"pid":152696,"hostname":"university-and-course-data","req":{"id":22,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819284879,"pid":152696,"hostname":"university-and-course-data","req":{"id":23,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819286530,"pid":152696,"hostname":"university-and-course-data","req":{"id":24,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819288177,"pid":152696,"hostname":"university-and-course-data","req":{"id":25,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819289827,"pid":152696,"hostname":"university-and-course-data","req":{"id":26,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819291478,"pid":152696,"hostname":"university-and-course-data","req":{"id":27,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819293128,"pid":152696,"hostname":"university-and-course-data","req":{"id":28,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819294779,"pid":152696,"hostname":"university-and-course-data","req":{"id":29,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819296428,"pid":152696,"hostname":"university-and-course-data","req":{"id":30,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819298075,"pid":152696,"hostname":"university-and-course-data","req":{"id":31,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819299728,"pid":152696,"hostname":"university-and-course-data","req":{"id":32,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819301380,"pid":152696,"hostname":"university-and-course-data","req":{"id":33,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819303029,"pid":152696,"hostname":"university-and-course-data","req":{"id":34,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819304677,"pid":152696,"hostname":"university-and-course-data","req":{"id":35,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819306328,"pid":152696,"hostname":"university-and-course-data","req":{"id":36,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819307978,"pid":152696,"hostname":"university-and-course-data","req":{"id":37,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819309630,"pid":152696,"hostname":"university-and-course-data","req":{"id":38,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+{"level":30,"time":1776819311281,"pid":152696,"hostname":"university-and-course-data","req":{"id":39,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819313215,"pid":152696,"hostname":"university-and-course-data","req":{"id":40,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819315213,"pid":152696,"hostname":"university-and-course-data","req":{"id":41,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819317213,"pid":152696,"hostname":"university-and-course-data","req":{"id":42,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819319212,"pid":152696,"hostname":"university-and-course-data","req":{"id":43,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819321209,"pid":152696,"hostname":"university-and-course-data","req":{"id":44,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819323212,"pid":152696,"hostname":"university-and-course-data","req":{"id":45,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819325213,"pid":152696,"hostname":"university-and-course-data","req":{"id":46,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819326419,"pid":152696,"hostname":"university-and-course-data","req":{"id":47,"method":"GET","url":"/api/universities"},"res":{"statusCode":200},"responseTime":20,"msg":"request completed"}
+{"level":30,"time":1776819326964,"pid":152696,"hostname":"university-and-course-data","req":{"id":48,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819327005,"pid":152696,"hostname":"university-and-course-data","req":{"id":49,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":8,"msg":"request completed"}
+{"level":30,"time":1776819327106,"pid":152696,"hostname":"university-and-course-data","req":{"id":50,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819327112,"pid":152696,"hostname":"university-and-course-data","req":{"id":51,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819327121,"pid":152696,"hostname":"university-and-course-data","req":{"id":54,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":8,"msg":"request completed"}
+{"level":30,"time":1776819327128,"pid":152696,"hostname":"university-and-course-data","req":{"id":52,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":19,"msg":"request completed"}
+{"level":30,"time":1776819327134,"pid":152696,"hostname":"university-and-course-data","req":{"id":53,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":23,"msg":"request completed"}
+{"level":30,"time":1776819329216,"pid":152696,"hostname":"university-and-course-data","req":{"id":55,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819330679,"pid":152696,"hostname":"university-and-course-data","req":{"id":56,"method":"GET","url":"/api/universities"},"res":{"statusCode":304},"responseTime":6,"msg":"request completed"}
+{"level":30,"time":1776819330873,"pid":152696,"hostname":"university-and-course-data","req":{"id":57,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819332517,"pid":152696,"hostname":"university-and-course-data","req":{"id":58,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819334162,"pid":152696,"hostname":"university-and-course-data","req":{"id":59,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819335811,"pid":152696,"hostname":"university-and-course-data","req":{"id":60,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819337463,"pid":152696,"hostname":"university-and-course-data","req":{"id":61,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819339217,"pid":152696,"hostname":"university-and-course-data","req":{"id":62,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819341206,"pid":152696,"hostname":"university-and-course-data","req":{"id":63,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819343215,"pid":152696,"hostname":"university-and-course-data","req":{"id":64,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819345219,"pid":152696,"hostname":"university-and-course-data","req":{"id":65,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+root@university-and-course-data:~/University-and-Course-data# curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status')); [print(l['message']) for l in d.get('logs',[])][-10:]" 2>/dev/null || \
+curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -m json.tool | tail -40
+-bash: syntax error near unexpected token `|'
+-bash: syntax error near unexpected token `|'
+root@university-and-course-data:~/University-and-Course-data# # Stop, set env explicitly in pm2, restart
+set -a && source /root/.env.backup && set +a
+
+# Write a proper pm2 ecosystem file with the env vars baked in
+cat > /root/ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [{
+    name: "uni-api",
+    script: "/root/University-and-Course-data/artifacts/api-server/dist/index.mjs",
+    instances: 1,
+    exec_mode: "cluster",
+    env: {
+      NODE_ENV: "production",
+      PORT: "3001"
+    }
+  }]
+}
+EOF
+
+# Inject actual secret values
+python3 - <<'PYEOF'
+import subprocess, os
+
+env_vars = {}
+with open('/root/.env.backup') as f:
+    for line in f:
+        line = line.strip()
+        if '=' in line and not line.startswith('#'):
+            k, _, v = line.partition('=')
+            env_vars[k.strip()] = v.strip().strip('"').strip("'")
+
+# Read the ecosystem file
+eco = open('/root/ecosystem.config.cjs').read()
+
+env_lines = '\n'.join(f'      {k}: "{v}",' for k,v in env_vars.items())
+eco = eco.replace('      NODE_ENV: "production",', f'      NODE_ENV: "production",\n{env_lines}')
+open('/root/ecosystem.config.cjs', 'w').write(eco)
+print("Env vars injected:", list(env_vars.keys()))
+PYEOF
+
+pm2 delete 1 2>/dev/null || true
+pm2 start /root/ecosystem.config.cjs
+pm2 save
+pm2 list
+Env vars injected: ['DATABASE_URL', 'GEMINI_API_KEY', 'SESSION_SECRET', 'PORT', 'NODE_ENV']
+[PM2] Applying action deleteProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications uni-api not running, starting...
+[PM2] App [uni-api] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 0    │ online    │ 0%       │ 45.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 0    │ online    │ 0%       │ 114.9mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# tail -f ~/.pm2/logs/uni-api-out-0.log | grep -v "request completed"
+{"level":30,"time":1776819394838,"pid":152902,"hostname":"university-and-course-data","port":3001,"host":"0.0.0.0","msg":"Server listening"}
+{"level":40,"time":1776819394875,"pid":152902,"hostname":"university-and-course-data","count":1,"runtimeJobIds":["scrape_1776819251706_9l822g"],"msg":"Stopped orphaned active scrape jobs on startup"}
+{"level":30,"time":1776819394876,"pid":152902,"hostname":"university-and-course-data","intervalMinutes":15,"dayOfMonth":1,"hourUtc":2,"msg":"Monthly scraping scheduler started"}
+{"level":30,"time":1776819394876,"pid":152902,"hostname":"university-and-course-data","checkIntervalMinutes":60,"msg":"Daily backup scheduler started"}
+{"level":30,"time":1776819395039,"pid":152902,"hostname":"university-and-course-data","triggerSource":"startup","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+{"level":30,"time":1776819404878,"pid":152902,"hostname":"university-and-course-data","msg":"Daily backup: today's backup already exists, skipping startup run"}
+
+^C
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 567ms
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 1    │ online    │ 0%       │ 45.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# # Replace with actual job ID from the UI URL
+JOB_ID=$(curl -s http://localhost:3001/api/scrape/jobs 2>/dev/null | python3 -c "import sys,json; jobs=json.load(sys.stdin); print(jobs[0]['id'] if jobs else 'none')" 2>/dev/null)
+echo "Job: $JOB_ID"
+curl -s "http://localhost:3001/api/scrape/status/$JOB_ID" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print('Status:', d.get('status'))
+logs = d.get('logs', [])
+print('Total logs:', len(logs))
+print('--- LAST 20 LOG MESSAGES ---')
+for l in logs[-20:]:
+    print(l.get('message',''))
+"
+Job: 
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+root@university-and-course-data:~/University-and-Course-data# tail -20 ~/.pm2/logs/uni-api-error-0.log
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+OLD = '''      // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
+      // probe each known category slug to discover courses that only appear under specific filters
+      if (
+        /\\/course-list|\\/course-finder|\\/courses?\\/?$/i.test(new URL(resolvedUrl).pathname) &&
+        courseLinks.length > 0 &&
+        courseLinks.length < 50
+      ) {
+        const before = courseLinks.length;
+        courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);'''
+
+NEW = '''      // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
+      // probe each known category slug to discover courses that only appear under specific filters.
+      // Skip when all sampled pages passed (100% — no filtering was applied, so we already have
+      // the complete set and probing categories would waste 5-10 min on heavy hosts).
+      const needsCategoryExpansion =
+        /\\/course-list|\\/course-finder|\\/courses?\\/?$/i.test(new URL(resolvedUrl).pathname) &&
+        courseLinks.length > 0 &&
+        courseLinks.length < 50 &&
+        researchStats.rejectedSamples > 0;
+      if (needsCategoryExpansion) {
+        addLog(job, "status", { message: `Probing category filters to find additional course pages...`, phase: "discover" });
+        const before = courseLinks.length;
+        courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);'''
+
+if OLD in s:
+    s = s.replace(OLD, NEW)
+    open(p, "w").write(s)
+    print("PASS: category expansion guard applied")
+elif 'needsCategoryExpansion' in s:
+    print("SKIP: already patched")
+else:
+    print("MISS — anchor not found")
+    idx = s.find('expandCourseListWithCategories(resolvedUrl')
+    if idx > 0: print(repr(s[idx-300:idx+100]))
+PYEOF
+
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+PASS: category expansion guard applied
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 514ms
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 2    │ online    │ 0%       │ 45.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# High confidence: 12/12 samples valid (100%). Auto-proceeding with 30 courses (~5 min).
+[SMART] Fetching 30 validated course pages...
+Rendering requirements page with browser (JS-heavy site)...
+Gemini bands: IELTS 5.5->PTE 42 TOEFL 46 | IELTS 6.0->PTE 50 TOEFL 60 | IELTS 6.5->PTE 58 TOEFL 79
+-bash: syntax error near unexpected token `('
+[SMART]: command not found
+-bash: syntax error near unexpected token `('
+IELTS: command not found
+IELTS: command not found
+Gemini: command not found
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+import re
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+# Find the existing Gemini block by the unique start anchor that was inserted in the last patch
+OLD = re.search(
+    r'            // ── Gemini text on rendered HTML \(catches JS-rendered tables static parse misses\) ──\n'
+    r'            if \(!\(renderedReq\.pteOverall && renderedReq\.toeflOverall\) && GEMINI_API_KEY\) \{.*?'
+    r'            \}',
+    s, re.DOTALL
+)
+if OLD:
+    print("FOUND existing block at", OLD.start(), "-", OLD.end())
+    NEW = '''            // ── Gemini text on rendered HTML (catches JS-rendered tables static parse misses) ──
+            if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
+              try {
+                const renderedCompact = renderedText.slice(0, 14000);
+                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+                const enPrompt2 = `Extract English language proficiency test requirements from this university requirements page.\\nIf there is a TABLE with rows for different IELTS scores (e.g. 5.5, 6.0, 6.5), return ALL rows in "bands".\\nIf only one flat requirement exists, put it in "flat".\\nReturn ONLY valid JSON: {"bands":[{"ielts":5.5,"pte":42,"toefl":46,"cae":null,"duo":null}],"flat":{"ielts":null,"pte":null,"toefl":null,"cae":null,"duo":null}}\\nUse null for missing values. Empty "bands" array is fine if no table.`;
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+                addLog(job, "status", { message: `Gemini-rendered raw: ${enResult2.slice(0, 200)}`, phase: "fetch" });
+                const jsonMatch = enResult2.match(/\\{[\\s\\S]*\\}/);
+                const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
+                if (Array.isArray(enParsed2.bands) && enParsed2.bands.length > 1) {
+                  cachedEnglishBands = enParsed2.bands.filter((b: any) => b && b.ielts != null);
+                  addLog(job, "status", { message: `Gemini bands: ${cachedEnglishBands!.map((b: any) => `IELTS ${b.ielts}->PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
+                }
+                const flat2 = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+                if (flat2 && (flat2.ielts || flat2.pte || flat2.toefl)) {
+                  if (!renderedReq.ieltsOverall && flat2.ielts) renderedReq.ieltsOverall = flat2.ielts;
+                  if (!renderedReq.pteOverall && flat2.pte) renderedReq.pteOverall = flat2.pte;
+                  if (!renderedReq.toeflOverall && flat2.toefl) renderedReq.toeflOverall = flat2.toefl;
+                  if (!(renderedReq as any).cambridgeOverall && flat2.cae) (renderedReq as any).cambridgeOverall = flat2.cae;
+                  addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+                }
+              } catch (gemErr) {
+                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 1pm2 restart uni-api --update-env && echo "DEPLOYED OK"ail -3 && \l || renderedReq.toeflOverall) {'''e?.slice(0, 1
+FOUND existing block at 351577 - 353064
+PASS: Gemini block replaced with diagnostic version
+/root/University-and-Course-data/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 build: `node ./build.mjs`
+Exit status 1
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 3    │ online    │ 0%       │ 45.9mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+import re
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+# Find the existing Gemini block by the unique start anchor that was inserted in the last patch
+OLD = re.search(
+    r'            // ── Gemini text on rendered HTML \(catches JS-rendered tables static parse misses\) ──\n'
+    r'            if \(!\(renderedReq\.pteOverall && renderedReq\.toeflOverall\) && GEMINI_API_KEY\) \{.*?'
+    r'            \}',
+    s, re.DOTALL
+)
+if OLD:
+    print("FOUND existing block at", OLD.start(), "-", OLD.end())
+    NEW = '''            // ── Gemini text on rendered HTML (catches JS-rendered tables static parse misses) ──
+            if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
+              try {
+                const renderedCompact = renderedText.slice(0, 14000);
+                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+                const enPrompt2 = `Extract English language proficiency test requirements from this university requirements page.\\nIf there is a TABLE with rows for different IELTS scores (e.g. 5.5, 6.0, 6.5), return ALL rows in "bands".\\nIf only one flat requirement exists, put it in "flat".\\nReturn ONLY valid JSON: {"bands":[{"ielts":5.5,"pte":42,"toefl":46,"cae":null,"duo":null}],"flat":{"ielts":null,"pte":null,"toefl":null,"cae":null,"duo":null}}\\nUse null for missing values. Empty "bands" array is fine if no table.`;
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+                addLog(job, "status", { message: `Gemini-rendered raw: ${enResult2.slice(0, 200)}`, phase: "fetch" });
+                const jsonMatch = enResult2.match(/\\{[\\s\\S]*\\}/);
+                const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
+                if (Array.isArray(enParsed2.bands) && enParsed2.bands.length > 1) {
+                  cachedEnglishBands = enParsed2.bands.filter((b: any) => b && b.ielts != null);
+                  addLog(job, "status", { message: `Gemini bands: ${cachedEnglishBands!.map((b: any) => `IELTS ${b.ielts}->PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
+                }
+                const flat2 = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+                if (flat2 && (flat2.ielts || flat2.pte || flat2.toefl)) {
+                  if (!renderedReq.ieltsOverall && flat2.ielts) renderedReq.ieltsOverall = flat2.ielts;
+                  if (!renderedReq.pteOverall && flat2.pte) renderedReq.pteOverall = flat2.pte;
+                  if (!renderedReq.toeflOverall && flat2.toefl) renderedReq.toeflOverall = flat2.toefl;
+                  if (!(renderedReq as any).cambridgeOverall && flat2.cae) (renderedReq as any).cambridgeOverall = flat2.cae;
+                  addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+                }
+              } catch (gemErr) {
+                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 1pm2 restart uni-api --update-env && echo "DEPLOYED OK"ail -3 && \l || renderedReq.toeflOverall) {'''e?.slice(0, 1
+FOUND existing block at 351577 - 353277
+PASS: Gemini block replaced with diagnostic version
+/root/University-and-Course-data/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 build: `node ./build.mjs`
+Exit status 1
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 4    │ online    │ 0%       │ 46.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# pm2 list
+pm2 logs uni-api --lines 30 --err
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 4    │ online    │ 0%       │ 63.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 30 lines for [uni-api] process (change the value with --lines option)
+/root/.pm2/logs/uni-api-error-0.log last 30 lines:
+0|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+0|uni-api  | Error: Cannot find module '/root/University-and-Course-data/artifacts/api-server/dist/index.mjs' imported from /usr/lib/node_modules/pm2/lib/ProcessContainer.js
+0|uni-api  |     at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+0|uni-api  |     at moduleResolve (node:internal/modules/esm/resolve:865:10)
+0|uni-api  |     at defaultResolve (node:internal/modules/esm/resolve:991:11)
+0|uni-api  |     at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+0|uni-api  |     at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+0|uni-api  |     at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+0|uni-api  |     at ModuleLoader.#resolve (node:internal/modules/esm/loader:701:17)
+0|uni-api  |     at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+0|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:650:32)
+0|uni-api  |     at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+0|uni-api  | You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+0|uni-api  | Error: Cannot find module '/root/University-and-Course-data/artifacts/api-server/dist/index.mjs' imported from /usr/lib/node_modules/pm2/lib/ProcessContainer.js
+0|uni-api  |     at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+0|uni-api  |     at moduleResolve (node:internal/modules/esm/resolve:865:10)
+0|uni-api  |     at defaultResolve (node:internal/modules/esm/resolve:991:11)
+0|uni-api  |     at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+0|uni-api  |     at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+0|uni-api  |     at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+0|uni-api  |     at ModuleLoader.#resolve (node:internal/modules/esm/loader:701:17)
+0|uni-api  |     at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+0|uni-api  |     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:650:32)
+0|uni-api  |     at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+
+^C
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -20
+
+✘ [ERROR] Unexpected "catch"
+
+    src/routes/scrape.ts:7849:16:
+      7849 │               } catch (gemErr) {
+           ╵                 ~~~~~
+
+1 error
+Error: Build failed with 1 error:
+src/routes/scrape.ts:7849:16: ERROR: Unexpected "catch"
+    at failureErrorWithLog (/root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1467:15)
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:926:25
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1345:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+/root/University-and-Course-data/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 build: `node ./build.mjs`
+Exit status 1
+root@university-and-course-data:~/University-and-Course-data# 
