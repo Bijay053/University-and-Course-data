@@ -1,0 +1,69 @@
+root@university-and-course-data:~/University-and-Course-data# curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status')); [print(l['message']) for l in d.get('logs',[])][-10:]" 2>/dev/null || \
+curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -m json.tool | tail -40
+-bash: syntax error near unexpected token `|'
+-bash: syntax error near unexpected token `|'
+root@university-and-course-data:~/University-and-Course-data# # Stop, set env explicitly in pm2, restart
+set -a && source /root/.env.backup && set +a
+
+# Write a proper pm2 ecosystem file with the env vars baked in
+cat > /root/ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [{
+    name: "uni-api",
+    script: "/root/University-and-Course-data/artifacts/api-server/dist/index.mjs",
+    instances: 1,
+    exec_mode: "cluster",
+    env: {
+      NODE_ENV: "production",
+      PORT: "3001"
+    }
+  }]
+}
+EOF
+
+# Inject actual secret values
+python3 - <<'PYEOF'
+import subprocess, os
+
+env_vars = {}
+with open('/root/.env.backup') as f:
+    for line in f:
+        line = line.strip()
+        if '=' in line and not line.startswith('#'):
+            k, _, v = line.partition('=')
+            env_vars[k.strip()] = v.strip().strip('"').strip("'")
+
+# Read the ecosystem file
+eco = open('/root/ecosystem.config.cjs').read()
+
+env_lines = '\n'.join(f'      {k}: "{v}",' for k,v in env_vars.items())
+eco = eco.replace('      NODE_ENV: "production",', f'      NODE_ENV: "production",\n{env_lines}')
+open('/root/ecosystem.config.cjs', 'w').write(eco)
+print("Env vars injected:", list(env_vars.keys()))
+PYEOF
+
+pm2 delete 1 2>/dev/null || true
+pm2 start /root/ecosystem.config.cjs
+pm2 save
+pm2 list
+Env vars injected: ['DATABASE_URL', 'GEMINI_API_KEY', 'SESSION_SECRET', 'PORT', 'NODE_ENV']
+[PM2] Applying action deleteProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications uni-api not running, starting...
+[PM2] App [uni-api] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 0    │ online    │ 0%       │ 45.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 0    │ online    │ 0%       │ 114.9mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# 
