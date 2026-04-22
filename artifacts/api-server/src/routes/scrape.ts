@@ -1,4 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import {
+  callGeminiWithModelFallback as _callGeminiWithModelFallback,
+  geminiUrl,
+  GEMINI_MODELS,
+} from "../lib/gemini-client.js";
 import * as cheerio from "cheerio";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -136,10 +141,6 @@ function stripPageNoise($: ReturnType<typeof cheerio.load>): void {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
-function geminiUrl(model: string) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-}
 
 interface CourseData {
   courseName: string;
@@ -665,67 +666,15 @@ function withHardTimeout<T>(promise: Promise<T>, ms: number, label: string): Pro
 
 async function geminiChatInner(systemPrompt: string, userContent: string, maxTokens = 8192): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
-
-  const body = JSON.stringify({
+  const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ parts: [{ text: userContent }] }],
-    generationConfig: {
-      responseMimeType: "application/json",
-      maxOutputTokens: maxTokens,
-    },
-  });
-
-  // Per-request timeout. Gemini usually responds in 5-25s; 45s is plenty of headroom
-  // without making a stuck connection drag the whole scrape down.
-  const GEMINI_REQUEST_TIMEOUT_MS = 45000;
-  // Up to 2 full passes across all models. Each pass tries every model once.
-  // Total worst-case time (when everything is failing): 2 passes × 3 models × 45s ≈ 4.5 min,
-  // then we throw and the caller falls back to per-course classification — no silent data loss.
-  const MAX_PASSES = 2;
-  for (let pass = 0; pass < MAX_PASSES; pass++) {
-    for (const model of GEMINI_MODELS) {
-      const startedAt = Date.now();
-      try {
-        const resp = await fetch(geminiUrl(model), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-          signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
-        });
-
-        if (resp.status === 429 || resp.status === 503) {
-          const backoffMs = Math.min(2000 * Math.pow(2, pass), 15000);
-          console.log(`Gemini ${model} returned ${resp.status} (pass ${pass + 1}/${MAX_PASSES}), backing off ${backoffMs}ms then trying next model...`);
-          await new Promise((r) => setTimeout(r, backoffMs));
-          continue;
-        }
-        if (resp.status === 404) { console.log(`Gemini model ${model} not available, trying next...`); continue; }
-        if (!resp.ok) {
-          const errText = await resp.text();
-          throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 300)}`);
-        }
-
-        const data = await resp.json() as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (!text) { console.log(`Empty response from ${model} (pass ${pass + 1}/${MAX_PASSES}), trying next...`); continue; }
-        console.log(`Gemini response OK from ${model} in ${Date.now() - startedAt}ms (pass ${pass + 1})`);
-        return text;
-      } catch (err) {
-        const e = err as Error;
-        if (e.message.includes("Gemini API error")) throw err;
-        const isTimeout = e.name === "TimeoutError" || e.message.includes("aborted") || e.message.includes("timeout");
-        console.log(`Gemini ${model} pass ${pass + 1} failed${isTimeout ? " (timeout)" : ""}: ${e.message}`);
-        // Continue to next model immediately on timeout; small backoff on other errors
-        if (!isTimeout) await new Promise((r) => setTimeout(r, 1500));
-      }
-    }
-    if (pass < MAX_PASSES - 1) {
-      const passBackoffMs = Math.min(5000 * Math.pow(2, pass), 30000);
-      console.log(`All Gemini models failed in pass ${pass + 1}/${MAX_PASSES}. Waiting ${passBackoffMs}ms before next pass...`);
-      await new Promise((r) => setTimeout(r, passBackoffMs));
-    }
-  }
-  throw new Error("All Gemini models are currently unavailable after multiple retries. Please try again in a minute.");
+    generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
+  };
+  const data = await _callGeminiWithModelFallback(body);
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!text) throw new Error("All Gemini models are currently unavailable after multiple retries. Please try again in a minute.");
+  return text;
 }
 
 // Outer hard cap on the entire Gemini call. Even if AbortSignal misbehaves or
@@ -3578,33 +3527,20 @@ Return JSON (use null ONLY if completely absent from the image):
 
     let best: Partial<CourseData> = {};
     for (const prompt of prompts) {
-      if (countFields(best) > 0) break; // already have data — no need for retry prompt
-      const body = JSON.stringify({
+      if (countFields(best) > 0) break;
+      const body = {
         contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
         generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-      });
-      for (const model of GEMINI_MODELS) {
-        try {
-          const apiResp = await fetch(geminiUrl(model), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body,
-            signal: AbortSignal.timeout(45_000),
-          });
-          if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
-          if (!apiResp.ok) continue;
-          const data = await apiResp.json() as any;
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          if (!text) continue;
-          const parsed = JSON.parse(text) as Partial<CourseData>;
-          // Keep this result if it has MORE non-null fields than the best so far.
-          if (countFields(parsed) > countFields(best)) {
-            best = parsed;
-            // If we have meaningful English data, stop trying other models.
-            if (best.ieltsOverall != null || best.pteOverall != null || best.toeflOverall != null) break;
-          }
-        } catch { continue; }
-      }
+      };
+      try {
+        const data = await _callGeminiWithModelFallback(body);
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (!text) continue;
+        const parsed = JSON.parse(text) as Partial<CourseData>;
+        if (countFields(parsed) > countFields(best)) {
+          best = parsed;
+        }
+      } catch { /* try next prompt */ }
     }
     return best;
   } catch {}
@@ -3926,7 +3862,7 @@ async function extractFeesFromPdf(pdfUrl: string, courseName: string, evidenceCo
 Return JSON: {"internationalFee":<number per year or per unit>,"currency":"<AUD|GBP|USD>","feeTerm":"<Annual|Trimester|Semester|Term|Session|Per Unit|Full Course>","feeYear":<year>}
 Use null for missing fields. Only include INTERNATIONAL fees.`;
 
-      const body = JSON.stringify({
+      const body = {
         contents: [{
           parts: [
             { text: prompt },
@@ -3934,31 +3870,19 @@ Use null for missing fields. Only include INTERNATIONAL fees.`;
           ],
         }],
         generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-      });
-
-      for (const model of GEMINI_MODELS) {
-        try {
-          const apiResp = await fetch(geminiUrl(model), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body,
-            signal: AbortSignal.timeout(45_000),
-          });
-          if (apiResp.status === 429 || apiResp.status === 503 || apiResp.status === 404) continue;
-          if (!apiResp.ok) continue;
-          const data = await apiResp.json() as any;
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          if (!text) continue;
+      };
+      try {
+        const data = await _callGeminiWithModelFallback(body);
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) {
           const parsedAi = JSON.parse(text) as Partial<CourseData>;
           const fee = parsedAi.internationalFee;
           if (typeof fee === "number" && validAmounts.has(Math.round(fee))) {
             pushFeeEvidence(pdfText, fee, "ai");
             return parsedAi;
           }
-          // Got a valid Gemini response but fee didn't match validAmounts — stop retrying.
-          return {};
-        } catch { continue; }
-      }
+        }
+      } catch { /* fall through */ }
       return {};
     } catch {}
   } catch {}
@@ -4017,31 +3941,21 @@ async function extractEnglishFromPdf(pdfUrl: string): Promise<Partial<CourseData
       try {
         const base64 = Buffer.from(buffer).toString("base64");
         const prompt = `This is a university admissions policy PDF. Extract ALL English language proficiency test score requirements (IELTS, PTE Academic, TOEFL iBT, Cambridge CAE, Duolingo). There may be different values for undergraduate vs postgraduate. Return ONLY valid JSON: {"ieltsOverall":null,"pteOverall":null,"toeflOverall":null,"cambridgeOverall":null,"duolingoOverall":null}`;
-        const body = JSON.stringify({
+        const body = {
           contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "application/pdf", data: base64 } }] }],
           generationConfig: { responseMimeType: "application/json", maxOutputTokens: 256 },
-        });
-        for (const model of GEMINI_MODELS) {
-          try {
-            const apiResp = await fetch(geminiUrl(model), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body,
-              signal: AbortSignal.timeout(60_000),
-            });
-            if (!apiResp.ok || apiResp.status === 429 || apiResp.status === 404) continue;
-            const data = await apiResp.json() as any;
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-            if (!text) continue;
-            const parsed3 = JSON.parse(text);
-            const cd3: Partial<CourseData> = {};
-            if (parsed3.ieltsOverall) cd3.ieltsOverall = parsed3.ieltsOverall;
-            if (parsed3.pteOverall) cd3.pteOverall = parsed3.pteOverall;
-            if (parsed3.toeflOverall) cd3.toeflOverall = parsed3.toeflOverall;
-            if ((parsed3 as any).cambridgeOverall) (cd3 as any).cambridgeOverall = (parsed3 as any).cambridgeOverall;
-            if ((parsed3 as any).duolingoOverall) (cd3 as any).duolingoOverall = (parsed3 as any).duolingoOverall;
-            if (cd3.ieltsOverall || cd3.pteOverall || cd3.toeflOverall) return cd3;
-          } catch { continue; }
+        };
+        const data = await _callGeminiWithModelFallback(body);
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) {
+          const parsed3 = JSON.parse(text);
+          const cd3: Partial<CourseData> = {};
+          if (parsed3.ieltsOverall) cd3.ieltsOverall = parsed3.ieltsOverall;
+          if (parsed3.pteOverall) cd3.pteOverall = parsed3.pteOverall;
+          if (parsed3.toeflOverall) cd3.toeflOverall = parsed3.toeflOverall;
+          if ((parsed3 as any).cambridgeOverall) (cd3 as any).cambridgeOverall = (parsed3 as any).cambridgeOverall;
+          if ((parsed3 as any).duolingoOverall) (cd3 as any).duolingoOverall = (parsed3 as any).duolingoOverall;
+          if (cd3.ieltsOverall || cd3.pteOverall || cd3.toeflOverall) return cd3;
         }
       } catch {}
     }
@@ -8835,6 +8749,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                       }
                     } catch {}
                   };
+                  let visionLastError: string | null = null;
                   const scanOnce = async (urls: string[], label: string) => {
                     addLog(job, "status", {
                       message: `[per-course vision${label}] scanning ${urls.length} image(s) for ${link.name.slice(0, 40)}...`,
@@ -8857,8 +8772,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                         }
                         if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) return true;
                       } catch (e) {
+                        visionLastError = (e as Error).message?.slice(0, 100) ?? "unknown error";
                         addLog(job, "status", {
-                          message: `[per-course vision${label} img ${vi + 1}/${urls.length}] ${link.name.slice(0, 30)} failed: ${(e as Error).message}`,
+                          message: `[per-course vision${label} img ${vi + 1}/${urls.length}] ${link.name.slice(0, 30)} failed: ${visionLastError}`,
                           phase: "fallback",
                         });
                       }
@@ -8950,8 +8866,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                       } catch {}
                     }
                     if (!siblingApplied) {
+                      const reason = visionLastError
+                        ? `last error: ${visionLastError}`
+                        : `image truly has no data`;
                       addLog(job, "status", {
-                        message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${allImgUrls.length} image(s), no sibling cache for ${dlk ?? "unknown degreeLevel"}`,
+                        message: `[per-course vision ⚠ no English data] ${link.name.slice(0, 50)} — scanned ${allImgUrls.length} image(s), no sibling cache for ${dlk ?? "unknown degreeLevel"} (${reason})`,
                         phase: "fallback",
                       });
                     }

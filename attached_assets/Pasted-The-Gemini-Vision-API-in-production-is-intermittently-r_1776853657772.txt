@@ -1,0 +1,62 @@
+The Gemini Vision API in production is intermittently returning 503 "UNAVAILABLE — high demand" errors. When this happens, the per-course vision extraction silently fails and logs [per-course vision ⚠ no English data], even though the image clearly contains the data. We confirmed this by:
+
+Direct curl to Gemini Vision with the same image returned correct data: IELTS=6, PTE=50, TOEFL=60, CAE=169
+But during the actual scrape, all 9 ASA courses returned "no English data"
+Earlier today the same scrape succeeded — proving the code is fine but Gemini is throttling
+
+Fix needed: Add retry-with-backoff to ALL Gemini API calls.
+Find the function that calls Gemini's generateContent endpoint (likely named geminiVision, callGemini, geminiChat, or similar — search scrape.ts, english-requirements.ts, and browser-helper.ts for generativelanguage.googleapis.com).
+Wrap every Gemini API call with this retry logic:
+typescriptasync function callGeminiWithRetry(
+  url: string,
+  body: any,
+  maxRetries = 4
+): Promise<any> {
+  const RETRY_STATUSES = [429, 500, 502, 503, 504];
+  const BACKOFFS_MS = [2000, 5000, 10000, 20000]; // 2s, 5s, 10s, 20s
+  
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60_000),
+      });
+      
+      if (res.ok) return await res.json();
+      
+      // Retryable error
+      if (RETRY_STATUSES.includes(res.status) && attempt < maxRetries) {
+        const wait = BACKOFFS_MS[attempt];
+        console.log(`[gemini retry] HTTP ${res.status}, waiting ${wait}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      
+      // Non-retryable or max retries hit
+      const errBody = await res.text();
+      throw new Error(`Gemini API ${res.status}: ${errBody.slice(0, 200)}`);
+    } catch (e: any) {
+      lastError = e;
+      // Network errors / timeouts: also retry
+      if (attempt < maxRetries && (e.name === 'TimeoutError' || e.code === 'ECONNRESET' || e.code === 'ETIMEDOUT')) {
+        const wait = BACKOFFS_MS[attempt];
+        console.log(`[gemini retry] network error ${e.message}, waiting ${wait}ms`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError;
+}
+Also: when Gemini Vision returns null/empty after all retries, log the actual error message instead of silently saying "no English data". Change the log line [per-course vision ⚠ no English data] to include the failure reason — e.g. [per-course vision ⚠ no English data] (last error: HTTP 503 high demand) so we can tell extraction failures from "image truly has no data".
+Additionally: try fallback to gemini-flash-latest when gemini-2.5-flash returns 503. The model name should be configurable so we can fall back. List of working models confirmed:
+
+gemini-2.5-flash (primary)
+gemini-flash-latest (fallback)
+gemini-2.5-pro (last resort)
+
+Build, commit, push to main. I'll deploy on the server.

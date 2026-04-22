@@ -1,12 +1,10 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
+import { callGeminiWithModelFallback } from "../lib/gemini-client.js";
 
 const router = Router();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
-const geminiUrl = (m: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${GEMINI_API_KEY}`;
 
 // ── Icon resolver ────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, { emoji: string; bg: string; color: string }> = {
@@ -124,28 +122,18 @@ function cardSortIndex(title: string): number {
 
 async function parseWithGemini(rawText: string): Promise<unknown[]> {
   if (!GEMINI_API_KEY) return [];
-  for (const model of GEMINI_MODELS) {
-    try {
-      const resp = await fetch(geminiUrl(model), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: PROMPT + rawText }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
-        }),
-      });
-      if (resp.status === 429 || resp.status === 503 || resp.status === 404) continue;
-      if (!resp.ok) throw new Error(await resp.text());
-      const json = await resp.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-      const cards = JSON.parse(cleaned) as { title?: string }[];
-      const enriched = cards.map(card => ({ ...card, ...resolveIcon(card.title ?? "") }));
-      enriched.sort((a, b) => cardSortIndex(a.title ?? "") - cardSortIndex(b.title ?? ""));
-      return enriched;
-    } catch { continue; }
-  }
-  return [];
+  try {
+    const json = await callGeminiWithModelFallback({
+      contents: [{ parts: [{ text: PROMPT + rawText }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+    }) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+    const cards = JSON.parse(cleaned) as { title?: string }[];
+    const enriched = cards.map(card => ({ ...card, ...resolveIcon(card.title ?? "") }));
+    enriched.sort((a, b) => cardSortIndex(a.title ?? "") - cardSortIndex(b.title ?? ""));
+    return enriched;
+  } catch { return []; }
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────

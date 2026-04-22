@@ -1,0 +1,90 @@
+PROBLEM 1: Production behaves DIFFERENTLY from Replit preview, even though both pulled the same git commit.
+On Replit preview: ASA scrape works perfectly. All 9 courses extract correct IELTS/PTE/TOEFL/CAE from the per-course images via vision.
+On production server (DigitalOcean): same git commit 6a1881a, same code, but the per-course vision step returns [per-course vision ⚠ no English data] for every course. Direct curl to Gemini Vision API from the production server with the same image returns the correct data, so the API key and network are fine. The failure is happening silently inside the code — most likely Gemini returning a 503 "high demand" error and the code treating that as "no data".
+Investigate and fix these gaps between the two environments:
+
+Verify that the production build actually contains the latest mergeCourseData and per-course vision code. Run on production:
+bashgrep -c "mergeCourseData" artifacts/api-server/dist/index.mjs
+grep -c "mergeCourseData" artifacts/api-server/dist/workers/scrape-worker.mjs
+grep -c "per-course vision" artifacts/api-server/dist/workers/scrape-worker.mjs
+All three must return ≥ 1. If scrape-worker.mjs is missing the merge or vision code, the build is broken — add the worker bundle to the build script if it's not there.
+Check if the worker bundle is actually being rebuilt. The bundle file artifacts/api-server/dist/workers/scrape-worker.mjs must have a newer modification time than the source artifacts/api-server/src/workers/scrape-worker.ts. If the worker isn't in build.mjs, add it.
+The pm2 restart command may not actually be reloading the worker child processes. Workers are spawned by the parent and may keep stale code in memory until pm2 fully kills them. Add a pm2 delete uni-api && pm2 start ecosystem.config.cjs flow or document this as the proper deploy step.
+
+
+PROBLEM 2: Gemini Vision API intermittently returns 503 "UNAVAILABLE — high demand" errors. The code treats this as "no data" and gives up silently.
+Confirmed: direct curl with the same image and same key works one minute, fails with 503 the next. The gemini-2.5-flash model is overloaded periodically. The code currently has zero retry logic.
+Fix needed: Add retry-with-backoff to ALL Gemini API calls. Find every fetch call to generativelanguage.googleapis.com (search across scrape.ts, english-requirements.ts, browser-helper.ts, and the worker file) and replace with a wrapper:
+typescriptasync function callGeminiWithRetry(
+  url: string,
+  body: any,
+  maxRetries = 4,
+): Promise<any> {
+  const RETRY_STATUSES = [429, 500, 502, 503, 504];
+  const BACKOFFS_MS = [2000, 5000, 10000, 20000];
+  const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro"];
+  
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Cycle through fallback models on retries
+    const modelIdx = Math.min(attempt, FALLBACK_MODELS.length - 1);
+    const currentUrl = url.replace(/models\/[^:]+:/, `models/${FALLBACK_MODELS[modelIdx]}:`);
+    
+    try {
+      const res = await fetch(currentUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60_000),
+      });
+      
+      if (res.ok) return await res.json();
+      
+      if (RETRY_STATUSES.includes(res.status) && attempt < maxRetries) {
+        const wait = BACKOFFS_MS[attempt];
+        console.log(`[gemini retry] HTTP ${res.status} on ${FALLBACK_MODELS[modelIdx]}, waiting ${wait}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      
+      const errBody = await res.text();
+      throw new Error(`Gemini API ${res.status} on ${FALLBACK_MODELS[modelIdx]}: ${errBody.slice(0, 200)}`);
+    } catch (e: any) {
+      lastError = e;
+      if (attempt < maxRetries && (e.name === "TimeoutError" || e.code === "ECONNRESET" || e.code === "ETIMEDOUT")) {
+        const wait = BACKOFFS_MS[attempt];
+        console.log(`[gemini retry] network error: ${e.message}, waiting ${wait}ms`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError;
+}
+
+PROBLEM 3: When extraction fails, the log message lies. It says "no English data" when the truth is "Gemini returned 503". Change it to log the real reason.
+Find every place that logs [per-course vision ⚠ no English data] and change it to include the actual error from the last Gemini call:
+typescript// Before:
+addLog(job, "fallback", { message: `[per-course vision ⚠ no English data] ${courseName} — scanned ${imgs.length} image(s)` });
+
+// After:
+const reason = lastGeminiError 
+  ? `Gemini error: ${lastGeminiError.message.slice(0, 100)}` 
+  : "image had no extractable English-test data";
+addLog(job, "fallback", { message: `[per-course vision ⚠ failed] ${courseName} — scanned ${imgs.length} image(s) — ${reason}` });
+This way we can immediately tell rate-limit failures apart from genuine "no data" failures.
+
+What to deliver:
+
+The retry wrapper applied to every Gemini fetch call across the codebase
+The improved error logging
+Verify the worker bundle (scrape-worker.mjs) is actually being rebuilt by build.mjs — if not, fix the build script
+Document the correct deploy command (with full pm2 delete + restart, not just restart)
+Build, commit, push to main
+
+After your push, I'll deploy on the production server and re-scrape ASA. The expected outcome:
+
+If Gemini is healthy: works first try, all 9 courses get correct scores
+If Gemini returns 503: retry kicks in, fallback model used, eventually succeeds
+If everything fails after 4 retries: log shows the actual error, not "no English data"

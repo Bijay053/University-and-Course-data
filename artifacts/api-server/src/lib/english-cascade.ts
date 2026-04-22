@@ -29,12 +29,10 @@ import {
   type EnglishCourseFields,
 } from "./english-requirements.js";
 
-// ── Gemini (mirrors scrape.ts so this module has no cross-import) ─────────────
+// ── Gemini client (shared retry + model-fallback) ─────────────────────────────
+import { callGeminiWithModelFallback } from "./gemini-client.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001"];
-const geminiUrl = (m: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${GEMINI_API_KEY}`;
 
 // ── Selector patterns ────────────────────────────────────────────────────────
 
@@ -150,28 +148,18 @@ async function visionExtract(
     `"pteOverall":<n>,"pteListening":<n>,"pteSpeaking":<n>,"pteWriting":<n>,"pteReading":<n>,` +
     `"toeflOverall":<n>,"toeflListening":<n>,"toeflSpeaking":<n>,"toeflWriting":<n>,"toeflReading":<n>,` +
     `"cambridgeOverall":<n>,"duolingoOverall":<n>}`;
-  const body = JSON.stringify({
+  const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
     generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024 },
-  });
-  for (const model of GEMINI_MODELS) {
-    try {
-      const r = await fetch(geminiUrl(model), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        signal: AbortSignal.timeout(60_000),
-      });
-      if (!r.ok) continue;
-      const j = (await r.json()) as any;
-      const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) continue;
+  };
+  try {
+    const j = await callGeminiWithModelFallback(body);
+    const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
       const parsed = JSON.parse(text);
       if (parsed && typeof parsed === "object") return parsed;
-    } catch {
-      /* try next model */
     }
-  }
+  } catch { /* fall through */ }
   return null;
 }
 
