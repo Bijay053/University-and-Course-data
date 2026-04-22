@@ -1,0 +1,54 @@
+root@university-and-course-data:~/University-and-Course-data# grep -c "ASSIGN-PTE\|ASSIGN-TOEFL\|ASSIGN-CAE" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts
+grep -c "ASSIGN-PTE\|ASSIGN-TOEFL\|ASSIGN-CAE" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+pm2 list | grep uni-api
+0
+0
+│ 0  │ uni-api    │ default     │ 0.0.0   │ cluster │ 181885   │ 37m    │ 13   │ online    │ 0%       │ 255.8mb  │ root     │ disabled │
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_assign_logs.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+if 'ASSIGN-PTE' in s:
+    print("ALREADY PATCHED"); raise SystemExit(0)
+OLD = '''          if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[PTE] cached hit: overall=${cachedEnglishReqs.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[TOEFL] cached hit: overall=${cachedEnglishReqs.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }'''
+NEW = '''          if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            cachedApplied = true;
+            addLog(job, "status", { message: `[ASSIGN-PTE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.pteOverall} readback=${JSON.stringify(cheerioData.pteOverall)}`, phase: "extract" });
+          }
+          if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            cachedApplied = true;
+            addLog(job, "status", { message: `[ASSIGN-TOEFL] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.toeflOverall} readback=${JSON.stringify(cheerioData.toeflOverall)}`, phase: "extract" });
+          }
+          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) {
+            cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
+            cachedApplied = true;
+            addLog(job, "status", { message: `[ASSIGN-CAE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.cambridgeOverall} readback=${JSON.stringify(cheerioData.cambridgeOverall)}`, phase: "extract" });
+          }'''
+n = s.count(OLD)
+print(f"OLD pattern matches: {n}")
+if n != 1:
+    print("=== first 200 chars of source around 'PTE] cached hit' ===")
+    idx = s.find('PTE] cached hit')
+    print(repr(s[max(0,idx-300):idx+300]) if idx >= 0 else "NOT FOUND")
+    raise SystemExit(1)
+open(p, "w").write(s.replace(OLD, NEW))
+print("PATCHED OK")
+PYEOF
+echo "script written"
+script written
+root@university-and-course-data:~/University-and-Course-data# python3 /tmp/patch_assign_logs.py
+OLD pattern matches: 0
+=== first 200 chars of source around 'PTE] cached hit' ===
+NOT FOUND
+root@university-and-course-data:~/University-and-Course-data# 
