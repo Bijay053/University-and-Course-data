@@ -8915,7 +8915,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // garbage (truthy) values blocking the fill.
         if (cachedEnglishReqs) {
           let cachedApplied = false;
-          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";
+          // forceCourseOverride: only when cache literally came from THIS course's
+          // URL. Otherwise the cached values are from a different course's page
+          // and must NOT be allowed to overwrite this course's actual values.
+          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page"
+            && (cachedEnglishReqsSource as any)?.url === link.url;
           addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
           // Per-course modal data wins: skip cache override for fields the
           // per-course modal already populated (those values are course-specific).
