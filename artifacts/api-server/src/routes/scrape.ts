@@ -8339,10 +8339,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               const cToefl = cellVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== cPte);
               const cCae   = cellVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v));
               if (cIelts || cPte || cToefl || cCae) {
-                if (cIelts != null) cheerioData.ieltsOverall = cIelts;
-                if (cPte   != null) cheerioData.pteOverall   = cPte;
-                if (cToefl != null) cheerioData.toeflOverall = cToefl;
-                if (cCae   != null) (cheerioData as any).cambridgeOverall = cCae;
+                if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+                if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+                if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+                if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
                 addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"}`, phase: "extract" });
                 break;
               }
@@ -8917,7 +8917,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           let cachedApplied = false;
           const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";
           addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
-          if ((!cheerioData.ieltsOverall || forceCourseOverride) && cachedEnglishReqs.ieltsOverall) {
+          // Per-course modal data wins: skip cache override for fields the
+          // per-course modal already populated (those values are course-specific).
+          const pcm = cheerioData as any;
+          if ((!cheerioData.ieltsOverall || (forceCourseOverride && !pcm.__perCourseModal_ielts)) && cachedEnglishReqs.ieltsOverall) {
             cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
             cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || cheerioData.ieltsReading   || undefined;
             cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || cheerioData.ieltsWriting   || undefined;
@@ -8926,17 +8929,17 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             cachedApplied = true;
             addVerboseLog(job, "status", { message: `[IELTS] cached hit: overall=${cachedEnglishReqs.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
           }
-          if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {
+          if ((!cheerioData.pteOverall || (forceCourseOverride && !pcm.__perCourseModal_pte)) && cachedEnglishReqs.pteOverall) {
             cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
             cachedApplied = true;
             addLog(job, "status", { message: `[ASSIGN-PTE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.pteOverall} readback=${JSON.stringify(cheerioData.pteOverall)}`, phase: "extract" });
           }
-          if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {
+          if ((!cheerioData.toeflOverall || (forceCourseOverride && !pcm.__perCourseModal_toefl)) && cachedEnglishReqs.toeflOverall) {
             cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
             cachedApplied = true;
             addLog(job, "status", { message: `[ASSIGN-TOEFL] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.toeflOverall} readback=${JSON.stringify(cheerioData.toeflOverall)}`, phase: "extract" });
           }
-          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) {
+          if ((!cheerioData.cambridgeOverall || (forceCourseOverride && !pcm.__perCourseModal_cae)) && cachedEnglishReqs.cambridgeOverall) {
             cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
             cachedApplied = true;
             addLog(job, "status", { message: `[ASSIGN-CAE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.cambridgeOverall} readback=${JSON.stringify(cheerioData.cambridgeOverall)}`, phase: "extract" });
