@@ -308,6 +308,7 @@ export default function Scraping() {
   const pollRequestTimeoutRef = useRef<number | null>(null);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
+  const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
@@ -369,8 +370,10 @@ export default function Scraping() {
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`);
       if (res.ok) {
-        const data = await readResponseJson<StagedCourse[]>(res);
-        if (!data) return;
+        const payload = await readResponseJson<{ courses: StagedCourse[]; lastScrape: typeof lastScrapeInfo }>(res);
+        if (!payload) return;
+        const data = payload.courses ?? (payload as unknown as StagedCourse[]);
+        if (payload.lastScrape) setLastScrapeInfo(payload.lastScrape);
         setStagedCourses(data.filter((c: StagedCourse) => c.status === "pending"));
         setReviewJobId(jobId);
         setShowReview(true);
@@ -1502,11 +1505,31 @@ export default function Scraping() {
         <Card className="border-2 border-green-100">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Eye className="w-5 h-5 text-green-600" />
-                Review Scraped Courses
-                <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
-              </CardTitle>
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Eye className="w-5 h-5 text-green-600" />
+                  Review Scraped Courses
+                  <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
+                </CardTitle>
+                {lastScrapeInfo && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Last scrape: <span className="font-medium text-gray-700">
+                      {lastScrapeInfo.staged} courses staged in{" "}
+                      {lastScrapeInfo.durationMs != null
+                        ? lastScrapeInfo.durationMs >= 3600000
+                          ? `${Math.floor(lastScrapeInfo.durationMs / 3600000)}h ${Math.floor((lastScrapeInfo.durationMs % 3600000) / 60000)}m`
+                          : `${Math.floor(lastScrapeInfo.durationMs / 60000)}m ${Math.floor((lastScrapeInfo.durationMs % 60000) / 1000)}s`
+                        : "–"}
+                    </span>
+                    {lastScrapeInfo.startedAt && (
+                      <> &bull; Started {new Date(lastScrapeInfo.startedAt).toISOString().replace("T", " ").slice(0, 16)} UTC</>
+                    )}
+                    {(lastScrapeInfo.skipped > 0 || lastScrapeInfo.errors > 0) && (
+                      <> &bull; {lastScrapeInfo.skipped} skipped{lastScrapeInfo.errors > 0 ? `, ${lastScrapeInfo.errors} errors` : ""}</>
+                    )}
+                  </p>
+                )}
+              </div>
               <div className="flex gap-2">
                 {selectedUni && selectedUni !== ALL && (
                   <Button

@@ -37,6 +37,8 @@ export const REVIEW_FIELD_KEYS = [
   "ieltsOverall",
   "pteOverall",
   "toeflOverall",
+  "cambridgeOverall",
+  "duolingoOverall",
   "academicRequirement",
 ] as const;
 
@@ -169,6 +171,10 @@ function valueToString(fieldKey: ReviewFieldKey, data: ReviewCourseData): string
       return data.pteOverall != null ? String(data.pteOverall) : null;
     case "toeflOverall":
       return data.toeflOverall != null ? String(data.toeflOverall) : null;
+    case "cambridgeOverall":
+      return data.cambridgeOverall != null ? String(data.cambridgeOverall) : null;
+    case "duolingoOverall":
+      return data.duolingoOverall != null ? String(data.duolingoOverall) : null;
     case "academicRequirement":
       if (data.academicLevel) return data.academicScore != null ? `${data.academicLevel} ${data.academicScore}` : data.academicLevel;
       if (data.otherRequirement) return data.otherRequirement;
@@ -190,7 +196,7 @@ function normalizeFieldValue(fieldKey: ReviewFieldKey, value: string | null): st
       .sort()
       .join(",");
   }
-  if (fieldKey === "ieltsOverall" || fieldKey === "pteOverall" || fieldKey === "toeflOverall") {
+  if (fieldKey === "ieltsOverall" || fieldKey === "pteOverall" || fieldKey === "toeflOverall" || fieldKey === "cambridgeOverall" || fieldKey === "duolingoOverall") {
     const numeric = parseFloat(cleaned);
     if (Number.isFinite(numeric)) return String(numeric);
   }
@@ -268,6 +274,10 @@ function buildPatterns(fieldKey: ReviewFieldKey, value: string): RegExp[] {
       return [/\bpte\b[\s\S]{0,120}?\b\d{2}\b/i];
     case "toeflOverall":
       return [/\btoefl\b[\s\S]{0,120}?\b\d{2,3}\b/i];
+    case "cambridgeOverall":
+      return [/\b(?:cambridge|cae|c2|c1|b2|proficiency|advanced)\b[\s\S]{0,120}?\b\d{3}\b/i, /\b\d{3}\b[\s\S]{0,60}?\b(?:cambridge|cae|proficiency|advanced)\b/i];
+    case "duolingoOverall":
+      return [/\b(?:duolingo|det)\b[\s\S]{0,120}?\b\d{2,3}\b/i];
     case "academicRequirement":
       return [/\b(entry|admission|academic|required|requirement|eligib)\b[\s\S]{0,220}/i];
   }
@@ -294,6 +304,16 @@ function validateField(fieldKey: ReviewFieldKey, normalizedValue: string | null,
     case "toeflOverall": {
       const score = parseFloat(rawValue);
       if (!Number.isFinite(score) || score < 30 || score > 120) return "rejected";
+      return "accepted";
+    }
+    case "cambridgeOverall": {
+      const score = parseFloat(rawValue);
+      if (!Number.isFinite(score) || score < 100 || score > 230) return "rejected";
+      return "accepted";
+    }
+    case "duolingoOverall": {
+      const score = parseFloat(rawValue);
+      if (!Number.isFinite(score) || score < 45 || score > 160) return "rejected";
       return "accepted";
     }
     case "duration":
@@ -355,6 +375,16 @@ function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource)
   } else if (fieldKey === "toeflOverall") {
     const match = source.content.match(/\btoefl\b[\s\S]{0,120}?\b(\d{2,3})\b/i);
     if (match) pushValue(match[1], findSnippet(source, [/\btoefl\b[\s\S]{0,120}?\b\d{2,3}\b/i]), sourceBaseConfidence(source));
+  } else if (fieldKey === "cambridgeOverall") {
+    const match = source.content.match(/\b(?:cambridge|cae|c2\s*proficiency|c1\s*advanced|b2\s*first)\b[\s\S]{0,120}?\b(\d{3})\b/i)
+      || source.content.match(/\b(\d{3})\b[\s\S]{0,60}?\b(?:cambridge|cae|proficiency|advanced)\b/i);
+    if (match) {
+      const score = parseInt(match[1], 10);
+      if (score >= 100 && score <= 230) pushValue(match[1], findSnippet(source, [/\b(?:cambridge|cae|proficiency|advanced)\b[\s\S]{0,120}?\b\d{3}\b/i]), sourceBaseConfidence(source));
+    }
+  } else if (fieldKey === "duolingoOverall") {
+    const match = source.content.match(/\b(?:duolingo|det)\b[\s\S]{0,120}?\b(\d{2,3})\b/i);
+    if (match) pushValue(match[1], findSnippet(source, [/\b(?:duolingo|det)\b[\s\S]{0,120}?\b\d{2,3}\b/i]), sourceBaseConfidence(source));
   } else if (fieldKey === "duration") {
     if (!courseDetailSourceAllowed) return results;
     const match = source.content.match(/\b(\d(?:\.\d+)?)\s*(year|month|week|semester|trimester)s?\b/i);

@@ -1,0 +1,54 @@
+Major progress on production scraping. Now please fix these 3 remaining issues:
+
+ISSUE 1: CAE evidence not displayed in review UI
+The vision step extracts CAE=169 correctly (visible in logs and final table column), and the value gets into the database. But in the per-course Evidence Review modal, the cambridgeOverall evidence card is missing entirely (only ieltsOverall and pteOverall show).
+The data is there — the UI just isn't rendering the CAE evidence section. Check the review modal component and:
+
+Confirm cambridgeOverall is in the list of fields the modal iterates to render evidence cards
+Confirm cambridgeOverall evidence rows are being saved to scraped_field_evidence table during the scrape (run query below to verify)
+Confirm toeflOverall, duolingoOverall are also in the list (they're missing from current screenshots too)
+
+Verify in DB:
+sqlSELECT field_key, page_type, extraction_method, confidence, LEFT(candidate_value, 30)
+FROM scraped_field_evidence
+WHERE scraped_course_id IN (SELECT id FROM scraped_courses WHERE university_id=2 AND course_name='Bachelor of Business' ORDER BY id DESC LIMIT 1)
+AND field_key IN ('ieltsOverall', 'pteOverall', 'toeflOverall', 'cambridgeOverall', 'duolingoOverall')
+ORDER BY field_key, confidence DESC;
+Expected: rows for all 4-5 fields. If CAE row is missing → fix the evidence-saving step. If CAE row exists but UI doesn't show it → fix the React component that renders the evidence list.
+
+ISSUE 2: IELTS sub-bands (L/R/W/S) saved to DB but not displayed
+The vision logs show ieltsListening=5.5 ieltsSpeaking=5.5 ieltsWriting=5.5 ieltsReading=5.5 correctly extracted. But in the staged review table, only the IELTS Overall column shows a value — the L/R/W/S input boxes in the Edit modal are empty.
+Check:
+
+Are ielts_listening, ielts_reading, ielts_writing, ielts_speaking columns being written to scraped_courses during insert?
+sqlSELECT course_name, ielts_overall, ielts_listening, ielts_reading, ielts_writing, ielts_speaking
+FROM scraped_courses WHERE university_id=2 ORDER BY id DESC LIMIT 3;
+
+If columns are populated → fix the Edit modal to read these fields
+If columns are NULL → fix the insert step to map vision-extracted sub-bands to DB columns
+
+Same fix needed for PTE and TOEFL sub-bands.
+
+ISSUE 3: Add "Total Time Elapsed" display in Review Scraped Courses page
+Add a small status line at the top of the Review Scraped Courses panel showing:
+Last scrape: 9 courses staged in 3m 42s • Started 2026-04-22 10:15 UTC
+Compute from existing data:
+
+started_at and completed_at columns from the scrape_jobs table (or wherever job runs are tracked)
+Pull the most recent completed job for the current university
+Display as Xm Ys format if under 1 hour, or Hh Mm if over 1 hour
+
+The endpoint that returns staged courses for a university should include a lastScrape: { jobId, startedAt, completedAt, durationMs, totalFound, staged, skipped, errors } field. Frontend reads this and renders the status line.
+
+DELIVERY:
+
+Build, commit, push to main with message "Fix CAE evidence display, IELTS sub-bands, add scrape duration"
+Reply with:
+
+DB query result confirming sub-bands ARE being saved (or not)
+DB query result confirming CAE evidence row exists (or not)
+Screenshot or description of where the duration string now appears
+
+
+
+After your push, I'll deploy on production and verify.

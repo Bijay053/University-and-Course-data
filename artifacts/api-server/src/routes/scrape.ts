@@ -10935,9 +10935,31 @@ router.post("/scrape/bulk/stop/:sessionId", (req: Request, res: Response): void 
 router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
   try {
     const jobId = paramString(req, "jobId");
-    const courses = await db.select().from(scrapedCoursesTable)
-      .where(eq(scrapedCoursesTable.scrapeJobId, jobId));
-    res.json(courses);
+    const [courses, jobResult] = await Promise.all([
+      db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.scrapeJobId, jobId)),
+      pool.query(
+        `SELECT runtime_job_id as "jobId", university_id as "universityId", started_at as "startedAt",
+                completed_at as "completedAt", total_found as "totalFound", imported as "staged",
+                skipped, errors
+         FROM scrape_runtime_jobs WHERE runtime_job_id = $1 LIMIT 1`,
+        [jobId],
+      ),
+    ]);
+    const jobRow = jobResult.rows[0] ?? null;
+    const lastScrape = jobRow ? {
+      jobId: jobRow.jobId,
+      universityId: jobRow.universityId,
+      startedAt: jobRow.startedAt,
+      completedAt: jobRow.completedAt,
+      durationMs: jobRow.startedAt && jobRow.completedAt
+        ? new Date(jobRow.completedAt).getTime() - new Date(jobRow.startedAt).getTime()
+        : null,
+      totalFound: jobRow.totalFound,
+      staged: jobRow.staged,
+      skipped: jobRow.skipped,
+      errors: jobRow.errors,
+    } : null;
+    res.json({ courses, lastScrape });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
