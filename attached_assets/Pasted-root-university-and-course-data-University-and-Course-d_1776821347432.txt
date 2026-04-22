@@ -1,0 +1,80 @@
+root@university-and-course-data:~/University-and-Course-data# set -a && source /root/.env.backup && set +a && pm2 restart uni-api --update-env && pm2 list
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 5    │ online    │ 0%       │ 46.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 5    │ online    │ 0%       │ 62.9mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+pnpm --filter @workspace/api-server run build 2>&1 | grep -A5 "ERROR\|error:" | head -30
+✘ [ERROR] Unexpected "catch"
+
+    src/routes/scrape.ts:7849:16:
+      7849 │               } catch (gemErr) {
+           ╵                 ~~~~~
+
+--
+Error: Build failed with 1 error:
+src/routes/scrape.ts:7849:16: ERROR: Unexpected "catch"
+    at failureErrorWithLog (/root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1467:15)
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:926:25
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1345:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  errors: [Getter/Setter],
+root@university-and-course-data:~/University-and-Course-data# grep -n "jsonMatch\|geminiChat.*enPrompt2\|Gemini-rendered" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -10
+7819:                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+7821:                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+7822:                addLog(job, "status", { message: `Gemini-rendered raw: ${enResult2.slice(0, 200)}`, phase: "fetch" });
+7823:                const jsonMatch = enResult2.match(/\{[\s\S]*\}/);
+7824:                const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
+7838:                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+7850:                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+lines = s.splitlines()
+# Show lines 7830-7860 (1-indexed)
+for i, l in enumerate(lines[7828:7862], start=7829):
+    print(f"{i}: {l}")
+PYEOF
+7829:                 const flat2 = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+7830:                 if (flat2 && (flat2.ielts || flat2.pte || flat2.toefl)) {
+7831:                   if (!renderedReq.ieltsOverall && flat2.ielts) renderedReq.ieltsOverall = flat2.ielts;
+7832:                   if (!renderedReq.pteOverall && flat2.pte) renderedReq.pteOverall = flat2.pte;
+7833:                   if (!renderedReq.toeflOverall && flat2.toefl) renderedReq.toeflOverall = flat2.toefl;
+7834:                   if (!(renderedReq as any).cambridgeOverall && flat2.cae) (renderedReq as any).cambridgeOverall = flat2.cae;
+7835:                   addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+7836:                 }
+7837:               } catch (gemErr) {
+7838:                 addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+7839:               }
+7840:             }
+7841:                 const flat2 = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+7842:                 if (flat2 && (flat2.ielts || flat2.pte || flat2.toefl)) {
+7843:                   if (!renderedReq.ieltsOverall && flat2.ielts) renderedReq.ieltsOverall = flat2.ielts;
+7844:                   if (!renderedReq.pteOverall && flat2.pte) renderedReq.pteOverall = flat2.pte;
+7845:                   if (!renderedReq.toeflOverall && flat2.toefl) renderedReq.toeflOverall = flat2.toefl;
+7846:                   if (!(renderedReq as any).cambridgeOverall && flat2.cae) (renderedReq as any).cambridgeOverall = flat2.cae;
+7847:                   addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+7848:                 }
+7849:               } catch (gemErr) {
+7850:                 addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+7851:               }
+7852:             }
+7853:                 const flat2 = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+7854:                 if (flat2) {
+7855:                   if (!renderedReq.ieltsOverall && flat2.ielts) renderedReq.ieltsOverall = flat2.ielts;
+7856:                   if (!renderedReq.pteOverall && flat2.pte) renderedReq.pteOverall = flat2.pte;
+7857:                   if (!renderedReq.toeflOverall && flat2.toefl) renderedReq.toeflOverall = flat2.toefl;
+7858:                   if (!(renderedReq as any).cambridgeOverall && flat2.cae) (renderedReq as any).cambridgeOverall = flat2.cae;
+7859:                   addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+7860:                 }
+7861:               } catch {}
+7862:             }
+root@university-and-course-data:~/University-and-Course-data# 
