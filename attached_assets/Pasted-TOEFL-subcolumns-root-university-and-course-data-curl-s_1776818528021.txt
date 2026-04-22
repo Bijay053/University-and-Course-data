@@ -1,0 +1,50 @@
+TOEFL subcolumns -->
+root@university-and-course-data:~# curl -s "http://localhost/api/scrape/status/scrape_1776779216330_jxa4ft" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for l in d.get('logs', []):
+    msg = l.get('message','') if isinstance(l, dict) else str(l)
+    if any(x in msg for x in ['Vision','Browser-rendered','boilerplate','requirements page','cached','IELTS=','PTE=','AI extract']):
+        print(msg)
+" 2>&1 | head -40
+Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+Static IELTS extraction failed — using AI on requirements page (1 call)...
+Rendering requirements page with browser (JS-heavy site)...
+[POST-CACHE] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus Accounting -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus Business Technology -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus Human Resource Management -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus International Business Management -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus Marketing -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bbus Tourism And Hospitality Management -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Diploma Of Business -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Mba Finance -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Mba Information Systems -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Mba Leadership And Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Mba Project Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Mba Tourism And Hospitality Management -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Master of Business Administration -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] GDBA - Graduate Diploma of Business Admi -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] GCBA - Graduate Certificate of Business  -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Bachelor of Information Technology and S -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Master of Information Technology and Sys -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] GDITS-Graduate Diploma of Information Te -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] GCITS-Graduate Certificate of Informatio -> IELTS=6.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate III in Commercial Cookery -> IELTS=5.5 PTE=42 TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate IV in Kitchen Management -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate III in Patisserie -> IELTS=5.5 PTE=42 TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate IV in Patisserie -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Diploma of Hospitality Management -> IELTS=5.5 PTE=42 TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Advanced Diploma of Hospitality Manageme -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate IV in Information Technology -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Diploma of Information Technology -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Advanced Diploma of Information Technolo -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[POST-CACHE] Certificate III in Carpentry -> IELTS=5.5 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[PRE-INSERT] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus Accounting -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus Business Technology -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus Human Resource Management -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus International Business Management -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus Marketing -> IELTS=6 PTE=- TOEFL=- CAE=-
+[PRE-INSERT] Bbus Tourism And Hospitality Management -> IELTS=6 PTE=- TOEFL=- CAE=-
+root@university-and-course-data:~# 
