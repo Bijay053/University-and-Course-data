@@ -1,0 +1,312 @@
+0|uni-api  | {"level":30,"time":1776823510331,"pid":168550,"hostname":"university-and-course-data","req":{"id":52,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823512319,"pid":168550,"hostname":"university-and-course-data","req":{"id":53,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+^C
+root@university-and-course-data:~/University-and-Course-data# # Check if the new probe code reached the source file:
+grep -c "probing course page for equivalency link" \
+  /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts
+
+# Check if it made it into the compiled bundle:
+grep -c "probing course page for equivalency link" \
+  /root/University-and-Course-data/artifacts/api-server/dist/index.mjs
+0
+0
+root@university-and-course-data:~/University-and-Course-data# # From your local machine (or wherever you can reach both):
+scp <fetch-from-replit>/artifacts/api-server/src/routes/scrape.ts \
+    root@159.65.152.72:/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts
+
+# Then on the server:
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+grep -c "probing course page" artifacts/api-server/dist/index.mjs && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env
+-bash: fetch-from-replit: No such file or directory
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 976ms
+0
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'probing course page for equivalency link' in s:
+    print("ALREADY PATCHED — skipping insert")
+else:
+    ANCHOR = '''      }
+    } catch {}
+  }
+
+  // Queues filled by parallel workers, flushed after all done'''
+
+    NEW_BLOCK = '''      }
+    } catch {}
+  }
+
+  // ── COURSE-PAGE SUB-LINK PROBE (final fallback) ──
+  // Many universities (e.g. VIT) only show IELTS on the course page itself but link
+  // to a separate "Other Recognised Tests" / "English Language Equivalents" page that
+  // holds the PTE/TOEFL/CAE table. Probe the first course page once for that link
+  // and extract from it. Result is cached and applied to every course in the batch.
+  if (!cachedEnglishReqs && !cachedEnglishBands && courseLinks.length > 0 && GEMINI_API_KEY) {
+    try {
+      const sampleCourseUrl = courseLinks[0].url;
+      addLog(job, "status", { message: `No university-level English data — probing course page for equivalency link: ${sampleCourseUrl}`, phase: "fetch" });
+      let sampleHtml = "";
+      if (siteNeedsBrowser(sampleCourseUrl)) {
+        try {
+          const br = await fetchPageWithBrowser(sampleCourseUrl, { clickRequirementsTab: true, expandAccordions: true, timeoutMs: 25000 });
+          sampleHtml = br?.requirementsHtml || br?.mainHtml || "";
+        } catch {}
+      }
+      if (!sampleHtml) sampleHtml = await fetchPage(sampleCourseUrl);
+      const $s = cheerio.load(sampleHtml);
+      let equivLink: string | null = null;
+      const equivPattern = /other.{0,5}recognis|english.{0,10}(equivalents?|equivalencies|equivalent\\s*test)|approved.{0,10}(test|english)|ielts.{0,10}equivalent|test.{0,10}equivalencies|english.{0,10}(language\\s+)?(test|score)\\s*equivalent|english.{0,5}proficiency.{0,10}(table|equivalent)/i;
+      $s("a[href]").each((_, el) => {
+        if (equivLink) return;
+        const text = $s(el).text().trim();
+        const href = $s(el).attr("href") || "";
+        if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+        if (equivPattern.test(text) || equivPattern.test(href)) {
+          try {
+            const abs = new URL(href, sampleCourseUrl).toString();
+            if (!/\\.(jpg|png|gif|svg|css|js)(\\?|$)/i.test(abs)) equivLink = abs;
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"t/index.mjs && \ link", p], capture_output=True, text=True)
+Anchor occurrences: 1
+PATCHED OK
+Source occurrences: 1
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 850ms
+--- Verify dist ---
+0
+root@university-and-course-data:~/University-and-Course-data# echo "--- index.mjs ---"
+grep -c "probing course page" /root/University-and-Course-data/artifacts/api-server/dist/index.mjs
+echo "--- scrape-worker.mjs ---"
+grep -c "probing course page" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+echo "--- full build output ---"
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -20
+echo "--- recheck both ---"
+grep -c "probing course page" /root/University-and-Course-data/artifacts/api-server/dist/index.mjs
+grep -c "probing course page" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+echo "--- restart ---"
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "RESTARTED"
+--- index.mjs ---
+0
+--- scrape-worker.mjs ---
+1
+--- full build output ---
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.8mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 616ms
+--- recheck both ---
+0
+1
+--- restart ---
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 10   │ online    │ 0%       │ 46.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+RESTARTED
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'PRE-PROBE: many sites (e.g. VIT) embed the equivalency table inline' in s:
+    print("MODAL BLOCK ALREADY PATCHED — skipping insert")
+else:
+    ANCHOR = '''      if (!sampleHtml) sampleHtml = await fetchPage(sampleCourseUrl);
+      const $s = cheerio.load(sampleHtml);
+      let equivLink: string | null = null;'''
+
+    NEW_BLOCK = '''      if (!sampleHtml) sampleHtml = await fetchPage(sampleCourseUrl);
+      const $s = cheerio.load(sampleHtml);
+
+      // PRE-PROBE: many sites (e.g. VIT) embed the equivalency table inline as a
+      // hidden Bootstrap/Webflow MODAL on the course page itself, triggered by a
+      // data-bs-toggle button (no href). The modal HTML is already in the DOM —
+      // scan for it before attempting any link-following.
+      const modalSel = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
+      let modalHtml = "";
+      $s(modalSel).each((_, el) => {
+        if (modalHtml) return;
+        const t = $s(el).text().replace(/\\s+/g, " ").trim();
+        if (/IELTS/i.test(t) && /PTE/i.test(t) && /TOEFL/i.test(t) && /\\d/.test(t) && t.length > 80 && t.length < 8000) {
+          const outer = $s.html(el) || "";
+          if (outer && outer.length < 25000) modalHtml = outer;
+        }
+      });
+      if (modalHtml) {
+        addLog(job, "status", { message: `Found inline equivalency modal on course page (${modalHtml.length} chars) — extracting via Gemini`, phase: "fetch" });
+        try {
+          let modalCompact = extractCompactContent(modalHtml, sampleCourseUrl);
+          if (modalCompact.length < 200 || !/IELTS/i.test(modalCompact)) {
+            const $m = cheerio.load(modalHtml);
+            $m("script, style").remove();
+            modalCompact = $m("body").html()?.replace(/<[^>]+>/g, " | ").replace(/\\s*\\|\\s*\\|\\s*/g, " | ").replace(/\\s{2,}/g, " ").trim().slice(0, 8000) || "";
+          }
+          const modalPrompt = `Extract English language test requirements from this MODAL TABLE. The table has columns for IELTS, PTE, TOEFL iBT, Cambridge (CAE), and possibly Duolingo or KITE.\\nReturn ONLY valid JSON: {"bands":[{"ielts":6.0,"pte":47,"toefl":67,"cae":169,"duo":null}],"flat":{"ielts":6.0,"pte":47,"toefl":67,"cae":169,"duo":null}}\\nIf only one row of overall scores exists, put it in BOTH bands (single entry) AND flat. Use null for missing.`;
+          const modalResult = await geminiChat(modalPrompt, modalCompact, 800);
+          addLog(job, "status", { message: `Modal Gemini raw (first 200): ${modalResult.slice(0, 200)}`, phase: "fetch" });
+          const mm = modalResult.match(/\\{[\\s\\S]*\\}/);
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"-server/dist/workers/scrape-worker.mjs && \=True)ce(0, 120)
+Anchor occurrences: 1
+PATCHED OK
+Source occurrences: 1
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 577ms
+--- worker bundle ---
+1
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 11   │ online    │ 0%       │ 47.9mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'Modal deterministic parse:' in s:
+    print("DETERMINISTIC PARSER ALREADY PATCHED — skipping")
+else:
+    OLD = '''      if (modalHtml) {
+        addLog(job, "status", { message: `Found inline equivalency modal on course page (${modalHtml.length} chars) — extracting via Gemini`, phase: "fetch" });
+        try {
+          let modalCompact = extractCompactContent(modalHtml, sampleCourseUrl);'''
+
+    NEW = '''      if (modalHtml) {
+        addLog(job, "status", { message: `Found inline equivalency modal on course page (${modalHtml.length} chars)`, phase: "fetch" });
+
+        // DETERMINISTIC TABLE PARSER (no Gemini): extract numeric cells from the
+        // table inside the modal and assign by score-range sanity. This gives
+        // 100% accuracy and works even when Gemini is rate-limited.
+        try {
+          const $mod = cheerio.load(modalHtml);
+          const tables = $mod("table").toArray();
+          for (const tbl of tables) {
+            const $tbl = $mod(tbl);
+            const tblText = $tbl.text();
+            if (!/IELTS/i.test(tblText)) continue;
+            const cellVals: number[] = [];
+            $tbl.find("th, td").each((_, c) => {
+              const txt = $mod(c).text().replace(/\\s+/g, " ").trim();
+              if (/^\\d+(\\.\\d+)?$/.test(txt)) {
+                const v = parseFloat(txt);
+                if (!isNaN(v)) cellVals.push(v);
+              }
+            });
+            if (cellVals.length === 0) continue;
+            const ielts = cellVals.find(v => v >= 4 && v <= 9);
+            const pte = cellVals.find(v => v >= 10 && v <= 90 && Number.isInteger(v));
+            const toefl = cellVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== pte);
+            const cae = cellVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v));
+            if (ielts || pte || toefl || cae) {
+              cachedEnglishBands = [{ ielts: ielts ?? 0, pte: pte ?? null, toefl: toefl ?? null, cae: cae ?? null, duo: null }];
+              cachedEnglishReqs = {
+                ieltsOverall: ielts,
+                pteOverall: pte,
+                toeflOverall: toefl,
+                cambridgeOverall: cae,
+              } as Partial<CourseData>;
+              cachedEnglishReqsSource = { url: sampleCourseUrl, pageType: "course_page" };
+              addLog(job, "status", { message: `Modal deterministic parse: IELTS=${ielts ?? "-"} PTE=${pte ?? "-"pm2 restart uni-api --update-env && echo "DEPLOYED OK"er/dist/workers/scrape-worker.mjs && \t=True)essage?.slice(
+Anchor occurrences: 1
+PATCHED OK
+Source occurrences: 1
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 1120ms
+--- worker bundle ---
+2
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 12   │ online    │ 0%       │ 46.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'forceCourseOverride' in s:
+    print("FORCE-OVERRIDE ALREADY PATCHED — skipping")
+else:
+    OLD = '''        if (cachedEnglishReqs) {
+          let cachedApplied = false;
+          if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
+            cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
+            cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || undefined;
+            cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || undefined;
+            cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
+            cheerioData.ieltsSpeaking  = cachedEnglishReqs.ieltsSpeaking  || undefined;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[IELTS] cached hit: overall=${cachedEnglishReqs.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[PTE] cached hit: overall=${cachedEnglishReqs.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[TOEFL] cached hit: overall=${cachedEnglishReqs.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+          if (!(cheerioData as any).duolingoOverall && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;'''
+
+    NEW = '''        if (cachedEnglishReqs) {
+          let cachedApplied = false;
+          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";
+          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
+          if ((!cheerioData.ieltsOverall || forceCourseOverride) && cachedEnglishReqs.ieltsOverall) {
+            cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
+            cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || cheerioData.ieltsReading   || undefined;
+            cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || cheerioData.ieltsWriting   || undefined;
+            cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || cheerioData.ieltsListening || undefipm2 restart uni-api --update-env && echo "DEPLOYED OK"t/workers/scrape-worker.mjs && \=True);'''qs as any).duolin
+Anchor occurrences: 0
+ABORT: anchor not found or not unique
+Source occurrences: 0
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 556ms
+--- worker bundle ---
+0
+root@university-and-course-data:~/University-and-Course-data# 
