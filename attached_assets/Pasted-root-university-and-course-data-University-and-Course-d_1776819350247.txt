@@ -1,0 +1,88 @@
+root@university-and-course-data:~/University-and-Course-data# # Check pm2 logs for errors after discovery
+tail -50 ~/.pm2/logs/uni-api-out-1.log
+tail -50 ~/.pm2/logs/uni-api-error-1.log
+{"level":30,"time":1776819273328,"pid":152696,"hostname":"university-and-course-data","req":{"id":16,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819274979,"pid":152696,"hostname":"university-and-course-data","req":{"id":17,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819276628,"pid":152696,"hostname":"university-and-course-data","req":{"id":18,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819278277,"pid":152696,"hostname":"university-and-course-data","req":{"id":19,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819279928,"pid":152696,"hostname":"university-and-course-data","req":{"id":20,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819281577,"pid":152696,"hostname":"university-and-course-data","req":{"id":21,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819283228,"pid":152696,"hostname":"university-and-course-data","req":{"id":22,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819284879,"pid":152696,"hostname":"university-and-course-data","req":{"id":23,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819286530,"pid":152696,"hostname":"university-and-course-data","req":{"id":24,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819288177,"pid":152696,"hostname":"university-and-course-data","req":{"id":25,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819289827,"pid":152696,"hostname":"university-and-course-data","req":{"id":26,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819291478,"pid":152696,"hostname":"university-and-course-data","req":{"id":27,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819293128,"pid":152696,"hostname":"university-and-course-data","req":{"id":28,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819294779,"pid":152696,"hostname":"university-and-course-data","req":{"id":29,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819296428,"pid":152696,"hostname":"university-and-course-data","req":{"id":30,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819298075,"pid":152696,"hostname":"university-and-course-data","req":{"id":31,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819299728,"pid":152696,"hostname":"university-and-course-data","req":{"id":32,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819301380,"pid":152696,"hostname":"university-and-course-data","req":{"id":33,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819303029,"pid":152696,"hostname":"university-and-course-data","req":{"id":34,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819304677,"pid":152696,"hostname":"university-and-course-data","req":{"id":35,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819306328,"pid":152696,"hostname":"university-and-course-data","req":{"id":36,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819307978,"pid":152696,"hostname":"university-and-course-data","req":{"id":37,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819309630,"pid":152696,"hostname":"university-and-course-data","req":{"id":38,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+{"level":30,"time":1776819311281,"pid":152696,"hostname":"university-and-course-data","req":{"id":39,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819313215,"pid":152696,"hostname":"university-and-course-data","req":{"id":40,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819315213,"pid":152696,"hostname":"university-and-course-data","req":{"id":41,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819317213,"pid":152696,"hostname":"university-and-course-data","req":{"id":42,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819319212,"pid":152696,"hostname":"university-and-course-data","req":{"id":43,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819321209,"pid":152696,"hostname":"university-and-course-data","req":{"id":44,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819323212,"pid":152696,"hostname":"university-and-course-data","req":{"id":45,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819325213,"pid":152696,"hostname":"university-and-course-data","req":{"id":46,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819326419,"pid":152696,"hostname":"university-and-course-data","req":{"id":47,"method":"GET","url":"/api/universities"},"res":{"statusCode":200},"responseTime":20,"msg":"request completed"}
+{"level":30,"time":1776819326964,"pid":152696,"hostname":"university-and-course-data","req":{"id":48,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819327005,"pid":152696,"hostname":"university-and-course-data","req":{"id":49,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":8,"msg":"request completed"}
+{"level":30,"time":1776819327106,"pid":152696,"hostname":"university-and-course-data","req":{"id":50,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819327112,"pid":152696,"hostname":"university-and-course-data","req":{"id":51,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819327121,"pid":152696,"hostname":"university-and-course-data","req":{"id":54,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":8,"msg":"request completed"}
+{"level":30,"time":1776819327128,"pid":152696,"hostname":"university-and-course-data","req":{"id":52,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":19,"msg":"request completed"}
+{"level":30,"time":1776819327134,"pid":152696,"hostname":"university-and-course-data","req":{"id":53,"method":"GET","url":"/api/courses"},"res":{"statusCode":304},"responseTime":23,"msg":"request completed"}
+{"level":30,"time":1776819329216,"pid":152696,"hostname":"university-and-course-data","req":{"id":55,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+{"level":30,"time":1776819330679,"pid":152696,"hostname":"university-and-course-data","req":{"id":56,"method":"GET","url":"/api/universities"},"res":{"statusCode":304},"responseTime":6,"msg":"request completed"}
+{"level":30,"time":1776819330873,"pid":152696,"hostname":"university-and-course-data","req":{"id":57,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819332517,"pid":152696,"hostname":"university-and-course-data","req":{"id":58,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819334162,"pid":152696,"hostname":"university-and-course-data","req":{"id":59,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819335811,"pid":152696,"hostname":"university-and-course-data","req":{"id":60,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819337463,"pid":152696,"hostname":"university-and-course-data","req":{"id":61,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819339217,"pid":152696,"hostname":"university-and-course-data","req":{"id":62,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+{"level":30,"time":1776819341206,"pid":152696,"hostname":"university-and-course-data","req":{"id":63,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819343215,"pid":152696,"hostname":"university-and-course-data","req":{"id":64,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+{"level":30,"time":1776819345219,"pid":152696,"hostname":"university-and-course-data","req":{"id":65,"method":"GET","url":"/api/scrape/status/scrape_1776819251706_9l822g"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///root/University-and-Course-data/lib/db/src/index.ts:8:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+root@university-and-course-data:~/University-and-Course-data# curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status')); [print(l['message']) for l in d.get('logs',[])][-10:]" 2>/dev/null || \
+curl -s http://localhost:3001/api/scrape/status/<JOBID> | python3 -m json.tool | tail -40
+-bash: syntax error near unexpected token `|'
+-bash: syntax error near unexpected token `|'
+root@university-and-course-data:~/University-and-Course-data# 
