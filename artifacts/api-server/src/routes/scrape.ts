@@ -7715,6 +7715,9 @@ async function scrapeCourseBatch(
   let uniReqsText: string | null = null;
   let uniReqsHtml: string | null = null;
   // University-level English requirements (resolved ONCE, applied to every course in the batch).
+  // Tiered band mapping from requirements page: [{ielts, pte, toefl, cae}] for
+  // universities that publish different scores per qualification level.
+  let cachedEnglishBands: Array<{ ielts: number; pte?: number | null; toefl?: number | null; cae?: number | null; duo?: number | null }> | null = null;
   // Populated from the requirements page — first via static patterns, then AI if needed.
   let cachedEnglishReqs: Partial<CourseData> | null = null;
   // Source URL and page-type for cachedEnglishReqs — used to create a proper
@@ -7841,6 +7844,30 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               extractEnglishRequirements(renderedText, renderedReq);
             }
             applyEnglishResultToCourse(renderedReq, parseEnglishRequirementsFromText(renderedText, "browser"));
+
+            // ── Gemini text on rendered HTML (catches JS-injected tables static parse misses) ──
+            if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
+              try {
+                const renderedCompact = extractCompactContent(renderedHtml, reqUrl);
+                const enPrompt2 = `Extract English language proficiency test requirements from this university page.\nIf the page has a TABLE with multiple rows for different IELTS levels (e.g. 5.5, 6.0, 6.5), return ALL rows as "bands".\nIf there is only one flat requirement, return it in "flat".\nReturn ONLY valid JSON in this exact shape:\n{"bands":[{"ielts":<number>,"pte":<number|null>,"toefl":<number|null>,"cae":<number|null>,"duo":<number|null>}],"flat":{"ielts":<number|null>,"pte":<number|null>,"toefl":<number|null>,"cae":<number|null>,"duo":<number|null>}}\nUse null for any test not found. "bands" may be an empty array if no tiered table exists.`;
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact.slice(0, 12000), 400);
+                const enParsed2 = JSON.parse(enResult2);
+                // Store tiered bands for per-course IELTS→PTE lookup
+                if (Array.isArray(enParsed2.bands) && enParsed2.bands.length > 1) {
+                  cachedEnglishBands = enParsed2.bands.filter((b: any) => b && b.ielts != null);
+                  addLog(job, "status", { message: `Gemini-rendered bands: ${cachedEnglishBands!.map((b) => `IELTS ${b.ielts}→PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
+                }
+                // Also apply flat values if HTML parser missed them
+                const flat = enParsed2.flat || (enParsed2.bands?.length === 1 ? enParsed2.bands[0] : null);
+                if (flat) {
+                  if (!renderedReq.ieltsOverall && flat.ielts) renderedReq.ieltsOverall = flat.ielts;
+                  if (!renderedReq.pteOverall && flat.pte) renderedReq.pteOverall = flat.pte;
+                  if (!renderedReq.toeflOverall && flat.toefl) renderedReq.toeflOverall = flat.toefl;
+                  if (!(renderedReq as any).cambridgeOverall && flat.cae) (renderedReq as any).cambridgeOverall = flat.cae;
+                  addLog(job, "status", { message: `Gemini-rendered flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+                }
+              } catch {}
+            }
 
             if (renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall) {
               // Merge: browser results fill slots the AI scan missed; AI values take
@@ -8608,6 +8635,27 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               message: `[per-course browser ✗] ${link.name.slice(0, 60)}: ${(e as Error).message}`,
               phase: "fallback",
             });
+          }
+        }
+
+        // Tier 4a: Band-matched requirements for tiered universities (e.g. VIT).
+        // If the requirements page had multiple IELTS bands, find the band matching
+        // this course's IELTS level and fill PTE/TOEFL from it.
+        if (cachedEnglishBands && cachedEnglishBands.length > 1 && cheerioData.ieltsOverall) {
+          const targetIelts = cheerioData.ieltsOverall;
+          const band = cachedEnglishBands.reduce((best, b) =>
+            Math.abs(b.ielts - targetIelts) < Math.abs(best.ielts - targetIelts) ? b : best
+          );
+          if (Math.abs(band.ielts - targetIelts) <= 0.26) {
+            let bandApplied = false;
+            if (!cheerioData.pteOverall && band.pte) { cheerioData.pteOverall = band.pte; bandApplied = true; }
+            if (!cheerioData.toeflOverall && band.toefl) { cheerioData.toeflOverall = band.toefl; bandApplied = true; }
+            if (!cheerioData.cambridgeOverall && band.cae) { cheerioData.cambridgeOverall = band.cae; bandApplied = true; }
+            if (!(cheerioData as any).duolingoOverall && band.duo) (cheerioData as any).duolingoOverall = band.duo;
+            if (bandApplied) {
+              addLog(job, "status", { message: `[BAND] IELTS ${targetIelts}→band IELTS ${band.ielts}: PTE=${band.pte ?? "-"} TOEFL=${band.toefl ?? "-"} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+              if (cachedEnglishReqsSource) reviewSources.push({ url: cachedEnglishReqsSource.url, pageType: cachedEnglishReqsSource.pageType, extractionMethod: "cheerio", content: `IELTS ${targetIelts} PTE ${band.pte ?? ""} TOEFL ${band.toefl ?? ""}`.trim() });
+            }
           }
         }
 
