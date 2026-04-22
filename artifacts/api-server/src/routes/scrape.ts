@@ -8292,6 +8292,56 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const cheerioData = extractWithCheerio(extractionHtml, link.url, link.name, universityCountry, batchPageTemplate, feedbackHints);
         if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
 
+        // PER-COURSE MODAL SCAN: many sites (e.g. VIT) embed a hidden Bootstrap
+        // equivalency modal directly on each course page with course-specific
+        // IELTS/PTE/TOEFL/CAE values. Different courses (Bachelor vs MBA) often
+        // have different requirements, so we MUST scan each course's own modal
+        // and not rely on the cache from the sample page.
+        try {
+          const $cs = cheerio.load(cHtml);
+          const cmSel = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
+          let cmHtml = "";
+          $cs(cmSel).each((_, el) => {
+            if (cmHtml) return;
+            const t = $cs(el).text().replace(/\s+/g, " ").trim();
+            if (/IELTS/i.test(t) && /PTE/i.test(t) && /TOEFL/i.test(t) && /\d/.test(t) && t.length > 80 && t.length < 8000) {
+              const outer = $cs.html(el) || "";
+              if (outer && outer.length < 25000) cmHtml = outer;
+            }
+          });
+          if (cmHtml) {
+            const $cm = cheerio.load(cmHtml);
+            const cmTables = $cm("table").toArray();
+            for (const tbl of cmTables) {
+              const $tbl = $cm(tbl);
+              if (!/IELTS/i.test($tbl.text())) continue;
+              const cellVals: number[] = [];
+              $tbl.find("th, td").each((_, c) => {
+                const txt = $cm(c).text().replace(/\s+/g, " ").trim();
+                if (/^\d+(\.\d+)?$/.test(txt)) {
+                  const v = parseFloat(txt);
+                  if (!isNaN(v)) cellVals.push(v);
+                }
+              });
+              if (cellVals.length === 0) continue;
+              const cIelts = cellVals.find(v => v >= 4 && v <= 9);
+              const cPte   = cellVals.find(v => v >= 10 && v <= 90 && Number.isInteger(v));
+              const cToefl = cellVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== cPte);
+              const cCae   = cellVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v));
+              if (cIelts || cPte || cToefl || cCae) {
+                if (cIelts != null) cheerioData.ieltsOverall = cIelts;
+                if (cPte   != null) cheerioData.pteOverall   = cPte;
+                if (cToefl != null) cheerioData.toeflOverall = cToefl;
+                if (cCae   != null) (cheerioData as any).cambridgeOverall = cCae;
+                addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"}`, phase: "extract" });
+                break;
+              }
+            }
+          }
+        } catch (cmErr) {
+          addLog(job, "status", { message: `[per-course modal ✗] ${link.name.slice(0, 40)} — ${(cmErr as Error).message?.slice(0, 80)}`, phase: "extract" });
+        }
+
         // Heavy-host full-text English scan: the truncated HTML (180 KB) and
         // text (12 K chars) limits are set for performance, but English
         // requirements are often deep in the page body — e.g. Torrens has
