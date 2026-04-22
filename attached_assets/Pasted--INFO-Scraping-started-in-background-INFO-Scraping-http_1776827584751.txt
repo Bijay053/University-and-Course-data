@@ -1,0 +1,214 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au/...
+[INFO ] Using university: vit (ID: 6)
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO ] Switched to course listing: https://vit.edu.au/course-list
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 16 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 30 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 30 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Business Technology"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus International Business Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDBA - Graduate Diploma of Business Administration"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Information Technology and Systems (BITS)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDITS-Graduate Diploma of Information Technology and Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Commercial Cookery"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Patisserie"
+[DISCOVER] Research complete: 12/12 sampled pages are genuine course pages
+[DISCOVER] All 12 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (30 total).
+[DISCOVER] High confidence: 12/12 samples valid (100%). Auto-proceeding with 30 courses (~1 min). (30 courses)
+[EXTRACT ] [SMART] Fetching 30 validated course pages (browser-first for JS-heavy, static-first for the rest)... (30 courses)
+[INFO ] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Rendering requirements page with browser (JS-heavy site)...
+[INFO ] Gemini-rendered call: length=12000 hasTables=false
+[INFO ] Gemini-rendered failed: All Gemini models are currently unavailable after multiple retries. Please try again in a minute.
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...
+[INFO ] No university-level English data — probing course page for equivalency link: https://vit.edu.au/bachelor-of-business
+[INFO ] Found inline equivalency modal on course page (2935 chars)
+[INFO ] Modal deterministic parse: IELTS=6 PTE=47 TOEFL=67 CAE=169 (no Gemini needed)
+[INFO ] No equivalency link found in course page
+[INFO ] Batch concurrency: HTTP 3, browser 2 (heavy host: vit.edu.au)
+[ 1/30] Fetching 1/30: Bachelor Of Business
+[ 2/30] Fetching 2/30: Bbus Accounting
+[ 3/30] Fetching 3/30: Bbus Business Technology
+[EXTRACT ] [browser ✓ intl] Bbus Accounting — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [browser ✓ intl] Bachelor Of Business — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus Accounting — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [VIT static fallback ✓] Bachelor Of Business — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus Accounting src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus Accounting -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 4/30] Fetching 4/30: Bbus Human Resource Management
+[EXTRACT ] [CACHE-FILL] Bachelor Of Business src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 5/30] Fetching 5/30: Bbus International Business Management
+[EXTRACT ] [browser ✓ intl] Bbus Business Technology — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus Business Technology — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus Business Technology src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus Business Technology -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 6/30] Fetching 6/30: Bbus Marketing
+[EXTRACT ] [browser ✓ intl] Bbus Human Resource Management — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus Human Resource Management — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus Human Resource Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus Human Resource Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 7/30] Fetching 7/30: Bbus Tourism And Hospitality Management
+[EXTRACT ] [browser ✓ intl] Bbus International Business Management — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus International Business Management — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus International Business Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus International Business Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 8/30] Fetching 8/30: Diploma Of Business
+[EXTRACT ] [browser ✓ intl] Bbus Marketing — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus Marketing — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus Marketing src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus Marketing -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 9/30] Fetching 9/30: Mba Finance
+[EXTRACT ] [browser ✓ intl] Bbus Tourism And Hospitality Management — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bbus Tourism And Hospitality Management — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bbus Tourism And Hospitality Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bbus Tourism And Hospitality Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 10/30] Fetching 10/30: Mba Information Systems
+[EXTRACT ] [browser ✓ intl] Diploma Of Business — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Diploma Of Business — recovered duration=1 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Diploma Of Business src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Diploma Of Business -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 11/30] Fetching 11/30: Mba Leadership And Management
+[EXTRACT ] [browser ✓ intl] Mba Finance — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Mba Finance — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Mba Finance src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Mba Finance -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 12/30] Fetching 12/30: Mba Project Management
+[EXTRACT ] [browser ✓ intl] Mba Information Systems — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Mba Information Systems — recovered duration=2 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Mba Information Systems src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Mba Information Systems -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 13/30] Fetching 13/30: Mba Tourism And Hospitality Management
+[EXTRACT ] [browser ✓ intl] Mba Leadership And Management — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Mba Leadership And Management — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Mba Leadership And Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Mba Leadership And Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 14/30] Fetching 14/30: Master of Business Administration
+[EXTRACT ] [browser ✓ intl] Mba Project Management — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Mba Project Management — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Mba Project Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Mba Project Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 15/30] Fetching 15/30: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [browser ✓ intl] Mba Tourism And Hospitality Management — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Mba Tourism And Hospitality Management — recovered duration=2 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Mba Tourism And Hospitality Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Mba Tourism And Hospitality Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 16/30] Fetching 16/30: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [browser ✓ intl] Master of Business Administration — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Master of Business Administration — recovered duration=2 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Master of Business Administration src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Master of Business Administration -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 17/30] Fetching 17/30: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [browser ✓ intl] GDBA - Graduate Diploma of Business Administration — international_toggle_css[label:has-text("International")]
+[EXTRACT ] [VIT static fallback ✓] GDBA - Graduate Diploma of Business Administration — recovered duration=1 Year, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] GDBA - Graduate Diploma of Business Admi src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] GDBA - Graduate Diploma of Business Admi -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 18/30] Fetching 18/30: Master of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] GCBA - Graduate Certificate of Business Administration — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] GCBA - Graduate Certificate of Business Administra — recovered duration=6 Month, intakes=January,March,May,June,August,October, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] GCBA - Graduate Certificate of Business src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] GCBA - Graduate Certificate of Business -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 19/30] Fetching 19/30: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] Bachelor of Information Technology and Systems (BITS) — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bachelor of Information Technology and Systems (BI — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Bachelor of Information Technology and S src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Bachelor of Information Technology and S -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 20/30] Fetching 20/30: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [browser ✓ intl] Master of Information Technology and Systems — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Master of Information Technology and Systems — recovered duration=2 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] Master of Information Technology and Sys src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Master of Information Technology and Sys -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 21/30] Fetching 21/30: Certificate III in Commercial Cookery
+[EXTRACT ] [browser ✓ intl] GDITS-Graduate Diploma of Information Technology and Systems — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] GDITS-Graduate Diploma of Information Technology a — recovered duration=12 Month, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] GDITS-Graduate Diploma of Information Te src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] GDITS-Graduate Diploma of Information Te -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 22/30] Fetching 22/30: Certificate IV in Kitchen Management
+[EXTRACT ] [browser ✓ intl] GCITS-Graduate Certificate of Information Technology and Sys — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] GCITS-Graduate Certificate of Information Technolo — recovered duration=6 Month, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [CACHE-FILL] GCITS-Graduate Certificate of Informatio src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] GCITS-Graduate Certificate of Informatio -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 23/30] Fetching 23/30: Certificate III in Patisserie
+[EXTRACT ] [browser ✓ intl] Certificate III in Commercial Cookery — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate III in Commercial Cookery — recovered duration=64 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Certificate III in Commercial Cookery src=course_page force=true | course PTE=42 TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate III in Commercial Cookery -> IELTS=6 PTE=42 TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 24/30] Fetching 24/30: Certificate IV in Patisserie
+[EXTRACT ] [browser ✓ intl] Certificate IV in Kitchen Management — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate IV in Kitchen Management — recovered duration=100 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Certificate IV in Kitchen Management src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate IV in Kitchen Management -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 25/30] Fetching 25/30: Diploma of Hospitality Management
+[EXTRACT ] [browser ✓ intl] Certificate III in Patisserie — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate III in Patisserie — recovered duration=52 Week, intakes=February,March,May,June,July,August, location=Melbourne
+[EXTRACT ] [CACHE-FILL] Certificate III in Patisserie src=course_page force=true | course PTE=42 TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate III in Patisserie -> IELTS=6 PTE=42 TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 26/30] Fetching 26/30: Advanced Diploma of Hospitality Management
+[EXTRACT ] [browser ✓ intl] Certificate IV in Patisserie — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate IV in Patisserie — recovered duration=88 Week, intakes=February,March,May,June,July, location=Melbourne
+[EXTRACT ] [CACHE-FILL] Certificate IV in Patisserie src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate IV in Patisserie -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 27/30] Fetching 27/30: Certificate IV in Information Technology
+[EXTRACT ] [browser ✓ intl] Diploma of Hospitality Management — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Diploma of Hospitality Management — recovered duration=88 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Diploma of Hospitality Management src=course_page force=true | course PTE=42 TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Diploma of Hospitality Management -> IELTS=6 PTE=42 TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 28/30] Fetching 28/30: Diploma of Information Technology
+[EXTRACT ] [browser ✓ intl] Advanced Diploma of Hospitality Management — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Advanced Diploma of Hospitality Management — recovered duration=107 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Advanced Diploma of Hospitality Manageme src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Advanced Diploma of Hospitality Manageme -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 29/30] Fetching 29/30: Advanced Diploma of Information Technology
+[EXTRACT ] [browser ✓ intl] Certificate IV in Information Technology — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate IV in Information Technology — recovered duration=52 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [browser ✓ intl] Diploma of Information Technology — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [CACHE-FILL] Certificate IV in Information Technology src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate IV in Information Technology -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[ 30/30] Fetching 30/30: Certificate III in Carpentry
+[EXTRACT ] [VIT static fallback ✓] Diploma of Information Technology — recovered duration=66 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Diploma of Information Technology src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Diploma of Information Technology -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[EXTRACT ] [browser ✓ intl] Advanced Diploma of Information Technology — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Advanced Diploma of Information Technology — recovered duration=104 Week, intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[EXTRACT ] [CACHE-FILL] Advanced Diploma of Information Technolo src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Advanced Diploma of Information Technolo -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[EXTRACT ] [browser ✓ intl] Certificate III in Carpentry — international_toggle_css[li:has-text("International students")]
+[EXTRACT ] [VIT static fallback ✓] Certificate III in Carpentry — recovered duration=104 Week, intakes=February,March,May,June,July,August, location=Melbourne
+[EXTRACT ] [CACHE-FILL] Certificate III in Carpentry src=course_page force=true | course PTE=undefined TOEFL=undefined CAE=undefined | cache PTE=47 TOEFL=67 CAE=169
+[EXTRACT ] [POST-CACHE] Certificate III in Carpentry -> IELTS=6 PTE=- TOEFL=- CAE=169 | cached: I=6 P=47 T=67
+[INFO ] Classifying 30 courses with AI (batched)...
+– Bbus Accounting [skipped]
+– Bachelor Of Business [skipped]
+– Bbus Business Technology [skipped]
+– Bbus Human Resource Management [skipped]
+– Bbus International Business Management [skipped]
+– Bbus Marketing [skipped]
+– Bbus Tourism And Hospitality Management [skipped]
+– Diploma Of Business [skipped]
+– Mba Finance [skipped]
+– Mba Information Systems [skipped]
+– Mba Leadership And Management [skipped]
+– Mba Project Management [skipped]
+– Mba Tourism And Hospitality Management [skipped]
+– Master of Business Administration [skipped]
+– GDBA - Graduate Diploma of Business Administration [skipped]
+Processing in background...
