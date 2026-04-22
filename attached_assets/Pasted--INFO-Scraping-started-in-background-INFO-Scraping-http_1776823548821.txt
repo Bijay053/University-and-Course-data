@@ -1,0 +1,56 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au/...
+[INFO ] Using university: vit (ID: 6)
+[INFO ] Cleared 10 older pending staged rows for vit before starting fresh scrape
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO ] Switched to course listing: https://vit.edu.au/course-list
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 16 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 30 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 30 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Business Technology"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus International Business Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDBA - Graduate Diploma of Business Administration"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Information Technology and Systems (BITS)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDITS-Graduate Diploma of Information Technology and Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Commercial Cookery"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Patisserie"
+[DISCOVER] Research complete: 12/12 sampled pages are genuine course pages
+[DISCOVER] All 12 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (30 total).
+[DISCOVER] High confidence: 12/12 samples valid (100%). Auto-proceeding with 30 courses (~1 min). (30 courses)
+[EXTRACT ] [SMART] Fetching 30 validated course pages (browser-first for JS-heavy, static-first for the rest)... (30 courses)
+[INFO ] Using university requirements page: https://vit.edu.au/resources/course-entry-requirements
+[INFO ] Static IELTS extraction failed — using AI on requirements page (1 call)...
+[INFO ] Rendering requirements page with browser (JS-heavy site)...
+[INFO ] Gemini-rendered call: length=12000 hasTables=false
+[INFO ] Gemini-rendered failed: All Gemini models are currently unavailable after multiple retries. Please try again in a minute.
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...
+[INFO ] Batch concurrency: HTTP 3, browser 2 (heavy host: vit.edu.au)
+[ 1/30] Fetching 1/30: Bachelor Of Business
+[ 2/30] Fetching 2/30: Bbus Accounting
+[ 3/30] Fetching 3/30: Bbus Business Technology
+[EXTRACT ] [browser ✓ intl] Bachelor Of Business — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [browser ✓ intl] Bbus Accounting — international_toggle_css[label:text-is("International")]
+[EXTRACT ] [VIT static fallback ✓] Bachelor Of Business — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [VIT static fallback ✓] Bbus Accounting — recovered duration=3 Year, intakes=March,May,August,September,December, location=Melbourne, Sydney, Adelaide, Geelong
+[EXTRACT ] [POST-CACHE] Bbus Accounting -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 4/30] Fetching 4/30: Bbus Human Resource Management
+[EXTRACT ] [POST-CACHE] Bachelor Of Business -> IELTS=6 PTE=- TOEFL=- CAE=- | cached: I=- P=- T=-
+[ 5/30] Fetching 5/30: Bbus International Business Management
+[EXTRACT ] [browser ✓ intl] Bbus Business Technology — international_toggle_css[label:text-is("International")]
