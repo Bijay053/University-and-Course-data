@@ -1,0 +1,46 @@
+root@university-and-course-data:~/University-and-Course-data# python3 /tmp/patch_assign_logs.py
+OLD pattern matches: 0
+=== first 200 chars of source around 'PTE] cached hit' ===
+NOT FOUND
+root@university-and-course-data:~/University-and-Course-data# grep -n "cheerioData.pteOverall\|cheerioData.toeflOverall\|cheerioData.cambridgeOverall\|forceCourseOverride\|CACHE-FILL\|POST-CACHE" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -40
+7423:    pteOverall: cheerioData.pteOverall,
+7428:    toeflOverall: cheerioData.toeflOverall,
+7433:    cambridgeOverall: cheerioData.cambridgeOverall,
+8281:                message: `[heavy-host full-text scan ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"}`,
+8367:          !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) ||
+8396:            !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)
+8406:            message: `[English] ${fetchType} page — IELTS=${fmt(cheerioData.ieltsOverall)} PTE=${fmt(cheerioData.pteOverall)} TOEFL=${fmt(cheerioData.toeflOverall)} CAE=${fmt(cheerioData.cambridgeOverall)} DET=${fmt((cheerioData as any).duolingoOverall)} | "${link.name.slice(0, 40)}"`,
+8412:        debugIelts(link.name, "B-after-tier1-2", { ieltsOverall: cheerioData.ieltsOverall, pteOverall: cheerioData.pteOverall });
+8429:          !(cheerioData.pteOverall && cheerioData.toeflOverall)
+8477:                message: `[course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+8521:          if (uniReqsHtml && !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && cheerioData.cambridgeOverall)) {
+8561:          !(cheerioData.ieltsOverall && cheerioData.pteOverall && cheerioData.toeflOverall && (cheerioData as any).cambridgeOverall)
+8589:                if (cheerioData.pteOverall != null) synthLines.push(`PTE ${cheerioData.pteOverall}`);
+8590:                if (cheerioData.toeflOverall != null) synthLines.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+8599:                  message: `[per-course browser ✓] ${link.name.slice(0, 60)} — IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+8613:                const ptOrTofMissing = !(cheerioData.pteOverall && cheerioData.toeflOverall);
+8724:                    if (cheerioData.pteOverall   != null) vsl.push(`PTE ${cheerioData.pteOverall}`);
+8725:                    if (cheerioData.toeflOverall != null) vsl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+8736:                      message: `[per-course vision ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+8754:                          if (cheerioData.pteOverall   != null) ssl.push(`PTE ${cheerioData.pteOverall}`);
+8755:                          if (cheerioData.toeflOverall != null) ssl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+8768:                            message: `[per-course vision ↻ sibling cache ${dlk}] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"}`,
+8800:            if (!cheerioData.pteOverall && band.pte) { cheerioData.pteOverall = band.pte; bandApplied = true; }
+8801:            if (!cheerioData.toeflOverall && band.toefl) { cheerioData.toeflOverall = band.toefl; bandApplied = true; }
+8802:            if (!cheerioData.cambridgeOverall && band.cae) { cheerioData.cambridgeOverall = band.cae; bandApplied = true; }
+8815:          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";
+8816:          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
+8817:          if ((!cheerioData.ieltsOverall || forceCourseOverride) && cachedEnglishReqs.ieltsOverall) {
+8829:          // if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {
+8830:          //   cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+8833:          // if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {
+8834:          //   cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+8837:          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+8838:          if ((!(cheerioData as any).duolingoOverall || forceCourseOverride) && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
+8845:            if (cheerioData.pteOverall   != null) sl.push(`PTE ${cheerioData.pteOverall}`);
+8846:            if (cheerioData.toeflOverall != null) sl.push(`TOEFL iBT ${cheerioData.toeflOverall}`);
+8847:            if (cheerioData.cambridgeOverall != null) sl.push(`Cambridge CAE ${cheerioData.cambridgeOverall}`);
+8860:            source: (cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) ? (wasBrowserFetch ? "browser" : "static") : "none",
+8862:            pte:   { overall: cheerioData.pteOverall ?? null, listening: cheerioData.pteListening ?? null, reading: cheerioData.pteReading ?? null, writing: cheerioData.pteWriting ?? null, speaking: cheerioData.pteSpeaking ?? null, confidence: 0 },
+8863:            toefl: { overall: cheerioData.toeflOverall ?? null, listening: cheerioData.toeflListening ?? null, reading: cheerioData.toeflReading ?? null, writing: cheerioData.toeflWriting ?? null, speaking: cheerioData.toeflSpeaking ?? null, confidence: 0 },
+root@university-and-course-data:~/University-and-Course-data# 
