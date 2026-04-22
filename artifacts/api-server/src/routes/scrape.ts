@@ -4878,59 +4878,11 @@ async function stageCourse(
   );
   if (dup.rows.length > 0) return false;
 
-  // Skip if course is already published AND the freshly scraped English data is
-  // not BETTER than what's already stored. "Better" means: more non-null fields
-  // OR at least one differing value. This allows the cascade / rescrape to
-  // overwrite stale or wrong values (e.g. ASA's PTE=50 CEFR-floor) while still
-  // skipping pure no-op rescrapes.
-  const published = await pool.query(
-    `SELECT c.id, sc.ielts_overall, sc.pte_overall, sc.toefl_overall, sc.cambridge_overall
-     FROM courses c
-     LEFT JOIN scraped_courses sc ON sc.course_id = c.id AND sc.status = 'approved'
-     WHERE c.university_id = $1
-       AND TRIM(REGEXP_REPLACE(LOWER(c.name), '[^a-z0-9]+', ' ', 'g')) = $2
-     LIMIT 1`,
-    [uniId, fingerprint],
-  );
-  if (published.rows.length > 0) {
-    const stored = published.rows[0];
-    const storedIelts = stored.ielts_overall == null ? null : Number(stored.ielts_overall);
-    const storedPte   = stored.pte_overall   == null ? null : Number(stored.pte_overall);
-    const storedToefl = stored.toefl_overall == null ? null : Number(stored.toefl_overall);
-    const storedCae   = stored.cambridge_overall == null ? null : Number(stored.cambridge_overall);
-    const newIelts = courseData.ieltsOverall ?? null;
-    const newPte   = courseData.pteOverall   ?? null;
-    const newToefl = courseData.toeflOverall ?? null;
-    const newCae   = courseData.cambridgeOverall ?? null;
-
-    const filledStored = [storedIelts, storedPte, storedToefl, storedCae].filter((v) => v != null).length;
-    const filledNew    = [newIelts,    newPte,    newToefl,    newCae   ].filter((v) => v != null).length;
-
-    const hasNewField =
-      (newIelts != null && storedIelts == null) ||
-      (newPte   != null && storedPte   == null) ||
-      (newToefl != null && storedToefl == null) ||
-      (newCae   != null && storedCae   == null);
-
-    const hasDiff =
-      (newIelts != null && storedIelts != null && newIelts !== storedIelts) ||
-      (newPte   != null && storedPte   != null && newPte   !== storedPte)   ||
-      (newToefl != null && storedToefl != null && newToefl !== storedToefl) ||
-      (newCae   != null && storedCae   != null && newCae   !== storedCae);
-
-    const isImprovement = filledNew > filledStored || hasNewField || hasDiff;
-    if (!isImprovement) {
-      // Truly identical — no point re-staging.
-      return false;
-    }
-    if (job) {
-      addLog(job, "status", {
-        message:
-          `[re-stage] ${courseData.courseName.slice(0, 50)} — stored I=${storedIelts ?? "-"} P=${storedPte ?? "-"} T=${storedToefl ?? "-"} C=${storedCae ?? "-"} → new I=${newIelts ?? "-"} P=${newPte ?? "-"} T=${newToefl ?? "-"} C=${newCae ?? "-"}`,
-        phase: "validate",
-      });
-    }
-  }
+  // NOTE: we no longer skip already-published courses. Every fresh scrape goes
+  // into the staging review so the user can see latest values (incl. cascade-
+  // filled English) and decide whether to re-approve. Duplicate prevention is
+  // handled by the `dup` check above (same university + same name fingerprint
+  // already pending in this or any prior scrape run).
   // Use the cleaned display form when storing so future dedup checks match consistently.
   courseData.courseName = displayName;
 
