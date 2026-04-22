@@ -1,0 +1,13 @@
+root@university-and-course-data:~/University-and-Course-data# grep -n "pteOverall\|toeflOverall\|cambridgeOverall" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | grep -i "forceCourse\|cachedEng" | head -30
+7804:      if (siteNeedsBrowser(reqUrl) && !(cachedEnglishReqs?.pteOverall && cachedEnglishReqs?.toeflOverall)) {
+8872:          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
+8885:          if (forceCourseOverride && cachedEnglishReqs.pteOverall) {
+8886:            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+8889:          if (forceCourseOverride && cachedEnglishReqs.toeflOverall) {
+8890:            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+8893:          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+8933:          message: `[POST-CACHE] ${link.name.slice(0, 40)} -> IELTS=${cheerioData.ieltsOverall ?? "-"} PTE=${cheerioData.pteOverall ?? "-"} TOEFL=${cheerioData.toeflOverall ?? "-"} CAE=${(cheerioData as any).cambridgeOverall ?? "-"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "-"} P=${cachedEnglishReqs?.pteOverall ?? "-"} T=${cachedEnglishReqs?.toeflOverall ?? "-"}`,
+9114:            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) { cheerioData.pteOverall = cachedEnglishReqs.pteOverall; cachedAppliedRetry = true; }
+9115:            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) { cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall; cachedAppliedRetry = true; }
+9116:            if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedAppliedRetry = true; }
+root@university-and-course-data:~/University-and-Course-data# 
