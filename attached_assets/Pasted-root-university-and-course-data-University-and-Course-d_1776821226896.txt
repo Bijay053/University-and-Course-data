@@ -1,0 +1,25 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && \
+pnpm --filter @workspace/api-server run build 2>&1 | grep -A5 "ERROR\|error:" | head -30
+✘ [ERROR] Unexpected "catch"
+
+    src/routes/scrape.ts:7849:16:
+      7849 │               } catch (gemErr) {
+           ╵                 ~~~~~
+
+--
+Error: Build failed with 1 error:
+src/routes/scrape.ts:7849:16: ERROR: Unexpected "catch"
+    at failureErrorWithLog (/root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1467:15)
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:926:25
+    at /root/University-and-Course-data/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1345:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  errors: [Getter/Setter],
+root@university-and-course-data:~/University-and-Course-data# grep -n "jsonMatch\|geminiChat.*enPrompt2\|Gemini-rendered" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -10
+7819:                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+7821:                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+7822:                addLog(job, "status", { message: `Gemini-rendered raw: ${enResult2.slice(0, 200)}`, phase: "fetch" });
+7823:                const jsonMatch = enResult2.match(/\{[\s\S]*\}/);
+7824:                const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
+7838:                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+7850:                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+root@university-and-course-data:~/University-and-Course-data# 
