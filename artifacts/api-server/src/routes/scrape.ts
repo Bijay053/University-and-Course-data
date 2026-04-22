@@ -11156,6 +11156,12 @@ router.put("/scrape/staged/:id", async (req: Request, res: Response): Promise<vo
 router.delete("/scrape/staged/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const id = parseInt(paramString(req, "id"), 10);
+    // 2-WAY SYNC: if this staged row was approved and is linked to a published course,
+    // also delete the published course so it disappears from the Courses tab.
+    const [staged] = await db.select().from(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
+    if (staged?.courseId) {
+      await pool.query("DELETE FROM courses WHERE id=$1", [staged.courseId]);
+    }
     await db.delete(scrapedCoursesTable).where(eq(scrapedCoursesTable.id, id));
     res.json({ success: true });
   } catch (err) {
@@ -11330,16 +11336,35 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       }
     }
 
+    // Check existing course's last_edited_at — if a human edited it, don't overwrite
+    // populated fields. Only fill gaps where existing column is NULL. This protects
+    // user edits across re-scrapes.
+    const editedRow = dup.rows.length > 0
+      ? (await client.query<{ lastEditedAt: Date | null }>(
+          `SELECT last_edited_at AS "lastEditedAt" FROM courses WHERE id=$1`,
+          [dup.rows[0].id],
+        )).rows[0]
+      : null;
+    const humanEdited = !!editedRow?.lastEditedAt;
+
     let courseId: number;
     if (dup.rows.length > 0) {
       courseId = dup.rows[0].id;
       const existing = dup.rows[0];
-      const nextDuration = acceptedFields.has("duration") ? course.duration : existing.duration;
-      const nextDurationTerm = acceptedFields.has("duration") ? course.durationTerm : existing.durationTerm;
-      const nextLocation = acceptedFields.has("courseLocation") ? course.courseLocation : existing.courseLocation;
-      const nextStudyMode = acceptedFields.has("studyMode") ? course.studyMode : existing.studyMode;
-      const nextDegree = acceptedFields.has("degreeLevel") ? course.degreeLevel : existing.degreeLevel;
-      const nextOtherReq = acceptedFields.has("academicRequirement") ? course.otherRequirement : existing.otherRequirement;
+      // FIX: Always copy staged value if present. Only fall back to existing when staged is null.
+      // The previous `acceptedFields.has(X)` gate caused MASS DATA LOSS — fields were nulled
+      // out because deterministic scrapes don't create selected evidence rows.
+      // If humanEdited, prefer existing populated values (gap-fill only).
+      const pick = <T>(staged: T, current: T): T =>
+        humanEdited
+          ? (current != null ? current : staged)
+          : (staged != null ? staged : current);
+      const nextDuration = pick(course.duration, existing.duration);
+      const nextDurationTerm = pick(course.durationTerm, existing.durationTerm);
+      const nextLocation = pick(course.courseLocation, existing.courseLocation);
+      const nextStudyMode = pick(course.studyMode, existing.studyMode);
+      const nextDegree = pick(course.degreeLevel, existing.degreeLevel);
+      const nextOtherReq = pick(course.otherRequirement, existing.otherRequirement);
       await client.query(
         `UPDATE courses SET category=$2, sub_category=$3, course_website=$4, duration=$5, duration_term=$6,
          course_location=$7, study_mode=$8, degree_level=$9, study_load=$10, language=$11, description=$12, other_requirement=$13,
@@ -11383,15 +11408,16 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
           course.category,
           course.subCategory,
           course.courseWebsite,
-          acceptedFields.has("duration") ? course.duration : null,
-          acceptedFields.has("duration") ? course.durationTerm : null,
-          acceptedFields.has("courseLocation") ? course.courseLocation : null,
-          acceptedFields.has("studyMode") ? course.studyMode : null,
-          acceptedFields.has("degreeLevel") ? course.degreeLevel : null,
+          // FIX: Always copy staged values. Previous gating on acceptedFields caused data loss.
+          course.duration,
+          course.durationTerm,
+          course.courseLocation,
+          course.studyMode,
+          course.degreeLevel,
           course.studyLoad,
           course.language,
           course.description,
-          acceptedFields.has("academicRequirement") ? course.otherRequirement : null,
+          course.otherRequirement,
           course.studentMarket,
           course.deliveryMode,
           course.internationalEligible,
@@ -11405,14 +11431,16 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       courseId = cRes.rows[0].id;
     }
 
-    if (acceptedFields.has("intakeMonths") && course.intakeMonths && Array.isArray(course.intakeMonths) && course.intakeMonths.length > 0) {
+    // FIX: Removed acceptedFields gating — was dropping deterministically scraped data.
+    // Skip overwrites if course was human-edited (preserve manual values).
+    if (!humanEdited && course.intakeMonths && Array.isArray(course.intakeMonths) && course.intakeMonths.length > 0) {
       await client.query("DELETE FROM intakes WHERE course_id=$1", [courseId]);
       for (const m of course.intakeMonths) {
         await client.query("INSERT INTO intakes (course_id, intake_month) VALUES ($1,$2)", [courseId, m]);
       }
     }
 
-    if (acceptedFields.has("internationalFee") && course.internationalFee) {
+    if (!humanEdited && course.internationalFee != null) {
       await client.query("DELETE FROM fees WHERE course_id=$1", [courseId]);
       await client.query(
         "INSERT INTO fees (course_id, international_fee, fee_term, fee_year, currency) VALUES ($1,$2,$3,$4,$5)",
@@ -11420,21 +11448,21 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       );
     }
 
-    if (acceptedFields.has("ieltsOverall") && course.ieltsOverall) {
+    if (!humanEdited && course.ieltsOverall != null) {
       await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='IELTS'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
         [courseId, "IELTS", course.ieltsListening, course.ieltsSpeaking, course.ieltsWriting, course.ieltsReading, course.ieltsOverall],
       );
     }
-    if (acceptedFields.has("pteOverall") && course.pteOverall) {
+    if (!humanEdited && course.pteOverall != null) {
       await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='PTE'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
         [courseId, "PTE", course.pteListening, course.pteSpeaking, course.pteWriting, course.pteReading, course.pteOverall],
       );
     }
-    if (acceptedFields.has("toeflOverall") && course.toeflOverall) {
+    if (!humanEdited && course.toeflOverall != null) {
       await client.query("DELETE FROM english_requirements WHERE course_id=$1 AND test_type='TOEFL'", [courseId]);
       await client.query(
         "INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall) VALUES ($1,$2,$3,$4,$5,$6,$7)",
@@ -11456,7 +11484,7 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       );
     }
 
-    if (acceptedFields.has("academicRequirement") && (course.academicLevel || course.academicScore || course.otherRequirement)) {
+    if (!humanEdited && (course.academicLevel || course.academicScore || course.otherRequirement)) {
       await client.query("DELETE FROM academic_requirements WHERE course_id=$1", [courseId]);
       await client.query(
         "INSERT INTO academic_requirements (course_id, academic_level, academic_score, score_type, academic_country) VALUES ($1,$2,$3,$4,$5)",

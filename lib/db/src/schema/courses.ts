@@ -34,6 +34,8 @@ export const coursesTable = pgTable("courses", {
   approvalScore: real("approval_score"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+  lastEditedAt: timestamp("last_edited_at", { withTimezone: true }),
+  lastEditedBy: text("last_edited_by"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, pool, coursesTable, universitiesTable, intakesTable, feesTable, englishRequirementsTable, academicRequirementsTable, scholarshipsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { db, pool, coursesTable, universitiesTable, intakesTable, feesTable, englishRequirementsTable, academicRequirementsTable, scholarshipsTable, scrapedCoursesTable } from "@workspace/db";
 import {
   ListCoursesQueryParams,
   CreateCourseBody,
@@ -222,11 +222,47 @@ router.patch("/courses/:id", async (req, res): Promise<void> => {
   for (const [k, v] of Object.entries(parsed.data)) {
     if (v !== undefined && v !== null) updateData[k] = v;
   }
+  // Stamp human-edit metadata so re-scrapes know to skip overwriting this row.
+  updateData.lastEditedAt = new Date();
+  updateData.lastEditedBy = (req.headers["x-user-id"] as string) || "user";
+
   const [course] = await db.update(coursesTable).set(updateData).where(eq(coursesTable.id, params.data.id)).returning();
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
   }
+
+  // 2-WAY SYNC: mirror edits back to scraped_courses so Raw Data tab reflects the change.
+  // Field-name mapping: courses.name → scraped_courses.course_name; the rest line up.
+  const stagedUpdate: Record<string, unknown> = {};
+  const fieldMap: Record<string, string> = {
+    name: "courseName",
+    category: "category",
+    subCategory: "subCategory",
+    courseWebsite: "courseWebsite",
+    courseLocation: "courseLocation",
+    duration: "duration",
+    durationTerm: "durationTerm",
+    studyMode: "studyMode",
+    degreeLevel: "degreeLevel",
+    studyLoad: "studyLoad",
+    language: "language",
+    description: "description",
+    otherRequirement: "otherRequirement",
+    studentMarket: "studentMarket",
+    deliveryMode: "deliveryMode",
+    internationalEligible: "internationalEligible",
+    onCampusAvailable: "onCampusAvailable",
+  };
+  for (const [courseKey, stagedKey] of Object.entries(fieldMap)) {
+    if (courseKey in updateData) stagedUpdate[stagedKey] = updateData[courseKey];
+  }
+  if (Object.keys(stagedUpdate).length > 0) {
+    await db.update(scrapedCoursesTable)
+      .set(stagedUpdate)
+      .where(eq(scrapedCoursesTable.courseId, params.data.id));
+  }
+
   res.json(course);
 });
 
@@ -236,6 +272,13 @@ router.delete("/courses/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
+  // 2-WAY SYNC: soft-delete linked scraped_courses rows BEFORE physically deleting the
+  // course (the FK uses ON DELETE SET NULL so we'd lose the link otherwise). Marking
+  // status='deleted' keeps the staging row so future re-scrapes know not to re-stage it.
+  await db.update(scrapedCoursesTable)
+    .set({ status: "deleted", reviewedAt: new Date() })
+    .where(eq(scrapedCoursesTable.courseId, params.data.id));
+
   const [course] = await db.delete(coursesTable).where(eq(coursesTable.id, params.data.id)).returning();
   if (!course) {
     res.status(404).json({ error: "Course not found" });
