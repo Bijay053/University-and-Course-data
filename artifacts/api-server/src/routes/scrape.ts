@@ -9617,12 +9617,16 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
       researchStats = { validSamples: result.validSamples, rejectedSamples: result.rejectedSamples, validExamples: result.validExamples, rejectedExamples: result.rejectedExamples };
 
       // For category-filtered listing pages (e.g. VIT /course-list?course_categories[0]=bits),
-      // probe each known category slug to discover courses that only appear under specific filters
-      if (
+      // probe each known category slug to discover courses that only appear under specific filters.
+      // Skip when all sampled pages passed (100% — no filtering was applied, so we already have
+      // the complete set and probing categories would waste 5-10 min on heavy hosts).
+      const needsCategoryExpansion =
         /\/course-list|\/course-finder|\/courses?\/?$/i.test(new URL(resolvedUrl).pathname) &&
         courseLinks.length > 0 &&
-        courseLinks.length < 50
-      ) {
+        courseLinks.length < 50 &&
+        researchStats.rejectedSamples > 0; // at least one rejection means a prefix filter was applied
+      if (needsCategoryExpansion) {
+        addLog(job, "status", { message: `Probing category filters to find additional course pages...`, phase: "discover" });
         const before = courseLinks.length;
         courseLinks = await expandCourseListWithCategories(resolvedUrl, courseLinks);
         // Re-dedupe after expansion: category probes often return the same course
