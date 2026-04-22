@@ -1,0 +1,34 @@
+INFO ] Scraping started in background...
+[INFO ] Scraping https://vit.edu.au...
+[INFO ] Using university: vit (ID: 6)
+[INFO ] Queued scrape job for worker execution
+[INFO ] Worker claimed queued scrape job
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Home page detected. Searching for course listing page...
+[DISCOVER] Home page detected → course listing at https://vit.edu.au/course-list (high-priority probe)
+[INFO ] Switched to course listing: https://vit.edu.au/course-list
+[DISCOVER] Using provided university-level pages: feePage: https://vit.edu.au/international/fees, requirementsPage: https://vit.edu.au/resources/course-entry-requirements
+[CLASSIFY] Page type: listing — 16 course links found
+[DISCOVER] [ENGINE] Advanced Smart Scraper selected
+[DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)...
+[DISCOVER] Sitemap index: checking 6 sub-sitemaps...
+[DISCOVER] Sub-sitemap vit.edu.au/sitemap_course_list.xml → 13 courses
+[DISCOVER] Sitemap: found 13 course URLs total
+[DISCOVER] [SMART] Sitemap found 13 candidate URLs. Analyzing to identify real course pages...
+[DISCOVER] [SMART] Sampling candidate pages — researching 30 candidates to identify genuine course pages...
+[DISCOVER] Phase 2: Researching 30 candidates — sampling 12 pages to confirm genuine course pages...
+[DISCOVER] Sampling concurrency: 1 (heavy host: vit.edu.au)
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Business Technology"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus International Business Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bbus Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Finance"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Leadership And Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Mba Tourism And Hospitality Management"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDBA - Graduate Diploma of Business Administration"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor of Information Technology and Systems (BITS)"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "GDITS-Graduate Diploma of Information Technology and Systems"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Commercial Cookery"
+[SAMPLE✓] ✓ Confirmed course (detail metadata): "Certificate III in Patisserie"
+[DISCOVER] Research complete: 12/12 sampled pages are genuine course pages
+[DISCOVER] All 12 sampled pages confirmed — skipping URL prefix filter to preserve multi-category courses (30 total).
