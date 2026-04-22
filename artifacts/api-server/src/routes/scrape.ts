@@ -7957,6 +7957,58 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       }
       if (!sampleHtml) sampleHtml = await fetchPage(sampleCourseUrl);
       const $s = cheerio.load(sampleHtml);
+
+      // PRE-PROBE: many sites (e.g. VIT) embed the equivalency table inline as a
+      // hidden Bootstrap/Webflow MODAL on the course page itself, triggered by a
+      // data-bs-toggle button (no href). The modal HTML is already in the DOM —
+      // scan for it before attempting any link-following.
+      const modalSel = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
+      let modalHtml = "";
+      $s(modalSel).each((_, el) => {
+        if (modalHtml) return;
+        const t = $s(el).text().replace(/\s+/g, " ").trim();
+        if (/IELTS/i.test(t) && /PTE/i.test(t) && /TOEFL/i.test(t) && /\d/.test(t) && t.length > 80 && t.length < 8000) {
+          const outer = $s.html(el) || "";
+          if (outer && outer.length < 25000) modalHtml = outer;
+        }
+      });
+      if (modalHtml) {
+        addLog(job, "status", { message: `Found inline equivalency modal on course page (${modalHtml.length} chars) — extracting via Gemini`, phase: "fetch" });
+        try {
+          let modalCompact = extractCompactContent(modalHtml, sampleCourseUrl);
+          if (modalCompact.length < 200 || !/IELTS/i.test(modalCompact)) {
+            const $m = cheerio.load(modalHtml);
+            $m("script, style").remove();
+            modalCompact = $m("body").html()?.replace(/<[^>]+>/g, " | ").replace(/\s*\|\s*\|\s*/g, " | ").replace(/\s{2,}/g, " ").trim().slice(0, 8000) || "";
+          }
+          const modalPrompt = `Extract English language test requirements from this MODAL TABLE. The table has columns for IELTS, PTE, TOEFL iBT, Cambridge (CAE), and possibly Duolingo or KITE.\nReturn ONLY valid JSON: {"bands":[{"ielts":6.0,"pte":47,"toefl":67,"cae":169,"duo":null}],"flat":{"ielts":6.0,"pte":47,"toefl":67,"cae":169,"duo":null}}\nIf only one row of overall scores exists, put it in BOTH bands (single entry) AND flat. Use null for missing.`;
+          const modalResult = await geminiChat(modalPrompt, modalCompact, 800);
+          addLog(job, "status", { message: `Modal Gemini raw (first 200): ${modalResult.slice(0, 200)}`, phase: "fetch" });
+          const mm = modalResult.match(/\{[\s\S]*\}/);
+          const modalParsed = JSON.parse(mm ? mm[0] : modalResult);
+          if (Array.isArray(modalParsed.bands) && modalParsed.bands.length > 0) {
+            cachedEnglishBands = modalParsed.bands.map((b: any) => ({
+              ielts: Number(b.ielts), pte: b.pte ?? null, toefl: b.toefl ?? null, cae: b.cae ?? null, duo: b.duo ?? null
+            })).filter((b: any) => !isNaN(b.ielts));
+            addLog(job, "status", { message: `Modal bands extracted: ${cachedEnglishBands?.length ?? 0} tier(s) — ${(cachedEnglishBands ?? []).map(b => `IELTS ${b.ielts}→PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"} CAE ${b.cae ?? "-"}`).join(" | ")}`, phase: "fetch" });
+          }
+          const flatM = modalParsed.flat || (Array.isArray(modalParsed.bands) && modalParsed.bands.length === 1 ? modalParsed.bands[0] : null);
+          if (flatM && (flatM.ielts || flatM.pte || flatM.toefl || flatM.cae)) {
+            cachedEnglishReqs = {
+              ieltsOverall: flatM.ielts ?? undefined,
+              pteOverall: flatM.pte ?? undefined,
+              toeflOverall: flatM.toefl ?? undefined,
+              cambridgeOverall: flatM.cae ?? undefined,
+              duolingoOverall: flatM.duo ?? undefined,
+            } as Partial<CourseData>;
+            cachedEnglishReqsSource = { url: sampleCourseUrl, pageType: "course_page" };
+            addLog(job, "status", { message: `Modal flat: IELTS=${flatM.ielts} PTE=${flatM.pte} TOEFL=${flatM.toefl} CAE=${flatM.cae}`, phase: "fetch" });
+          }
+        } catch (modalErr) {
+          addLog(job, "status", { message: `Modal extraction failed: ${(modalErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+        }
+      }
+
       let equivLink: string | null = null;
       const equivPattern = /other.{0,5}recognis|english.{0,10}(equivalents?|equivalencies|equivalent\s*test)|approved.{0,10}(test|english)|ielts.{0,10}equivalent|test.{0,10}equivalencies|english.{0,10}(language\s+)?(test|score)\s*equivalent|english.{0,5}proficiency.{0,10}(table|equivalent)/i;
       $s("a[href]").each((_, el) => {
