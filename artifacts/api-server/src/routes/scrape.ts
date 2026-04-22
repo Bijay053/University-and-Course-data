@@ -296,6 +296,7 @@ interface ScrapeJob {
   approvalSummary?: ApprovalSummary;
   awaitingApproval?: { resolve?: (proceed: boolean) => void; summary: ApprovalSummary };
   runtimeBinding?: RuntimeJobBinding;
+  geminiVisionCallCount?: number;
 }
 
 const scrapeJobs = new Map<string, ScrapeJob>();
@@ -7867,34 +7868,129 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               if (!cachedEnglishReqsSource) cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
               addLog(job, "status", { message: `Browser-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall} CAE=${(renderedReq as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
             } else if (GEMINI_API_KEY) {
-              // Still nothing — try vision-AI on every candidate image on the page.
-              // Filter out obvious logos/icons by size hints and filename keywords.
-              const imgUrls: string[] = [];
-              $r("img").each((_, el) => {
-                const src = $r(el).attr("src") || $r(el).attr("data-src") || "";
-                if (!src) return;
-                if (/logo|icon|favicon|avatar|header|footer|social|facebook|instagram|linkedin|twitter|youtube|map-marker|phone|email/i.test(src)) return;
+              // ── FIX 3: Pre-probe a sample course page modal BEFORE running vision-AI ──
+              // VIT and similar sites embed an inline equivalency modal on every course
+              // page with deterministic IELTS/PTE/TOEFL/CAE values. If we find it, the
+              // entire vision-AI image scan (5+ minutes) becomes redundant.
+              if (courseLinks.length > 0) {
                 try {
-                  const abs = new URL(src, reqUrl).toString();
-                  if (!imgUrls.includes(abs)) imgUrls.push(abs);
-                } catch {}
-              });
-              if (imgUrls.length > 0) {
-                addLog(job, "status", { message: `Trying vision-AI on ${Math.min(imgUrls.length, 6)} candidate image(s) for requirements table...`, phase: "fetch" });
-                const merged: Partial<CourseData> = {};
-                for (const imgUrl of imgUrls.slice(0, 6)) {
-                  try {
-                    const visionData = await analyzeImageWithGemini(imgUrl, "This image may contain English language test score requirements (IELTS, TOEFL, PTE, Cambridge CAE, Duolingo).");
-                    for (const [k, v] of Object.entries(visionData)) {
-                      if (v != null && (merged as any)[k] == null) (merged as any)[k] = v;
+                  const probeStart = Date.now();
+                  const probeUrl = courseLinks[0].url;
+                  let probeHtml = "";
+                  if (siteNeedsBrowser(probeUrl)) {
+                    try {
+                      const br = await fetchPageWithBrowser(probeUrl, { clickRequirementsTab: true, expandAccordions: true, timeoutMs: 15000 });
+                      probeHtml = br?.requirementsHtml || br?.mainHtml || "";
+                    } catch {}
+                  }
+                  if (!probeHtml) probeHtml = await fetchPage(probeUrl);
+                  const $p = cheerio.load(probeHtml);
+                  const modalSel2 = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
+                  $p(modalSel2).each((_, el) => {
+                    if (cachedEnglishReqs?.ieltsOverall && cachedEnglishReqs?.pteOverall && cachedEnglishReqs?.toeflOverall) return;
+                    const $el = $p(el);
+                    const t = $el.text().replace(/\s+/g, " ").trim();
+                    if (!(/IELTS/i.test(t) && /PTE/i.test(t) && /TOEFL/i.test(t) && /\d/.test(t) && t.length > 80 && t.length < 8000)) return;
+                    const cellVals: number[] = [];
+                    $el.find("th, td").each((_, c) => {
+                      const txt = $p(c).text().replace(/\s+/g, " ").trim();
+                      if (/^\d+(\.\d+)?$/.test(txt)) {
+                        const v = parseFloat(txt);
+                        if (!isNaN(v)) cellVals.push(v);
+                      }
+                    });
+                    if (cellVals.length === 0) return;
+                    const ielts = cellVals.find(v => v >= 4 && v <= 9);
+                    const pte = cellVals.find(v => v >= 10 && v <= 90 && Number.isInteger(v));
+                    const toefl = cellVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== pte);
+                    const cae = cellVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v));
+                    if (ielts && pte && toefl) {
+                      cachedEnglishReqs = { ieltsOverall: ielts, pteOverall: pte, toeflOverall: toefl, cambridgeOverall: cae } as Partial<CourseData>;
+                      cachedEnglishBands = [{ ielts, pte, toefl, cae: cae ?? null, duo: null }];
+                      cachedEnglishReqsSource = { url: probeUrl, pageType: "course_page" };
                     }
-                    if (merged.ieltsOverall && merged.pteOverall && merged.toeflOverall) break;
-                  } catch {}
+                  });
+                  if (cachedEnglishReqs?.ieltsOverall && cachedEnglishReqs?.pteOverall && cachedEnglishReqs?.toeflOverall) {
+                    addLog(job, "status", {
+                      message: `[fix3] Course-page modal provided complete English data — SKIPPING requirements-page vision-AI (saved ~5min). IELTS=${cachedEnglishReqs.ieltsOverall} PTE=${cachedEnglishReqs.pteOverall} TOEFL=${cachedEnglishReqs.toeflOverall} CAE=${(cachedEnglishReqs as any).cambridgeOverall ?? "-"} [${Math.round((Date.now() - probeStart) / 1000)}s]`,
+                      phase: "fetch",
+                    });
+                  }
+                } catch (probeErr) {
+                  addLog(job, "status", { message: `[fix3] Course-page modal pre-probe failed: ${(probeErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
                 }
-                if (merged.ieltsOverall || merged.pteOverall || merged.toeflOverall || (merged as any).cambridgeOverall) {
-                  cachedEnglishReqs = merged;
-                  if (!cachedEnglishReqsSource) cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
-                  addLog(job, "status", { message: `Vision-AI extracted from image: IELTS=${merged.ieltsOverall} PTE=${merged.pteOverall} TOEFL=${merged.toeflOverall} CAE=${(merged as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
+              }
+
+              // If pre-probe filled cache, vision-AI is now skipped.
+              if (!cachedEnglishReqs) {
+                // Still nothing — try vision-AI on every candidate image on the page.
+                // Filter out obvious logos/icons by size hints and filename keywords.
+                const imgUrls: string[] = [];
+                $r("img").each((_, el) => {
+                  const src = $r(el).attr("src") || $r(el).attr("data-src") || "";
+                  if (!src) return;
+                  if (/logo|icon|favicon|avatar|header|footer|social|facebook|instagram|linkedin|twitter|youtube|map-marker|phone|email/i.test(src)) return;
+                  try {
+                    const abs = new URL(src, reqUrl).toString();
+                    if (!imgUrls.includes(abs)) imgUrls.push(abs);
+                  } catch {}
+                });
+                if (imgUrls.length > 0) {
+                  // ── FIX 2: Hard timeout on the requirements-page vision loop ──
+                  // 30s total budget, 10s per image, stop early when we have complete data.
+                  const VISION_BUDGET_MS = 30_000;
+                  const PER_IMAGE_MS = 10_000;
+                  const visionStart = Date.now();
+                  // ── FIX 4: Stuck-step warning if any single step exceeds 90s ──
+                  const stuckTimer = setTimeout(() => {
+                    addLog(job, "warning", {
+                      message: `[SLOW-STEP] requirements-vision still running after 90s — investigate`,
+                      phase: "fetch",
+                    });
+                  }, 90_000);
+
+                  addLog(job, "status", { message: `Trying vision-AI on ${Math.min(imgUrls.length, 6)} candidate image(s) for requirements table (budget: 30s, per-image: 10s)...`, phase: "fetch" });
+                  const merged: Partial<CourseData> = {};
+                  let visionCalls = 0;
+                  for (let i = 0; i < Math.min(imgUrls.length, 6); i++) {
+                    const elapsed = Date.now() - visionStart;
+                    if (elapsed > VISION_BUDGET_MS) {
+                      addLog(job, "status", {
+                        message: `[requirements-vision] Stopped at image ${i}/${Math.min(imgUrls.length, 6)} — budget exhausted (${Math.round(elapsed / 1000)}s)`,
+                        phase: "fetch",
+                      });
+                      break;
+                    }
+                    try {
+                      visionCalls++;
+                      const visionData = await Promise.race([
+                        analyzeImageWithGemini(imgUrls[i], "This image may contain English language test score requirements (IELTS, TOEFL, PTE, Cambridge CAE, Duolingo)."),
+                        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`per-image timeout (${PER_IMAGE_MS}ms)`)), PER_IMAGE_MS)),
+                      ]) as Awaited<ReturnType<typeof analyzeImageWithGemini>>;
+                      for (const [k, v] of Object.entries(visionData)) {
+                        if (v != null && (merged as any)[k] == null) (merged as any)[k] = v;
+                      }
+                      if (merged.ieltsOverall && merged.pteOverall && merged.toeflOverall) {
+                        addLog(job, "status", { message: `[requirements-vision] Complete after image ${i + 1} (${Math.round((Date.now() - visionStart) / 1000)}s)`, phase: "fetch" });
+                        break;
+                      }
+                    } catch (visErr) {
+                      addLog(job, "status", { message: `[requirements-vision] img ${i + 1} skip: ${(visErr as Error).message?.slice(0, 80)}`, phase: "fetch" });
+                      continue;
+                    }
+                  }
+                  clearTimeout(stuckTimer);
+                  addLog(job, "status", {
+                    message: `[STEP-TIME] requirements-vision: ${Math.round((Date.now() - visionStart) / 1000)}s (${visionCalls} vision call(s))`,
+                    phase: "fetch",
+                  });
+                  job.geminiVisionCallCount = (job.geminiVisionCallCount || 0) + visionCalls;
+
+                  if (merged.ieltsOverall || merged.pteOverall || merged.toeflOverall || (merged as any).cambridgeOverall) {
+                    cachedEnglishReqs = merged;
+                    if (!cachedEnglishReqsSource) cachedEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };
+                    addLog(job, "status", { message: `Vision-AI extracted from image: IELTS=${merged.ieltsOverall} PTE=${merged.pteOverall} TOEFL=${merged.toeflOverall} CAE=${(merged as any).cambridgeOverall ?? "-"}`, phase: "fetch" });
+                  }
                 }
               }
             }

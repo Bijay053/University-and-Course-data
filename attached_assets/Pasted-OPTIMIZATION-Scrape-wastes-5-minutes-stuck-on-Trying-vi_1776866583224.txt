@@ -1,0 +1,118 @@
+OPTIMIZATION: Scrape wastes 5 minutes stuck on "Trying vision-AI on 6 candidate image(s) for requirements table..." on every VIT scrape.
+The scrape eventually works and produces correct data, but this one step burns 5 minutes because it's sequential and has no timeout. Meanwhile the per-course modal extraction (which actually works) is blocked from starting until it finishes.
+
+FIX 1 — Make requirements-page vision NON-BLOCKING (run in background)
+The per-course loop should start IMMEDIATELY without waiting for the requirements-page vision scan. Requirements-page data is a fallback anyway — the per-course modal scraping gets the real data per course.
+Find the block in scrape.ts that logs "Trying vision-AI on 6 candidate image(s) for requirements table..." and wrap it in a fire-and-forget promise:
+typescript// OLD: awaits the vision scan, blocks everything
+const reqsData = await extractRequirementsViaVision(candidateImages);
+
+// NEW: start it in background, continue with per-course extraction
+const reqsPromise = extractRequirementsViaVision(candidateImages)
+  .catch(e => {
+    addLog(job, 'info', { message: `[requirements-vision] background scan failed: ${e.message}` });
+    return null;
+  });
+
+// Continue immediately — don't await
+// Per-course loop starts NOW, not 5 minutes later
+Later, when per-course extraction needs the requirements data as fallback, check if reqsPromise has resolved yet:
+typescript// When a course has no English data and needs fallback
+const reqsData = await Promise.race([
+  reqsPromise,
+  new Promise(r => setTimeout(() => r(null), 100)) // don't wait more than 100ms
+]);
+If the background scan finished by then, great. If not, use sibling cache or null — per-course modal usually has what we need anyway.
+
+FIX 2 — Hard timeout on the requirements-page vision loop
+Even in background, cap total time at 30 seconds (not 5 minutes):
+typescriptconst VISION_BUDGET_MS = 30_000;
+const startTime = Date.now();
+
+for (let i = 0; i < candidateImages.length; i++) {
+  const elapsed = Date.now() - startTime;
+  if (elapsed > VISION_BUDGET_MS) {
+    addLog(job, 'info', { 
+      message: `[requirements-vision] Stopped at image ${i}/${candidateImages.length} (budget: ${Math.round(elapsed/1000)}s)` 
+    });
+    break;
+  }
+  
+  try {
+    const result = await Promise.race([
+      callGeminiVision(candidateImages[i]),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('image timeout')), 10_000))
+    ]);
+    if (hasValidEnglishData(result)) break; // found it, stop early
+  } catch (e) {
+    addLog(job, 'info', { message: `[requirements-vision] img ${i+1} skip: ${e.message}` });
+    continue;
+  }
+}
+10-second per-image cap × 3 images = 30s max. Currently each image takes ~50s × 6 images = 5 min.
+
+FIX 3 — Skip vision entirely when deterministic modal parse already succeeded
+Looking at the log:
+[INFO ] Found inline equivalency modal on course page (2935 chars)
+[INFO ] Modal deterministic parse: IELTS=6 PTE=47 TOEFL=67 CAE=169 (no Gemini needed)
+[INFO ] No equivalency link found in course page  ← this line suggests code kept looking
+[INFO ] Trying vision-AI on 6 candidate image(s) for requirements table...  ← unnecessary!
+The modal parse ALREADY got IELTS=6 PTE=47 TOEFL=67 CAE=169 from /bachelor-of-business course page. That's VIT's canonical English data — every VIT Bachelor uses these scores. The requirements-page vision scan is redundant.
+Add this short-circuit:
+typescript// After probing a course page for modal
+if (modalResult.ieltsOverall && modalResult.pteOverall && modalResult.toeflOverall) {
+  addLog(job, 'info', { 
+    message: `[requirements] Course-page modal provided complete English data — skipping requirements-page vision` 
+  });
+  // Skip the entire "Trying vision-AI on 6 candidate image(s)" block
+  universityEnglishData = modalResult;
+  return;
+}
+This alone would save 5 minutes on every VIT scrape.
+
+FIX 4 — Add stuck-step detection
+If any single step takes > 90 seconds, log a warning so we can see where time is spent:
+typescriptconst stepStart = Date.now();
+const stepName = 'requirements-vision';
+const warnTimer = setTimeout(() => {
+  addLog(job, 'warning', { 
+    message: `[SLOW-STEP] ${stepName} still running after 90s — consider optimizing or timing out` 
+  });
+}, 90_000);
+
+try {
+  await doTheStep();
+} finally {
+  clearTimeout(warnTimer);
+  addLog(job, 'info', { 
+    message: `[STEP-TIME] ${stepName}: ${Math.round((Date.now() - stepStart) / 1000)}s` 
+  });
+}
+Apply to these steps: discovery, sampling, requirements-vision, per-course-extraction, classification. Makes it obvious where the 5 minutes is going.
+
+FIX 5 — Cap Gemini calls per scrape
+Hard budget to prevent future runaway loops:
+typescriptlet geminiCallCount = 0;
+const GEMINI_BUDGET = 150; // for a 30-course scrape, average 5 calls per course
+
+function budgetedGeminiCall(...) {
+  geminiCallCount++;
+  if (geminiCallCount > GEMINI_BUDGET) {
+    throw new Error(`Gemini budget exceeded (${GEMINI_BUDGET} calls) — aborting AI calls to protect quota`);
+  }
+  return callGemini(...);
+}
+
+// At scrape end:
+addLog(job, 'status', { 
+  message: `[GEMINI-STATS] ${geminiCallCount} calls | ${(geminiCallCount/coursesFound).toFixed(1)} per course` 
+});
+
+DELIVERY:
+
+Apply all 5 fixes to scrape.ts
+Build, commit, push to main
+Reply with the git commit hash and confirmation each fix is in the bundle
+
+After your push I'll deploy. Target: VIT 30-course scrape under 8 minutes (currently 15-20 min with the 5-min hang).
+The single biggest win is FIX 3 (skip requirements vision when course-page modal already has data) — that alone saves 5 min on VIT.
