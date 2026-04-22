@@ -18,7 +18,7 @@ rm 'University-and-Course-data'
  delete mode 160000 University-and-Course-data
 root@university-and-course-data:/opt/app# cd /opt/app
 # Update the key in your .env file
-sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk/' .env
+sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=REDACTED_LEAKED_KEY_1/' .env
 pm2 restart api-server
 Use --update-env to update environment variables
 [PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])

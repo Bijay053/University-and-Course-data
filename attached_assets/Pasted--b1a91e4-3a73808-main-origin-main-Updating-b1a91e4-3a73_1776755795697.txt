@@ -152,7 +152,7 @@ Use --update-env to update environment variables
 ├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
 │ 2  │ api-server         │ fork     │ 6    │ online    │ 0%       │ 19.4mb   │
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-root@university-and-course-data:~/University-and-Course-data# echo "GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk" > /root/University-and-Course-data/.env
+root@university-and-course-data:~/University-and-Course-data# echo "GEMINI_API_KEY=REDACTED_LEAKED_KEY_1" > /root/University-and-Course-data/.env
 pm2 restart 2
 Use --update-env to update environment variables
 [PM2] Applying action restartProcessId on app [2](ids: [ '2' ])

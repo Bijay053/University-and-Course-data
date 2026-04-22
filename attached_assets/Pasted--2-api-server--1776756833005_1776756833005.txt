@@ -98,7 +98,7 @@ Use --update-env to update environment variables
 ├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
 │ 2  │ api-server         │ fork     │ 6    │ online    │ 0%       │ 19.4mb   │
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-root@university-and-course-data:~/University-and-Course-data# echo "GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk" > /root/University-and-Course-data/.env
+root@university-and-course-data:~/University-and-Course-data# echo "GEMINI_API_KEY=REDACTED_LEAKED_KEY_1" > /root/University-and-Course-data/.env
 pm2 restart 2
 Use --update-env to update environment variables
 [PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
@@ -117,7 +117,7 @@ pm2 restart 2 --update-env
 ├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
 │ 2  │ api-server         │ fork     │ 8    │ online    │ 0%       │ 18.0mb   │
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
-root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_1
 pm2 restart 2 --update-env
 [PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
 [PM2] [api-server](2) ✓
@@ -127,8 +127,8 @@ pm2 restart 2 --update-env
 │ 2  │ api-server         │ fork     │ 9    │ online    │ 0%       │ 14.0mb   │
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
 root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
-GEMINI_API_KEY: AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk
-root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk" \
+GEMINI_API_KEY: REDACTED_LEAKED_KEY_1
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=REDACTED_LEAKED_KEY_1" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
 {
@@ -149,10 +149,10 @@ pm2 restart 2 --update-env
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
 root@university-and-course-data:~/University-and-Course-data# 
 root@university-and-course-data:~/University-and-Course-data# 
-root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_2
 root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
 GEMINI_API_KEY: 
-root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68
+root@university-and-course-data:~/University-and-Course-data# export GEMINI_API_KEY=REDACTED_LEAKED_KEY_2
 pm2 restart 2 --update-env
 [PM2] Applying action restartProcessId on app [2](ids: [ '2' ])
 [PM2] [api-server](2) ✓
@@ -162,14 +162,14 @@ pm2 restart 2 --update-env
 │ 2  │ api-server         │ fork     │ 11   │ online    │ 0%       │ 17.4mb   │
 └────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
 root@university-and-course-data:~/University-and-Course-data# pm2 env 2 | grep GEMINI
-GEMINI_API_KEY: AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68
-root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk" \
+GEMINI_API_KEY: REDACTED_LEAKED_KEY_2
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=REDACTED_LEAKED_KEY_1" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
 {
   "error": {
     "code": 403,
-root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key= AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68" \
+root@university-and-course-data:~/University-and-Course-data# curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key= REDACTED_LEAKED_KEY_2" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"parts":[{"text":"Say hi"}]}]}' | head -3
 root@university-and-course-data:~/University-and-Course-data# read -rs GEMINI_API_KEY

@@ -120,7 +120,7 @@ EOF
 root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
 cat > .env << 'EOF'
 DATABASE_URL=postgresql://user:password@localhost:5432/yourdb
-GEMINI_API_KEY=AIzaSyBduudyTMPdEEXzETnrG_J5AfVR5b1hRGk
+GEMINI_API_KEY=REDACTED_LEAKED_KEY_1
 SESSION_SECRET=pXUBUgzw+Fu7NC50TPMdRbOrLHnHH2+UX3NVvH5qmc6SJOmJsDbD09u6oym2DLGj3ajEMnrm13jb9gdwE4vSHw==
 PORT=8080
 EOF
