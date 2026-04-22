@@ -1,0 +1,53 @@
+root@university-and-course-data:~/University-and-Course-data# # Watch live for the per-course modal log line
+pm2 logs uni-api --lines 0 &
+LOGPID=$!
+# (let it run while you click re-scrape in the UI; Ctrl+C after it finishes,
+#  or kill it after ~3 min)
+sleep 180
+kill $LOGPID 2>/dev/null
+
+# After the scrape completes, inspect the NEWEST staging row for VIT MBA PM:
+psql "$DATABASE_URL" -c "SELECT id, course_name, created_at FROM scraped_courses WHERE university_id = 6 AND course_name ILIKE '%project management%' ORDER BY created_at DESC LIMIT 3;"
+
+# Then check the field evidence for PTE/TOEFL on that newest row (replace NEW_ID):
+# psql "$DATABASE_URL" -c "SELECT field_name, page_type, extraction_method, confidence, LEFT(content, 200) FROM scraped_field_evidence WHERE staged_course_id = NEW_ID AND field_name IN ('pteOverall','toeflOverall','ieltsOverall') ORDER BY field_name, confidence DESC;"
+[1] 211323
+
+^C
+  id  |      course_name       |          created_at           
+------+------------------------+-------------------------------
+ 3972 | Mba Project Management | 2026-04-22 05:29:21.044079+00
+(1 row)
+
+[1]+  Terminated              pm2 logs uni-api --lines 0
+root@university-and-course-data:~/University-and-Course-data# # 1. Find the MBA Project Management course URL/id
+psql "$DATABASE_URL" -c "SELECT id, course_name FROM scraped_courses WHERE university_id=6 AND course_name ILIKE '%project management%' ORDER BY created_at DESC LIMIT 5;"
+
+# 2. Find the scrape endpoint (look for re-scrape route)
+grep -nE "router\.(post|get).*scrape|app\.(post|get).*scrape" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -20
+  id  |      course_name       
+------+------------------------
+ 3972 | Mba Project Management
+(1 row)
+
+10020:router.post("/scrape/start", async (req: Request, res: Response): Promise<void> => {
+10494:router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<void> => {
+10558:router.get("/scrape/status/:jobId", async (req: Request, res: Response): Promise<void> => {
+10570:router.post("/scrape/stop/:jobId", async (req: Request, res: Response): Promise<void> => {
+10576:router.post("/scrape/approve/:jobId", async (req: Request, res: Response): Promise<void> => {
+10584:router.get("/scrape/jobs", async (_req: Request, res: Response): Promise<void> => {
+10594:router.get("/scrape/last-runs", async (_req: Request, res: Response): Promise<void> => {
+10618:router.get("/scrape/bulk/active", (_req: Request, res: Response): void => {
+10631:router.post("/scrape/bulk/start", async (req: Request, res: Response): Promise<void> => {
+10664:router.get("/scrape/bulk/status/:sessionId", (req: Request, res: Response): void => {
+10691:router.post("/scrape/bulk/stop/:sessionId", (req: Request, res: Response): void => {
+10701:router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
+10712:router.get("/scrape/staged", async (req: Request, res: Response): Promise<void> => {
+10814:router.post("/scrape/staged/dedup/:universityId", async (req: Request, res: Response): Promise<void> => {
+10835:router.post("/scrape/staged/:id/reject", async (req: Request, res: Response): Promise<void> => {
+10873:router.get("/scrape/staged/:id/review", async (req: Request, res: Response): Promise<void> => {
+11143:router.post("/scrape/staged/:id/approve", async (req: Request, res: Response): Promise<void> => {
+11160:router.post("/scrape/staged/approve-all", async (req: Request, res: Response): Promise<void> => {
+11184:router.post("/scrape/staged/reject-all", async (req: Request, res: Response): Promise<void> => {
+11198:router.get("/scrape/export", async (req: Request, res: Response): Promise<void> => {
+root@university-and-course-data:~/University-and-Course-data# 
