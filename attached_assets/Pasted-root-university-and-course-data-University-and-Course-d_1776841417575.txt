@@ -1,0 +1,69 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data/artifacts/api-server
+
+# Use the api-server's resolved cheerio directly via node's require resolution from the package dir
+cat > /tmp/asa_debug.cjs <<'EOF'
+const path = require('path');
+process.chdir('/root/University-and-Course-data/artifacts/api-server');
+const cheerio = require('cheerio');
+const https = require('https');
+
+function fetchPage(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml'
+      }
+    }, res => {
+      let html = '';
+      res.on('data', d => html += d);
+      res.on('end', () => resolve(html));
+    }).on('error', reject);
+  });
+}
+
+(async () => {
+  process.stdout.write('Fetching ASA course page...\n');
+  const html = await fetchPage('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development');
+  process.stdout.write(`HTML size: ${html.length} bytes\n`);
+  
+  const $ = cheerio.load(html);
+  
+  process.stdout.write('\n=== TABLE SCAN ===\n');
+  let tableCount = 0;
+  $('table').each((ti, table) => {
+    tableCount++;
+    process.stdout.write(`\nTable ${ti}:\n`);
+    $(table).find('tr').each((ri, row) => {
+      const cells = $(row).find('td,th').toArray().map(c => $(c).text().trim().replace(/\s+/g,' ').slice(0,100)); 
+      if (cells.length >= 2) process.stdout.write(`  Row ${ri}: [${cells[0]}] | [${cells[1]}]\n`);
+    });
+  });
+  process.stdout.write(`\nTotal tables: ${tableCount}\n`);
+  
+  process.stdout.write('\n=== TEXT SEARCH (cheerio body.text) ===\n');
+  const bodyText = $('body').text();
+cd /root/University-and-Course-data/artifacts/api-server && node /tmp/asa_debug.cjs 2>&1 | head -120
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module 'cheerio'
+Require stack:
+- /tmp/asa_debug.cjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (/tmp/asa_debug.cjs:3:17)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/tmp/asa_debug.cjs' ]
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
