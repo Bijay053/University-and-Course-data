@@ -1,0 +1,30 @@
+                                          Table "public.scraped_field_evidence"
+      Column       |           Type           | Collation | Nullable |                      Default                       
+-------------------+--------------------------+-----------+----------+----------------------------------------------------
+ id                | integer                  |           | not null | nextval('scraped_field_evidence_id_seq'::regclass)
+ scraped_course_id | integer                  |           | not null | 
+ field_key         | text                     |           | not null | 
+ candidate_value   | text                     |           |          | 
+ normalized_value  | text                     |           |          | 
+ source_url        | text                     |           |          | 
+ page_type         | text                     |           |          | 
+ extraction_method | text                     |           |          | 
+ raw_text          | text                     |           |          | 
+ snippet           | text                     |           |          | 
+ confidence        | real                     |           |          | 
+ decision_score    | real                     |           |          | 
+ validation_status | text                     |           | not null | 'pending'::text
+ decision_status   | text                     |           | not null | 'needs_review'::text
+ selected          | boolean                  |           | not null | false
+ created_at        | timestamp with time zone |           | not null | now()
+Indexes:
+    "scraped_field_evidence_pkey" PRIMARY KEY, btree (id)
+Foreign-key constraints:
+    "scraped_field_evidence_scraped_course_id_scraped_courses_id_fk" FOREIGN KEY (scraped_course_id) REFERENCES scraped_courses(id) ON DELETE CASCADE
+Referenced by:
+    TABLE "course_audit_log" CONSTRAINT "course_audit_log_source_evidence_id_scraped_field_evidence_id_f" FOREIGN KEY (source_evidence_id) REFERENCES scraped_field_evidence(id) ON DELETE SET NULL
+    TABLE "course_field_approvals" CONSTRAINT "course_field_approvals_source_evidence_id_scraped_field_evidenc" FOREIGN KEY (source_evidence_id) REFERENCES scraped_field_evidence(id) ON DELETE SET NULL
+    TABLE "field_conflicts" CONSTRAINT "field_conflicts_evidence_a_id_scraped_field_evidence_id_fk" FOREIGN KEY (evidence_a_id) REFERENCES scraped_field_evidence(id) ON DELETE SET NULL
+    TABLE "field_conflicts" CONSTRAINT "field_conflicts_evidence_b_id_scraped_field_evidence_id_fk" FOREIGN KEY (evidence_b_id) REFERENCES scraped_field_evidence(id) ON DELETE SET NULL
+
+(END)
