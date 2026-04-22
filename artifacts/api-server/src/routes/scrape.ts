@@ -187,6 +187,52 @@ interface CourseData {
   onlineOnly?: boolean;
 }
 
+/**
+ * SINGLE SOURCE OF TRUTH for merging course data.
+ * Course page ALWAYS wins. Cache/PDF only fills truly empty slots.
+ * No exceptions. No per-university special cases.
+ */
+function mergeCourseData(
+  coursePageData: Partial<CourseData>,
+  fallbackData: Partial<CourseData>,
+): Partial<CourseData> {
+  const result: Partial<CourseData> = { ...coursePageData };
+
+  const fields: (keyof CourseData)[] = [
+    // English requirements
+    "ieltsOverall", "ieltsListening", "ieltsReading", "ieltsWriting", "ieltsSpeaking",
+    "pteOverall", "pteListening", "pteReading", "pteWriting", "pteSpeaking",
+    "toeflOverall", "toeflListening", "toeflReading", "toeflWriting", "toeflSpeaking",
+    "cambridgeOverall",
+    "duolingoOverall",
+    // Fees
+    "internationalFee", "feeTerm", "feeYear", "currency",
+    // Course details
+    "duration", "studyMode", "location", "intakes",
+    // Academic requirements
+    "academicLevel", "academicScore", "scoreType",
+  ];
+
+  for (const field of fields) {
+    const courseValue = (coursePageData as any)[field];
+    const fallbackValue = (fallbackData as any)[field];
+
+    // Only fill from fallback if course page has NO value
+    const isEmpty =
+      courseValue === null ||
+      courseValue === undefined ||
+      courseValue === "" ||
+      (Array.isArray(courseValue) && courseValue.length === 0);
+
+    if (isEmpty && fallbackValue !== null && fallbackValue !== undefined) {
+      (result as any)[field] = fallbackValue;
+    }
+    // If course page had a value, it stays. No overwriting. Ever.
+  }
+
+  return result;
+}
+
 interface ScrapeConfig {
   courseLinks: { url: string; name: string }[];
   uniPages: { feePage?: string; feesPdf?: string; requirementsPage?: string; entryPage?: string; requirementsPdf?: string };
@@ -8974,6 +9020,13 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           });
         }
 
+        // ── COURSE-PAGE SNAPSHOT (pre-cache) ─────────────────────────────
+        // Everything filled up to this point came from the course page itself
+        // (cheerio extract → per-course vision → cascade). Snapshot it now so
+        // we can guarantee these values survive the cache-fill block below
+        // via mergeCourseData (course-page wins, cache only fills empty).
+        const coursePageSnapshot: Partial<CourseData> = { ...(cheerioData as any) };
+
         // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
         // Per-field: fills only slots still empty after the three tiers above.
         // EXCEPTION: when the cached source is the course page itself (e.g. VIT's
@@ -9066,6 +9119,15 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           message: `[POST-CACHE] ${link.name.slice(0, 40)} → IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "—"} P=${cachedEnglishReqs?.pteOverall ?? "—"} T=${cachedEnglishReqs?.toeflOverall ?? "—"}`,
           phase: "extract",
         });
+
+        // ── FINAL MERGE (course-page wins over cache/fallback) ───────────
+        // Re-apply the snapshot so any course-page value the cache-fill
+        // block clobbered is restored. Cache-derived values survive only
+        // where the course page had nothing.
+        const merged = mergeCourseData(coursePageSnapshot, cheerioData as any);
+        for (const k of Object.keys(merged)) {
+          (cheerioData as any)[k] = (merged as any)[k];
+        }
 
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
