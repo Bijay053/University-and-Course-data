@@ -1,0 +1,26 @@
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+idx = s.find('renderedHtml')
+# Show 3000 chars from the block
+chunk = s[idx:idx+3000]
+# Print in 200-char segments to avoid truncation
+for i in range(0, len(chunk), 200):
+    print(f"[{i}]", repr(chunk[i:i+200]))
+PYEOF
+[0] 'renderedHtml = browserResult.requirementsHtml || browserResult.mainHtml;\n            const $r = cheerio.load(renderedHtml);\n            stripPageNoise($r);\n            const renderedText = $r("body").'
+[200] 'text();\n            const renderedReq: Partial<CourseData> = {};\n            extractEnglishFromHtml($r, renderedReq);\n            if (!(renderedReq.ieltsOverall || renderedReq.pteOverall || renderedRe'
+[400] 'q.toeflOverall)) {\n              extractEnglishRequirements(renderedText, renderedReq);\n            }\n            applyEnglishResultToCourse(renderedReq, parseEnglishRequirementsFromText(renderedText,'
+[600] ' "browser"));\n\n            if (renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall) {\n              // Merge: browser results fill slots the AI scan missed; AI values take\n '
+[800] '             // precedence (they come from a more curated text extraction).\n              cachedEnglishReqs = { ...renderedReq, ...cachedEnglishReqs };\n              if (!cachedEnglishReqsSource) cach'
+[1000] 'edEnglishReqsSource = { url: reqUrl, pageType: "requirements_page" };\n              addLog(job, "status", { message: `Browser-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq'
+[1200] '.pteOverall} TOEFL=${renderedReq.toeflOverall} CAE=${(renderedReq as any).cambridgeOverall ?? "-"}`, phase: "fetch" });\n            } else if (GEMINI_API_KEY) {\n              // Still nothing — try vi'
+[1400] 'sion-AI on every candidate image on the page.\n              // Filter out obvious logos/icons by size hints and filename keywords.\n              const imgUrls: string[] = [];\n              $r("img").e'
+[1600] 'ach((_, el) => {\n                const src = $r(el).attr("src") || $r(el).attr("data-src") || "";\n                if (!src) return;\n                if (/logo|icon|favicon|avatar|header|footer|social|f'
+[1800] 'acebook|instagram|linkedin|twitter|youtube|map-marker|phone|email/i.test(src)) return;\n                try {\n                  const abs = new URL(src, reqUrl).toString();\n                  if (!imgUr'
+[2000] 'ls.includes(abs)) imgUrls.push(abs);\n                } catch {}\n              });\n              if (imgUrls.length > 0) {\n                addLog(job, "status", { message: `Trying vision-AI on ${Math.m'
+[2200] 'in(imgUrls.length, 6)} candidate image(s) for requirements table...`, phase: "fetch" });\n                const merged: Partial<CourseData> = {};\n                for (const imgUrl of imgUrls.slice(0, 6'
+[2400] ')) {\n                  try {\n                    const visionData = await analyzeImageWithGemini(imgUrl, "This image may contain English language test score requirements (IELTS, TOEFL, PTE, Cambridge '
+[2600] 'CAE, Duolingo).");\n                    for (const [k, v] of Object.entries(visionData)) {\n                      if (v != null && (merged as any)[k] == null) (merged as any)[k] = v;\n                   '
+[2800] ' }\n                    if (merged.ieltsOverall && merged.pteOverall && merged.toeflOverall) break;\n                  } catch {}\n                }\n                if (merged.ieltsOverall || merged.pteO'
+root@university-and-course-data:~/University-and-Course-data# 
