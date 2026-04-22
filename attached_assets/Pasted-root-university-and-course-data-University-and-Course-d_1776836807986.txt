@@ -1,0 +1,45 @@
+root@university-and-course-data:~/University-and-Course-data# # 1. List all tables
+psql "$DATABASE_URL" -c "\dt"
+
+# 2. Trigger a fresh scrape on a SINGLE VIT course via the API to test fast
+#    Replace UNI_ID with VIT's id from the universities table
+psql "$DATABASE_URL" -c "SELECT id, name FROM universities WHERE name ILIKE '%vit%';"
+
+# 3. After you get the uni id, re-scrape from the UI: open VIT, click "Re-scrape" on
+#    "MBA Project Management" (or run bulk on VIT only). Then watch logs LIVE:
+pm2 logs uni-api --lines 0
+                     List of relations
+ Schema |             Name             | Type  |   Owner   
+--------+------------------------------+-------+-----------
+ public | academic_requirements        | table | uniportal
+ public | academic_requirements_backup | table | uniportal
+ public | assessment_notes             | table | uniportal
+ public | course_audit_log             | table | uniportal
+ public | course_field_approvals       | table | uniportal
+ public | courses                      | table | uniportal
+ public | courses_backup               | table | uniportal
+ public | english_requirements         | table | uniportal
+ public | english_requirements_backup  | table | uniportal
+ public | fees                         | table | uniportal
+ public | fees_backup                  | table | uniportal
+ public | field_conflicts              | table | uniportal
+ public | import_jobs                  | table | uniportal
+ public | intakes                      | table | uniportal
+ public | intakes_backup               | table | uniportal
+ public | scholarships                 | table | uniportal
+ public | scholarships_backup          | table | uniportal
+ public | scrape_feedback              | table | uniportal
+ public | scrape_runtime_jobs          | table | uniportal
+ public | scrape_runtime_logs          | table | uniportal
+ public | scraped_courses              | table | uniportal
+ public | scraped_field_evidence       | table | uniportal
+ public | scraping_changes             | table | uniportal
+ public | scraping_jobs                | table | uniportal
+ public | universities                 | table | uniportal
+(25 rows)
+
+ id | name 
+----+------
+  6 | vit
+(1 row)
+
