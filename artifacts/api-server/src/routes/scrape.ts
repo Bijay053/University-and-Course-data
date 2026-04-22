@@ -7939,6 +7939,86 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
     } catch {}
   }
 
+  // ── COURSE-PAGE SUB-LINK PROBE (final fallback) ──
+  // Many universities (e.g. VIT) only show IELTS on the course page itself but link
+  // to a separate "Other Recognised Tests" / "English Language Equivalents" page that
+  // holds the PTE/TOEFL/CAE table. Probe the first course page once for that link
+  // and extract from it. Result is cached and applied to every course in the batch.
+  if (!cachedEnglishReqs && !cachedEnglishBands && courseLinks.length > 0 && GEMINI_API_KEY) {
+    try {
+      const sampleCourseUrl = courseLinks[0].url;
+      addLog(job, "status", { message: `No university-level English data — probing course page for equivalency link: ${sampleCourseUrl}`, phase: "fetch" });
+      let sampleHtml = "";
+      if (siteNeedsBrowser(sampleCourseUrl)) {
+        try {
+          const br = await fetchPageWithBrowser(sampleCourseUrl, { clickRequirementsTab: true, expandAccordions: true, timeoutMs: 25000 });
+          sampleHtml = br?.requirementsHtml || br?.mainHtml || "";
+        } catch {}
+      }
+      if (!sampleHtml) sampleHtml = await fetchPage(sampleCourseUrl);
+      const $s = cheerio.load(sampleHtml);
+      let equivLink: string | null = null;
+      const equivPattern = /other.{0,5}recognis|english.{0,10}(equivalents?|equivalencies|equivalent\s*test)|approved.{0,10}(test|english)|ielts.{0,10}equivalent|test.{0,10}equivalencies|english.{0,10}(language\s+)?(test|score)\s*equivalent|english.{0,5}proficiency.{0,10}(table|equivalent)/i;
+      $s("a[href]").each((_, el) => {
+        if (equivLink) return;
+        const text = $s(el).text().trim();
+        const href = $s(el).attr("href") || "";
+        if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+        if (equivPattern.test(text) || equivPattern.test(href)) {
+          try {
+            const abs = new URL(href, sampleCourseUrl).toString();
+            if (!/\.(jpg|png|gif|svg|css|js)(\?|$)/i.test(abs)) equivLink = abs;
+          } catch {}
+        }
+      });
+      if (equivLink) {
+        addLog(job, "status", { message: `Found equivalency link in course page: ${equivLink}`, phase: "fetch" });
+        let equivHtml = "";
+        if (siteNeedsBrowser(equivLink)) {
+          try {
+            const br2 = await fetchPageWithBrowser(equivLink, { expandAccordions: true, timeoutMs: 25000 });
+            equivHtml = br2?.requirementsHtml || br2?.mainHtml || "";
+          } catch {}
+        }
+        if (!equivHtml) equivHtml = await fetchPage(equivLink);
+        let equivCompact = extractCompactContent(equivHtml, equivLink);
+        if (equivCompact.length < 500 || !equivCompact.includes(" | ")) {
+          const $strip = cheerio.load(equivHtml);
+          $strip("script, style, noscript, nav, header, footer, .cookie, .chat, .popup").remove();
+          equivCompact = $strip("body").html()?.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 12000) || cheerio.load(equivHtml)("body").text().slice(0, 12000);
+        }
+        addLog(job, "status", { message: `Equivalency page loaded: length=${equivCompact.length} hasTables=${equivCompact.includes(" | ")}`, phase: "fetch" });
+        const equivPrompt = `Extract English language proficiency test requirements (IELTS, PTE, TOEFL iBT, Cambridge CAE, Duolingo) from this page.\nIf there is a TABLE with rows for different IELTS scores (e.g. 5.5, 6.0, 6.5), return ALL rows in "bands".\nIf only one flat requirement exists, put it in "flat".\nReturn ONLY valid JSON: {"bands":[{"ielts":5.5,"pte":42,"toefl":46,"cae":null,"duo":null}],"flat":{"ielts":null,"pte":null,"toefl":null,"cae":null,"duo":null}}\nUse null for missing values.`;
+        const equivResult = await geminiChat(equivPrompt, equivCompact, 800);
+        addLog(job, "status", { message: `Equivalency Gemini raw (first 200): ${equivResult.slice(0, 200)}`, phase: "fetch" });
+        const m = equivResult.match(/\{[\s\S]*\}/);
+        const equivParsed = JSON.parse(m ? m[0] : equivResult);
+        if (Array.isArray(equivParsed.bands) && equivParsed.bands.length > 0) {
+          cachedEnglishBands = equivParsed.bands.map((b: any) => ({
+            ielts: Number(b.ielts), pte: b.pte ?? null, toefl: b.toefl ?? null, cae: b.cae ?? null, duo: b.duo ?? null
+          })).filter((b: any) => !isNaN(b.ielts));
+          addLog(job, "status", { message: `Equivalency bands extracted: ${cachedEnglishBands?.length ?? 0} tier(s) — ${(cachedEnglishBands ?? []).map(b => `IELTS ${b.ielts}→PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
+        }
+        const flat = equivParsed.flat || (Array.isArray(equivParsed.bands) && equivParsed.bands.length === 1 ? equivParsed.bands[0] : null);
+        if (flat && (flat.ielts || flat.pte || flat.toefl || flat.cae)) {
+          cachedEnglishReqs = {
+            ieltsOverall: flat.ielts ?? undefined,
+            pteOverall: flat.pte ?? undefined,
+            toeflOverall: flat.toefl ?? undefined,
+            cambridgeOverall: flat.cae ?? undefined,
+            duolingoOverall: flat.duo ?? undefined,
+          } as Partial<CourseData>;
+          cachedEnglishReqsSource = { url: equivLink, pageType: "course_page" };
+          addLog(job, "status", { message: `Equivalency flat: IELTS=${flat.ielts} PTE=${flat.pte} TOEFL=${flat.toefl} CAE=${flat.cae}`, phase: "fetch" });
+        }
+      } else {
+        addLog(job, "status", { message: `No equivalency link found in course page`, phase: "fetch" });
+      }
+    } catch (probeErr) {
+      addLog(job, "status", { message: `Course-page equivalency probe failed: ${(probeErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+    }
+  }
+
   // Queues filled by parallel workers, flushed after all done
   const classifyQueue: { index: number; name: string; existing: Partial<CourseData>; data: CourseData; reviewSources: ReviewSource[] }[] = [];
   const fullAIQueue: { index: number; name: string; html: string; cheerioData: ReturnType<typeof extractWithCheerio>; reviewSources: ReviewSource[] }[] = [];
