@@ -1,0 +1,125 @@
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'forceCourseOverride' in s:
+    print("FORCE-OVERRIDE ALREADY PATCHED — skipping insert")
+else:
+    OLD = '''        if (cachedEnglishReqs) {
+          let cachedApplied = false;
+          if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
+            cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
+            cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || undefined;
+            cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || undefined;
+            cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
+            cheerioData.ieltsSpeaking  = cachedEnglishReqs.ieltsSpeaking  || undefined;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[IELTS] cached hit: overall=${cachedEnglishReqs.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[PTE] cached hit: overall=${cachedEnglishReqs.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+            cachedApplied = true;
+            addVerboseLog(job, "status", { message: `[TOEFL] cached hit: overall=${cachedEnglishReqs.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+          if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+          if (!(cheerioData as any).duolingoOverall && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;'''
+
+    NEW = '''        if (cachedEnglishReqs) {
+          let cachedApplied = false;
+          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";
+          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
+          if ((!cheerioData.ieltsOverall || forceCourseOverride) && cachedEnglishReqs.ieltsOverall) {
+            cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
+            cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || cheerioData.ieltsReading   || undefined;
+            cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || cheerioData.ieltsWriting   || undefined;
+            cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || cheerioData.ieltsListening || undefipm2 restart uni-api --update-env && echo "DEPLOYED OK"/scrape-worker.mjs && \.mjs && \=True);'''qs as any).duolin
+Anchor occurrences: 0
+ABORT: anchor not found or not unique
+Source occurrences: 0
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 974ms
+--- worker bundle forceCourseOverride count: ---
+0
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_force_override.py <<'PYEOF'
+import re, subprocess
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+if 'forceCourseOverride' in s:
+    print("ALREADY PATCHED")
+    raise SystemExit(0)
+
+# Find the "if (cachedEnglishReqs) {" block start and inject the flag + debug log
+marker = "if (cachedEnglishReqs) {\n          let cachedApplied = false;\n"
+inject = ('if (cachedEnglishReqs) {\n'
+          '          let cachedApplied = false;\n'
+          '          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page";\n'
+          '          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });\n')
+n = s.count(marker)
+print("marker count:", n)
+assert n == 1, "marker not unique"
+s = s.replace(marker, inject)
+
+# Now broaden each per-field guard: !cheerioData.X  ->  (!cheerioData.X || forceCourseOverride)
+fields = ["ieltsOverall", "pteOverall", "toeflOverall", "cambridgeOverall"]
+for f in fields:
+    old = f"!cheerioData.{f} && cachedEnglishReqs.{f}"
+    new = f"(!cheerioData.{f} || forceCourseOverride) && cachedEnglishReqs.{f}"
+    c = s.count(old)
+    print(f"{f}: {c} match(es)")
+    assert c >= 1, f"missing guard for {f}"
+    s = s.replace(old, new, 1)
+
+# Duolingo lives on (cheerioData as any).duolingoOverall
+old_d = "!(cheerioData as any).duolingoOverall && (cachedEnglishReqs as any).duolingoOverall"
+new_d = "(!(cheerioData as any).duolingoOverall || forceCourseOverride) && (cachedEnglishReqs as any).duolingoOverall"
+print("duo:", s.count(old_d))
+s = s.replace(old_d, new_d, 1)
+
+open(p, "w").write(s)
+print("PATCHED OK; forceCourseOverride occurrences:",
+      subprocess.run(["grep","-c","forceCourseOverride",p], capture_output=True, text=True).stdout.strip())
+PYEOF
+echo "script written"
+script written
+root@university-and-course-data:~/University-and-Course-data# python3 /tmp/patch_force_override.py && \
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+echo "--- worker bundle forceCourseOverride: ---" && \
+grep -c "forceCourseOverride" artifacts/api-server/dist/workers/scrape-worker.mjs && \
+echo "--- worker bundle CACHE-FILL: ---" && \
+grep -c "CACHE-FILL" artifacts/api-server/dist/workers/scrape-worker.mjs && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+marker count: 1
+ieltsOverall: 2 match(es)
+pteOverall: 2 match(es)
+toeflOverall: 2 match(es)
+cambridgeOverall: 2 match(es)
+duo: 1
+PATCHED OK; forceCourseOverride occurrences: 7
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 988ms
+--- worker bundle forceCourseOverride: ---
+5
+--- worker bundle CACHE-FILL: ---
+1
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 13   │ online    │ 0%       │ 46.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# 
