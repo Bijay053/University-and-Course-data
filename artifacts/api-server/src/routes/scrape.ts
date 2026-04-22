@@ -8942,6 +8942,38 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }
         }
 
+        // ── UNIVERSAL ENGLISH CASCADE (course-page evidence, runs BEFORE cache) ──
+        // Course-page evidence (text→tabs→modals→vision→links) is more specific
+        // than the university-wide cache fallback. Run it BEFORE the cache-fill
+        // so cache only fills what the cascade couldn't find on the actual
+        // course page. Otherwise cache PTE=50 (university minimum) silently
+        // blocks cascade PTE=58 (course-specific) because applyEnglishResultToCourse
+        // only fills empty slots.
+        try {
+          const englishIncomplete =
+            !cheerioData.ieltsOverall ||
+            !cheerioData.pteOverall ||
+            !cheerioData.toeflOverall;
+          if (englishIncomplete && siteNeedsBrowser(link.url) && GEMINI_API_KEY) {
+            const outcome = await extractEnglishWithCascade(link.url, cheerioData as any, {
+              courseName: cheerioData.courseName || link.name,
+              degreeLevel: cheerioData.degreeLevel,
+            });
+            if (outcome.evidence.length > 0) {
+              for (const ev of outcome.evidence) reviewSources.push(ev);
+              addLog(job, "status", {
+                message: `[cascade ✓ pre-cache] ${link.name.slice(0, 40)} — ${outcome.steps.join("→")} | I=${cheerioData.ieltsOverall ?? "-"} P=${cheerioData.pteOverall ?? "-"} T=${cheerioData.toeflOverall ?? "-"} C=${(cheerioData as any).cambridgeOverall ?? "-"}`,
+                phase: "extract",
+              });
+            }
+          }
+        } catch (cascadeErr) {
+          addVerboseLog(job, "status", {
+            message: `[cascade ✗ pre-cache] ${link.name.slice(0, 40)} — ${(cascadeErr as Error).message?.slice(0, 80)}`,
+            phase: "extract",
+          });
+        }
+
         // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
         // Per-field: fills only slots still empty after the three tiers above.
         // EXCEPTION: when the cached source is the course page itself (e.g. VIT's
@@ -9034,37 +9066,6 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           message: `[POST-CACHE] ${link.name.slice(0, 40)} → IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "—"} P=${cachedEnglishReqs?.pteOverall ?? "—"} T=${cachedEnglishReqs?.toeflOverall ?? "—"}`,
           phase: "extract",
         });
-
-        // ── UNIVERSAL ENGLISH CASCADE (safety net) ─────────────────────────
-        // For JS-heavy sites where regular extraction missed one of the three
-        // critical English tests (IELTS/PTE/TOEFL), run text→tabs→modals→vision
-        // →links cascade as last-resort fill. Cambridge-only misses do NOT
-        // trigger the cascade — too many sites legitimately omit CAE and we
-        // don't want to spawn a Chromium per course just for that.
-        try {
-          const englishIncomplete =
-            !cheerioData.ieltsOverall ||
-            !cheerioData.pteOverall ||
-            !cheerioData.toeflOverall;
-          if (englishIncomplete && siteNeedsBrowser(link.url) && GEMINI_API_KEY) {
-            const outcome = await extractEnglishWithCascade(link.url, cheerioData as any, {
-              courseName: cheerioData.courseName || link.name,
-              degreeLevel: cheerioData.degreeLevel,
-            });
-            if (outcome.evidence.length > 0) {
-              for (const ev of outcome.evidence) reviewSources.push(ev);
-              addLog(job, "status", {
-                message: `[cascade ✓] ${link.name.slice(0, 40)} — ${outcome.steps.join("→")} | I=${cheerioData.ieltsOverall ?? "-"} P=${cheerioData.pteOverall ?? "-"} T=${cheerioData.toeflOverall ?? "-"} C=${(cheerioData as any).cambridgeOverall ?? "-"}`,
-                phase: "extract",
-              });
-            }
-          }
-        } catch (cascadeErr) {
-          addVerboseLog(job, "status", {
-            message: `[cascade ✗] ${link.name.slice(0, 40)} — ${(cascadeErr as Error).message?.slice(0, 80)}`,
-            phase: "extract",
-          });
-        }
 
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
