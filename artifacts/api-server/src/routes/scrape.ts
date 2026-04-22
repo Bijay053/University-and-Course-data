@@ -4287,7 +4287,12 @@ async function batchClassify(courses: { index: number; name: string; existing: P
   for (let attempt = 0; attempt < MAX_BATCH_ATTEMPTS; attempt++) {
     try {
       const text = await geminiChat(BATCH_CLASSIFY_PROMPT, input, 4096);
-      const parsed = JSON.parse(text) as any[];
+      // Strip markdown fences and extract the JSON array, handling cases where
+      // Gemini wraps its output in ```json ... ``` or returns an object with an
+      // array-valued key instead of a bare array.
+      const cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+      const parsed = JSON.parse(arrMatch ? arrMatch[0] : cleaned) as any[];
       for (const item of parsed) {
         if (item.index !== undefined) {
           result.set(item.index, {
@@ -4299,7 +4304,7 @@ async function batchClassify(courses: { index: number; name: string; existing: P
         }
       }
       if (result.size > 0) return result;
-      console.log(`Batch classify returned no results on attempt ${attempt + 1}/${MAX_BATCH_ATTEMPTS}`);
+      console.log(`Batch classify returned no results on attempt ${attempt + 1}/${MAX_BATCH_ATTEMPTS} (raw: ${text.slice(0, 200)})`);
     } catch (err) {
       console.log(`Batch classify attempt ${attempt + 1}/${MAX_BATCH_ATTEMPTS} error:`, (err as Error).message);
     }
@@ -4315,7 +4320,9 @@ async function batchClassify(courses: { index: number; name: string; existing: P
     try {
       const single = `#${c.index}: "${c.name}"${c.existing.degreeLevel ? `, level=${c.existing.degreeLevel}` : ""}`;
       const text = await geminiChat(BATCH_CLASSIFY_PROMPT, single, 1024);
-      const parsed = JSON.parse(text) as any[];
+      const cleaned2 = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+      const arrMatch2 = cleaned2.match(/\[[\s\S]*\]/);
+      const parsed = JSON.parse(arrMatch2 ? arrMatch2[0] : cleaned2) as any[];
       for (const item of parsed) {
         if (item.index !== undefined) {
           result.set(item.index, {
@@ -8255,6 +8262,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         const cheerioData = extractWithCheerio(extractionHtml, link.url, link.name, universityCountry, batchPageTemplate, feedbackHints);
         if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
 
+        // ── reviewSources tracks all evidence used for this course. Declared HERE
+        // (before the per-course modal scan) because the modal block pushes to it
+        // immediately on success. Declaring it after the modal block caused a
+        // JavaScript Temporal Dead Zone error: "Cannot access 'reviewSources'
+        // before initialization" for every single course.
+        const reviewSources: ReviewSource[] = [{
+          url: link.url,
+          pageType: "course_page",
+          extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
+          content: pageText,
+        }];
+
         // PER-COURSE MODAL SCAN: many sites (e.g. VIT) embed a hidden Bootstrap
         // equivalency modal directly on each course page with course-specific
         // IELTS/PTE/TOEFL/CAE values. Different courses (Bachelor vs MBA) often
@@ -8340,7 +8359,48 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 extractionMethod: "cheerio",
                 content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
               });
-              addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s))`, phase: "extract" });
+              // ── Sub-band extraction from modal text ──────────────────────────────
+              // VIT modal text contains patterns like:
+              //   "IELTS Academic: Overall 6.0, with no individual band below 5.5."
+              //   "Listening 5.5 Reading 5.5 Writing 5.5 Speaking 5.5"
+              // The table row parser above captures overall scores only.
+              // Read the full modal text to fill L/R/W/S bands.
+              const cmText = $cm("body").text().replace(/\s+/g, " ");
+
+              if (cIelts != null) {
+                // Pattern 1: "no individual band below X.X" / "each band of X.X"
+                const noBandM =
+                  cmText.match(/no individual band (?:below|under|less than|score below) (\d+(?:\.\d+)?)/i) ||
+                  cmText.match(/each (?:band|component|skill|section)(?:\s+score)?\s+(?:of|at least|is|above)?\s*(\d+(?:\.\d+)?)/i) ||
+                  cmText.match(/minimum.*?band.*?(\d+(?:\.\d+)?)/i);
+                if (noBandM) {
+                  const minBand = parseFloat(noBandM[1]);
+                  if (!isNaN(minBand) && minBand >= 4 && minBand <= 9) {
+                    if (!cheerioData.ieltsListening) cheerioData.ieltsListening = minBand;
+                    if (!cheerioData.ieltsSpeaking) cheerioData.ieltsSpeaking = minBand;
+                    if (!cheerioData.ieltsWriting) cheerioData.ieltsWriting = minBand;
+                    if (!cheerioData.ieltsReading) cheerioData.ieltsReading = minBand;
+                  }
+                }
+                // Pattern 2: explicit "Listening X.X ... Reading X.X ... Writing X.X ... Speaking X.X"
+                const indivM = cmText.match(
+                  /Listening\s+(\d+(?:\.\d+)?)[^]*?Reading\s+(\d+(?:\.\d+)?)[^]*?Writing\s+(\d+(?:\.\d+)?)[^]*?Speaking\s+(\d+(?:\.\d+)?)/i,
+                );
+                if (indivM) {
+                  cheerioData.ieltsListening = parseFloat(indivM[1]);
+                  cheerioData.ieltsReading   = parseFloat(indivM[2]);
+                  cheerioData.ieltsWriting   = parseFloat(indivM[3]);
+                  cheerioData.ieltsSpeaking  = parseFloat(indivM[4]);
+                }
+              }
+
+              const subBandLog = [
+                cheerioData.ieltsListening != null ? `L=${cheerioData.ieltsListening}` : null,
+                cheerioData.ieltsReading   != null ? `R=${cheerioData.ieltsReading}`   : null,
+                cheerioData.ieltsWriting   != null ? `W=${cheerioData.ieltsWriting}`   : null,
+                cheerioData.ieltsSpeaking  != null ? `S=${cheerioData.ieltsSpeaking}`  : null,
+              ].filter(Boolean).join(" ");
+              addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} (${subBandLog || "no sub-bands"}) PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s))`, phase: "extract" });
             }
           }
         } catch (cmErr) {
@@ -8428,13 +8488,6 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             });
           }
         }
-
-        const reviewSources: ReviewSource[] = [{
-          url: link.url,
-          pageType: "course_page",
-          extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
-          content: pageText,
-        }];
 
         if (cheerioData.domesticOnly) {
           job.skipped++;

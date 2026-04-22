@@ -1,0 +1,89 @@
+PRODUCTION BUGS FROM VIT SCRAPE — 4 issues to fix in one push
+Production server pulled commit 6a1881a and ran a VIT scrape. The mergeCourseData refactor broke 4 things. Logs show all 30 courses failing the per-course modal step with the same JavaScript error. Need to fix all 4 issues below in one PR.
+
+BUG 1: Cannot access 'reviewSources' before initialization — kills modal extraction on every course
+Every single course shows:
+[per-course modal ✗] Bachelor Of Business — Cannot access 'reviewSources' before initialization
+[per-course modal ✗] Bbus Accounting — Cannot access 'reviewSources' before initialization
+[per-course modal ✗] Mba Finance — Cannot access 'reviewSources' before initialization
+... (30 times)
+This is a JavaScript Temporal Dead Zone error — the variable reviewSources is being used inside a function/closure BEFORE its let/const declaration is reached. The mergeCourseData refactor in scrape.ts likely moved the declaration below where it's used.
+Search for reviewSources in artifacts/api-server/src/routes/scrape.ts and find every location where it's referenced. The declaration must come BEFORE any function that captures it via closure. Fix the hoisting / scoping issue.
+Add a defensive check: if any code path references reviewSources before declaration, return early or initialize as [] at the top of the enclosing scope.
+Confirm fix by grepping the bundle:
+bashgrep -c "reviewSources" artifacts/api-server/dist/workers/scrape-worker.mjs
+The error stops appearing in scrape logs.
+
+BUG 2: PTE/TOEFL evidence shows derived/derived 45% instead of course_page/cheerio 97% for VIT courses
+Screenshot 1 shows for "Bachelor of Business" review screen:
+
+IELTS: accepted, selected, fee_page/cheerio, 99% ✅ correct
+PTE 47: needs_review, derived/derived, 45% ❌ wrong source
+TOEFL 67: needs_review, derived/derived, 45% ❌ wrong source
+
+But screenshot 4 (Diploma of Information Technology) shows the SAME data with correct provenance:
+
+PTE 47: accepted, selected, course_page/cheerio, 97% ✅
+TOEFL 67: accepted, selected, course_page/cheerio, 97% ✅
+
+This is a direct consequence of BUG 1. The per-course modal extraction failed (reviewSources error) → no course_page/cheerio evidence was created → the system fell back to derived provenance from the cache.
+Once BUG 1 is fixed, this should auto-resolve. Verify after fix: every course's PTE/TOEFL evidence shows course_page/cheerio with confidence ≥95%, NOT derived.
+
+BUG 3: IELTS L/R/W/S sub-bands not extracted
+Screenshot 2 (Edit Scraped Course modal) shows IELTS Overall = 6 but L, R, W, S boxes are all empty. Same for PTE and TOEFL.
+VIT's per-course modal contains the sub-band info — for example, the modal text "IELTS Academic: Overall 6.0, with no individual band below 5.5" implies all 4 sub-bands = 5.5. The modal parser should extract this.
+In the deterministic VIT modal parser (the one that successfully extracted "IELTS=6 PTE=47 TOEFL=67 CAE=169"), add sub-band extraction:
+
+"with no individual band below X.X" pattern → set L/R/W/S = X.X
+"L X.X R X.X W X.X S X.X" pattern → individual values
+"Listening X.X, Reading X.X, Writing X.X, Speaking X.X" pattern → individual values
+
+Apply same logic for PTE and TOEFL sub-bands.
+Also propagate sub-bands through mergeCourseData — if course page has sub-bands, they win. If not, leave empty (do NOT fill from PDF cache).
+
+BUG 4: Category and Sub Category not auto-populated
+Screenshot 3 (Edit Scraped Course modal) shows Category and Sub Category fields completely empty for "Bachelor Of Business".
+The classification step at the end (Classifying 30 courses with AI (batched)...) is supposed to assign these. Either:
+a) The AI classifier isn't returning category/subCategory fields
+b) Returned values aren't being saved to the staging row
+c) The fields exist in DB but UI isn't reading them
+Investigate and fix:
+
+Check the prompt sent to Gemini for classification — does it ask for category and subCategory?
+Check the response parser — is it extracting and saving these fields?
+Check the DB schema — are category and sub_category columns being written to scraped_courses?
+Verify with: psql "$DATABASE_URL" -c "SELECT course_name, category, sub_category FROM scraped_courses WHERE university_id=6 LIMIT 5;" — they should NOT be NULL.
+
+Use a standard taxonomy. For VIT examples:
+
+"Bachelor of Business" → Category=Business, Sub Category=General Business
+"Mba Finance" → Category=Business, Sub Category=Finance
+"Bachelor of Information Technology and Systems" → Category=IT, Sub Category=Information Technology
+"Certificate III in Commercial Cookery" → Category=Hospitality, Sub Category=Cookery
+"Certificate III in Carpentry" → Category=Trades, Sub Category=Construction
+
+
+BUG 5 (also caught in logs): The discarded API key restriction error
+Gemini-rendered failed: Gemini API error 403: { "error": { "code": 403, "message": "The provided API key has an IP address restriction
+The new key has IP restrictions enabled. This is GOOD for security, but the requirements-page rendering call on the production server (not the worker) uses a different network path that's being blocked. Investigate which call this is and either:
+
+Confirm the production server IP 159.65.152.72 is in the allowlist (check Google Cloud Console)
+OR have the requirements-page rendering call go through the same path as the per-course vision calls (which work fine)
+
+Don't ask user to remove IP restrictions — fix the call path instead.
+
+DELIVERY:
+
+Fix all 5 bugs in artifacts/api-server/src/routes/scrape.ts and any related files
+Build, commit, push to main with message "Fix VIT scrape: hoisting bug, sub-bands, category mapping, evidence provenance"
+Reply with:
+
+Which line had the reviewSources hoisting issue
+What sub-band patterns you added
+How category/subCategory is now populated (AI prompt? hardcoded mapping?)
+
+
+
+After your push, I'll deploy on production and re-scrape VIT. Expected log output for each course:
+[per-course modal ✓] Bachelor Of Business — IELTS=6 (L=5.5 R=5.5 W=5.5 S=5.5) PTE=47 TOEFL=67 CAE=169
+[PRE-INSERT] Bachelor Of Business → IELTS=6 PTE=47 TOEFL=67 CAE=169 | category=Business sub=General Business

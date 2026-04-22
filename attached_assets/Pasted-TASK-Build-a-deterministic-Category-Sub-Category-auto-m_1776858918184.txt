@@ -1,0 +1,475 @@
+TASK: Build a deterministic Category + Sub Category auto-mapping system for scraped courses.
+The current system leaves Category and Sub Category empty in the staged review. Need to fix this with a hybrid approach: (1) deterministic keyword matching first (fast, free, reliable), (2) AI fallback for edge cases (using existing Gemini call), (3) "Other" sub category as last resort so a row never has empty fields.
+
+STEP 1: Create the canonical taxonomy file
+Create new file: artifacts/api-server/src/lib/course-taxonomy.ts
+Paste this exact taxonomy (extracted from a 2020 reference list, plus modern additions for AI/cloud/sustainability/data trends from 2020-2026):
+typescriptexport type CategoryKey = string;
+export type SubCategoryKey = string;
+
+export interface TaxonomyEntry {
+  category: CategoryKey;
+  subCategories: SubCategoryKey[];
+}
+
+export const COURSE_TAXONOMY: TaxonomyEntry[] = [
+  {
+    category: "Agriculture & Environmental Studies",
+    subCategories: [
+      "Agriculture", "Animal Sciences", "Aquaculture & Fisheries", "Forestry",
+      "Horticulture", "Plant & Crop Sciences", "Biodiversity & Conservation",
+      "Climate Studies & Meteorology", "Earth Sciences", "Ecology",
+      "Environmental Sciences", "Geology", "Hydrology & Water Management",
+      "Natural Resource Management", "Sustainable Development", "Toxicology",
+      "Food Science", "Veterinary Science", "Development Policies", "Other",
+    ],
+  },
+  {
+    category: "Architecture, Building & Design",
+    subCategories: [
+      "Architecture", "Design", "Building", "Fashion Design", "Graphic Design",
+      "User Experience Design", "Industrial Design", "Interior Design",
+      "Construction Management", "Urban Planning", "Other",
+    ],
+  },
+  {
+    category: "Arts, Humanities & Social Sciences",
+    subCategories: [
+      "Arts", "Humanities", "Social Sciences", "Creative Writing",
+      "General Studies & Classics", "History", "Liberal Arts", "Literature",
+      "Linguistics", "Philosophy & Ethics", "Gender & Sexuality Studies",
+      "International Relations", "Political Science", "Psychology",
+      "Public Policy", "Sociology", "Leadership", "Anthropology", "Other",
+    ],
+  },
+  {
+    category: "Business & Management",
+    subCategories: [
+      "Accounting", "Business", "Actuarial Science", "Agribusiness",
+      "Human Resource Management", "Auditing",
+      "Enterprise Resource Planning Management", "Business Administration",
+      "Business Intelligence & Analytics", "Commerce", "Finance", "Marketing",
+      "Management", "Project Management", "Economics",
+      "Quality Assurance & Management", "Manufacturing", "Real Estate & Trading",
+      "Supply Chain & Logistics", "Entrepreneurship", "International Business",
+      "Hospitality Management", "Banking", "Risk Management", "Other",
+    ],
+  },
+  {
+    category: "Computer Science & IT",
+    subCategories: [
+      "Artificial Intelligence", "Information Technology (IT)",
+      "Business Information Systems", "Computer Science", "Cyber Security",
+      "Networking", "Data Science & Big Data", "Software Engineering",
+      "Video Games & Multimedia", "Web Technologies & Cloud Computing",
+      "3D Arts and Animation", "Machine Learning", "DevOps",
+      "Blockchain", "Mobile App Development", "IT Management", "Other",
+    ],
+  },
+  {
+    category: "Education & Social Work",
+    subCategories: [
+      "Education", "Coaching", "Counselling", "Early Childhood Education",
+      "Educational Research", "Pedagogy", "Teaching", "Social Work",
+      "Special Education", "Adult Education", "Other",
+    ],
+  },
+  {
+    category: "Engineering & Technology",
+    subCategories: [
+      "Aerospace Engineering", "Automotive Engineering",
+      "Bio & Biomedical Engineering", "Chemical Engineering",
+      "Civil Engineering & Construction", "Electrical Engineering",
+      "Electronics Engineering", "Energy & Power Engineering",
+      "Environmental Engineering", "General Engineering & Technology",
+      "Industrial & Systems Engineering", "Marine Engineering",
+      "Engineering Management", "Materials Science & Engineering",
+      "Mechanical Engineering", "Mechatronics", "Mining Oil & Gas",
+      "Robotics", "Aviation", "Sustainable Energy", "Transportation",
+      "Other",
+    ],
+  },
+  {
+    category: "Languages & Culture",
+    subCategories: [
+      "Area & Cultural Studies", "Islamic Studies", "Languages", "TESOL",
+      "Christian Studies", "Asian Studies", "European Studies", "Other",
+    ],
+  },
+  {
+    category: "Law & Criminology",
+    subCategories: [
+      "Business Law", "Criminology", "Law", "Civil & Private Law",
+      "Criminal Law", "International Law", "Legal Studies",
+      "Patent & Intellectual Property Law", "Public Law",
+      "Terrorism & Security", "Other",
+    ],
+  },
+  {
+    category: "Maths & Sciences",
+    subCategories: [
+      "Applied Mathematics", "Science", "Astronomy & Space Sciences",
+      "Biochemistry", "Biotechnology", "Chemistry", "Financial Mathematics",
+      "Dermal Science", "Genetics", "Physics", "Statistics", "Biology",
+      "Mathematics", "Other",
+    ],
+  },
+  {
+    category: "Media & Communications",
+    subCategories: [
+      "Journalism", "Communications", "Media Management",
+      "Media Studies & Mass Media", "Public Relations", "Media Marketing",
+      "Translation & Interpreting", "Film Photography & Media",
+      "Digital Media", "Advertising", "Other",
+    ],
+  },
+  {
+    category: "Medicine & Health",
+    subCategories: [
+      "Biomedicine", "Biomedical Sciences", "Clinical Psychology",
+      "Complementary & Alternative Medicine", "Dentistry", "Health Sciences",
+      "Human Medicine", "Midwifery", "Nursing", "Nutrition & Dietetics",
+      "Pharmacy", "Physiotherapy", "Public Health", "Pharmaceutical",
+      "Laboratory Medicine", "Community Services", "Community Health",
+      "Ageing & Aged Care", "Veterinary Medicine", "Psychotherapy",
+      "Health & Social Care", "Mental Health", "Occupational Therapy",
+      "Paramedicine", "Other",
+    ],
+  },
+  {
+    category: "Music & Performing Arts",
+    subCategories: [
+      "Music", "Music History", "Visual Arts", "Theatre", "Dance",
+      "Performing Arts", "Other",
+    ],
+  },
+  {
+    category: "Sports & Personal Services",
+    subCategories: [
+      "Sports Management", "Sports Science", "Beauty Therapy",
+      "Exercise Sciences", "Hairdressing", "Personal Training",
+      "Massage Therapy", "Other",
+    ],
+  },
+  {
+    category: "Tourism & Hospitality",
+    subCategories: [
+      "Culinary Arts", "Event Management", "Hospitality Management",
+      "Tourism", "Patisserie", "Cookery", "Hotel Management", "Other",
+    ],
+  },
+  {
+    category: "Trades",
+    subCategories: [
+      "Carpentry", "Plumbing", "Electrical", "Welding", "Automotive Trades",
+      "Painting & Decorating", "Bricklaying", "Other",
+    ],
+  },
+];
+
+export const DEGREE_LEVELS = [
+  "Associate Degree or Equivalent",
+  "Certificate & Diploma",
+  "Pathway to Undergraduate",
+  "Bachelor",
+  "Graduate Certificate & Diploma",
+  "Master",
+  "Bachelor Dual Degree",
+  "Master Dual Degree",
+  "Dual Degree",
+  "Doctor/Doctorate",
+  "English Language",
+];
+
+STEP 2: Create the deterministic mapper
+Add to the same file (course-taxonomy.ts):
+typescript// Keyword → [category, subCategory] mapping. Higher priority = more specific.
+// Match against course name (lowercased, normalized).
+const KEYWORD_RULES: Array<{ pattern: RegExp; cat: string; sub: string; priority: number }> = [
+  // === COMPUTER SCIENCE & IT (high specificity first) ===
+  { pattern: /\b(artificial intelligence|machine learning|\bai\b)\b/i, cat: "Computer Science & IT", sub: "Artificial Intelligence", priority: 100 },
+  { pattern: /\bcyber\s*security|infosec|information security\b/i, cat: "Computer Science & IT", sub: "Cyber Security", priority: 100 },
+  { pattern: /\bdata science|big data|data analytics|data engineer/i, cat: "Computer Science & IT", sub: "Data Science & Big Data", priority: 100 },
+  { pattern: /\bsoftware (engineer|develop|application)/i, cat: "Computer Science & IT", sub: "Software Engineering", priority: 95 },
+  { pattern: /\bcloud computing|web technolog|web develop/i, cat: "Computer Science & IT", sub: "Web Technologies & Cloud Computing", priority: 90 },
+  { pattern: /\bnetwork(ing)?\b/i, cat: "Computer Science & IT", sub: "Networking", priority: 85 },
+  { pattern: /\bcomputer science\b/i, cat: "Computer Science & IT", sub: "Computer Science", priority: 90 },
+  { pattern: /\b(business information system|bis\b)/i, cat: "Computer Science & IT", sub: "Business Information Systems", priority: 90 },
+  { pattern: /\b(information technology|\bit\b|\bbits\b|\bgdits\b|\bgcits\b)/i, cat: "Computer Science & IT", sub: "Information Technology (IT)", priority: 80 },
+
+  // === BUSINESS & MANAGEMENT ===
+  { pattern: /\baccount(ing|ancy)\b/i, cat: "Business & Management", sub: "Accounting", priority: 100 },
+  { pattern: /\bfinance|financial planning|banking\b/i, cat: "Business & Management", sub: "Finance", priority: 100 },
+  { pattern: /\bmarketing\b/i, cat: "Business & Management", sub: "Marketing", priority: 100 },
+  { pattern: /\bhuman resource|\bhr\b|hrm\b/i, cat: "Business & Management", sub: "Human Resource Management", priority: 100 },
+  { pattern: /\bproject management\b/i, cat: "Business & Management", sub: "Project Management", priority: 100 },
+  { pattern: /\bsupply chain|logistics\b/i, cat: "Business & Management", sub: "Supply Chain & Logistics", priority: 100 },
+  { pattern: /\bentrepreneur(ship)?\b/i, cat: "Business & Management", sub: "Entrepreneurship", priority: 95 },
+  { pattern: /\binternational business\b/i, cat: "Business & Management", sub: "International Business", priority: 95 },
+  { pattern: /\bbusiness analytic|business intelligence\b/i, cat: "Business & Management", sub: "Business Intelligence & Analytics", priority: 95 },
+  { pattern: /\bbusiness administration|\bmba\b|\bgdba\b|\bgcba\b/i, cat: "Business & Management", sub: "Business Administration", priority: 90 },
+  { pattern: /\beconomic(s)?\b/i, cat: "Business & Management", sub: "Economics", priority: 90 },
+  { pattern: /\bcommerce\b/i, cat: "Business & Management", sub: "Commerce", priority: 85 },
+  { pattern: /\b(business technology|business)\b/i, cat: "Business & Management", sub: "Business", priority: 70 },
+
+  // === TOURISM & HOSPITALITY ===
+  { pattern: /\bpatisserie\b/i, cat: "Tourism & Hospitality", sub: "Patisserie", priority: 100 },
+  { pattern: /\b(cookery|culinary|chef|kitchen management)\b/i, cat: "Tourism & Hospitality", sub: "Culinary Arts", priority: 100 },
+  { pattern: /\bhospitality\b/i, cat: "Tourism & Hospitality", sub: "Hospitality Management", priority: 95 },
+  { pattern: /\b(tourism|travel)\b/i, cat: "Tourism & Hospitality", sub: "Tourism", priority: 90 },
+  { pattern: /\bevent management\b/i, cat: "Tourism & Hospitality", sub: "Event Management", priority: 100 },
+
+  // === TRADES ===
+  { pattern: /\bcarpentry\b/i, cat: "Trades", sub: "Carpentry", priority: 100 },
+  { pattern: /\bplumb(ing|er)\b/i, cat: "Trades", sub: "Plumbing", priority: 100 },
+  { pattern: /\b(electrician|electrical (trade|installation))\b/i, cat: "Trades", sub: "Electrical", priority: 100 },
+  { pattern: /\bweld(ing|er)\b/i, cat: "Trades", sub: "Welding", priority: 100 },
+  { pattern: /\bbricklay/i, cat: "Trades", sub: "Bricklaying", priority: 100 },
+
+  // === ENGINEERING ===
+  { pattern: /\baerospace\b/i, cat: "Engineering & Technology", sub: "Aerospace Engineering", priority: 100 },
+  { pattern: /\bautomotive engineer/i, cat: "Engineering & Technology", sub: "Automotive Engineering", priority: 100 },
+  { pattern: /\b(biomedical|bioengineer)/i, cat: "Engineering & Technology", sub: "Bio & Biomedical Engineering", priority: 100 },
+  { pattern: /\bchemical engineer/i, cat: "Engineering & Technology", sub: "Chemical Engineering", priority: 100 },
+  { pattern: /\bcivil engineer|construction engineer/i, cat: "Engineering & Technology", sub: "Civil Engineering & Construction", priority: 100 },
+  { pattern: /\belectrical engineer/i, cat: "Engineering & Technology", sub: "Electrical Engineering", priority: 100 },
+  { pattern: /\belectronics engineer/i, cat: "Engineering & Technology", sub: "Electronics Engineering", priority: 100 },
+  { pattern: /\b(mechanical engineer)/i, cat: "Engineering & Technology", sub: "Mechanical Engineering", priority: 100 },
+  { pattern: /\bmechatronic/i, cat: "Engineering & Technology", sub: "Mechatronics", priority: 100 },
+  { pattern: /\brobotic/i, cat: "Engineering & Technology", sub: "Robotics", priority: 100 },
+  { pattern: /\baviation|pilot\b/i, cat: "Engineering & Technology", sub: "Aviation", priority: 100 },
+  { pattern: /\bmining|oil and gas|petroleum/i, cat: "Engineering & Technology", sub: "Mining Oil & Gas", priority: 100 },
+  { pattern: /\bengineering\b/i, cat: "Engineering & Technology", sub: "General Engineering & Technology", priority: 70 },
+
+  // === MEDICINE & HEALTH ===
+  { pattern: /\bnursing\b/i, cat: "Medicine & Health", sub: "Nursing", priority: 100 },
+  { pattern: /\bmidwifery\b/i, cat: "Medicine & Health", sub: "Midwifery", priority: 100 },
+  { pattern: /\bdentist|dentistry\b/i, cat: "Medicine & Health", sub: "Dentistry", priority: 100 },
+  { pattern: /\bpharmac(y|eutical)/i, cat: "Medicine & Health", sub: "Pharmacy", priority: 100 },
+  { pattern: /\bphysiotherap/i, cat: "Medicine & Health", sub: "Physiotherapy", priority: 100 },
+  { pattern: /\bpublic health\b/i, cat: "Medicine & Health", sub: "Public Health", priority: 100 },
+  { pattern: /\bnutrition|dietetic/i, cat: "Medicine & Health", sub: "Nutrition & Dietetics", priority: 100 },
+  { pattern: /\bveterinary medicine|vet med/i, cat: "Medicine & Health", sub: "Veterinary Medicine", priority: 100 },
+  { pattern: /\bmental health\b/i, cat: "Medicine & Health", sub: "Mental Health", priority: 100 },
+  { pattern: /\boccupational therap/i, cat: "Medicine & Health", sub: "Occupational Therapy", priority: 100 },
+  { pattern: /\b(paramedic|paramedicine)/i, cat: "Medicine & Health", sub: "Paramedicine", priority: 100 },
+  { pattern: /\bcommunity (services|health)/i, cat: "Medicine & Health", sub: "Community Services", priority: 95 },
+  { pattern: /\baged care|ageing\b/i, cat: "Medicine & Health", sub: "Ageing & Aged Care", priority: 100 },
+  { pattern: /\bbiomedicine|biomedical (science)?/i, cat: "Medicine & Health", sub: "Biomedical Sciences", priority: 95 },
+  { pattern: /\b(medicine|medical|md\b)/i, cat: "Medicine & Health", sub: "Human Medicine", priority: 80 },
+  { pattern: /\bhealth (science|care)/i, cat: "Medicine & Health", sub: "Health Sciences", priority: 75 },
+
+  // === EDUCATION & SOCIAL WORK ===
+  { pattern: /\bearly childhood\b/i, cat: "Education & Social Work", sub: "Early Childhood Education", priority: 100 },
+  { pattern: /\b(teaching|teacher|pedagog)/i, cat: "Education & Social Work", sub: "Teaching", priority: 95 },
+  { pattern: /\bsocial work\b/i, cat: "Education & Social Work", sub: "Social Work", priority: 100 },
+  { pattern: /\bcounsell?ing\b/i, cat: "Education & Social Work", sub: "Counselling", priority: 95 },
+  { pattern: /\beducation\b/i, cat: "Education & Social Work", sub: "Education", priority: 80 },
+
+  // === LAW ===
+  { pattern: /\bcriminolog/i, cat: "Law & Criminology", sub: "Criminology", priority: 100 },
+  { pattern: /\bbusiness law\b/i, cat: "Law & Criminology", sub: "Business Law", priority: 100 },
+  { pattern: /\bintellectual property|patent law/i, cat: "Law & Criminology", sub: "Patent & Intellectual Property Law", priority: 100 },
+  { pattern: /\binternational law\b/i, cat: "Law & Criminology", sub: "International Law", priority: 100 },
+  { pattern: /\b(criminal law)\b/i, cat: "Law & Criminology", sub: "Criminal Law", priority: 100 },
+  { pattern: /\b(law|legal|jd\b|llb\b|llm\b)/i, cat: "Law & Criminology", sub: "Law", priority: 80 },
+
+  // === MEDIA & COMMUNICATIONS ===
+  { pattern: /\bjournalism|journalist/i, cat: "Media & Communications", sub: "Journalism", priority: 100 },
+  { pattern: /\bpublic relations|\bpr\b/i, cat: "Media & Communications", sub: "Public Relations", priority: 100 },
+  { pattern: /\b(film|cinema|photograph)/i, cat: "Media & Communications", sub: "Film Photography & Media", priority: 100 },
+  { pattern: /\bcommunication(s)?\b/i, cat: "Media & Communications", sub: "Communications", priority: 90 },
+  { pattern: /\b(media studies|mass media|digital media)/i, cat: "Media & Communications", sub: "Media Studies & Mass Media", priority: 90 },
+
+  // === ARTS, HUMANITIES, SOCIAL SCIENCES ===
+  { pattern: /\bpsycholog/i, cat: "Arts, Humanities & Social Sciences", sub: "Psychology", priority: 100 },
+  { pattern: /\bsociolog/i, cat: "Arts, Humanities & Social Sciences", sub: "Sociology", priority: 100 },
+  { pattern: /\binternational relations\b/i, cat: "Arts, Humanities & Social Sciences", sub: "International Relations", priority: 100 },
+  { pattern: /\bpolitical science|politics\b/i, cat: "Arts, Humanities & Social Sciences", sub: "Political Science", priority: 100 },
+  { pattern: /\bphilosoph|ethics\b/i, cat: "Arts, Humanities & Social Sciences", sub: "Philosophy & Ethics", priority: 100 },
+  { pattern: /\bhistory\b/i, cat: "Arts, Humanities & Social Sciences", sub: "History", priority: 95 },
+  { pattern: /\bliterature\b/i, cat: "Arts, Humanities & Social Sciences", sub: "Literature", priority: 95 },
+  { pattern: /\blinguistic/i, cat: "Arts, Humanities & Social Sciences", sub: "Linguistics", priority: 95 },
+  { pattern: /\bcreative writing\b/i, cat: "Arts, Humanities & Social Sciences", sub: "Creative Writing", priority: 95 },
+  { pattern: /\b(humanities|liberal arts|arts(\s+and\s+|\s*&\s*)humanities)/i, cat: "Arts, Humanities & Social Sciences", sub: "Humanities", priority: 80 },
+
+  // === SCIENCES ===
+  { pattern: /\bbiotechnolog/i, cat: "Maths & Sciences", sub: "Biotechnology", priority: 100 },
+  { pattern: /\bbiochem/i, cat: "Maths & Sciences", sub: "Biochemistry", priority: 100 },
+  { pattern: /\bgenetic/i, cat: "Maths & Sciences", sub: "Genetics", priority: 100 },
+  { pattern: /\bphysics\b/i, cat: "Maths & Sciences", sub: "Physics", priority: 100 },
+  { pattern: /\bchemistry\b/i, cat: "Maths & Sciences", sub: "Chemistry", priority: 100 },
+  { pattern: /\bbiology\b/i, cat: "Maths & Sciences", sub: "Biology", priority: 100 },
+  { pattern: /\bmathematic/i, cat: "Maths & Sciences", sub: "Mathematics", priority: 90 },
+  { pattern: /\bstatistic/i, cat: "Maths & Sciences", sub: "Statistics", priority: 100 },
+  { pattern: /\bastronomy|astrophys/i, cat: "Maths & Sciences", sub: "Astronomy & Space Sciences", priority: 100 },
+  { pattern: /\bscience\b/i, cat: "Maths & Sciences", sub: "Science", priority: 60 },
+
+  // === SPORTS ===
+  { pattern: /\bsports? science\b/i, cat: "Sports & Personal Services", sub: "Sports Science", priority: 100 },
+  { pattern: /\bsports? management\b/i, cat: "Sports & Personal Services", sub: "Sports Management", priority: 100 },
+  { pattern: /\bexercise (science|physiology)/i, cat: "Sports & Personal Services", sub: "Exercise Sciences", priority: 100 },
+  { pattern: /\b(beauty therap|cosmetolog)/i, cat: "Sports & Personal Services", sub: "Beauty Therapy", priority: 100 },
+  { pattern: /\bhairdress/i, cat: "Sports & Personal Services", sub: "Hairdressing", priority: 100 },
+
+  // === MUSIC & PERFORMING ARTS ===
+  { pattern: /\bmusic\b/i, cat: "Music & Performing Arts", sub: "Music", priority: 95 },
+  { pattern: /\b(theatre|drama|acting)\b/i, cat: "Music & Performing Arts", sub: "Theatre", priority: 95 },
+  { pattern: /\bdance\b/i, cat: "Music & Performing Arts", sub: "Dance", priority: 95 },
+  { pattern: /\bvisual arts?\b/i, cat: "Music & Performing Arts", sub: "Visual Arts", priority: 95 },
+
+  // === ARCHITECTURE & DESIGN ===
+  { pattern: /\barchitect/i, cat: "Architecture, Building & Design", sub: "Architecture", priority: 100 },
+  { pattern: /\binterior design/i, cat: "Architecture, Building & Design", sub: "Interior Design", priority: 100 },
+  { pattern: /\bgraphic design/i, cat: "Architecture, Building & Design", sub: "Graphic Design", priority: 100 },
+  { pattern: /\bfashion design/i, cat: "Architecture, Building & Design", sub: "Fashion Design", priority: 100 },
+  { pattern: /\bindustrial design/i, cat: "Architecture, Building & Design", sub: "Industrial Design", priority: 100 },
+  { pattern: /\b(ux|user experience|ui design)/i, cat: "Architecture, Building & Design", sub: "User Experience Design", priority: 100 },
+  { pattern: /\burban planning\b/i, cat: "Architecture, Building & Design", sub: "Urban Planning", priority: 100 },
+  { pattern: /\b(building|construction management)\b/i, cat: "Architecture, Building & Design", sub: "Building", priority: 85 },
+  { pattern: /\bdesign\b/i, cat: "Architecture, Building & Design", sub: "Design", priority: 60 },
+
+  // === AGRICULTURE & ENVIRONMENT ===
+  { pattern: /\bveterinary science\b/i, cat: "Agriculture & Environmental Studies", sub: "Veterinary Science", priority: 100 },
+  { pattern: /\benvironmental science|ecology\b/i, cat: "Agriculture & Environmental Studies", sub: "Environmental Sciences", priority: 100 },
+  { pattern: /\bsustainability|sustainable development/i, cat: "Agriculture & Environmental Studies", sub: "Sustainable Development", priority: 95 },
+  { pattern: /\bclimate (studies|change)|meteorolog/i, cat: "Agriculture & Environmental Studies", sub: "Climate Studies & Meteorology", priority: 100 },
+  { pattern: /\b(agriculture|farming|agronom)/i, cat: "Agriculture & Environmental Studies", sub: "Agriculture", priority: 95 },
+  { pattern: /\bhorticultur/i, cat: "Agriculture & Environmental Studies", sub: "Horticulture", priority: 100 },
+  { pattern: /\bforestry\b/i, cat: "Agriculture & Environmental Studies", sub: "Forestry", priority: 100 },
+  { pattern: /\b(food science|food technolog)/i, cat: "Agriculture & Environmental Studies", sub: "Food Science", priority: 100 },
+  { pattern: /\bgeolog/i, cat: "Agriculture & Environmental Studies", sub: "Geology", priority: 100 },
+
+  // === LANGUAGES ===
+  { pattern: /\b(english language|elicos|esl)\b/i, cat: "Languages & Culture", sub: "Languages", priority: 100 },
+  { pattern: /\btesol\b/i, cat: "Languages & Culture", sub: "TESOL", priority: 100 },
+  { pattern: /\b(translation|interpreting)/i, cat: "Media & Communications", sub: "Translation & Interpreting", priority: 100 },
+];
+
+/**
+ * Map a course name + degree level to a category and sub category.
+ * Returns the highest-priority match. If nothing matches, returns null.
+ */
+export function mapCourseToCategory(courseName: string): { category: string; subCategory: string } | null {
+  if (!courseName) return null;
+  const normalized = courseName.trim();
+  if (!normalized) return null;
+
+  let bestMatch: { cat: string; sub: string; priority: number } | null = null;
+  for (const rule of KEYWORD_RULES) {
+    if (rule.pattern.test(normalized)) {
+      if (!bestMatch || rule.priority > bestMatch.priority) {
+        bestMatch = { cat: rule.cat, sub: rule.sub, priority: rule.priority };
+      }
+    }
+  }
+
+  if (bestMatch) {
+    return { category: bestMatch.cat, subCategory: bestMatch.sub };
+  }
+  return null;
+}
+
+/**
+ * Validate that a category/subCategory combination exists in the canonical taxonomy.
+ * Useful for AI-returned values — if AI hallucinates, fall back to "Other".
+ */
+export function validateTaxonomy(category: string, subCategory: string): { category: string; subCategory: string } {
+  const catEntry = COURSE_TAXONOMY.find(t => t.category.toLowerCase() === category.toLowerCase());
+  if (!catEntry) {
+    return { category: "Arts, Humanities & Social Sciences", subCategory: "Other" };
+  }
+  const subExists = catEntry.subCategories.find(s => s.toLowerCase() === subCategory.toLowerCase());
+  return {
+    category: catEntry.category,
+    subCategory: subExists ?? "Other",
+  };
+}
+
+/**
+ * Map a free-text degree string to a canonical degree level.
+ */
+export function mapDegreeLevel(rawDegree: string, courseName: string): string {
+  const text = `${rawDegree ?? ""} ${courseName ?? ""}`.toLowerCase();
+  if (/\b(phd|doctorate|doctor of)\b/.test(text)) return "Doctor/Doctorate";
+  if (/\b(dual|double) (degree|major)\b/.test(text)) return /master/.test(text) ? "Master Dual Degree" : "Bachelor Dual Degree";
+  if (/\b(master|mba|mit|m\.?eng|llm|m\.?sc|m\.?a\.?)\b/.test(text)) return "Master";
+  if (/\b(graduate certificate|graduate diploma|gdba|gcba|gdits|gcits)\b/.test(text)) return "Graduate Certificate & Diploma";
+  if (/\b(bachelor|b\.?sc|b\.?a\.?|b\.?eng|llb|bbus|bits)\b/.test(text)) return "Bachelor";
+  if (/\b(associate degree)\b/.test(text)) return "Associate Degree or Equivalent";
+  if (/\bfoundation|pathway|preparation\b/.test(text)) return "Pathway to Undergraduate";
+  if (/\b(certificate|diploma|advanced diploma)\b/.test(text)) return "Certificate & Diploma";
+  if (/\b(english|elicos|esl|tesol)\b/.test(text)) return "English Language";
+  return "Bachelor"; // safe default
+}
+
+STEP 3: Wire into the scrape flow
+Find the AI classification step in artifacts/api-server/src/routes/scrape.ts (the block that logs Classifying N courses with AI (batched)...). Replace the empty/missing category logic with this priority chain:
+typescriptimport { mapCourseToCategory, validateTaxonomy, mapDegreeLevel } from "../lib/course-taxonomy";
+
+// After AI classification returns (or before, doesn't matter):
+for (const course of classifiedCourses) {
+  // Step 1: Try deterministic keyword mapping FIRST (fast, free, reliable)
+  const detMap = mapCourseToCategory(course.name);
+
+  if (detMap) {
+    course.category = detMap.category;
+    course.subCategory = detMap.subCategory;
+  } else if (course.aiCategory && course.aiSubCategory) {
+    // Step 2: Fall back to AI-returned category, but VALIDATE against taxonomy
+    const validated = validateTaxonomy(course.aiCategory, course.aiSubCategory);
+    course.category = validated.category;
+    course.subCategory = validated.subCategory;
+  } else {
+    // Step 3: Last resort — never leave empty
+    course.category = "Arts, Humanities & Social Sciences";
+    course.subCategory = "Other";
+  }
+
+  // Same idea for degree level
+  if (!course.degreeLevel) {
+    course.degreeLevel = mapDegreeLevel(course.rawDegree ?? "", course.name);
+  }
+
+  addLog(job, "info", { message: `[CATEGORY] ${course.name} → ${course.category} / ${course.subCategory} (${detMap ? "deterministic" : course.aiCategory ? "ai+validated" : "default"})` });
+}
+
+STEP 4: Update Gemini classification prompt to ask for taxonomy-aware values
+Find the AI classification prompt and update it to ask Gemini to pick ONLY from the canonical list. Modify it to include:
+typescriptconst TAXONOMY_FOR_PROMPT = COURSE_TAXONOMY.map(t =>
+  `${t.category}: ${t.subCategories.join(", ")}`
+).join("\n");
+
+const aiPrompt = `Classify this course into ONE category and ONE sub category from the list below.
+Return JSON: {"category": "<exact name>", "subCategory": "<exact name>"}.
+If unsure, use "Other" for sub category.
+
+COURSE: ${courseName}
+
+AVAILABLE TAXONOMY:
+${TAXONOMY_FOR_PROMPT}`;
+
+STEP 5: Verify in DB
+After deploy and re-scrape, this query must show non-null categories for every staged course:
+bashpsql "$DATABASE_URL" -c "SELECT course_name, category, sub_category FROM scraped_courses WHERE university_id=6 ORDER BY id DESC LIMIT 30;"
+Expected for VIT's 30 courses:
+
+"Bachelor Of Business" → Business & Management / Business
+"Bbus Accounting" → Business & Management / Accounting
+"Bbus Marketing" → Business & Management / Marketing
+"Mba Finance" → Business & Management / Finance
+"Mba Project Management" → Business & Management / Project Management
+"Bachelor of Information Technology and Systems (BITS)" → Computer Science & IT / Information Technology (IT)
+"Master of Information Technology and Systems" → Computer Science & IT / Information Technology (IT)
+"Certificate III in Commercial Cookery" → Tourism & Hospitality / Culinary Arts
+"Certificate III in Patisserie" → Tourism & Hospitality / Patisserie
+"Certificate III in Carpentry" → Trades / Carpentry
+"Diploma of Hospitality Management" → Tourism & Hospitality / Hospitality Management
+
+
+DELIVERY:
+
+Build, commit, push to main with message "Add Category/Sub Category auto-mapping with deterministic-first taxonomy"
+Reply with the rebuild output and confirm the new file course-taxonomy.ts exists in the bundle:
+bashgrep -c "COURSE_TAXONOMY" artifacts/api-server/dist/workers/scrape-worker.mjs
+Should be ≥ 1.
