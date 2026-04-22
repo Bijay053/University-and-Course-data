@@ -1,0 +1,24 @@
+root@university-and-course-data:~/University-and-Course-data# # All English-test evidence for the new MBA Project Management row 4002
+psql "$DATABASE_URL" <<'SQL'
+SELECT field_key, page_type, extraction_method,
+       confidence, selected, decision_status,
+       LEFT(candidate_value, 60)  AS value,
+       LEFT(source_url, 80)       AS source_url,
+       LEFT(snippet, 120)         AS snippet
+FROM scraped_field_evidence
+WHERE scraped_course_id = 4002
+  AND field_key IN ('ieltsOverall','pteOverall','toeflOverall','cambridgeOverall')
+ORDER BY field_key, confidence DESC NULLS LAST;
+SQL
+
+# And the modal log lines from the recent scrape
+pm2 logs uni-api --lines 8000 --nostream 2>&1 | grep -E "per-course modal" | tail -30
+  field_key   |     page_type     | extraction_method | confidence | selected | decision_status | value |                   source_url                   |                                                         snippet                                                          
+--------------+-------------------+-------------------+------------+----------+-----------------+-------+------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------
+ ieltsOverall | fee_page          | cheerio           |       0.99 | f        | needs_review    | 6.5   | https://vit.edu.au/mba/mba-project-management# | ee (AQF Level 6) or higher. English test results IELTS Academic: Overall score 6.5, with no band below 6.0, or Equivalen
+ ieltsOverall | english_page      | cheerio           |       0.99 | f        | needs_review    | 6.5   | https://vit.edu.au/mba/mba-project-management# | ee (AQF Level 6) or higher. English test results IELTS Academic: Overall score 6.5, with no band below 6.0, or Equivalen
+ ieltsOverall | course_page       | browser           |       0.98 | t        | accepted        | 6.5   | https://vit.edu.au/mba/mba-project-management  | ee (AQF Level 6) or higher. English test results IELTS Academic: Overall score 6.5, with no band below 6.0, or Equivalen
+ ieltsOverall | requirements_page | cheerio           |       0.95 | f        | needs_review    | 6.5   | https://vit.edu.au/mba/mba-project-management# | ee (AQF Level 6) or higher. English test results IELTS Academic: Overall score 6.5, with no band below 6.0, or Equivalen
+(4 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 

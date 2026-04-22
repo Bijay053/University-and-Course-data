@@ -10383,6 +10383,90 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
             content: pageText,
           }];
 
+          // PER-COURSE MODAL SCAN (mirrors scrapeCourseBatch). Many sites
+          // embed a hidden Bootstrap equivalency modal on each course page
+          // with course-specific IELTS/PTE/TOEFL/CAE values. Different
+          // courses (Bachelor vs MBA) have different requirements, so we
+          // MUST scan each course's own modal and not rely on the cache
+          // from the sample page or a shared requirements page.
+          try {
+            const $cs = cheerio.load(cHtml);
+            const cmSel = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
+            let cmHtml = "";
+            $cs(cmSel).each((_, el) => {
+              if (cmHtml) return;
+              const t = $cs(el).text().replace(/\s+/g, " ").trim();
+              if (/IELTS/i.test(t) && /PTE/i.test(t) && /TOEFL/i.test(t) && /\d/.test(t) && t.length > 80 && t.length < 8000) {
+                const outer = $cs.html(el) || "";
+                if (outer && outer.length < 25000) cmHtml = outer;
+              }
+            });
+            if (cmHtml) {
+              const $cm = cheerio.load(cmHtml);
+              const cmTables = $cm("table").toArray();
+              const cn = (link.name || "").toLowerCase();
+              const dl = (cheerioData.degreeLevel || "").toLowerCase();
+              let targetIelts = 6.0;
+              if (/master|\bmba\b|postgrad|graduate (diploma|cert)|\bgdba\b|\bgcba\b|\bgdits\b|\bgcits\b|\bm\.?(sc|a|eng|ed|com|phil)\b/.test(cn) || /master|postgrad|graduate/.test(dl)) {
+                targetIelts = 6.5;
+              } else if (/diploma|certificate|\bcert\b|advanced diploma/.test(cn) || /diploma|certificate/.test(dl)) {
+                targetIelts = 5.5;
+              } else if (/bachelor|\bbbus\b|\bbits\b|\bb\.?(eng|sc|com|a|ed)\b/.test(cn) || /bachelor/.test(dl)) {
+                targetIelts = 6.0;
+              }
+              type ModalRow = { ielts?: number; pte?: number; toefl?: number; cae?: number };
+              const allRows: ModalRow[] = [];
+              for (const tbl of cmTables) {
+                const $tbl = $cm(tbl);
+                if (!/IELTS/i.test($tbl.text())) continue;
+                $tbl.find("tr").each((_, tr) => {
+                  const rowVals: number[] = [];
+                  $cm(tr).find("th, td").each((_, c) => {
+                    const txt = $cm(c).text().replace(/\s+/g, " ").trim();
+                    if (/^\d+(\.\d+)?$/.test(txt)) {
+                      const v = parseFloat(txt);
+                      if (!isNaN(v)) rowVals.push(v);
+                    }
+                  });
+                  if (rowVals.length === 0) return;
+                  const r: ModalRow = {
+                    ielts: rowVals.find(v => v >= 4 && v <= 9),
+                    pte:   rowVals.find(v => v >= 10 && v <= 90 && Number.isInteger(v)),
+                    toefl: undefined,
+                    cae:   rowVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v)),
+                  };
+                  r.toefl = rowVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== r.pte);
+                  if (r.ielts != null || r.pte != null || r.toefl != null || r.cae != null) allRows.push(r);
+                });
+              }
+              if (allRows.length > 0) {
+                const rowsWithIelts = allRows.filter(r => r.ielts != null);
+                const best = rowsWithIelts.length > 0
+                  ? rowsWithIelts.reduce((b, r) => Math.abs((r.ielts as number) - targetIelts) < Math.abs((b.ielts as number) - targetIelts) ? r : b)
+                  : allRows[0];
+                const { ielts: cIelts, pte: cPte, toefl: cToefl, cae: cCae } = best;
+                if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+                if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+                if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+                if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
+                const modalSrcParts: string[] = [];
+                if (cIelts != null) modalSrcParts.push(`IELTS overall ${cIelts}`);
+                if (cPte   != null) modalSrcParts.push(`PTE ${cPte}`);
+                if (cToefl != null) modalSrcParts.push(`TOEFL iBT ${cToefl}`);
+                if (cCae   != null) modalSrcParts.push(`Cambridge CAE ${cCae}`);
+                reviewSources.push({
+                  url: link.url,
+                  pageType: "course_page",
+                  extractionMethod: "cheerio",
+                  content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
+                });
+                addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s)) [rescrape]`, phase: "extract" });
+              }
+            }
+          } catch (cmErr) {
+            addLog(job, "status", { message: `[per-course modal ✗] ${link.name.slice(0, 40)} — ${(cmErr as Error).message?.slice(0, 80)} [rescrape]`, phase: "extract" });
+          }
+
           const needsEnrich =
             !cheerioData.internationalFee ||
             !(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall) ||
