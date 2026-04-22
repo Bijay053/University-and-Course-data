@@ -1,0 +1,52 @@
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_row_aware.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+if 'targetIelts' in s and 'allRows' in s:
+    print("ALREADY PATCHED"); raise SystemExit(0)
+
+OLD = '''          if (cmHtml) {
+            const $cm = cheerio.load(cmHtml);
+            const cmTables = $cm("table").toArray();
+            for (const tbl of cmTables) {
+              const $tbl = $cm(tbl);
+              if (!/IELTS/i.test($tbl.text())) continue;
+              const cellVals: number[] = [];
+              $tbl.find("th, td").each((_, c) => {
+                const txt = $cm(c).text().replace(/\\s+/g, " ").trim();
+                if (/^\\d+(\\.\\d+)?$/.test(txt)) {
+                  const v = parseFloat(txt);
+                  if (!isNaN(v)) cellVals.push(v);
+                }
+              });
+              if (cellVals.length === 0) continue;
+              const cIelts = cellVals.find(v => v >= 4 && v <= 9);
+              const cPte   = cellVals.find(v => v >= 10 && v <= 90 && Number.isInteger(v));
+              const cToefl = cellVals.find(v => v >= 30 && v <= 120 && Number.isInteger(v) && v !== cPte);
+              const cCae   = cellVals.find(v => v >= 140 && v <= 230 && Number.isInteger(v));
+              if (cIelts || cPte || cToefl || cCae) {
+                if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+                if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+                if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+                if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
+                addLog(job, "status", { message: `[per-course modal \u2713] ${link.name.slice(0, 40)} \u2014 IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"}`, phase: "extract" });
+                break;
+              }
+            }
+          }'''
+
+NEW = '''          if (cmHtml) {
+            const $cm = cheerio.load(cmHtml);
+            const cmTables = $cm("table").toArray();
+            const cn = (link.name || "").toLowerCase();
+            const dl = (cheerioData.degreeLevel || "").toLowerCase();
+            let targetIelts = 6.0;
+            if (/master|\\bmba\\b|postgrad|graduate (diploma|cert)|\\bgdba\\b|\\bgcba\\b|\\bgdits\\b|\\bgcits\\b|\\bm\\.?(sc|a|eng|ed|com|phil)\\b/.test(cn) || /master|postgrad|graduate/.test(dl)) {
+              targetIelts = 6.5;
+            } else if (/diploma|certificate|\\bcert\\b|advanced diploma/.test(cn) || /diploma|certificate/.test(dpm2 restart uni-api --update-env && echo "DEPLOYED OK"st/workers/scrape-worker.mjs && \ELTS=${targetIelts}, ${all
+matches: 0
+Traceback (most recent call last):
+  File "/tmp/patch_row_aware.py", line 88, in <module>
+    n = s.count(OLD); print(f"matches: {n}"); assert n == 1
+                                                     ^^^^^^
+AssertionError
+root@university-and-course-data:~/University-and-Course-data# 
