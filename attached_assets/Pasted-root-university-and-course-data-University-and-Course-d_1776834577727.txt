@@ -1,0 +1,66 @@
+root@university-and-course-data:~/University-and-Course-data# grep -n "cmHtml\|per-course modal" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | head -20
+8270:          let cmHtml = "";
+8272:            if (cmHtml) return;
+8276:              if (outer && outer.length < 25000) cmHtml = outer;
+8279:          if (cmHtml) {
+8280:            const $cm = cheerio.load(cmHtml);
+8303:                addLog(job, "status", { message: `[per-course modal \u2713] ${link.name.slice(0, 40)} \u2014 IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"}`, phase: "extract" });
+8309:          addLog(job, "status", { message: `[per-course modal \u2717] ${link.name.slice(0, 40)} \u2014 ${(cmErr as Error).message?.slice(0, 80)}`, phase: "extract" });
+root@university-and-course-data:~/University-and-Course-data# sed -n '8305,8360p' /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts
+              }
+            }
+          }
+        } catch (cmErr) {
+          addLog(job, "status", { message: `[per-course modal \u2717] ${link.name.slice(0, 40)} \u2014 ${(cmErr as Error).message?.slice(0, 80)}`, phase: "extract" });
+        }
+
+        // Heavy-host full-text English scan: the truncated HTML (180 KB) and
+        // text (12 K chars) limits are set for performance, but English
+        // requirements are often deep in the page body — e.g. Torrens has
+        // IELTS at byte 471 K, well beyond both limits. When static extraction
+        // leaves IELTS blank on a heavy host, do a cheap second pass over the
+        // full raw HTML body text (no cheerio DOM parse, just a plain text
+        // scan) to recover the correct overall IELTS score before the
+        // expensive per-course browser escalation fires and may latch on to the
+        // minimum sub-band value instead.
+        if (isHeavyBatchHost && !wasBrowserFetch && !cheerioData.ieltsOverall && cHtml.length > MAX_HEAVY_HOST_HTML_CHARS) {
+          try {
+            const fullBodyText = cHtml
+              .replace(/<script[^]*?<\/script>/gi, " ")
+              .replace(/<style[^]*?<\/style>/gi, " ")
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ");
+            const englishSupplement: Partial<CourseData> = {};
+            const fullResult = parseEnglishRequirementsFromText(fullBodyText, "browser", {
+              courseName: cheerioData.courseName || link.name,
+              degreeLevel: cheerioData.degreeLevel,
+            });
+            applyEnglishResultToCourse(englishSupplement, fullResult);
+            if (englishSupplement.ieltsOverall) {
+              mergeEnglishRequirements(cheerioData, englishSupplement);
+              addLog(job, "status", {
+                message: `[heavy-host full-text scan ✓] ${link.name.slice(0, 50)}: IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"}`,
+                phase: "extract",
+              });
+            }
+          } catch { /* best-effort */ }
+        }
+        if (isHeavyBatchHost) await maybeYieldToEventLoop(num, 1);
+
+        // VIT supplementary static fetch: when the browser fetched the page and
+        // clicked the "International students" toggle, the international panel
+        // sometimes does NOT contain a duration/intake/locations table — and
+        // the toggle action removed the static `<p><strong>Duration:</strong>
+        // Usually a 3 year course...</p>` narrative paragraph from the rendered
+        // DOM. As a result, courses like Bachelor Of Business, Diploma Of
+        // Business, MBA Finance, and BBus - HR Specialisation lose ALL three
+        // fields. Fix: when extraction yields none of duration/intake/location
+        // for a VIT course, do one extra plain-HTTP GET of the same URL and
+        // re-run the bucketed extractor on the raw (pre-toggle) HTML, then
+        // merge any newly found values into cheerioData.
+        if (
+          wasBrowserFetch &&
+          /vit\.edu\.au/i.test(link.url) &&
+          (cheerioData.duration == null || !cheerioData.intakeMonths?.length || !cheerioData.courseLocation)
+        ) {
+root@university-and-course-data:~/University-and-Course-data# 
