@@ -1,0 +1,63 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Apr 22 07:28:50 UTC 2026
+
+  System load:           0.01
+  Usage of /:            2.2% of 231.44GB
+  Memory usage:          25%
+  Swap usage:            0%
+  Processes:             177
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+2 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Wed Apr 22 06:38:47 2026 from 162.243.188.66
+root@university-and-course-data:~# cd /root/University-and-Course-data && git pull && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && source /root/.env.backup && pm2 restart uni-api --update-env
+Already up to date.
+Scope: all 10 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "U…
+└─ Done in 24ms
+Done in 2.5s using pnpm v10.33.0
+
+> @workspace/api-server@0.0.0 build /root/University-and-Course-data/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.1kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.2mb
+  dist/workers/scrape-worker.mjs.map    7.8mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.1kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 678ms
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 25   │ online    │ 0%       │ 45.2mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@university-and-course-data:~/University-and-Course-data# 
