@@ -15,9 +15,13 @@
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 
+// gemini-flash-latest is significantly faster than gemini-2.5-flash for routine
+// classification (5-10x faster — 2.5-flash burns 700+ "thinking" tokens for trivial
+// JSON responses). Vision/extraction calls that explicitly need 2.5-flash should
+// pass it via the model arg.
 export const GEMINI_MODELS: string[] = [
-  process.env.GEMINI_PRIMARY_MODEL ?? "gemini-2.5-flash",
-  "gemini-flash-latest",
+  process.env.GEMINI_PRIMARY_MODEL ?? "gemini-flash-latest",
+  "gemini-2.5-flash",
   "gemini-2.5-pro",
 ];
 

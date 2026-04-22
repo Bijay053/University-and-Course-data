@@ -370,10 +370,16 @@ export default function Scraping() {
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`);
       if (res.ok) {
-        const payload = await readResponseJson<{ courses: StagedCourse[]; lastScrape: typeof lastScrapeInfo }>(res);
+        const payload = await readResponseJson<unknown>(res);
         if (!payload) return;
-        const data = payload.courses ?? (payload as unknown as StagedCourse[]);
-        if (payload.lastScrape) setLastScrapeInfo(payload.lastScrape);
+        // Backward-compat: old endpoint returned Array<StagedCourse>; new endpoint returns { courses, lastScrape }
+        const data: StagedCourse[] = Array.isArray(payload)
+          ? (payload as StagedCourse[])
+          : ((payload as { courses?: StagedCourse[] }).courses ?? []);
+        const lastScrape = Array.isArray(payload)
+          ? null
+          : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
+        if (lastScrape) setLastScrapeInfo(lastScrape);
         setStagedCourses(data.filter((c: StagedCourse) => c.status === "pending"));
         setReviewJobId(jobId);
         setShowReview(true);

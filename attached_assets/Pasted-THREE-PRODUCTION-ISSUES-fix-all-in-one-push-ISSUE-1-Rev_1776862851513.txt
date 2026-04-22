@@ -1,0 +1,68 @@
+THREE PRODUCTION ISSUES — fix all in one push:
+
+ISSUE 1: Review Scraped Courses table not loading after scrape completes
+Status panel correctly shows "30 Staged for Review" but the table below is empty. The /api/scrape/staged/:jobId endpoint response shape changed in your last commit (now returns {courses: [], lastScrape: {}} instead of Array<Course>), but the frontend isn't reading .courses from the new shape.
+Find the React component that loads staged courses (StagingReview.tsx, ScrapeReview.tsx, or similar) and update to handle BOTH old and new response shapes:
+typescriptconst response = await fetch(`/api/scrape/staged/${jobId}`);
+const data = await response.json();
+const courses = Array.isArray(data) ? data : (data.courses ?? []);
+const lastScrape = Array.isArray(data) ? null : (data.lastScrape ?? null);
+setStagedCourses(courses);
+if (lastScrape) setLastScrape(lastScrape);
+Verify by reloading the Review Scraped Courses panel — table must appear with all 30 VIT courses.
+
+ISSUE 2: IELTS sub-bands (L/R/W/S) not extracted for VIT Bachelor/Master courses
+Every VIT Bachelor and Master course page contains the IELTS sub-bands explicitly. Example from https://vit.edu.au/bachelor-of-business:
+
+"IELTS Academic: Overall 6.0, with no individual band below 5.5"
+
+This means: IELTS L=5.5, R=5.5, W=5.5, S=5.5 (all sub-bands inferred from "no individual band below").
+But current logs show:
+[per-course modal ✓] Bachelor Of Business — IELTS=6 (no sub-bands) PTE=47 TOEFL=67 CAE=169
+The (no sub-bands) message confirms the modal parser extracts overall scores but skips sub-bands.
+Fix the deterministic VIT modal parser to extract sub-bands from these patterns:
+Pattern A — "no individual band below" (most common on VIT):
+/IELTS\s+(?:Academic\s+)?(?:Overall\s+)?(\d+\.?\d*)\s*,?\s*with\s+no\s+(?:individual\s+)?band(?:\s+score)?\s+below\s+(\d+\.?\d*)/i
+When matched: ieltsOverall = $1, and ieltsListening = ieltsReading = ieltsWriting = ieltsSpeaking = $2
+Pattern B — explicit per-band:
+/Listening[:\s]+(\d+\.?\d*).{0,30}Reading[:\s]+(\d+\.?\d*).{0,30}Writing[:\s]+(\d+\.?\d*).{0,30}Speaking[:\s]+(\d+\.?\d*)/is
+Pattern C — short form "L X.X R X.X W X.X S X.X":
+/\bL\s*(\d+\.?\d*)\s+R\s*(\d+\.?\d*)\s+W\s*(\d+\.?\d*)\s+S\s*(\d+\.?\d*)/i
+Apply same pattern logic for PTE and TOEFL sub-bands when present in modal text.
+Update the log line to show sub-bands when found:
+[per-course modal ✓] Bachelor Of Business — IELTS=6 (L=5.5 R=5.5 W=5.5 S=5.5) PTE=47 TOEFL=67 CAE=169
+Verify after deploy with:
+sqlSELECT course_name, ielts_overall, ielts_listening, ielts_reading, ielts_writing, ielts_speaking
+FROM scraped_courses WHERE university_id=6 AND course_name ILIKE 'bachelor of business' ORDER BY id DESC LIMIT 1;
+Expected: 6 | 5.5 | 5.5 | 5.5 | 5.5
+
+ISSUE 3: Scraping is way too slow — 30 minutes for 30 courses is unacceptable
+User complaint: "we can do manually in this time, what's the point of AI?"
+Bottleneck is Gemini API latency. Fixes in priority order:
+
+Skip Gemini when deterministic parser already found values. Logs show:
+[per-course modal ✓] Bachelor Of Business — IELTS=6 PTE=47 TOEFL=67 CAE=169 (target IELTS=6, 2 row(s))
+Deterministic parser already got the answer. But code still calls AI afterwards (~15s per course). Add early-return: if deterministic parser found IELTS+PTE+TOEFL, skip the AI step entirely.
+Switch from gemini-2.5-flash to gemini-flash-latest for classification calls. The 2.5 model burns 700+ thinking tokens for trivial responses (5-10× slower). Use gemini-flash-latest for routine classification, keep gemini-2.5-flash only for vision (image extraction needs it).
+Increase concurrency from 1 to 3 for VIT. Currently HTTP 1, browser 1 (sequential). Bump BROWSER_CONCURRENCY = 3 for vit.edu.au. We tested this before — site handles 3 parallel requests fine.
+Verify category classification is actually batched. Log says Classifying 30 courses with AI (batched)... — confirm it's ONE Gemini call with all 30 courses in array, not 30 sequential calls. If sequential, batch them: send [{name1, name2, ..., name30}] and parse [{cat1, sub1}, ...] back. Note: deterministic mapper from course-taxonomy.ts should handle most courses with ZERO AI calls — verify the AI step only runs for courses where deterministic mapping returned null.
+Add [TIMING] log line at scrape end showing where time is spent:
+[TIMING] Total: 7m 42s | Discovery: 1m 12s | Extraction: 5m 18s | Classification: 1m 12s
+For each per-course step also log time:
+[per-course modal ✓] Bachelor Of Business — IELTS=6 (L=5.5 R=5.5 W=5.5 S=5.5) PTE=47 TOEFL=67 CAE=169 [3.2s]
+
+
+Target: VIT scrape (30 courses) completes in under 10 minutes. ASA (9 courses) under 3 minutes.
+
+DELIVERY:
+
+Build, commit, push to main with message "Fix staged endpoint shape, extract IELTS sub-bands, 3x speedup"
+Reply with:
+
+Test run on Replit preview showing the new [TIMING] line for both ASA and VIT
+Sample log line confirming sub-bands extracted: IELTS=6 (L=5.5 R=5.5 W=5.5 S=5.5)
+Confirmation the staged endpoint now works in both response shapes
+
+
+
+Then I'll deploy on production.

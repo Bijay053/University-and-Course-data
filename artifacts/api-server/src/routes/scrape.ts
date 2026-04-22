@@ -7676,6 +7676,7 @@ async function scrapeCourseBatch(
 ) {
   const max = Math.min(courseLinks.length, maxCourses);
   job.totalFound = courseLinks.length;
+  const batchStartTime = Date.now();
 
   const feedbackHints = await loadScrapeFeedbackHints(uniId);
   if (feedbackHints.activeCount > 0) {
@@ -8119,9 +8120,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // Other heavy hosts (VIT, ASA, KOI) keep concurrency=1 due to bot protection / small
   // catalogs where parallelism doesn't help.
   const isTorrensHost = /(^|\.)torrens\.edu\.au$/.test(batchHost);
-  const CONCURRENCY = isTorrensHost ? 8 : isHeavyBatchHost ? 1 : 32;
-  const BROWSER_CONCURRENCY = isHeavyBatchHost ? 1 : 8;
-  const RETRY_CONCURRENCY = isTorrensHost ? 4 : isHeavyBatchHost ? 1 : 12;
+  const isVitHost = /(^|\.)vit\.edu\.au$/.test(batchHost);
+  const CONCURRENCY = isTorrensHost ? 8 : isVitHost ? 3 : isHeavyBatchHost ? 1 : 32;
+  // VIT tested fine at 3 parallel browser fetches — 3x speedup over sequential
+  const BROWSER_CONCURRENCY = isVitHost ? 3 : isHeavyBatchHost ? 1 : 8;
+  const RETRY_CONCURRENCY = isTorrensHost ? 4 : isVitHost ? 3 : isHeavyBatchHost ? 1 : 12;
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Reset the related-page dedup cache for this batch so stale responses from
@@ -8286,6 +8289,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // IELTS/PTE/TOEFL/CAE values. Different courses (Bachelor vs MBA) often
         // have different requirements, so we MUST scan each course's own modal
         // and not rely on the cache from the sample page.
+        const courseT0 = Date.now();
         try {
           const $cs = cheerio.load(cHtml);
           const cmSel = '.modal, [class*="modal"], [class*="popup"], [role="dialog"], [class*="lightbox"], [class*="dialog" i]';
@@ -8366,38 +8370,68 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 extractionMethod: "cheerio",
                 content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
               });
-              // ── Sub-band extraction from modal text ──────────────────────────────
-              // VIT modal text contains patterns like:
-              //   "IELTS Academic: Overall 6.0, with no individual band below 5.5."
-              //   "Listening 5.5 Reading 5.5 Writing 5.5 Speaking 5.5"
-              // The table row parser above captures overall scores only.
-              // Read the full modal text to fill L/R/W/S bands.
+              // ── Sub-band extraction from modal text + full page text ──────────────
+              // VIT pages embed sub-band info in two places:
+              //   1. Inside the modal: "IELTS Academic: Overall 6.0, with no individual band below 5.5"
+              //   2. ON THE PAGE BODY (next to the modal trigger), often outside the modal HTML.
+              // We must scan both, since "no individual band below" frequently lives in the
+              // surrounding paragraph rather than the modal table itself.
               const cmText = $cm("body").text().replace(/\s+/g, " ");
+              const pageBodyText = $cs("body").text().replace(/\s+/g, " ");
+              const scanText = `${cmText} ${pageBodyText}`;
 
               if (cIelts != null) {
-                // Pattern 1: "no individual band below X.X" / "each band of X.X"
-                const noBandM =
-                  cmText.match(/no individual band (?:below|under|less than|score below) (\d+(?:\.\d+)?)/i) ||
-                  cmText.match(/each (?:band|component|skill|section)(?:\s+score)?\s+(?:of|at least|is|above)?\s*(\d+(?:\.\d+)?)/i) ||
-                  cmText.match(/minimum.*?band.*?(\d+(?:\.\d+)?)/i);
-                if (noBandM) {
-                  const minBand = parseFloat(noBandM[1]);
+                // Pattern A (most specific — VIT canonical):
+                //   "IELTS Academic: Overall 6.0, with no individual band below 5.5"
+                //   "IELTS Overall 6.0 with no band score below 5.5"
+                const patternA = scanText.match(
+                  /IELTS\s+(?:Academic\s+)?(?:Overall\s+)?(\d+\.?\d*)\s*,?\s*with\s+no\s+(?:individual\s+)?band(?:\s+score)?\s+below\s+(\d+\.?\d*)/i,
+                );
+                if (patternA) {
+                  const minBand = parseFloat(patternA[2]);
                   if (!isNaN(minBand) && minBand >= 4 && minBand <= 9) {
-                    if (!cheerioData.ieltsListening) cheerioData.ieltsListening = minBand;
-                    if (!cheerioData.ieltsSpeaking) cheerioData.ieltsSpeaking = minBand;
-                    if (!cheerioData.ieltsWriting) cheerioData.ieltsWriting = minBand;
-                    if (!cheerioData.ieltsReading) cheerioData.ieltsReading = minBand;
+                    cheerioData.ieltsListening = minBand;
+                    cheerioData.ieltsSpeaking = minBand;
+                    cheerioData.ieltsWriting = minBand;
+                    cheerioData.ieltsReading = minBand;
                   }
                 }
-                // Pattern 2: explicit "Listening X.X ... Reading X.X ... Writing X.X ... Speaking X.X"
-                const indivM = cmText.match(
-                  /Listening\s+(\d+(?:\.\d+)?)[^]*?Reading\s+(\d+(?:\.\d+)?)[^]*?Writing\s+(\d+(?:\.\d+)?)[^]*?Speaking\s+(\d+(?:\.\d+)?)/i,
+                // Pattern A2: looser "no individual/each band below X.X" anywhere
+                if (cheerioData.ieltsListening == null) {
+                  const noBandM =
+                    scanText.match(/no individual band (?:below|under|less than|score below) (\d+(?:\.\d+)?)/i) ||
+                    scanText.match(/no band(?:\s+score)? below (\d+(?:\.\d+)?)/i) ||
+                    scanText.match(/each (?:band|component|skill|section)(?:\s+score)?\s+(?:of|at least|is|above)?\s*(\d+(?:\.\d+)?)/i) ||
+                    scanText.match(/minimum.*?band.*?(\d+(?:\.\d+)?)/i);
+                  if (noBandM) {
+                    const minBand = parseFloat(noBandM[1]);
+                    if (!isNaN(minBand) && minBand >= 4 && minBand <= 9) {
+                      cheerioData.ieltsListening = minBand;
+                      cheerioData.ieltsSpeaking = minBand;
+                      cheerioData.ieltsWriting = minBand;
+                      cheerioData.ieltsReading = minBand;
+                    }
+                  }
+                }
+                // Pattern B: explicit "Listening X.X ... Reading X.X ... Writing X.X ... Speaking X.X"
+                const indivM = scanText.match(
+                  /Listening[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Reading[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Writing[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Speaking[:\s]+(\d+(?:\.\d+)?)/i,
                 );
                 if (indivM) {
                   cheerioData.ieltsListening = parseFloat(indivM[1]);
                   cheerioData.ieltsReading   = parseFloat(indivM[2]);
                   cheerioData.ieltsWriting   = parseFloat(indivM[3]);
                   cheerioData.ieltsSpeaking  = parseFloat(indivM[4]);
+                }
+                // Pattern C: short form "L X.X R X.X W X.X S X.X"
+                if (cheerioData.ieltsListening == null) {
+                  const shortM = scanText.match(/\bL\s*(\d+\.?\d*)\s+R\s*(\d+\.?\d*)\s+W\s*(\d+\.?\d*)\s+S\s*(\d+\.?\d*)/i);
+                  if (shortM) {
+                    cheerioData.ieltsListening = parseFloat(shortM[1]);
+                    cheerioData.ieltsReading   = parseFloat(shortM[2]);
+                    cheerioData.ieltsWriting   = parseFloat(shortM[3]);
+                    cheerioData.ieltsSpeaking  = parseFloat(shortM[4]);
+                  }
                 }
               }
 
@@ -8407,7 +8441,8 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 cheerioData.ieltsWriting   != null ? `W=${cheerioData.ieltsWriting}`   : null,
                 cheerioData.ieltsSpeaking  != null ? `S=${cheerioData.ieltsSpeaking}`  : null,
               ].filter(Boolean).join(" ");
-              addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} (${subBandLog || "no sub-bands"}) PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s))`, phase: "extract" });
+              const elapsed = ((Date.now() - courseT0) / 1000).toFixed(1);
+              addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} (${subBandLog || "no sub-bands"}) PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} [${elapsed}s]`, phase: "extract" });
             }
           }
         } catch (cmErr) {
@@ -9447,6 +9482,21 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       })
     ));
   }
+
+  // ── Final timing summary ─────────────────────────────────────────────────
+  const totalMs = Date.now() - batchStartTime;
+  const fmt = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const rs = s % 60;
+    return `${m}m ${rs}s`;
+  };
+  addLog(job, "status", {
+    message: `[TIMING] Total: ${fmt(totalMs)} | Courses: ${max} | Avg: ${fmt(Math.round(totalMs / Math.max(1, max)))}/course | Concurrency: HTTP=${CONCURRENCY} Browser=${BROWSER_CONCURRENCY}`,
+    phase: "complete",
+  });
 }
 
 async function tryAlternativeUrls(url: string, job: ScrapeJob): Promise<{ html: string; resolvedUrl: string } | null> {
@@ -10506,7 +10556,55 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
                   extractionMethod: "cheerio",
                   content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
                 });
-                addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s)) [rescrape]`, phase: "extract" });
+                // Sub-band extraction (same patterns as initial scrape; see line ~8385)
+                const cmText = $cm("body").text().replace(/\s+/g, " ");
+                const pageBodyText = $cs("body").text().replace(/\s+/g, " ");
+                const scanText = `${cmText} ${pageBodyText}`;
+                if (cIelts != null) {
+                  const patternA = scanText.match(
+                    /IELTS\s+(?:Academic\s+)?(?:Overall\s+)?(\d+\.?\d*)\s*,?\s*with\s+no\s+(?:individual\s+)?band(?:\s+score)?\s+below\s+(\d+\.?\d*)/i,
+                  );
+                  if (patternA) {
+                    const minBand = parseFloat(patternA[2]);
+                    if (!isNaN(minBand) && minBand >= 4 && minBand <= 9) {
+                      cheerioData.ieltsListening = minBand;
+                      cheerioData.ieltsSpeaking = minBand;
+                      cheerioData.ieltsWriting = minBand;
+                      cheerioData.ieltsReading = minBand;
+                    }
+                  }
+                  if (cheerioData.ieltsListening == null) {
+                    const noBandM =
+                      scanText.match(/no individual band (?:below|under|less than|score below) (\d+(?:\.\d+)?)/i) ||
+                      scanText.match(/no band(?:\s+score)? below (\d+(?:\.\d+)?)/i) ||
+                      scanText.match(/each (?:band|component|skill|section)(?:\s+score)?\s+(?:of|at least|is|above)?\s*(\d+(?:\.\d+)?)/i);
+                    if (noBandM) {
+                      const minBand = parseFloat(noBandM[1]);
+                      if (!isNaN(minBand) && minBand >= 4 && minBand <= 9) {
+                        cheerioData.ieltsListening = minBand;
+                        cheerioData.ieltsSpeaking = minBand;
+                        cheerioData.ieltsWriting = minBand;
+                        cheerioData.ieltsReading = minBand;
+                      }
+                    }
+                  }
+                  const indivM = scanText.match(
+                    /Listening[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Reading[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Writing[:\s]+(\d+(?:\.\d+)?)[^]{0,30}Speaking[:\s]+(\d+(?:\.\d+)?)/i,
+                  );
+                  if (indivM) {
+                    cheerioData.ieltsListening = parseFloat(indivM[1]);
+                    cheerioData.ieltsReading   = parseFloat(indivM[2]);
+                    cheerioData.ieltsWriting   = parseFloat(indivM[3]);
+                    cheerioData.ieltsSpeaking  = parseFloat(indivM[4]);
+                  }
+                }
+                const sbLog = [
+                  cheerioData.ieltsListening != null ? `L=${cheerioData.ieltsListening}` : null,
+                  cheerioData.ieltsReading   != null ? `R=${cheerioData.ieltsReading}`   : null,
+                  cheerioData.ieltsWriting   != null ? `W=${cheerioData.ieltsWriting}`   : null,
+                  cheerioData.ieltsSpeaking  != null ? `S=${cheerioData.ieltsSpeaking}`  : null,
+                ].filter(Boolean).join(" ");
+                addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} (${sbLog || "no sub-bands"}) PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} [rescrape]`, phase: "extract" });
               }
             }
           } catch (cmErr) {
