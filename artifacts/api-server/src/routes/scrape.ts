@@ -8373,6 +8373,20 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
               if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
               if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
+              // Emit a course_page review source so PTE/TOEFL/CAE values
+              // extracted ONLY from the modal show proper provenance instead
+              // of "derived/derived" in the review UI.
+              const modalSrcParts: string[] = [];
+              if (cIelts != null) modalSrcParts.push(`IELTS overall ${cIelts}`);
+              if (cPte   != null) modalSrcParts.push(`PTE ${cPte}`);
+              if (cToefl != null) modalSrcParts.push(`TOEFL iBT ${cToefl}`);
+              if (cCae   != null) modalSrcParts.push(`Cambridge CAE ${cCae}`);
+              reviewSources.push({
+                url: link.url,
+                pageType: "course_page",
+                extractionMethod: "cheerio",
+                content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
+              });
               addLog(job, "status", { message: `[per-course modal ✓] ${link.name.slice(0, 40)} — IELTS=${cIelts ?? "-"} PTE=${cPte ?? "-"} TOEFL=${cToefl ?? "-"} CAE=${cCae ?? "-"} (target IELTS=${targetIelts}, ${allRows.length} row(s))`, phase: "extract" });
             }
           }
