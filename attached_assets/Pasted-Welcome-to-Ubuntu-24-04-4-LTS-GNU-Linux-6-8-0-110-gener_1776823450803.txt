@@ -1,0 +1,69 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Apr 22 01:56:39 UTC 2026
+
+  System load:           1.38
+  Usage of /:            2.2% of 231.44GB
+  Memory usage:          29%
+  Swap usage:            0%
+  Processes:             178
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+2 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Wed Apr 22 00:28:46 2026 from 162.243.190.66
+root@university-and-course-data:~# # On 159.65.152.72:
+cd /root/University-and-Course-data && \
+git pull && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && \
+pm2 logs uni-api --lines 0
+Already up to date.
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 569ms
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 9    │ online    │ 0%       │ 48.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+0|uni-api  | {"level":30,"time":1776823406812,"pid":168550,"hostname":"university-and-course-data","port":8080,"host":"0.0.0.0","msg":"Server listening"}
+0|uni-api  | {"level":40,"time":1776823406853,"pid":168550,"hostname":"university-and-course-data","count":1,"runtimeJobIds":["scrape_1776822107663_e354pe"],"msg":"Stopped orphaned active scrape jobs on startup"}
+0|uni-api  | {"level":30,"time":1776823406853,"pid":168550,"hostname":"university-and-course-data","intervalMinutes":15,"dayOfMonth":1,"hourUtc":2,"msg":"Monthly scraping scheduler started"}
+0|uni-api  | {"level":30,"time":1776823406854,"pid":168550,"hostname":"university-and-course-data","checkIntervalMinutes":60,"msg":"Daily backup scheduler started"}
+0|uni-api  | {"level":30,"time":1776823406988,"pid":168550,"hostname":"university-and-course-data","triggerSource":"startup","totals":{"eligibleUniversities":6,"started":0,"skippedNotDue":6,"skippedAlreadyRunning":0,"skippedMissingUrl":0,"failed":0},"msg":"Monthly scraping trigger completed"}
+0|uni-api  | {"level":30,"time":1776823407376,"pid":168550,"hostname":"university-and-course-data","req":{"id":1,"method":"GET","url":"/api/scrape/status/scrape_1776822107663_e354pe"},"res":{"statusCode":200},"responseTime":49,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823416855,"pid":168550,"hostname":"university-and-course-data","msg":"Daily backup: today's backup already exists, skipping startup run"}
+0|uni-api  | {"level":30,"time":1776823427447,"pid":168550,"hostname":"university-and-course-data","req":{"id":2,"method":"GET","url":"/api/universities"},"res":{"statusCode":304},"responseTime":15,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823438343,"pid":168550,"hostname":"university-and-course-data","req":{"id":3,"method":"POST","url":"/api/scrape/start"},"res":{"statusCode":200},"responseTime":51,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823438485,"pid":168550,"hostname":"university-and-course-data","req":{"id":4,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823440143,"pid":168550,"hostname":"university-and-course-data","req":{"id":5,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823441793,"pid":168550,"hostname":"university-and-course-data","req":{"id":6,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823443443,"pid":168550,"hostname":"university-and-course-data","req":{"id":7,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823445094,"pid":168550,"hostname":"university-and-course-data","req":{"id":8,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823446742,"pid":168550,"hostname":"university-and-course-data","req":{"id":9,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823448395,"pid":168550,"hostname":"university-and-course-data","req":{"id":10,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823450043,"pid":168550,"hostname":"university-and-course-data","req":{"id":11,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":3,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823451693,"pid":168550,"hostname":"university-and-course-data","req":{"id":12,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823453345,"pid":168550,"hostname":"university-and-course-data","req":{"id":13,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":5,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823454998,"pid":168550,"hostname":"university-and-course-data","req":{"id":14,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":8,"msg":"request completed"}
+0|uni-api  | {"level":30,"time":1776823456661,"pid":168550,"hostname":"university-and-course-data","req":{"id":15,"method":"GET","url":"/api/scrape/status/scrape_1776823438304_hqtb77"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|uni-api
