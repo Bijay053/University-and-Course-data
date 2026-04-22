@@ -1,0 +1,62 @@
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# cat > /tmp/asa_pw.cjs <<'EOF'
+const { chromium } = require('/root/University-and-Course-data/node_modules/.pnpm/playwright-core@1.59.1/node_modules/playwright-core');
+
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development', {waitUntil:'networkidle', timeout:30000});
+  await page.waitForTimeout(2000);
+  
+  process.stdout.write('=== BEFORE TAB CLICK ===\n');
+  let tableCount = await page.evaluate(() => document.querySelectorAll('table').length);
+  process.stdout.write(`Tables: ${tableCount}\n`);
+  
+  // Try the same selectors browser-helper uses
+  const selectors = [
+    'a:has-text("Entry Requirements")',
+    'button:has-text("Entry Requirements")',
+    '[href*="entry-requirements"]',
+    '[href*="entryrequirements"]',
+    'li:has-text("Entry Requirements") a',
+    'li:has-text("Entry Requirements") button',
+  ];
+  
+  let clicked = null;
+  for (const sel of selectors) {
+    try {
+      const el = await page.$(sel);
+      if (!el) { process.stdout.write(`  ${sel}: NOT FOUND\n`); continue; }
+      const visible = await el.isVisible();
+      process.stdout.write(`  ${sel}: found, visible=${visible}\n`);
+      if (visible) {
+        await el.click();
+        await page.waitForTimeout(2000);
+        clicked = sel;
+        break;
+      }
+    } catch (e) {
+      process.stdout.write(`  ${sel}: ERROR ${e.message}\n`);
+    }
+  }
+  
+  process.stdout.write(`\nClicked: ${clicked || 'NONE'}\n`);
+  
+  process.stdout.write('\n=== AFTER TAB CLICK ===\n');
+  tableCount = await page.evaluate(() => document.querySelectorAll('table').length);
+  process.stdout.write(`Tables: ${tableCount}\n`);
+node /tmp/asa_pw.cjs 2>&1 | head -150'ERR: ' + e.message + '\n'));ss="${c.classes}" text="${c.text}"\n`);
+=== BEFORE TAB CLICK ===
+Tables: 0
+  a:has-text("Entry Requirements"): found, visible=true
+
+Clicked: a:has-text("Entry Requirements")
+
+=== AFTER TAB CLICK ===
+Tables: 0
+
+=== ALL CLICKABLE WITH "ENTRY" TEXT ===
+  A class="tab-link-tab-2 course-tab-link w-inline-block w-tab-link w--current" text="Entry Requirements"
+  DIV class="text-block-2" text="Entry Requirements"
+  DIV class="section-title-wrapper course" text="Entry Requirements"
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
+root@university-and-course-data:~/University-and-Course-data/artifacts/api-server# 
