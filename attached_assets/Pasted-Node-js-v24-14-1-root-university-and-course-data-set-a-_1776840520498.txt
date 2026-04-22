@@ -1,0 +1,140 @@
+Node.js v24.14.1
+root@university-and-course-data:~# set -a && source /root/.env.backup && set +a
+cd /root/University-and-Course-data
+
+node -e "
+const pw = require('./node_modules/.pnpm/playwright@1.52.0/node_modules/playwright');
+(async () => {
+  const browser = await pw.chromium.launch({executablePath: require('./node_modules/.pnpm/playwright@1.52.0/node_modules/playwright/.local-browsers/chromium-' + require('./node_modules/.pnpm/playwright@1.52.0/node_modules/playwright/package.json').version + '/chrome-linux/chrome') });
+  const page = await browser.newPage();
+  await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development',{waitUntil:'networkidle',timeout:30000});
+  await page.waitForTimeout(3000);
+  const text = await page.evaluate(()=>document.body.innerText);
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  let found = false;
+  for(let i=0;i<lines.length;i++){
+    if(/ielts|pte|toefl|cae|english.*req/i.test(lines[i])){ found=true; console.log('LINE '+i+': '+lines[i]); if(i+1<lines.length)console.log('LINE '+(i+1)+': '+lines[i+1]); if(i+2<lines.length)console.log('LINE '+(i+2)+': '+lines[i+2]); }
+  }
+  if(!found)console.log('NOTHING FOUND');
+  await browser.close();
+})().catch(e=>console.error(e.message));
+" 2>&1 | head -80
+-bash: !found: event not found
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module './node_modules/.pnpm/playwright@1.52.0/node_modules/playwright'
+Require stack:
+- /root/University-and-Course-data/[eval]
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at [eval]:2:12
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:451:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/root/University-and-Course-data/[eval]' ]
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+npx --yes tsx -e "
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development',{waitUntil:'networkidle',timeout:30000});
+await page.waitForTimeout(3000);
+const text = await page.evaluate(()=>document.body.innerText);
+const lines = text.split('\n').map((l:string)=>l.trim()).filter(Boolean);
+for(let i=0;i<lines.length;i++){
+  if(/ielts|pte|toefl|cae|english.*req/i.test(lines[i])){ console.log(i+': '+lines[i]); console.log((i+1)+': '+(lines[i+1]||'')); console.log((i+2)+': '+(lines[i+2]||'')); }
+}
+await browser.close();
+" 2>&1 | head -80
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "strict-peer-dependencies". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+Error: Transform failed with 6 errors:
+/eval.ts:3:16: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:4:13: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:5:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:6:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:7:13: ERROR: Top-level await is currently not supported with the "cjs" output format
+...
+    at failureErrorWithLog (/root/.npm/_npx/fd45a72a545557e9/node_modules/esbuild/lib/main.js:1748:15)
+    at /root/.npm/_npx/fd45a72a545557e9/node_modules/esbuild/lib/main.js:1017:50
+    at responseCallbacks.<computed> (/root/.npm/_npx/fd45a72a545557e9/node_modules/esbuild/lib/main.js:884:9)
+    at handleIncomingPacket (/root/.npm/_npx/fd45a72a545557e9/node_modules/esbuild/lib/main.js:939:12)
+    at Socket.readFromStdout (/root/.npm/_npx/fd45a72a545557e9/node_modules/esbuild/lib/main.js:862:7)
+    at Socket.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  errors: [
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 16,
+        file: '/eval.ts',
+        length: 5,
+        line: 3,
+        lineText: 'const browser = await chromium.launch();',
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 13,
+        file: '/eval.ts',
+        length: 5,
+        line: 4,
+        lineText: 'const page = await browser.newPage();',
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 5,
+        lineText: "await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development',{waitUntil:'networkidle',timeout:30000});",
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 6,
+root@university-and-course-data:~/University-and-Course-data# ^C
+root@university-and-course-data:~/University-and-Course-data# 
