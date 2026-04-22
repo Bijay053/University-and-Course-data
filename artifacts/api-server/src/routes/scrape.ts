@@ -4,6 +4,12 @@ import {
   geminiUrl,
   GEMINI_MODELS,
 } from "../lib/gemini-client.js";
+import {
+  mapCourseToCategory,
+  validateTaxonomy,
+  mapDegreeLevel as mapDegreeLevelTaxonomy,
+  TAXONOMY_FOR_PROMPT,
+} from "../lib/course-taxonomy.js";
 import * as cheerio from "cheerio";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -4257,16 +4263,17 @@ async function enrichFromRelatedPages(
   if (_enrichMs > 3000) process.stdout.write(`[enrich] total ${_enrichMs}ms course="${courseData.courseName?.slice(0, 40)}"\n`);
 }
 
-const BATCH_CLASSIFY_PROMPT = `You are a university course classifier. Given a list of courses with their names and any extracted data, fill in ONLY the missing fields.
+const BATCH_CLASSIFY_PROMPT = `You are a university course classifier. Classify each course into EXACTLY ONE category and ONE sub category from the taxonomy below. Return ALL fields for every course.
 
 Return a JSON array where each item has:
 - "index": the original index number
-- "category": one of: "Business & Management", "Engineering & Technology", "Computer Science & IT", "Medicine & Health", "Arts, Humanities & Social Sciences", "Education & Social Work", "Architecture, Building & Design", "Media & Communications", "Law & Legal Studies", "Hospitality, Tourism & Events", "Science & Mathematics", "Agriculture & Environmental Science"
-- "subCategory": specific sub-category (e.g. "Accounting", "Civil Engineering", "Nursing")
-- "degreeLevel": one of: "Bachelor", "Master", "PhD", "Certificate & Diploma", "Graduate Certificate & Diploma", "Associate Degree", "Equivalent" (only if not already provided)
+- "category": MUST be one of the exact category names listed in the taxonomy below
+- "subCategory": MUST be one of the exact sub category names for that category; use "Other" if unsure
+- "degreeLevel": one of: "Bachelor", "Master", "Doctor/Doctorate", "Certificate & Diploma", "Graduate Certificate & Diploma", "Associate Degree or Equivalent", "Pathway to Undergraduate", "English Language" (only if not already provided)
 - "description": brief 1-2 sentence description if not already provided (max 200 chars)
 
-Only include fields that are MISSING from the input data. Be concise.`;
+AVAILABLE TAXONOMY (use exact names only):
+${TAXONOMY_FOR_PROMPT}`;
 
 async function batchClassify(courses: { index: number; name: string; existing: Partial<CourseData> }[]): Promise<Map<number, Partial<CourseData>>> {
   const result = new Map<number, Partial<CourseData>>();
@@ -9358,11 +9365,30 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
       for (const item of batch) {
         const extra = classifications.get(item.index);
         if (extra) {
-          if (extra.category && !item.data.category) item.data.category = extra.category;
-          if (extra.subCategory && !item.data.subCategory) item.data.subCategory = extra.subCategory;
           if (extra.degreeLevel && !item.data.degreeLevel) item.data.degreeLevel = extra.degreeLevel;
           if (extra.description && !item.data.description) item.data.description = extra.description;
         }
+
+        // ── Category/Sub Category priority chain ────────────────────────────
+        // 1. Deterministic keyword map (fast, free, always correct)
+        // 2. AI-returned value, validated against taxonomy (fixes hallucinations)
+        // 3. Last resort: never leave empty
+        const detMap = mapCourseToCategory(item.data.courseName || item.name);
+        if (detMap) {
+          item.data.category    = detMap.category;
+          item.data.subCategory = detMap.subCategory;
+          addLog(job, "status", { message: `[CATEGORY det] ${item.name.slice(0, 40)} → ${detMap.category} / ${detMap.subCategory}`, phase: "classify" });
+        } else if (extra?.category && extra?.subCategory) {
+          const validated = validateTaxonomy(extra.category, extra.subCategory);
+          item.data.category    = validated.category;
+          item.data.subCategory = validated.subCategory;
+          addLog(job, "status", { message: `[CATEGORY ai] ${item.name.slice(0, 40)} → ${validated.category} / ${validated.subCategory}`, phase: "classify" });
+        } else {
+          item.data.category    = item.data.category    || "Arts, Humanities & Social Sciences";
+          item.data.subCategory = item.data.subCategory || "Other";
+          addLog(job, "status", { message: `[CATEGORY fallback] ${item.name.slice(0, 40)} → ${item.data.category} / ${item.data.subCategory}`, phase: "classify" });
+        }
+
         // PROBE-F: value entering stageCourse — proves whether Phase A merge wipes IELTS
         debugIelts(item.data.courseName, "F-before-stageCourse-phaseA", { ieltsOverall: item.data.ieltsOverall });
         const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
@@ -9394,11 +9420,22 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             if (val !== undefined && val !== null && !(cData as any)[key]) (cData as any)[key] = val;
           }
           cData.courseWebsite = cData.courseWebsite || courseLinks[item.index].url;
+          // Apply deterministic category mapping (overrides AI which may hallucinate)
+          const detMapB = mapCourseToCategory(cData.courseName || item.name);
+          if (detMapB) { cData.category = detMapB.category; cData.subCategory = detMapB.subCategory; }
+          else if (cData.category && cData.subCategory) {
+            const v = validateTaxonomy(cData.category, cData.subCategory);
+            cData.category = v.category; cData.subCategory = v.subCategory;
+          } else { cData.category = cData.category || "Arts, Humanities & Social Sciences"; cData.subCategory = cData.subCategory || "Other"; }
           const saved = await stageCourse(cData, uniId, jobId, job, { sources: item.reviewSources });
           if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: item.index + 1 }); }
         } else if (item.cheerioData.courseName || item.name) {
           const fallbackData = cheerioToCourseData(item.cheerioData, item.name, courseLinks[item.index].url);
+          // Apply deterministic category mapping to cheerio-only data
+          const detMapFb = mapCourseToCategory(fallbackData.courseName || item.name);
+          if (detMapFb) { fallbackData.category = detMapFb.category; fallbackData.subCategory = detMapFb.subCategory; }
+          else { fallbackData.category = fallbackData.category || "Arts, Humanities & Social Sciences"; fallbackData.subCategory = fallbackData.subCategory || "Other"; }
           const saved = await stageCourse(fallbackData, uniId, jobId, job, { sources: item.reviewSources });
           if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
           else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: item.index + 1 }); }
@@ -10597,6 +10634,12 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
     // Stage all collected courses
     addLog(job, "status", { message: `Staging ${stagedCourses.length} courses...`, phase: "stage" });
     for (const item of stagedCourses.sort((a, b) => a.index - b.index)) {
+      const detMapStg = mapCourseToCategory(item.data.courseName);
+      if (detMapStg) { item.data.category = detMapStg.category; item.data.subCategory = detMapStg.subCategory; }
+      else if (item.data.category && item.data.subCategory) {
+        const vStg = validateTaxonomy(item.data.category, item.data.subCategory);
+        item.data.category = vStg.category; item.data.subCategory = vStg.subCategory;
+      } else { item.data.category = item.data.category || "Arts, Humanities & Social Sciences"; item.data.subCategory = item.data.subCategory || "Other"; }
       const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
       if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
       else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
