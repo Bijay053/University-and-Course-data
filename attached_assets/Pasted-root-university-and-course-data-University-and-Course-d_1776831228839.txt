@@ -1,0 +1,50 @@
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_pcm_wins.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+if '__perCourseModal_pte' in s:
+    print("ALREADY PATCHED"); raise SystemExit(0)
+
+# Step 1: tag fields in per-course modal scan
+OLD1 = '''              if (cIelts || cPte || cToefl || cCae) {
+                if (cIelts != null) cheerioData.ieltsOverall = cIelts;
+                if (cPte   != null) cheerioData.pteOverall   = cPte;
+                if (cToefl != null) cheerioData.toeflOverall = cToefl;
+                if (cCae   != null) (cheerioData as any).cambridgeOverall = cCae;'''
+NEW1 = '''              if (cIelts || cPte || cToefl || cCae) {
+                if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+                if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+                if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+                if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }'''
+n1 = s.count(OLD1); print(f"step1 matches: {n1}"); assert n1 == 1
+s = s.replace(OLD1, NEW1)
+
+# Step 2: respect tags in cache fill (IELTS guard + add pcm var)
+OLD2 = '''          if ((!cheerioData.ieltsOverall || forceCourseOverride) && cachedEnglishReqs.ieltsOverall) {'''
+NEW2 = '''          const pcm = cheerioData as any;
+          if ((!cheerioData.ieltsOverall || (forceCourseOverride && !pcm.__perCourseModal_ielts)) && cachedEnglishReqs.ieltsOverall) {'''
+n2 = s.count(OLD2); print(f"step2 matches: {n2}"); assert n2 == 1
+s = s.replace(OLD2, NEW2)
+
+# Step 3: PTE guard
+OLD3 = '''          if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {'''
+NEW3 = '''          if ((!cheerioData.pteOverall || (forceCourseOverride && !pcm.__perCourseModal_pte)) && cachedEnglishReqs.pteOverall) {'''
+n3 = s.count(OLD3); print(f"step3 matches: {n3}"); assert n3 == 1
+s = s.replace(OLD3, NEW3)
+
+# Step 4: TOEFL guard
+OLD4 = '''          if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {'''
+NEW4 = '''          if ((!cheerioData.toeflOverall || (forceCourseOverride && !pcm.__perCourseModal_toefl)) && cachedEnglishReqs.toeflOverall) {'''
+n4 = s.count(OLD4); print(f"step4 matches: {n4}"); assert n4 == 1
+s = s.replace(OLD4, NEW4)
+
+# Step 5: CAE guard
+OLD5 = '''          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverpm2 restart uni-api --update-env && echo "DEPLOYED OK"workers/scrape-worker.mjs && \cm.__perCourseModal_cae)) && 
+step1 matches: 1
+step2 matches: 1
+step3 matches: 0
+Traceback (most recent call last):
+  File "/tmp/patch_pcm_wins.py", line 30, in <module>
+    n3 = s.count(OLD3); print(f"step3 matches: {n3}"); assert n3 == 1
+                                                              ^^^^^^^
+AssertionError
+root@university-and-course-data:~/University-and-Course-data# 
