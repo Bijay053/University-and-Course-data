@@ -1,0 +1,105 @@
+root@university-and-course-data:~# set -a && source /root/.env.backup && set +a
+
+psql "$DATABASE_URL" -c "
+SELECT
+  t.name,
+  CASE WHEN c.id IS NULL THEN 'NEW (not published)' ELSE 'ALREADY PUBLISHED' END AS status,
+  sc.ielts_overall, sc.pte_overall, sc.toefl_overall
+FROM (VALUES
+  ('Bachelor of Business International Business'),
+  ('Bachelor of Business Hospitality Management'),
+  ('Bachelor of Business Technology Management'),
+  ('Bachelor of Business'),
+  ('Bachelor of Professional Accounting'),
+  ('Master of Project Management'),
+  ('Master of Information Technology (Cyber Security)'),
+  ('Master of Information Technology (Artificial Intelligence)'),
+  ('Master of Information Technology (Software Application Development)')
+) AS t(name)
+LEFT JOIN courses c ON c.university_id=2
+  AND TRIM(REGEXP_REPLACE(LOWER(c.name), '[^a-z0-9]+', ' ', 'g'))
+    = TRIM(REGEXP_REPLACE(LOWER(t.name), '[^a-z0-9]+', ' ', 'g'))
+LEFT JOIN scraped_courses sc ON sc.course_id = c.id AND sc.status='approved'
+ORDER BY t.name;
+"
+
+[1]+  Stopped                 psql "$DATABASE_URL" -c "
+SELECT
+  t.name,
+  CASE WHEN c.id IS NULL THEN 'NEW (not published)' ELSE 'ALREADY PUBLISHED' END AS status,
+  sc.ielts_overall, sc.pte_overall, sc.toefl_overall
+FROM (VALUES
+  ('Bachelor of Business International Business'),
+  ('Bachelor of Business Hospitality Management'),
+  ('Bachelor of Business Technology Management'),
+  ('Bachelor of Business'),
+  ('Bachelor of Professional Accounting'),
+  ('Master of Project Management'),
+  ('Master of Information Technology (Cyber Security)'),
+  ('Master of Information Technology (Artificial Intelligence)'),
+  ('Master of Information Technology (Software Application Development)')
+) AS t(name)
+LEFT JOIN courses c ON c.university_id=2
+  AND TRIM(REGEXP_REPLACE(LOWER(c.name), '[^a-z0-9]+', ' ', 'g'))
+    = TRIM(REGEXP_REPLACE(LOWER(t.name), '[^a-z0-9]+', ' ', 'g'))
+LEFT JOIN scraped_courses sc ON sc.course_id = c.id AND sc.status='approved'
+ORDER BY t.name;
+"
+root@university-and-course-data:~# 
+root@university-and-course-data:~# set -a && source /root/.env.backup && set +a
+
+# Fetch the course page and check what English-test mentions exist
+curl -s "https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development" \
+  | grep -oE "(IELTS|PTE|TOEFL|CAE|Cambridge|Duolingo)[^<]{0,200}" \
+  | sort -u
+
+# And check the policy PDF reference
+curl -s "https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development" \
+  | grep -oiE "(admissions[- ]?policy|english[- ]?language[- ]?req)[^\"']{0,300}" \
+  | head -5
+English Language Requirements</strong> </h6><p> </p><p>Along with the above admissions criteria, international applicants also must demonstrate and meet one of the following minimum English Language Proficiency standards:  </p><p>‍</p><figure style=
+English Language Requirements of the Student Admission Policy – </em><strong>Include link directly to policy section</strong></p><p>For more information about our standard admission requirements:  </p><p><strong>Student Admission Policy</strong></p><h3><strong>International Students</strong> </h3><p> </p><p>Internation
+root@university-and-course-data:~# set -a && source /root/.env.backup && set +a
+
+node -e "
+const pw = require('playwright');
+(async () => {
+  const browser = await pw.chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development', {waitUntil:'networkidle',timeout:30000});
+  await page.waitForTimeout(3000);
+  const text = await page.evaluate(() => document.body.innerText);
+  // Find the English requirements section
+  const lines = text.split('\n');
+  let inEnglish = false;
+  for (const line of lines) {
+    if (/english.*req|IELTS|PTE|TOEFL|CAE/i.test(line)) { inEnglish = true; }
+    if (inEnglish) { console.log(JSON.stringify(line)); }
+    if (inEnglish && lines.indexOf(line) > 10) break;
+  }
+  await browser.close();
+})().catch(e => console.error(e.message));
+" 2>&1 | head -60
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module 'playwright'
+Require stack:
+- /root/[eval]
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at [eval]:2:12
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:451:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/root/[eval]' ]
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~# 
