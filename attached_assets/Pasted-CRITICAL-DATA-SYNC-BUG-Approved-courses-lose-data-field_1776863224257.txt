@@ -1,0 +1,62 @@
+CRITICAL DATA SYNC BUG: Approved courses lose data fields when displayed in Courses tab
+Comparing two views of the SAME approved ASA courses:
+Raw Data tab (correct, complete data):
+
+Course: "Master of Information Technology"
+Duration: 2
+Term: Year
+Mode: On Campus
+Int'l Fee: 52,800
+Fee Term: Full Course
+Year: 2026
+Currency: AUD
+
+Courses tab (same approved row, missing data):
+
+Duration: — (empty)
+Term: — (empty)
+Year column missing entirely
+Fee Term missing entirely
+
+Bachelor courses are even worse — both Duration AND Term show "—" for all 5 Bachelor entries in Courses tab, but Raw Data correctly shows Duration=3, Term=Year.
+
+Investigate root cause — likely 3 possible bugs:
+A) Approval/publish step drops fields. When user approves a row in scraped_courses, the data should INSERT INTO courses table preserving every field. Check the publish handler — likely something like POST /api/scrape/staged/:id/approve — and verify it copies ALL fields:
+sql-- Compare staged vs published for one course
+SELECT 'staged' AS source, course_name, duration, duration_unit, fee_term, fee_year, international_fee, study_mode 
+FROM scraped_courses 
+WHERE university_id=2 AND course_name='Master of Information Technology (Cyber Security)' 
+AND status='approved'
+UNION ALL
+SELECT 'published' AS source, name, duration::text, duration_unit, fee_term, fee_year::text, international_fee::text, study_mode 
+FROM courses 
+WHERE university_id=2 AND name LIKE 'Master of Information Technology (Cyber Security)%';
+If published row has NULLs where staged row had values → fix the INSERT statement to copy those fields.
+B) Courses tab API endpoint doesn't return all fields. Check GET /api/universities/:id/courses (or whatever powers the Courses tab). Compare with GET /api/universities/:id/raw-data. If raw-data returns 15 fields but courses returns only 10, fix the courses endpoint to SELECT all needed columns.
+C) Frontend Courses tab table doesn't render all fields it receives. Check the React component for the Courses tab table — verify it has columns for: Duration, Term, Mode, Year, Fee Term, Currency. If columns are present but cells show "—", check the field name mapping (e.g. backend returns feeYear but frontend reads fee_year).
+
+AUTO-SYNC REQUIREMENT:
+The user wants: "if edited / delete it should auto sync"
+This means the published courses table must be the single source of truth, with a 2-way relationship to scraped_courses:
+
+On approve: copy ALL fields from scraped_courses → courses
+On edit in Courses tab: write changes back to courses (UPDATE), and ALSO update the scraped_courses row so re-scrapes don't overwrite the edit
+On delete in Courses tab: DELETE from courses AND mark scraped_courses.status = 'deleted' (don't physically delete staging row — keep it so re-scrapes know not to re-stage)
+On delete in Raw Data tab: same as above
+
+Add a last_edited_at and last_edited_by column to courses so re-scrapes can detect human-edited rows and skip overwriting them.
+
+DELIVERY:
+
+Run the SQL diagnosis query above on production DB FIRST to identify which fields are getting lost
+Reply with the query result so we can see exactly what's NULL where
+Then fix the publish step + courses endpoint + frontend rendering
+Implement 2-way sync (edit in either tab → updates both, delete in either → soft-deletes both)
+Add last_edited_at column and respect it during re-scrapes
+Build, commit, push to main with message "Fix data loss on approve, add 2-way sync between Courses and Raw Data tabs"
+
+After your push, I'll deploy. Test by:
+
+Re-scraping ASA → check both Raw Data and Courses tabs show the same complete data
+Edit a course in Courses tab → verify Raw Data tab reflects the change
+Delete a course in Raw Data tab → verify it disappears from Courses tab too
