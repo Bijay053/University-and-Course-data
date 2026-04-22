@@ -1,0 +1,109 @@
+root@university-and-course-data:~# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+ok = 0
+
+# Patch 1: Add cachedEnglishBands variable
+OLD1 = '  // Populated from the requirements page — first via static patterns, then AI if needed.\n  let cachedEnglishReqs: Partial<CourseData> | null = null;'
+NEW1 = '''  // Tiered band mapping from requirements page: [{ielts, pte, toefl, cae}] for
+  // universities that publish different scores per qualification level.
+  let cachedEnglishBands: Array<{ ielts: number; pte?: number | null; toefl?: number | null; cae?: number | null; duo?: number | null }> | null = null;
+  // Populated from the requirements page — first via static patterns, then AI if needed.
+  let cachedEnglishReqs: Partial<CourseData> | null = null;'''
+if OLD1 in s and 'cachedEnglishBands' not in s:
+    s = s.replace(OLD1, NEW1); ok += 1; print("PASS 1: cachedEnglishBands added")
+else: print("SKIP 1:", "already patched" if 'cachedEnglishBands' in s else "anchor not found")
+
+# Patch 2: Replace old Gemini block with new bands-aware block
+OLD2 = '''            // ── Gemini text on rendered HTML (catches JS-injected tables static parse misses) ──
+            if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
+              try {
+                const renderedCompact = extractCompactContent(renderedHtml, reqUrl);
+                const enPrompt2 = `Extract ALL English language proficiency test requirements from this university page. There may be multiple rows for different qualification levels (vocational, bachelor, master). Return the values for the HIGHEST qualification level shown (master/postgraduate if present, otherwise bachelor/undergraduate).\\nReturn JSON: {"ieltsOverall":<number|null>,"pteOverall":<number|null>,"toeflOverall":<number|null>,"cambridgeOverall":<number|null>,"duolingoOverall":<number|null>}\\nUse null for any test not mentioned. Return ONLY valid JSON.`;
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact.slice(0, 12000), 200);
+                const enParsed2 = JSON.parse(enResult2);
+                if (enParsed2.pteOverall || enParsed2.toeflOverall || enParsed2.ieltsOverall) {
+                  if (!renderedReq.ieltsOverall && enParsed2.ieltsOverall) renderedReq.ieltsOverall = enParsed2.ieltsOverall;
+                  if (!renderedReq.pteOverall && enParsed2.pteOverall) renderedReq.pteOverall = enParsed2.pteOverall;
+                  if (!renderedReq.toeflOverall && enParsed2.toeflOverall) renderedReq.toeflOverall = enParsed2.toeflOverall;
+                  if (!(renderedReq as any).cambridgeOverall && enParsed2.cambridgeOverall) (renderedReq as any).cambridgeOverall = enParsed2.cambridgeOverall;
+                  addLog(job, "status", { message: `Gemini-rendered requirements: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+                }
+              } catch {}
+            }'''
+NEW2 = '''            // ── Gemini text on rendered HTML (catches JS-injected tables static parse misses) ──
+            if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
+              try {
+pm2 restart 1 --update-env && echo "DEPLOYED OK"\1 | tail -4 && \ded")rs above.ce before the loop)..pte ?? ""} TO
+PASS 1: cachedEnglishBands added
+MISS 2: block not found
+PASS 3: Tier 4a added
+Done: 2/3 patches applied
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 597ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ uni-api            │ cluster  │ 33   │ online    │ 0%       │ 46.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# python3 - <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+ok = 0
+
+OLD1 = '  // Populated from the requirements page — first via static patterns, then AI if needed.\n  let cachedEnglishReqs: Partial<CourseData> | null = null;'
+NEW1 = '  let cachedEnglishBands: Array<{ ielts: number; pte?: number | null; toefl?: number | null; cae?: number | null; duo?: number | null }> | null = null;\n  // Populated from the requirements page — first via static patterns, then AI if needed.\n  let cachedEnglishReqs: Partial<CourseData> | null = null;'
+if OLD1 in s and 'cachedEnglishBands' not in s:
+    s = s.replace(OLD1, NEW1); ok += 1; print("PASS 1")
+else: print("SKIP 1:", "already patched" if 'cachedEnglishBands' in s else "MISS")
+
+OLD3 = '        // Tier 4: University-level cached English requirements (AI-resolved once before the loop).\n        // Per-field: fills only slots still empty after the three tiers above.\n        if (cachedEnglishReqs) {'
+NEW3 = '''        // Tier 4a: Band-matched requirements for tiered universities (e.g. VIT).
+        if (cachedEnglishBands && cachedEnglishBands.length > 1 && cheerioData.ieltsOverall) {
+          const targetIelts = cheerioData.ieltsOverall;
+          const band = cachedEnglishBands.reduce((best: any, b: any) =>
+            Math.abs(b.ielts - targetIelts) < Math.abs(best.ielts - targetIelts) ? b : best
+          );
+          if (Math.abs(band.ielts - targetIelts) <= 0.26) {
+            let bandApplied = false;
+            if (!cheerioData.pteOverall && band.pte) { cheerioData.pteOverall = band.pte; bandApplied = true; }
+            if (!cheerioData.toeflOverall && band.toefl) { cheerioData.toeflOverall = band.toefl; bandApplied = true; }
+            if (!cheerioData.cambridgeOverall && band.cae) { cheerioData.cambridgeOverall = band.cae; bandApplied = true; }
+            if (!(cheerioData as any).duolingoOverall && band.duo) (cheerioData as any).duolingoOverall = band.duo;
+            if (bandApplied) addLog(job, "status", { message: `[BAND] IELTS ${targetIelts}->PTE=${band.pte ?? "-"} TOEFL=${band.toefl ?? "-"} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+          }
+        }
+        // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
+        // Per-field: fills only slots still empty after the three tiers above.
+        if (cachedEnglishReqs) {'''
+if OLD3 in s and 'Tier 4a' not in s:
+    s = s.replace(OLD3, NEW3); ok += 1; print("PASS 3")
+elif 'Tier 4a' in s: print("SKIP 3: already patched")
+else: print("MISS 3")
+
+open(p, "w").write(s)
+print(f"Done: {ok}/2")
+PYEOF
+
+cd /root/University-and-Course-data && \
+pm2 restart 1 --update-env && echo "DEPLOYED OK"\1 | tail -3 && \
+SKIP 1: already patched
+SKIP 3: already patched
+Done: 0/2
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 596ms
+[PM2] Applying action restartProcessId on app [1](ids: [ '1' ])
+[PM2] [uni-api](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ uni-api            │ cluster  │ 34   │ online    │ 0%       │ 45.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# 
