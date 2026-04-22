@@ -1,0 +1,57 @@
+root@university-and-course-data:~/University-and-Course-data# # Find playwright location on the server
+find /root/University-and-Course-data -name "chromium.js" 2>/dev/null | head -3
+ls /root/University-and-Course-data/artifacts/api-server/node_modules/.pnpm/ 2>/dev/null | grep playwright | head -5
+
+# Simpler: just use the API server's playwright directly via a temp script
+PW_PATH=$(find /root/University-and-Course-data/artifacts/api-server -name "package.json" -path "*/playwright/package.json" 2>/dev/null | head -1 | xargs dirname)
+echo "Playwright at: $PW_PATH"
+
+cat > /tmp/check_asa.cjs <<'EOF'
+const { chromium } = require(process.env.PW_PATH);
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development', {waitUntil:'networkidle', timeout:30000});
+  await page.waitForTimeout(4000);
+  const text = await page.evaluate(() => document.body.innerText);
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let found = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/ielts|pte|toefl|cae|english.*req/i.test(lines[i])) {
+      found = true;
+      for (let j = Math.max(0,i-2); j <= Math.min(lines.length-1, i+6); j++)
+        console.log(j + ': ' + lines[j]);
+      console.log('---');
+    }
+  }
+  if (!found) console.log('NOTHING FOUND IN RENDERED TEXT');
+  await browser.close();
+})().catch(e => console.error(e.message));
+EOF
+
+PW_PATH=$PW_PATH node /tmp/check_asa.cjs 2>&1 | head -80
+/root/University-and-Course-data/node_modules/.pnpm/playwright-core@1.59.1/node_modules/playwright-core/lib/server/chromium/chromium.js
+/root/University-and-Course-data/node_modules/.pnpm/lucide-react@0.545.0_react@19.1.0/node_modules/lucide-react/dist/esm/icons/chromium.js
+dirname: missing operand
+Try 'dirname --help' for more information.
+Playwright at: 
+node:internal/modules/cjs/loader:1551
+    throw new ERR_INVALID_ARG_VALUE('id', id,
+    ^
+
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'id' must be a non-empty string. Received ''
+    at Module.require (node:internal/modules/cjs/loader:1551:11)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (/tmp/check_asa.cjs:1:22)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'ERR_INVALID_ARG_VALUE'
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# 
