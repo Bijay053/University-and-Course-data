@@ -1,0 +1,61 @@
+root@university-and-course-data:~/University-and-Course-data# grep -n "pteOverall\|toeflOverall\|cambridgeOverall" /root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts | grep -i "forceCourse\|cachedEng" | head -30
+7804:      if (siteNeedsBrowser(reqUrl) && !(cachedEnglishReqs?.pteOverall && cachedEnglishReqs?.toeflOverall)) {
+8872:          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
+8885:          if (forceCourseOverride && cachedEnglishReqs.pteOverall) {
+8886:            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
+8889:          if (forceCourseOverride && cachedEnglishReqs.toeflOverall) {
+8890:            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
+8893:          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+8933:          message: `[POST-CACHE] ${link.name.slice(0, 40)} -> IELTS=${cheerioData.ieltsOverall ?? "-"} PTE=${cheerioData.pteOverall ?? "-"} TOEFL=${cheerioData.toeflOverall ?? "-"} CAE=${(cheerioData as any).cambridgeOverall ?? "-"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "-"} P=${cachedEnglishReqs?.pteOverall ?? "-"} T=${cachedEnglishReqs?.toeflOverall ?? "-"}`,
+9114:            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) { cheerioData.pteOverall = cachedEnglishReqs.pteOverall; cachedAppliedRetry = true; }
+9115:            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) { cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall; cachedAppliedRetry = true; }
+9116:            if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedAppliedRetry = true; }
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_pcm_wins2.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+
+# Step 3: PTE — server uses `if (forceCourseOverride && ...)` (no !cheerioData.X)
+OLD3 = '''          if (forceCourseOverride && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;'''
+NEW3 = '''          if ((!cheerioData.pteOverall || (forceCourseOverride && !pcm.__perCourseModal_pte)) && cachedEnglishReqs.pteOverall) {
+            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;'''
+n3 = s.count(OLD3); print(f"step3 matches: {n3}"); assert n3 == 1
+s = s.replace(OLD3, NEW3)
+
+# Step 4: TOEFL
+OLD4 = '''          if (forceCourseOverride && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;'''
+NEW4 = '''          if ((!cheerioData.toeflOverall || (forceCourseOverride && !pcm.__perCourseModal_toefl)) && cachedEnglishReqs.toeflOverall) {
+            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;'''
+n4 = s.count(OLD4); print(f"step4 matches: {n4}"); assert n4 == 1
+s = s.replace(OLD4, NEW4)
+
+# Step 5: CAE — single line on server
+OLD5 = '''          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }'''
+NEW5 = '''          if ((!cheerioData.cambridgeOverall || (forceCourseOverride && !pcm.__perCourseModal_cae)) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }'''
+n5 = s.count(OLD5); print(f"step5 matches: {n5}"); assert n5 == 1
+s = s.replace(OLD5, NEW5)
+
+# Sanity: pcm var must already exist from earlier successful step 2
+assert 'const pcm = cheerioData as any;' in s, "pcm var missing — step 2 didn't apply"
+
+open(p, "w").write(s)
+print("PATCHED OK")
+PYEOF
+python3 /tmp/patch_pcm_wins2.py && \
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+echo "--- bundle __perCourseModal count: ---" && \
+grep -c "__perCourseModal_" artifacts/api-server/dist/workers/scrape-worker.mjs && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+step3 matches: 1
+step4 matches: 1
+step5 matches: 1
+Traceback (most recent call last):
+  File "/tmp/patch_pcm_wins2.py", line 27, in <module>
+    assert 'const pcm = cheerioData as any;' in s, "pcm var missing — step 2 didn't apply"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: pcm var missing — step 2 didn't apply
+root@university-and-course-data:~/University-and-Course-data# 
