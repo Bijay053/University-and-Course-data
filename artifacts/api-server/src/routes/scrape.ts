@@ -8869,14 +8869,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           if ((!cheerioData.pteOverall || forceCourseOverride) && cachedEnglishReqs.pteOverall) {
             cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
             cachedApplied = true;
-            addVerboseLog(job, "status", { message: `[PTE] cached hit: overall=${cachedEnglishReqs.pteOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            addLog(job, "status", { message: `[ASSIGN-PTE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.pteOverall} readback=${JSON.stringify(cheerioData.pteOverall)}`, phase: "extract" });
           }
           if ((!cheerioData.toeflOverall || forceCourseOverride) && cachedEnglishReqs.toeflOverall) {
             cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
             cachedApplied = true;
-            addVerboseLog(job, "status", { message: `[TOEFL] cached hit: overall=${cachedEnglishReqs.toeflOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+            addLog(job, "status", { message: `[ASSIGN-TOEFL] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.toeflOverall} readback=${JSON.stringify(cheerioData.toeflOverall)}`, phase: "extract" });
           }
-          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedApplied = true; }
+          if ((!cheerioData.cambridgeOverall || forceCourseOverride) && cachedEnglishReqs.cambridgeOverall) {
+            cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
+            cachedApplied = true;
+            addLog(job, "status", { message: `[ASSIGN-CAE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.cambridgeOverall} readback=${JSON.stringify(cheerioData.cambridgeOverall)}`, phase: "extract" });
+          }
           if ((!(cheerioData as any).duolingoOverall || forceCourseOverride) && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
           // Push a proper review source so the review engine can locate these
           // values and assign course_page-level (or requirements_page-level)
