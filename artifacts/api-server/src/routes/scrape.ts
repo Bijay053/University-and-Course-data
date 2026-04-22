@@ -327,11 +327,21 @@ async function runBulkSessionLoop(session: BulkSession): Promise<void> {
         initialLogs: [{ event: "status", message: `[Bulk] Starting ${entry.name}` }],
       });
 
-      // Poll until the job leaves the active-job set
+      // Poll until the job leaves the active-job set, or wall-clock cap is hit.
+      // Per-university hard timeout: 45 min. Without this, a single hung
+      // browser fetch or stuck job would block the entire bulk queue forever.
+      const PER_UNI_TIMEOUT_MS = 45 * 60 * 1000;
+      const startedAt = Date.now();
       let pollFailures = 0;
       // eslint-disable-next-line no-constant-condition
       while (true) {
         if ((session.status as string) === "stopped") break;
+        if (Date.now() - startedAt > PER_UNI_TIMEOUT_MS) {
+          try { await requestStopForRuntimeJob(jobId); } catch { /* best-effort */ }
+          entry.status = "error";
+          entry.error = `Timed out after ${Math.round(PER_UNI_TIMEOUT_MS / 60000)} min — moved on to next university`;
+          break;
+        }
         await new Promise((r) => setTimeout(r, 3000));
         try {
           const snap = await getRuntimeJobStatus(jobId, 0);
