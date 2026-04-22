@@ -7848,10 +7848,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             // ── Gemini text on rendered HTML (catches JS-injected tables static parse misses) ──
             if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
               try {
-                const renderedCompact = renderedText.slice(0, 14000);
-                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+                // Prefer structured extractCompactContent (preserves <table> rows as pipe-delimited).
+                // If the page uses <div>-based layout (no <table> tags), fall back to stripped HTML
+                // which preserves element nesting context better than plain text.
+                let renderedCompact = extractCompactContent(renderedHtml, reqUrl);
+                if (renderedCompact.length < 500 || !renderedCompact.includes(" | ")) {
+                  const $strip = cheerio.load(renderedHtml);
+                  $strip("script, style, noscript, nav, header, footer, .cookie, .chat, .popup").remove();
+                  renderedCompact = $strip("body").html()?.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 12000) || renderedText.slice(0, 12000);
+                }
+                addLog(job, "status", { message: `Gemini-rendered call: length=${renderedCompact.length} hasTables=${renderedCompact.includes(" | ")}`, phase: "fetch" });
                 const enPrompt2 = `Extract English language proficiency test requirements from this university requirements page.\nIf there is a TABLE with rows for different IELTS scores (e.g. 5.5, 6.0, 6.5), return ALL rows in "bands".\nIf only one flat requirement exists, put it in "flat".\nReturn ONLY valid JSON: {"bands":[{"ielts":5.5,"pte":42,"toefl":46,"cae":null,"duo":null}],"flat":{"ielts":null,"pte":null,"toefl":null,"cae":null,"duo":null}}\nUse null for missing values. Empty "bands" array is fine if no table.`;
-                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 800);
                 addLog(job, "status", { message: `Gemini-rendered raw response (first 200): ${enResult2.slice(0, 200)}`, phase: "fetch" });
                 const jsonMatch = enResult2.match(/\{[\s\S]*\}/);
                 const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
