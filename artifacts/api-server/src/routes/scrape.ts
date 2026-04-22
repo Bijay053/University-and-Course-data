@@ -9027,61 +9027,22 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // via mergeCourseData (course-page wins, cache only fills empty).
         const coursePageSnapshot: Partial<CourseData> = { ...(cheerioData as any) };
 
-        // Tier 4: University-level cached English requirements (AI-resolved once before the loop).
-        // Per-field: fills only slots still empty after the three tiers above.
-        // EXCEPTION: when the cached source is the course page itself (e.g. VIT's
-        // inline modal), it IS the authoritative source — force-override any
-        // prior values from generic page-text extraction that may have set
-        // garbage (truthy) values blocking the fill.
-        // Hard guard: if the cache came from a course_page that isn't THIS
-        // course, skip cache-fill entirely. Course-page-derived English values
-        // are course-specific and must never leak across courses (e.g. a
-        // Bachelor's PTE=47 must not seed an MBA or Carpentry course).
-        const cacheIsForeignCoursePage = cachedEnglishReqsSource?.pageType === "course_page"
-          && (cachedEnglishReqsSource as any)?.url !== link.url;
-        if (cachedEnglishReqs && cacheIsForeignCoursePage) {
-          addLog(job, "status", { message: `[CACHE-SKIP] ${link.name.slice(0, 40)} — cache is from a different course page, not applied`, phase: "extract" });
-        }
-        if (cachedEnglishReqs && !cacheIsForeignCoursePage) {
-          let cachedApplied = false;
-          // forceCourseOverride: only when cache literally came from THIS course's
-          // URL. Otherwise the cached values are from a different course's page
-          // and must NOT be allowed to overwrite this course's actual values.
-          const forceCourseOverride = cachedEnglishReqsSource?.pageType === "course_page"
-            && (cachedEnglishReqsSource as any)?.url === link.url;
-          addLog(job, "status", { message: `[CACHE-FILL] ${link.name.slice(0, 40)} src=${cachedEnglishReqsSource?.pageType ?? "?"} force=${forceCourseOverride} | course PTE=${JSON.stringify(cheerioData.pteOverall)} TOEFL=${JSON.stringify(cheerioData.toeflOverall)} CAE=${JSON.stringify(cheerioData.cambridgeOverall)} | cache PTE=${cachedEnglishReqs.pteOverall ?? "-"} TOEFL=${cachedEnglishReqs.toeflOverall ?? "-"} CAE=${cachedEnglishReqs.cambridgeOverall ?? "-"}`, phase: "extract" });
-          // Per-course modal data wins: skip cache override for fields the
-          // per-course modal already populated (those values are course-specific).
-          const pcm = cheerioData as any;
-          if ((!cheerioData.ieltsOverall || (forceCourseOverride && !pcm.__perCourseModal_ielts)) && cachedEnglishReqs.ieltsOverall) {
-            cheerioData.ieltsOverall   = cachedEnglishReqs.ieltsOverall;
-            cheerioData.ieltsReading   = cachedEnglishReqs.ieltsReading   || cheerioData.ieltsReading   || undefined;
-            cheerioData.ieltsWriting   = cachedEnglishReqs.ieltsWriting   || cheerioData.ieltsWriting   || undefined;
-            cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || cheerioData.ieltsListening || undefined;
-            cheerioData.ieltsSpeaking  = cachedEnglishReqs.ieltsSpeaking  || cheerioData.ieltsSpeaking  || undefined;
-            cachedApplied = true;
-            addVerboseLog(job, "status", { message: `[IELTS] cached hit: overall=${cachedEnglishReqs.ieltsOverall} for "${link.name.slice(0, 40)}"`, phase: "extract" });
+        // ── SINGLE MERGE STEP (replaces the old cache-fill / forceCourseOverride
+        // / cacheIsForeignCoursePage block). Course page ALWAYS wins. The
+        // university-wide cache (PDF/policy page) only fills truly empty
+        // slots. No per-university branches, no force-override flags.
+        if (cachedEnglishReqs) {
+          const finalCourseData = mergeCourseData(coursePageSnapshot, cachedEnglishReqs as any);
+          // List of fields actually filled by the cache (slots empty in snapshot).
+          const filledByCache: string[] = [];
+          for (const k of Object.keys(finalCourseData)) {
+            const before = (coursePageSnapshot as any)[k];
+            const after = (finalCourseData as any)[k];
+            const wasEmpty = before === null || before === undefined || before === "" || (Array.isArray(before) && before.length === 0);
+            if (wasEmpty && after !== undefined && after !== null) filledByCache.push(k);
+            (cheerioData as any)[k] = after;
           }
-          if ((!cheerioData.pteOverall || (forceCourseOverride && !pcm.__perCourseModal_pte)) && cachedEnglishReqs.pteOverall) {
-            cheerioData.pteOverall = cachedEnglishReqs.pteOverall;
-            cachedApplied = true;
-            addLog(job, "status", { message: `[ASSIGN-PTE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.pteOverall} readback=${JSON.stringify(cheerioData.pteOverall)}`, phase: "extract" });
-          }
-          if ((!cheerioData.toeflOverall || (forceCourseOverride && !pcm.__perCourseModal_toefl)) && cachedEnglishReqs.toeflOverall) {
-            cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall;
-            cachedApplied = true;
-            addLog(job, "status", { message: `[ASSIGN-TOEFL] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.toeflOverall} readback=${JSON.stringify(cheerioData.toeflOverall)}`, phase: "extract" });
-          }
-          if ((!cheerioData.cambridgeOverall || (forceCourseOverride && !pcm.__perCourseModal_cae)) && cachedEnglishReqs.cambridgeOverall) {
-            cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall;
-            cachedApplied = true;
-            addLog(job, "status", { message: `[ASSIGN-CAE] ${link.name.slice(0, 40)} assigned=${cachedEnglishReqs.cambridgeOverall} readback=${JSON.stringify(cheerioData.cambridgeOverall)}`, phase: "extract" });
-          }
-          if ((!(cheerioData as any).duolingoOverall || forceCourseOverride) && (cachedEnglishReqs as any).duolingoOverall) (cheerioData as any).duolingoOverall = (cachedEnglishReqs as any).duolingoOverall;
-          // Push a proper review source so the review engine can locate these
-          // values and assign course_page-level (or requirements_page-level)
-          // confidence instead of creating a "derived / derived" placeholder.
-          if (cachedApplied && cachedEnglishReqsSource) {
+          if (filledByCache.length > 0 && cachedEnglishReqsSource) {
             const sl: string[] = [];
             if (cheerioData.ieltsOverall != null) sl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
             if (cheerioData.pteOverall   != null) sl.push(`PTE ${cheerioData.pteOverall}`);
@@ -9109,25 +9070,6 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           }),
           phase: "extract",
         });
-
-        // PROBE-D: final IELTS value after ALL extraction tiers + cache
-        debugIelts(link.name, "D-after-all-tiers-and-cache", {
-          ieltsOverall: cheerioData.ieltsOverall,
-          cachedIelts: cachedEnglishReqs?.ieltsOverall ?? null,
-        });
-        addLog(job, "status", {
-          message: `[POST-CACHE] ${link.name.slice(0, 40)} → IELTS=${cheerioData.ieltsOverall ?? "—"} PTE=${cheerioData.pteOverall ?? "—"} TOEFL=${cheerioData.toeflOverall ?? "—"} CAE=${(cheerioData as any).cambridgeOverall ?? "—"} | cached: I=${cachedEnglishReqs?.ieltsOverall ?? "—"} P=${cachedEnglishReqs?.pteOverall ?? "—"} T=${cachedEnglishReqs?.toeflOverall ?? "—"}`,
-          phase: "extract",
-        });
-
-        // ── FINAL MERGE (course-page wins over cache/fallback) ───────────
-        // Re-apply the snapshot so any course-page value the cache-fill
-        // block clobbered is restored. Cache-derived values survive only
-        // where the course page had nothing.
-        const merged = mergeCourseData(coursePageSnapshot, cheerioData as any);
-        for (const k of Object.keys(merged)) {
-          (cheerioData as any)[k] = (merged as any)[k];
-        }
 
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
@@ -9309,24 +9251,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               degreeLevel: cheerioData.degreeLevel,
             }));
           }
-          // Per-field cache fill (same logic as main batch).
-          // Same hard guard: skip foreign course_page cache to prevent leakage.
-          const cacheIsForeignCoursePageRetry = cachedEnglishReqsSource?.pageType === "course_page"
-            && (cachedEnglishReqsSource as any)?.url !== url;
-          if (cachedEnglishReqs && !cacheIsForeignCoursePageRetry) {
-            let cachedAppliedRetry = false;
-            if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
-              cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
-              cheerioData.ieltsReading = cachedEnglishReqs.ieltsReading || undefined;
-              cheerioData.ieltsWriting = cachedEnglishReqs.ieltsWriting || undefined;
-              cheerioData.ieltsListening = cachedEnglishReqs.ieltsListening || undefined;
-              cheerioData.ieltsSpeaking = cachedEnglishReqs.ieltsSpeaking || undefined;
-              cachedAppliedRetry = true;
+          // SINGLE MERGE STEP (retry path) — course page wins, cache fills empty.
+          if (cachedEnglishReqs) {
+            const coursePageSnapshotRetry: Partial<CourseData> = { ...(cheerioData as any) };
+            const finalCourseData = mergeCourseData(coursePageSnapshotRetry, cachedEnglishReqs as any);
+            let appliedFromCache = false;
+            for (const k of Object.keys(finalCourseData)) {
+              const before = (coursePageSnapshotRetry as any)[k];
+              const wasEmpty = before === null || before === undefined || before === "" || (Array.isArray(before) && before.length === 0);
+              if (wasEmpty && (finalCourseData as any)[k] != null) appliedFromCache = true;
+              (cheerioData as any)[k] = (finalCourseData as any)[k];
             }
-            if (!cheerioData.pteOverall && cachedEnglishReqs.pteOverall) { cheerioData.pteOverall = cachedEnglishReqs.pteOverall; cachedAppliedRetry = true; }
-            if (!cheerioData.toeflOverall && cachedEnglishReqs.toeflOverall) { cheerioData.toeflOverall = cachedEnglishReqs.toeflOverall; cachedAppliedRetry = true; }
-            if (!cheerioData.cambridgeOverall && cachedEnglishReqs.cambridgeOverall) { cheerioData.cambridgeOverall = cachedEnglishReqs.cambridgeOverall; cachedAppliedRetry = true; }
-            if (cachedAppliedRetry && cachedEnglishReqsSource) {
+            if (appliedFromCache && cachedEnglishReqsSource) {
               const sl: string[] = [];
               if (cheerioData.ieltsOverall != null) sl.push(`IELTS overall ${cheerioData.ieltsOverall}${cheerioData.ieltsListening != null ? ` no band below ${cheerioData.ieltsListening}` : ""}`);
               if (cheerioData.pteOverall   != null) sl.push(`PTE ${cheerioData.pteOverall}`);
