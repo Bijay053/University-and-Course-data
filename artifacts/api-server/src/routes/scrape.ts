@@ -8913,7 +8913,16 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
         // inline modal), it IS the authoritative source — force-override any
         // prior values from generic page-text extraction that may have set
         // garbage (truthy) values blocking the fill.
-        if (cachedEnglishReqs) {
+        // Hard guard: if the cache came from a course_page that isn't THIS
+        // course, skip cache-fill entirely. Course-page-derived English values
+        // are course-specific and must never leak across courses (e.g. a
+        // Bachelor's PTE=47 must not seed an MBA or Carpentry course).
+        const cacheIsForeignCoursePage = cachedEnglishReqsSource?.pageType === "course_page"
+          && (cachedEnglishReqsSource as any)?.url !== link.url;
+        if (cachedEnglishReqs && cacheIsForeignCoursePage) {
+          addLog(job, "status", { message: `[CACHE-SKIP] ${link.name.slice(0, 40)} — cache is from a different course page, not applied`, phase: "extract" });
+        }
+        if (cachedEnglishReqs && !cacheIsForeignCoursePage) {
           let cachedApplied = false;
           // forceCourseOverride: only when cache literally came from THIS course's
           // URL. Otherwise the cached values are from a different course's page
@@ -9157,8 +9166,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               degreeLevel: cheerioData.degreeLevel,
             }));
           }
-          // Per-field cache fill (same logic as main batch)
-          if (cachedEnglishReqs) {
+          // Per-field cache fill (same logic as main batch).
+          // Same hard guard: skip foreign course_page cache to prevent leakage.
+          const cacheIsForeignCoursePageRetry = cachedEnglishReqsSource?.pageType === "course_page"
+            && (cachedEnglishReqsSource as any)?.url !== url;
+          if (cachedEnglishReqs && !cacheIsForeignCoursePageRetry) {
             let cachedAppliedRetry = false;
             if (!cheerioData.ieltsOverall && cachedEnglishReqs.ieltsOverall) {
               cheerioData.ieltsOverall = cachedEnglishReqs.ieltsOverall;
