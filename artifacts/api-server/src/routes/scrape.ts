@@ -7848,25 +7848,30 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             // ── Gemini text on rendered HTML (catches JS-injected tables static parse misses) ──
             if (!(renderedReq.pteOverall && renderedReq.toeflOverall) && GEMINI_API_KEY) {
               try {
-                const renderedCompact = extractCompactContent(renderedHtml, reqUrl);
-                const enPrompt2 = `Extract English language proficiency test requirements from this university page.\nIf the page has a TABLE with multiple rows for different IELTS levels (e.g. 5.5, 6.0, 6.5), return ALL rows as "bands".\nIf there is only one flat requirement, return it in "flat".\nReturn ONLY valid JSON in this exact shape:\n{"bands":[{"ielts":<number>,"pte":<number|null>,"toefl":<number|null>,"cae":<number|null>,"duo":<number|null>}],"flat":{"ielts":<number|null>,"pte":<number|null>,"toefl":<number|null>,"cae":<number|null>,"duo":<number|null>}}\nUse null for any test not found. "bands" may be an empty array if no tiered table exists.`;
-                const enResult2 = await geminiChat(enPrompt2, renderedCompact.slice(0, 12000), 400);
-                const enParsed2 = JSON.parse(enResult2);
+                const renderedCompact = renderedText.slice(0, 14000);
+                addLog(job, "status", { message: `Gemini-rendered call: text length=${renderedCompact.length} chars`, phase: "fetch" });
+                const enPrompt2 = `Extract English language proficiency test requirements from this university requirements page.\nIf there is a TABLE with rows for different IELTS scores (e.g. 5.5, 6.0, 6.5), return ALL rows in "bands".\nIf only one flat requirement exists, put it in "flat".\nReturn ONLY valid JSON: {"bands":[{"ielts":5.5,"pte":42,"toefl":46,"cae":null,"duo":null}],"flat":{"ielts":null,"pte":null,"toefl":null,"cae":null,"duo":null}}\nUse null for missing values. Empty "bands" array is fine if no table.`;
+                const enResult2 = await geminiChat(enPrompt2, renderedCompact, 400);
+                addLog(job, "status", { message: `Gemini-rendered raw response (first 200): ${enResult2.slice(0, 200)}`, phase: "fetch" });
+                const jsonMatch = enResult2.match(/\{[\s\S]*\}/);
+                const enParsed2 = JSON.parse(jsonMatch ? jsonMatch[0] : enResult2);
                 // Store tiered bands for per-course IELTS→PTE lookup
                 if (Array.isArray(enParsed2.bands) && enParsed2.bands.length > 1) {
                   cachedEnglishBands = enParsed2.bands.filter((b: any) => b && b.ielts != null);
-                  addLog(job, "status", { message: `Gemini-rendered bands: ${cachedEnglishBands!.map((b) => `IELTS ${b.ielts}→PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
+                  addLog(job, "status", { message: `Gemini bands: ${cachedEnglishBands!.map((b) => `IELTS ${b.ielts}->PTE ${b.pte ?? "-"} TOEFL ${b.toefl ?? "-"}`).join(" | ")}`, phase: "fetch" });
                 }
                 // Also apply flat values if HTML parser missed them
-                const flat = enParsed2.flat || (enParsed2.bands?.length === 1 ? enParsed2.bands[0] : null);
-                if (flat) {
+                const flat = enParsed2.flat || (Array.isArray(enParsed2.bands) && enParsed2.bands.length === 1 ? enParsed2.bands[0] : null);
+                if (flat && (flat.ielts || flat.pte || flat.toefl)) {
                   if (!renderedReq.ieltsOverall && flat.ielts) renderedReq.ieltsOverall = flat.ielts;
                   if (!renderedReq.pteOverall && flat.pte) renderedReq.pteOverall = flat.pte;
                   if (!renderedReq.toeflOverall && flat.toefl) renderedReq.toeflOverall = flat.toefl;
                   if (!(renderedReq as any).cambridgeOverall && flat.cae) (renderedReq as any).cambridgeOverall = flat.cae;
-                  addLog(job, "status", { message: `Gemini-rendered flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
+                  addLog(job, "status", { message: `Gemini flat: IELTS=${renderedReq.ieltsOverall} PTE=${renderedReq.pteOverall} TOEFL=${renderedReq.toeflOverall}`, phase: "fetch" });
                 }
-              } catch {}
+              } catch (gemErr) {
+                addLog(job, "status", { message: `Gemini-rendered failed: ${(gemErr as Error).message?.slice(0, 120)}`, phase: "fetch" });
+              }
             }
 
             if (renderedReq.ieltsOverall || renderedReq.pteOverall || renderedReq.toeflOverall) {
