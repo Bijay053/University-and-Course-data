@@ -1,0 +1,90 @@
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 13,
+        file: '/eval.ts',
+        length: 5,
+        line: 4,
+        lineText: 'const page = await browser.newPage();',
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 5,
+        lineText: "await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development',{waitUntil:'networkidle',timeout:30000});",
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 6,
+root@university-and-course-data:~/University-and-Course-data# ^C
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/check_asa.mjs <<'EOF'
+import { chromium } from '/root/University-and-Course-data/node_modules/playwright/index.mjs';
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development', {waitUntil:'networkidle', timeout:30000});
+await page.waitForTimeout(4000);
+
+const text = await page.evaluate(() => document.body.innerText);
+const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+let found = false;
+for (let i = 0; i < lines.length; i++) {
+  if (/ielts|pte|toefl|cae|english.*req/i.test(lines[i])) {
+    found = true;
+    for (let j = Math.max(0,i-1); j <= Math.min(lines.length-1, i+5); j++) {
+      console.log(j + ': ' + lines[j]);
+    }
+    console.log('---');
+  }
+}
+if (!found) console.log('NOTHING FOUND IN RENDERED TEXT');
+
+await browser.close();
+EOF
+
+node --input-type=module < /tmp/check_asa.mjs 2>&1 | head -80
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/root/University-and-Course-data/node_modules/playwright/index.mjs' imported from /root/University-and-Course-data/[eval1]
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:991:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+    at #resolve (node:internal/modules/esm/loader:701:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:245:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///root/University-and-Course-data/node_modules/playwright/index.mjs'
+}
+
+Node.js v24.14.1
+root@university-and-course-data:~/University-and-Course-data# 
