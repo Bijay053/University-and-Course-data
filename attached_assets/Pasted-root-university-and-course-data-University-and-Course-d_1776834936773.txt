@@ -1,0 +1,60 @@
+root@university-and-course-data:~/University-and-Course-data# grep -c "targetIelts\|allRows" /root/University-and-Course-data/artifacts/api-server/dist/workers/scrape-worker.mjs
+15
+root@university-and-course-data:~/University-and-Course-data# pm2 logs uni-api --lines 200 --nostream | grep -E "Mba Project|per-course modal|PRE-INSERT.*Project"
+root@university-and-course-data:~/University-and-Course-data# cat > /tmp/patch_modal_source.py <<'PYEOF'
+p = "/root/University-and-Course-data/artifacts/api-server/src/routes/scrape.ts"
+s = open(p).read()
+if 'Per-course modal (degree-matched' in s:
+    print("ALREADY PATCHED"); raise SystemExit(0)
+
+OLD = '''              if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+              if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+              if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+              if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
+              addLog(job, "status", { message: `[per-course modal \u2713] ${link.name.slice(0, 40)} \u2014'''
+
+NEW = '''              if (cIelts != null) { cheerioData.ieltsOverall = cIelts; (cheerioData as any).__perCourseModal_ielts = true; }
+              if (cPte   != null) { cheerioData.pteOverall   = cPte;   (cheerioData as any).__perCourseModal_pte   = true; }
+              if (cToefl != null) { cheerioData.toeflOverall = cToefl; (cheerioData as any).__perCourseModal_toefl = true; }
+              if (cCae   != null) { (cheerioData as any).cambridgeOverall = cCae; (cheerioData as any).__perCourseModal_cae = true; }
+              const modalSrcParts: string[] = [];
+              if (cIelts != null) modalSrcParts.push(`IELTS overall ${cIelts}`);
+              if (cPte   != null) modalSrcParts.push(`PTE ${cPte}`);
+              if (cToefl != null) modalSrcParts.push(`TOEFL iBT ${cToefl}`);
+              if (cCae   != null) modalSrcParts.push(`Cambridge CAE ${cCae}`);
+              reviewSources.push({
+                url: link.url,
+                pageType: "course_page",
+                extractionMethod: "cheerio",
+                content: `Per-course modal (degree-matched, target IELTS=${targetIelts}): ${modalSrcParts.join(", ")}`,
+              });
+              addLog(job, "status", { message: `[per-course modal \u2713] ${link.name.slice(0, 40)} \u2014'''
+
+n = s.count(OLD); print(f"matches: {n}"); assert n == 1
+open(p, "w").write(s.replace(OLD, NEW))
+print("PATCHED OK")
+PYEOF
+python3 /tmp/patch_modal_source.py && \
+cd /root/University-and-Course-data && \
+rm -rf artifacts/api-server/dist && \
+pnpm --filter @workspace/api-server run build 2>&1 | tail -3 && \
+echo "--- bundle marker (should be ≥1): ---" && \
+grep -c "Per-course modal" artifacts/api-server/dist/workers/scrape-worker.mjs && \
+set -a && source /root/.env.backup && set +a && \
+pm2 restart uni-api --update-env && echo "DEPLOYED OK"
+matches: 1
+PATCHED OK
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 640ms
+--- bundle marker (should be ≥1): ---
+1
+[PM2] Applying action restartProcessId on app [uni-api](ids: [ 0 ])
+[PM2] [uni-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ uni-api            │ cluster  │ 23   │ online    │ 0%       │ 46.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+DEPLOYED OK
+root@university-and-course-data:~/University-and-Course-data# 
