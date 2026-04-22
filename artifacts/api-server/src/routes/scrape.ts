@@ -18,6 +18,7 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
+import { extractEnglishWithCascade } from "../lib/english-cascade.js";
 import {
   buildCourseReviewSnapshot,
   type CourseReviewSnapshot,
@@ -9042,6 +9043,37 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           phase: "extract",
         });
 
+        // ── UNIVERSAL ENGLISH CASCADE (safety net) ─────────────────────────
+        // For JS-heavy sites where regular extraction missed one of the three
+        // critical English tests (IELTS/PTE/TOEFL), run text→tabs→modals→vision
+        // →links cascade as last-resort fill. Cambridge-only misses do NOT
+        // trigger the cascade — too many sites legitimately omit CAE and we
+        // don't want to spawn a Chromium per course just for that.
+        try {
+          const englishIncomplete =
+            !cheerioData.ieltsOverall ||
+            !cheerioData.pteOverall ||
+            !cheerioData.toeflOverall;
+          if (englishIncomplete && siteNeedsBrowser(link.url) && GEMINI_API_KEY) {
+            const outcome = await extractEnglishWithCascade(link.url, cheerioData as any, {
+              courseName: cheerioData.courseName || link.name,
+              degreeLevel: cheerioData.degreeLevel,
+            });
+            if (outcome.evidence.length > 0) {
+              for (const ev of outcome.evidence) reviewSources.push(ev);
+              addLog(job, "status", {
+                message: `[cascade ✓] ${link.name.slice(0, 40)} — ${outcome.steps.join("→")} | I=${cheerioData.ieltsOverall ?? "-"} P=${cheerioData.pteOverall ?? "-"} T=${cheerioData.toeflOverall ?? "-"} C=${(cheerioData as any).cambridgeOverall ?? "-"}`,
+                phase: "extract",
+              });
+            }
+          }
+        } catch (cascadeErr) {
+          addVerboseLog(job, "status", {
+            message: `[cascade ✗] ${link.name.slice(0, 40)} — ${(cascadeErr as Error).message?.slice(0, 80)}`,
+            phase: "extract",
+          });
+        }
+
         const hasFees = !!cheerioData.internationalFee;
         const hasEnglish = !!(cheerioData.ieltsOverall || cheerioData.pteOverall || cheerioData.toeflOverall || cheerioData.cambridgeOverall);
         const hasDuration = !!cheerioData.duration;
@@ -10542,6 +10574,37 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
 
           if (cachedEnglishReqs) {
             mergeEnglishRequirements(cheerioData, cachedEnglishReqs);
+          }
+
+          // ── UNIVERSAL ENGLISH CASCADE (rescrape safety net) ───────────────
+          // Mirrors the cascade in scrapeCourseBatch so the rescrape path also
+          // gets text→tabs→modals→vision→links coverage for JS-heavy sites
+          // whose requirements are image-based (e.g. ASA). Triggers on missing
+          // IELTS/PTE/TOEFL only — Cambridge-only misses are too common to
+          // justify spawning a browser per course.
+          try {
+            const englishIncomplete =
+              !cheerioData.ieltsOverall ||
+              !cheerioData.pteOverall ||
+              !cheerioData.toeflOverall;
+            if (englishIncomplete && siteNeedsBrowser(link.url) && GEMINI_API_KEY) {
+              const outcome = await extractEnglishWithCascade(link.url, cheerioData as any, {
+                courseName: cheerioData.courseName || link.name,
+                degreeLevel: cheerioData.degreeLevel,
+              });
+              if (outcome.evidence.length > 0) {
+                for (const ev of outcome.evidence) reviewSources.push(ev);
+                addLog(job, "status", {
+                  message: `[cascade ✓ rescrape] ${link.name.slice(0, 40)} — ${outcome.steps.join("→")} | I=${cheerioData.ieltsOverall ?? "-"} P=${cheerioData.pteOverall ?? "-"} T=${cheerioData.toeflOverall ?? "-"} C=${(cheerioData as any).cambridgeOverall ?? "-"}`,
+                  phase: "extract",
+                });
+              }
+            }
+          } catch (cascadeErr) {
+            addVerboseLog(job, "status", {
+              message: `[cascade ✗ rescrape] ${link.name.slice(0, 40)} — ${(cascadeErr as Error).message?.slice(0, 80)}`,
+              phase: "extract",
+            });
           }
 
           stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url), reviewSources });
