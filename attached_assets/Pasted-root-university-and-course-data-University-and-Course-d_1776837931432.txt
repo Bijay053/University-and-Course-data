@@ -1,0 +1,69 @@
+root@university-and-course-data:~/University-and-Course-data# # Trigger rescrape of all VIT courses (uses saved config; should hit modal scan path)
+curl -s -X POST http://localhost:$(grep -E "^PORT=" /root/.env.backup | cut -d= -f2)/api/scrape/rescrape \
+  -H "Content-Type: application/json" \
+  -d '{"universityId":6,"universityName":"vit"}' | head -c 500
+echo ""
+
+# Wait ~10s then watch live for the modal log line
+sleep 5
+pm2 logs uni-api --lines 0 --raw 2>&1 | grep --line-buffered -E "per-course modal|Project Management|PRE-INSERT" &
+TAIL_PID=$!
+sleep 240   # let scrape run up to 4 min
+kill $TAIL_PID 2>/dev/null
+
+# Then check newest staging row
+psql "$DATABASE_URL" -c "SELECT id, course_name, created_at FROM scraped_courses WHERE university_id=6 AND course_name ILIKE '%project management%' ORDER BY created_at DESC LIMIT 3;"
+{"jobId":"scrape_1776837357601_ez4zya","message":"Re-scraping started (no AI)"}
+[1] 214333
+  id  |      course_name       |          created_at           
+------+------------------------+-------------------------------
+ 4002 | Mba Project Management | 2026-04-22 05:56:38.421258+00
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# ^[[200~# Poll until job completes
+while true; do
+  STATUS=$(curl -s http://localhost:$(grep -E "^PORT=" /root/.env.backup | cut -d= -f2)/api/scrape/status/scrape_1776837116232_ctmey1 | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status'),'imported=',d.get('imported'),'current=',d.get('current'),'/',d.get('totalFound'))")
+  echo "$(date +%H:%M:%S) $STATUS"
+  echo "$STATUS" | grep -qE "completed|failed" && break
+  sleep 15
+done
+
+# Once done, fetch the new staging row + its evidence
+psql "$DATABASE_URL" <<'SQL'
+SELECT id, course_name, created_at FROM scraped_courses
+WHERE university_id=6 AND course_name ILIKE '%project management%'
+ORDER BY created_at DESC LIMIT 1;
+SQL
+
+# Grep the FULL recent log for our marker (no live tail — just the captured logs)
+pm2 logs uni-api --lines 5000 --nostream 2>&1 | grep -E "per-course modal|Project Management" | tail -30^[[201~
+# Poll until job completes                                    # Poll until job completes
+while true; do
+  STATUS=$(curl -s http://localhost:$(grep -E "^PORT=" /root/.env.backup | cut -d= -f2)/api/scrape/status/scrape_1776837116232_ctmey1 | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status'),'imported=',d.get('imported'),'current=',d.get('current'),'/',d.get('totalFound'))")
+  echo "$(date +%H:%M:%S) $STATUS"
+  echo "$STATUS" | grep -qE "completed|failed" && break
+  sleep 15
+done
+
+# Once done, fetch the new staging row + its evidence
+psql "$DATABASE_URL" <<'SQL'
+SELECT id, course_name, created_at FROM scraped_courses
+WHERE university_id=6 AND course_name ILIKE '%project management%'
+ORDER BY created_at DESC LIMIT 1;
+SQL
+
+# Grep the FULL recent log for our marker (no live tail — just the captured logs)
+pm2 logs uni-api --lines 5000 --nostream 2>&1 | grep -E "per-course modal|Project Management" | tail -30
+[1]+  Terminated              pm2 logs uni-api --lines 0 --raw 2>&1 | grep --color=auto --line-buffered -E "per-course modal|Project Management|PRE-INSERT"
+06:02:46 stopped imported= 30 current= 30 / 30
+06:03:01 stopped imported= 30 current= 30 / 30
+06:03:16 stopped imported= 30 current= 30 / 30
+06:03:31 stopped imported= 30 current= 30 / 30
+06:03:46 stopped imported= 30 current= 30 / 30
+06:04:01 stopped imported= 30 current= 30 / 30
+06:04:16 stopped imported= 30 current= 30 / 30
+06:04:31 stopped imported= 30 current= 30 / 30
+06:04:46 stopped imported= 30 current= 30 / 30
+06:05:01 stopped imported= 30 current= 30 / 30
+06:05:16 stopped imported= 30 current= 30 / 30
+06:05:31 stopped imported= 30 current= 30 / 30
