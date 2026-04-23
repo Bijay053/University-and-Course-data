@@ -1,0 +1,124 @@
+ENHANCE: Scrape History "View Courses" must show the FULL Review Scraped Courses table with evidence sources
+User wants the History view to match the live Review Scraped Courses table shown immediately after scrape completion, plus expandable evidence rows showing where each value came from.
+Evidence table confirmed schema (from \d scraped_field_evidence):
+
+field_key (e.g. "ieltsOverall", "internationalFee")
+candidate_value (raw found value)
+normalized_value (cleaned)
+source_url
+page_type (values seen: "course_page", "requirements_page", "fee_pdf", "english_page", "fee_page", "derived")
+extraction_method (values seen: "cheerio", "browser", "ai", "pdf", "derived")
+raw_text
+snippet
+confidence (0.0-1.0)
+decision_score (0.0-1.0)
+validation_status
+decision_status
+selected (boolean — true = value used on the course)
+
+Evidence data is populated — 2,263 rows for CSU alone, average ~12 evidence rows per course.
+
+BACKEND — update GET /api/scrape/history/:jobId:
+Return each staged course with ALL its columns from scraped_courses PLUS the full evidence array:
+typescriptconst stagedCourses = await db.execute(sql`
+  SELECT 
+    sc.*,
+    COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'id', id,
+          'fieldKey', field_key,
+          'candidateValue', candidate_value,
+          'normalizedValue', normalized_value,
+          'sourceUrl', source_url,
+          'pageType', page_type,
+          'extractionMethod', extraction_method,
+          'snippet', snippet,
+          'confidence', confidence,
+          'decisionScore', decision_score,
+          'decisionStatus', decision_status,
+          'validationStatus', validation_status,
+          'selected', selected
+        )
+        ORDER BY field_key ASC, selected DESC, decision_score DESC NULLS LAST
+      )
+      FROM scraped_field_evidence
+      WHERE scraped_course_id = sc.id
+    ), '[]'::jsonb) as evidence
+  FROM scraped_courses sc
+  WHERE sc.scrape_job_id = ${jobId}
+  ORDER BY sc.course_name ASC
+`);
+
+FRONTEND — extract & reuse the live Review table component:
+
+Find the existing "Review Scraped Courses" table used on the Scraping page (likely in scraping.tsx or a separate component). It shows ALL columns (course name, category, publish status, eligibility, score %, level, duration, fee, IELTS, PTE, TOEFL, CAE, DET, intakes, location, mode).
+Extract it into a standalone component if not already: ReviewScrapedCoursesTable.tsx with props:
+typescriptinterface Props {
+  courses: StagedCourse[];
+  readOnly?: boolean;  // hide Approve/Reject/Edit in history view
+  showEvidence?: boolean;  // enable evidence expansion
+}
+
+Replace the current simple table in the Scrape History "View Courses" section with:
+tsx<ReviewScrapedCoursesTable 
+  courses={detail.stagedCourses}
+  readOnly
+  showEvidence
+/>
+
+
+
+EVIDENCE EXPANSION UI:
+Each row in the staged courses table gets a "▶ Sources" button. Clicking expands a sub-panel grouped by field_key:
+┌───────────────────────────────────────────────────────────────────┐
+│ Field: ieltsOverall                                                │
+├───────────────────────────────────────────────────────────────────┤
+│ ✓ 6.0    course_page · browser              0.98 confidence       │
+│   6.5    requirements_page · cheerio        0.80 confidence       │
+│   6.0    english_page · ai                  0.90 confidence       │
+│                                                                    │
+│ Field: internationalFee                                            │
+├───────────────────────────────────────────────────────────────────┤
+│ ✓ AUD 112500 Full Course   fee_pdf · pdf    0.96 confidence       │
+│                                                                    │
+│ Field: courseLocation                                              │
+├───────────────────────────────────────────────────────────────────┤
+│ ✓ Sydney    course_page · cheerio           0.97 confidence       │
+│   Sydney    requirements_page · cheerio     0.95 confidence       │
+│   Sydney    fee_pdf · pdf                   0.96 confidence       │
+│   Sydney    english_page · cheerio          0.99 confidence       │
+└───────────────────────────────────────────────────────────────────┘
+
+The ✓ marks the selected=true row (the value used on the course)
+Show page_type · extraction_method as the source label
+Click the source_url to open the original page in a new tab
+Sort candidates within each field by: selected DESC, decision_score DESC
+
+Visual style: make the selected row background lightly highlighted (green/blue tint). Non-selected rows slightly greyed so it's clear which is active.
+
+READ-ONLY MODE:
+In history view (readOnly={true}):
+
+Hide Approve/Reject/Edit buttons
+Still allow clicking course URLs
+Still allow expanding evidence
+Show a subtle "Read-only (historical record)" banner at top
+
+
+DELIVERY:
+
+Update backend GET /api/scrape/history/:jobId to include full sc.* + evidence array
+Extract live Review Scraped Courses table to reusable component
+Wire it into the Scrape History "View Courses" section with readOnly and showEvidence
+Implement evidence expansion UI grouped by field_key
+Build frontend + backend, commit, push to main
+Commit message: "Scrape history: show full review table with evidence sources per field"
+Reply with:
+
+Commit hash
+Screenshot of expanded evidence for "Bachelor Of 3d Design And Animation" Torrens course (should show ieltsOverall selected=6.0 from course_page/browser, plus alternative candidates; courseLocation selected=Sydney from 4 sources)
+
+
+
+Deploy on my server using my standard path /root/University-and-Course-data.

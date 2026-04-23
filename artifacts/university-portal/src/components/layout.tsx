@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Course Search", href: "/search", icon: SearchIcon },
   { name: "Universities", href: "/universities", icon: Building2 },
   { name: "Scraping", href: "/scraping", icon: HardDrive },
   { name: "Bulk Upload", href: "/bulk", icon: UploadCloud },

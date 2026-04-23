@@ -31,6 +31,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
 import { extractEnglishWithCascade } from "../lib/english-cascade.js";
+import { refreshCourseSearchView } from "../services/search-index.js";
 import {
   buildCourseReviewSnapshot,
   type CourseReviewSnapshot,
@@ -12021,6 +12022,9 @@ router.post("/scrape/staged/:id/approve", async (req: Request, res: Response): P
 
     const result = await approveSingleCourse(course);
     if (result.success) {
+      // Refresh the public Course Search MV in the background so newly
+      // approved courses appear in /api/search/courses without delay.
+      void refreshCourseSearchView();
       res.json({ success: true, courseId: result.courseId });
     } else {
       res.status(result.blocked ? 400 : 500).json({ error: result.error });
@@ -12047,6 +12051,10 @@ router.post("/scrape/staged/approve-all", async (req: Request, res: Response): P
       const result = await approveSingleCourse(course);
       if (result.success) approved++; else failed++;
     }
+
+    // Refresh the public Course Search MV once after the batch (debounced
+    // internally so concurrent approvals coalesce).
+    if (approved > 0) void refreshCourseSearchView();
 
     res.json({ approved, failed, skippedReview, total: courses.length });
   } catch (err) {

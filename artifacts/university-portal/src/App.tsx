@@ -12,6 +12,8 @@ import Scraping from "@/pages/scraping";
 import Bulk from "@/pages/bulk";
 import Backup from "@/pages/backup";
 import SettingsAcademicLevels from "@/pages/settings-academic-levels";
+import SearchPage from "@/pages/search";
+import ComparePage from "@/pages/compare";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ function Router() {
         <Route path="/bulk" component={Bulk} />
         <Route path="/backup" component={Backup} />
         <Route path="/settings/academic-levels" component={SettingsAcademicLevels} />
+        <Route path="/search" component={SearchPage} />
+        <Route path="/compare" component={ComparePage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

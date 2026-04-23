@@ -1,0 +1,121 @@
+ENHANCE: Scrape History "View Courses" must show the FULL Review Scraped Courses table with evidence sources
+The History section's "View Courses" currently shows a basic table (course name, level, category, status, fee, IELTS). This is NOT the same rich table that appears right after a scrape completes on the Scraping page.
+What the user wants: When viewing history from any past scrape, the staged-courses view should be identical to the live "Review Scraped Courses" table shown immediately after scraping. Specifically:
+
+All columns displayed during live review:
+
+Course Name
+Category + Sub-category
+Publish status (ready/review/rejected) + Eligibility status
+Publish blocking reasons + warnings
+Score (confidence %)
+Degree Level
+Duration + Term
+International Fee + Currency + Fee Term (per year / full course / per unit)
+Fee Year
+Application Fee (if available)
+IELTS (overall + sub-bands)
+PTE (overall + sub-bands)
+TOEFL (overall + sub-bands)
+CAE / Cambridge
+DET / Duolingo
+Intake months
+Course Location
+Study Mode
+Course URL
+Other Requirements
+Academic Requirements
+
+
+Evidence sources for each field — the "source of truth" showing:
+
+Where the value came from (course page URL, requirements page, PDF, vision-scan image, sibling cache backfill, etc.)
+What other candidate values were seen but rejected
+Why the selected value was chosen (highest confidence, most recent, page-specific override, etc.)
+
+
+
+This data ALREADY exists in the scraped_field_evidence table. The live review table already surfaces it. The history view just doesn't load it.
+
+BACKEND — extend GET /api/scrape/history/:jobId response:
+Update the stagedCourses query to include ALL fields from scraped_courses (not just the handful currently returned), PLUS pull evidence from scraped_field_evidence:
+typescriptconst stagedCourses = await db.execute(sql`
+  SELECT 
+    sc.*,
+    -- Aggregate all evidence rows for this course as JSONB
+    COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'fieldKey', field_key,
+          'candidateValue', candidate_value,
+          'selected', selected,
+          'source', source,
+          'sourceUrl', source_url,
+          'decisionScore', decision_score,
+          'decisionStatus', decision_status,
+          'decisionReason', decision_reason
+        )
+        ORDER BY field_key, selected DESC, decision_score DESC NULLS LAST
+      )
+      FROM scraped_field_evidence
+      WHERE scraped_course_id = sc.id
+    ), '[]'::jsonb) as evidence
+  FROM scraped_courses sc
+  WHERE sc.scrape_job_id = ${jobId}
+  ORDER BY sc.course_name ASC
+`);
+This returns each course row with an evidence array showing ALL candidate values seen for each field, which one was selected, and why.
+Verify the column names in scraped_field_evidence — adjust the SELECT if actual columns differ (e.g., it might be source_type and source_url or similar).
+
+FRONTEND — reuse the existing Review table component:
+The live "Review Scraped Courses" table is already a component somewhere in artifacts/university-portal/src/ — probably ReviewScrapedCoursesTable.tsx or inside scraping.tsx. Don't rebuild it — reuse it.
+Find that component and extract it if it's not already standalone. Pass the staged courses array as a prop.
+In the History section, replace the current simple "View Courses" table with this same component:
+tsx{expandedRun === run.runtimeJobId && detail && (
+  <div className="mt-4">
+    <ReviewScrapedCoursesTable 
+      courses={detail.stagedCourses}
+      readOnly={true}  // history view — no approve/reject buttons
+      showEvidence={true}  // show the evidence drawer per course
+    />
+  </div>
+)}
+
+Evidence display — expandable row:
+Each course row should have a "▶ Show sources" expandable arrow. Clicking it reveals a sub-table:
+┌─────────────────────────────────────────────────────────────────┐
+│ Field              Value    Source                     Score   │
+├─────────────────────────────────────────────────────────────────┤
+│ ielts_overall      6.0      course-page (selected ✓)   95%     │
+│ ielts_overall      6.5      requirements-page          80%     │
+│ ielts_overall      6.0      vision-scan-img-3          90%     │
+│                                                                 │
+│ international_fee  32000    course-page (selected ✓)   100%    │
+│ international_fee  32000    vision-scan-img-5          85%     │
+│                                                                 │
+│ duration           3        course-page (selected ✓)   100%    │
+│                                                                 │
+│ pte_overall        50       sibling-cache-backfill (✓) 70%     │
+└─────────────────────────────────────────────────────────────────┘
+The selected ✓ row is the value that made it to the course record. The others are rejected candidates — keeping them visible helps the user understand WHY a value was chosen and whether to override it.
+Group rows by field_key so all candidates for one field are together.
+
+Read-only mode for history:
+In the live review table, each row has Approve/Reject/Edit buttons. In the history view, these should be hidden or disabled since the data is already past its approval decision. Still allow:
+
+Viewing full details
+Expanding the evidence panel
+Clicking course URL to open the source page
+
+
+DELIVERY:
+
+Update GET /api/scrape/history/:jobId to return full columns + evidence aggregated
+Extract/reuse the live Review Scraped Courses table component
+Replace the History "View Courses" section with the full-fidelity table + evidence expander
+Verify scraped_field_evidence column names match the query (run psql "$DATABASE_URL" -c "\d scraped_field_evidence" and paste the output if unsure)
+Build frontend + backend, commit, push to main
+Commit message: "Scrape history: show full Review table with evidence sources for every field"
+Reply with commit hash + screenshot showing the expanded evidence rows for one CSU or Torrens course
+
+After your push I'll deploy.
