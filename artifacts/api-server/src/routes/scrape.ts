@@ -1481,6 +1481,21 @@ function normalizeCsuCampusName(raw: string | undefined): string | undefined {
   return cleaned || undefined;
 }
 
+/**
+ * CSU lists overseas exchange-partner universities (e.g. "Jilin Uni - Finance &
+ * Economics", "Tianjin University of Commerce", "Yangzhou University", "Yunnan
+ * Uni-Finance & Economics") in the international (FPOS) offering feed alongside
+ * real Australian campuses.  These partner names are NOT a CSU campus location,
+ * so we exclude them when populating `courseLocation`.  Real CSU campuses are
+ * always plain Australian city names (Bathurst, Wagga Wagga, Albury-Wodonga,
+ * Port Macquarie, Orange, Dubbo, etc.) and never contain the word "uni" or
+ * "university".
+ */
+function isCsuPartnerCampus(name: string | undefined): boolean {
+  if (!name) return false;
+  return /\b(uni|university|college|institute)\b/i.test(name);
+}
+
 function applyCsuStructuredCourseData(html: string, url: string, data: Partial<CourseData>) {
   if (!isCsuCoursePage(url)) return;
 
@@ -1540,20 +1555,39 @@ function applyCsuStructuredCourseData(html: string, url: string, data: Partial<C
 
     if (data.studyMode === "Online") data.onlineOnly = true;
 
-    if (!data.courseLocation) {
-      const campuses = [...new Set(yearOfferings
-        .filter((record) => isPhysicalOffering(record))
-        .map((record) => normalizeCsuCampusName(record.campus_name))
-        .filter((value): value is string => !!value))];
-      if (campuses.length > 0) data.courseLocation = campuses.join(", ");
-    }
-
     if (!data.intakeMonths?.length) {
       const intakeMonths = [...new Set(yearOfferings
         .map((record) => mapCsuSessionCodeToMonth(record.session_code ?? ""))
         .filter((value): value is string => !!value))];
       if (intakeMonths.length > 0) data.intakeMonths = intakeMonths;
     }
+  }
+
+  // Campus location is derived from ALL offerings (CGS + FPOS), not just the
+  // international (FPOS) subset.  The international feed often contains foreign
+  // exchange-partner universities (Jilin/Tianjin/Yangzhou/Yunnan) plus only
+  // one or two real Australian campuses, while the domestic (CGS) feed lists
+  // the full set of Australian campuses where the course is delivered
+  // (e.g. Bathurst, Albury-Wodonga, Port Macquarie, Wagga Wagga).  Run this
+  // independently of the FPOS-only `yearOfferings` block so courses with no
+  // current international offerings still get a campus.
+  if (!data.courseLocation && courseOfferings.length > 0) {
+    const allOfferingYears = [...new Set(courseOfferings
+      .map((record) => parseInt(record.session_year ?? "", 10))
+      .filter((year) => Number.isFinite(year)))].sort((a, b) => a - b);
+    const selectedCampusYear = allOfferingYears.find((year) => year >= currentYear) ?? allOfferingYears[0];
+    const campusYearOfferings = selectedCampusYear != null
+      ? courseOfferings.filter((record) => parseInt(record.session_year ?? "", 10) === selectedCampusYear)
+      : courseOfferings;
+    const physicalCampuses = [...new Set(campusYearOfferings
+      .filter((record) => isPhysicalOffering(record))
+      .map((record) => normalizeCsuCampusName(record.campus_name))
+      .filter((value): value is string => !!value)
+      .filter((value) => !isCsuPartnerCampus(value)))];
+    const hasOnlineForCampus = campusYearOfferings.some((record) => isOnlineOffering(record));
+    const campuses = [...physicalCampuses];
+    if (hasOnlineForCampus) campuses.push("Online");
+    if (campuses.length > 0) data.courseLocation = campuses.join(", ");
   }
 
   const intlFees = courseFees.filter((record) => isIntlFee(record));
