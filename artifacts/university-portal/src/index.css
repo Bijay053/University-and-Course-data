@@ -205,3 +205,21 @@
 .courses-table td {
   border-color: #e9eaec !important;
 }
+
+/* ─── Number inputs ────────────────────────────────────────────────
+   1. Hide the native up/down spinner buttons project-wide — they
+      collide with our compact filter UI and looked broken next to
+      score boxes (Reading / Speaking, etc.).
+   2. The wheel-to-change behaviour is suppressed globally in main.tsx
+      so users can scroll the page over a focused number input
+      without accidentally changing its value.
+*/
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
