@@ -15,7 +15,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -329,6 +329,72 @@ export default function UniversityDetail() {
   const [editUniCity, setEditUniCity] = useState("");
   const [editUniCountry, setEditUniCountry] = useState("");
   const [editUniSaving, setEditUniSaving] = useState(false);
+
+  // ── Repair scrape state ─────────────────────────────────────────────────
+  type RepairCourse = { id: number; name: string; url: string | null; missing: string[] };
+  const [repairOpen, setRepairOpen] = useState(false);
+  const [repairLoading, setRepairLoading] = useState(false);
+  const [repairCourses, setRepairCourses] = useState<RepairCourse[]>([]);
+  const [repairLoadError, setRepairLoadError] = useState<string | null>(null);
+  const [repairStarting, setRepairStarting] = useState(false);
+  const [repairStartResult, setRepairStartResult] = useState<{
+    jobId?: string;
+    count: number;
+    rejectedForeignIds?: number[];
+    message?: string;
+  } | null>(null);
+
+  const loadRepairMissing = useCallback(async () => {
+    if (!id) return;
+    setRepairLoading(true);
+    setRepairLoadError(null);
+    setRepairStartResult(null);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/repair/missing/${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setRepairCourses(Array.isArray(data?.courses) ? data.courses : []);
+    } catch (err) {
+      setRepairLoadError((err as Error).message);
+      setRepairCourses([]);
+    } finally {
+      setRepairLoading(false);
+    }
+  }, [id]);
+
+  const openRepairDialog = useCallback(() => {
+    setRepairOpen(true);
+    void loadRepairMissing();
+  }, [loadRepairMissing]);
+
+  const startRepairScrape = useCallback(async () => {
+    if (!id) return;
+    setRepairStarting(true);
+    setRepairStartResult(null);
+    try {
+      const res = await fetch(`${BASE}/api/scrape/repair/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universityId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setRepairStartResult({
+        jobId: data?.jobId,
+        count: Number(data?.count ?? 0),
+        rejectedForeignIds: Array.isArray(data?.rejectedForeignIds) ? data.rejectedForeignIds : [],
+        message: data?.message,
+      });
+      toast({
+        title: data?.jobId ? "Repair scrape started" : "Nothing to repair",
+        description: data?.message || (data?.jobId ? `Job ${data.jobId} queued.` : ""),
+      });
+    } catch (err) {
+      toast({ title: "Repair scrape failed", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setRepairStarting(false);
+    }
+  }, [id, toast]);
 
   const [tab, setTab] = useState<Tab>("courses");
 
@@ -1313,6 +1379,17 @@ export default function UniversityDetail() {
             <h1 className="text-2xl font-bold tracking-tight">{uni.name}</h1>
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={openEditUni} title="Edit university">
               <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={openRepairDialog}
+              title="Re-scrape only courses missing duration / location / English requirements (no AI)"
+              data-testid="button-repair-scrape"
+            >
+              <Wrench className="h-3.5 w-3.5 mr-1" />
+              Repair Scrape
             </Button>
             <button
               type="button"
@@ -3547,6 +3624,132 @@ export default function UniversityDetail() {
             <Button variant="outline" onClick={() => setEditUniOpen(false)}>Cancel</Button>
             <Button onClick={saveEditUni} disabled={editUniSaving}>
               {editUniSaving ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Repair Scrape Dialog ───────────────────────────────────────────── */}
+      <Dialog open={repairOpen} onOpenChange={setRepairOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-amber-600" />
+              Repair Scrape — {uni.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Re-scrapes only courses with missing critical fields (duration,
+              location, or any English requirement rows). Uses the saved scrape
+              config — no AI cost.
+            </p>
+
+            {repairLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading missing courses…
+              </div>
+            ) : repairLoadError ? (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
+                Failed to load: {repairLoadError}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">
+                    <span className="font-semibold">{repairCourses.length}</span>{" "}
+                    course{repairCourses.length === 1 ? "" : "s"} need repair
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={loadRepairMissing} disabled={repairLoading} className="h-7">
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+                  </Button>
+                </div>
+
+                {repairCourses.length > 0 && (
+                  <div className="border rounded-md max-h-72 overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr className="text-left">
+                          <th className="px-2 py-1.5 font-semibold text-gray-600">Course</th>
+                          <th className="px-2 py-1.5 font-semibold text-gray-600 w-[260px]">Missing fields</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repairCourses.map((c) => (
+                          <tr key={c.id} className="border-t" data-testid={`repair-row-${c.id}`}>
+                            <td className="px-2 py-1.5 align-top">
+                              <div className="font-medium text-gray-800">{c.name}</div>
+                              {c.url && (
+                                <a
+                                  href={c.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-blue-600 hover:underline truncate block max-w-[360px]"
+                                >
+                                  {c.url}
+                                </a>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 align-top">
+                              <div className="flex flex-wrap gap-1">
+                                {c.missing.map((m) => (
+                                  <Badge key={m} variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50">
+                                    {m}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {repairStartResult && (
+              <div className="text-sm border rounded p-3 bg-green-50 border-green-200 text-green-800 space-y-1">
+                <div>
+                  <span className="font-semibold">Started:</span>{" "}
+                  {repairStartResult.message || "Repair scrape queued."}
+                </div>
+                {repairStartResult.jobId && (
+                  <div>
+                    <span className="font-semibold">Job ID:</span>{" "}
+                    <code className="text-xs">{repairStartResult.jobId}</code>
+                  </div>
+                )}
+                <div>
+                  <span className="font-semibold">Courses queued:</span> {repairStartResult.count}
+                </div>
+                {repairStartResult.rejectedForeignIds && repairStartResult.rejectedForeignIds.length > 0 && (
+                  <div className="text-amber-800">
+                    <span className="font-semibold">Rejected foreign IDs:</span>{" "}
+                    {repairStartResult.rejectedForeignIds.join(", ")}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepairOpen(false)}>Close</Button>
+            <Button
+              onClick={startRepairScrape}
+              disabled={repairStarting || repairLoading || repairCourses.length === 0}
+              data-testid="button-start-repair"
+            >
+              {repairStarting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Starting…
+                </>
+              ) : (
+                <>
+                  <Wrench className="h-4 w-4 mr-2" /> Start Repair Scrape
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
