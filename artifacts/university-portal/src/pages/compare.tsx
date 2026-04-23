@@ -26,6 +26,7 @@ type CompareCourse = {
   study_mode: string | null;
   intakes: string[];
   international_fee: number | null;
+  international_fee_yearly: number | null;
   currency: string | null;
   fee_term: string | null;
   application_fee: number | null;
@@ -35,10 +36,13 @@ type CompareCourse = {
 };
 
 function formatFee(c: CompareCourse): string | null {
-  if (c.international_fee == null) return null;
+  // Always render the per-year amount. The API normalises "Full Course" /
+  // "Total" / "Trimester" via `international_fee_yearly`; if missing, use
+  // the raw amount as a best-effort fallback.
+  const value = c.international_fee_yearly != null ? c.international_fee_yearly : c.international_fee;
+  if (value == null) return null;
   const cur = c.currency || "AUD";
-  const t = c.fee_term ? ` / ${c.fee_term}` : "";
-  return `${cur} ${Math.round(c.international_fee).toLocaleString()}${t}`;
+  return `${cur} ${Math.round(value).toLocaleString()} / Year`;
 }
 function formatDuration(c: CompareCourse): string | null {
   if (c.duration == null) return null;

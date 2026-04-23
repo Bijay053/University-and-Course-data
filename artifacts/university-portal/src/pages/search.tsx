@@ -31,6 +31,7 @@ type CourseResult = {
   duration_years: number | null;
   intakes: string[];
   international_fee: number | null;
+  international_fee_yearly: number | null;
   currency: string | null;
   fee_term: string | null;
   application_fee: number | null;
@@ -71,11 +72,20 @@ function saveCompareTray(ids: number[]) {
   window.dispatchEvent(new CustomEvent("compareTrayChange"));
 }
 
-function formatFee(amount: number | null, currency: string | null, term: string | null) {
-  if (amount == null) return null;
+function formatFee(
+  amount: number | null,
+  currency: string | null,
+  term: string | null,
+  yearly?: number | null,
+) {
+  // Always display the per-year amount so listings are comparable. The API
+  // already converts "Full Course" / "Total" / "Trimester" into a yearly
+  // figure via `international_fee_yearly`; fall back to the raw amount when
+  // we don't have a normalized value.
+  const value = yearly != null ? yearly : amount;
+  if (value == null) return null;
   const cur = currency || "AUD";
-  const t = term ? ` / ${term}` : "";
-  return `${cur} ${Math.round(amount).toLocaleString()}${t}`;
+  return `${cur} ${Math.round(value).toLocaleString()} / Year`;
 }
 function formatDuration(d: number | null, term: string | null) {
   if (d == null) return null;
@@ -511,7 +521,7 @@ export default function SearchPage() {
             {(data?.results ?? []).map((r) => {
               const inTray = tray.includes(r.id);
               const trayFull = tray.length >= MAX_COMPARE && !inTray;
-              const fee = formatFee(r.international_fee, r.currency, r.fee_term);
+              const fee = formatFee(r.international_fee, r.currency, r.fee_term, r.international_fee_yearly);
               const dur = formatDuration(r.duration, r.duration_term);
               const cityCountry = r.course_location || [r.university.city, r.university.country].filter(Boolean).join(", ");
               const meta: Array<{ icon: React.ReactNode; text: string }> = [];

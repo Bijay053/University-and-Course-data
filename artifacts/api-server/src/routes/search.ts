@@ -50,6 +50,36 @@ function whereSql(b: SqlBuilder): string {
   return b.parts.length ? `WHERE ${b.parts.join(" AND ")}` : "";
 }
 
+/**
+ * Wraps the materialized view in a subquery that adds an
+ * `international_fee_yearly` column normalised to AUD-per-year. This lets
+ * the Tuition Fee filter and the fee_asc/fee_desc sorts behave consistently
+ * regardless of how the source data expresses the term:
+ *   - "Year" / "Annual" / NULL  → as-is
+ *   - "Trimester"               → ×3 (3 trimesters per academic year)
+ *   - "Full Course" / "Total"   → ÷ duration_years (when duration is known)
+ *
+ * The alias is kept as `course_search_view` so all existing column references
+ * in the calling SQL continue to compile without changes.
+ */
+const FEE_YEARLY_SQL = `
+  CASE
+    WHEN international_fee IS NULL THEN NULL
+    WHEN fee_term ILIKE 'full%' OR fee_term ILIKE 'total%'
+      THEN CASE
+        WHEN duration_years IS NOT NULL AND duration_years > 0
+          THEN international_fee / duration_years
+        ELSE international_fee
+      END
+    WHEN fee_term ILIKE 'trimester%' THEN international_fee * 3
+    ELSE international_fee
+  END
+`;
+const COURSE_SEARCH_VIEW = `(
+  SELECT csv.*, ${FEE_YEARLY_SQL} AS international_fee_yearly
+  FROM course_search_view csv
+) course_search_view`;
+
 /** Parse a comma-separated query param into a trimmed string array. */
 function csvList(v: unknown): string[] | null {
   if (typeof v !== "string" || !v.trim()) return null;
@@ -131,8 +161,8 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
 
   const feeMin = num(q.fee_min);
   const feeMax = num(q.fee_max);
-  if (feeMin !== null) b.add(`international_fee >= ?`, feeMin);
-  if (feeMax !== null) b.add(`international_fee <= ?`, feeMax);
+  if (feeMin !== null) b.add(`international_fee_yearly >= ?`, feeMin);
+  if (feeMax !== null) b.add(`international_fee_yearly <= ?`, feeMax);
 
   const exam = typeof q.english_exam === "string" ? q.english_exam.trim().toUpperCase() : "";
   const examScore = num(q.english_score_min); // legacy: overall band
@@ -262,41 +292,42 @@ router.get("/search/courses", async (req: Request, res: Response) => {
         university_id, university_name, logo_url,
         university_city, university_country, university_website,
         international_fee, currency, fee_term, application_fee,
+        international_fee_yearly,
         intakes,
         ielts_overall, pte_overall, toefl_overall, cae_overall, duolingo_overall
-      FROM course_search_view
+      FROM ${COURSE_SEARCH_VIEW}
       ${whereClause}
       ORDER BY ${orderBy}
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
-    const countSql = `SELECT COUNT(*)::int AS total FROM course_search_view ${whereClause}`;
+    const countSql = `SELECT COUNT(*)::int AS total FROM ${COURSE_SEARCH_VIEW} ${whereClause}`;
 
     // Facets — same WHERE, grouped by each dimension. Run in parallel.
     const facetsValues = where.values;
     const facetsParts = [
       pool.query(
         `SELECT university_id AS id, university_name AS name, COUNT(*)::int AS count
-         FROM course_search_view ${whereClause}
+         FROM ${COURSE_SEARCH_VIEW} ${whereClause}
          GROUP BY university_id, university_name
          ORDER BY count DESC, name ASC LIMIT 50`,
         facetsValues,
       ),
       pool.query(
         `SELECT category AS name, COUNT(*)::int AS count
-         FROM course_search_view ${whereClause} ${whereClause ? "AND" : "WHERE"} category IS NOT NULL
+         FROM ${COURSE_SEARCH_VIEW} ${whereClause} ${whereClause ? "AND" : "WHERE"} category IS NOT NULL
          GROUP BY category ORDER BY count DESC, name ASC LIMIT 50`,
         facetsValues,
       ),
       pool.query(
         `SELECT degree_level AS name, COUNT(*)::int AS count
-         FROM course_search_view ${whereClause} ${whereClause ? "AND" : "WHERE"} degree_level IS NOT NULL
+         FROM ${COURSE_SEARCH_VIEW} ${whereClause} ${whereClause ? "AND" : "WHERE"} degree_level IS NOT NULL
          GROUP BY degree_level ORDER BY count DESC, name ASC LIMIT 50`,
         facetsValues,
       ),
       pool.query(
         `SELECT m AS name, COUNT(*)::int AS count
-         FROM course_search_view, UNNEST(coalesce(course_search_view.intakes, ARRAY[]::text[])) m
+         FROM ${COURSE_SEARCH_VIEW}, UNNEST(coalesce(course_search_view.intakes, ARRAY[]::text[])) m
          ${whereClause}
          GROUP BY m ORDER BY count DESC, name ASC LIMIT 50`,
         facetsValues,
@@ -339,6 +370,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
         duration_years: r.duration_years,
         intakes: r.intakes ?? [],
         international_fee: r.international_fee,
+        international_fee_yearly: r.international_fee_yearly == null ? null : Number(r.international_fee_yearly),
         currency: r.currency,
         fee_term: r.fee_term,
         application_fee: r.application_fee,
@@ -388,7 +420,7 @@ router.get("/search/compare", async (req: Request, res: Response) => {
     // base tables (full detail, all test types).
     const [mvRes, engRes, acadRes] = await Promise.all([
       pool.query(
-        `SELECT * FROM course_search_view WHERE id = ANY($1::int[])`,
+        `SELECT * FROM ${COURSE_SEARCH_VIEW} WHERE id = ANY($1::int[])`,
         [intIds],
       ),
       pool.query(
@@ -440,6 +472,7 @@ router.get("/search/compare", async (req: Request, res: Response) => {
         study_mode: r.study_mode,
         intakes: r.intakes ?? [],
         international_fee: r.international_fee,
+        international_fee_yearly: r.international_fee_yearly == null ? null : Number(r.international_fee_yearly),
         currency: r.currency,
         fee_term: r.fee_term,
         application_fee: r.application_fee,
