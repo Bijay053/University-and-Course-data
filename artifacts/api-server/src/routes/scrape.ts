@@ -11417,10 +11417,15 @@ router.post("/scrape/repair/start", async (req: Request, res: Response): Promise
     if (targetIds.length === 0) { res.json({ message: "No courses need repair", count: 0 }); return; }
 
     // Fetch the URLs + names for those courses to build a focused courseLinks list.
+    // Enforce ownership: only courses that belong to THIS university are eligible
+    // — prevents cross-university contamination if a caller supplies foreign ids.
     const urlsResult = await pool.query(
-      `SELECT id, name, course_website FROM courses WHERE id = ANY($1::int[])`,
-      [targetIds],
+      `SELECT id, name, course_website FROM courses
+        WHERE university_id = $1 AND id = ANY($2::int[])`,
+      [universityId, targetIds],
     );
+    const ownedIds = new Set(urlsResult.rows.map((r: any) => Number(r.id)));
+    const rejectedIds = targetIds.filter((id) => !ownedIds.has(id));
     const repairLinks = urlsResult.rows
       .filter((r: any) => r.course_website && String(r.course_website).startsWith("http"))
       .map((r: any) => ({ name: r.name as string, url: r.course_website as string }));
@@ -11450,7 +11455,14 @@ router.post("/scrape/repair/start", async (req: Request, res: Response): Promise
         { event: "status", message: "Queued repair job for worker execution", phase: "queue" },
       ],
     });
-    res.json({ jobId, count: repairLinks.length, message: "Repair scrape started" });
+    res.json({
+      jobId,
+      count: repairLinks.length,
+      rejectedForeignIds: rejectedIds,
+      message: rejectedIds.length > 0
+        ? `Repair scrape started; rejected ${rejectedIds.length} courseId(s) that do not belong to university ${universityId}`
+        : "Repair scrape started",
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
