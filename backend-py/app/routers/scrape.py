@@ -414,10 +414,11 @@ async def staged_list(
         "scrapeJobId": r.scrape_job_id,
         "status": r.status,
         "createdAt": r.created_at.isoformat() if r.created_at else None,
-        # Spread all model columns so UI gets fees, requirements, etc. when it wants them
-        **{c.name: getattr(r, c.name) for c in r.__table__.columns 
-           if c.name not in ('id','course_name','course_website','university_id','scrape_job_id','status','created_at')
-           and not isinstance(getattr(r, c.name, None), (bytes, bytearray))},
+        "fees": getattr(r, "fees", None),
+        "duration": getattr(r, "duration", None),
+        "intake": getattr(r, "intake", None),
+        "level": getattr(r, "level", None),
+        "field": getattr(r, "field", None),
     } for r in rows]
 
 
@@ -435,7 +436,7 @@ async def staged_one(
             select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
-        # UI expects bare array
+        # UI expects bare array — simple, JSON-safe shape only
         return [{
             "id": s.id,
             "courseName": s.course_name,
@@ -444,9 +445,11 @@ async def staged_one(
             "scrapeJobId": s.scrape_job_id,
             "status": s.status,
             "createdAt": s.created_at.isoformat() if s.created_at else None,
-            **{c.name: getattr(s, c.name) for c in s.__table__.columns 
-               if c.name not in ('id','course_name','course_website','university_id','scrape_job_id','status','created_at')
-               and not isinstance(getattr(s, c.name, None), (bytes, bytearray))},
+            "fees": getattr(s, "fees", None),
+            "duration": getattr(s, "duration", None),
+            "intake": getattr(s, "intake", None),
+            "level": getattr(s, "level", None),
+            "field": getattr(s, "field", None),
         } for s in rows]
     
     # Otherwise treat as integer sc_id
