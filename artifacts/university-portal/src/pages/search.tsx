@@ -89,9 +89,6 @@ export default function SearchPage() {
   // ─── core filters ──────────────────────────────────────
   const [q, setQ] = useState("");
   const [location, setLocFilter] = useState("");
-  const [selectedUnis, setSelectedUnis] = useState<string[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [selectedIntakes, setSelectedIntakes] = useState<string[]>([]);
   const [feeRange, setFeeRange] = useState<[number, number]>([0, 100000]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 6]);
@@ -145,9 +142,6 @@ export default function SearchPage() {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
     if (location.trim()) params.set("location", location.trim());
-    if (selectedUnis.length) params.set("university_id", selectedUnis.join(","));
-    if (selectedCategories.length) params.set("category", selectedCategories.join(","));
-    if (selectedLevels.length) params.set("degree_level", selectedLevels.join(","));
     if (selectedIntakes.length) params.set("intakes", selectedIntakes.join(","));
     if (feeRange[0] > 0) params.set("fee_min", String(feeRange[0]));
     if (feeRange[1] < 100000) params.set("fee_max", String(feeRange[1]));
@@ -169,7 +163,7 @@ export default function SearchPage() {
     if (page > 1) params.set("page", String(page));
     params.set("limit", "20");
     return `${BASE}/api/search/courses?${params.toString()}`;
-  }, [q, location, selectedUnis, selectedCategories, selectedLevels, selectedIntakes,
+  }, [q, location, selectedIntakes,
       feeRange, durationRange, englishExam, eOverall, eReading, eWriting, eListening, eSpeaking,
       country, qualification, scheme, outOf, gradingScore, otherExam, sort, page]);
 
@@ -213,8 +207,7 @@ export default function SearchPage() {
   }, [data]);
 
   const clearAllFilters = () => {
-    setQ(""); setLocFilter(""); setSelectedUnis([]); setSelectedCategories([]);
-    setSelectedLevels([]); setSelectedIntakes([]); setFeeRange([0, 100000]);
+    setQ(""); setLocFilter(""); setSelectedIntakes([]); setFeeRange([0, 100000]);
     setDurationRange([0, 6]); setEnglishExam("");
     setEOverall(""); setEReading(""); setEWriting(""); setEListening(""); setESpeaking("");
     setCountry(""); setQualification(""); setScheme(""); setOutOf(""); setGradingScore("");
@@ -222,15 +215,6 @@ export default function SearchPage() {
   };
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
-
-  // Universities options for the dropdown — prefer faceted (filtered) when present, else full.
-  const uniOptions = useMemo(() => {
-    const facets = data?.facets.universities ?? [];
-    if (facets.length > 0) {
-      return facets.map((f) => ({ value: String(f.id), label: f.name, count: f.count }));
-    }
-    return (options?.universities ?? []).map((u) => ({ value: String(u.id), label: u.name }));
-  }, [data, options]);
 
   const intakeOptions = useMemo(() => {
     return (data?.facets.intakes ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }));
@@ -285,21 +269,7 @@ export default function SearchPage() {
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
           </div>
 
-          <Accordion type="multiple" defaultValue={["uni", "intakes", "fee", "duration", "advanced", "english"]} className="w-full">
-            {/* University */}
-            <AccordionItem value="uni">
-              <AccordionTrigger className="text-sm">University</AccordionTrigger>
-              <AccordionContent className="pt-1">
-                <MultiSelect
-                  options={uniOptions}
-                  value={selectedUnis}
-                  onChange={(v) => { setSelectedUnis(v); resetPage(); }}
-                  placeholder="Any university"
-                  searchPlaceholder="Search universities..."
-                />
-              </AccordionContent>
-            </AccordionItem>
-
+          <Accordion type="multiple" defaultValue={["intakes", "fee", "duration", "advanced", "english"]} className="w-full">
             {/* Intakes */}
             <AccordionItem value="intakes">
               <AccordionTrigger className="text-sm">Intakes</AccordionTrigger>
@@ -347,29 +317,6 @@ export default function SearchPage() {
                 Advanced Filter
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                {/* Degree Level (moved from main filters) */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">Degree Level</Label>
-                  <MultiSelect
-                    options={(data?.facets.degree_levels ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
-                    value={selectedLevels}
-                    onChange={(v) => { setSelectedLevels(v); resetPage(); }}
-                    placeholder="Any level"
-                  />
-                </div>
-
-                {/* Category (moved from main filters) */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">Category</Label>
-                  <MultiSelect
-                    options={(data?.facets.categories ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
-                    value={selectedCategories}
-                    onChange={(v) => { setSelectedCategories(v); resetPage(); }}
-                    placeholder="Any category"
-                    searchPlaceholder="Search categories..."
-                  />
-                </div>
-
                 <div>
                   <Label className="text-xs text-gray-600 mb-1 block">
                     Country of Residence <span className="text-red-500">*</span>
