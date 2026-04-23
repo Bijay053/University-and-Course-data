@@ -494,3 +494,83 @@ async def bulk_start_alias(
 ) -> BulkScrapeResponse:
     """Alias for /bulk that UI uses."""
     return await start_bulk(body, db)
+
+
+
+@router.post("/staged/clear-rejected/{university_id}")
+async def staged_clear_rejected(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Delete all rejected staged courses for a university so they can be re-scraped."""
+    from app.models import ScrapedCourse
+    from sqlalchemy import delete
+    result = await db.execute(
+        delete(ScrapedCourse).where(
+            ScrapedCourse.university_id == university_id,
+            ScrapedCourse.status == "rejected",
+        )
+    )
+    await db.commit()
+    return {"ok": True, "deleted": result.rowcount or 0}
+
+
+@router.post("/staged/dedup/{university_id}")
+async def staged_dedup(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Remove duplicate staged courses for a university (keep newest per course_website)."""
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        DELETE FROM scraped_courses
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (
+                    PARTITION BY university_id, LOWER(course_website)
+                    ORDER BY created_at DESC
+                ) AS rn
+                FROM scraped_courses
+                WHERE university_id = :uid
+            ) t WHERE t.rn > 1
+        )
+    """), {"uid": university_id})
+    await db.commit()
+    return {"ok": True, "deleted": result.rowcount or 0}
+
+
+@router.post("/staged/{sc_id}/approve")
+async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    from app.models import ScrapedCourse
+    from datetime import datetime, timezone
+    sc = await db.get(ScrapedCourse, sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Not found")
+    sc.status = "approved"
+    sc.reviewed_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"ok": True, "id": sc_id, "status": "approved"}
+
+
+@router.post("/staged/{sc_id}/reject")
+async def staged_reject(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    from app.models import ScrapedCourse
+    from datetime import datetime, timezone
+    sc = await db.get(ScrapedCourse, sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Not found")
+    sc.status = "rejected"
+    sc.reviewed_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"ok": True, "id": sc_id, "status": "rejected"}
+
+
+@router.delete("/staged/{sc_id}")
+async def staged_delete(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    from app.models import ScrapedCourse
+    sc = await db.get(ScrapedCourse, sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db.delete(sc)
+    await db.commit()
+    return {"ok": True, "id": sc_id, "deleted": True}
