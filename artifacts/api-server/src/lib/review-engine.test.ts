@@ -284,3 +284,50 @@ test("preferApprovedValue keeps existing when allowReplace is false", () => {
   assert.equal(preferApprovedValue("old", "new", true), "new");
   assert.equal(preferApprovedValue("old", "" as any, true), "old");
 });
+
+test("course_page with sparse pageText plus extracted-fields footer produces course_page evidence rows (CSU-style JS-hydrated case)", () => {
+  // Simulates the production CSU bug: the static page text is essentially
+  // just the H1 ("Bachelor of Business Studies"), but extractWithCheerio
+  // pulled duration / location / fee / intakes from inline JSON. The
+  // provenance footer (built by buildCoursePageProvenanceFooter in
+  // scrape.ts) makes those values matchable so they get credited to the
+  // course_page rather than dropped entirely.
+  const sparseHeading = "Bachelor of Business Studies | CSU";
+  const provenanceFooter =
+    "\n\n[course-page extracted fields] courseName: Bachelor of Business Studies; degreeLevel: Bachelor; duration: 3 Year; location: Bathurst, Wagga Wagga; international fee: AUD 30000 Annual; intake: February, July; IELTS 6.5.";
+
+  const snapshot = buildCourseReviewSnapshot(
+    {
+      courseName: "Bachelor of Business Studies",
+      degreeLevel: "Bachelor",
+      duration: 3,
+      durationTerm: "Year",
+      studyMode: "On Campus",
+      courseLocation: "Bathurst, Wagga Wagga",
+      internationalFee: 30000,
+      currency: "AUD",
+      feeTerm: "Annual",
+      intakeMonths: ["February", "July"],
+      ieltsOverall: 6.5,
+    },
+    [{
+      url: "https://study.csu.edu.au/courses/bachelor-business-studies",
+      pageType: "course_page",
+      extractionMethod: "cheerio",
+      content: sparseHeading + provenanceFooter,
+    }],
+  );
+
+  const coursePageFields = new Set(
+    snapshot.candidates
+      .filter((c) => c.pageType === "course_page")
+      .map((c) => c.fieldKey),
+  );
+
+  for (const required of ["courseName", "duration", "courseLocation", "internationalFee", "intakeMonths", "ieltsOverall"]) {
+    assert.ok(
+      coursePageFields.has(required as any),
+      `expected at least one course_page evidence row for ${required}, got fields: ${[...coursePageFields].join(", ")}`,
+    );
+  }
+});

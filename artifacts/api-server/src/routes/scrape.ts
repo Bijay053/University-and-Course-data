@@ -7732,6 +7732,49 @@ Use null if not found. Important: Only return INTERNATIONAL student fees, not do
   }
 }
 
+/**
+ * Build a deterministic, human-readable summary of every field that
+ * `extractWithCheerio` (and any subsequent per-course modal/cascade pass)
+ * pulled from a single course page. The string is APPENDED to that page's
+ * raw `pageText` before we hand it to `buildCourseReviewSnapshot`, which
+ * uses substring matching to attribute each field to a source.
+ *
+ * Why this is necessary: many universities (CSU is the canonical case)
+ * SSR-render only a course-name heading; the duration / fee / location /
+ * intake values come from inline JSON blobs (`ocb_metadata.course_offerings`)
+ * or data-* attributes that `cheerio` parses but never appear in
+ * `body.text()`. Without this footer, a perfectly successful per-course
+ * extraction produces ZERO `page_type='course_page'` evidence rows because
+ * `findSnippet` cannot find the literal value anywhere in the rendered
+ * text — the value lived in a script tag we already parsed and discarded.
+ *
+ * Stamping the extracted values into the source's content closes that gap
+ * and faithfully credits the course page as the evidence source for fields
+ * we genuinely pulled from it.
+ */
+function buildCoursePageProvenanceFooter(cheerioData: Partial<CourseData>): string {
+  const parts: string[] = [];
+  if (cheerioData.courseName) parts.push(`courseName: ${cheerioData.courseName}`);
+  if (cheerioData.degreeLevel) parts.push(`degreeLevel: ${cheerioData.degreeLevel}`);
+  if (cheerioData.duration != null && cheerioData.durationTerm) {
+    parts.push(`duration: ${cheerioData.duration} ${cheerioData.durationTerm}`);
+  }
+  if (cheerioData.studyMode) parts.push(`study mode: ${cheerioData.studyMode}`);
+  if (cheerioData.courseLocation) parts.push(`location: ${cheerioData.courseLocation}`);
+  if (cheerioData.internationalFee != null) {
+    const fee = `${cheerioData.currency || "AUD"} ${cheerioData.internationalFee}${cheerioData.feeTerm ? ` ${cheerioData.feeTerm}` : ""}`;
+    parts.push(`international fee: ${fee}`);
+  }
+  if (cheerioData.intakeMonths?.length) parts.push(`intake: ${cheerioData.intakeMonths.join(", ")}`);
+  if (cheerioData.ieltsOverall != null) parts.push(`IELTS ${cheerioData.ieltsOverall}`);
+  if (cheerioData.pteOverall != null) parts.push(`PTE ${cheerioData.pteOverall}`);
+  if (cheerioData.toeflOverall != null) parts.push(`TOEFL ${cheerioData.toeflOverall}`);
+  if ((cheerioData as any).cambridgeOverall != null) parts.push(`Cambridge ${(cheerioData as any).cambridgeOverall}`);
+  if (cheerioData.duolingoOverall != null) parts.push(`Duolingo ${cheerioData.duolingoOverall}`);
+  if (parts.length === 0) return "";
+  return `\n\n[course-page extracted fields] ${parts.join("; ")}.`;
+}
+
 function cheerioToCourseData(cheerioData: Partial<CourseData>, name: string, url: string): CourseData {
   const preferredUrl = preferInternationalCourseUrl(url);
   return {
@@ -8712,7 +8755,11 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           url: link.url,
           pageType: "course_page",
           extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
-          content: pageText,
+          // Stamp the extracted-fields footer onto pageText so the snapshot
+          // builder can attribute fields back to this course_page even when
+          // the rendered text is sparse (CSU-style JS-hydrated pages).
+          // See buildCoursePageProvenanceFooter for the full rationale.
+          content: pageText + buildCoursePageProvenanceFooter(cheerioData),
         }];
 
         // PER-COURSE MODAL SCAN: many sites (e.g. VIT) embed a hidden Bootstrap
@@ -10975,7 +11022,11 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
             url: link.url,
             pageType: "course_page",
             extractionMethod: wasBrowserFetch ? "browser" : "cheerio",
-            content: pageText,
+            // Stamp the extracted-fields footer onto pageText so the snapshot
+            // builder can attribute fields back to this course_page even when
+            // the rendered text is sparse (CSU-style JS-hydrated pages).
+            // See buildCoursePageProvenanceFooter for the full rationale.
+            content: pageText + buildCoursePageProvenanceFooter(cheerioData),
           }];
 
           // PER-COURSE MODAL SCAN (mirrors scrapeCourseBatch). Many sites
