@@ -646,19 +646,41 @@ export default function Scraping() {
   }, [activeJobId, pollJobStatus]);
 
   useEffect(() => {
+    let cancelled = false;
     const savedJobId = sessionStorage.getItem("activeScrapeJob");
+
+    // Helper: recover startedAt from /api/scrape/active for a known job id so
+    // the live elapsed-timer can resume after in-tab navigation. Without this,
+    // navigating away from /scraping and back leaves scrapeStartTime=null
+    // (sessionStorage doesn't persist it), which silently kills the timer.
+    const restoreStartTimeFor = (jobId: string) => {
+      fetch("/api/scrape/active")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { activeJobs?: Array<{ id?: string; runtimeJobId?: string; universityName?: string | null; startedAt?: string | null }> } | null) => {
+          if (cancelled) return;
+          const match = data?.activeJobs?.find((j) => (j.runtimeJobId ?? j.id) === jobId);
+          if (!match) return;
+          if (match.universityName) setScrapeUniName(match.universityName);
+          if (match.startedAt) {
+            const t = new Date(match.startedAt).getTime();
+            if (!Number.isNaN(t)) setScrapeStartTime(t);
+          }
+        })
+        .catch(() => {});
+    };
+
     if (savedJobId) {
       setActiveJobId(savedJobId);
       setScraping(true);
       setScrapeLogs([]);
       setScrapeResult(null);
       pollJobStatus(savedJobId);
-      return;
+      restoreStartTimeFor(savedJobId);
+      return () => { cancelled = true; };
     }
     // Cross-tab sync: no job in sessionStorage, but maybe another browser
     // tab (or the API server itself, after a restart) has a scrape running.
     // Pick it up so every tab on /scraping shows the live progress.
-    let cancelled = false;
     fetch("/api/scrape/active")
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { activeJobs?: Array<{ id?: string; runtimeJobId?: string; universityName?: string | null; status?: string; startedAt?: string | null }> } | null) => {

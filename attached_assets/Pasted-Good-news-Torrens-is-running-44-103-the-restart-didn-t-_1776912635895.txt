@@ -1,0 +1,122 @@
+Good news: Torrens is running (44/103) — the restart didn't kill it. But the elapsed time issue persists. That fix was part of an instruction we sent to Replit but they haven't pushed it yet.
+Let me resend a more urgent and specific instruction to Replit:
+
+Paste this to Replit agent:
+
+UI BUG — PREVIOUSLY REPORTED BUT NOT FIXED: Elapsed time missing when returning to Scraping page
+Screenshot from production shows Torrens scrape at 44/103, but the header shows ONLY 44/103 — no elapsed time, no ETA. When user left the Scraping page and came back, the timer display disappeared entirely.
+This was reported earlier but the fix wasn't included in the recent commits.
+
+The exact symptoms:
+
+Start a scrape → header shows 44/103 ~5m 30s left (1m 20s elapsed) ✅
+Click away to "Universities" tab
+Click back to "Scraping" tab
+Header shows ONLY 44/103 — elapsed time and ETA are gone ❌
+Bundle index-DTAGtafo.js is current production (just verified)
+
+
+Root cause:
+When the user navigates to /scraping, the component mounts fresh. It calls the /api/scrape/status/:jobId endpoint but the response doesn't include startedAt — OR the frontend's elapsed-time logic only runs when the user initiated the scrape in this browser session.
+Open artifacts/university-portal/src/pages/Scraping.tsx (or wherever the scraping page component is). Look for how the elapsed time is displayed. The bug is likely one of:
+A. Elapsed time is stored in React state that's only set when the "Start Scraping" button is clicked — not re-populated from server on mount
+B. The component reads startedAt from a local variable instead of from the status API response
+C. There's no /api/scrape/active endpoint yet, so the component has no way to rediscover the running job
+
+Fix required:
+1. Backend — add /api/scrape/active endpoint (if not already there):
+typescriptrouter.get("/scrape/active", async (_req: Request, res: Response) => {
+  const active = await db.select().from(scrapeRuntimeJobsTable)
+    .where(inArray(scrapeRuntimeJobsTable.status, ['running', 'queued', 'awaiting_approval']))
+    .orderBy(desc(scrapeRuntimeJobsTable.startedAt))
+    .limit(5);
+  res.json({ 
+    activeJobs: active.map(j => ({
+      runtimeJobId: j.runtimeJobId,
+      universityId: j.universityId,
+      universityName: j.universityName,
+      status: j.status,
+      startedAt: j.startedAt,  // CRITICAL: must include this for elapsed calc
+      totalFound: j.totalFound,
+      current: j.current,
+      imported: j.imported,
+    }))
+  });
+});
+2. Frontend — Scraping page component useEffect on mount:
+typescriptuseEffect(() => {
+  // On page mount, check for any active scrape
+  fetch('/api/scrape/active')
+    .then(r => r.json())
+    .then(data => {
+      if (data.activeJobs?.length > 0) {
+        const job = data.activeJobs[0];
+        // FULLY restore scraping state
+        setCurrentJob({
+          runtimeJobId: job.runtimeJobId,
+          universityId: job.universityId,
+          universityName: job.universityName,
+          status: job.status,
+          startedAt: new Date(job.startedAt),  // for elapsed calc
+          totalFound: job.totalFound,
+          current: job.current,
+        });
+        setIsRunning(true);
+        // Then start the normal status-polling loop
+      }
+    });
+}, []);
+3. Frontend — live-ticking elapsed timer (tick every 1 second):
+typescriptconst [now, setNow] = useState(Date.now());
+
+useEffect(() => {
+  if (!currentJob?.startedAt) return;
+  const interval = setInterval(() => setNow(Date.now()), 1000);
+  return () => clearInterval(interval);
+}, [currentJob?.startedAt]);
+
+const elapsedMs = currentJob?.startedAt 
+  ? now - new Date(currentJob.startedAt).getTime()
+  : 0;
+
+const formatElapsed = (ms: number) => {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+};
+
+// In JSX:
+<span>{currentJob.totalFound ? `${currentJob.current}/${currentJob.totalFound}` : ''}</span>
+{currentJob.startedAt && (
+  <span> ({formatElapsed(elapsedMs)} elapsed)</span>
+)}
+4. Handle visibility change (tab return):
+typescriptuseEffect(() => {
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible' && currentJob?.runtimeJobId) {
+      // Re-fetch status immediately when user returns to tab
+      fetchStatus(currentJob.runtimeJobId);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => document.removeEventListener('visibilitychange', onVisibility);
+}, [currentJob?.runtimeJobId]);
+
+VERIFICATION AFTER PUSH:
+I will test:
+
+Start Torrens scrape (already running) → elapsed time ticks every 1 second ✓
+Click "Universities" tab → wait 30s → click back to "Scraping" → elapsed time shows correct current value (not missing) ✓
+Open /scraping in a second browser tab → shows the running Torrens with live elapsed ✓
+Switch browser to another tab (not the app) for 60s → come back → elapsed jumps to correct value ✓
+
+DELIVERY:
+
+Apply all 4 fixes
+Build BOTH frontend and backend: pnpm -r build
+Commit with message "Fix elapsed time: live ticker + persist across navigation + restore on mount"
+Push to main
+Reply with commit hash AND the specific file paths changed
+
+I'll deploy and verify in production.
