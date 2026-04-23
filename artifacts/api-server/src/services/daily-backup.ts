@@ -24,9 +24,71 @@ export type BackupResult = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Schema bootstrap — the 6 _backup tables are not part of the Drizzle schema,
+// so `pnpm db:push` does not create them. This function runs CREATE TABLE
+// IF NOT EXISTS for each one so the feature self-heals on first use (and on
+// any environment where the tables haven't been created yet — including the
+// production DigitalOcean DB that's currently throwing
+// `relation "courses_backup" does not exist`).
+//
+// We use `CREATE TABLE ... AS SELECT ... WITH NO DATA` so each backup table
+// inherits its source table's columns automatically. New columns added to
+// the source later won't be auto-mirrored, but the explicit INSERT below
+// only references known columns, so older backup tables keep working.
+// ─────────────────────────────────────────────────────────────────────────────
+const BACKUP_PAIRS: Array<{ backup: string; source: string }> = [
+  { backup: "courses_backup",               source: "courses" },
+  { backup: "fees_backup",                  source: "fees" },
+  { backup: "intakes_backup",               source: "intakes" },
+  { backup: "english_requirements_backup",  source: "english_requirements" },
+  { backup: "academic_requirements_backup", source: "academic_requirements" },
+  { backup: "scholarships_backup",          source: "scholarships" },
+];
+
+export async function ensureBackupTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    for (const { backup, source } of BACKUP_PAIRS) {
+      // CREATE TABLE AS ... WITH NO DATA copies the column list (types and
+      // NOT NULL) but no constraints/indexes/PKs — which is what we want
+      // (the same id can appear once per snapshot date).
+      await client.query(
+        `CREATE TABLE IF NOT EXISTS ${backup} AS
+           SELECT NOW()::timestamptz AS backed_up_at, t.*
+           FROM ${source} t
+           WITH NO DATA`
+      );
+      // Defensive: backed_up_at must be NOT NULL so MAX() and date filters
+      // behave correctly even on tables created by older code paths.
+      await client.query(
+        `ALTER TABLE ${backup} ALTER COLUMN backed_up_at SET NOT NULL`
+      );
+      // Index on backed_up_at speeds up the "today's backup done?" query
+      // and the snapshot history listing.
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS ${backup}_backed_up_at_idx ON ${backup} (backed_up_at)`
+      );
+    }
+  } finally {
+    client.release();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Core backup logic (shared between scheduler and HTTP endpoint)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function runBackup(triggeredBy: "scheduler" | "manual" = "manual"): Promise<BackupResult> {
+  // Self-heal: create any missing backup tables before inserting. Cheap and
+  // idempotent — Postgres no-ops CREATE TABLE IF NOT EXISTS when the table
+  // already exists.
+  try {
+    await ensureBackupTables();
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    logger.error({ triggeredBy, error }, "Daily backup: ensureBackupTables() failed");
+    return { ok: false, error: `Failed to ensure backup tables exist: ${error}` };
+  }
+
   const snapTime = new Date();
   const client = await pool.connect();
   try {
@@ -125,6 +187,9 @@ export function startDailyBackupScheduler(): void {
   // Run an initial check shortly after startup
   setTimeout(async () => {
     try {
+      // Make sure the backup tables exist before any query touches them.
+      // Without this, todayBackupDone() throws on a fresh DB.
+      await ensureBackupTables();
       const done = await todayBackupDone();
       if (!done) {
         logger.info("Daily backup: no backup for today found on startup — running now");

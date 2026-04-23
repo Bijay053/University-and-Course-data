@@ -1,0 +1,107 @@
+Here's the instruction for Replit:
+
+Paste this to Replit agent:
+
+UI BUG: Scraping page elapsed time counter is broken
+Screenshots attached show: Progress bar "Fetching 38/299..." with (49s elapsed) — but the elapsed time doesn't tick up live like a clock. It only updates when the user:
+
+Switches to another browser tab and comes back, OR
+Navigates away and returns to the Scraping page
+
+Between those events, the time is frozen at whatever value was last fetched.
+Also: When user clicks away to another tab in the app (e.g. Universities) and returns to Scraping, the elapsed time disappears entirely and the progress indicator doesn't show.
+
+Root cause (likely):
+
+The elapsed time is calculated from server response ((NOW() - started_at)) but the frontend only re-fetches it when the status API poll fires. If the poll interval is 5s, the user sees the number jump in 5s steps instead of ticking every second.
+When browser tab is inactive, setInterval throttles to 1+ minute in modern browsers — so the next-fetch never fires.
+State resets on route change because currentJob / startedAt is stored in local React state, not in a store or fetched on mount.
+
+
+Fix 1 — Live-updating elapsed timer (client-side increment):
+Instead of displaying elapsed from the API response, calculate it every 1 second on the client from startedAt (ISO string):
+typescript// In the scraping page component
+const [now, setNow] = useState(() => Date.now());
+
+useEffect(() => {
+  if (!currentJob?.startedAt) return;
+  const interval = setInterval(() => setNow(Date.now()), 1000);
+  return () => clearInterval(interval);
+}, [currentJob?.startedAt]);
+
+const elapsedMs = currentJob?.startedAt 
+  ? now - new Date(currentJob.startedAt).getTime()
+  : 0;
+
+const elapsedLabel = formatElapsed(elapsedMs); // "49s elapsed" / "1m 9s elapsed"
+This ticks every second regardless of tab visibility (setInterval still fires at ~1Hz even for background tabs, just less precisely — good enough).
+
+Fix 2 — Restore state when user returns to Scraping page:
+When the Scraping page mounts, fetch active jobs from the server (not local React state):
+typescriptuseEffect(() => {
+  // On page mount, check if there's an active scrape
+  fetch('/api/scrape/active')
+    .then(r => r.json())
+    .then(data => {
+      if (data.activeJobs?.length > 0) {
+        const job = data.activeJobs[0];
+        setCurrentJob({
+          runtimeJobId: job.runtimeJobId,
+          universityId: job.universityId,
+          universityName: job.universityName,
+          startedAt: job.startedAt,
+          totalFound: job.totalFound,
+          current: job.current,
+          status: job.status,
+        });
+        setIsRunning(true);
+        // Start polling for status updates
+      }
+    });
+}, []); // runs once on mount
+Also add the corresponding backend endpoint if it doesn't exist yet:
+typescriptrouter.get("/scrape/active", async (_req, res) => {
+  const active = await db.query.scrapeRuntimeJobsTable.findMany({
+    where: (j, { inArray }) => inArray(j.status, ['running', 'queued']),
+    orderBy: (j, { desc }) => desc(j.startedAt),
+    limit: 5,
+  });
+  res.json({ activeJobs: active });
+});
+
+Fix 3 — Survive cross-tab navigation in the app:
+The Scraping page likely uses component-local state that gets destroyed on unmount. Move currentJob state to a context, Zustand store, or React Query cache so it persists across route changes within the same SPA session.
+Simplest approach: use React Query with a query key of ['activeScrapeJob'] — it caches automatically, so navigating back to /scraping re-shows the last known job instantly, then revalidates in the background.
+typescriptconst { data: activeJob } = useQuery({
+  queryKey: ['activeScrapeJob'],
+  queryFn: () => fetch('/api/scrape/active').then(r => r.json()),
+  refetchInterval: 3000, // poll every 3s
+  refetchIntervalInBackground: true, // keeps polling when tab is inactive
+});
+
+Fix 4 — Keep polling when tab is backgrounded:
+Modern browsers throttle setInterval / setTimeout on inactive tabs. Use Web Workers, refetchIntervalInBackground: true in React Query, or accept the throttling (the Page Visibility API's visibilitychange event can be used to force a refetch on return).
+Minimum: add a visibilitychange listener to re-fetch status when user returns:
+typescriptuseEffect(() => {
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      refetchActiveJob();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => document.removeEventListener('visibilitychange', onVisibility);
+}, []);
+
+DELIVERY:
+
+Apply all 4 fixes in artifacts/university-portal/src/pages/Scraping.tsx (or wherever the Scraping page lives)
+Add the GET /scrape/active endpoint if missing
+Build, commit, push with message "Scraping page: live elapsed timer + persist across navigation + cross-tab sync"
+Reply with commit hash
+
+After push, verify:
+
+Start a scrape in Browser A
+Open /scraping in Browser B → should immediately show the running job with live elapsed time
+Click "Universities" tab then click back to "Scraping" → job should still show, time should still tick
+Switch to a different Chrome tab for 30s, come back → time should show correct elapsed (not stuck at old value)
