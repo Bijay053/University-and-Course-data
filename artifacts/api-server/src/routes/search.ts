@@ -457,21 +457,20 @@ router.get("/search/courses", async (req: Request, res: Response) => {
     let didYouMeanLocation: string | null = null;
     if (location && totalCount === 0) {
       try {
+        // Score over the *distinct* set of locations rather than every row,
+        // so cost stays O(unique cities + unique countries) instead of
+        // O(courses).  At the current ~1k MV size this is negligible, but
+        // the distinct set keeps it cheap as the dataset grows.
         const sugg = await pool.query(
           `WITH cand AS (
-             SELECT university_country AS s,
-                    word_similarity(lower($1), lower(university_country)) AS score
-               FROM course_search_view
+             SELECT DISTINCT university_country AS s FROM course_search_view
               WHERE university_country IS NOT NULL AND university_country <> ''
-              UNION ALL
-             SELECT university_city AS s,
-                    word_similarity(lower($1), lower(university_city)) AS score
-               FROM course_search_view
+              UNION
+             SELECT DISTINCT university_city FROM course_search_view
               WHERE university_city IS NOT NULL AND university_city <> 'Unknown'
            )
-           SELECT s, MAX(score) AS score
+           SELECT s, word_similarity(lower($1), lower(s)) AS score
              FROM cand
-            GROUP BY s
             ORDER BY score DESC
             LIMIT 1`,
           [location],
