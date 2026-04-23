@@ -426,7 +426,7 @@ async def staged_list(
 async def staged_one(
     sc_id_or_job: str,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> dict:
+):
     """Handle both /staged/123 (single course by id) and /staged/job_xxx (all staged for job)."""
     from app.models import ScrapedCourse
     
