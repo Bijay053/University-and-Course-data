@@ -260,16 +260,30 @@ export async function listRuntimeJobs(limit = 20) {
 }
 
 export async function listActiveRuntimeJobs() {
+  // Order so the most relevant job comes first when callers (e.g. the
+  // /scrape/active cross-tab pickup endpoint) take `[0]`:
+  // running → awaiting_approval → queued, then most-recently-started.
   return db
     .select({
       id: scrapeRuntimeJobsTable.runtimeJobId,
+      runtimeJobId: scrapeRuntimeJobsTable.runtimeJobId,
       status: scrapeRuntimeJobsTable.status,
       universityId: scrapeRuntimeJobsTable.universityId,
       universityName: scrapeRuntimeJobsTable.universityName,
       url: scrapeRuntimeJobsTable.url,
+      startedAt: scrapeRuntimeJobsTable.startedAt,
     })
     .from(scrapeRuntimeJobsTable)
-    .where(inArray(scrapeRuntimeJobsTable.status, ["queued", "running", "awaiting_approval"]));
+    .where(inArray(scrapeRuntimeJobsTable.status, ["queued", "running", "awaiting_approval"]))
+    .orderBy(
+      sql`CASE ${scrapeRuntimeJobsTable.status}
+            WHEN 'running' THEN 0
+            WHEN 'awaiting_approval' THEN 1
+            WHEN 'queued' THEN 2
+            ELSE 3
+          END`,
+      desc(scrapeRuntimeJobsTable.startedAt),
+    );
 }
 
 export async function stopRunningRuntimeJobs(reason = "API server restarted while the scrape was active.") {

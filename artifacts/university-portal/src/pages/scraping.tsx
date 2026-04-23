@@ -630,17 +630,20 @@ export default function Scraping() {
     let cancelled = false;
     fetch("/api/scrape/active")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { activeJobs?: Array<{ runtimeJobId: string; universityName?: string | null }> } | null) => {
+      .then((data: { activeJobs?: Array<{ id?: string; runtimeJobId?: string; universityName?: string | null; status?: string }> } | null) => {
         if (cancelled || !data?.activeJobs?.length) return;
+        // Backend orders running > awaiting_approval > queued by recency,
+        // so [0] is the right job. Accept either `id` or `runtimeJobId`.
         const job = data.activeJobs[0];
-        if (!job?.runtimeJobId) return;
-        setActiveJobId(job.runtimeJobId);
+        const jobId = job?.runtimeJobId ?? job?.id;
+        if (!jobId) return;
+        setActiveJobId(jobId);
         if (job.universityName) setScrapeUniName(job.universityName);
         setScraping(true);
         setScrapeLogs([{ event: "status", message: `Resumed in-progress scrape (${job.universityName ?? "unknown"}) from another tab/session.` }]);
         setScrapeResult(null);
-        sessionStorage.setItem("activeScrapeJob", job.runtimeJobId);
-        pollJobStatus(job.runtimeJobId);
+        sessionStorage.setItem("activeScrapeJob", jobId);
+        pollJobStatus(jobId);
       })
       .catch(() => {});
     return () => { cancelled = true; };

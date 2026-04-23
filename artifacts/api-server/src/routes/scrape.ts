@@ -9085,14 +9085,19 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                 );
                 const ptOrTofMissing = !(cheerioData.pteOverall && cheerioData.toeflOverall);
                 // Vision short-circuit: if HTML already produced all three
-                // overall scores (IELTS, PTE, TOEFL), skip the entire vision
-                // scan. Saves 2-4 minutes per course on sites where the
-                // English data is in plain HTML (most non-image-table sites).
+                // overall scores (IELTS, PTE, TOEFL) AND IELTS bands are
+                // present (or IELTS overall is absent so bands aren't
+                // applicable), skip the entire vision scan. Critically we
+                // STILL run vision when ieltsBandsMissing is true — the
+                // band detail (L/R/W/S) is commonly only in the image
+                // table, and ASA/Newcastle-style hosts depend on it.
+                // Saves 2-4 minutes per course on sites where the English
+                // data is fully in plain HTML (most non-image-table sites).
                 const allEnglishOverallsFromHtml =
                   cheerioData.ieltsOverall != null &&
                   cheerioData.pteOverall != null &&
                   cheerioData.toeflOverall != null;
-                if (allEnglishOverallsFromHtml) {
+                if (allEnglishOverallsFromHtml && !ieltsBandsMissing) {
                   addLog(job, "status", {
                     message: `[per-course HTML ✓] ${link.name.slice(0, 50)} — IELTS=${cheerioData.ieltsOverall} PTE=${cheerioData.pteOverall} TOEFL=${cheerioData.toeflOverall} (skipped vision)`,
                     phase: "fallback",
@@ -9126,14 +9131,20 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                       if (u.startsWith(stem)) { push(u); break; }
                     }
                   }
-                  // Hard cap: max 3 images per course (was 8). On a 4-core
-                  // server with 32 concurrent courses each scanning 8 images
-                  // we'd issue 256 vision calls per batch — way over Gemini
-                  // quota. The first 3 priority images catch the requirements
-                  // table in 95%+ of cases; sibling cache covers the rest.
-                  const MAX_IMAGES_PER_COURSE = 3;
-                  for (const u of filteredImgUrls.slice(0, MAX_IMAGES_PER_COURSE)) push(u);
-                  let scanList = priority.slice(0, MAX_IMAGES_PER_COURSE);
+                  // Image cap strategy:
+                  //   - Priority pass capped at 3 (was 8): cached winners +
+                  //     stem-prefix matches usually catch the requirements
+                  //     image immediately. This is the fast path that
+                  //     dominates after the first course on the host.
+                  //   - Full-scan fallback (below) keeps a higher cap (8)
+                  //     so the very first course on an image-table host
+                  //     can discover the winner and seed the cache for
+                  //     all sibling courses. Without this, ASA and other
+                  //     image-only hosts cascade-miss.
+                  const MAX_PRIORITY_IMAGES = 3;
+                  const MAX_FULLSCAN_IMAGES = 8;
+                  for (const u of filteredImgUrls.slice(0, MAX_PRIORITY_IMAGES)) push(u);
+                  let scanList = priority.slice(0, MAX_PRIORITY_IMAGES);
                   // If priority pass yields nothing, broaden to ALL images on the
                   // page (unfiltered) — defends against requirements images that
                   // are loaded via uncommon attributes / odd paths.
@@ -9190,9 +9201,10 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                   // matches the decorative-filter regex by coincidence.
                   const stillEmpty = !(visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall);
                   if (stillEmpty && allImgUrls.length > scanList.length) {
-                    // Bound full-scan to MAX_IMAGES_PER_COURSE too — never
-                    // let one course consume 25 vision calls.
-                    const remaining = allImgUrls.filter((u) => !seen.has(u)).slice(0, MAX_IMAGES_PER_COURSE);
+                    // Bound full-scan so one course can't consume 25 vision
+                    // calls, but allow up to 8 so first-on-host discovery
+                    // can find the requirements image and seed sibling cache.
+                    const remaining = allImgUrls.filter((u) => !seen.has(u)).slice(0, MAX_FULLSCAN_IMAGES);
                     if (remaining.length > 0) await scanOnce(remaining, " full-scan");
                   }
                   if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {

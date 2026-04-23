@@ -1,0 +1,37 @@
+TWO ISSUES — Assessment Notes feature:
+
+ISSUE 1: Assessment Notes card UI not live in production
+The card-based UI for Assessment Notes (Acceptable Banks, Scholarship, Under 18 / Relatives, Spouse/dependent, Sponsors, Turnaround times cards) works correctly in Replit preview but shows as raw text only in production.
+Production URL: http://159.65.152.72/universities/2 (asa) — shows only "Raw notes:" block with plain text
+Replit preview: /universities/5 (Torrens) — shows beautiful colored cards with parsed details
+Root cause: The card-rendering code hasn't been committed and pushed to main branch. User deployed from main and only got the text version.
+Fix:
+
+Verify the card UI component is saved (check artifacts/university-portal/src/pages/UniversityDetail.tsx or wherever Assessment Notes renders)
+Run git status to confirm uncommitted changes exist
+git add -A && git commit -m "Assessment Notes: render parsed cards (Banks, Scholarships, Sponsors, etc) with color-coded sections"
+git push origin main
+Reply with commit hash
+
+
+ISSUE 2: Rename "Assessment Notes" to "Key Insights"
+Everywhere in the UI where the label "Assessment Notes" appears, change it to "Key Insights". This includes:
+
+Tab label on university detail page (currently shows "Assessment Notes" next to "Courses / English Proficiency / Academic Requirements / Scholarships / Raw Data")
+"Add Assessment Note" button → "Add Key Insight"
+"X note across Y country" label → "X insight across Y country" (or keep plural forms consistent: "insights" when > 1)
+Any section headers, modal titles, or tooltip text referencing "Assessment Notes" or "assessment note"
+Internal variable/function names can stay (no need to refactor assessmentNotes → keyInsights in code) — just the user-facing strings
+
+Search the codebase for all occurrences:
+bashgrep -rn "Assessment Note\|assessment note" artifacts/university-portal/src --include="*.tsx" --include="*.ts"
+Update only the display strings. Don't break the API endpoints or DB column names.
+
+DELIVERY:
+
+Fix Issue 1 (push the missing card UI to main)
+Fix Issue 2 (rename "Assessment Notes" → "Key Insights" in UI)
+Build, commit, push with message "Key Insights: push card UI to prod + rename from Assessment Notes"
+Reply with commit hash
+
+After push I'll deploy and verify both on http://159.65.152.72/universities/2.
