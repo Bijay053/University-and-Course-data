@@ -62,14 +62,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         uni = (
             await db.execute(select(University).where(University.id == job.university_id))
         ).scalar_one_or_none()
-        if not uni or not uni.scrape_url:
+        # Prefer the URL that was captured on the job row at API time.
+        # Falling back to uni.scrape_url handles legacy jobs.
+        scrape_url = (job.url or "").strip() or (uni.scrape_url or "").strip() if uni else (job.url or "").strip()
+        if not scrape_url:
             raise RuntimeError("University missing scrape_url")
 
         max_pages = 12 if job.fast_mode else 25
         max_courses = 20 if job.fast_mode else _MAX_COURSES_PER_JOB
-        log.info("Discovering course links from %s (fast_mode=%s)", uni.scrape_url, job.fast_mode)
+        log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         links = await discover_course_links(
-            uni.scrape_url, max_pages=max_pages, max_courses=max_courses
+            scrape_url, max_pages=max_pages, max_courses=max_courses
         )
         summary["discovered"] = len(links)
         log.info("Discovered %d candidate course links for %s", len(links), uni.name)
