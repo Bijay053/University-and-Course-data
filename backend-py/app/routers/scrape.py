@@ -60,9 +60,27 @@ async def start_scrape(
     body: StartScrapeBody,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ScrapeStartResponse:
-    uni = await db.get(University, body.university_id)
+    # Lookup by university_id first, fall back to URL match (UI compatibility)
+    uni = None
+    if body.university_id:
+        uni = await db.get(University, body.university_id)
+    if not uni and body.url:
+        from sqlalchemy import select, or_, func
+        result = await db.execute(
+            select(University).where(
+                or_(
+                    University.scrape_url == body.url,
+                    University.website == body.url,
+                    func.lower(University.name) == (body.university_name or "").lower(),
+                )
+            ).limit(1)
+        )
+        uni = result.scalar_one_or_none()
     if not uni:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"University not found (id={body.university_id}, url={body.url}, name={body.university_name})"
+        )
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     job = ScrapeRuntimeJob(
         runtime_job_id=job_id,
@@ -86,7 +104,7 @@ async def start_scrape(
     except Exception:
         pass
 
-    return ScrapeStartResponse(job_id=job_id, status="queued")
+    return ScrapeStartResponse(job_id=job_id, runtime_job_id=job_id, status="queued")
 
 
 @router.post("/bulk", response_model=BulkScrapeResponse, status_code=status.HTTP_202_ACCEPTED)
