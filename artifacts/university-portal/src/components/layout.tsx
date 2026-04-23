@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -9,6 +9,7 @@ const navigation = [
   { name: "Scraping", href: "/scraping", icon: HardDrive },
   { name: "Bulk Upload", href: "/bulk", icon: UploadCloud },
   { name: "Data Backup", href: "/backup", icon: Shield },
+  { name: "Settings", href: "/settings/academic-levels", icon: Settings },
 ];
 
 function NavLinks({ onNav }: { onNav?: () => void }) {

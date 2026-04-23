@@ -1,0 +1,295 @@
+NEW FEATURE: Public Course Search Engine API + Frontend
+Build a fast, public-facing course search with filters, comparison (up to 5 courses), and PDF export. This is for end-users (students searching for courses), separate from the admin portal.
+
+PART 1 — Search API (Backend)
+Performance target: p95 response time under 200ms for any query over 1000+ courses. This means:
+
+Full-text index on course_name
+Database indexes on every filterable field
+Paginated results (20 per page)
+No N+1 queries — single JOIN query per request
+Response caching (5-min TTL for non-personalized results)
+
+New endpoint: GET /api/search/courses
+Query parameters (all optional):
+q                      — search term (matches course_name and university_name)
+location               — city OR country (e.g. "Sydney" OR "Australia")
+country_residence      — student's country for visa/eligibility logic
+highest_qualification  — "High School", "Bachelor", "Master", etc.
+grading_scheme         — "GPA", "Percentage", "ATAR"
+english_exam           — "IELTS", "PTE", "TOEFL", "CAE", "DET"
+english_score_min      — minimum score user has
+other_exam             — "SAT", "GRE", "GMAT"
+intakes                — comma-separated months "March,September"
+duration_years_min     — min duration in years (0.5, 1, 2)
+duration_years_max     — max duration in years
+fee_min                — min international fee per year (AUD)
+fee_max                — max international fee per year (AUD)
+application_fee_max    — max application fee
+university_id          — filter to specific university
+degree_level           — Bachelor, Master, Diploma, etc.
+category               — "Business & Management", "IT", etc.
+sub_category           — "Marketing", "Data Science", etc.
+sort                   — "relevance" (default) | "fee_asc" | "fee_desc" | "duration_asc" | "name_asc"
+page                   — default 1
+limit                  — default 20, max 100
+Example response:
+json{
+  "total": 347,
+  "page": 1,
+  "limit": 20,
+  "results": [
+    {
+      "id": 4290,
+      "course_name": "Bachelor of Business Accounting",
+      "university": {
+        "id": 4,
+        "name": "Charles Sturt University",
+        "logo_url": "https://cdn.../csu.png",
+        "city": "Bathurst",
+        "country": "Australia"
+      },
+      "course_location": "Bathurst, Wagga Wagga",
+      "degree_level": "Bachelor",
+      "category": "Business & Management",
+      "sub_category": "Accounting",
+      "duration": 3,
+      "duration_term": "Year",
+      "intakes": ["March", "July"],
+      "international_fee": 32000,
+      "currency": "AUD",
+      "fee_term": "Annual",
+      "application_fee": 95,
+      "english_requirements": {
+        "ielts_overall": 6,
+        "pte_overall": 50,
+        "toefl_overall": 79,
+        "cae_overall": 176,
+        "duolingo_overall": 95
+      },
+      "course_url": "https://..."
+    }
+  ],
+  "facets": {
+    "universities": [{"id": 4, "name": "Charles Sturt", "count": 173}, ...],
+    "categories": [{"name": "Business & Management", "count": 128}, ...],
+    "degree_levels": [{"name": "Bachelor", "count": 189}, ...],
+    "intakes": [{"name": "March", "count": 220}, {"name": "July", "count": 198}, ...]
+  }
+}
+Facets (on the right panel) help users narrow down — show counts so they know how many results match each filter.
+
+PART 2 — Database Optimizations (Critical for Speed)
+Add these indexes — most impactful change:
+sql-- Full-text search index on course name
+CREATE INDEX IF NOT EXISTS idx_courses_name_trgm 
+  ON courses USING gin (name gin_trgm_ops);
+
+-- Filterable columns
+CREATE INDEX IF NOT EXISTS idx_courses_university_id ON courses(university_id);
+CREATE INDEX IF NOT EXISTS idx_courses_degree_level ON courses(degree_level);
+CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category);
+CREATE INDEX IF NOT EXISTS idx_courses_duration ON courses(duration);
+
+-- Join-friendly indexes on related tables
+CREATE INDEX IF NOT EXISTS idx_fees_course_id ON fees(course_id);
+CREATE INDEX IF NOT EXISTS idx_fees_intl_amount ON fees(international_fee);
+CREATE INDEX IF NOT EXISTS idx_intakes_course_id ON intakes(course_id);
+CREATE INDEX IF NOT EXISTS idx_english_req_course_id ON english_requirements(course_id);
+
+-- Compound index for common filters
+CREATE INDEX IF NOT EXISTS idx_courses_university_level ON courses(university_id, degree_level);
+Enable trigram extension:
+sqlCREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+PART 3 — Denormalized Search Table (For Extreme Speed)
+For blazing fast queries, create a denormalized materialized view that pre-joins everything:
+sqlCREATE MATERIALIZED VIEW course_search_view AS
+SELECT 
+  c.id,
+  c.name as course_name,
+  c.name_tsv,  -- tsvector for full-text search
+  c.category,
+  c.sub_category,
+  c.degree_level,
+  c.duration,
+  c.duration_term,
+  c.study_mode,
+  c.course_website,
+  c.course_location,
+  c.university_id,
+  u.name as university_name,
+  u.logo_url,
+  u.city as university_city,
+  u.country as university_country,
+  u.website as university_website,
+  f.international_fee,
+  f.currency,
+  f.fee_term,
+  f.application_fee,
+  (SELECT jsonb_agg(intake_month) FROM intakes WHERE course_id = c.id) as intakes,
+  er.ielts_overall,
+  er.pte_overall,
+  er.toefl_overall,
+  er.cambridge_overall as cae_overall,
+  er.duolingo_overall
+FROM courses c
+JOIN universities u ON u.id = c.university_id
+LEFT JOIN fees f ON f.course_id = c.id
+LEFT JOIN english_requirements er ON er.course_id = c.id
+WHERE c.status = 'active';
+
+CREATE INDEX ON course_search_view USING gin(name_tsv);
+CREATE INDEX ON course_search_view USING gin(course_name gin_trgm_ops);
+CREATE INDEX ON course_search_view (university_id);
+CREATE INDEX ON course_search_view (degree_level);
+CREATE INDEX ON course_search_view (international_fee);
+CREATE INDEX ON course_search_view (duration);
+Refresh on course data changes:
+sqlREFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view;
+Call this refresh every time a scraped course is approved (in approveSingleCourse function, at the end).
+
+PART 4 — Compare Courses (Up to 5)
+Endpoint: GET /api/courses/compare?ids=1,2,3,4,5
+Returns full details of up to 5 courses side by side. Limit enforced server-side (reject if > 5 IDs).
+json{
+  "courses": [
+    { ...full course object... },
+    { ...full course object... }
+  ]
+}
+
+PART 5 — PDF Export of Comparison
+Endpoint: POST /api/courses/compare/pdf
+Body:
+json{
+  "course_ids": [1, 2, 3, 4, 5]
+}
+Returns a PDF (binary response, content-type application/pdf) with side-by-side comparison table.
+Use a Node PDF library like pdfkit or puppeteer (prefer pdfkit for speed). Table should have:
+
+Course name (with university logo)
+University name, location
+Fee, duration, intakes
+English requirements (IELTS, PTE, TOEFL, CAE, DET)
+Academic requirements
+Course URL (clickable)
+
+
+PART 6 — Frontend Search Page
+New public route /search — accessible without login (this is for students, not admins).
+Layout:
+┌──────────────────────────────────────────────────────────────┐
+│ [🔍 Search course name or keywords]        [📍 Location]     │
+│                                                                │
+│ [+ Advanced Filters ▼]                                        │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────┬──────────────────────────────────────────────┐
+│ FILTERS      │ 347 courses found                            │
+│              │                                               │
+│ University   │ Sort by: [Relevance ▼]                       │
+│ ▢ Charles S. │                                               │
+│ ▢ USQ        │ ┌─────────────────────────────────────────┐ │
+│ ▢ VIT        │ │ [🎓 USQ Logo]                           │ │
+│              │ │                                          │ │
+│ Category     │ │ Bachelor of Business Accounting          │ │
+│ ▢ Business   │ │ University of Southern Queensland        │ │
+│ ▢ IT         │ │ 📍 Toowoomba, Springfield               │ │
+│ ▢ Health     │ │ 💰 A$32,000/yr  ⏱ 3 years              │ │
+│              │ │ 📅 Intakes: March, July                 │ │
+│ Degree Level │ │                                          │ │
+│ ▢ Bachelor   │ │ [⚖ Compare] [View Details]              │ │
+│ ▢ Master     │ └─────────────────────────────────────────┘ │
+│              │                                               │
+│ Fee Range    │ ┌─────────────────────────────────────────┐ │
+│ ═════○═══    │ │ ...more cards...                         │ │
+│ $0  ─  $100K │ └─────────────────────────────────────────┘ │
+│              │                                               │
+└──────────────┴──────────────────────────────────────────────┘
+Course Card requirements (from user spec):
+
+University Logo (if available — need logo_url column on universities table)
+Course Name — large, bold, high priority
+University Name — below course name, smaller
+Course Location
+Fee (with currency + term)
+Duration
+Intakes
+Compare button — adds to compare tray (max 5)
+
+Compare tray (floating bottom bar):
+┌─────────────────────────────────────────────────────────┐
+│ 3 of 5 courses selected                                  │
+│ [Bachelor Accounting ×] [Bachelor IT ×] [Master BA ×]   │
+│                          [Clear] [Compare 3 Courses →]   │
+└─────────────────────────────────────────────────────────┘
+Click "Compare" → /compare?ids=1,2,3 — side-by-side table with [Download PDF] button.
+Filters panel collapsible sections:
+
+Search & Location (always visible)
+Country of Residence (dropdown)
+Highest Qualification Studied (dropdown)
+Grading Scheme (dropdown)
+English Proficiency Exam + Score (dropdown + number input)
+Other Exam (dropdown)
+Intakes (multi-select checkboxes)
+Duration (slider, years)
+Tuition Fee (slider, AUD per year)
+Application Fee (slider)
+University (multi-select)
+Category (multi-select)
+Degree Level (multi-select)
+
+
+PART 7 — Additional Schema Changes
+Add to universities table:
+sqlALTER TABLE universities ADD COLUMN IF NOT EXISTS logo_url TEXT;
+Admin can upload logos via UI later — for now, this column is nullable.
+
+PART 8 — Performance Budget
+Measure and enforce:
+
+p50 search response: <50ms
+p95 search response: <200ms
+p99 search response: <500ms
+
+Log slow queries (>300ms) to help identify bottlenecks:
+typescriptconst start = Date.now();
+const result = await runSearch(...);
+const elapsed = Date.now() - start;
+if (elapsed > 300) {
+  console.warn(`[SLOW-SEARCH] ${elapsed}ms for query:`, query);
+}
+
+DELIVERY PHASES
+Phase 1 (core):
+
+DB indexes + materialized view
+GET /search/courses with all filters
+Basic /search page with results cards
+GET /courses/compare
+Compare tray UX
+/compare page
+
+Phase 2:
+
+PDF export
+Facets with counts
+Advanced filter UI polish
+Query result caching
+
+Phase 3 (nice-to-have):
+
+Course detail page (public, not admin)
+Save favorite courses
+Share search URL
+
+Build Phase 1 fully, ship it, then iterate. Reply with:
+
+Commit hash
+List of new files created
+SQL migration confirmation (indexes + materialized view created)
+Test the endpoint curl "http://localhost:3000/api/search/courses?q=accounting&fee_max=40000" and paste response
+
+After your push I'll deploy and load-test.

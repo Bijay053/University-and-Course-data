@@ -15,6 +15,7 @@ import scrapeRouter from "./scrape";
 import backupRouter from "./backup";
 import backupMappingRouter from "./backup_mapping";
 import assessmentNotesRouter from "./assessment_notes";
+import academicLevelOptionsRouter from "./academic_level_options";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(scrapeRouter);
 router.use(backupRouter);
 router.use(backupMappingRouter);
 router.use(assessmentNotesRouter);
+router.use(academicLevelOptionsRouter);
 
 export default router;
