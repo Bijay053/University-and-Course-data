@@ -46,13 +46,16 @@ WHERE id = 6
 
 -- Refresh the public search MV so location filters reflect the new data.
 -- Wrapped in DO so the migration still succeeds on environments where the
--- MV doesn't exist yet (fresh installs).
+-- MV doesn't exist yet (fresh installs). Non-CONCURRENT refresh is required
+-- here because CONCURRENTLY cannot run inside a transaction block, and the
+-- whole migration runs in one tx. The MV is small and the migration is a
+-- one-off, so a brief exclusive lock is acceptable.
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_matviews WHERE matviewname = 'course_search_view'
   ) THEN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view;
+    REFRESH MATERIALIZED VIEW course_search_view;
   END IF;
 END $$;
 
