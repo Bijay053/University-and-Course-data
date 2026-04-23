@@ -1,0 +1,48 @@
+BUG: Bulk Scrape queue stops after first few universities — doesn't recover from errors
+User ran Bulk Scrape on 6 universities overnight. Result:
+
+3 completed successfully (Tasmania, ASA, VIT)
+1 stopped (Torrens — likely timeout or crash)
+2 never scraped at all (Charles Sturt, USQ)
+
+Expected: queue should process ALL 6, regardless of individual failures.
+Root cause investigation:
+
+Check the bulk-queue handler in routes/scrape.ts or routes/bulk.ts — does it abort on first error?
+Check if there's a global state (like a scraping flag) that gets stuck in true if one scrape crashes, blocking subsequent queue items.
+Check if Gemini quota exhaustion on one university propagates to kill all subsequent scrapes.
+
+Fixes needed:
+A. Queue-level error isolation: Each university should run in its own try/catch. If one throws, log [bulk] university N failed: <error> and move to next. Never abort the queue.
+B. Per-university timeout cap: No single university scrape should block the queue for more than 15 minutes. If it does, mark it failed and move on:
+typescriptconst BULK_PER_UNI_TIMEOUT = 15 * 60 * 1000; // 15 min
+await Promise.race([
+  scrapeOneUniversity(uniId),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('bulk timeout')), BULK_PER_UNI_TIMEOUT))
+]);
+C. Skip on quota exhaustion instead of blocking queue: If a scrape fails due to Gemini 429, mark that university as skipped_quota_exhausted and continue. The other universities might have different bottlenecks.
+D. Auto-retry failed universities: At end of queue, automatically re-queue any universities marked failed or stopped, up to 2 retry attempts.
+E. Bulk status endpoint: Add GET /api/bulk/status that returns:
+json{
+  "queueStartedAt": "...",
+  "totalUniversities": 6,
+  "completed": 3,
+  "failed": 1,
+  "pending": 2,
+  "currentlyRunning": "torrens",
+  "universities": [
+    { "id": 1, "name": "charles sturt", "status": "pending", "startedAt": null },
+    { "id": 5, "name": "asa", "status": "done", "imported": 9, "duration": "3m 12s" },
+    ...
+  ]
+}
+This lets the UI show real-time queue progress instead of just end-state.
+F. Email/log summary at queue end: Log a clear summary showing what succeeded, what failed, and why:
+[BULK-DONE] 6 universities | 3 success | 1 failed | 2 skipped
+✓ asa (9 courses, 3m 12s)
+✓ tasmania (1 course, 2m 1s)
+✓ vit (30 courses, 8m 42s)
+✗ torrens (stopped: per-course vision timeout)
+- charles sturt (skipped: queue aborted before reaching)
+- usq (skipped: queue aborted before reaching)
+Build, commit, push. Reply with the git commit hash.
