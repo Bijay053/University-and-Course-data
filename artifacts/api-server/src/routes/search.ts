@@ -165,23 +165,53 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
 
   const term = typeof q.q === "string" ? q.q.trim() : "";
   if (term) {
-    // Combined fuzzy match: full-text (handles word variations and stopwords
-    // via the English dictionary) OR trigram similarity (handles typos and
-    // partial matches) OR ILIKE substring (handles 1–3 char queries like
-    // "it" / "ai" that fall below the trigram threshold and get dropped by
-    // the English-dictionary stopword list).
-    b.add(
-      `(
-        search_tsv @@ plainto_tsquery('english', ?)
-        OR lower(course_name) % lower(?)
-        OR lower(university_name) % lower(?)
-        OR lower(coalesce(course_location, '')) % lower(?)
-        OR lower(coalesce(university_city, '')) % lower(?)
-        OR course_name ILIKE ?
-        OR university_name ILIKE ?
-      )`,
-      term, term, term, term, term, `%${term}%`, `%${term}%`,
-    );
+    // Strip stopwords and short tokens to decide whether this is a
+    // single-token (typo-tolerant) query or a phrase query.  We must NOT
+    // use pg_trgm `%` for phrase queries: "bachelor of nursing" shares
+    // enough trigrams with "Bachelor of Business International Business"
+    // and "Bachelor of Networking, major in Cybersecurity" (the
+    // "bachelor of" prefix is ~9 trigrams of overlap) to clear the 0.3
+    // default similarity threshold, which floods the results with
+    // unrelated courses that happen to share generic words.
+    const stop = new Set([
+      "a","an","the","of","in","on","at","for","to","and","or","with","by",
+      "from","into","is","are","be","as",
+    ]);
+    const meaningful = term
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 2 && !stop.has(w));
+    const isPhrase = meaningful.length >= 2;
+
+    if (isPhrase) {
+      // Multi-word query: require full-text match (plainto_tsquery ANDs
+      // its terms) OR exact substring on name.  No trigram OR-legs —
+      // those produced false positives like the Bachelor-of-Business
+      // bug.
+      b.add(
+        `(
+          search_tsv @@ plainto_tsquery('english', ?)
+          OR course_name ILIKE ?
+          OR university_name ILIKE ?
+        )`,
+        term, `%${term}%`, `%${term}%`,
+      );
+    } else {
+      // Single-token / very-short query: keep the trigram OR-legs so
+      // typos ("nrsing") and short aliases ("ai", "it") still match.
+      b.add(
+        `(
+          search_tsv @@ plainto_tsquery('english', ?)
+          OR lower(course_name) % lower(?)
+          OR lower(university_name) % lower(?)
+          OR lower(coalesce(course_location, '')) % lower(?)
+          OR lower(coalesce(university_city, '')) % lower(?)
+          OR course_name ILIKE ?
+          OR university_name ILIKE ?
+        )`,
+        term, term, term, term, term, `%${term}%`, `%${term}%`,
+      );
+    }
   }
 
   const location = typeof q.location === "string" ? q.location.trim() : "";
