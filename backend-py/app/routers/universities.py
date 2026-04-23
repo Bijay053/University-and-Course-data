@@ -152,9 +152,12 @@ async def bulk_import_universities(
     if file.content_type and "csv" not in file.content_type and "text" not in file.content_type:
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
-    raw = await file.read()
+    MAX_BYTES = 5 * 1024 * 1024  # 5 MB hard cap (~50k rows)
+    raw = await file.read(MAX_BYTES + 1)
     if not raw:
         raise HTTPException(status_code=400, detail="Empty file")
+    if len(raw) > MAX_BYTES:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_BYTES} bytes")
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -217,7 +220,14 @@ async def bulk_import_universities(
         db.add(University(**payload))
         created += 1
 
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as exc:  # IntegrityError, disconnect, etc.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk import failed at commit: {exc.__class__.__name__}",
+        ) from exc
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
