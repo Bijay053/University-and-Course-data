@@ -1,0 +1,58 @@
+root@university-and-course-data:/opt/app# cd /opt/app && git fetch origin && git reset --hard origin/main \
+  && pnpm install \
+  && pnpm --filter @workspace/api-server run build \
+  && PORT=3000 BASE_PATH=/ NODE_ENV=production \
+       pnpm --filter @workspace/university-portal run build \
+  && pm2 restart api-server
+HEAD is now at 0a4bcda Scale scrape concurrency to 4-core server (CPU_COUNT * N), parallelize vision
+Scope: all 10 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "U…
+└─ Done in 22ms
+Done in 2.2s using pnpm v10.33.0
+
+> @workspace/api-server@0.0.0 build /opt/app/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                        6.8mb ⚠️
+  dist/workers/scrape-worker.mjs        4.7mb ⚠️
+  dist/pino-worker.mjs                153.4kb
+  dist/pino-file.mjs                  142.0kb
+  dist/pino-pretty.mjs                114.6kb
+  dist/thread-stream-worker.mjs         7.3kb
+  dist/index.mjs.map                   11.3mb
+  dist/workers/scrape-worker.mjs.map    7.9mb
+  dist/pino-worker.mjs.map            256.9kb
+  dist/pino-file.mjs.map              229.0kb
+  dist/pino-pretty.mjs.map            203.9kb
+  dist/thread-stream-worker.mjs.map    12.0kb
+
+⚡ Done in 654ms
+
+> @workspace/university-portal@0.0.0 build /opt/app/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1860 modules transformed.
+dist/public/index.html                   0.74 kB │ gzip:   0.41 kB
+dist/public/assets/index-BJ9DwTro.css  124.20 kB │ gzip:  20.67 kB
+dist/public/assets/index-DTAGtafo.js   746.47 kB │ gzip: 213.61 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.60s
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace api-server not found
+root@university-and-course-data:/opt/app# grep -c "Key Insights" /opt/app/artifacts/university-portal/dist/public/assets/*.js
+2
+root@university-and-course-data:/opt/app# 
