@@ -285,7 +285,7 @@ export default function SearchPage() {
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
           </div>
 
-          <Accordion type="multiple" defaultValue={["uni", "intakes", "fee", "duration", "level", "advanced", "english"]} className="w-full">
+          <Accordion type="multiple" defaultValue={["uni", "intakes", "fee", "duration", "advanced", "english"]} className="w-full">
             {/* University */}
             <AccordionItem value="uni">
               <AccordionTrigger className="text-sm">University</AccordionTrigger>
@@ -311,33 +311,6 @@ export default function SearchPage() {
                   placeholder="Any intake"
                   searchPlaceholder="Search intakes..."
                   maxBadgeCount={3}
-                />
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Degree level */}
-            <AccordionItem value="level">
-              <AccordionTrigger className="text-sm">Degree Level</AccordionTrigger>
-              <AccordionContent className="pt-1">
-                <MultiSelect
-                  options={(data?.facets.degree_levels ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
-                  value={selectedLevels}
-                  onChange={(v) => { setSelectedLevels(v); resetPage(); }}
-                  placeholder="Any level"
-                />
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Category */}
-            <AccordionItem value="cat">
-              <AccordionTrigger className="text-sm">Category</AccordionTrigger>
-              <AccordionContent className="pt-1">
-                <MultiSelect
-                  options={(data?.facets.categories ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
-                  value={selectedCategories}
-                  onChange={(v) => { setSelectedCategories(v); resetPage(); }}
-                  placeholder="Any category"
-                  searchPlaceholder="Search categories..."
                 />
               </AccordionContent>
             </AccordionItem>
@@ -374,6 +347,29 @@ export default function SearchPage() {
                 Advanced Filter
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
+                {/* Degree Level (moved from main filters) */}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">Degree Level</Label>
+                  <MultiSelect
+                    options={(data?.facets.degree_levels ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
+                    value={selectedLevels}
+                    onChange={(v) => { setSelectedLevels(v); resetPage(); }}
+                    placeholder="Any level"
+                  />
+                </div>
+
+                {/* Category (moved from main filters) */}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">Category</Label>
+                  <MultiSelect
+                    options={(data?.facets.categories ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
+                    value={selectedCategories}
+                    onChange={(v) => { setSelectedCategories(v); resetPage(); }}
+                    placeholder="Any category"
+                    searchPlaceholder="Search categories..."
+                  />
+                </div>
+
                 <div>
                   <Label className="text-xs text-gray-600 mb-1 block">
                     Country of Residence <span className="text-red-500">*</span>
@@ -391,7 +387,7 @@ export default function SearchPage() {
                   <Label className="text-xs text-gray-600 mb-1 block">
                     Highest Qualification Studied <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); resetPage(); }}>
+                  <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); setScheme(""); setOutOf(""); setGradingScore(""); resetPage(); }}>
                     <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="any">— Any —</SelectItem>
@@ -400,41 +396,75 @@ export default function SearchPage() {
                   </Select>
                 </div>
 
+                {/* Grading scheme is linked to qualification: only enabled
+                    once a qualification is selected, and the labels reflect
+                    that choice (e.g. "Bachelor Grading Scheme"). */}
                 <div>
                   <Label className="text-xs text-gray-600 mb-1 block">
-                    Grading Scheme (12th)
+                    {qualification ? `${qualification} Grading Scheme` : "Grading Scheme"}
                   </Label>
-                  <Select value={scheme || "any"} onValueChange={(v) => { setScheme(v === "any" ? "" : v); setOutOf(""); resetPage(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                  <Select
+                    value={scheme || "any"}
+                    onValueChange={(v) => { setScheme(v === "any" ? "" : v); setOutOf(""); resetPage(); }}
+                    disabled={!qualification}
+                  >
+                    <SelectTrigger className="h-9"><SelectValue placeholder={qualification ? "Choose scheme" : "Pick qualification first"} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="any">— Any —</SelectItem>
-                      {(options?.grading_schemes ?? []).map((s) => <SelectItem key={s.scheme} value={s.scheme}>{s.scheme}</SelectItem>)}
+                      <SelectItem value="GPA">GPA</SelectItem>
+                      <SelectItem value="Percentage">Percentage</SelectItem>
                     </SelectContent>
                   </Select>
+                  {!qualification && (
+                    <p className="text-[11px] text-gray-500 mt-1">Select a qualification above to enter your grade.</p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Out of</Label>
-                    <Select value={outOf || "any"} onValueChange={(v) => { setOutOf(v === "any" ? "" : v); resetPage(); }} disabled={!scheme}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">— Any —</SelectItem>
-                        {currentSchemeOuts.map((o) => <SelectItem key={o} value={o}>Out of {o}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                {/* Out of — only when GPA is chosen */}
+                {qualification && scheme === "GPA" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">Out of</Label>
+                      <Select value={outOf || "any"} onValueChange={(v) => { setOutOf(v === "any" ? "" : v); resetPage(); }}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">— Any —</SelectItem>
+                          {(currentSchemeOuts.length ? currentSchemeOuts : ["4", "5", "10"]).map((o) =>
+                            <SelectItem key={o} value={o}>Out of {o}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">
+                        {qualification} GPA
+                      </Label>
+                      <Input
+                        type="number" step="0.01" min="0"
+                        value={gradingScore}
+                        onChange={(e) => { setGradingScore(e.target.value); resetPage(); }}
+                        placeholder="e.g. 3.5"
+                        className="h-9"
+                      />
+                    </div>
                   </div>
+                )}
+
+                {/* Percentage entry — only when Percentage chosen */}
+                {qualification && scheme === "Percentage" && (
                   <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Grading Score</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      {qualification} Percentage (%)
+                    </Label>
                     <Input
-                      type="number" step="0.01" min="0"
+                      type="number" step="0.01" min="0" max="100"
                       value={gradingScore}
                       onChange={(e) => { setGradingScore(e.target.value); resetPage(); }}
-                      placeholder="e.g. 3.5"
+                      placeholder="e.g. 75"
                       className="h-9"
                     />
                   </div>
-                </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
