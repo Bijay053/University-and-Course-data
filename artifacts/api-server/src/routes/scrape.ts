@@ -30,6 +30,7 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
+import { applyCsuTextualCampusFallback } from "../lib/csu-campus-fallback.js";
 import { extractEnglishWithCascade } from "../lib/english-cascade.js";
 import { fillFromConcordance } from "../lib/concordance-cache.js";
 import { refreshCourseSearchView } from "../services/search-index.js";
@@ -1695,6 +1696,12 @@ function extractWithCheerio(
   const reconstructedName = validateNameAgainstSlug(name, preferredUrl);
   const data: Partial<CourseData> = { courseName: reconstructedName, courseWebsite: preferredUrl, language: "English" };
   applyCsuStructuredCourseData(html, preferredUrl, data);
+  // CSU pages whose static HTML lacks the embedded `ocb_metadata.course_offerings`
+  // JSON (typically client-side rendered postgrad pages) get a textual campus
+  // fallback that scans for known CSU campus city names under campus-related
+  // headings / sentences. No-op when the structured-data path already filled
+  // courseLocation, and no-op for non-CSU URLs.
+  applyCsuTextualCampusFallback($, html, preferredUrl, data as { courseLocation?: string });
 
   const pageTemplate = detectCoursePageTemplate(html, preferredUrl);
   const effectiveTemplate = pickEffectiveCourseTemplate(batchPageTemplateHint ?? null, pageTemplate);
