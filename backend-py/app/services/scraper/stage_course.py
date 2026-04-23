@@ -69,7 +69,7 @@ async def stage_course(
         scrape_job_id=scrape_job_id,
         university_id=university_id,
         course_name=name,
-        **{k: v for k, v in payload.items() if hasattr(ScrapedCourse, k)},
+        **{k: v for k, v in payload.items() if hasattr(ScrapedCourse, k) and k != "course_name"},
     )
     db.add(sc)
     await db.flush()
