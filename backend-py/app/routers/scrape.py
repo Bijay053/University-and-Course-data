@@ -97,36 +97,43 @@ async def start_bulk(
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> BulkScrapeResponse:
     session_id = f"bulk_{uuid.uuid4().hex[:12]}"
-    queued = 0
+    job_ids: list[str] = []
     for uid in body.university_ids:
         uni = await db.get(University, uid)
         if not uni:
             continue
         job_id = f"job_{uuid.uuid4().hex[:12]}"
-        job = ScrapeRuntimeJob(
-            runtime_job_id=job_id,
-            university_id=uni.id,
-            university_name=uni.name,
-            url=uni.scrape_url,
-            job_type="bulk",
-            status="queued",
-            fast_mode=body.fast_mode,
-            request_payload={
-                "session_id": session_id,
-                "university_id": uni.id,
-                "fast_mode": body.fast_mode,
-            },
+        db.add(
+            ScrapeRuntimeJob(
+                runtime_job_id=job_id,
+                university_id=uni.id,
+                university_name=uni.name,
+                url=uni.scrape_url,
+                job_type="bulk",
+                status="queued",
+                fast_mode=body.fast_mode,
+                request_payload={
+                    "session_id": session_id,
+                    "university_id": uni.id,
+                    "fast_mode": body.fast_mode,
+                },
+            )
         )
-        db.add(job)
-        queued += 1
-        try:
-            from app.tasks.scrape_tasks import scrape_university
+        job_ids.append(job_id)
 
-            scrape_university.delay(job_id)
-        except Exception:
-            pass
+    # Commit BEFORE enqueueing so the worker can never race ahead of the row insert.
     await db.commit()
-    return BulkScrapeResponse(session_id=session_id, queued=queued)
+
+    try:
+        from app.tasks.scrape_tasks import scrape_university
+
+        for jid in job_ids:
+            scrape_university.delay(jid)
+    except Exception:
+        # Broker unavailable: rows stay 'queued' for retry by the next start call
+        # or the periodic reaper.
+        pass
+    return BulkScrapeResponse(session_id=session_id, queued=len(job_ids))
 
 
 @router.post("/jobs/{job_id}/stop")

@@ -1,13 +1,19 @@
 """Public course search endpoints. Reads from the existing materialized view
 ``course_search_view`` so the user-facing search behaviour stays identical
 to Node. The view is created/refreshed by the existing Drizzle migrations.
+
+View columns we rely on (verified live):
+    id, course_name, university_id, university_name, university_country,
+    university_city, degree_level, course_location, duration, duration_term,
+    international_fee, ielts_overall, intakes, search_tsv
 """
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -17,6 +23,8 @@ from app.schemas.search import (
     SearchOptionsResponse,
     SearchStatsResponse,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,19 +43,20 @@ async def search_courses(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> SearchCourseResponse:
-    where: list[str] = ["c.status = 'active'", "c.approval_status = 'approved'"]
+    where: list[str] = []
     params: dict = {}
     if q:
+        # search_tsv is a precomputed tsvector on the MV; fall back to ILIKE on course_name.
         where.append(
-            "(c.search_vector @@ plainto_tsquery('english', :q) OR lower(c.name) ILIKE :ql)"
+            "(c.search_tsv @@ plainto_tsquery('english', :q) OR lower(c.course_name) ILIKE :ql)"
         )
         params["q"] = q
         params["ql"] = f"%{q.lower()}%"
     if country:
-        where.append("lower(c.country) = lower(:country)")
+        where.append("lower(c.university_country) = lower(:country)")
         params["country"] = country
     if city:
-        where.append("lower(c.city) = lower(:city)")
+        where.append("lower(c.university_city) = lower(:city)")
         params["city"] = city
     if university_id:
         where.append("c.university_id = :uid")
@@ -56,7 +65,7 @@ async def search_courses(
         where.append("c.degree_level = :dl")
         params["dl"] = degree_level
     if intake_month:
-        where.append(":im = ANY(c.intake_months)")
+        where.append(":im = ANY(c.intakes)")
         params["im"] = intake_month
     if max_fee is not None:
         where.append("(c.international_fee IS NULL OR c.international_fee <= :max_fee)")
@@ -68,17 +77,25 @@ async def search_courses(
     where_sql = " AND ".join(where) if where else "TRUE"
 
     rank_select = (
-        "ts_rank(c.search_vector, plainto_tsquery('english', :q)) AS rank" if q else "NULL AS rank"
+        "ts_rank(c.search_tsv, plainto_tsquery('english', :q)) AS rank" if q else "NULL AS rank"
     )
 
     base_sql = f"""
-        SELECT c.course_id, c.course_name, c.university_id, c.university_name,
-               c.degree_level, c.course_location, c.duration, c.duration_term,
-               c.international_fee, c.ielts_overall, c.intake_months,
+        SELECT c.id           AS course_id,
+               c.course_name,
+               c.university_id,
+               c.university_name,
+               c.degree_level,
+               c.course_location,
+               c.duration,
+               c.duration_term,
+               c.international_fee,
+               c.ielts_overall,
+               c.intakes      AS intake_months,
                {rank_select}
         FROM course_search_view c
         WHERE {where_sql}
-        ORDER BY {"rank DESC, " if q else ""}c.course_name
+        ORDER BY {"rank DESC NULLS LAST, " if q else ""}c.course_name
         LIMIT :limit OFFSET :offset
     """
     count_sql = f"SELECT COUNT(*) FROM course_search_view c WHERE {where_sql}"
@@ -89,7 +106,9 @@ async def search_courses(
     try:
         rows = (await db.execute(text(base_sql), params)).mappings().all()
         total = (await db.execute(text(count_sql), params)).scalar_one()
-    except Exception:  # view may not exist on dev DBs — fall back to empty
+    except Exception as exc:
+        # Surface DB errors in logs (don't silently mask) but never 500 the search page.
+        log.error("search_courses SQL failed: %s", exc)
         return SearchCourseResponse(results=[], total=0, page=page, limit=limit)
 
     return SearchCourseResponse(
@@ -158,7 +177,8 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             "November",
             "December",
         ]
-    except Exception:
+    except Exception as exc:
+        log.error("search_options SQL failed: %s", exc)
         return SearchOptionsResponse()
 
     return SearchOptionsResponse(
@@ -189,7 +209,8 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
                 )
             )
         ).scalar_one()
-    except Exception:
+    except Exception as exc:
+        log.error("search_stats SQL failed: %s", exc)
         return SearchStatsResponse()
 
     return SearchStatsResponse(
@@ -198,7 +219,3 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
         countries=int(countries or 0),
         average_fee=float(avg_fee) if avg_fee is not None else None,
     )
-
-
-# Keep an unused symbol to silence "imported but unused" warnings if linted.
-_ = bindparam
