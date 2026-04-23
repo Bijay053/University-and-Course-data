@@ -11454,7 +11454,11 @@ router.get("/scrape/history", async (req: Request, res: Response): Promise<void>
        LIMIT $1 OFFSET $2`,
       [limit, offset],
     );
-    res.json({ runs: result.rows });
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM scrape_runtime_jobs`,
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+    res.json({ runs: result.rows, total, limit, offset });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -11494,15 +11498,92 @@ router.get("/scrape/history/:jobId", async (req: Request, res: Response): Promis
          ORDER BY sequence ASC`,
         [jobId],
       ),
+      // Full course row + evidence array (jsonb_agg per scraped_course_id).
+      // Aliased to camelCase so it matches the StagedCourse type used by
+      // the live review table (no separate lite type needed any more).
       pool.query(
-        `SELECT id, course_name AS "courseName", status, auto_publish_status AS "autoPublishStatus",
-                eligibility_status AS "eligibilityStatus",
-                ielts_overall AS "ieltsOverall", pte_overall AS "pteOverall", toefl_overall AS "toeflOverall",
-                international_fee AS "internationalFee", duration, duration_term AS "durationTerm",
-                category, degree_level AS "degreeLevel"
-         FROM scraped_courses
-         WHERE scrape_job_id = $1
-         ORDER BY course_name ASC NULLS LAST`,
+        `SELECT
+           sc.id,
+           sc.scrape_job_id          AS "scrapeJobId",
+           sc.university_id          AS "universityId",
+           sc.course_name            AS "courseName",
+           sc.category,
+           sc.sub_category           AS "subCategory",
+           sc.course_website         AS "courseWebsite",
+           sc.course_location        AS "courseLocation",
+           sc.duration,
+           sc.duration_term          AS "durationTerm",
+           sc.study_mode             AS "studyMode",
+           sc.degree_level           AS "degreeLevel",
+           sc.study_load             AS "studyLoad",
+           sc.language,
+           sc.description,
+           sc.other_requirement      AS "otherRequirement",
+           sc.international_fee      AS "internationalFee",
+           sc.fee_term               AS "feeTerm",
+           sc.fee_year               AS "feeYear",
+           sc.currency,
+           sc.ielts_overall          AS "ieltsOverall",
+           sc.ielts_listening        AS "ieltsListening",
+           sc.ielts_speaking         AS "ieltsSpeaking",
+           sc.ielts_writing          AS "ieltsWriting",
+           sc.ielts_reading          AS "ieltsReading",
+           sc.pte_overall            AS "pteOverall",
+           sc.pte_listening          AS "pteListening",
+           sc.pte_speaking           AS "pteSpeaking",
+           sc.pte_writing            AS "pteWriting",
+           sc.pte_reading            AS "pteReading",
+           sc.toefl_overall          AS "toeflOverall",
+           sc.toefl_listening        AS "toeflListening",
+           sc.toefl_speaking         AS "toeflSpeaking",
+           sc.toefl_writing          AS "toeflWriting",
+           sc.toefl_reading          AS "toeflReading",
+           sc.cambridge_overall      AS "cambridgeOverall",
+           sc.duolingo_overall       AS "duolingoOverall",
+           sc.intake_months          AS "intakeMonths",
+           sc.academic_level         AS "academicLevel",
+           sc.academic_score         AS "academicScore",
+           sc.score_type             AS "scoreType",
+           sc.academic_country       AS "academicCountry",
+           sc.scholarship,
+           sc.student_market         AS "studentMarket",
+           sc.delivery_mode          AS "deliveryMode",
+           sc.international_eligible AS "internationalEligible",
+           sc.on_campus_available    AS "onCampusAvailable",
+           sc.eligibility_status     AS "eligibilityStatus",
+           sc.eligibility_reason     AS "eligibilityReason",
+           sc.eligibility_confidence AS "eligibilityConfidence",
+           sc.auto_publish_status    AS "autoPublishStatus",
+           sc.decision_score         AS "decisionScore",
+           sc.status,
+           sc.completeness,
+           sc.notes,
+           sc.created_at             AS "createdAt",
+           COALESCE((
+             SELECT jsonb_agg(
+               jsonb_build_object(
+                 'id', e.id,
+                 'fieldKey', e.field_key,
+                 'candidateValue', e.candidate_value,
+                 'normalizedValue', e.normalized_value,
+                 'sourceUrl', e.source_url,
+                 'pageType', e.page_type,
+                 'extractionMethod', e.extraction_method,
+                 'snippet', e.snippet,
+                 'confidence', e.confidence,
+                 'decisionScore', e.decision_score,
+                 'decisionStatus', e.decision_status,
+                 'validationStatus', e.validation_status,
+                 'selected', e.selected
+               )
+               ORDER BY e.field_key ASC, e.selected DESC, e.decision_score DESC NULLS LAST
+             )
+             FROM scraped_field_evidence e
+             WHERE e.scraped_course_id = sc.id
+           ), '[]'::jsonb) AS "evidence"
+         FROM scraped_courses sc
+         WHERE sc.scrape_job_id = $1
+         ORDER BY sc.course_name ASC NULLS LAST`,
         [jobId],
       ),
     ]);

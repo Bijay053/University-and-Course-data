@@ -18,6 +18,11 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
+import {
+  ReviewScrapedCoursesTable,
+  type ReviewStagedCourse,
+  type ReviewEvidenceItem,
+} from "@/components/review-scraped-courses-table";
 
 type ImportJob = {
   id: number;
@@ -355,13 +360,14 @@ export default function Scraping() {
     rejectedCount: number;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
-  type HistoryStagedCourse = {
-    id: number; courseName: string | null; status: string | null; autoPublishStatus: string | null;
-    eligibilityStatus: string | null; ieltsOverall: string | null; pteOverall: string | null;
-    toeflOverall: string | null; internationalFee: string | null; duration: string | null;
-    durationTerm: string | null; category: string | null; degreeLevel: string | null;
-  };
+  // History staged course is now the full StagedCourse + evidence array
+  // (matches the live Review table). Keep it loose here — the component
+  // owns the strict typing.
+  type HistoryStagedCourse = ReviewStagedCourse & { evidence: ReviewEvidenceItem[] };
   const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState<10 | 50 | 100>(10);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
@@ -372,15 +378,17 @@ export default function Scraping() {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch("/api/scrape/history?limit=50");
-      const data = await readResponseJson<{ runs: HistoryRun[] }>(res);
+      const offset = (historyPage - 1) * historyPageSize;
+      const res = await fetch(`/api/scrape/history?limit=${historyPageSize}&offset=${offset}`);
+      const data = await readResponseJson<{ runs: HistoryRun[]; total?: number }>(res);
       setHistoryRuns(data?.runs ?? []);
+      setHistoryTotal(data?.total ?? (data?.runs?.length ?? 0));
     } catch {
       // Non-fatal — empty state will render.
     } finally {
       setLoadingHistory(false);
     }
-  }, []);
+  }, [historyPage, historyPageSize]);
 
   const openHistoryDetail = useCallback(async (runtimeJobId: string, view: "logs" | "courses") => {
     if (expandedHistoryId === runtimeJobId && historyView === view) {
@@ -2364,12 +2372,54 @@ export default function Scraping() {
 
       {/* ── Scrape History ─────────────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Scrape History</h2>
-          <Button variant="outline" size="sm" onClick={fetchHistory} disabled={loadingHistory}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loadingHistory ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold">Scrape History</h2>
+            {historyTotal > 0 ? (
+              <span className="text-xs text-gray-500">
+                {((historyPage - 1) * historyPageSize) + 1}–{Math.min(historyPage * historyPageSize, historyTotal)} of {historyTotal}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">Per page:</label>
+            <Select
+              value={String(historyPageSize)}
+              onValueChange={(v) => { setHistoryPage(1); setHistoryPageSize(Number(v) as 10 | 50 | 100); }}
+            >
+              <SelectTrigger className="h-8 w-20 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              disabled={historyPage <= 1 || loadingHistory}
+            >
+              Prev
+            </Button>
+            <span className="text-xs text-gray-600 min-w-[60px] text-center">
+              Page {historyPage} / {Math.max(1, Math.ceil(historyTotal / historyPageSize))}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHistoryPage((p) => p + 1)}
+              disabled={historyPage * historyPageSize >= historyTotal || loadingHistory}
+            >
+              Next
+            </Button>
+            <Button variant="outline" size="sm" onClick={fetchHistory} disabled={loadingHistory}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loadingHistory ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
         {loadingHistory && historyRuns.length === 0 ? (
           <div className="border rounded-xl p-10 text-center text-gray-400">Loading…</div>
@@ -2466,34 +2516,12 @@ export default function Scraping() {
                           <div className="text-xs text-gray-500 mb-2">
                             {historyDetail?.stagedCourses.length ?? 0} staged courses
                           </div>
-                          <div className="max-h-96 overflow-auto border rounded bg-white">
-                            <table className="w-full text-xs">
-                              <thead className="bg-gray-100 sticky top-0">
-                                <tr>
-                                  <th className="text-left p-2 font-medium text-gray-600">Course</th>
-                                  <th className="text-left p-2 font-medium text-gray-600">Level</th>
-                                  <th className="text-left p-2 font-medium text-gray-600">Category</th>
-                                  <th className="text-center p-2 font-medium text-gray-600">Status</th>
-                                  <th className="text-right p-2 font-medium text-gray-600">Fee</th>
-                                  <th className="text-center p-2 font-medium text-gray-600">IELTS</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y">
-                                {(historyDetail?.stagedCourses ?? []).map((c) => (
-                                  <tr key={c.id} className="hover:bg-gray-50">
-                                    <td className="p-2 text-gray-800">{c.courseName ?? "—"}</td>
-                                    <td className="p-2 text-gray-600">{c.degreeLevel ?? "—"}</td>
-                                    <td className="p-2 text-gray-600">{c.category ?? "—"}</td>
-                                    <td className="p-2 text-center text-gray-600">{c.status ?? "—"}</td>
-                                    <td className="p-2 text-right text-gray-700">{c.internationalFee ?? "—"}</td>
-                                    <td className="p-2 text-center text-gray-600">{c.ieltsOverall ?? "—"}</td>
-                                  </tr>
-                                ))}
-                                {(historyDetail?.stagedCourses.length ?? 0) === 0 && (
-                                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">No staged courses recorded for this run.</td></tr>
-                                )}
-                              </tbody>
-                            </table>
+                          <div className="max-h-[600px] overflow-auto bg-white">
+                            <ReviewScrapedCoursesTable
+                              courses={historyDetail?.stagedCourses ?? []}
+                              readOnly
+                              showEvidence
+                            />
                           </div>
                         </div>
                       )}
