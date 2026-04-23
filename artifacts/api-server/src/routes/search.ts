@@ -175,7 +175,7 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
   const scheme = typeof q.grading_scheme === "string" ? q.grading_scheme.trim() : "";
   const outOf = typeof q.grading_out_of === "string" ? q.grading_out_of.trim() : "";
   const score = num(q.grading_score);
-  if (country || qual || (scheme && outOf) || score != null) {
+  if (country || qual || scheme || score != null) {
     const conds: string[] = ["ar.course_id = course_search_view.id"];
     const vals: unknown[] = [];
     // Treat NULLs as "matches any" — most academic_requirement rows in
@@ -511,12 +511,23 @@ router.get("/search/options", async (_req: Request, res: Response) => {
         scheme,
         out_of: Array.from(outs).sort((a, b) => Number(a) - Number(b)),
       })),
-      english_exams: exams.rows.map((r) => {
-        const v = String(r.v);
-        if (v === "Cambridge" || v === "Cambridge CAE" || v === "CAE") return "CAE";
-        if (v === "Duolingo" || v === "DET") return "DET";
-        return v;
-      }).filter((v, i, arr) => arr.indexOf(v) === i),
+      // Canonicalize to the uppercase keys used by ENGLISH_EXAM_TEST_TYPES so
+      // that the frontend can submit the value verbatim and the backend
+      // matcher will always recognize it. Drop any value that does not
+      // canonicalize so we never return options the backend cannot filter on.
+      english_exams: (() => {
+        const out = new Set<string>();
+        for (const r of exams.rows) {
+          const v = String(r.v).trim();
+          const u = v.toUpperCase();
+          if (u === "IELTS") out.add("IELTS");
+          else if (u === "PTE" || u.startsWith("PTE ")) out.add("PTE");
+          else if (u === "TOEFL" || u.startsWith("TOEFL")) out.add("TOEFL");
+          else if (u === "CAE" || u === "CAMBRIDGE" || u === "CAMBRIDGE CAE") out.add("CAE");
+          else if (u === "DET" || u === "DUOLINGO") out.add("DET");
+        }
+        return Array.from(out);
+      })(),
       universities: universities.rows.map((r) => ({ id: r.id, name: r.name })),
     };
     optionsCache = { at: Date.now(), data };

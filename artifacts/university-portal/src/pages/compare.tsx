@@ -86,9 +86,16 @@ export default function ComparePage() {
   // Build the english requirements per course, keyed by normalized test type.
   const englishMap = useMemo(() => courses.map((c) => {
     const m = new Map<string, EnglishReq>();
+    const score = (e: EnglishReq) =>
+      (e.overall != null ? 1 : 0) + (e.listening != null ? 1 : 0) +
+      (e.reading != null ? 1 : 0) + (e.writing != null ? 1 : 0) +
+      (e.speaking != null ? 1 : 0);
     for (const e of c.english_requirements) {
       const k = normalizeTestType(e.test_type);
-      if (!m.has(k)) m.set(k, e);
+      const prev = m.get(k);
+      // Keep the row with the most non-null bands so we don't drop richer
+      // duplicates of the same test type.
+      if (!prev || score(e) > score(prev)) m.set(k, e);
     }
     return m;
   }), [courses]);
