@@ -167,7 +167,9 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
   if (term) {
     // Combined fuzzy match: full-text (handles word variations and stopwords
     // via the English dictionary) OR trigram similarity (handles typos and
-    // partial matches). Either path qualifies a row.
+    // partial matches) OR ILIKE substring (handles 1–3 char queries like
+    // "it" / "ai" that fall below the trigram threshold and get dropped by
+    // the English-dictionary stopword list).
     b.add(
       `(
         search_tsv @@ plainto_tsquery('english', ?)
@@ -175,25 +177,37 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
         OR lower(university_name) % lower(?)
         OR lower(coalesce(course_location, '')) % lower(?)
         OR lower(coalesce(university_city, '')) % lower(?)
+        OR course_name ILIKE ?
+        OR university_name ILIKE ?
       )`,
-      term, term, term, term, term,
+      term, term, term, term, term, `%${term}%`, `%${term}%`,
     );
   }
 
   const location = typeof q.location === "string" ? q.location.trim() : "";
   if (location) {
-    // Expand "syd" → ["sydney","syd","nsw","new south wales"], then run
-    // trigram similarity against city / country / per-course location.
+    // Expand "syd" → ["sydney","syd","nsw","new south wales"], then run a
+    // word_similarity check against city / country / per-course location.
+    //
+    // Why word_similarity and not the `%` operator?  Many rows store a CSV
+    // of cities (e.g. "Sydney, Melbourne, Adelaide, Brisbane, Online").
+    // similarity('sydney', 'sydney, melbourne, …') is ~0.17 — below the 0.3
+    // pg_trgm threshold — so plain `%` misses them.  word_similarity scans
+    // the *best matching word* inside the longer string, so 'sydney' scores
+    // 1.0 and 'sidney' scores 0.43, both clearing 0.3.  Threshold is
+    // injected literally to keep the query sargable / index-friendly.
     const candidates = expandLocation(location);
     const conds: string[] = [];
     const vals: unknown[] = [];
     for (const c of candidates) {
-      conds.push(`lower(university_city) % lower(?)`); vals.push(c);
-      conds.push(`lower(university_country) % lower(?)`); vals.push(c);
-      conds.push(`lower(coalesce(course_location, '')) % lower(?)`); vals.push(c);
-      // ILIKE fallback for very short strings ("act") that trigram drops.
+      conds.push(`word_similarity(lower(?), lower(university_city)) > 0.3`); vals.push(c);
+      conds.push(`word_similarity(lower(?), lower(university_country)) > 0.3`); vals.push(c);
+      conds.push(`word_similarity(lower(?), lower(coalesce(course_location, ''))) > 0.3`); vals.push(c);
+      // ILIKE fallback for very short strings ("oz", "act") that even
+      // word_similarity drops below 0.3.
       conds.push(`university_city ILIKE ?`); vals.push(`%${c}%`);
       conds.push(`university_country ILIKE ?`); vals.push(`%${c}%`);
+      conds.push(`coalesce(course_location, '') ILIKE ?`); vals.push(`%${c}%`);
     }
     b.add(`(${conds.join(" OR ")})`, ...vals);
   }
@@ -347,6 +361,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
     let sortKey = typeof req.query.sort === "string" ? req.query.sort : "relevance";
     if (!ALLOWED_SORTS[sortKey]) sortKey = "relevance";
     const term = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const location = typeof req.query.location === "string" ? req.query.location.trim() : "";
 
     // Build values array. When relevance + q, we append the term once. The
     // ordering combines FTS rank (higher = better) with trigram similarity
@@ -433,10 +448,44 @@ router.get("/search/courses", async (req: Request, res: Response) => {
 
     const totalCount: number = countRes.rows[0]?.total ?? 0;
 
-    // "Did you mean" — only computed when the user typed a term and we got
-    // zero results. Uses trigram similarity to find the closest course name
-    // ignoring all other filters (since they're likely the reason for zero).
+    // "Did you mean" — only computed when we got zero results.  Two flavours:
+    //   • course-name suggestion (when q was supplied)
+    //   • location suggestion   (when location was supplied)
+    // Both ignore all other filters since those filters are the most likely
+    // reason for the zero result.
     let didYouMean: string | null = null;
+    let didYouMeanLocation: string | null = null;
+    if (location && totalCount === 0) {
+      try {
+        const sugg = await pool.query(
+          `WITH cand AS (
+             SELECT university_country AS s,
+                    word_similarity(lower($1), lower(university_country)) AS score
+               FROM course_search_view
+              WHERE university_country IS NOT NULL AND university_country <> ''
+              UNION ALL
+             SELECT university_city AS s,
+                    word_similarity(lower($1), lower(university_city)) AS score
+               FROM course_search_view
+              WHERE university_city IS NOT NULL AND university_city <> 'Unknown'
+           )
+           SELECT s, MAX(score) AS score
+             FROM cand
+            GROUP BY s
+            ORDER BY score DESC
+            LIMIT 1`,
+          [location],
+        );
+        if (sugg.rows.length && sugg.rows[0].score >= 0.3) {
+          const suggested = sugg.rows[0].s as string;
+          if (suggested && suggested.toLowerCase() !== location.toLowerCase()) {
+            didYouMeanLocation = suggested;
+          }
+        }
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "did-you-mean (location) lookup failed");
+      }
+    }
     if (term && totalCount === 0) {
       try {
         // word_similarity scans the *best matching word* inside course_name,
@@ -478,6 +527,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       limit,
       took_ms: elapsed,
       did_you_mean: didYouMean,
+      did_you_mean_location: didYouMeanLocation,
       results: resultsRes.rows.map((r) => ({
         id: r.id,
         course_name: r.course_name,

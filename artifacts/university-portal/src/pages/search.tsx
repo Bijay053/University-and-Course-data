@@ -45,6 +45,7 @@ type CourseResult = {
 type SearchResponse = {
   total: number; page: number; limit: number; took_ms: number;
   did_you_mean?: string | null;
+  did_you_mean_location?: string | null;
   results: CourseResult[];
   facets: {
     universities: FacetItem[]; categories: FacetItem[];
@@ -516,6 +517,19 @@ export default function SearchPage() {
                         className="text-red-700 underline font-medium hover:text-red-800"
                       >
                         “{data.did_you_mean}”
+                      </button>
+                      ?
+                    </span>
+                  )}
+                  {data.did_you_mean_location && data.total === 0 && (
+                    <span className="ml-3 text-gray-600">
+                      Did you mean location{" "}
+                      <button
+                        type="button"
+                        onClick={() => { setLocFilter(data.did_you_mean_location!); resetPage(); }}
+                        className="text-red-700 underline font-medium hover:text-red-800"
+                      >
+                        “{data.did_you_mean_location}”
                       </button>
                       ?
                     </span>

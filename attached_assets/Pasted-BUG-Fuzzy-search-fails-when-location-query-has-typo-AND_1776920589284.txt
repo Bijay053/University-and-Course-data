@@ -1,0 +1,85 @@
+BUG: Fuzzy search fails when location query has typo AND course query has typo combined. Also "aussie" alias for Australia not supported.
+Tested on production today (commit a1f8c07):
+QueryLocationResultbachlor nursing(none)✓ works — "Did you mean: Bachelor Nursing"bachlor nursingsidney❌ 0 resultsbachlor nursingaussie❌ 0 resultsbachlor nursingmelbone❌ 0 results
+Two bugs:
+Bug A — Location doesn't use trigram fuzzy match when combined with course search.
+The location query parameter must use the SAME trigram fuzzy matching the course name uses. Not exact/ILIKE.
+sql-- Current likely uses ILIKE or equality
+AND course_location ILIKE '%' || $location || '%'
+
+-- Should use trigram % operator (same as course_name)
+AND (
+  LOWER(university_city) % LOWER($location) 
+  OR LOWER(university_country) % LOWER($location)
+  OR LOWER(COALESCE(course_location, '')) % LOWER($location)
+)
+Also lower similarity threshold for location (short words like "syd" need more tolerance):
+sqlSET LOCAL pg_trgm.similarity_threshold = 0.2;  -- or use word_similarity()
+Bug B — Informal location aliases not supported.
+Users use colloquial terms. Add alias expansion BEFORE the trigram search:
+typescriptconst LOCATION_ALIASES: Record<string, string[]> = {
+  // Country aliases
+  'aussie': ['australia'],
+  'oz': ['australia'],
+  'au': ['australia'],
+  'usa': ['united states', 'america'],
+  'uk': ['united kingdom', 'england', 'britain'],
+  'britain': ['united kingdom'],
+  'england': ['united kingdom'],
+  
+  // City aliases (AU focus)
+  'syd': ['sydney'],
+  'melb': ['melbourne'],
+  'bris': ['brisbane'],
+  'adel': ['adelaide'],
+  'per': ['perth'],
+  'canberra': ['canberra', 'act'],
+  
+  // Common typos handled via trigram already: sidney→sydney, melbone→melbourne
+};
+
+function expandLocationQuery(input: string): string[] {
+  const key = input.toLowerCase().trim();
+  const aliases = LOCATION_ALIASES[key];
+  return aliases ? [...aliases, input] : [input];
+}
+
+// In the query builder:
+const locationCandidates = expandLocationQuery(locationParam);
+// Then OR across all candidates with trigram match
+SQL:
+sqlAND (
+  -- For each candidate location, check with trigram
+  EXISTS (
+    SELECT 1 FROM unnest(ARRAY[$location1, $location2, ...]) AS loc
+    WHERE 
+      LOWER(university_city) % LOWER(loc) 
+      OR LOWER(university_country) % LOWER(loc)
+      OR LOWER(COALESCE(course_location, '')) % LOWER(loc)
+  )
+)
+Also — "Did you mean" suggestion for location:
+When location=aussie returns 0 results, also show "Did you mean: Australia?" using fuzzystrmatch on the universities.country column.
+
+Test cases (all must pass):
+QueryLocationExpectedbachlor nursingsidney≥1 result (Sydney nursing courses)bachlor nursingmelbone≥1 result (Melbourne courses)bachlor nursingaussie≥1 result (all AU courses)itoz≥1 resultanythingsyd≥1 result
+Also fix: "Did you mean" must be CLICKABLE. Currently it's displayed as text. User should be able to click it to auto-execute the suggested query:
+tsx<button 
+  onClick={() => { setQuery(suggestion); runSearch(suggestion); }}
+  className="underline text-primary hover:text-primary/80"
+>
+  "{suggestion}"
+</button>
+
+DELIVERY:
+
+Fix location filter to use trigram % operator (same as course name)
+Lower trigram similarity threshold for location only (0.2 instead of 0.3)
+Add LOCATION_ALIASES map with AU-focused aliases
+Expand location query to candidates[] before searching
+Add "Did you mean" for locations (not just course names)
+Make "Did you mean" suggestion clickable — auto-fills input and re-runs search
+Build, commit "Fuzzy search: location trigram + aliases + clickable did-you-mean", push
+
+Deploy path: /root/University-and-Course-data
+Reply with commit hash + test output for all 5 test cases above.

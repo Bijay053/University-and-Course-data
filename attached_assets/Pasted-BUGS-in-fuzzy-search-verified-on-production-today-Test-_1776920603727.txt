@@ -1,0 +1,125 @@
+BUGS in fuzzy search — verified on production today:
+Test results (commit a1f8c07):
+
+?location=sidney → 19 results ✓
+?location=aussie → 0 results ❌
+?q=bachlor%20nursing → 21 results ✓ + "did you mean" suggestion
+?q=bachlor%20nursing&location=sidney → 0 results ❌ (combining breaks it)
+
+Root causes:
+A. Location aliases not supported. "aussie", "oz", "syd", "melb" etc. are empty returns. Add alias expansion.
+B. Combined q + location uses AND with strict location matching even though the course name uses fuzzy. Probably the location WHERE clause is ILIKE %location% while course uses % operator.
+C. "Did you mean" is returned but not clickable in the UI. User sees "Did you mean: Bachelor Nursing" as plain text with no way to click it to re-run the search.
+D. Zero-result fallback missing. When combined filters = 0, frontend should try each filter separately and suggest "we have 21 courses matching 'nursing' and 19 in Sydney — remove a filter?"
+
+Fixes:
+1. Apply trigram fuzzy match to location (both q AND location should use SAME matching quality):
+sql-- Currently (probably):
+WHERE (course_name matches q via trigram)
+  AND (course_location ILIKE '%' || $location || '%')  -- strict!
+
+-- Change to:
+WHERE (course_name matches q via trigram)
+  AND (
+    LOWER(university_city) % LOWER($location) 
+    OR LOWER(university_country) % LOWER($location)
+    OR LOWER(COALESCE(course_location, '')) % LOWER($location)
+  )
+2. Add location aliases:
+typescriptconst LOCATION_ALIASES: Record<string, string[]> = {
+  // Country
+  'aussie': ['australia'],
+  'oz': ['australia'],
+  'au': ['australia'],
+  
+  // AU cities
+  'syd': ['sydney'],
+  'melb': ['melbourne'],
+  'bris': ['brisbane'],
+  'adel': ['adelaide'],
+  
+  // US/UK for future
+  'usa': ['united states', 'america'],
+  'uk': ['united kingdom', 'england', 'britain'],
+};
+
+function expandLocation(input: string): string[] {
+  const key = input.toLowerCase().trim();
+  return LOCATION_ALIASES[key] ?? [input];
+}
+Use expanded candidates with OR:
+sqlWHERE EXISTS (
+  SELECT 1 FROM unnest($locationCandidates::text[]) AS loc
+  WHERE 
+    LOWER(v.university_city) % LOWER(loc) 
+    OR LOWER(v.university_country) % LOWER(loc)
+    OR LOWER(COALESCE(v.course_location, '')) % LOWER(loc)
+)
+3. Make "Did you mean" clickable in the frontend. Currently displayed as underlined text but not a link:
+tsx{didYouMean && (
+  <span>
+    Did you mean{' '}
+    <button 
+      onClick={() => { 
+        setSearchQuery(didYouMean); 
+        runSearch({ q: didYouMean, location }); 
+      }}
+      className="text-primary underline hover:text-primary/80 cursor-pointer"
+    >
+      "{didYouMean}"
+    </button>?
+  </span>
+)}
+4. Add "Did you mean" for LOCATION too (currently only course):
+sql-- When location returns 0, find closest match in cities/countries
+SELECT value, levenshtein(LOWER(value), LOWER($location)) as dist
+FROM (
+  SELECT DISTINCT city as value FROM universities WHERE city IS NOT NULL
+  UNION
+  SELECT DISTINCT country FROM universities WHERE country IS NOT NULL
+  UNION
+  SELECT DISTINCT unnest(string_to_array(course_location, ',')) FROM courses WHERE course_location IS NOT NULL
+) candidates
+WHERE levenshtein(LOWER(value), LOWER($location)) <= 3
+ORDER BY dist ASC
+LIMIT 1;
+Return in response:
+json{
+  "did_you_mean": "Bachelor Nursing",        // course suggestion
+  "did_you_mean_location": "Sydney",         // location suggestion (new)
+  ...
+}
+5. Zero-result fallback message:
+When combined filters return 0 but individually have matches:
+typescriptif (results.length === 0 && q && location) {
+  const [qOnly, locOnly] = await Promise.all([
+    searchCourses({ q, location: null, limit: 1 }),
+    searchCourses({ q: null, location, limit: 1 }),
+  ]);
+  return {
+    total: 0,
+    results: [],
+    no_match_suggestion: {
+      q_matches: qOnly.total,         // e.g. 21 courses match "nursing"
+      location_matches: locOnly.total,// e.g. 19 courses in Sydney
+      message: `We have ${qOnly.total} courses matching "${q}" and ${locOnly.total} in ${location}. Try removing a filter.`
+    }
+  };
+}
+Frontend displays this message as helpful context, not just generic "No courses match."
+
+Acceptance tests — all must return >=1 result:
+QueryLocationBeforeAfterbachlor nursingsidney❌ 0✓ ≥1bachlor nursingaussie❌ 0✓ ≥1IToz❌ 0✓ ≥1anythingsyd❌ 0✓ ≥1
+And the "did you mean" must be clickable (not static text).
+
+DELIVERY:
+
+Fix combined q+location trigram matching
+Add LOCATION_ALIASES map
+Add did_you_mean_location to response
+Clickable did-you-mean suggestion (button re-runs search)
+Zero-result fallback with helpful "remove filter" context
+Build, commit "Fuzzy search: location trigram + aliases + clickable suggestion + zero-result fallback", push to main
+Reply with commit hash and curl output for the 4 test cases
+
+Deploy path: /root/University-and-Course-data
