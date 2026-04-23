@@ -16,6 +16,7 @@ import backupRouter from "./backup";
 import backupMappingRouter from "./backup_mapping";
 import assessmentNotesRouter from "./assessment_notes";
 import academicLevelOptionsRouter from "./academic_level_options";
+import acronymsRouter from "./acronyms";
 import searchRouter from "./search";
 
 const router: IRouter = Router();
@@ -37,6 +38,7 @@ router.use(backupRouter);
 router.use(backupMappingRouter);
 router.use(assessmentNotesRouter);
 router.use(academicLevelOptionsRouter);
+router.use(acronymsRouter);
 router.use(searchRouter);
 
 export default router;

@@ -12,6 +12,7 @@ import Scraping from "@/pages/scraping";
 import Bulk from "@/pages/bulk";
 import Backup from "@/pages/backup";
 import SettingsAcademicLevels from "@/pages/settings-academic-levels";
+import SettingsAcronyms from "@/pages/settings-acronyms";
 import SearchPage from "@/pages/search";
 import ComparePage from "@/pages/compare";
 import CourseDetail from "@/pages/course-detail";
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/bulk" component={Bulk} />
         <Route path="/backup" component={Backup} />
         <Route path="/settings/academic-levels" component={SettingsAcademicLevels} />
+        <Route path="/settings/acronyms" component={SettingsAcronyms} />
         <Route path="/search" component={SearchPage} />
         <Route path="/compare" component={ComparePage} />
         <Route path="/courses/:id" component={CourseDetail} />

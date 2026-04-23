@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeCourseNameCasing, validateNameAgainstSlug } from "./course-name-normalizer.ts";
+import {
+  clearDynamicAcronyms,
+  getActiveAcronyms,
+  normalizeCourseNameCasing,
+  setDynamicAcronyms,
+  validateNameAgainstSlug,
+  DEFAULT_ACRONYMS,
+} from "./course-name-normalizer.ts";
 
 test("preserves name when slug also lacks preposition", () => {
   const out = validateNameAgainstSlug(
@@ -132,4 +139,50 @@ test("preserves parentheses and inner casing", () => {
     normalizeCourseNameCasing("Bachelor Of Business (mba Pathway)"),
     "Bachelor of Business (MBA Pathway)",
   );
+});
+
+test("operator-added acronym is preserved by the normalizer", () => {
+  try {
+    setDynamicAcronyms(["BPA"]);
+    assert.ok(getActiveAcronyms().has("BPA"));
+    assert.equal(normalizeCourseNameCasing("Bpa Accounting"), "BPA Accounting");
+    // Built-in acronyms still work alongside the new dynamic ones.
+    assert.equal(normalizeCourseNameCasing("Mba Finance"), "MBA Finance");
+  } finally {
+    clearDynamicAcronyms();
+  }
+});
+
+test("clearDynamicAcronyms reverts to the built-in default set", () => {
+  setDynamicAcronyms(["BPA"]);
+  clearDynamicAcronyms();
+  assert.equal(getActiveAcronyms(), DEFAULT_ACRONYMS);
+  // Without the dynamic layer, BPA should be title-cased like any word.
+  assert.equal(normalizeCourseNameCasing("Bpa Accounting"), "Bpa Accounting");
+});
+
+test("setDynamicAcronyms ignores blank/invalid entries and lowercases input", () => {
+  try {
+    setDynamicAcronyms(["", "  ", "bcom-extra", "x@", "bpa", "MComm"]);
+    const active = getActiveAcronyms();
+    assert.ok(active.has("BPA"));
+    assert.ok(active.has("MCOMM"));
+    assert.ok(!active.has("BCOM-EXTRA"));
+    assert.ok(!active.has("X@"));
+  } finally {
+    clearDynamicAcronyms();
+  }
+});
+
+test("validateNameAgainstSlug uses operator-added acronyms when rebuilding from slug", () => {
+  try {
+    setDynamicAcronyms(["BPA"]);
+    const out = validateNameAgainstSlug(
+      "Bpa Bachelor Of Professional Accounting",
+      "https://example.edu.au/courses/bpa-bachelor-of-professional-accounting",
+    );
+    assert.equal(out, "BPA Bachelor of Professional Accounting");
+  } finally {
+    clearDynamicAcronyms();
+  }
 });

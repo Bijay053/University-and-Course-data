@@ -65,6 +65,7 @@ import {
   type CoursePageTemplate,
 } from "../lib/course-page-template.js";
 import { validateNameAgainstSlug } from "../lib/course-name-normalizer.js";
+import { primeAcronymCache } from "../lib/acronym-cache.js";
 import { validateCourseLocation } from "../lib/course-location-validator.js";
 import type { AnyNode, Element } from "domhandler";
 import type { Cheerio } from "cheerio";
@@ -11290,6 +11291,9 @@ type RescrapeRuntimePayload = {
 export async function executeRuntimeScrapeJob(runtimeJobId: string): Promise<void> {
   const record = await getRuntimeJobRecord(runtimeJobId);
   if (!record) return;
+  // Make sure operator-managed acronyms (added via Settings → Acronyms)
+  // are loaded before we start normalizing course names for this job.
+  await primeAcronymCache();
   const payload = (record.requestPayload ?? {}) as Record<string, unknown>;
   const job: ScrapeJob = {
     id: runtimeJobId,

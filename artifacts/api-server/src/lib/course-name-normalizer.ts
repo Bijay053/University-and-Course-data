@@ -33,7 +33,11 @@ const LOWERCASE_WORDS = new Set([...PREPOSITIONS]);
 // list focused on terms that actually appear in Australian higher-ed
 // course names and admissions criteria so we don't accidentally upper-case
 // ordinary English words.
-const ACRONYMS = new Set([
+//
+// This is the built-in default set.  Operators can layer additional
+// acronyms on top via the `/api/settings/acronyms` admin endpoint without
+// a code change — see `setDynamicAcronyms` / `primeAcronymCache` below.
+export const DEFAULT_ACRONYMS: ReadonlySet<string> = new Set([
   "MBA",
   "BBA",
   "BBUS",
@@ -60,6 +64,44 @@ const ACRONYMS = new Set([
   "TAFE",
 ]);
 
+// Operator-managed acronyms layered on top of DEFAULT_ACRONYMS.  When
+// `null`, only defaults are used (until `primeAcronymCache` populates the
+// cache from the database).
+let dynamicAcronyms: Set<string> | null = null;
+
+function getEffectiveAcronyms(): ReadonlySet<string> {
+  if (!dynamicAcronyms) return DEFAULT_ACRONYMS;
+  return dynamicAcronyms;
+}
+
+/**
+ * Replace the in-memory acronym set with the supplied custom acronyms
+ * merged on top of the built-in defaults.  Acronyms are normalized to
+ * uppercase and de-duplicated.  Pass an empty list to reset the dynamic
+ * layer back to defaults-only.
+ */
+export function setDynamicAcronyms(customAcronyms: Iterable<string>): void {
+  const merged = new Set<string>(DEFAULT_ACRONYMS);
+  for (const raw of customAcronyms) {
+    if (typeof raw !== "string") continue;
+    const cleaned = raw.trim().toUpperCase();
+    if (!cleaned) continue;
+    if (!/^[A-Z][A-Z0-9]*$/.test(cleaned)) continue;
+    merged.add(cleaned);
+  }
+  dynamicAcronyms = merged;
+}
+
+/** Forget the dynamic layer; the next normalization call will use defaults. */
+export function clearDynamicAcronyms(): void {
+  dynamicAcronyms = null;
+}
+
+/** Test/inspection helper — returns the acronyms the normalizer will recognize. */
+export function getActiveAcronyms(): ReadonlySet<string> {
+  return getEffectiveAcronyms();
+}
+
 const DEGREE_HEAD_RE =
   /^(bachelor|master|doctor|diploma|graduate certificate|graduate diploma|undergraduate certificate|honours)\b/i;
 
@@ -70,7 +112,7 @@ function normalizeWordCasing(word: string, isFirst: boolean): string {
   if (!match) return word;
   const [, prefix, core, suffix] = match;
   const upper = core.toUpperCase();
-  if (ACRONYMS.has(upper)) return `${prefix}${upper}${suffix}`;
+  if (getEffectiveAcronyms().has(upper)) return `${prefix}${upper}${suffix}`;
   const lower = core.toLowerCase();
   if (!isFirst && LOWERCASE_WORDS.has(lower)) return `${prefix}${lower}${suffix}`;
   // Roman numerals up to 4 chars (II, III, IV, etc.).
