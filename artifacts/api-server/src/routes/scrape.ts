@@ -9171,15 +9171,30 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                     } catch {}
                   };
                   let visionLastError: string | null = null;
+                  // Parallelized vision scan: fire all Gemini-vision calls for
+                  // this batch concurrently instead of awaiting them one-by-one
+                  // (was 2-5s × N images per course = main per-course bottleneck
+                  // when the HTML short-circuit doesn't trip). We can't use
+                  // Promise.any "first-complete-wins" because the IELTS table,
+                  // PTE table and TOEFL table are often on different images —
+                  // we need to await all and merge. We keep the original
+                  // iteration order so deterministic-first-wins still applies
+                  // to merge() (recordWinner adds the first matching image's
+                  // stem to the per-host cache).
                   const scanOnce = async (urls: string[], label: string) => {
                     addLog(job, "status", {
-                      message: `[per-course vision${label}] scanning ${urls.length} image(s) for ${link.name.slice(0, 40)}...`,
+                      message: `[per-course vision${label}] scanning ${urls.length} image(s) in parallel for ${link.name.slice(0, 40)}...`,
                       phase: "fallback",
                     });
+                    const prompt = `English language proficiency test score requirements table for: ${link.name}. Look for IELTS, PTE Academic, TOEFL iBT, Cambridge CAE/C1 Advanced, and Duolingo bands and overall scores.`;
+                    const results = await Promise.allSettled(
+                      urls.map((imgUrl) => analyzeImageWithGemini(imgUrl, prompt)),
+                    );
                     for (let vi = 0; vi < urls.length; vi++) {
                       const imgUrl = urls[vi];
-                      try {
-                        const vd = await analyzeImageWithGemini(imgUrl, `English language proficiency test score requirements table for: ${link.name}. Look for IELTS, PTE Academic, TOEFL iBT, Cambridge CAE/C1 Advanced, and Duolingo bands and overall scores.`);
+                      const r = results[vi];
+                      if (r.status === "fulfilled") {
+                        const vd = r.value;
                         const found = Object.entries(vd).filter(([, v]) => v != null);
                         if (found.length > 0) {
                           recordWinner(imgUrl);
@@ -9191,16 +9206,17 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                         for (const [k, v] of Object.entries(vd)) {
                           if (v != null && (visionMerged as any)[k] == null) (visionMerged as any)[k] = v;
                         }
-                        if (visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall) return true;
-                      } catch (e) {
-                        visionLastError = (e as Error).message?.slice(0, 100) ?? "unknown error";
+                      } else {
+                        visionLastError = (r.reason as Error)?.message?.slice(0, 100) ?? "unknown error";
                         addLog(job, "status", {
                           message: `[per-course vision${label} img ${vi + 1}/${urls.length}] ${link.name.slice(0, 30)} failed: ${visionLastError}`,
                           phase: "fallback",
                         });
                       }
                     }
-                    return false;
+                    // After merging all results, signal early-completion so
+                    // the caller can skip the full-scan fallback.
+                    return Boolean(visionMerged.pteOverall && visionMerged.toeflOverall && visionMerged.ieltsOverall);
                   };
                   if (scanList.length > 0) {
                     await scanOnce(scanList, "");
