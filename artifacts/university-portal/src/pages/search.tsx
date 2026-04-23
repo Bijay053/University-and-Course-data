@@ -127,15 +127,24 @@ export default function SearchPage() {
   // ─── data ──────────────────────────────────────────────
   const [data, setData] = useState<SearchResponse | null>(null);
   const [options, setOptions] = useState<OptionsResponse | null>(null);
+  const [stats, setStats] = useState<{
+    universities_with_courses: number;
+    total_universities: number;
+    total_courses: number;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tray, setTray] = useState<number[]>(loadCompareTray());
 
-  // Fetch dropdown options once.
+  // Fetch dropdown options + stats once.
   useEffect(() => {
     fetch(`${BASE}/api/search/options`)
       .then((r) => r.ok ? r.json() : null)
       .then((j) => j && setOptions(j))
+      .catch(() => {});
+    fetch(`${BASE}/api/search/stats`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((j) => j && setStats(j))
       .catch(() => {});
   }, []);
 
@@ -245,7 +254,9 @@ export default function SearchPage() {
             <GraduationCap className="w-6 h-6" /> Find Your Perfect Course
           </h1>
           <p className="text-blue-100 text-sm mt-1">
-            Search across {options?.universities.length ?? "all"} universities and thousands of programs.
+            {stats
+              ? `Search across ${stats.universities_with_courses.toLocaleString()} universit${stats.universities_with_courses === 1 ? "y" : "ies"} and ${stats.total_courses.toLocaleString()} program${stats.total_courses === 1 ? "" : "s"}.`
+              : "Search across all universities and programs."}
           </p>
         </div>
         <div className="flex flex-col md:flex-row gap-3">

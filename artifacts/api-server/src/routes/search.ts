@@ -312,7 +312,25 @@ const ALLOWED_SORTS: Record<string, string> = {
   relevance: "id DESC", // overridden if q present
 };
 
-/* ─────────────────── GET /api/search/courses ─────────────────── */
+/* ─────────────────── GET /api/search/stats ─────────────────── */
+
+router.get("/search/stats", async (_req: Request, res: Response) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(DISTINCT u.id)
+           FROM universities u
+          WHERE EXISTS (SELECT 1 FROM courses c WHERE c.university_id = u.id))::int
+          AS universities_with_courses,
+        (SELECT COUNT(*) FROM universities)::int AS total_universities,
+        (SELECT COUNT(*) FROM courses)::int      AS total_courses
+    `);
+    res.json(rows[0] ?? { universities_with_courses: 0, total_universities: 0, total_courses: 0 });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, "search/stats failed");
+    res.status(500).json({ error: "stats_failed" });
+  }
+});
 
 router.get("/search/courses", async (req: Request, res: Response) => {
   const t0 = Date.now();
