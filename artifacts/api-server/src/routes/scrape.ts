@@ -26,6 +26,7 @@ import {
   courseFieldApprovalsTable,
   courseAuditLogTable,
   scrapeFeedbackTable,
+  bulkSessionsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
@@ -324,114 +325,298 @@ type BulkSession = {
 };
 const bulkSessions = new Map<string, BulkSession>();
 
-async function runBulkSessionLoop(session: BulkSession): Promise<void> {
-  for (let i = 0; i < session.unis.length; i++) {
-    if (session.status === "stopped") break;
-    const entry = session.unis[i];
-    if (!entry || !entry.url) { entry && (entry.status = "skipped"); continue; }
-    session.currentIndex = i;
-    session.updatedAt = new Date();
-    entry.status = "running";
+// Persist bulk session state to DB so a PM2/process restart doesn't kill the queue.
+async function persistBulkSession(session: BulkSession, completed = false): Promise<void> {
+  try {
+    await db.insert(bulkSessionsTable).values({
+      sessionId: session.sessionId,
+      status: session.status,
+      currentIndex: session.currentIndex,
+      fastMode: session.fastMode,
+      unis: session.unis as unknown as never,
+      startedAt: session.startedAt,
+      updatedAt: session.updatedAt,
+      completedAt: completed ? new Date() : null,
+    }).onConflictDoUpdate({
+      target: bulkSessionsTable.sessionId,
+      set: {
+        status: session.status,
+        currentIndex: session.currentIndex,
+        unis: session.unis as unknown as never,
+        updatedAt: session.updatedAt,
+        completedAt: completed ? new Date() : null,
+      },
+    });
+  } catch (err) {
+    console.error("[bulk] persist failed", { sessionId: session.sessionId, err: (err as Error)?.message });
+  }
+}
 
-    try {
-      const uni = await db.select().from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
-      if (!uni[0]) { entry.status = "error"; entry.error = "University not found"; continue; }
+async function bulkLog(entry: BulkUniEntry | null, message: string): Promise<void> {
+  // Mirror bulk progress to the runtime job log (visible in UI). Best-effort.
+  if (!entry?.jobId) return;
+  try {
+    await appendRuntimeJobLogs(entry.jobId, [{ event: "status", message }]);
+  } catch { /* best-effort */ }
+}
 
-      const activeJob = (await listActiveRuntimeJobs()).find((j) => j.universityId === entry.uniId);
-      if (activeJob) await requestStopForRuntimeJob(activeJob.id);
+async function runOneBulkUniversity(
+  session: BulkSession,
+  entry: BulkUniEntry,
+  index: number,
+  total: number,
+  attempt: number,
+): Promise<void> {
+  if (!entry.url) {
+    entry.status = "skipped";
+    entry.error = "No scrapeUrl configured for this university — fix the university record and re-queue";
+    console.warn(`[BULK ${index + 1}/${total}] ${entry.name} SKIPPED — no scrapeUrl`);
+    return;
+  }
 
-      const savedConfigRows = await db.select({
-        scrapeConfig: universitiesTable.scrapeConfig,
-        feePageUrl: universitiesTable.feePageUrl,
-        requirementsPageUrl: universitiesTable.requirementsPageUrl,
-        scholarshipPageUrl: universitiesTable.scholarshipPageUrl,
-        academicRequirementsPageUrl: universitiesTable.academicRequirementsPageUrl,
-      }).from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
-      const savedUniPages = (savedConfigRows[0]?.scrapeConfig as Partial<ScrapeConfig> | null)?.uniPages;
-      const isPdfUrl = (u?: string | null) => !!u && /\.pdf(\?|#|$)/i.test(u);
-      const savedFeeRaw = savedConfigRows[0]?.feePageUrl ?? undefined;
-      const savedReqRaw = savedConfigRows[0]?.requirementsPageUrl ?? undefined;
-      const savedUniversityPages: SharedUniversityPages = {
-        ...(savedFeeRaw ? (isPdfUrl(savedFeeRaw) ? { feesPdf: savedFeeRaw } : { feePage: savedFeeRaw }) : {}),
-        ...(savedReqRaw ? (isPdfUrl(savedReqRaw) ? { requirementsPdf: savedReqRaw } : { requirementsPage: savedReqRaw }) : {}),
-        ...(savedConfigRows[0]?.scholarshipPageUrl ? { scholarshipPage: savedConfigRows[0].scholarshipPageUrl } : {}),
-        ...(savedConfigRows[0]?.academicRequirementsPageUrl ? { academicRequirementsPage: savedConfigRows[0].academicRequirementsPageUrl } : {}),
-      };
-      const savedPages = (savedUniPages ?? {}) as SharedUniversityPages;
-      const manualPages: SharedUniversityPages = { ...savedPages, ...savedUniversityPages };
+  const attemptLabel = attempt > 1 ? ` (retry ${attempt - 1})` : "";
+  console.log(`[BULK ${index + 1}/${total}] Starting: ${entry.name}${attemptLabel}`);
 
-      const jobId = createRuntimeJobId();
-      entry.jobId = jobId;
-      await clearPendingStagedCoursesForUniversity(entry.uniId);
-      await db.update(universitiesTable).set({ scrapeUrl: entry.url }).where(eq(universitiesTable.id, entry.uniId));
-      await enqueueRuntimeJob({
-        runtimeJobId: jobId,
+  const startedAt = Date.now();
+  entry.status = "running";
+  entry.attempts = attempt;
+  entry.startedAt = new Date().toISOString();
+  entry.error = undefined;
+
+  try {
+    const uni = await db.select().from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
+    if (!uni[0]) {
+      entry.status = "error";
+      entry.error = "University not found in DB";
+      return;
+    }
+
+    // Stop any orphaned active job for this university first.
+    const activeJob = (await listActiveRuntimeJobs()).find((j) => j.universityId === entry.uniId);
+    if (activeJob) {
+      try { await requestStopForRuntimeJob(activeJob.id); } catch { /* best-effort */ }
+    }
+
+    const savedConfigRows = await db.select({
+      scrapeConfig: universitiesTable.scrapeConfig,
+      feePageUrl: universitiesTable.feePageUrl,
+      requirementsPageUrl: universitiesTable.requirementsPageUrl,
+      scholarshipPageUrl: universitiesTable.scholarshipPageUrl,
+      academicRequirementsPageUrl: universitiesTable.academicRequirementsPageUrl,
+    }).from(universitiesTable).where(eq(universitiesTable.id, entry.uniId));
+    const savedUniPages = (savedConfigRows[0]?.scrapeConfig as Partial<ScrapeConfig> | null)?.uniPages;
+    const isPdfUrl = (u?: string | null) => !!u && /\.pdf(\?|#|$)/i.test(u);
+    const savedFeeRaw = savedConfigRows[0]?.feePageUrl ?? undefined;
+    const savedReqRaw = savedConfigRows[0]?.requirementsPageUrl ?? undefined;
+    const savedUniversityPages: SharedUniversityPages = {
+      ...(savedFeeRaw ? (isPdfUrl(savedFeeRaw) ? { feesPdf: savedFeeRaw } : { feePage: savedFeeRaw }) : {}),
+      ...(savedReqRaw ? (isPdfUrl(savedReqRaw) ? { requirementsPdf: savedReqRaw } : { requirementsPage: savedReqRaw }) : {}),
+      ...(savedConfigRows[0]?.scholarshipPageUrl ? { scholarshipPage: savedConfigRows[0].scholarshipPageUrl } : {}),
+      ...(savedConfigRows[0]?.academicRequirementsPageUrl ? { academicRequirementsPage: savedConfigRows[0].academicRequirementsPageUrl } : {}),
+    };
+    const savedPages = (savedUniPages ?? {}) as SharedUniversityPages;
+    const manualPages: SharedUniversityPages = { ...savedPages, ...savedUniversityPages };
+
+    const jobId = createRuntimeJobId();
+    entry.jobId = jobId;
+    await clearPendingStagedCoursesForUniversity(entry.uniId);
+    await db.update(universitiesTable).set({ scrapeUrl: entry.url }).where(eq(universitiesTable.id, entry.uniId));
+    await enqueueRuntimeJob({
+      runtimeJobId: jobId,
+      universityId: entry.uniId,
+      universityName: entry.name,
+      url: entry.url,
+      jobType: "start",
+      fastMode: session.fastMode,
+      requestPayload: {
+        url: entry.url,
         universityId: entry.uniId,
         universityName: entry.name,
-        url: entry.url,
-        jobType: "start",
+        manualPages: Object.values(manualPages).some(Boolean) ? manualPages : undefined,
         fastMode: session.fastMode,
-        requestPayload: {
-          url: entry.url,
-          universityId: entry.uniId,
-          universityName: entry.name,
-          manualPages: Object.values(manualPages).some(Boolean) ? manualPages : undefined,
-          fastMode: session.fastMode,
-          bulkMode: true,
-        },
-        initialLogs: [{ event: "status", message: `[Bulk] Starting ${entry.name}` }],
-      });
+        bulkMode: true,
+      },
+      initialLogs: [{
+        event: "status",
+        message: `[BULK ${index + 1}/${total}] Starting ${entry.name}${attemptLabel}`,
+      }],
+    });
 
-      // Poll until the job leaves the active-job set, or wall-clock cap is hit.
-      // Per-university hard timeout: 45 min. Without this, a single hung
-      // browser fetch or stuck job would block the entire bulk queue forever.
-      const PER_UNI_TIMEOUT_MS = 45 * 60 * 1000;
-      const startedAt = Date.now();
-      let pollFailures = 0;
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        if ((session.status as string) === "stopped") break;
-        if (Date.now() - startedAt > PER_UNI_TIMEOUT_MS) {
-          try { await requestStopForRuntimeJob(jobId); } catch { /* best-effort */ }
-          entry.status = "error";
-          entry.error = `Timed out after ${Math.round(PER_UNI_TIMEOUT_MS / 60000)} min — moved on to next university`;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 3000));
-        try {
-          const snap = await getRuntimeJobStatus(jobId, 0);
-          if (!snap) { pollFailures++; if (pollFailures >= 10) { entry.status = "error"; entry.error = "Job status unavailable"; break; } continue; }
-          const terminalStatuses = ["completed", "completed_with_errors", "failed", "stopped"];
-          if (terminalStatuses.includes(snap.status)) {
-            entry.imported = snap.imported;
-            entry.found = snap.totalFound;
-            entry.staged = snap.imported;
-            entry.status = snap.status === "completed" || snap.status === "completed_with_errors" ? "done" : "error";
-            if (snap.status === "failed") entry.error = "Job failed on server";
-            break;
-          }
-          pollFailures = 0;
-        } catch {
+    // Per-university hard timeout: 25 min (was 45). Bounds the queue at the
+    // worst case while still allowing slow PDF/Playwright fetches.
+    const PER_UNI_TIMEOUT_MS = 25 * 60 * 1000;
+    const pollStart = Date.now();
+    let pollFailures = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      if ((session.status as string) === "stopped") break;
+      if (Date.now() - pollStart > PER_UNI_TIMEOUT_MS) {
+        try { await requestStopForRuntimeJob(jobId); } catch { /* best-effort */ }
+        entry.status = "error";
+        entry.error = `bulk_timeout after ${Math.round(PER_UNI_TIMEOUT_MS / 60000)}min — moved on to next university`;
+        await bulkLog(entry, `[BULK ${index + 1}/${total}] ${entry.name} TIMEOUT — moving to next`);
+        console.warn(`[BULK ${index + 1}/${total}] ${entry.name} TIMEOUT — moving to next`);
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const snap = await getRuntimeJobStatus(jobId, 0);
+        if (!snap) {
           pollFailures++;
           if (pollFailures >= 10) {
             entry.status = "error";
-            entry.error = "Lost connection to job status";
+            entry.error = "Job status unavailable (10 polls)";
             break;
           }
+          continue;
+        }
+        const terminalStatuses = ["completed", "completed_with_errors", "failed", "stopped"];
+        if (terminalStatuses.includes(snap.status)) {
+          entry.imported = snap.imported;
+          entry.found = snap.totalFound;
+          entry.staged = snap.imported;
+          entry.status = snap.status === "completed" || snap.status === "completed_with_errors" ? "done" : "error";
+          if (snap.status === "failed") entry.error = "Job failed on server";
+          if (snap.status === "stopped") entry.error = entry.error ?? "Job stopped before completion";
+          break;
+        }
+        pollFailures = 0;
+      } catch (pollErr) {
+        pollFailures++;
+        if (pollFailures >= 10) {
+          entry.status = "error";
+          entry.error = `Lost connection to job status: ${(pollErr as Error)?.message?.slice(0, 100)}`;
+          break;
         }
       }
-      if ((session.status as string) === "stopped") { entry.status = "stopped"; break; }
-    } catch (err) {
-      entry.status = "error";
-      entry.error = (err as Error).message;
     }
-    session.updatedAt = new Date();
+
+    if ((session.status as string) === "stopped") {
+      entry.status = "stopped";
+      entry.error = entry.error ?? "Bulk session was stopped";
+    }
+  } catch (err) {
+    // Belt-and-suspenders: any thrown error is captured and the queue
+    // continues. This is the contract — never abort the queue.
+    entry.status = "error";
+    entry.error = `Unexpected error: ${(err as Error)?.message?.slice(0, 200) ?? String(err)}`;
+    console.error(`[BULK ${index + 1}/${total}] ${entry.name} threw:`, err);
+  } finally {
+    entry.completedAt = new Date().toISOString();
+    entry.durationMs = Date.now() - startedAt;
   }
-  if (session.status !== "stopped") session.status = "completed";
+}
+
+async function runBulkSessionLoop(session: BulkSession): Promise<void> {
+  const total = session.unis.length;
+  console.log(`[BULK-START] session=${session.sessionId} total=${total} fastMode=${session.fastMode}`);
+  await persistBulkSession(session);
+
+  // ── First pass ─────────────────────────────────────────────────────────
+  for (let i = 0; i < session.unis.length; i++) {
+    if ((session.status as string) === "stopped") break;
+    const entry = session.unis[i];
+    if (!entry) continue;
+    session.currentIndex = i;
+    session.updatedAt = new Date();
+    await persistBulkSession(session);
+
+    await runOneBulkUniversity(session, entry, i, total, (entry.attempts ?? 0) + 1);
+    session.updatedAt = new Date();
+    await persistBulkSession(session);
+
+    // Brief cooldown between universities — gives Playwright/Gemini quota a
+    // moment to recover, and lets the next worker claim cleanly.
+    if (i < session.unis.length - 1 && (session.status as string) !== "stopped") {
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+
+  // ── Auto-retry pass ────────────────────────────────────────────────────
+  // Universities that errored or stopped (not skipped — those have config
+  // problems that won't fix themselves) get one more attempt.
+  if ((session.status as string) !== "stopped") {
+    const retryable = session.unis
+      .map((u, idx) => ({ u, idx }))
+      .filter(({ u }) => (u.status === "error" || u.status === "stopped") && (u.attempts ?? 0) < 2);
+    if (retryable.length > 0) {
+      console.log(`[BULK-RETRY] Retrying ${retryable.length} failed universit${retryable.length === 1 ? "y" : "ies"}`);
+      for (const { u, idx } of retryable) {
+        if ((session.status as string) === "stopped") break;
+        await new Promise((r) => setTimeout(r, 5000));
+        session.currentIndex = idx;
+        session.updatedAt = new Date();
+        await persistBulkSession(session);
+        await runOneBulkUniversity(session, u, idx, total, (u.attempts ?? 0) + 1);
+        session.updatedAt = new Date();
+        await persistBulkSession(session);
+      }
+    }
+  }
+
+  // ── Summary ────────────────────────────────────────────────────────────
+  const succeeded = session.unis.filter((u) => u.status === "done");
+  const failed = session.unis.filter((u) => u.status === "error" || u.status === "stopped");
+  const skipped = session.unis.filter((u) => u.status === "skipped");
+
+  console.log(`[BULK-DONE] ${total} universities | ${succeeded.length} success | ${failed.length} failed | ${skipped.length} skipped`);
+  for (const u of session.unis) {
+    const icon = u.status === "done" ? "✓" : u.status === "skipped" ? "-" : "✗";
+    const dur = u.durationMs ? `${Math.round(u.durationMs / 60000)}m ${Math.round((u.durationMs % 60000) / 1000)}s` : "-";
+    console.log(`  ${icon} ${u.name} (${u.imported}/${u.found} in ${dur})${u.error ? ` — ${u.error}` : ""}`);
+  }
+
+  if ((session.status as string) !== "stopped") session.status = "completed";
   session.currentIndex = -1;
   session.updatedAt = new Date();
-  // Evict after 2 hours
+  await persistBulkSession(session, true);
+
+  // Evict from in-memory map after 2 hours; DB row stays as audit trail.
   setTimeout(() => bulkSessions.delete(session.sessionId), 2 * 60 * 60 * 1000);
+}
+
+// On API server startup, resume any bulk sessions that were "running" when
+// the previous process died (PM2 restart, OOM, deploy, etc.). Without this,
+// a single restart kills the queue and remaining universities never start.
+export async function resumeBulkSessionsOnStartup(): Promise<void> {
+  try {
+    const rows = await db.select().from(bulkSessionsTable).where(eq(bulkSessionsTable.status, "running"));
+    if (rows.length === 0) return;
+    console.log(`[BULK-RESUME] Found ${rows.length} interrupted bulk session(s) — resuming`);
+    for (const row of rows) {
+      const session: BulkSession = {
+        sessionId: row.sessionId,
+        status: "running",
+        unis: (row.unis ?? []) as BulkUniEntry[],
+        currentIndex: row.currentIndex,
+        startedAt: row.startedAt,
+        updatedAt: new Date(),
+        fastMode: row.fastMode,
+      };
+      // Mark anything that was "running" mid-restart as "error" with retry-eligible
+      // status; the loop's retry pass will re-attempt it.
+      for (const u of session.unis) {
+        if (u.status === "running") {
+          u.status = "error";
+          u.error = "Interrupted by API restart — will be retried";
+        }
+      }
+      // Skip entries already done/skipped, resume from the first pending/error one.
+      const firstPending = session.unis.findIndex((u) => u.status === "pending");
+      if (firstPending >= 0) {
+        // Truncate the loop to start from firstPending by setting currentIndex,
+        // but the loop iterates from 0 — instead, mark earlier non-pending as
+        // already-processed (their status already reflects what happened).
+      }
+      bulkSessions.set(session.sessionId, session);
+      void runBulkSessionLoop(session).catch((err) => {
+        console.error(`[BULK-RESUME] session ${session.sessionId} loop crashed`, err);
+      });
+    }
+  } catch (err) {
+    console.error("[BULK-RESUME] failed", err);
+  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 

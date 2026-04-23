@@ -1,0 +1,202 @@
+Got it — so the bulk scrape actually did worse than I thought:
+
+Tasmania, ASA, VIT → you did these manually before starting bulk
+Bulk scrape's actual output: Torrens stopped, Charles Sturt + USQ never even started
+
+So the bulk queue is completely broken. It either:
+
+Crashes on the first university and silently dies, OR
+Never processes anything at all
+
+Let me revise the Replit instruction and add the DB diagnosis:
+
+First, diagnose on your server (DB should work now if you fixed the DATABASE_URL earlier):
+bash# Which DB are we using?
+echo "DATABASE_URL: $DATABASE_URL"
+
+# If DATABASE_URL is broken, fix first:
+if ! psql "$DATABASE_URL" -c "SELECT 1" 2>/dev/null; then
+  echo "DB broken, sourcing fresh..."
+  set -a; source /root/.env.backup; set +a
+fi
+
+# Now check what actually happened with bulk
+psql "$DATABASE_URL" -c "
+SELECT 
+  u.id as uni_id,
+  u.name,
+  sj.status,
+  sj.total_found,
+  sj.imported,
+  sj.errors,
+  sj.started_at,
+  sj.completed_at,
+  ROUND(EXTRACT(EPOCH FROM (COALESCE(sj.completed_at, NOW()) - sj.started_at))/60, 1) as minutes
+FROM universities u
+LEFT JOIN scrape_jobs sj ON sj.university_id = u.id
+WHERE sj.started_at > NOW() - INTERVAL '24 hours'
+ORDER BY sj.started_at DESC;
+"
+
+# Check if bulk endpoint even exists
+echo ""
+echo "--- Bulk queue tables ---"
+psql "$DATABASE_URL" -c "\dt" | grep -iE "bulk|queue"
+
+# Check logs for bulk-specific entries
+echo ""
+echo "--- Bulk queue log mentions ---"
+pm2 logs uni-api --lines 5000 --nostream | grep -iE "bulk|queue|start.*queue" | tail -30
+Paste the outputs.
+
+Now here's the revised Replit instruction — more accurate:
+
+CRITICAL BUG: Bulk Scrape queue is completely broken. Ran overnight on 6 universities — ZERO completed via the queue. Only Torrens attempted (stopped). Charles Sturt and USQ never started.
+Earlier I claimed Tasmania/ASA/VIT completed — that was wrong. User confirmed those were done manually BEFORE the bulk run. The bulk queue itself produced:
+
+Torrens: Stopped (first & only attempt, then queue died)
+Charles Sturt: Never scraped (queue never reached it)
+USQ: Never scraped (queue never reached it)
+3 others: Never touched by queue
+
+This means the bulk queue either:
+A. Crashes on first failure and silently dies (no next-iteration trigger)
+B. Has a race condition that deadlocks when the first scrape stops
+C. Has a "is_scraping" lock that never releases after the first scrape exits unexpectedly
+
+DIAGNOSE:
+
+Find the bulk queue handler — search for POST /api/bulk/start or Start Queue or bulk-scrape. Read the code end-to-end.
+Identify what triggers the NEXT university after one finishes. Most likely:
+
+Sequential for loop with await (safest)
+Event emitter on job.completed (fragile — breaks on stopped or error status)
+Cron-like timer polling for "next pending" (breaks if global lock stuck)
+
+
+Check for a global variable like isScrapingRunning, currentJob, or similar. If set to true by one scrape and not cleared on failure, the next iteration is blocked forever.
+
+
+FIX — Make the bulk queue bulletproof:
+Replace whatever exists with this pattern:
+typescriptasync function runBulkQueue(universityIds: number[]) {
+  const results: BulkResult[] = [];
+  const PER_UNI_TIMEOUT_MS = 15 * 60 * 1000; // 15 min hard cap
+  
+  for (let i = 0; i < universityIds.length; i++) {
+    const uniId = universityIds[i];
+    const uni = await getUniversity(uniId);
+    
+    addLog({
+      event: 'bulk_progress',
+      message: `[BULK ${i+1}/${universityIds.length}] Starting: ${uni.name}`,
+    });
+    
+    const startTime = Date.now();
+    let result: BulkResult;
+    
+    try {
+      // Hard timeout wrapper — if scrape hangs, we move on
+      result = await Promise.race([
+        scrapeOneUniversity(uniId),
+        new Promise<BulkResult>((_, rej) => 
+          setTimeout(() => rej(new Error(`bulk_timeout after ${PER_UNI_TIMEOUT_MS/60_000}min`)), PER_UNI_TIMEOUT_MS)
+        ),
+      ]);
+    } catch (err: any) {
+      // ALWAYS continue to next university, no matter what failed
+      result = {
+        universityId: uniId,
+        status: 'failed',
+        error: err.message.slice(0, 200),
+        imported: 0,
+        found: 0,
+        durationMs: Date.now() - startTime,
+      };
+      addLog({
+        event: 'bulk_error',
+        message: `[BULK ${i+1}/${universityIds.length}] ${uni.name} FAILED: ${err.message} — moving to next`,
+      });
+    }
+    
+    results.push(result);
+    
+    // Force-release any locks between universities
+    await releaseAllScrapeLocks();
+    await killOrphanWorkers();
+    await sleep(5000); // 5s cooldown
+  }
+  
+  // Summary
+  const succeeded = results.filter(r => r.status === 'completed');
+  const failed = results.filter(r => r.status === 'failed');
+  
+  addLog({
+    event: 'bulk_done',
+    message: `[BULK-DONE] ${results.length} universities | ${succeeded.length} success | ${failed.length} failed`,
+  });
+  
+  for (const r of results) {
+    const icon = r.status === 'completed' ? '✓' : '✗';
+    addLog({
+      event: 'bulk_summary',
+      message: `${icon} ${r.universityName} (${r.imported}/${r.found} in ${Math.round(r.durationMs/60000)}m) ${r.error || ''}`,
+    });
+  }
+  
+  return results;
+}
+
+async function releaseAllScrapeLocks() {
+  // Mark any 'running' jobs as 'stopped' — they're orphaned
+  await db.execute(`
+    UPDATE scrape_jobs 
+    SET status='stopped', completed_at=NOW(), errors=errors||' [bulk queue released lock]'
+    WHERE status='running' AND started_at < NOW() - INTERVAL '20 minutes'
+  `);
+  // Clear any in-memory locks
+  // (adjust based on actual code)
+}
+
+async function killOrphanWorkers() {
+  // Kill scrape-worker processes that have been running > 20 min
+  // (This requires server-side exec, may need to skip on Replit)
+}
+
+ADDITIONAL FIXES:
+
+Persist queue state in DB, not memory. Create table bulk_queue:
+sqlCREATE TABLE bulk_queue (
+  id SERIAL PRIMARY KEY,
+  started_at TIMESTAMP DEFAULT NOW(),
+  total_universities INT,
+  completed INT DEFAULT 0,
+  status TEXT DEFAULT 'running', -- running|completed|failed
+  results JSONB
+);
+
+CREATE TABLE bulk_queue_items (
+  id SERIAL PRIMARY KEY,
+  queue_id INT REFERENCES bulk_queue(id),
+  university_id INT REFERENCES universities(id),
+  status TEXT DEFAULT 'pending', -- pending|running|completed|failed|skipped
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  error TEXT,
+  position INT
+);
+This survives server restarts and crashes.
+Add GET /api/bulk/status endpoint returning current queue state + per-university progress. Frontend polls this every 5s for real-time updates.
+Add a "resume queue" button that picks up from where it left off (any pending + failed items).
+Don't let bulk queue use gemini-2.5-flash — always use gemini-2.5-flash-lite or whatever has quota. Check quota before starting each university (attempt a tiny test call) — skip if 429.
+
+
+DELIVERY:
+
+Read the current bulk queue code and report: is it a for loop? Event-based? Cron polling?
+Report what global state / locks exist that could deadlock
+Apply the fix above
+Build, commit, push to main
+Reply with a test result: trigger bulk queue on 3 universities (include one known-broken one like Charles Sturt whose config might be incomplete) and show the [BULK-DONE] summary
+
+Target: bulk queue completes all 6 universities in one run, even if 2-3 individually fail.

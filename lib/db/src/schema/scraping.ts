@@ -90,3 +90,29 @@ export const insertScrapeRuntimeJobSchema = createInsertSchema(scrapeRuntimeJobs
 export type InsertScrapeRuntimeJob = z.infer<typeof insertScrapeRuntimeJobSchema>;
 export type ScrapeRuntimeJob = typeof scrapeRuntimeJobsTable.$inferSelect;
 export type ScrapeRuntimeLog = typeof scrapeRuntimeLogsTable.$inferSelect;
+
+export const bulkSessionsTable = pgTable("bulk_sessions", {
+  sessionId: text("session_id").primaryKey(),
+  status: text("status").notNull().default("running"),
+  currentIndex: integer("current_index").notNull().default(-1),
+  fastMode: boolean("fast_mode").notNull().default(false),
+  unis: jsonb("unis").$type<Array<{
+    uniId: number;
+    name: string;
+    url: string;
+    jobId: string | null;
+    status: "pending" | "running" | "done" | "error" | "skipped" | "stopped";
+    imported: number;
+    found: number;
+    staged: number;
+    error?: string;
+    attempts?: number;
+    startedAt?: string;
+    completedAt?: string;
+    durationMs?: number;
+  }>>().notNull().default([]),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+export type BulkSessionRow = typeof bulkSessionsTable.$inferSelect;

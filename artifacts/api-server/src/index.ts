@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startMonthlyScrapingScheduler } from "./services/monthly-scraping";
 import { startDailyBackupScheduler } from "./services/daily-backup";
 import { stopRunningRuntimeJobs, requeueStaleRuntimeJobs } from "./services/scrape-runtime-jobs";
+import { resumeBulkSessionsOnStartup } from "./routes/scrape";
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -87,6 +88,13 @@ app.listen(port, host, async (err) => {
   for (let i = 0; i < scrapeWorkerCount; i++) {
     startScrapeWorker();
   }
+
+  // Resume any bulk sessions interrupted by a previous restart (PM2 OOM,
+  // deploy, crash). Without this the in-memory queue dies and the remaining
+  // universities are silently abandoned.
+  void resumeBulkSessionsOnStartup().catch((err) => {
+    logger.error({ err }, "Failed to resume bulk sessions on startup");
+  });
 
   // Periodic stale-job reaper: any "running" job whose worker hasn't sent a
   // heartbeat in 5 minutes is presumed dead (PDF fetches + pdftotext on large
