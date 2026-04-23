@@ -485,6 +485,33 @@ router.get("/search/courses", async (req: Request, res: Response) => {
         logger.warn({ err: (err as Error).message }, "did-you-mean (location) lookup failed");
       }
     }
+    // Zero-result fallback: when both q and location are present but combined
+    // returns nothing, run COUNT for each filter alone so the UI can suggest
+    // "we have N courses for your search and M in that location — drop one".
+    let noMatchSuggestion: { q_matches: number; location_matches: number; message: string } | null = null;
+    if (totalCount === 0 && term && location) {
+      try {
+        const qOnlyWhere = buildSearchWhere({ ...req.query, location: undefined });
+        const locOnlyWhere = buildSearchWhere({ ...req.query, q: undefined });
+        const qOnlySql = `SELECT COUNT(*)::int AS total FROM course_search_view ${whereSql(qOnlyWhere)}`;
+        const locOnlySql = `SELECT COUNT(*)::int AS total FROM course_search_view ${whereSql(locOnlyWhere)}`;
+        const [qRes, lRes] = await Promise.all([
+          pool.query(qOnlySql, qOnlyWhere.values),
+          pool.query(locOnlySql, locOnlyWhere.values),
+        ]);
+        const qMatches: number = qRes.rows[0]?.total ?? 0;
+        const lMatches: number = lRes.rows[0]?.total ?? 0;
+        noMatchSuggestion = {
+          q_matches: qMatches,
+          location_matches: lMatches,
+          message:
+            `We found ${qMatches} course${qMatches === 1 ? "" : "s"} matching “${term}” ` +
+            `and ${lMatches} in “${location}”, but none match both. Try removing a filter.`,
+        };
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "no-match-suggestion lookup failed");
+      }
+    }
     if (term && totalCount === 0) {
       try {
         // word_similarity scans the *best matching word* inside course_name,
@@ -527,6 +554,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       took_ms: elapsed,
       did_you_mean: didYouMean,
       did_you_mean_location: didYouMeanLocation,
+      no_match_suggestion: noMatchSuggestion,
       results: resultsRes.rows.map((r) => ({
         id: r.id,
         course_name: r.course_name,

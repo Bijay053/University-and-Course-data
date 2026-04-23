@@ -46,6 +46,7 @@ type SearchResponse = {
   total: number; page: number; limit: number; took_ms: number;
   did_you_mean?: string | null;
   did_you_mean_location?: string | null;
+  no_match_suggestion?: { q_matches: number; location_matches: number; message: string } | null;
   results: CourseResult[];
   facets: {
     universities: FacetItem[]; categories: FacetItem[];
@@ -537,6 +538,32 @@ export default function SearchPage() {
                 </span>
               ) : "—"}
             </div>
+            {data?.no_match_suggestion && data.total === 0 && (
+              <div className="w-full mt-1 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+                {data.no_match_suggestion.message}{" "}
+                {data.no_match_suggestion.q_matches > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setLocFilter(""); resetPage(); }}
+                    className="ml-1 underline font-medium text-amber-800 hover:text-amber-900"
+                  >
+                    Show {data.no_match_suggestion.q_matches} matching “{q}”
+                  </button>
+                )}
+                {data.no_match_suggestion.q_matches > 0 && data.no_match_suggestion.location_matches > 0 && (
+                  <span className="mx-1 text-amber-700">·</span>
+                )}
+                {data.no_match_suggestion.location_matches > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setQ(""); resetPage(); }}
+                    className="underline font-medium text-amber-800 hover:text-amber-900"
+                  >
+                    Show {data.no_match_suggestion.location_matches} in “{location}”
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2 text-sm">
               <Label className="text-xs text-gray-500">Sort</Label>
               <Select value={sort} onValueChange={(v) => { setSort(v); resetPage(); }}>
