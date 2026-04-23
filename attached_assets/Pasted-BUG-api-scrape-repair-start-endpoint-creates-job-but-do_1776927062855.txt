@@ -1,0 +1,40 @@
+BUG: /api/scrape/repair/start endpoint creates job but does NOT dispatch to worker — silent failure
+Production reproduction (commit 94c3ed3):
+
+Called POST /api/scrape/repair/start with {"universityId": 4}
+Endpoint returned 200 with {"jobId":"scrape_1776926722241_r3hp68", "count":141, "message":"Repair scrape started"}
+Job row created in scrape_runtime_jobs with status='running'
+Worker never picks it up. Verified after 6 minutes:
+
+imported = 0
+errors = 0
+0 rows in scraped_field_evidence for that jobId
+0 rows in scrape_runtime_logs for that jobId
+0 recent updates to courses table for university_id=4
+pm2 logs show NO worker activity, just the API request log entry
+
+
+
+Same issue with /api/scrape/rescrape triggered immediately after (probably from UI clicks) — also created jobs scrape_1776926989177_wa0f5h and scrape_1776926989700_od9q7a that never executed.
+
+Suspected cause:
+The endpoint inserts into scrape_runtime_jobs but doesn't call the worker dispatch function (the same one regular /scrape/start uses). For regular scrapes, after inserting the job row, the code calls something like dispatchScrapeWorker(jobId) or pushes onto an internal queue. The repair endpoint may be missing this dispatch call.
+Compare working code path:
+typescript// GET /scrape/start (works) — likely structure:
+const jobId = await createJob({ universityId, urls });
+await dispatchScrapeWorker(jobId);  // ← THIS LINE PROBABLY MISSING IN REPAIR
+return res.json({ jobId });
+
+Also fix /scrape/rescrape — appears to have the same bug (jobs created but worker never runs them).
+
+DELIVERY:
+
+Trace the regular /scrape/start code path. Find the worker dispatch call.
+Add the same dispatch call to /scrape/repair/start AND /scrape/rescrape.
+Add a smoke test: after POST /scrape/repair/start, poll job status — within 30s the imported counter should be > 0 OR the scrape_runtime_logs table should have at least one log entry.
+Add a startup safety: if pm2 receives SIGINT mid-job, on restart any status='running' jobs older than 30 seconds should auto-mark status='failed' (so they don't appear stuck forever in admin UI).
+Commit: "Fix: repair-scrape and rescrape now dispatch to worker (was creating zombie jobs)"
+Push to main
+Reply with commit hash and a curl test showing it works end-to-end (job → worker logs → evidence rows appear within 60s).
+
+Deploy path: /root/University-and-Course-data

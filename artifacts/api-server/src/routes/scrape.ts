@@ -78,6 +78,7 @@ import {
   enqueueRuntimeJob,
   getRuntimeJobRecord,
   getRuntimeJobStatus,
+  getRuntimeQueueHealth,
   listActiveRuntimeJobs,
   listRuntimeJobs,
   markRuntimeJobHeartbeat,
@@ -11344,6 +11345,23 @@ router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<voi
     });
 
     res.json({ jobId, message: "Re-scraping started (no AI)" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── RUNTIME HEALTH ───────────────────────────────────────────────────────────
+// Single-call diagnostic for "why isn't my scrape running?". Returns the
+// queue depth (queued / running / awaiting_approval), the age of the oldest
+// waiting job, and the list of currently-active workers with their last
+// heartbeat. If `queued.count > 0` and `queued.oldestAgeSeconds > 5` while
+// `activeWorkers.length === 0`, the workers are dead. If `running` jobs have
+// no recent heartbeat, they're zombies (the periodic reaper will requeue
+// them after 5 min).
+router.get("/scrape/runtime/health", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const health = await getRuntimeQueueHealth();
+    res.json(health);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

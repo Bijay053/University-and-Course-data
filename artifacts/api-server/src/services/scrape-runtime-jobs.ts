@@ -80,9 +80,76 @@ export async function enqueueRuntimeJob(input: EnqueueRuntimeJobInput) {
     updatedAt: new Date(),
   });
 
+  // Defensive read-back: confirm the row landed with status='queued'. If
+  // anything (a trigger, a concurrent UPDATE, a schema default override)
+  // produced a different status, the worker poll loop will never claim it
+  // and the job becomes a zombie. This used to be silent; now we log it
+  // and force-correct the status to 'queued' so dispatch always works.
+  const [verify] = await db
+    .select({ status: scrapeRuntimeJobsTable.status })
+    .from(scrapeRuntimeJobsTable)
+    .where(eq(scrapeRuntimeJobsTable.runtimeJobId, input.runtimeJobId))
+    .limit(1);
+  if (!verify) {
+    throw new Error(`enqueueRuntimeJob: row for ${input.runtimeJobId} disappeared immediately after insert`);
+  }
+  if (verify.status !== "queued") {
+    console.warn(
+      `[enqueueRuntimeJob] runtime_job_id=${input.runtimeJobId} landed with status='${verify.status}' instead of 'queued' — forcing back to queued so worker can claim it`,
+    );
+    await updateRuntimeJob(input.runtimeJobId, { status: "queued" });
+  }
+
+  // Wake any worker that's currently sleeping on its poll interval. The
+  // worker poll loop ignores NOTIFY (it just polls every 1s) so this is
+  // purely informational right now, but operators can `LISTEN
+  // scrape_jobs_queued` from psql to confirm the enqueue actually happened.
+  try {
+    await pool.query(`SELECT pg_notify('scrape_jobs_queued', $1)`, [input.runtimeJobId]);
+  } catch { /* notify is best-effort */ }
+
   if (input.initialLogs && input.initialLogs.length > 0) {
     await appendRuntimeJobLogs(input.runtimeJobId, input.initialLogs);
   }
+}
+
+// Health snapshot used by /scrape/runtime/health — gives the operator a
+// one-shot view of "is the queue draining, are workers alive, how old is
+// the oldest waiting job".
+export async function getRuntimeQueueHealth() {
+  const result = await pool.query<{
+    status: string;
+    cnt: number;
+    oldest_age_seconds: number | null;
+  }>(`
+    SELECT status,
+           COUNT(*)::int AS cnt,
+           EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))::int AS oldest_age_seconds
+    FROM scrape_runtime_jobs
+    WHERE status IN ('queued', 'running', 'awaiting_approval')
+    GROUP BY status
+  `);
+  const workers = await pool.query<{ worker_id: string; heartbeat_at: Date | null; runtime_job_id: string }>(`
+    SELECT DISTINCT worker_id, heartbeat_at, runtime_job_id
+    FROM scrape_runtime_jobs
+    WHERE status = 'running' AND worker_id IS NOT NULL
+    ORDER BY heartbeat_at DESC NULLS LAST
+    LIMIT 50
+  `);
+  const buckets: Record<string, { count: number; oldestAgeSeconds: number | null }> = {};
+  for (const row of result.rows) {
+    buckets[row.status] = { count: Number(row.cnt), oldestAgeSeconds: row.oldest_age_seconds };
+  }
+  return {
+    queued: buckets.queued ?? { count: 0, oldestAgeSeconds: null },
+    running: buckets.running ?? { count: 0, oldestAgeSeconds: null },
+    awaitingApproval: buckets.awaiting_approval ?? { count: 0, oldestAgeSeconds: null },
+    activeWorkers: workers.rows.map((r) => ({
+      workerId: r.worker_id,
+      lastHeartbeat: r.heartbeat_at,
+      runtimeJobId: r.runtime_job_id,
+    })),
+  };
 }
 
 export async function appendRuntimeJobLogs(runtimeJobId: string, logs: RuntimeLogEvent[]) {
