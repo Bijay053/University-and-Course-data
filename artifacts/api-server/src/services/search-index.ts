@@ -74,7 +74,8 @@ export async function ensureSearchInfra(): Promise<void> {
       // may have NULLs.
       // Schema version. Bump whenever the MV definition changes — the block
       // below drops the old view and rebuilds it. Using a marker column
-      // (search_tsv) keeps the upgrade path automatic on every deploy.
+      // (currently `featured`) keeps the upgrade path automatic on every
+      // deploy — bump this marker when the MV gains another new column.
       // Check for the latest schema marker — `featured`. If missing, drop &
       // rebuild the MV so the new column is included automatically on deploy.
       const mvHasFeatured = await client.query(`
