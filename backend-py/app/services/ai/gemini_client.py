@@ -39,7 +39,7 @@ def _model():
         import google.generativeai as genai
 
         genai.configure(api_key=settings.gemini_api_key)
-        return genai.GenerativeModel("gemini-2.0-flash-exp")
+        return genai.GenerativeModel(settings.gemini_model)
     except Exception as exc:
         log.warning("Gemini client init failed: %s", exc)
         return None

@@ -1,0 +1,517 @@
+🧪 PYTHON BACKEND VERIFICATION CHECKLIST
+Rule: For every checkbox, Replit must paste the actual command + actual output. No "looks good" without proof.
+
+✅ PART 1: Infrastructure (Foundation)
+1.1 Server processes
+
+ Node.js still running on port 8080
+
+bash  pm2 list | grep uni-api
+  curl -s http://localhost:8080/api/health
+Expected: online status + 200 OK
+
+ Python running on port 8000
+
+bash  ps aux | grep uvicorn | grep -v grep
+  curl -s http://localhost:8000/api/health
+Expected: process running + {"status": "ok"}
+
+ Both ports respond simultaneously, no conflicts
+
+bash  ss -tlnp | grep -E ":8000|:8080"
+Expected: both LISTENing
+
+ Redis running for Celery
+
+bash  redis-cli ping
+Expected: PONG
+
+ Celery workers running
+
+bash  ps aux | grep "celery.*worker" | grep -v grep
+  celery -A app.tasks.celery_app inspect active
+Expected: at least 1 worker process
+
+✅ PART 2: Database Integrity (CRITICAL)
+2.1 Database connection
+
+ Python connects to SAME database as Node
+
+bash  source /root/.env.backup
+  echo "Node DB:"
+  psql "$DATABASE_URL" -c "SELECT current_database();"
+  echo "Python DB (from Python health check):"
+  curl -s http://localhost:8000/api/health/db
+Expected: same database name
+2.2 No data loss
+
+ Course count matches pre-migration baseline
+
+bash  psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM courses WHERE status='active';"
+Expected: ≥ 353 (no fewer than before)
+
+ University count matches
+
+bash  psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM universities;"
+Expected: 6 (the original 6, unless user added more)
+
+ Evidence rows preserved
+
+bash  psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM scraped_field_evidence;"
+Expected: ≥ 11,253
+
+ All 28 tables still exist
+
+bash  psql "$DATABASE_URL" -c "\dt" | wc -l
+Expected: ≥ 30 lines (28 tables + headers)
+
+ Materialized view intact
+
+bash  psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM course_search_view;"
+Expected: ≥ 353
+2.3 Schema unchanged
+
+ No tables dropped
+
+bash  psql "$DATABASE_URL" -c "
+  SELECT table_name FROM information_schema.tables 
+  WHERE table_schema='public' ORDER BY table_name;
+  "
+Compare to backup file:
+bash  grep "^CREATE TABLE" /root/backups/before_python_migration_20260423.sql | wc -l
+Both numbers must be equal
+
+ Course #169 still has its location (the bug we fixed)
+
+bash  psql "$DATABASE_URL" -c "SELECT id, name, course_location FROM courses WHERE id=169;"
+Expected: location = "Albury-Wodonga, Port Macquarie, Bathurst, Online"
+
+✅ PART 3: Read Endpoints (Phase 3)
+3.1 Core endpoints respond
+
+ GET /api/health
+
+bash  curl -s http://localhost:8000/api/health | python3 -m json.tool
+Expected: {"status": "ok", ...}
+
+ GET /api/universities returns real data
+
+bash  curl -s http://localhost:8000/api/universities | python3 -m json.tool
+Expected: 6 universities with id, name, city, country
+
+ GET /api/universities/4 returns CSU
+
+bash  curl -s http://localhost:8000/api/universities/4 | python3 -m json.tool
+Expected: Charles Sturt university details
+
+ GET /api/universities/4/courses returns CSU's courses
+
+bash  curl -s "http://localhost:8000/api/universities/4/courses?limit=5" | python3 -m json.tool | head -40
+Expected: array of 5 courses with name, location, duration
+
+ GET /api/courses/169 returns the famous course
+
+bash  curl -s http://localhost:8000/api/courses/169 | python3 -m json.tool
+Expected: Bachelor Of Business Studies with full details
+3.2 Search functionality
+
+ Search for "business" returns results
+
+bash  curl -s "http://localhost:8000/api/search/courses?q=business&limit=5" | python3 -m json.tool
+Expected: array of business-related courses, ranked
+
+ Search for "engineering" returns results
+
+bash  curl -s "http://localhost:8000/api/search/courses?q=engineering&limit=5" | python3 -m json.tool
+Expected: at least 1 result
+
+ Search with no results behaves correctly
+
+bash  curl -s "http://localhost:8000/api/search/courses?q=xyzabc999&limit=5" | python3 -m json.tool
+Expected: empty array, no error
+
+ Search pagination works
+
+bash  curl -s "http://localhost:8000/api/search/courses?q=master&limit=5&offset=10" | python3 -m json.tool
+Expected: different results than offset=0
+3.3 Search results MATCH Node output
+
+ Same query → same count on both backends
+
+bash  echo "Node count for 'business':"
+  curl -s "http://localhost:8080/api/search/courses?q=business" | python3 -c "import sys, json; d=json.load(sys.stdin); print(len(d.get('results', d if isinstance(d, list) else [])))"
+  echo "Python count for 'business':"
+  curl -s "http://localhost:8000/api/search/courses?q=business" | python3 -c "import sys, json; d=json.load(sys.stdin); print(len(d.get('results', d if isinstance(d, list) else [])))"
+Expected: counts match (or Python ≥ Node)
+
+✅ PART 4: Auth (Phase 4)
+4.1 Login flow
+
+ POST /api/auth/login with valid credentials returns 200 + session
+
+bash  curl -s -c /tmp/py_cookies.txt -X POST http://localhost:8000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email": "<your_email>", "password": "<your_password>"}'
+Expected: {"user": {...}} + Set-Cookie header
+
+ Login with wrong password returns 401
+
+bash  curl -s -X POST http://localhost:8000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email": "<email>", "password": "wrong"}'
+Expected: {"detail": "Invalid credentials"}
+4.2 Protected endpoints
+
+ Admin endpoint without auth returns 401
+
+bash  curl -s http://localhost:8000/api/scrape/jobs
+Expected: {"detail": "Not authenticated"}
+
+ Admin endpoint WITH auth returns data
+
+bash  curl -s -b /tmp/py_cookies.txt http://localhost:8000/api/scrape/jobs
+Expected: list of jobs
+
+ GET /api/auth/me returns user when logged in
+
+bash  curl -s -b /tmp/py_cookies.txt http://localhost:8000/api/auth/me
+Expected: user object
+
+✅ PART 5: Bug Fixes Verification (CRITICAL)
+5.1 Bug #1: Case-insensitive name match
+
+ approve_course finds existing course with different case
+
+Test: Create scraped_course "bachelor of business studies" (lowercase)
+Verify: approve updates existing #169 instead of creating duplicate
+
+
+
+bash  # Before: count CSU courses
+  psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM courses WHERE university_id=4 AND status='active';"
+  
+  # Trigger approval (Python)
+  # Then check no new dup created:
+  psql "$DATABASE_URL" -c "
+  SELECT LOWER(name), COUNT(*) FROM courses 
+  WHERE university_id=4 AND status='active' 
+  GROUP BY LOWER(name) HAVING COUNT(*) > 1;
+  "
+Expected: 0 duplicates after approval
+5.2 Bug #2: StageResult dataclass (not bare bool)
+
+ stage_course always returns StageResult
+
+bash  grep -rn "return.*saved" backend-py/app/services/scraper/stagers/
+  grep -rn "return True\|return False" backend-py/app/services/scraper/stagers/
+Expected: only StageResult(saved=...) returns, NO bare True/False
+5.3 Bug #3: Auto-publish thresholds
+
+ should_auto_publish requires location, duration, intakes, English (not fee)
+
+bash  grep -A 20 "def should_auto_publish" backend-py/app/services/auto_publish.py
+Expected: Function checks completeness ≥ 75, duration, location, intakes, English; does NOT require fee
+5.4 Bug #4: 7-day rejection rule
+
+ Rejection window is 7 days, not 30
+
+bash  grep -rn "REJECTION_BLOCK_DAYS\|reviewed_at.*INTERVAL" backend-py/
+Expected: REJECTION_BLOCK_DAYS = 7 or INTERVAL '7 days'
+5.5 Bug #5: City/country required in schema
+
+ Pydantic rejects "Unknown" city/country
+
+bash  curl -s -X POST -b /tmp/py_cookies.txt http://localhost:8000/api/universities \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Test Uni", "city": "Unknown", "country": "Unknown"}'
+Expected: 422 validation error
+
+ Pydantic accepts valid city/country
+
+bash  curl -s -X POST -b /tmp/py_cookies.txt http://localhost:8000/api/universities \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Test Uni 2", "city": "Sydney", "country": "Australia"}'
+Expected: 200 with new university
+5.6 Bug #6: CSV bulk import
+
+ Bulk import endpoint exists
+
+bash  curl -s -X POST -b /tmp/py_cookies.txt http://localhost:8000/api/universities/bulk-import \
+    -F "file=@/tmp/test_unis.csv"
+First create test CSV:
+bash  cat > /tmp/test_unis.csv <<EOF
+  name,website,scrape_url,country,city
+  Test Uni Bulk 1,https://test1.edu.au,https://test1.edu.au/courses,Australia,Sydney
+  Test Uni Bulk 2,https://test2.edu.au,https://test2.edu.au/courses,Australia,Melbourne
+  EOF
+Expected: {"created": 2, "skipped": 0, "errors": []}
+
+✅ PART 6: Scraper Engine (Phase 5 - The Hard Part)
+6.1 Scaffolding present
+
+ Browser pool implemented
+
+bash  cat backend-py/app/services/scraper/browser_pool.py | grep -E "async def (start|stop|acquire|release)"
+Expected: 4 method definitions
+
+ HTTP fetcher implemented
+
+bash  cat backend-py/app/services/scraper/http_fetcher.py | grep "async def fetch"
+Expected: at least fetch_html method
+
+ All extractor files exist
+
+bash  ls backend-py/app/services/scraper/extractors/
+Expected: english.py, duration.py, fees.py, intakes.py, location.py, eligibility.py, course_name.py
+6.2 Stub vs implemented status
+
+ Show which extractors have real logic vs TODO stubs
+
+bash  for f in backend-py/app/services/scraper/extractors/*.py; do
+    echo "=== $f ==="
+    if grep -q "NotImplementedError\|TODO\|pass$" "$f"; then
+      echo "  ⚠️  STUB"
+    else
+      echo "  ✅ IMPLEMENTED"
+    fi
+    wc -l "$f"
+  done
+Replit must declare honestly which are stubs vs done
+6.3 End-to-end scrape (only when extractors are done)
+
+ Single university scrape works end-to-end
+
+bash  # Trigger Python scrape on USQ
+  curl -s -b /tmp/py_cookies.txt -X POST http://localhost:8000/api/scrape/start \
+    -H "Content-Type: application/json" \
+    -d '{"universityId": 1}' | python3 -m json.tool
+Expected: returns job_id, then check progress:
+bash  sleep 60
+  psql "$DATABASE_URL" -c "
+  SELECT runtime_job_id, status, current, total_found, imported, errors 
+  FROM scrape_runtime_jobs 
+  ORDER BY started_at DESC LIMIT 1;
+  "
+Expected: status progresses from running → completed; imported > 0
+
+ Browser fallback for CSU (the hardest case)
+
+bash  curl -s -b /tmp/py_cookies.txt -X POST http://localhost:8000/api/scrape/repair/start \
+    -H "Content-Type: application/json" \
+    -d '{"universityId": 4}'
+Wait 15 min, then verify location extraction:
+bash  psql "$DATABASE_URL" -c "
+  SELECT page_type, extraction_method, COUNT(*) 
+  FROM scraped_field_evidence sfe
+  JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+  WHERE sc.scrape_job_id = (SELECT runtime_job_id FROM scrape_runtime_jobs ORDER BY started_at DESC LIMIT 1)
+  GROUP BY page_type, extraction_method;
+  "
+Expected: at least 50 rows with page_type='course_page', extraction_method='browser'
+6.4 Provenance footer (port the recent fix)
+
+ build_course_page_provenance_footer function exists
+
+bash  grep -A 5 "def build_course_page_provenance_footer" backend-py/app/services/scraper/
+Expected: function definition
+
+ Footer is appended in extraction pipeline
+
+bash  grep -rn "build_course_page_provenance_footer" backend-py/
+Expected: called from at least one place
+
+✅ PART 7: Celery Bulk Scraping (Phase 6)
+7.1 Worker functionality
+
+ Workers connect to Redis
+
+bash  celery -A app.tasks.celery_app inspect ping
+Expected: pong from each worker
+
+ Single task can be enqueued and runs
+
+bash  python3 -c "
+  from app.tasks.scrape_tasks import scrape_university_task
+  result = scrape_university_task.delay(1, 'test_job_001')
+  print(f'Task ID: {result.id}, Status: {result.status}')
+  "
+Expected: task gets ID, status is PENDING then STARTED
+7.2 Bulk endpoint
+
+ POST /api/scrape/bulk queues multiple jobs
+
+bash  curl -s -b /tmp/py_cookies.txt -X POST http://localhost:8000/api/scrape/bulk \
+    -H "Content-Type: application/json" \
+    -d '{"university_ids": [1, 2, 3]}'
+Expected: {"session_id": "...", "queued": 3}
+
+ Multiple jobs run in parallel
+
+bash  sleep 30
+  celery -A app.tasks.celery_app inspect active
+Expected: 2-3 active tasks simultaneously
+
+✅ PART 8: AI Integration (Phase 7)
+8.1 Gemini connectivity
+
+ Client connects without errors
+
+bash  python3 -c "
+  import asyncio
+  from app.services.ai.gemini_client import GeminiClient
+  async def test():
+      g = GeminiClient()
+      result = await g.classify('You answer JSON.', 'Reply with {\"ok\": true}')
+      print(result)
+  asyncio.run(test())
+  "
+Expected: JSON response from Gemini
+8.2 Budget tracking
+
+ Budget recorded after call
+
+bash  redis-cli get "gemini:spend:$(date +%Y-%m-%d)"
+Expected: number > 0 after first Gemini call
+
+ Budget ceiling blocks calls when exceeded
+
+bash  redis-cli set "gemini:spend:$(date +%Y-%m-%d)" 999.99
+  # Now try a call - should raise BudgetExceededError
+Expected: BudgetExceededError
+
+✅ PART 9: Frontend Integration
+9.1 Frontend can hit Python backend
+
+ Update frontend .env to point to port 8000 (test build only)
+ Search page works against Python
+ Course detail page works
+ University list page works
+ Login flow works (cookies set)
+ Scraping page can submit jobs
+
+9.2 No changes needed to frontend
+
+ All existing React components work without modification
+ API contracts match Node version exactly
+
+
+✅ PART 10: Deployment Files
+10.1 systemd configs present
+
+ /root/University-and-Course-data/backend-py/deploy/uni-api-py.service exists
+ /root/University-and-Course-data/backend-py/deploy/uni-celery.service exists
+ Both have correct paths and EnvironmentFile
+
+10.2 Nginx config ready
+
+ Nginx config snippet shows /api/ → port 8000 (NOT yet applied)
+ Nginx config preserves frontend serving
+
+10.3 Cutover plan documented
+
+ Step-by-step cutover instructions present
+ Rollback plan documented
+ Both backends still running side-by-side (cutover NOT executed yet)
+
+
+✅ PART 11: Code Quality
+11.1 Tests pass
+
+ All pytest tests pass
+
+bash  cd /root/University-and-Course-data/backend-py
+  pytest -v
+Expected: all green
+
+ Test count
+
+bash  pytest --collect-only -q | tail -5
+Expected: at least 22 tests collected
+11.2 No syntax/import errors
+
+ App imports cleanly
+
+bash  python3 -c "from app.main import app; print(f'Routes: {len(app.routes)}')"
+Expected: > 30 routes
+
+ No type errors
+
+bash  mypy app/ --ignore-missing-imports 2>&1 | tail -10
+Expected: minimal errors (or none)
+
+✅ PART 12: Git State
+12.1 Code committed
+
+ All changes committed locally
+
+bash  cd /root/University-and-Course-data
+  git status
+  git log --oneline -5
+Expected: clean working tree, recent commits visible
+
+ Pushed to GitHub
+
+bash  git remote -v
+  git log --oneline origin/main..HEAD
+Expected: 0 commits ahead of origin (or document why push blocked)
+
+✅ PART 13: Documentation
+13.1 README updated
+
+ backend-py/README.md exists with setup instructions
+ Lists which phases are complete vs pending
+ Includes deployment steps
+
+13.2 API parity document
+
+ List of all endpoints with status: ✅ implemented / ⚠️ stub / ❌ missing
+ Compared to Node.js endpoints
+
+
+🚨 PART 14: Honest Status Declaration
+Replit must answer YES or NO with proof for each:
+
+ Can Python search existing courses? YES/NO + proof
+ Can Python read all existing data? YES/NO + proof
+ Can Python authenticate users? YES/NO + proof
+ Can Python scrape a NEW university end-to-end? YES/NO + proof
+ Can Python handle the CSU browser fallback case? YES/NO + proof
+ Can Python bulk-scrape multiple universities? YES/NO + proof
+ Are extractors fully implemented or stubs? List each
+ Does the existing frontend work against Python? YES/NO + proof
+ Is anything in production using Python yet? YES/NO
+ What's the realistic completion percentage? __%
+
+
+🛡️ PART 15: Safety Net
+15.1 Database backups verified
+
+ /root/backups/before_python_migration_20260423.sql exists (15 MB, 28 tables)
+ Restore command documented and tested
+ Daily backup cron job set up
+
+15.2 Node.js still functional
+
+ Node.js can still serve all original endpoints
+ Node.js still has all original features working
+ pm2 list shows uni-api online
+
+15.3 Rollback procedure
+
+ Document: "If Python breaks, how do we revert?"
+ Test rollback procedure on a single endpoint
+
+
+📋 HOW TO USE THIS CHECKLIST
+Send this to Replit with these instructions:
+
+Run this entire checklist. For each item:
+
+Run the command
+Paste the actual output (not summary)
+Mark ✅ PASS or ❌ FAIL
+If FAIL, explain why and what's needed to fix
+
+Do NOT skip items. Do NOT claim "done" without proof.
+Do NOT proceed to cutover until ALL items in Parts 1-12 pass.
+Report back with the completed checklist before any further work.
