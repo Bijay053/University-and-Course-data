@@ -4943,38 +4943,45 @@ async function persistReviewArtifacts(scrapedCourseId: number, snapshot: CourseR
   }
 }
 
+/**
+ * Result returned by stageCourse so callers can surface WHY a course was
+ * skipped in their per-course log line, instead of the user just seeing a
+ * bare `Master X [skipped]` with no explanation.
+ */
+type StageCourseResult = { saved: true } | { saved: false; reason: string };
+
 async function stageCourse(
   courseData: CourseData,
   uniId: number,
   jobId: string,
   job?: ScrapeJob,
   reviewContext?: CourseReviewContext,
-): Promise<boolean> {
-  if (!courseData.courseName) return false;
+): Promise<StageCourseResult> {
+  if (!courseData.courseName) return { saved: false, reason: "missing course name" };
 
   if (courseData.domesticOnly) {
     if (job) addLog(job, "status", { message: `Skipped (domestic only): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping domestic-only course: "${courseData.courseName}"`);
-    return false;
+    return { saved: false, reason: "domestic-only course" };
   }
 
   if (courseData.onlineOnly) {
     if (job) addLog(job, "status", { message: `Skipped (online only / no physical campus): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping online-only course: "${courseData.courseName}"`);
-    return false;
+    return { saved: false, reason: "online-only / no physical campus" };
   }
 
   if (courseData.courseWebsite && isKnownNonCourseLandingUrl(courseData.courseWebsite)) {
     if (job) addLog(job, "status", { message: `Skipped (landing page): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping landing page: "${courseData.courseName}"`);
-    return false;
+    return { saved: false, reason: "landing / non-course page" };
   }
 
   // Last-resort junk filter — catch event/category/news pages the link collector missed
   if (isJunkCourseName(courseData.courseName)) {
     if (job) addLog(job, "status", { message: `Skipped (junk name): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping non-course page: "${courseData.courseName}"`);
-    return false;
+    return { saved: false, reason: "non-course page (junk name)" };
   }
 
   // Infer degree level from course name when extraction missed it (e.g. JS-rendered pages
@@ -5002,7 +5009,7 @@ async function stageCourse(
   if (!hasDegreeLevel && !hasDuration && !hasFee) {
     if (job) addLog(job, "status", { message: `Skipped (empty: no degree/duration/fee): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
     else console.log(`[JUNK] Skipping empty page (no degree/duration/fee): "${courseData.courseName}"`);
-    return false;
+    return { saved: false, reason: "no degree, duration or fee extracted" };
   }
 
   // Fee term heuristic: fees ≥ $40,000 that have no explicit periodic label are almost
@@ -5047,7 +5054,10 @@ async function stageCourse(
      LIMIT 1`,
     [uniId, fingerprint],
   );
-  if (dup.rows.length > 0) return false;
+  if (dup.rows.length > 0) {
+    if (job) addLog(job, "status", { message: `Skipped (duplicate): "${courseData.courseName.slice(0, 60)}" already pending or recently rejected for this university`, phase: "validate" });
+    return { saved: false, reason: "already pending or recently rejected for this university" };
+  }
 
   // NOTE: we no longer skip already-published courses. Every fresh scrape goes
   // into the staging review so the user can see latest values (incl. cascade-
@@ -9645,9 +9655,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               content: uniReqsText,
             });
           }
-          const saved = await stageCourse(courseData, uniId, jobId, job, { sources: reviewSources });
-          if (saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name, status: "skipped", index: index + 1 }); }
+          const result = await stageCourse(courseData, uniId, jobId, job, { sources: reviewSources });
+          if (result.saved) { job.imported++; addLog(job, "course", { name, status: "staged", index: index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name, status: "skipped", message: result.reason, index: index + 1 }); }
         } catch (retryErr) {
           job.errors++;
           addLog(job, "course", { name, status: "error", message: `[retry failed] ${(retryErr as Error).message}`, index: index + 1 });
@@ -9772,9 +9782,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
 
         // PROBE-F: value entering stageCourse — proves whether Phase A merge wipes IELTS
         debugIelts(item.data.courseName, "F-before-stageCourse-phaseA", { ieltsOverall: item.data.ieltsOverall });
-        const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
-        if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
-        else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
+        const result = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
+        if (result.saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
+        else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", message: result.reason, index: item.index + 1 }); }
         await maybeYieldToEventLoop(job.imported + job.skipped + job.errors, 10);
       }
     }
@@ -9808,18 +9818,18 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
             const v = validateTaxonomy(cData.category, cData.subCategory);
             cData.category = v.category; cData.subCategory = v.subCategory;
           } else { cData.category = cData.category || "Arts, Humanities & Social Sciences"; cData.subCategory = cData.subCategory || "Other"; }
-          const saved = await stageCourse(cData, uniId, jobId, job, { sources: item.reviewSources });
-          if (saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", index: item.index + 1 }); }
+          const result = await stageCourse(cData, uniId, jobId, job, { sources: item.reviewSources });
+          if (result.saved) { job.imported++; addLog(job, "course", { name: cData.courseName, status: "staged", index: item.index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: cData.courseName, status: "skipped", message: result.reason, index: item.index + 1 }); }
         } else if (item.cheerioData.courseName || item.name) {
           const fallbackData = cheerioToCourseData(item.cheerioData, item.name, courseLinks[item.index].url);
           // Apply deterministic category mapping to cheerio-only data
           const detMapFb = mapCourseToCategory(fallbackData.courseName || item.name);
           if (detMapFb) { fallbackData.category = detMapFb.category; fallbackData.subCategory = detMapFb.subCategory; }
           else { fallbackData.category = fallbackData.category || "Arts, Humanities & Social Sciences"; fallbackData.subCategory = fallbackData.subCategory || "Other"; }
-          const saved = await stageCourse(fallbackData, uniId, jobId, job, { sources: item.reviewSources });
-          if (saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
-          else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", index: item.index + 1 }); }
+          const result = await stageCourse(fallbackData, uniId, jobId, job, { sources: item.reviewSources });
+          if (result.saved) { job.imported++; addLog(job, "course", { name: fallbackData.courseName, status: "staged (cheerio only)", index: item.index + 1 }); }
+          else { job.skipped++; addLog(job, "course", { name: fallbackData.courseName, status: "skipped", message: result.reason, index: item.index + 1 }); }
         } else {
           job.errors++;
           addLog(job, "course", { name: item.name, status: "error", message: "No extractable data", index: item.index + 1 });
@@ -10096,7 +10106,7 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
           }
         }
         aiData.courseWebsite = aiData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(aiData, uniId, jobId, job, {
+        const result = await stageCourse(aiData, uniId, jobId, job, {
           sources: [{
             url: resolvedUrl,
             pageType: "course_page",
@@ -10105,14 +10115,14 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
           }],
         });
         job.totalFound = 1;
-        if (saved) job.imported = 1; else job.skipped = 1;
-        addLog(job, "course", { name: aiData.courseName, status: saved ? "staged" : "skipped (duplicate)" });
+        if (result.saved) job.imported = 1; else job.skipped = 1;
+        addLog(job, "course", { name: aiData.courseName, status: result.saved ? "staged" : "skipped", message: result.saved ? undefined : result.reason });
         addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
       } else if (cheerioData.courseName) {
         // AI failed but Cheerio extracted data — use it directly rather than losing the course
         addLog(job, "status", { message: "AI extraction failed; saving Cheerio-extracted data as fallback.", phase: "extract" });
         cheerioData.courseWebsite = cheerioData.courseWebsite || resolvedUrl;
-        const saved = await stageCourse(cheerioData as CourseData, uniId, jobId, job, {
+        const result = await stageCourse(cheerioData as CourseData, uniId, jobId, job, {
           sources: [{
             url: resolvedUrl,
             pageType: "course_page",
@@ -10121,8 +10131,8 @@ export async function runScrapeJob(job: ScrapeJob, url: string, uniId: number, j
           }],
         });
         job.totalFound = 1;
-        if (saved) job.imported = 1; else job.skipped = 1;
-        addLog(job, "course", { name: cheerioData.courseName, status: saved ? "staged (partial)" : "skipped (duplicate)" });
+        if (result.saved) job.imported = 1; else job.skipped = 1;
+        addLog(job, "course", { name: cheerioData.courseName, status: result.saved ? "staged (partial)" : "skipped", message: result.saved ? undefined : result.reason });
         addLog(job, "done", { totalFound: 1, imported: job.imported, skipped: job.skipped, errors: 0 });
       } else {
         addLog(job, "error", { message: "Could not extract course data from this page." });
@@ -11084,9 +11094,9 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
         const vStg = validateTaxonomy(item.data.category, item.data.subCategory);
         item.data.category = vStg.category; item.data.subCategory = vStg.subCategory;
       } else { item.data.category = item.data.category || "Arts, Humanities & Social Sciences"; item.data.subCategory = item.data.subCategory || "Other"; }
-      const saved = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
-      if (saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
-      else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", index: item.index + 1 }); }
+      const result = await stageCourse(item.data, uniId, jobId, job, { sources: item.reviewSources });
+      if (result.saved) { job.imported++; addLog(job, "course", { name: item.data.courseName, status: "staged", index: item.index + 1 }); }
+      else { job.skipped++; addLog(job, "course", { name: item.data.courseName, status: "skipped", message: result.reason, index: item.index + 1 }); }
       await maybeYieldToEventLoop(job.imported + job.skipped + job.errors, 10);
     }
 
