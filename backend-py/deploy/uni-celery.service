@@ -1,0 +1,18 @@
+[Unit]
+Description=University Portal Celery Worker (scraper)
+After=network.target redis-server.service postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/University-and-Course-data/backend-py
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/celery \
+    -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
