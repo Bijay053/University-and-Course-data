@@ -156,7 +156,10 @@
   [role="link"],
   [role="tab"],
   [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
   [role="option"],
+  [role="treeitem"],
   [role="checkbox"],
   [role="radio"],
   [role="switch"],
@@ -169,7 +172,22 @@
   input[type="file"],
   input[type="submit"],
   input[type="button"],
-  input[type="reset"] {
+  input[type="reset"],
+  /* Radix UI primitives — Select / Dropdown / Popover items don't always
+     expose role attributes consistently, so target their data hooks too. */
+  [data-radix-collection-item],
+  [data-radix-select-trigger],
+  [data-radix-select-item],
+  [data-radix-dropdown-menu-trigger],
+  [data-radix-dropdown-menu-item],
+  [data-radix-menu-item],
+  [data-radix-popover-trigger],
+  [data-radix-accordion-trigger],
+  [data-radix-tabs-trigger],
+  [data-state][data-orientation],
+  [data-slot="select-trigger"],
+  [data-slot="select-item"],
+  [data-slot="dropdown-menu-item"] {
     cursor: pointer;
   }
 
