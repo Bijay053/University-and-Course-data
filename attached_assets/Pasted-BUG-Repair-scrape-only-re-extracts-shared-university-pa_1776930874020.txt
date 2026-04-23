@@ -1,0 +1,30 @@
+BUG: Repair scrape only re-extracts shared university-page data, not per-course pages
+Evidence from production for course #169 (Bachelor of Business Studies, CSU):
+All 11 evidence rows from the repair scrape (jobId scrape_1776926722241_r3hp68) have page_type=english_page or page_type=concordance or page_type=derived. Zero rows have page_type=course_page.
+Meaning: the repair scrape fetched the university's shared /international/entry-requirements page (concordance table) but never visited the actual course page at https://study.csu.edu.au/courses/bachelor-business-studies where course_location, the correct duration, and other per-course data lives.
+This is why:
+
+PTE/TOEFL/Duolingo backfilled successfully (came from concordance page) ✓
+course_location still NULL (would have come from course_page, but wasn't visited) ❌
+The new browser fallback (#13) for client-rendered CSU pages never triggered (wasn't in the code path)
+
+Bug location: Repair scrape's per-course extraction loop is missing the actual course page fetch. It's running concordance backfill but skipping the main course-page scrape.
+Expected behavior: For each course in the repair list:
+
+Fetch the course page (with browser fallback for CSU)
+Extract per-course fields (name, duration, location, intakes, fees)
+Apply concordance cache for missing English tests
+Apply universe-wide PDF cache for missing fees
+
+Currently only step 3 runs.
+Fix: In the repair scrape worker, ensure each course in the list goes through the same per-course extraction pipeline as a regular scrape (which DOES visit course pages). Don't skip the course-page fetch even if some fields are already populated.
+Also fix the secondary bug: studyMode was extracted as "On Campus" from english_page for course #169 (which is partner-uni offerings). The english_page is shared across the whole university — it shouldn't contribute to any per-course field except English requirements. Restrict that page's extraction to only ielts_*, pte_*, toefl_*, cambridge_*, duolingo_* fields.
+Test acceptance: After the fix, trigger another repair on CSU. Course #169's evidence should include rows with page_type=course_page for courseLocation, duration, and (if available) internationalFee. Course #169's course_location should populate.
+
+Priority order remains:
+
+Fix this repair-scrape course-page fetch bug
+Then run repair on CSU again — course_location for #169 should populate
+Then move to Tasmania scrape, Featured universities, Enhanced History
+
+No more acronym work. No more new features.

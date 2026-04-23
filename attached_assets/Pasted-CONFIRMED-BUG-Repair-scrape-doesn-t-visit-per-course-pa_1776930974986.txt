@@ -1,0 +1,12 @@
+CONFIRMED BUG: Repair scrape doesn't visit per-course pages — only fetches shared university pages
+Production verification on commit 01ec946:
+Course #169 ("Bachelor Of Business Studies", URL https://study.csu.edu.au/courses/bachelor-business-studies) was processed by repair job scrape_1776926722241_r3hp68. Log line confirms: sequence 125: "Fetching 115/141: Bachelor Of Business Studies".
+However, the resulting staged course (id 5400) has ZERO evidence rows with page_type='course_page'. All 11 evidence rows are from english_page, derived, or concordance — meaning only the shared university pages were fetched, not the actual course page.
+Result: staged 5400 has course_location = NULL, duration = NULL, international_fee = NULL. Approval merged this back into live course #169 keeping the OLD duration (3 Year from earlier scrape) and leaving location empty.
+Compare to a regular scrape (e.g. job scrape_1776907692731_06kur4) — those produce evidence with page_type='course_page' showing per-course extraction was executed.
+Root cause hypothesis: The repair scrape uses a "saved config (no AI) re-scrape" path (we can see this in log sequence 4: "Re-scraping with saved config (141 course links, no AI)..."). This shortcut likely skips the per-course HTML fetch + cheerio extraction and only re-runs the cheap shared-page extraction.
+Expected behavior: Repair scrape should run the SAME per-course extraction pipeline as regular scrape — fetch each course's URL, run cheerio + browser fallback, extract location/duration/fees/intakes — then merge with shared-page concordance for English tests.
+Fix: In the repair-scrape code path, do not skip per-course extraction. The "no AI" optimization should only skip Gemini classification, not skip the actual page fetch.
+Test acceptance: After the fix, trigger repair on CSU. Course #169's evidence should include page_type=course_page rows for courseLocation, duration, and internationalFee. Live courses.id=169 should have a non-NULL course_location.
+Don't ship anything else until repair scrape produces per-course evidence rows.
+Deploy path: /root/University-and-Course-data

@@ -410,11 +410,33 @@ function extractSourceCandidates(fieldKey: ReviewFieldKey, source: ReviewSource)
   return results;
 }
 
+// English_page sources are SHARED across every course at a university
+// (e.g. study.csu.edu.au/.../international/english-language-requirements).
+// They legitimately speak only to English-test bands. Allowing them to
+// match any other field's rawValue (e.g. a stray "on campus" phrase
+// pulled in as the studyMode evidence) lets shared-page text leak into
+// per-course fields whenever the per-course extraction came back empty
+// (the CSU JS-rendered case). Restrict english_page snippet-matching
+// to the five English-test overall fields only.
+const ENGLISH_ONLY_FIELDS: ReadonlySet<ReviewFieldKey> = new Set<ReviewFieldKey>([
+  "ieltsOverall",
+  "pteOverall",
+  "toeflOverall",
+  "cambridgeOverall",
+  "duolingoOverall",
+]);
+
+function sourceMayContributeToField(source: ReviewSource, fieldKey: ReviewFieldKey): boolean {
+  if (source.pageType === "english_page" && !ENGLISH_ONLY_FIELDS.has(fieldKey)) return false;
+  return true;
+}
+
 function collectCandidatesForField(fieldKey: ReviewFieldKey, data: ReviewCourseData, sources: ReviewSource[]): FieldCandidate[] {
   const candidates: FieldCandidate[] = [];
   const rawValue = valueToString(fieldKey, data);
   if (rawValue) {
     for (const source of sources) {
+      if (!sourceMayContributeToField(source, fieldKey)) continue;
       const snippet = findSnippet(source, buildPatterns(fieldKey, rawValue));
       if (!snippet) continue;
       const normalized = normalizeFieldValue(fieldKey, rawValue);
@@ -439,6 +461,7 @@ function collectCandidatesForField(fieldKey: ReviewFieldKey, data: ReviewCourseD
   }
 
   for (const source of sources) {
+    if (!sourceMayContributeToField(source, fieldKey)) continue;
     for (const extracted of extractSourceCandidates(fieldKey, source)) {
       const normalized = normalizeFieldValue(fieldKey, extracted.value);
       const validationStatus = validateField(fieldKey, normalized, extracted.value);

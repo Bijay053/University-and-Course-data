@@ -214,3 +214,73 @@ test("accepts abbreviated start-date months (Jun, Sep) in intake evidence", () =
   assert.equal(snapshot.conflicts.some((conflict) => conflict.fieldKey === "intakeMonths"), false);
   assert.equal(snapshot.resolutions.find((resolution) => resolution.fieldKey === "intakeMonths")?.status, "accepted");
 });
+
+test("english_page does not leak into non-English fields (CSU shared-page case)", () => {
+  const snapshot = buildCourseReviewSnapshot(
+    {
+      courseName: "Bachelor of Business Studies",
+      degreeLevel: "Bachelor",
+      duration: 3,
+      durationTerm: "Year",
+      studyMode: "On Campus",
+      courseLocation: "Bathurst",
+      internationalFee: 30000,
+      currency: "AUD",
+      feeTerm: "Annual",
+      intakeMonths: ["February", "July"],
+      ieltsOverall: 6.5,
+    },
+    [
+      {
+        url: "https://study.csu.edu.au/courses/business/bachelor-business-studies",
+        pageType: "course_page",
+        extractionMethod: "cheerio",
+        content: "",
+      },
+      {
+        url: "https://study.csu.edu.au/international/english-language-requirements",
+        pageType: "english_page",
+        extractionMethod: "cheerio",
+        content: "IELTS 6.5 overall. PTE 58. TOEFL 79. Study at our Bathurst campus on campus full-time. February and July intake. Bachelor degree, 3 year duration, A$30000 international fee.",
+      },
+    ],
+  );
+
+  const studyModeCands = snapshot.candidates.filter((c) => c.fieldKey === "studyMode");
+  assert.equal(
+    studyModeCands.some((c) => c.pageType === "english_page"),
+    false,
+    "english_page must not produce a studyMode candidate",
+  );
+  const locationCands = snapshot.candidates.filter((c) => c.fieldKey === "courseLocation");
+  assert.equal(
+    locationCands.some((c) => c.pageType === "english_page"),
+    false,
+    "english_page must not produce a courseLocation candidate",
+  );
+  const feeCands = snapshot.candidates.filter((c) => c.fieldKey === "internationalFee");
+  assert.equal(
+    feeCands.some((c) => c.pageType === "english_page"),
+    false,
+    "english_page must not produce an internationalFee candidate",
+  );
+  const intakeCands = snapshot.candidates.filter((c) => c.fieldKey === "intakeMonths");
+  assert.equal(
+    intakeCands.some((c) => c.pageType === "english_page"),
+    false,
+    "english_page must not produce an intakeMonths candidate",
+  );
+
+  const ieltsCands = snapshot.candidates.filter((c) => c.fieldKey === "ieltsOverall");
+  assert.equal(
+    ieltsCands.some((c) => c.pageType === "english_page"),
+    true,
+    "english_page IS still allowed to produce an ieltsOverall candidate",
+  );
+});
+
+test("preferApprovedValue keeps existing when allowReplace is false", () => {
+  assert.equal(preferApprovedValue("old", "new", false), "old");
+  assert.equal(preferApprovedValue("old", "new", true), "new");
+  assert.equal(preferApprovedValue("old", "" as any, true), "old");
+});
