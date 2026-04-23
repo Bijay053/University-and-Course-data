@@ -481,26 +481,138 @@ export default function SearchPage() {
             {/* 7. Duration */}
             <AccordionItem value="duration">
               <AccordionTrigger className="text-sm">Duration (years)</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-2">
+              <AccordionContent className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-gray-500 mb-1 block">Min</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={durationRange[1]}
+                      step={0.5}
+                      value={durationRange[0]}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(durationRange[1], Number(e.target.value) || 0));
+                        setDurationRange([v, durationRange[1]]);
+                        resetPage();
+                      }}
+                      className="w-full h-9 rounded-md border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 mb-1 block">Max</label>
+                    <input
+                      type="number"
+                      min={durationRange[0]}
+                      max={10}
+                      step={0.5}
+                      value={durationRange[1]}
+                      onChange={(e) => {
+                        const v = Math.min(10, Math.max(durationRange[0], Number(e.target.value) || 0));
+                        setDurationRange([durationRange[0], v]);
+                        resetPage();
+                      }}
+                      className="w-full h-9 rounded-md border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                    />
+                  </div>
+                </div>
                 <Slider
                   value={durationRange}
                   min={0} max={6} step={0.5}
                   onValueChange={(v) => { setDurationRange(v as [number, number]); resetPage(); }}
                 />
-                <p className="text-xs text-gray-500">{durationRange[0]} — {durationRange[1]} years</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "≤ 1 yr", range: [0, 1] as [number, number] },
+                    { label: "1–2 yrs", range: [1, 2] as [number, number] },
+                    { label: "3 yrs", range: [3, 3] as [number, number] },
+                    { label: "4+ yrs", range: [4, 6] as [number, number] },
+                  ].map((p) => {
+                    const active = durationRange[0] === p.range[0] && durationRange[1] === p.range[1];
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => { setDurationRange(p.range); resetPage(); }}
+                        className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${active ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-700"}`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </AccordionContent>
             </AccordionItem>
 
             {/* 8. Tuition Fee */}
             <AccordionItem value="fee">
               <AccordionTrigger className="text-sm">Tuition Fee (AUD/yr)</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-2">
+              <AccordionContent className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-gray-500 mb-1 block">Min (AUD)</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-2 flex items-center text-xs text-gray-400">$</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={feeRange[1]}
+                        step={1000}
+                        value={feeRange[0]}
+                        onChange={(e) => {
+                          const v = Math.max(0, Math.min(feeRange[1], Number(e.target.value) || 0));
+                          setFeeRange([v, feeRange[1]]);
+                          resetPage();
+                        }}
+                        className="w-full h-9 rounded-md border border-gray-300 pl-5 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500 mb-1 block">Max (AUD)</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-2 flex items-center text-xs text-gray-400">$</span>
+                      <input
+                        type="number"
+                        min={feeRange[0]}
+                        max={200000}
+                        step={1000}
+                        value={feeRange[1]}
+                        onChange={(e) => {
+                          const v = Math.min(200000, Math.max(feeRange[0], Number(e.target.value) || 0));
+                          setFeeRange([feeRange[0], v]);
+                          resetPage();
+                        }}
+                        className="w-full h-9 rounded-md border border-gray-300 pl-5 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <Slider
                   value={feeRange}
                   min={0} max={100000} step={1000}
                   onValueChange={(v) => { setFeeRange(v as [number, number]); resetPage(); }}
                 />
-                <p className="text-xs text-gray-500">${feeRange[0].toLocaleString()} — ${feeRange[1].toLocaleString()}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "≤ $20k", range: [0, 20000] as [number, number] },
+                    { label: "$20–40k", range: [20000, 40000] as [number, number] },
+                    { label: "$40–60k", range: [40000, 60000] as [number, number] },
+                    { label: "$60k+", range: [60000, 100000] as [number, number] },
+                  ].map((p) => {
+                    const active = feeRange[0] === p.range[0] && feeRange[1] === p.range[1];
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => { setFeeRange(p.range); resetPage(); }}
+                        className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${active ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-700"}`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
