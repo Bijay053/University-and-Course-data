@@ -243,49 +243,113 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
 async def history_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
 ) -> dict:
-    rows = (await db.execute(
-        select(ScrapeRuntimeJob)
+    """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount."""
+    from app.models import ScrapedCourse
+    from sqlalchemy import select as _select, func as _func, case
+    
+    # Counts subquery: per scrape_job_id, get total/approved/rejected staged
+    counts_q = _select(
+        ScrapedCourse.scrape_job_id.label("jid"),
+        _func.count().label("staged"),
+        _func.sum(case((ScrapedCourse.status == "approved", 1), else_=0)).label("approved"),
+        _func.sum(case((ScrapedCourse.status == "rejected", 1), else_=0)).label("rejected"),
+    ).group_by(ScrapedCourse.scrape_job_id).subquery()
+    
+    stmt = (
+        _select(
+            ScrapeRuntimeJob,
+            counts_q.c.staged,
+            counts_q.c.approved,
+            counts_q.c.rejected,
+        )
+        .outerjoin(counts_q, counts_q.c.jid == ScrapeRuntimeJob.runtime_job_id)
         .order_by(desc(ScrapeRuntimeJob.started_at))
+        .offset(offset)
         .limit(limit)
-    )).scalars().all()
-    return {"data": [
-        {
-            "jobId": r.runtime_job_id,
+    )
+    rows = (await db.execute(stmt)).all()
+    total = (await db.execute(_select(_func.count()).select_from(ScrapeRuntimeJob))).scalar_one()
+    
+    runs = []
+    for r, staged, approved, rejected in rows:
+        from datetime import datetime, timezone
+        end = r.completed_at or datetime.now(timezone.utc)
+        duration_ms = int((end - r.started_at).total_seconds() * 1000) if r.started_at else 0
+        runs.append({
             "runtimeJobId": r.runtime_job_id,
+            "jobId": r.runtime_job_id,
             "universityId": r.university_id,
             "universityName": r.university_name,
+            "url": r.url,
             "status": r.status,
+            "totalFound": r.total_found or 0,
             "imported": r.imported or 0,
             "skipped": r.skipped or 0,
             "errors": r.errors or 0,
-            "totalFound": r.total_found or 0,
             "startedAt": r.started_at.isoformat() if r.started_at else None,
             "completedAt": r.completed_at.isoformat() if r.completed_at else None,
-        } for r in rows
-    ], "ok": True}
+            "errorMessage": r.error_message,
+            "durationMs": duration_ms,
+            "stagedCount": int(staged or 0),
+            "approvedCount": int(approved or 0),
+            "rejectedCount": int(rejected or 0),
+        })
+    return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 
 
 @router.get("/history/{job_id}")
 async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    """Match Node: returns {job, logs, stagedCourses}."""
+    from app.models import ScrapedCourse
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Logs (if scrape_runtime_logs table exists)
+    logs = []
+    try:
+        from sqlalchemy import text
+        rows = await db.execute(text(
+            "SELECT sequence, event, payload FROM scrape_runtime_logs "
+            "WHERE runtime_job_id = :j ORDER BY sequence"
+        ), {"j": job_id})
+        logs = [{"sequence": r[0], "event": r[1], "payload": r[2]} for r in rows.fetchall()]
+    except Exception:
+        pass
+    
+    # Staged courses for this job
+    sc_rows = (await db.execute(
+        select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
+        .order_by(ScrapedCourse.created_at.desc())
+    )).scalars().all()
+    staged = [{
+        "id": s.id,
+        "courseName": s.course_name,
+        "courseWebsite": s.course_website,
+        "status": s.status,
+        "createdAt": s.created_at.isoformat() if s.created_at else None,
+    } for s in sc_rows]
+    
     return {
-        "jobId": job.runtime_job_id,
-        "runtimeJobId": job.runtime_job_id,
-        "universityId": job.university_id,
-        "universityName": job.university_name,
-        "status": job.status,
-        "imported": job.imported or 0,
-        "skipped": job.skipped or 0,
-        "errors": job.errors or 0,
-        "totalFound": job.total_found or 0,
-        "current": job.current or 0,
-        "startedAt": job.started_at.isoformat() if job.started_at else None,
-        "completedAt": job.completed_at.isoformat() if job.completed_at else None,
-        "errorMessage": job.error_message,
-        "ok": True,
+        "job": {
+            "runtimeJobId": job.runtime_job_id,
+            "jobId": job.runtime_job_id,
+            "universityId": job.university_id,
+            "universityName": job.university_name,
+            "status": job.status,
+            "imported": job.imported or 0,
+            "skipped": job.skipped or 0,
+            "errors": job.errors or 0,
+            "totalFound": job.total_found or 0,
+            "current": job.current or 0,
+            "startedAt": job.started_at.isoformat() if job.started_at else None,
+            "completedAt": job.completed_at.isoformat() if job.completed_at else None,
+            "errorMessage": job.error_message,
+        },
+        "logs": logs,
+        "stagedCourses": staged,
     }
 
 
