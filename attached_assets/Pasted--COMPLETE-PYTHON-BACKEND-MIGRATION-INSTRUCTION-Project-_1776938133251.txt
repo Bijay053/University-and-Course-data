@@ -1,0 +1,868 @@
+🐍 COMPLETE PYTHON BACKEND MIGRATION INSTRUCTION
+Project Context
+Migrating University Course Scraper backend from Node.js/TypeScript to Python.
+Production server:
+
+Path: /root/University-and-Course-data
+Server: DigitalOcean droplet, 4 vCPU, 8GB RAM, Ubuntu 24
+IP: 159.65.152.72
+Frontend: http://159.65.152.72/ (Nginx serves React)
+
+Critical constraint: Database stays. All 432+ courses, evidence rows, and scrape history MUST be preserved.
+
+Tech Stack (REQUIRED)
+Backend Framework:  FastAPI 0.115+
+ASGI Server:        Uvicorn + Gunicorn workers
+ORM:                SQLAlchemy 2.0 (async)
+Migrations:         Alembic
+Validation:         Pydantic v2
+Database:           PostgreSQL (EXISTING — do not rebuild)
+HTTP Client:        httpx (async)
+HTML Parser:        BeautifulSoup4 + lxml + selectolax
+Browser:            Playwright Python (async)
+PDF:                pypdf + pdfplumber
+AI:                 google-generativeai
+Queue:              Celery 5 + Redis
+Caching:            Redis
+Process Manager:    systemd (replace pm2)
+Reverse Proxy:      Nginx (existing — reuse)
+Testing:            pytest + pytest-asyncio + httpx test client
+Linting:            ruff + mypy
+
+Database — DO NOT REBUILD
+Use existing PostgreSQL database:
+
+DSN: postgresql+asyncpg://uniportal:Bij%40y12345@localhost:5432/university_portal
+Schema is already correct
+Use SQLAlchemy declarative models that match existing tables exactly
+Do NOT run any DROP TABLE commands
+Use Alembic only for additive changes (new columns, new tables)
+
+Existing tables to map (verify with \dt in psql):
+
+universities
+courses
+scraped_courses
+scraped_field_evidence
+english_requirements
+intakes
+fees
+scrape_runtime_jobs
+scrape_runtime_logs
+bulk_sessions
+acronym_cache
+concordance_cache
+users
+course_search_view (materialized view)
+
+
+Project Structure
+/root/University-and-Course-data/
+├── backend-py/                      # NEW — Python backend
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py                  # FastAPI entry
+│   │   ├── config.py                # Settings (Pydantic)
+│   │   ├── database.py              # SQLAlchemy session
+│   │   ├── dependencies.py          # FastAPI deps (auth, db)
+│   │   ├── models/                  # SQLAlchemy models
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── university.py
+│   │   │   ├── course.py
+│   │   │   ├── scraped_course.py
+│   │   │   ├── evidence.py
+│   │   │   ├── english_requirement.py
+│   │   │   ├── intake.py
+│   │   │   ├── fee.py
+│   │   │   ├── scrape_job.py
+│   │   │   ├── bulk_session.py
+│   │   │   └── user.py
+│   │   ├── schemas/                 # Pydantic request/response
+│   │   │   ├── university.py
+│   │   │   ├── course.py
+│   │   │   ├── search.py
+│   │   │   ├── scrape.py
+│   │   │   └── auth.py
+│   │   ├── routers/                 # FastAPI endpoints
+│   │   │   ├── __init__.py
+│   │   │   ├── health.py
+│   │   │   ├── universities.py
+│   │   │   ├── courses.py
+│   │   │   ├── search.py
+│   │   │   ├── reviews.py
+│   │   │   ├── scrape.py
+│   │   │   ├── auth.py
+│   │   │   └── acronyms.py
+│   │   ├── services/                # Business logic
+│   │   │   ├── __init__.py
+│   │   │   ├── search_service.py
+│   │   │   ├── review_engine.py
+│   │   │   ├── auto_publish.py
+│   │   │   ├── ai/
+│   │   │   │   ├── gemini_client.py
+│   │   │   │   └── budget.py
+│   │   │   └── scraper/
+│   │   │       ├── __init__.py
+│   │   │       ├── orchestrator.py
+│   │   │       ├── http_fetcher.py
+│   │   │       ├── browser_fetcher.py
+│   │   │       ├── browser_pool.py
+│   │   │       ├── extractors/
+│   │   │       │   ├── english.py
+│   │   │       │   ├── duration.py
+│   │   │       │   ├── fees.py
+│   │   │       │   ├── intakes.py
+│   │   │       │   ├── location.py
+│   │   │       │   ├── eligibility.py
+│   │   │       │   └── course_name.py
+│   │   │       ├── stagers/
+│   │   │       │   └── stage_course.py
+│   │   │       ├── approvers/
+│   │   │       │   └── approve_course.py
+│   │   │       └── pipelines/
+│   │   │           ├── single_uni.py
+│   │   │           └── bulk.py
+│   │   ├── tasks/                   # Celery
+│   │   │   ├── __init__.py
+│   │   │   ├── celery_app.py
+│   │   │   ├── scrape_tasks.py
+│   │   │   └── maintenance_tasks.py
+│   │   └── utils/
+│   │       ├── normalizers.py
+│   │       ├── concordance.py
+│   │       └── logger.py
+│   ├── alembic/
+│   │   ├── env.py
+│   │   └── versions/
+│   ├── tests/
+│   │   ├── conftest.py
+│   │   ├── test_search.py
+│   │   ├── test_extractors/
+│   │   └── test_scraper/
+│   ├── scripts/
+│   │   ├── verify_db_match.py       # Confirms models match existing schema
+│   │   └── migrate_check.py
+│   ├── pyproject.toml
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   ├── .env.example
+│   └── Makefile
+├── artifacts/                       # Existing Node.js (keep until Python verified)
+│   ├── api-server/                  # Will be removed after cutover
+│   └── university-portal/           # Frontend — KEEP, no changes
+└── ecosystem.config.cjs             # pm2 config — remove after cutover
+
+Migration Phases
+Phase 0: Pre-flight (Day 1, 2-4 hours)
+bash# 1. Backup database
+pg_dump postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal \
+  > /root/backups/university_portal_$(date +%Y%m%d_%H%M%S).sql
+
+# 2. Document current API contracts
+cd /root/University-and-Course-data/artifacts/api-server
+grep -rn "router\.\(get\|post\|put\|delete\|patch\)" src/routes/ \
+  > /root/api-endpoints-inventory.txt
+
+# 3. Install Python deps
+apt update
+apt install -y python3.12 python3.12-venv python3-pip postgresql-client redis-server
+systemctl enable redis-server
+systemctl start redis-server
+Acceptance: Database backed up. Endpoint inventory exists. Redis running.
+
+Phase 1: Project Skeleton (Day 1-2, 4-6 hours)
+Create backend-py/ with FastAPI skeleton.
+backend-py/pyproject.toml:
+toml[project]
+name = "university-portal-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "gunicorn>=22.0.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.2.0",
+    "selectolax>=0.3.21",
+    "playwright>=1.44.0",
+    "pypdf>=4.2.0",
+    "pdfplumber>=0.11.0",
+    "google-generativeai>=0.7.0",
+    "celery[redis]>=5.4.0",
+    "redis>=5.0.0",
+    "python-multipart>=0.0.9",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "rapidfuzz>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2.0", "pytest-asyncio>=0.23.0", "ruff>=0.4.0", "mypy>=1.10.0"]
+backend-py/app/config.py:
+pythonfrom pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    
+    database_url: str = Field(
+        default="postgresql+asyncpg://uniportal:Bij%40y12345@localhost:5432/university_portal"
+    )
+    redis_url: str = Field(default="redis://localhost:6379/0")
+    gemini_api_key: str
+    daily_gemini_budget_usd: float = 200.0
+    secret_key: str
+    cors_origins: list[str] = ["http://159.65.152.72", "http://localhost:5173"]
+    log_level: str = "INFO"
+    debug: bool = False
+    
+    # Scraping
+    max_browser_concurrency: int = 5
+    max_http_concurrency: int = 20
+    per_uni_timeout_seconds: int = 1500
+    
+    # Auto-publish thresholds
+    min_completeness_for_auto_publish: int = 75
+
+settings = Settings()
+backend-py/app/database.py:
+pythonfrom sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from app.config import settings
+
+engine = create_async_engine(
+    settings.database_url,
+    pool_size=20,
+    max_overflow=10,
+    pool_pre_ping=True,
+    echo=settings.debug,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+Base = declarative_base()
+
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+backend-py/app/main.py:
+pythonfrom fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from app.config import settings
+from app.routers import health, universities, courses, search, scrape, reviews, auth
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: warm up DB pool, init Redis
+    yield
+    # Shutdown: close connections
+
+app = FastAPI(
+    title="University Portal API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount routers under /api to match Node.js
+app.include_router(health.router, prefix="/api")
+app.include_router(auth.router, prefix="/api/auth")
+app.include_router(universities.router, prefix="/api/universities")
+app.include_router(courses.router, prefix="/api/courses")
+app.include_router(search.router, prefix="/api/search")
+app.include_router(reviews.router, prefix="/api/reviews")
+app.include_router(scrape.router, prefix="/api/scrape")
+Acceptance: curl http://localhost:8000/api/health returns {"status": "ok"}.
+
+Phase 2: SQLAlchemy Models Matching Existing Schema (Day 2-3, 6-8 hours)
+For EACH existing table, create a SQLAlchemy model that matches column-for-column.
+backend-py/app/models/university.py:
+pythonfrom sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.database import Base
+
+class University(Base):
+    __tablename__ = "universities"
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    website = Column(Text)
+    scrape_url = Column(Text)
+    country = Column(String(100), default="Unknown")
+    city = Column(String(100), default="Unknown")
+    scrape_config = Column(JSON)
+    scrape_status = Column(String(50))
+    last_scraped_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    courses = relationship("Course", back_populates="university")
+Repeat for Course, ScrapedCourse, Evidence, etc.
+Verification script backend-py/scripts/verify_db_match.py:
+python"""Verify SQLAlchemy models match existing PostgreSQL schema."""
+import asyncio
+from sqlalchemy import inspect, text
+from app.database import engine
+from app.models import (
+    University, Course, ScrapedCourse, Evidence,
+    EnglishRequirement, Intake, Fee, ScrapeJob, BulkSession, User
+)
+
+async def verify():
+    async with engine.begin() as conn:
+        for model in [University, Course, ScrapedCourse, Evidence,
+                      EnglishRequirement, Intake, Fee, ScrapeJob, BulkSession, User]:
+            table_name = model.__tablename__
+            result = await conn.execute(text(f"""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = '{table_name}' 
+                ORDER BY ordinal_position
+            """))
+            db_cols = {row[0]: row[1] for row in result}
+            model_cols = {c.name: str(c.type) for c in inspect(model).columns}
+            
+            missing = set(db_cols.keys()) - set(model_cols.keys())
+            extra = set(model_cols.keys()) - set(db_cols.keys())
+            
+            print(f"\n{table_name}:")
+            print(f"  DB columns: {len(db_cols)}, Model columns: {len(model_cols)}")
+            if missing: print(f"  ❌ Missing in model: {missing}")
+            if extra: print(f"  ⚠️  Extra in model: {extra}")
+            if not missing and not extra: print(f"  ✅ Match")
+
+asyncio.run(verify())
+Acceptance: python scripts/verify_db_match.py shows ✅ Match for every table.
+
+Phase 3: Read-Only Endpoints (Day 4-7, ~3-4 days)
+Port read endpoints first (lowest risk).
+Order of priority:
+
+GET /api/health ✅ (done in Phase 1)
+GET /api/universities — list all
+GET /api/universities/{id} — single
+GET /api/universities/{id}/courses — uni's courses
+GET /api/courses/{id} — course detail
+GET /api/search/courses — search engine (most complex)
+GET /api/reviews/pending — review queue
+GET /api/scrape/jobs — scrape history
+
+Critical: API contracts MUST match Node.js exactly. Frontend should not need ANY changes during cutover.
+For each endpoint:
+
+Look at Node.js implementation in artifacts/api-server/src/routes/
+Note exact request/response shape
+Replicate in FastAPI with same JSON shape
+Test with curl http://localhost:8000/api/... and compare to curl http://localhost/api/... (Node version)
+
+Search endpoint example — port carefully (it's the most-used):
+Node.js currently uses materialized view course_search_view. Python should use the same MV:
+python# app/services/search_service.py
+from sqlalchemy import text
+from rapidfuzz import fuzz, process
+
+class SearchService:
+    async def search_courses(self, db, q: str, limit: int = 20, offset: int = 0):
+        # Use existing MV
+        result = await db.execute(text("""
+            SELECT 
+                course_id, course_name, university_id, university_name,
+                degree_level, course_location, duration, duration_term,
+                international_fee, ielts_overall, intake_months,
+                ts_rank(search_vector, plainto_tsquery('english', :q)) as rank
+            FROM course_search_view
+            WHERE search_vector @@ plainto_tsquery('english', :q)
+            ORDER BY rank DESC
+            LIMIT :limit OFFSET :offset
+        """), {"q": q, "limit": limit, "offset": offset})
+        return result.fetchall()
+Acceptance: Frontend can hit Python at port 8000 and search/list works identically.
+
+Phase 4: Auth + Admin Endpoints (Day 8-10, 2-3 days)
+Cookie-based auth matching Node.js.
+python# app/routers/auth.py
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
+
+pwd_context = CryptContext(schemes=["bcrypt"])
+router = APIRouter()
+
+@router.post("/login")
+async def login(body: LoginBody, response: Response, db = Depends(get_db)):
+    user = await get_user_by_email(db, body.email)
+    if not user or not pwd_context.verify(body.password, user.password_hash):
+        raise HTTPException(401, "Invalid credentials")
+    
+    token = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.utcnow() + timedelta(days=7)},
+        settings.secret_key,
+        algorithm="HS256"
+    )
+    response.set_cookie("session", token, httponly=True, samesite="lax", max_age=604800)
+    return {"user": {"id": user.id, "email": user.email}}
+Acceptance: Frontend login works against Python backend.
+
+Phase 5: Scraper Engine — THE BIG ONE (Week 2-4)
+Port the 13,000-line routes/scrape.ts to organized Python modules.
+Strategy: Don't try to port line-by-line. Instead:
+
+Read the Node.js code to understand the logic
+Identify each extractor's responsibility
+Reimplement cleanly in Python (often half the code)
+Test each extractor in isolation
+
+Key components to port (in order):
+5a. Browser pool (app/services/scraper/browser_pool.py)
+pythonimport asyncio
+from playwright.async_api import async_playwright, Browser, BrowserContext
+
+class BrowserPool:
+    def __init__(self, max_size: int = 5):
+        self.max_size = max_size
+        self._semaphore = asyncio.Semaphore(max_size)
+        self._browser: Browser | None = None
+        self._playwright = None
+    
+    async def start(self):
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.launch(headless=True)
+    
+    async def acquire_context(self) -> BrowserContext:
+        await self._semaphore.acquire()
+        return await self._browser.new_context()
+    
+    async def release(self, context: BrowserContext):
+        await context.close()
+        self._semaphore.release()
+    
+    async def stop(self):
+        await self._browser.close()
+        await self._playwright.stop()
+5b. HTTP fetcher (app/services/scraper/http_fetcher.py)
+pythonimport httpx
+from selectolax.parser import HTMLParser
+
+class HTTPFetcher:
+    def __init__(self, max_concurrent: int = 20):
+        self.client = httpx.AsyncClient(
+            timeout=30.0,
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=max_concurrent),
+            headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"}
+        )
+    
+    async def fetch_html(self, url: str) -> str | None:
+        try:
+            r = await self.client.get(url)
+            r.raise_for_status()
+            return r.text
+        except Exception:
+            return None
+    
+    async def parse(self, html: str) -> HTMLParser:
+        return HTMLParser(html)
+5c. Extractors — port one at a time
+For EACH extractor, look at Node.js implementation, understand logic, reimplement in Python:
+
+extractors/english.py — port the 12-tier English extraction waterfall (the most complex)
+extractors/duration.py — duration parsing ("3 years", "1.5 yr", etc.)
+extractors/fees.py — international fee extraction
+extractors/intakes.py — intake month extraction
+extractors/location.py — campus location extraction (port the browser fallback for CSU)
+extractors/eligibility.py — international/domestic detection
+
+Each extractor returns evidence:
+python@dataclass
+class FieldEvidence:
+    field_key: str
+    candidate_value: str
+    page_type: str  # course_page | english_page | requirements_page | fee_page
+    extraction_method: str  # cheerio | browser | derived | concordance | ai
+    confidence: float
+    selected: bool = False
+5d. Provenance footer (CRITICAL — port the recent fix)
+pythondef build_course_page_provenance_footer(extracted: dict) -> str:
+    """Match the Node.js fix from commit 985b4ad.
+    
+    Appends an extracted-fields footer to course_page reviewSource so the
+    review-engine attributes fields to the correct page_type.
+    """
+    fields = []
+    if extracted.get('courseLocation'):
+        fields.append(f"courseLocation: {extracted['courseLocation']}")
+    if extracted.get('duration'):
+        fields.append(f"duration: {extracted['duration']}")
+    if extracted.get('durationTerm'):
+        fields.append(f"durationTerm: {extracted['durationTerm']}")
+    if extracted.get('intakeMonths'):
+        fields.append(f"intakeMonths: {', '.join(extracted['intakeMonths'])}")
+    if extracted.get('studyMode'):
+        fields.append(f"studyMode: {extracted['studyMode']}")
+    if extracted.get('internationalFee'):
+        fields.append(f"internationalFee: {extracted['internationalFee']}")
+    
+    if not fields:
+        return ""
+    return "\n\n[Extracted fields]\n" + "\n".join(fields)
+5e. Stage course (app/services/scraper/stagers/stage_course.py)
+Port stageCourse function. CRITICAL: fix the return type bug from Node:
+python@dataclass
+class StageResult:
+    saved: bool
+    reason: str = ""
+
+async def stage_course(...) -> StageResult:
+    # ...validation logic...
+    if duplicate_exists:
+        return StageResult(saved=False, reason="duplicate")
+    # ... 
+    await save_to_db(...)
+    return StageResult(saved=True)  # ← always wrap, never return bare True
+5f. Approve course (app/services/scraper/approvers/approve_course.py)
+Port approveSingleCourse. CRITICAL: fix the case-sensitive bug:
+pythonasync def approve_course(db, scraped_course):
+    # CASE-INSENSITIVE name match (fixes Node.js bug)
+    existing = await db.execute(
+        select(Course).where(
+            Course.university_id == scraped_course.university_id,
+            func.lower(Course.name) == func.lower(scraped_course.course_name)
+        )
+    )
+    existing_course = existing.scalar_one_or_none()
+    
+    if existing_course:
+        # UPDATE existing
+        await update_course_fields(db, existing_course, scraped_course)
+    else:
+        # INSERT new
+        await insert_new_course(db, scraped_course)
+5g. Auto-publish logic (tune better than Node)
+pythondef should_auto_publish(course) -> tuple[bool, str]:
+    if (course.completeness or 0) < settings.min_completeness_for_auto_publish:
+        return False, f"completeness < {settings.min_completeness_for_auto_publish}%"
+    if not course.duration:
+        return False, "no duration"
+    if not course.course_location:
+        return False, "no location"
+    if not course.intake_months:
+        return False, "no intakes"
+    if not (course.ielts_overall or course.pte_overall or course.toefl_overall):
+        return False, "no English test"
+    if course.eligibility_status == 'rejected':
+        return False, "eligibility rejected"
+    if course.international_eligible is False:
+        return False, "not for international"
+    # NOTE: international_fee NOT required
+    return True, "passed"
+Acceptance: Can scrape one university (e.g., USQ) end-to-end via Python and produce same/better results as Node.js.
+
+Phase 6: Bulk Scraping with Celery (Week 5)
+backend-py/app/tasks/celery_app.py:
+pythonfrom celery import Celery
+from app.config import settings
+
+celery_app = Celery(
+    "uni_portal",
+    broker=settings.redis_url,
+    backend=settings.redis_url,
+    include=["app.tasks.scrape_tasks"],
+)
+
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+    task_track_started=True,
+    task_time_limit=2400,  # 40 min hard limit
+    task_soft_time_limit=1800,  # 30 min soft limit
+    worker_prefetch_multiplier=1,  # Don't grab too many at once
+    worker_max_tasks_per_child=10,  # Restart worker after 10 tasks
+)
+backend-py/app/tasks/scrape_tasks.py:
+pythonfrom app.tasks.celery_app import celery_app
+from app.services.scraper.pipelines.single_uni import scrape_one_university
+import asyncio
+
+@celery_app.task(bind=True, max_retries=2)
+def scrape_university_task(self, university_id: int, job_id: str):
+    try:
+        return asyncio.run(scrape_one_university(university_id, job_id))
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+Endpoint to enqueue bulk scrape:
+python# app/routers/scrape.py
+@router.post("/bulk")
+async def start_bulk_scrape(body: BulkScrapeBody):
+    session_id = generate_session_id()
+    for uni_id in body.university_ids:
+        job_id = generate_job_id()
+        scrape_university_task.delay(uni_id, job_id)
+    return {"session_id": session_id, "queued": len(body.university_ids)}
+Run workers:
+bashcelery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info
+Acceptance: Can queue 5 unis simultaneously and they process in parallel.
+
+Phase 7: AI Integration (Week 5, parallel with Phase 6)
+backend-py/app/services/ai/gemini_client.py:
+pythonimport google.generativeai as genai
+from app.config import settings
+from app.services.ai.budget import BudgetTracker
+
+genai.configure(api_key=settings.gemini_api_key)
+
+class GeminiClient:
+    def __init__(self):
+        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        self.budget = BudgetTracker(settings.daily_gemini_budget_usd)
+    
+    async def classify(self, system_prompt: str, content: str) -> str:
+        if not await self.budget.check():
+            raise BudgetExceededError("Daily Gemini budget exceeded")
+        
+        response = await self.model.generate_content_async(
+            [system_prompt, content],
+            generation_config={"max_output_tokens": 8192, "temperature": 0.1}
+        )
+        await self.budget.record(estimated_cost=0.0015)
+        return response.text
+backend-py/app/services/ai/budget.py:
+pythonimport redis.asyncio as redis
+from datetime import date
+
+class BudgetTracker:
+    def __init__(self, daily_limit: float):
+        self.daily_limit = daily_limit
+        self.redis = redis.from_url(settings.redis_url)
+    
+    async def check(self) -> bool:
+        key = f"gemini:spend:{date.today().isoformat()}"
+        spent = float(await self.redis.get(key) or 0)
+        return spent < self.daily_limit
+    
+    async def record(self, estimated_cost: float):
+        key = f"gemini:spend:{date.today().isoformat()}"
+        await self.redis.incrbyfloat(key, estimated_cost)
+        await self.redis.expire(key, 86400 * 2)  # 2 day TTL
+
+Phase 8: Deployment (Week 6)
+/etc/systemd/system/uni-api-py.service:
+ini[Unit]
+Description=University Portal Python API
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=notify
+User=root
+WorkingDirectory=/root/University-and-Course-data/backend-py
+Environment="PATH=/root/University-and-Course-data/backend-py/venv/bin"
+EnvironmentFile=/root/.env.backup
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/gunicorn \
+  app.main:app \
+  --workers 4 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 127.0.0.1:8000 \
+  --access-logfile - \
+  --error-logfile - \
+  --timeout 120
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+/etc/systemd/system/uni-celery.service:
+ini[Unit]
+Description=University Portal Celery Workers
+After=network.target redis-server.service
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/root/University-and-Course-data/backend-py
+EnvironmentFile=/root/.env.backup
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/celery \
+  -A app.tasks.celery_app worker \
+  --detach \
+  --concurrency=4 \
+  --loglevel=info \
+  --logfile=/var/log/uni-celery.log \
+  --pidfile=/var/run/uni-celery.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+Update Nginx (/etc/nginx/sites-available/default):
+nginxserver {
+    listen 80 default_server;
+    server_name _;
+    
+    # Frontend (existing — no change)
+    location / {
+        root /var/www/university-portal;
+        try_files $uri /index.html;
+    }
+    
+    # API now goes to Python instead of Node
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+}
+Cutover:
+bash# 1. Verify Python is working
+curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:8000/api/universities
+
+# 2. Stop Node.js
+pm2 delete uni-api
+pm2 save
+
+# 3. Start Python
+systemctl daemon-reload
+systemctl enable uni-api-py uni-celery
+systemctl start uni-api-py uni-celery
+
+# 4. Reload Nginx
+nginx -t && systemctl reload nginx
+
+# 5. Verify
+curl http://localhost/api/health
+curl http://localhost/api/search/courses?q=business
+
+Phase 9: Cleanup (Week 6, last day)
+After Python verified working for 1 week:
+bash# Backup Node.js code one last time
+tar czf /root/backups/nodejs-final-$(date +%Y%m%d).tar.gz \
+  /root/University-and-Course-data/artifacts/api-server
+
+# Remove Node.js artifacts
+rm -rf /root/University-and-Course-data/artifacts/api-server
+rm /root/University-and-Course-data/ecosystem.config.cjs
+Keep frontend at artifacts/university-portal/ — no changes.
+
+Bug Fixes to Incorporate (DON'T port these bugs from Node)
+Bug #1: Case-sensitive name match (CRITICAL)
+Node has WHERE university_id=$1 AND name=$2. Python uses func.lower() — already shown above.
+Bug #2: stageCourse return type
+Node returns bare true instead of {saved: true}. Python uses dataclass StageResult — already shown above.
+Bug #3: Auto-publish thresholds too strict
+Node auto-publishes only 18% on CSU. Python tuned thresholds — already shown above.
+Bug #4: 30-day rejection rule
+Node blocks re-staging for 30 days after rejection. Python should use 7 days:
+pythonREJECTION_BLOCK_DAYS = 7
+Bug #5: University metadata defaults to "Unknown"
+Make city/country REQUIRED in Pydantic schema:
+pythonclass UniversityCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2, exclude={"Unknown"})
+    city: str = Field(..., min_length=2, exclude={"Unknown"})
+    website: HttpUrl | None = None
+    scrape_url: HttpUrl | None = None
+Bug #6: No CSV bulk import
+Add new endpoint:
+python@router.post("/bulk-import")
+async def bulk_import_unis(file: UploadFile = File(...)):
+    content = (await file.read()).decode()
+    rows = csv.DictReader(io.StringIO(content))
+    results = {"created": 0, "skipped": 0, "errors": []}
+    for row in rows:
+        # validate, insert with case-insensitive dup check
+        ...
+    return results
+
+Testing Strategy
+Unit tests (per extractor):
+python# tests/test_extractors/test_english.py
+async def test_english_ielts_extraction():
+    html = '<p>IELTS overall 6.5 with no band below 6.0</p>'
+    result = extract_english(html)
+    assert result.ielts_overall == 6.5
+Integration tests:
+python# tests/test_search.py
+async def test_search_business():
+    response = await client.get("/api/search/courses?q=business")
+    assert response.status_code == 200
+    assert len(response.json()["results"]) > 0
+End-to-end:
+
+Pick one university (USQ)
+Run Node scrape, save results
+Run Python scrape, save results
+Diff the two — should match within 95%
+
+
+Critical Success Metrics
+After cutover, these must be true:
+bash# 1. All endpoints respond
+curl http://localhost/api/health  # 200
+curl http://localhost/api/universities  # returns 6 unis
+curl http://localhost/api/search/courses?q=business  # returns results
+
+# 2. No data loss
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM courses WHERE status='active';"
+# Should be ≥ 432
+
+# 3. Search MV intact
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM course_search_view;"
+# Should be ≥ 432
+
+# 4. Can scrape one university
+curl -X POST http://localhost/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"universityId": 1}'
+# Returns job ID; job completes within 25 min
+
+# 5. Can bulk scrape
+curl -X POST http://localhost/api/scrape/bulk \
+  -H "Content-Type: application/json" \
+  -d '{"universityIds": [1,2,3]}'
+# Returns session ID; all 3 process in parallel via Celery
+
+Risks & Mitigations
+RiskMitigationPython scraper extracts less than NodeRun side-by-side comparison on 3 universities before cutoverFrontend breaks due to API differencesTest EVERY endpoint with frontend before cutoverDatabase corruptionDaily backups; never run DROP/TRUNCATECelery workers leak memoryworker_max_tasks_per_child=10 (restart after 10 tasks)Browser pool exhaustionStrict semaphore + pool recyclingGemini cost overrunDaily budget ceiling enforced in Redis
+
+Final Notes
+
+Ask user before destructive changes (deleting Node code, dropping tables)
+Test EVERY endpoint against Node version for parity
+Don't rush the scraper port — it's 13K lines of carefully-tuned logic
+Keep Node running until Python verified (parallel deployment)
+Use Python idioms — async/await, dataclasses, type hints, Pydantic
+Read scrape.ts before reimplementing — there are subtle behaviors in extractors
+
+
+Estimated Timeline
+PhaseDurationPhase 0: Pre-flight1 dayPhase 1: Skeleton1-2 daysPhase 2: Models2-3 daysPhase 3: Read endpoints3-4 daysPhase 4: Auth + admin2-3 daysPhase 5: Scraper engine3-4 weeksPhase 6: Celery bulk1 weekPhase 7: AI integration3 days (parallel with Phase 6)Phase 8: Deployment2-3 daysPhase 9: Cleanup1 dayTOTAL6-8 weeks
+
+End of instruction. Execute phases sequentially. Ask user before cutover.
