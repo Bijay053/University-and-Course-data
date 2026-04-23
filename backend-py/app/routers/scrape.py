@@ -422,13 +422,48 @@ async def staged_list(
     }
 
 
-@router.get("/staged/{sc_id}")
-async def staged_one(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+@router.get("/staged/{sc_id_or_job}")
+async def staged_one(
+    sc_id_or_job: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Handle both /staged/123 (single course by id) and /staged/job_xxx (all staged for job)."""
     from app.models import ScrapedCourse
+    
+    # If it looks like a job_id, return list of staged courses for that job
+    if sc_id_or_job.startswith("job_"):
+        rows = (await db.execute(
+            select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
+            .order_by(ScrapedCourse.created_at.desc())
+        )).scalars().all()
+        return {
+            "data": [{
+                "id": s.id,
+                "courseName": s.course_name,
+                "courseWebsite": s.course_website,
+                "universityId": s.university_id,
+                "scrapeJobId": s.scrape_job_id,
+                "status": s.status,
+                "createdAt": s.created_at.isoformat() if s.created_at else None,
+            } for s in rows],
+            "stagedCourses": [{
+                "id": s.id,
+                "courseName": s.course_name,
+                "courseWebsite": s.course_website,
+                "status": s.status,
+            } for s in rows],
+            "total": len(rows),
+            "ok": True,
+        }
+    
+    # Otherwise treat as integer sc_id
+    try:
+        sc_id = int(sc_id_or_job)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid id or job_id")
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
-    # Return all column data
     return {c.name: getattr(sc, c.name) for c in sc.__table__.columns} | {"ok": True}
 
 
