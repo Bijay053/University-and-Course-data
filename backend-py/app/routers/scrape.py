@@ -59,7 +59,6 @@ async def get_job(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> 
 async def start_scrape(
     body: StartScrapeBody,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
 ) -> ScrapeStartResponse:
     uni = await db.get(University, body.university_id)
     if not uni:
@@ -94,7 +93,6 @@ async def start_scrape(
 async def start_bulk(
     body: BulkScrapeBody,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
 ) -> BulkScrapeResponse:
     session_id = f"bulk_{uuid.uuid4().hex[:12]}"
     job_ids: list[str] = []
@@ -140,7 +138,6 @@ async def start_bulk(
 async def stop_job(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
