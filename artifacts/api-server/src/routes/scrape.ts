@@ -31,6 +31,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
 import { extractEnglishWithCascade } from "../lib/english-cascade.js";
+import { fillFromConcordance } from "../lib/concordance-cache.js";
 import { refreshCourseSearchView } from "../services/search-index.js";
 import {
   buildCourseReviewSnapshot,
@@ -9462,6 +9463,23 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           });
         }
 
+        // ── CONCORDANCE FILL (per-host IELTS→PTE/TOEFL/CAE/Duolingo) ─────
+        try {
+          const concord = fillFromConcordance(cheerioData as any, link.url);
+          if (concord.filled.length > 0) {
+            reviewSources.push({
+              url: link.url,
+              pageType: "concordance",
+              extractionMethod: "concordance-cache",
+              content: `IELTS ${concord.fromIelts} → ${concord.filled.map((f) => `${f}=${(cheerioData as any)[f]}`).join(", ")}`,
+            } as any);
+            addVerboseLog(job, "status", {
+              message: `[concordance ✓] ${link.name.slice(0, 40)} — IELTS ${concord.fromIelts} filled ${concord.filled.join(", ")}`,
+              phase: "extract",
+            });
+          }
+        } catch { /* concordance never throws */ }
+
         // ── COURSE-PAGE SNAPSHOT (pre-cache) ─────────────────────────────
         // Everything filled up to this point came from the course page itself
         // (cheerio extract → per-course vision → cascade). Snapshot it now so
@@ -11147,6 +11165,22 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
             });
           }
 
+          try {
+            const concord = fillFromConcordance(cheerioData as any, link.url);
+            if (concord.filled.length > 0) {
+              reviewSources.push({
+                url: link.url,
+                pageType: "concordance",
+                extractionMethod: "concordance-cache",
+                content: `IELTS ${concord.fromIelts} → ${concord.filled.map((f) => `${f}=${(cheerioData as any)[f]}`).join(", ")}`,
+              } as any);
+              addVerboseLog(job, "status", {
+                message: `[concordance ✓ rescrape] ${link.name.slice(0, 40)} — IELTS ${concord.fromIelts} filled ${concord.filled.join(", ")}`,
+                phase: "extract",
+              });
+            }
+          } catch { /* concordance never throws */ }
+
           stagedCourses.push({ index: i, data: cheerioToCourseData(cheerioData, link.name, link.url), reviewSources });
         } catch (err) {
           job.errors++;
@@ -11310,6 +11344,113 @@ router.post("/scrape/rescrape", async (req: Request, res: Response): Promise<voi
     });
 
     res.json({ jobId, message: "Re-scraping started (no AI)" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── REPAIR SCRAPE ────────────────────────────────────────────────────────────
+// "Repair" mode: identify courses with NULL critical fields (duration, location,
+// or no English requirement rows at all) and re-scrape ONLY those, instead of
+// the whole university catalog. Cheap to run — uses the saved scrapeConfig
+// (no AI cost) but limits the courseLinks to the broken subset.
+
+router.get("/scrape/repair/missing/:universityId", async (req: Request, res: Response): Promise<void> => {
+  const universityId = Number(req.params.universityId);
+  if (!Number.isFinite(universityId)) { res.status(400).json({ error: "Invalid university id" }); return; }
+  try {
+    const result = await pool.query(
+      `SELECT c.id, c.name, c.course_website, c.duration, c.course_location,
+              (SELECT COUNT(*) FROM english_requirements er WHERE er.course_id = c.id) AS english_row_count
+       FROM courses c
+       WHERE c.university_id = $1
+         AND c.status = 'active'
+         AND (
+           c.duration IS NULL
+           OR c.course_location IS NULL OR btrim(c.course_location) = ''
+           OR NOT EXISTS (SELECT 1 FROM english_requirements er WHERE er.course_id = c.id)
+         )
+       ORDER BY c.name
+       LIMIT 1000`,
+      [universityId],
+    );
+    const rows = result.rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      url: r.course_website,
+      missing: [
+        r.duration == null ? "duration" : null,
+        (!r.course_location || String(r.course_location).trim() === "") ? "location" : null,
+        Number(r.english_row_count) === 0 ? "english_requirements" : null,
+      ].filter(Boolean),
+    }));
+    res.json({ universityId, count: rows.length, courses: rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/scrape/repair/start", async (req: Request, res: Response): Promise<void> => {
+  const { universityId, courseIds } = req.body as { universityId: number; courseIds?: number[] };
+  if (!universityId) { res.status(400).json({ error: "University ID is required" }); return; }
+  try {
+    const [uni] = await db.select().from(universitiesTable).where(eq(universitiesTable.id, universityId));
+    if (!uni) { res.status(404).json({ error: "University not found" }); return; }
+    if (!uni.scrapeConfig) { res.status(400).json({ error: "No saved scraping config. Run a full AI scrape first." }); return; }
+
+    // Resolve the target course ids — either explicit list, or auto-detect.
+    let targetIds: number[];
+    if (Array.isArray(courseIds) && courseIds.length > 0) {
+      targetIds = courseIds.map(Number).filter(Number.isFinite);
+    } else {
+      const auto = await pool.query(
+        `SELECT c.id FROM courses c
+         WHERE c.university_id = $1 AND c.status = 'active'
+           AND (c.duration IS NULL
+                OR c.course_location IS NULL OR btrim(c.course_location) = ''
+                OR NOT EXISTS (SELECT 1 FROM english_requirements er WHERE er.course_id = c.id))
+         LIMIT 500`,
+        [universityId],
+      );
+      targetIds = auto.rows.map((r: any) => Number(r.id));
+    }
+    if (targetIds.length === 0) { res.json({ message: "No courses need repair", count: 0 }); return; }
+
+    // Fetch the URLs + names for those courses to build a focused courseLinks list.
+    const urlsResult = await pool.query(
+      `SELECT id, name, course_website FROM courses WHERE id = ANY($1::int[])`,
+      [targetIds],
+    );
+    const repairLinks = urlsResult.rows
+      .filter((r: any) => r.course_website && String(r.course_website).startsWith("http"))
+      .map((r: any) => ({ name: r.name as string, url: r.course_website as string }));
+    if (repairLinks.length === 0) { res.json({ message: "No repair targets have valid URLs", count: 0 }); return; }
+
+    const config: ScrapeConfig = JSON.parse(JSON.stringify(uni.scrapeConfig));
+    config.courseLinks = sanitizeCourseLinks(repairLinks as any);
+
+    const activeJob = (await listActiveRuntimeJobs()).find((job) => job.universityId === uni.id);
+    if (activeJob) await requestStopForRuntimeJob(activeJob.id);
+
+    const jobId = createRuntimeJobId();
+    await enqueueRuntimeJob({
+      runtimeJobId: jobId,
+      universityId: uni.id,
+      universityName: uni.name,
+      url: uni.scrapeUrl || config.resolvedUrl,
+      jobType: "rescrape",
+      requestPayload: {
+        universityId: uni.id,
+        universityName: uni.name,
+        url: uni.scrapeUrl || config.resolvedUrl,
+        config,
+      },
+      initialLogs: [
+        { event: "status", message: `Repair-scraping ${repairLinks.length} ${uni.name} courses with NULL critical fields (NO AI)` },
+        { event: "status", message: "Queued repair job for worker execution", phase: "queue" },
+      ],
+    });
+    res.json({ jobId, count: repairLinks.length, message: "Repair scrape started" });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
