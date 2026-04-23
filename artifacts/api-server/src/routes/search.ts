@@ -353,10 +353,10 @@ router.get("/search/courses", async (req: Request, res: Response) => {
     // (also higher = better) so typo'd queries still rank meaningfully.
     const baseValues = [...where.values];
     let nextIdx = baseValues.length + 1;
-    let orderBy = ALLOWED_SORTS[sortKey];
+    let innerOrder = ALLOWED_SORTS[sortKey];
     if (sortKey === "relevance" && term) {
       const i = nextIdx;
-      orderBy = `(
+      innerOrder = `(
         ts_rank(search_tsv, plainto_tsquery('english', $${i}))
           + GREATEST(
               similarity(lower(course_name), lower($${i})),
@@ -366,6 +366,9 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       baseValues.push(term);
       nextIdx++;
     }
+    // Featured universities always rank first regardless of the user's chosen
+    // sort. Within each group (featured / non-featured) the user's sort applies.
+    const orderBy = `featured DESC, featured_priority DESC, ${innerOrder}`;
     const limitIdx = nextIdx;
     const offsetIdx = nextIdx + 1;
 
@@ -378,6 +381,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
         study_mode, course_website, course_location,
         university_id, university_name, logo_url,
         university_city, university_country, university_website,
+        featured, featured_priority,
         international_fee, currency, fee_term, application_fee,
         international_fee_yearly,
         intakes,
@@ -484,6 +488,8 @@ router.get("/search/courses", async (req: Request, res: Response) => {
           city: r.university_city,
           country: r.university_country,
           website: r.university_website,
+          featured: !!r.featured,
+          featured_priority: r.featured_priority ?? 0,
         },
         course_location: r.course_location,
         degree_level: r.degree_level,

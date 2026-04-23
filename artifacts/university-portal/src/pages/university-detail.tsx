@@ -15,7 +15,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -1256,6 +1256,27 @@ export default function UniversityDetail() {
     setEditUniCountry(uni?.country ?? "");
     setEditUniOpen(true);
   };
+  const [featuredSaving, setFeaturedSaving] = useState(false);
+  const toggleUniFeatured = async () => {
+    if (!id || !uni) return;
+    const next = !(uni as { featured?: boolean }).featured;
+    setFeaturedSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/universities/${id}/featured`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featured: next, featuredPriority: next ? 100 : 0 }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: next ? "Marked as Featured" : "Removed from Featured" });
+      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setFeaturedSaving(false);
+    }
+  };
+
   const saveEditUni = async () => {
     if (!id) return;
     setEditUniSaving(true);
@@ -1288,11 +1309,27 @@ export default function UniversityDetail() {
           <Building2 className="h-7 w-7 text-primary" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">{uni.name}</h1>
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={openEditUni} title="Edit university">
               <Pencil className="h-4 w-4" />
             </Button>
+            <button
+              type="button"
+              disabled={featuredSaving}
+              onClick={toggleUniFeatured}
+              title={(uni as { featured?: boolean }).featured
+                ? "Featured — click to remove"
+                : "Mark this university as Featured (its courses will appear first in search results)"}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer disabled:opacity-50 ${
+                (uni as { featured?: boolean }).featured
+                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                  : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${(uni as { featured?: boolean }).featured ? "fill-amber-500 text-amber-500" : ""}`} />
+              {(uni as { featured?: boolean }).featured ? "Featured" : "Not Featured"}
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-muted-foreground mt-1">
             <span className="flex items-center gap-1 text-sm">

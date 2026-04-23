@@ -75,15 +75,17 @@ export async function ensureSearchInfra(): Promise<void> {
       // Schema version. Bump whenever the MV definition changes — the block
       // below drops the old view and rebuilds it. Using a marker column
       // (search_tsv) keeps the upgrade path automatic on every deploy.
-      const mvHasSearchTsv = await client.query(`
+      // Check for the latest schema marker — `featured`. If missing, drop &
+      // rebuild the MV so the new column is included automatically on deploy.
+      const mvHasFeatured = await client.query(`
         SELECT 1
           FROM information_schema.columns
          WHERE table_name = 'course_search_view'
-           AND column_name = 'search_tsv'
+           AND column_name = 'featured'
         LIMIT 1
       `);
-      if (mvHasSearchTsv.rowCount === 0) {
-        logger.info("search-index: dropping legacy MV (missing search_tsv)");
+      if (mvHasFeatured.rowCount === 0) {
+        logger.info("search-index: dropping legacy MV (missing featured column)");
         try { await client.query("DROP MATERIALIZED VIEW IF EXISTS course_search_view CASCADE"); }
         catch (err) { logger.warn({ err: (err as Error).message }, "search-index: drop MV failed"); }
       }
@@ -135,6 +137,8 @@ export async function ensureSearchInfra(): Promise<void> {
             u.city AS university_city,
             u.country AS university_country,
             u.website AS university_website,
+            COALESCE(u.featured, FALSE) AS featured,
+            COALESCE(u.featured_priority, 0) AS featured_priority,
             -- Latest fee row per course (best-effort: highest id wins).
             (SELECT international_fee FROM fees WHERE course_id = c.id ORDER BY id DESC LIMIT 1) AS international_fee,
             (SELECT currency FROM fees WHERE course_id = c.id ORDER BY id DESC LIMIT 1) AS currency,
@@ -186,6 +190,8 @@ export async function ensureSearchInfra(): Promise<void> {
         `CREATE INDEX IF NOT EXISTS idx_csv_country ON course_search_view (university_country)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_city ON course_search_view (university_city)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_intakes ON course_search_view USING gin (intakes)`,
+        // Featured-first ordering. Partial index keeps it tiny (only featured rows).
+        `CREATE INDEX IF NOT EXISTS idx_csv_featured ON course_search_view (featured DESC, featured_priority DESC) WHERE featured = TRUE`,
       ];
       for (const stmt of mvIndexStatements) {
         try { await client.query(stmt); }

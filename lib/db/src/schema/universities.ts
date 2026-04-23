@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, jsonb, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,8 @@ export const universitiesTable = pgTable("universities", {
   scholarshipPageUrl: text("scholarship_page_url"),
   academicRequirementsPageUrl: text("academic_requirements_page_url"),
   scrapeConfig: jsonb("scrape_config"),
+  featured: boolean("featured").notNull().default(false),
+  featuredPriority: integer("featured_priority").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

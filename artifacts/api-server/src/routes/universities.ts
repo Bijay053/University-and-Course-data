@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, type SQL, sql } from "drizzle-orm";
 import { db, pool, universitiesTable } from "@workspace/db";
+import { refreshCourseSearchView } from "../services/search-index";
 import {
   ListUniversitiesQueryParams,
   CreateUniversityBody,
@@ -90,6 +91,30 @@ router.patch("/universities/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "University not found" });
     return;
   }
+  res.json(uni);
+});
+
+router.patch("/universities/:id/featured", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id ?? "", 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const featured = !!req.body?.featured;
+  const rawPriority = req.body?.featuredPriority;
+  const featuredPriority = Number.isFinite(Number(rawPriority)) ? parseInt(String(rawPriority), 10) : 0;
+  const [uni] = await db
+    .update(universitiesTable)
+    .set({ featured, featuredPriority })
+    .where(eq(universitiesTable.id, id))
+    .returning();
+  if (!uni) {
+    res.status(404).json({ error: "University not found" });
+    return;
+  }
+  // Refresh the search MV in the background so featured ordering takes effect
+  // immediately on the public Course Search. Don't block the response.
+  void refreshCourseSearchView();
   res.json(uni);
 });
 

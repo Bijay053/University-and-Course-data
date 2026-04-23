@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Search, MapPin, X, Filter, Scale, ExternalLink, Loader2,
-  GraduationCap, Calendar, DollarSign, Clock, BookOpen, Globe2, Award,
+  GraduationCap, Calendar, DollarSign, Clock, BookOpen, Globe2, Award, Star,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ type FacetItem = { id?: number | string; name: string; count: number };
 type CourseResult = {
   id: number;
   course_name: string;
-  university: { id: number; name: string; logo_url: string | null; city: string | null; country: string | null; website: string | null };
+  university: { id: number; name: string; logo_url: string | null; city: string | null; country: string | null; website: string | null; featured?: boolean; featured_priority?: number };
   course_location: string | null;
   degree_level: string | null;
   category: string | null;
@@ -558,7 +558,12 @@ export default function SearchPage() {
               if (r.intakes.length > 0) meta.push({ icon: <Calendar className="w-3.5 h-3.5" />, text: r.intakes.join(", ") });
 
               return (
-                <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-red-300 transition-all">
+                <div key={r.id} className={`relative bg-white rounded-xl border p-4 hover:shadow-lg transition-all ${r.university.featured ? "border-amber-300 hover:border-amber-400 ring-1 ring-amber-100" : "border-gray-200 hover:border-red-300"}`}>
+                  {r.university.featured && (
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-sm">
+                      <Star className="w-3 h-3 fill-white" /> Featured
+                    </span>
+                  )}
                   <div className="flex gap-4">
                     {r.university.logo_url ? (
                       <img src={r.university.logo_url} alt={r.university.name} className="w-16 h-16 object-contain rounded-lg border bg-white p-1 flex-shrink-0" />
