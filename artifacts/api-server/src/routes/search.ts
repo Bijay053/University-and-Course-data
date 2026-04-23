@@ -493,8 +493,11 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       try {
         const qOnlyWhere = buildSearchWhere({ ...req.query, location: undefined });
         const locOnlyWhere = buildSearchWhere({ ...req.query, q: undefined });
-        const qOnlySql = `SELECT COUNT(*)::int AS total FROM course_search_view ${whereSql(qOnlyWhere)}`;
-        const locOnlySql = `SELECT COUNT(*)::int AS total FROM course_search_view ${whereSql(locOnlyWhere)}`;
+        // Use the COURSE_SEARCH_VIEW wrapper (not the raw MV) so any
+        // calculated columns referenced by the WHERE clause — e.g.
+        // `international_fee` from a fee_min/fee_max filter — resolve.
+        const qOnlySql = `SELECT COUNT(*)::int AS total FROM ${COURSE_SEARCH_VIEW} ${whereSql(qOnlyWhere)}`;
+        const locOnlySql = `SELECT COUNT(*)::int AS total FROM ${COURSE_SEARCH_VIEW} ${whereSql(locOnlyWhere)}`;
         const [qRes, lRes] = await Promise.all([
           pool.query(qOnlySql, qOnlyWhere.values),
           pool.query(locOnlySql, locOnlyWhere.values),
