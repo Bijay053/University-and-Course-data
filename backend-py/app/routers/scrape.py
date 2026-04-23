@@ -391,9 +391,9 @@ async def staged_list(
     job_id: str | None = Query(default=None, alias="jobId"),
     university_id: int | None = Query(default=None, alias="universityId"),
     status_f: str | None = Query(default=None, alias="status"),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=500, ge=1, le=2000),
     page: int = Query(default=1, ge=1),
-) -> dict:
+):
     from app.models import ScrapedCourse
     stmt = select(ScrapedCourse)
     if job_id:
@@ -405,21 +405,20 @@ async def staged_list(
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
-    return {
-        "data": [{
-            "id": r.id,
-            "courseName": r.course_name,
-            "courseWebsite": r.course_website,
-            "universityId": r.university_id,
-            "scrapeJobId": r.scrape_job_id,
-            "status": r.status,
-            "createdAt": r.created_at.isoformat() if r.created_at else None,
-        } for r in rows],
-        "total": int(total),
-        "page": page,
-        "limit": limit,
-        "ok": True,
-    }
+    # UI expects a bare array (Array.isArray check)
+    return [{
+        "id": r.id,
+        "courseName": r.course_name,
+        "courseWebsite": r.course_website,
+        "universityId": r.university_id,
+        "scrapeJobId": r.scrape_job_id,
+        "status": r.status,
+        "createdAt": r.created_at.isoformat() if r.created_at else None,
+        # Spread all model columns so UI gets fees, requirements, etc. when it wants them
+        **{c.name: getattr(r, c.name) for c in r.__table__.columns 
+           if c.name not in ('id','course_name','course_website','university_id','scrape_job_id','status','created_at')
+           and not isinstance(getattr(r, c.name, None), (bytes, bytearray))},
+    } for r in rows]
 
 
 @router.get("/staged/{sc_id_or_job}")
@@ -436,25 +435,19 @@ async def staged_one(
             select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
-        return {
-            "data": [{
-                "id": s.id,
-                "courseName": s.course_name,
-                "courseWebsite": s.course_website,
-                "universityId": s.university_id,
-                "scrapeJobId": s.scrape_job_id,
-                "status": s.status,
-                "createdAt": s.created_at.isoformat() if s.created_at else None,
-            } for s in rows],
-            "stagedCourses": [{
-                "id": s.id,
-                "courseName": s.course_name,
-                "courseWebsite": s.course_website,
-                "status": s.status,
-            } for s in rows],
-            "total": len(rows),
-            "ok": True,
-        }
+        # UI expects bare array
+        return [{
+            "id": s.id,
+            "courseName": s.course_name,
+            "courseWebsite": s.course_website,
+            "universityId": s.university_id,
+            "scrapeJobId": s.scrape_job_id,
+            "status": s.status,
+            "createdAt": s.created_at.isoformat() if s.created_at else None,
+            **{c.name: getattr(s, c.name) for c in s.__table__.columns 
+               if c.name not in ('id','course_name','course_website','university_id','scrape_job_id','status','created_at')
+               and not isinstance(getattr(s, c.name, None), (bytes, bytearray))},
+        } for s in rows]
     
     # Otherwise treat as integer sc_id
     try:
