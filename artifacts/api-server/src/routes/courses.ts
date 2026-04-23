@@ -35,8 +35,14 @@ router.get("/courses", async (req, res): Promise<void> => {
 
   if (search) { whereClauses.push(`c.name ILIKE $${pIdx++}`); params.push(`%${search}%`); }
   if (universityId) {
+    // Filter by university only.  An earlier version also required an
+    // approved row in `scraped_courses`, but that excluded courses that
+    // were imported directly (e.g. CSV / bulk upload) and never went
+    // through the staging pipeline — Federation University's 17 active
+    // + approved courses were silently hidden as a result.  The catalog
+    // filter block below (approval_status / status / international_eligible)
+    // is the correct, single source of truth for "is this course visible".
     whereClauses.push(`c.university_id = $${pIdx++}`); params.push(universityId);
-    whereClauses.push(`EXISTS (SELECT 1 FROM scraped_courses sc WHERE sc.course_id = c.id AND sc.status = 'approved')`);
   }
   if (category) { whereClauses.push(`c.category ILIKE $${pIdx++}`); params.push(`%${category}%`); }
   if (subCategory) { whereClauses.push(`c.sub_category ILIKE $${pIdx++}`); params.push(`%${subCategory}%`); }
