@@ -123,7 +123,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             summary["staged"] + summary["skipped"] > 0
         )
         job.status = "completed" if finished_cleanly else "failed"
-        if not finished_cleanly:
+        # Always update progress counters from this run.
+        job.total_found = summary["discovered"]
+        job.current = summary["discovered"]
+        job.imported = summary["staged"]
+        job.skipped = summary["skipped"]
+        job.errors = summary["errors"]
+        if finished_cleanly:
+            job.error_message = None  # clear any stale message
+        else:
             job.error_message = (
                 f"all {summary['errors']} workers errored "
                 f"(discovered={summary['discovered']})"
