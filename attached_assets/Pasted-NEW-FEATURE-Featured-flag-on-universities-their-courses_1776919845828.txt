@@ -1,0 +1,127 @@
+NEW FEATURE: "Featured" flag on universities — their courses appear first in search results
+Business purpose: Some universities are premium partners or curated recommendations. Admin wants to mark them as "Featured" so their courses always appear at the top of course search results before non-featured universities.
+
+PART 1 — Database schema
+Add a featured boolean column to universities:
+sqlALTER TABLE universities 
+  ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Optional: add priority for ordering within featured universities
+ALTER TABLE universities 
+  ADD COLUMN IF NOT EXISTS featured_priority INTEGER DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_universities_featured 
+  ON universities(featured DESC, featured_priority DESC) 
+  WHERE featured = TRUE;
+Update Drizzle schema in lib/db/src/schema/universities.ts:
+typescriptfeatured: boolean("featured").notNull().default(false),
+featuredPriority: integer("featured_priority").default(0),
+Refresh the course_search_view materialized view to include these new columns:
+sql-- In the CREATE MATERIALIZED VIEW statement, add:
+  u.featured,
+  u.featured_priority,
+
+PART 2 — Admin UI — Toggle in Universities page
+On http://159.65.152.72/universities (list page) and /universities/:id (detail page), add a "Featured" toggle.
+On the Universities list page, add a column/badge:
+┌─────────────────────────────────────────────┬──────────┬──────────┐
+│ University                                   │ Courses  │ Featured │
+├─────────────────────────────────────────────┼──────────┼──────────┤
+│ Charles Sturt University                     │ 173      │ [⭐ ON]  │
+│ Torrens University Australia                 │ 74       │ [ OFF ]  │
+│ University of Southern Queensland            │ 67       │ [⭐ ON]  │
+│ VIT                                          │ 30       │ [ OFF ]  │
+│ ASA                                          │ 9        │ [ OFF ]  │
+│ University of Tasmania                       │ 0        │ [ OFF ]  │
+└─────────────────────────────────────────────┴──────────┴──────────┘
+Toggle inline — click it to flip featured on/off. Use a Switch/Toggle component.
+On the University detail page (e.g. /universities/4), add to the header:
+┌───────────────────────────────────────────────────────────┐
+│ 🏛 Charles Sturt University                  [⭐ Featured] │
+│ Australia, Sydney                                         │
+│ [Edit] [🌐 Website]                                        │
+└───────────────────────────────────────────────────────────┘
+Clicking the Featured badge toggles state. When featured, show with filled star and accent color. When not featured, outlined star with muted color.
+Optional: featured priority input — small number field that only shows when featured=true. Default 0. Higher numbers rank first among featured universities.
+
+PART 3 — API endpoints
+typescript// Toggle featured status
+router.patch("/universities/:id/featured", async (req, res) => {
+  const { id } = req.params;
+  const { featured, featuredPriority } = req.body;
+  
+  const updated = await db
+    .update(universitiesTable)
+    .set({ 
+      featured: !!featured,
+      featuredPriority: featuredPriority ?? 0
+    })
+    .where(eq(universitiesTable.id, parseInt(id)))
+    .returning();
+  
+  // Refresh materialized view so search results reflect change immediately
+  await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view`);
+  
+  res.json(updated[0]);
+});
+
+PART 4 — Update course search to prioritize featured universities
+Modify the /api/search/courses query's ORDER BY clause. Featured universities' courses should appear before non-featured ones, regardless of relevance score within each group:
+sqlSELECT v.*, 
+  ts_rank(v.search_tsv, plainto_tsquery('english', $1)) AS relevance_score
+FROM course_search_view v
+WHERE /* all filters */
+ORDER BY 
+  v.featured DESC,              -- featured=true first
+  v.featured_priority DESC,     -- higher priority first among featured
+  relevance_score DESC,         -- then by search relevance
+  v.course_name ASC
+LIMIT 20 OFFSET $offset;
+Visual indicator in results: Featured course cards show a small "⭐ Featured" badge:
+┌─────────────────────────────────────────────────┐
+│ [CSU logo]   ⭐ Featured                         │
+│                                                  │
+│ Bachelor of Business Accounting                 │
+│ Charles Sturt University                        │
+│ 📍 Sydney  💰 $32,000/yr  ⏱ 3 years            │
+│                              [⚖ Compare]        │
+└─────────────────────────────────────────────────┘
+Style: small gold/amber badge in top-right of card.
+
+PART 5 — Don't bias sort options
+When user explicitly sorts by "Fee (Low to High)" or "Name A-Z", still put featured universities first, then apply their chosen sort within each group:
+sqlORDER BY 
+  v.featured DESC,
+  v.featured_priority DESC,
+  -- then user's chosen sort:
+  CASE $sort 
+    WHEN 'fee_asc' THEN v.international_fee 
+  END ASC NULLS LAST,
+  CASE $sort 
+    WHEN 'fee_desc' THEN v.international_fee 
+  END DESC NULLS LAST,
+  CASE $sort 
+    WHEN 'name_asc' THEN v.course_name 
+  END ASC
+This way featured is always the primary sort, but within featured group (and within non-featured group) the user's sort choice applies.
+Exception: If user sorts explicitly by "Relevance (Ignore Featured)" — add this as a 4th sort option for admins/power users — skip the featured boost. Optional, not required in v1.
+
+DELIVERY:
+
+Add featured + featured_priority columns via pnpm --filter @workspace/db push --force
+Seed: set featured=true on at least one university so we can verify the badge UI (USQ or CSU are good candidates)
+Add admin UI toggle on /universities list and /universities/:id detail
+Add PATCH /universities/:id/featured endpoint
+Update course search query with featured-first ORDER BY
+Add ⭐ Featured badge on course cards
+Build frontend + backend
+Commit: "Featured universities: admin toggle + boost courses in search results"
+Push to main
+Reply with commit hash + 2 screenshots:
+
+Universities list page showing Featured toggle column
+Course search results with Featured badge visible on at least one course
+
+
+
+Deploy path: /root/University-and-Course-data

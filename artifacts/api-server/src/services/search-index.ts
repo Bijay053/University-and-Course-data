@@ -25,14 +25,15 @@ export async function ensureSearchInfra(): Promise<void> {
     const t0 = Date.now();
     const client = await pool.connect();
     try {
-      // Trigram extension is needed for the gin_trgm_ops indexes used by ILIKE.
-      // Wrap in try/catch — on managed Postgres without superuser the extension
-      // may be pre-installed, and CREATE EXTENSION can fail silently.
-      try {
-        await client.query("CREATE EXTENSION IF NOT EXISTS pg_trgm");
-      } catch (err) {
-        logger.warn({ err: (err as Error).message }, "search-index: pg_trgm extension creation skipped");
-      }
+      // Trigram extension is needed for the gin_trgm_ops indexes used by ILIKE
+      // and similarity()/word_similarity(). fuzzystrmatch provides
+      // levenshtein() used for the "did you mean" suggestion. Wrap in
+      // try/catch — on managed Postgres without superuser the extension may
+      // be pre-installed, and CREATE EXTENSION can fail silently.
+      try { await client.query("CREATE EXTENSION IF NOT EXISTS pg_trgm"); }
+      catch (err) { logger.warn({ err: (err as Error).message }, "search-index: pg_trgm extension creation skipped"); }
+      try { await client.query("CREATE EXTENSION IF NOT EXISTS fuzzystrmatch"); }
+      catch (err) { logger.warn({ err: (err as Error).message }, "search-index: fuzzystrmatch extension creation skipped"); }
 
       // Indexes on base tables.
       const indexStatements = [
@@ -71,6 +72,22 @@ export async function ensureSearchInfra(): Promise<void> {
       // The "approved + active" gate ensures only published courses appear in
       // public search. We coalesce status/approval_status because legacy rows
       // may have NULLs.
+      // Schema version. Bump whenever the MV definition changes — the block
+      // below drops the old view and rebuilds it. Using a marker column
+      // (search_tsv) keeps the upgrade path automatic on every deploy.
+      const mvHasSearchTsv = await client.query(`
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_name = 'course_search_view'
+           AND column_name = 'search_tsv'
+        LIMIT 1
+      `);
+      if (mvHasSearchTsv.rowCount === 0) {
+        logger.info("search-index: dropping legacy MV (missing search_tsv)");
+        try { await client.query("DROP MATERIALIZED VIEW IF EXISTS course_search_view CASCADE"); }
+        catch (err) { logger.warn({ err: (err as Error).message }, "search-index: drop MV failed"); }
+      }
+
       const mvExists = await client.query(
         "SELECT 1 FROM pg_matviews WHERE matviewname = 'course_search_view'",
       );
@@ -90,9 +107,29 @@ export async function ensureSearchInfra(): Promise<void> {
             c.course_website,
             c.course_location,
             c.university_id,
-            -- Combined tsvector for full-text search across course + university name.
+            -- Legacy simple-dictionary tsvector kept for any older code paths.
             setweight(to_tsvector('simple', coalesce(c.name, '')), 'A') ||
               setweight(to_tsvector('simple', coalesce(u.name, '')), 'B') AS name_tsv,
+            -- Rich English-stemmed tsvector for fuzzy / typo-tolerant search.
+            -- Weights:
+            --   A: course name           (highest signal)
+            --   B: university name       (still strong)
+            --   C: category + location   (medium signal)
+            --   D: sub-category          (weakest, fallback)
+            -- The English dictionary stems "nursing" / "nurses" / "nurse" to
+            -- the same lexeme, so word variations match without code-side
+            -- normalisation. Stopwords ("of", "in", "the"...) are dropped by
+            -- the dictionary too, so "Bachelor of Nursing" and
+            -- "Bachelor in Nursing" produce identical lexeme sets.
+            (
+              setweight(to_tsvector('english', coalesce(c.name, '')), 'A') ||
+              setweight(to_tsvector('english', coalesce(u.name, '')), 'B') ||
+              setweight(to_tsvector('english', coalesce(c.category, '')), 'C') ||
+              setweight(to_tsvector('english', coalesce(c.course_location, '')), 'C') ||
+              setweight(to_tsvector('english', coalesce(u.city, '')), 'C') ||
+              setweight(to_tsvector('english', coalesce(u.country, '')), 'C') ||
+              setweight(to_tsvector('english', coalesce(c.sub_category, '')), 'D')
+            ) AS search_tsv,
             u.name AS university_name,
             u.logo_url,
             u.city AS university_city,
@@ -134,6 +171,13 @@ export async function ensureSearchInfra(): Promise<void> {
         `CREATE INDEX IF NOT EXISTS idx_csv_name_trgm ON course_search_view USING gin (course_name gin_trgm_ops)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_uni_name_trgm ON course_search_view USING gin (university_name gin_trgm_ops)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_name_tsv ON course_search_view USING gin (name_tsv)`,
+        `CREATE INDEX IF NOT EXISTS idx_csv_search_tsv ON course_search_view USING gin (search_tsv)`,
+        // Trigram indexes for typo-tolerant city / location matching.
+        `CREATE INDEX IF NOT EXISTS idx_csv_city_trgm ON course_search_view USING gin (lower(university_city) gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_csv_country_trgm ON course_search_view USING gin (lower(university_country) gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_csv_loc_trgm ON course_search_view USING gin (lower(coalesce(course_location, '')) gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_csv_course_name_lower_trgm ON course_search_view USING gin (lower(course_name) gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_csv_uni_name_lower_trgm ON course_search_view USING gin (lower(university_name) gin_trgm_ops)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_university_id ON course_search_view (university_id)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_degree_level ON course_search_view (degree_level)`,
         `CREATE INDEX IF NOT EXISTS idx_csv_category ON course_search_view (category)`,

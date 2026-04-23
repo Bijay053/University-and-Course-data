@@ -1,0 +1,215 @@
+ENHANCEMENT: Course Search must handle typos, preposition variations, and partial matches
+Currently the search is strict/literal:
+
+"bachelor of nursing" → 1 result ✓
+"bachelor in nursing" → 0 results ❌
+"bachlor nursing" (typo) → 0 results ❌
+"sidney" (typo of Sydney) → 0 results ❌
+
+Users make these mistakes constantly. Search must be forgiving.
+
+IMPLEMENT fuzzy full-text search with 3 layers:
+Layer 1 — Preposition & stopword normalization (query side)
+Before searching, normalize the query:
+typescriptconst STOPWORDS = new Set([
+  'of', 'in', 'the', 'a', 'an', 'for', 'at', 'to', 'and', 
+  'studies', 'degree', 'program', 'programme', 'course'
+]);
+
+function normalizeQuery(q: string): string[] {
+  return q
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')       // remove punctuation
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !STOPWORDS.has(w))
+    .map(stemWord);  // optional: basic stemming
+}
+
+function stemWord(w: string): string {
+  // Simple rules: nursing→nurs, bachelors→bachelor
+  return w
+    .replace(/ings?$/, '')   // nursing → nurs
+    .replace(/ies$/, 'y')    // studies → study
+    .replace(/s$/, '');      // bachelors → bachelor
+}
+
+// Example:
+// "bachelor in nursing"    → ['bachelor', 'nurs']
+// "bachelor of nursing"    → ['bachelor', 'nurs']
+// "bachelors nurse"        → ['bachelor', 'nurs']
+// All produce SAME token set — guaranteed match
+Layer 2 — Trigram fuzzy match in PostgreSQL (handles typos)
+Already have pg_trgm extension available. Add GIN trigram indexes:
+sqlCREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS idx_courses_name_trgm 
+  ON courses USING gin (LOWER(name) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_universities_name_trgm 
+  ON universities USING gin (LOWER(name) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_universities_city_trgm 
+  ON universities USING gin (LOWER(city) gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_courses_location_trgm
+  ON courses USING gin (LOWER(course_location) gin_trgm_ops);
+Search query with trigram similarity:
+sql-- "bachlor nursing" (typo) will match "Bachelor of Nursing" with similarity > 0.3
+SELECT *,
+  GREATEST(
+    similarity(LOWER(course_name), LOWER($1)),
+    word_similarity(LOWER($1), LOWER(course_name))
+  ) AS name_score
+FROM course_search_view
+WHERE 
+  LOWER(course_name) % LOWER($1)  -- trigram operator: "similar enough"
+  OR LOWER(university_name) % LOWER($1)
+ORDER BY name_score DESC
+LIMIT 20;
+The % operator returns rows where similarity > pg_trgm.similarity_threshold (default 0.3 — tune to 0.25 for more forgiving).
+Layer 3 — tsvector full-text search (handles word variations & stemming)
+Add a tsvector column to the course search view:
+sqlALTER MATERIALIZED VIEW course_search_view 
+  -- already includes course_name, university_name, category, course_location
+  -- add computed tsvector column
+;
+
+-- Better: add to the underlying materialized view SELECT
+CREATE MATERIALIZED VIEW course_search_view AS
+SELECT 
+  c.id,
+  c.name as course_name,
+  -- tsvector combining multiple fields with weights
+  setweight(to_tsvector('english', c.name), 'A') ||
+  setweight(to_tsvector('english', u.name), 'B') ||
+  setweight(to_tsvector('english', COALESCE(c.category, '')), 'C') ||
+  setweight(to_tsvector('english', COALESCE(c.course_location, '')), 'C') ||
+  setweight(to_tsvector('english', COALESCE(c.sub_category, '')), 'D') AS search_tsv,
+  -- ... rest of columns
+FROM courses c ...;
+
+CREATE INDEX ON course_search_view USING gin(search_tsv);
+Full-text search query:
+sql-- to_tsquery automatically stems: 'nursing' and 'nurse' match same lexeme
+SELECT *, ts_rank(search_tsv, query) AS fts_score
+FROM course_search_view, plainto_tsquery('english', $1) query
+WHERE search_tsv @@ query
+ORDER BY fts_score DESC;
+
+COMBINED SEARCH STRATEGY (the magic):
+Run both trigram AND tsvector in parallel, combine scores:
+typescriptasync function fuzzySearchCourses(userQuery: string, filters: Filters) {
+  const query = userQuery.trim();
+  
+  const sql = `
+    WITH fts_results AS (
+      SELECT id, ts_rank(search_tsv, plainto_tsquery('english', $1)) AS score, 'fts' as method
+      FROM course_search_view
+      WHERE search_tsv @@ plainto_tsquery('english', $1)
+    ),
+    trigram_results AS (
+      SELECT id, GREATEST(
+        similarity(LOWER(course_name), LOWER($1)),
+        similarity(LOWER(university_name), LOWER($1)),
+        similarity(LOWER(COALESCE(course_location, '')), LOWER($1))
+      ) AS score, 'trigram' as method
+      FROM course_search_view
+      WHERE 
+        LOWER(course_name) % LOWER($1) 
+        OR LOWER(university_name) % LOWER($1)
+        OR LOWER(COALESCE(course_location, '')) % LOWER($1)
+    ),
+    combined AS (
+      SELECT id, MAX(score) as score
+      FROM (
+        SELECT * FROM fts_results
+        UNION ALL
+        SELECT * FROM trigram_results
+      ) merged
+      GROUP BY id
+    )
+    SELECT v.*, c.score
+    FROM combined c
+    JOIN course_search_view v ON v.id = c.id
+    ORDER BY c.score DESC
+    LIMIT 20;
+  `;
+
+  return db.execute(sql, [query]);
+}
+This handles:
+
+"bachelor of nursing" → FTS matches (stopwords ignored)
+"bachelor in nursing" → FTS matches (stopwords ignored, same stem)
+"bachlor nursing" → trigram matches (similarity > 0.3)
+"nursing degree" → FTS matches via nursing tsvector
+"nurs" → trigram matches nursing
+"sidney" → trigram matches Sydney (similarity ~0.67)
+
+
+LOCATION SEARCH (handles country + city + aliases):
+Separate location search uses trigram + manual aliases:
+typescriptconst CITY_ALIASES: Record<string, string[]> = {
+  'sydney': ['sydney', 'syd', 'nsw'],
+  'melbourne': ['melbourne', 'melb', 'vic'],
+  'brisbane': ['brisbane', 'bris', 'qld'],
+  'aussie': ['australia'],
+  'oz': ['australia'],
+};
+
+function expandLocationQuery(loc: string): string[] {
+  const key = loc.toLowerCase().trim();
+  return CITY_ALIASES[key] ?? [loc];
+}
+SQL:
+sql-- Search in BOTH city and country with trigram matching
+WHERE 
+  LOWER(university_city) % LOWER($location)
+  OR LOWER(university_country) % LOWER($location)
+  OR LOWER(COALESCE(course_location, '')) % LOWER($location)
+
+SUGGEST "DID YOU MEAN" FOR LOW-CONFIDENCE MATCHES:
+If the best trigram score < 0.5, show a suggestion:
+json{
+  "results": [...],
+  "didYouMean": "Bachelor of Nursing"
+}
+Frontend displays:
+
+0 courses found. Did you mean: "Bachelor of Nursing"?
+
+Compute this using PostgreSQL levenshtein() from fuzzystrmatch extension:
+sqlCREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
+
+SELECT course_name, levenshtein(LOWER(course_name), LOWER($1)) as dist
+FROM course_search_view
+ORDER BY dist ASC
+LIMIT 1;
+
+ADJUST SIMILARITY THRESHOLD:
+sql-- Tune for your data (default 0.3 is often too strict)
+SET pg_trgm.similarity_threshold = 0.25;
+Or per query use word_similarity which is more forgiving than similarity.
+
+TEST CASES (acceptance criteria):
+After implementation, all these queries should return "Bachelor Of Nursing" (Torrens):
+User inputExpectedbachelor of nursing✅ 1+ resultsbachelor in nursing✅ 1+ resultsbachelors nursing✅ 1+ resultsbachlor nursing✅ 1+ resultsnursing bachelor✅ 1+ resultsnurse✅ 1+ resultsnursing degree✅ 1+ resultsbsn⚠ acceptable to miss
+Location:
+InputExpectedsydney✅ matches Sydneysidney✅ matches Sydneysyd✅ matches Sydneymelborne✅ matches Melbourneaustralia✅ returns all AU universities
+
+DELIVERY:
+
+Enable pg_trgm and fuzzystrmatch extensions
+Add trigram indexes on courses.name, universities.name, universities.city, course_location
+Add tsvector column with weighted fields to course_search_view
+Update GET /api/search/courses to use combined FTS + trigram approach
+Implement query normalization (stopwords, stemming)
+Add location alias expansion
+Add "Did you mean" suggestion for zero-result queries
+Build frontend to show didYouMean suggestion as clickable link
+Test all the acceptance cases above
+Commit: "Fuzzy search: handle typos, preposition variations, partial matches"
+Push to main
+Reply with commit hash + screenshots showing "bachelor in nursing" and "bachlor nursing" both return the course
+
+Deploy path: /root/University-and-Course-data

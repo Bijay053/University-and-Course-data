@@ -121,19 +121,81 @@ const ENGLISH_EXAM_TEST_TYPES: Record<string, string[]> = {
   DUOLINGO: ["Duolingo", "DET"],
 };
 
+/**
+ * City / country aliases for the location filter. Lets users type "syd" or
+ * "nsw" and still match Sydney rows, etc. Keys must be lower-case.
+ */
+const LOCATION_ALIASES: Record<string, string[]> = {
+  sydney: ["sydney", "syd", "nsw", "new south wales"],
+  melbourne: ["melbourne", "melb", "vic", "victoria"],
+  brisbane: ["brisbane", "bris", "qld", "queensland"],
+  perth: ["perth", "wa", "western australia"],
+  adelaide: ["adelaide", "sa", "south australia"],
+  canberra: ["canberra", "act"],
+  hobart: ["hobart", "tas", "tasmania"],
+  darwin: ["darwin", "nt", "northern territory"],
+  syd: ["sydney"],
+  melb: ["melbourne"],
+  bris: ["brisbane"],
+  nsw: ["sydney", "new south wales"],
+  vic: ["melbourne", "victoria"],
+  qld: ["brisbane", "queensland"],
+  wa: ["perth", "western australia"],
+  sa: ["adelaide", "south australia"],
+  act: ["canberra"],
+  tas: ["hobart", "tasmania"],
+  nt: ["darwin", "northern territory"],
+  aussie: ["australia"],
+  oz: ["australia"],
+  uk: ["united kingdom", "england"],
+  us: ["united states", "usa"],
+  usa: ["united states"],
+};
+
+/** Expand a user-typed location into the set of strings to fuzzy-match. */
+function expandLocation(loc: string): string[] {
+  const key = loc.toLowerCase().trim();
+  const aliases = LOCATION_ALIASES[key];
+  return aliases ? Array.from(new Set([key, ...aliases])) : [key];
+}
+
 /** Build the WHERE for /search/courses from request query params. */
 function buildSearchWhere(q: Request["query"]): SqlBuilder {
   const b = sqlWhere();
 
   const term = typeof q.q === "string" ? q.q.trim() : "";
   if (term) {
-    // ILIKE on both course + university name. Trigram index handles speed.
-    b.add("(course_name ILIKE ? OR university_name ILIKE ?)", `%${term}%`, `%${term}%`);
+    // Combined fuzzy match: full-text (handles word variations and stopwords
+    // via the English dictionary) OR trigram similarity (handles typos and
+    // partial matches). Either path qualifies a row.
+    b.add(
+      `(
+        search_tsv @@ plainto_tsquery('english', ?)
+        OR lower(course_name) % lower(?)
+        OR lower(university_name) % lower(?)
+        OR lower(coalesce(course_location, '')) % lower(?)
+        OR lower(coalesce(university_city, '')) % lower(?)
+      )`,
+      term, term, term, term, term,
+    );
   }
 
   const location = typeof q.location === "string" ? q.location.trim() : "";
   if (location) {
-    b.add("(university_city ILIKE ? OR university_country ILIKE ?)", `%${location}%`, `%${location}%`);
+    // Expand "syd" → ["sydney","syd","nsw","new south wales"], then run
+    // trigram similarity against city / country / per-course location.
+    const candidates = expandLocation(location);
+    const conds: string[] = [];
+    const vals: unknown[] = [];
+    for (const c of candidates) {
+      conds.push(`lower(university_city) % lower(?)`); vals.push(c);
+      conds.push(`lower(university_country) % lower(?)`); vals.push(c);
+      conds.push(`lower(coalesce(course_location, '')) % lower(?)`); vals.push(c);
+      // ILIKE fallback for very short strings ("act") that trigram drops.
+      conds.push(`university_city ILIKE ?`); vals.push(`%${c}%`);
+      conds.push(`university_country ILIKE ?`); vals.push(`%${c}%`);
+    }
+    b.add(`(${conds.join(" OR ")})`, ...vals);
   }
 
   const universityIds = csvList(q.university_id);
@@ -267,15 +329,22 @@ router.get("/search/courses", async (req: Request, res: Response) => {
     let sortKey = typeof req.query.sort === "string" ? req.query.sort : "relevance";
     if (!ALLOWED_SORTS[sortKey]) sortKey = "relevance";
     const term = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const orderBy = sortKey === "relevance" && term
-      ? `similarity(course_name, $${where.values.length + 1}) DESC, id DESC`
-      : ALLOWED_SORTS[sortKey];
 
-    // Build values array. When relevance + q, we append the term once for
-    // similarity(), then page/limit values come after.
+    // Build values array. When relevance + q, we append the term once. The
+    // ordering combines FTS rank (higher = better) with trigram similarity
+    // (also higher = better) so typo'd queries still rank meaningfully.
     const baseValues = [...where.values];
     let nextIdx = baseValues.length + 1;
+    let orderBy = ALLOWED_SORTS[sortKey];
     if (sortKey === "relevance" && term) {
+      const i = nextIdx;
+      orderBy = `(
+        ts_rank(search_tsv, plainto_tsquery('english', $${i}))
+          + GREATEST(
+              similarity(lower(course_name), lower($${i})),
+              similarity(lower(university_name), lower($${i}))
+            ) * 0.5
+      ) DESC, id DESC`;
       baseValues.push(term);
       nextIdx++;
     }
@@ -340,16 +409,53 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       ...facetsParts,
     ]);
 
+    const totalCount: number = countRes.rows[0]?.total ?? 0;
+
+    // "Did you mean" — only computed when the user typed a term and we got
+    // zero results. Uses trigram similarity to find the closest course name
+    // ignoring all other filters (since they're likely the reason for zero).
+    let didYouMean: string | null = null;
+    if (term && totalCount === 0) {
+      try {
+        // word_similarity scans the *best matching word* inside course_name,
+        // which catches typos like "nursng" → "Bachelor of Nursing" that the
+        // whole-string % operator misses. Scoring all rows is acceptable
+        // because the MV is small (~thousands of rows) and this only fires
+        // on zero-result queries.
+        const sugg = await pool.query(
+          `SELECT course_name,
+                  GREATEST(
+                    similarity(lower(course_name), lower($1)),
+                    word_similarity(lower($1), lower(course_name))
+                  ) AS score
+             FROM course_search_view
+            ORDER BY score DESC
+            LIMIT 1`,
+          [term],
+        );
+        if (sugg.rows.length && sugg.rows[0].score >= 0.35) {
+          const suggested = sugg.rows[0].course_name as string;
+          // Don't suggest the exact same term back to the user.
+          if (suggested && suggested.toLowerCase() !== term.toLowerCase()) {
+            didYouMean = suggested;
+          }
+        }
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "did-you-mean lookup failed");
+      }
+    }
+
     const elapsed = Date.now() - t0;
     if (elapsed > 300) {
       logger.warn({ ms: elapsed, query: req.query }, "[SLOW-SEARCH]");
     }
 
     res.json({
-      total: countRes.rows[0]?.total ?? 0,
+      total: totalCount,
       page,
       limit,
       took_ms: elapsed,
+      did_you_mean: didYouMean,
       results: resultsRes.rows.map((r) => ({
         id: r.id,
         course_name: r.course_name,

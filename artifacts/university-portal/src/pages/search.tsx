@@ -44,6 +44,7 @@ type CourseResult = {
 };
 type SearchResponse = {
   total: number; page: number; limit: number; took_ms: number;
+  did_you_mean?: string | null;
   results: CourseResult[];
   facets: {
     universities: FacetItem[]; categories: FacetItem[];
@@ -492,8 +493,23 @@ export default function SearchPage() {
               {loading ? (
                 <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</span>
               ) : data ? (
-                <span><strong className="text-red-700">{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
-                  <span className="text-xs text-gray-400 ml-2">({data.took_ms}ms)</span></span>
+                <span>
+                  <strong className="text-red-700">{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
+                  <span className="text-xs text-gray-400 ml-2">({data.took_ms}ms)</span>
+                  {data.did_you_mean && data.total === 0 && (
+                    <span className="ml-3 text-gray-600">
+                      Did you mean{" "}
+                      <button
+                        type="button"
+                        onClick={() => { setQ(data.did_you_mean!); resetPage(); }}
+                        className="text-red-700 underline font-medium hover:text-red-800"
+                      >
+                        “{data.did_you_mean}”
+                      </button>
+                      ?
+                    </span>
+                  )}
+                </span>
               ) : "—"}
             </div>
             <div className="flex items-center gap-2 text-sm">
