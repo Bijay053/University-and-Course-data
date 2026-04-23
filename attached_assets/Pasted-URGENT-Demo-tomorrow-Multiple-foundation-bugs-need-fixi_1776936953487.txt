@@ -1,0 +1,188 @@
+URGENT: Demo tomorrow. Multiple foundation bugs need fixing TONIGHT.Production server
+
+Path: /root/University-and-Course-data (NOT /opt/app)
+DB: postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal
+Source env: source /root/.env.backup after every SSH session
+Deploy: git pull && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && pm2 delete uni-api && pm2 start ecosystem.config.cjs && pm2 save
+Bug #1: CRITICAL — Case-sensitive name match creates duplicate courses on every repair scrapeFile: artifacts/api-server/src/routes/scrape.ts
+Function: approveSingleCourseCurrent broken code (around line 6700):
+typescriptconst dup = await client.query(
+  `SELECT id, ... FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1`,
+  [course.universityId, course.courseName],
+);Production evidence: Tonight's CSU repair created 10 duplicate courses (#402-#411) because the staged "Bachelor of Business Studies" did not match existing live "Bachelor Of Business Studies" (case-only difference).Required fix:
+typescriptconst dup = await client.query(
+  `SELECT id, ... FROM courses WHERE university_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1`,
+  [course.universityId, course.courseName],
+);Also check stageCourse function for the same pattern in the dedup query (~line 8000):
+typescriptconst dup = await pool.query(
+  `SELECT id FROM scraped_courses
+   WHERE university_id=$1
+     AND TRIM(REGEXP_REPLACE(LOWER(course_name), '[^a-z0-9]+', ' ', 'g'))=$2
+   ...`
+);
+This one is already case-insensitive — good.Add migration to dedupe existing courses: Create lib/db/migrations/0002_dedupe_case_insensitive_courses.sql:
+sql-- Find all duplicates within the same university where names differ only by case
+-- Keep the OLDER course (lower id), merge populated fields from newer, delete newer
+
+WITH dup_pairs AS (
+  SELECT 
+    MIN(id) as keep_id,
+    MAX(id) as drop_id
+  FROM courses
+  WHERE status = 'active'
+  GROUP BY university_id, LOWER(name)
+  HAVING COUNT(*) = 2
+)
+UPDATE courses c
+SET 
+  course_location = COALESCE(NULLIF(c.course_location, ''), n.course_location),
+  duration = COALESCE(c.duration, n.duration),
+  duration_term = COALESCE(c.duration_term, n.duration_term),
+  international_eligible = COALESCE(c.international_eligible, n.international_eligible),
+  on_campus_available = COALESCE(c.on_campus_available, n.on_campus_available),
+  eligibility_status = COALESCE(c.eligibility_status, n.eligibility_status),
+  study_mode = COALESCE(c.study_mode, n.study_mode),
+  description = COALESCE(c.description, n.description),
+  updated_at = NOW()
+FROM dup_pairs dp
+JOIN courses n ON n.id = dp.drop_id
+WHERE c.id = dp.keep_id;
+
+-- Move related rows to keep_id BEFORE deleting drop_id
+UPDATE fees f SET course_id = dp.keep_id
+FROM (SELECT MIN(id) as keep_id, MAX(id) as drop_id FROM courses WHERE status='active' GROUP BY university_id, LOWER(name) HAVING COUNT(*)=2) dp
+WHERE f.course_id = dp.drop_id 
+  AND NOT EXISTS (SELECT 1 FROM fees f2 WHERE f2.course_id = dp.keep_id);
+
+INSERT INTO english_requirements (course_id, test_type, listening, speaking, writing, reading, overall, test_name)
+SELECT dp.keep_id, er.test_type, er.listening, er.speaking, er.writing, er.reading, er.overall, er.test_name
+FROM (SELECT MIN(id) as keep_id, MAX(id) as drop_id FROM courses WHERE status='active' GROUP BY university_id, LOWER(name) HAVING COUNT(*)=2) dp
+JOIN english_requirements er ON er.course_id = dp.drop_id
+WHERE NOT EXISTS (SELECT 1 FROM english_requirements er2 WHERE er2.course_id = dp.keep_id AND er2.test_type = er.test_type);
+
+INSERT INTO intakes (course_id, intake_month, intake_day)
+SELECT dp.keep_id, i.intake_month, i.intake_day
+FROM (SELECT MIN(id) as keep_id, MAX(id) as drop_id FROM courses WHERE status='active' GROUP BY university_id, LOWER(name) HAVING COUNT(*)=2) dp
+JOIN intakes i ON i.course_id = dp.drop_id
+WHERE NOT EXISTS (SELECT 1 FROM intakes i2 WHERE i2.course_id = dp.keep_id);
+
+DELETE FROM courses WHERE id IN (
+  SELECT MAX(id) FROM courses WHERE status='active' 
+  GROUP BY university_id, LOWER(name) HAVING COUNT(*) = 2
+);
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view;Test acceptance:
+
+After deploy, run repair scrape on CSU again
+Verify NO new duplicates created
+Run: SELECT COUNT(*) FROM (SELECT LOWER(name) FROM courses WHERE university_id=4 AND status='active' GROUP BY LOWER(name) HAVING COUNT(*)>1) x; should return 0
+Bug #2: CRITICAL — stageCourse return type inconsistency causes silent failuresFile: artifacts/api-server/src/routes/scrape.ts
+Function: stageCourse (around line 7900)Current broken code:
+typescripttype StageCourseResult = { saved: true } | { saved: false; reason: string };
+
+async function stageCourse(...): Promise<StageCourseResult> {
+  // ... most paths return { saved: false, reason: "..." }
+  // ... but final success path returns:
+  return true;  // ← BUG! Should be { saved: true }
+}Required fix: Search for the line that returns true at the end of stageCourse and change to:
+typescriptreturn { saved: true };Why this matters: Callers do if (result.saved) which evaluates true.saved = undefined = falsy, so successful stages get logged as "skipped" with reason undefined. This is why tonight's repair showed imported: 0, skipped: 130 even though 79 courses were actually staged.Bug #3: HIGH — Bulk-add universities via CSV (currently 50 minutes of manual clicking)Current state: No way to add multiple universities at once. Must click "Add New" 10+ times.Required: New endpoint and UI for CSV bulk import.Backend — new endpoint in artifacts/api-server/src/routes/universities.ts:
+typescriptimport multer from "multer";
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post("/universities/bulk-import", upload.single('csv'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "CSV file required" });
+  
+  const csv = req.file.buffer.toString();
+  const lines = csv.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return res.status(400).json({ error: "CSV needs header + at least 1 row" });
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const required = ['name', 'website', 'country', 'city'];
+  const missing = required.filter(r => !headers.includes(r));
+  if (missing.length) return res.status(400).json({ error: `Missing columns: ${missing.join(', ')}` });
+  
+  const results = { created: 0, skipped: 0, errors: [] as string[] };
+  
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
+    
+    if (!row.name || !row.website) {
+      results.errors.push(`Row ${i+1}: missing name or website`);
+      continue;
+    }
+    
+    try {
+      const existing = await findUniversityByNameCaseInsensitive(row.name);
+      if (existing) { results.skipped++; continue; }
+      
+      await db.insert(universitiesTable).values({
+        name: row.name,
+        website: row.website,
+        scrapeUrl: row.scrape_url || row.website,
+        country: row.country || 'Unknown',
+        city: row.city || 'Unknown',
+      });
+      results.created++;
+    } catch (err) {
+      results.errors.push(`Row ${i+1} (${row.name}): ${(err as Error).message}`);
+    }
+  }
+  
+  res.json(results);
+});Frontend — new page artifacts/university-portal/src/pages/universities-bulk-import.tsx:
+
+File upload input
+Submit button
+Show results (created/skipped/errors)
+Link to it from /universities page header
+Sample CSV format:
+csvname,website,scrape_url,country,city
+Macquarie University,https://www.mq.edu.au,https://www.mq.edu.au/study/find-a-course/courses,Australia,Sydney
+Bond University,https://bond.edu.au,https://bond.edu.au/program-list,Australia,Gold Coast
+Australian Catholic University,https://www.acu.edu.au,https://www.acu.edu.au/study-at-acu/find-a-course,Australia,North SydneyBug #4: HIGH — University metadata defaults to "Unknown"Current: New universities get country='Unknown', city='Unknown'. This breaks location-based search.Required: Two changes.A) Make city/country REQUIRED in CreateUniversityBody Zod schema in packages/api-zod/src/universities.ts:
+typescriptexport const CreateUniversityBody = z.object({
+  name: z.string().min(1),
+  country: z.string().min(2).refine(v => v !== 'Unknown', 'Country must be specified'),
+  city: z.string().min(2).refine(v => v !== 'Unknown', 'City must be specified'),
+  website: z.string().url().optional(),
+  // ... other fields
+});B) One-time data migration to fix existing 6 universities:
+sqlUPDATE universities SET city='Toowoomba', country='Australia' WHERE id=1; -- USQ
+UPDATE universities SET city='Sydney', country='Australia' WHERE id=2; -- ASA
+UPDATE universities SET city='Sydney', country='Australia' WHERE id=3; -- Torrens
+UPDATE universities SET city='Bathurst', country='Australia' WHERE id=4; -- CSU
+UPDATE universities SET city='Hobart', country='Australia' WHERE id=5; -- Tasmania
+UPDATE universities SET city='Melbourne', country='Australia' WHERE id=6; -- VIT
+REFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view;Bug #5: MEDIUM — Job summary stats wrong (says skipped when actually staged)File: artifacts/api-server/src/routes/scrape.ts
+Function: Wherever the bulk session summary is computedSymptom: Tonight's repair job showed imported: 0, skipped: 130 but 79 courses were actually written to scraped_courses table.Root cause: Likely related to Bug #2 (stageCourse return type). After fixing #2, verify summary numbers match SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id = '<jobId>'.Test acceptance: After fix, run a repair scrape and verify:
+
+Job's imported count == staged_courses count for that jobId
+Job's skipped count only includes actual skips (duplicates, junk, domestic-only)
+Bug #6: MEDIUM — Auto-publish thresholds too strictCurrent state: Tonight's repair: 14 approved (18%), 58 pending_review (73%), 7 rejected (9%).Issue: 73% needing manual review is unsustainable for scaling. Many of those 58 likely have all critical fields populated and are SAFE to auto-publish.File: Find the function that sets auto_publish_status (search for autoPublishStatus).Required: Investigate and tune thresholds. Auto-approve criteria should be:
+typescriptfunction shouldAutoPublish(course): boolean {
+  // Hard requirements (all must pass)
+  if (course.completeness < 75) return false;
+  if (!course.duration || !course.durationTerm) return false;
+  if (!course.courseLocation) return false;
+  if (!course.intakeMonths?.length) return false;
+  if (!(course.ieltsOverall || course.pteOverall || course.toeflOverall)) return false;
+  if (course.eligibilityStatus === 'rejected') return false;
+  if (course.internationalEligible === false) return false;
+  
+  // Note: international_fee is NOT required (many courses publish without explicit fee)
+  
+  return true;
+}This should bring auto-approval to 50-60% instead of 18%.Test acceptance: After tuning, re-scrape CSU and check the auto_publish_status distribution.Bug #7: LOW — stageCourse 30-day rejection rule too aggressiveFile: scrape.ts ~line 7950Current:
+typescriptconst dup = await pool.query(
+  `... OR (status='rejected' AND reviewed_at > NOW() - INTERVAL '30 days')`
+);Issue: This means once a course is rejected (e.g. for missing fee), it can't be re-staged for 30 days even if the new scrape now finds the fee. This blocks improvements.Required: Reduce to 7 days OR add a flag to allow re-staging when scraping evidence improves:
+sql... OR (status='rejected' AND reviewed_at > NOW() - INTERVAL '7 days')EXECUTION ORDER (CRITICAL)Apply fixes in this order to avoid making things worse:
+First: Bug #2 (stageCourse return) — affects everything else
+Second: Bug #1 (case-sensitive match + dedup migration) — fixes existing duplicates
+Third: Bug #4 (university metadata) — required for search
+Fourth: Bug #6 (auto-publish thresholds) — improves scale
+Fifth: Bug #3 (CSV bulk import) — enables fast university addition
+Sixth: Bug #5 (summary stats) — verify after #2 is fixed
+Seventh: Bug #7 (rejection rule) — quality of life

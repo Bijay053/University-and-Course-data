@@ -5165,7 +5165,7 @@ async function stageCourse(
        AND TRIM(REGEXP_REPLACE(LOWER(course_name), '[^a-z0-9]+', ' ', 'g'))=$2
        AND (
          status='pending'
-         OR (status='rejected' AND reviewed_at > NOW() - INTERVAL '30 days')
+         OR (status='rejected' AND reviewed_at > NOW() - INTERVAL '7 days')
        )
      LIMIT 1`,
     [uniId, fingerprint],
@@ -5268,7 +5268,14 @@ async function stageCourse(
 
   await persistReviewArtifacts(inserted.id, snapshot);
 
-  return true;
+  // Bug #2 (2026-04-23): callers do `if (result.saved)` and we are typed as
+  // `Promise<StageCourseResult>`. Returning the bare `true` evaluated to
+  // `true.saved === undefined` (falsy) downstream, so successfully staged
+  // courses were being counted as `skipped` with reason `undefined`. This is
+  // why the recent CSU repair reported `imported: 0, skipped: 130` even
+  // though 79 rows actually landed in `scraped_courses`. Return the proper
+  // discriminated-union value so the counters match reality.
+  return { saved: true };
 }
 
 async function tryDiscoverApiEndpoints(html: string, pageUrl: string, job: ScrapeJob): Promise<{ url: string; name: string }[] | null> {

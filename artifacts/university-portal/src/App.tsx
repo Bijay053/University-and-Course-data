@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout";
 
 import Dashboard from "@/pages/dashboard";
 import Universities from "@/pages/universities";
+import UniversitiesBulkImport from "@/pages/universities-bulk-import";
 import UniversityDetail from "@/pages/university-detail";
 import Scraping from "@/pages/scraping";
 import Bulk from "@/pages/bulk";
@@ -25,6 +26,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/universities" component={Universities} />
+        <Route path="/universities/bulk-import" component={UniversitiesBulkImport} />
         <Route path="/universities/:id" component={UniversityDetail} />
         <Route path="/scraping" component={Scraping} />
         <Route path="/bulk" component={Bulk} />

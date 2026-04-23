@@ -11,15 +11,19 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Globe, ArrowRight, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star } from "lucide-react";
+import { Plus, Search, Globe, ArrowRight, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  country: z.string().min(1, "Country is required"),
-  city: z.string().min(1, "City is required"),
+  country: z.string()
+    .min(2, "Country is required")
+    .refine((v) => v.toLowerCase() !== "unknown", "Country must be specified (cannot be 'Unknown')"),
+  city: z.string()
+    .min(2, "City is required")
+    .refine((v) => v.toLowerCase() !== "unknown", "City must be specified (cannot be 'Unknown')"),
   website: z.string().url().optional().or(z.literal("")),
 });
 
@@ -138,12 +142,18 @@ export default function Universities() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Universities</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage partner universities and institutions.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-1.5">
-              <Plus className="h-4 w-4" /> Add University
+        <div className="flex gap-2">
+          <Link href="/universities/bulk-import">
+            <Button variant="outline" className="gap-1.5">
+              <Upload className="h-4 w-4" /> Bulk Import (CSV)
             </Button>
-          </DialogTrigger>
+          </Link>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-1.5">
+                <Plus className="h-4 w-4" /> Add University
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New University</DialogTitle>
@@ -171,6 +181,7 @@ export default function Universities() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Search + Table container */}

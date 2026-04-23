@@ -687,11 +687,32 @@ export function buildCourseReviewSnapshot(data: ReviewCourseData, sources: Revie
   }
 
   const eligibility = assessEligibility(data, sources);
-  const requiredFields: ReviewFieldKey[] = ["courseName", "duration", "internationalFee", "intakeMonths", "ieltsOverall"];
+  // Bug #6 (2026-04-23): tighten which fields actually GATE auto-publish.
+  //
+  // Old gate required `internationalFee` AND specifically `ieltsOverall`,
+  // which pushed ~73% of tonight's CSU repair into `pending_review` even
+  // when every other critical field was populated and at least one of
+  // PTE/TOEFL/Cambridge/Duolingo carried evidence — fee is genuinely
+  // optional for many published courses, and the IELTS-only requirement
+  // ignored equivalent English tests.
+  //
+  // New gate (matches user spec):
+  //   - hard-required fields:  courseName, duration, courseLocation,
+  //                            intakeMonths
+  //   - any-of English test:   IELTS OR PTE OR TOEFL must be accepted
+  //                            (Cambridge / Duolingo also count)
+  //   - eligibility check:     unchanged (rejected → rejected,
+  //                            anything-not-eligible → pending_review)
+  //   - internationalFee:      no longer gates auto-publish
+  const requiredFields: ReviewFieldKey[] = ["courseName", "duration", "courseLocation", "intakeMonths"];
   const requiredFailures = resolutions.filter((resolution) => requiredFields.includes(resolution.fieldKey) && resolution.status !== "accepted");
+
+  const englishTestKeys: ReviewFieldKey[] = ["ieltsOverall", "pteOverall", "toeflOverall", "cambridgeOverall", "duolingoOverall"];
+  const hasAcceptedEnglishTest = resolutions.some((resolution) => englishTestKeys.includes(resolution.fieldKey) && resolution.status === "accepted");
+
   const autoPublishStatus =
     eligibility.eligibilityStatus !== "eligible" ? (eligibility.eligibilityStatus === "rejected" ? "rejected" : "pending_review") :
-    conflicts.length > 0 || requiredFailures.length > 0 ? "pending_review" :
+    conflicts.length > 0 || requiredFailures.length > 0 || !hasAcceptedEnglishTest ? "pending_review" :
     "approved";
   const acceptedScores = resolutions.filter((resolution) => resolution.status === "accepted").map((resolution) => resolution.decisionScore);
   const decisionScore = acceptedScores.length > 0 ? acceptedScores.reduce((sum, value) => sum + value, 0) / acceptedScores.length : 0;
