@@ -36,6 +36,15 @@ def test_fee_ignores_salary_only_pages():
     assert out == []
 
 
+def test_fee_no_emit_without_tuition_or_intl_context():
+    # A page mentioning a $25,000 figure with no tuition/international cue
+    # (e.g. a scholarship value, a deposit, a building cost) must NOT be
+    # labelled as the international tuition fee.
+    html = "<p>Annual scholarship value: $25,000 awarded to top students.</p>"
+    out = _run(fee.extract(html, "https://x"))
+    assert out == []
+
+
 def test_fee_picks_intl_over_domestic_when_both_present():
     html = """
     <table>

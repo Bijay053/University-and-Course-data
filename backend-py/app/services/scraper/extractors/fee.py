@@ -176,6 +176,12 @@ async def extract(
     if best is None:
         return []
     score, amount, ctx = best
+    # Hard gate: never emit a fee unless the amount has at least one tuition
+    # OR international cue in its window. This prevents random currency
+    # numbers (deposits, scholarships, room costs) from being labelled as
+    # the international tuition fee.
+    if not (_TUITION_CTX.search(ctx) or _INTL_CTX.search(ctx)):
+        return []
     currency = _detect_currency(ctx, country)
     return [
         ExtractionResult(
