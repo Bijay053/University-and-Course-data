@@ -12235,10 +12235,19 @@ async function approveSingleCourse(course: typeof scrapedCoursesTable.$inferSele
       description: string | null;
       otherRequirement: string | null;
     }>(
+      // Case-insensitive name match: production found duplicates created
+      // because the live row was stored as "Bachelor Of Business Studies"
+      // (capital "Of") but the repair-staged row arrived as "Bachelor of
+      // Business Studies" (lower-case "of"), so the previous strict-equal
+      // check missed the existing course and inserted a new one.
+      // Prefer the OLDEST id when more than one historical match exists so
+      // we keep merging into the canonical row that downstream FKs point at.
       `SELECT id, category, sub_category AS "subCategory", course_website AS "courseWebsite", course_location AS "courseLocation",
               duration, duration_term AS "durationTerm", study_mode AS "studyMode", degree_level AS "degreeLevel",
               study_load AS "studyLoad", language, description, other_requirement AS "otherRequirement"
-       FROM courses WHERE university_id=$1 AND name=$2 LIMIT 1`,
+       FROM courses WHERE university_id=$1 AND LOWER(name)=LOWER($2)
+       ORDER BY id ASC
+       LIMIT 1`,
       [course.universityId, course.courseName],
     );
 
