@@ -296,6 +296,10 @@ export default function Scraping() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [urlQueueProgress, setUrlQueueProgress] = useState<{ current: number; total: number } | null>(null);
   const [scrapeStartTime, setScrapeStartTime] = useState<number | null>(null);
+  // `now` ticks every second while a scrape is running so the "(Xs elapsed)"
+  // counter updates live instead of only when the status poll fires
+  // (which is every 5s, and gets throttled to >1min on background tabs).
+  const [now, setNow] = useState<number>(() => Date.now());
   const urlQueueRef = useRef<string[]>([]);
   const uniBodyRef = useRef<Record<string, unknown>>({});
   const logIndexRef = useRef(0);
@@ -614,6 +618,33 @@ export default function Scraping() {
     };
   }, []);
 
+  // ── Live elapsed-timer tick ─────────────────────────────────────────────
+  // Re-render once per second while a scrape is running so the "(Xs elapsed)"
+  // label increments smoothly. We gate on `scrapeStartTime` so the timer is
+  // off when no scrape is active. setInterval is throttled on background
+  // tabs (~1Hz max), but that is fine — we just want monotonic ticks.
+  useEffect(() => {
+    if (!scrapeStartTime) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [scrapeStartTime]);
+
+  // ── Snap timer back to truth when the tab regains focus ────────────────
+  // Background-tab throttling can leave `now` lagging by tens of seconds.
+  // visibilitychange fires the moment the user returns, so we force one
+  // refresh — and trigger a status poll if a job is active so the progress
+  // numbers (current/total) catch up too.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setNow(Date.now());
+      if (activeJobId) void pollJobStatus(activeJobId);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [activeJobId, pollJobStatus]);
+
   useEffect(() => {
     const savedJobId = sessionStorage.getItem("activeScrapeJob");
     if (savedJobId) {
@@ -630,7 +661,7 @@ export default function Scraping() {
     let cancelled = false;
     fetch("/api/scrape/active")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { activeJobs?: Array<{ id?: string; runtimeJobId?: string; universityName?: string | null; status?: string }> } | null) => {
+      .then((data: { activeJobs?: Array<{ id?: string; runtimeJobId?: string; universityName?: string | null; status?: string; startedAt?: string | null }> } | null) => {
         if (cancelled || !data?.activeJobs?.length) return;
         // Backend orders running > awaiting_approval > queued by recency,
         // so [0] is the right job. Accept either `id` or `runtimeJobId`.
@@ -640,6 +671,13 @@ export default function Scraping() {
         setActiveJobId(jobId);
         if (job.universityName) setScrapeUniName(job.universityName);
         setScraping(true);
+        // Restore the elapsed-timer baseline from the server's startedAt so
+        // navigating back to /scraping (or opening it in a fresh tab) shows
+        // the correct "(Xs elapsed)" instead of starting from 0 or blank.
+        if (job.startedAt) {
+          const t = new Date(job.startedAt).getTime();
+          if (!Number.isNaN(t)) setScrapeStartTime(t);
+        }
         setScrapeLogs([{ event: "status", message: `Resumed in-progress scrape (${job.universityName ?? "unknown"}) from another tab/session.` }]);
         setScrapeResult(null);
         sessionStorage.setItem("activeScrapeJob", jobId);
@@ -1272,18 +1310,23 @@ export default function Scraping() {
                 const pct = (current / total) * 100;
                 let eta: string | null = null;
                 let elapsed: string | null = null;
-                if (scrapeStartTime && current > 0 && current < total) {
-                  const elapsedMs = Date.now() - scrapeStartTime;
-                  const pacePerItem = elapsedMs / current;
-                  const remainingMs = pacePerItem * (total - current);
+                if (scrapeStartTime) {
+                  // Use the ticking `now` state — it's bumped every second by
+                  // the elapsed-timer effect, so the label increments live
+                  // instead of only when the status poll lands.
+                  const elapsedMs = now - scrapeStartTime;
                   const fmt = (ms: number) => {
                     const s = Math.max(0, Math.round(ms / 1000));
                     const m = Math.floor(s / 60);
                     const r = s % 60;
                     return m > 0 ? `${m}m ${r}s` : `${r}s`;
                   };
-                  eta = fmt(remainingMs);
                   elapsed = fmt(elapsedMs);
+                  if (current > 0 && current < total) {
+                    const pacePerItem = elapsedMs / current;
+                    const remainingMs = pacePerItem * (total - current);
+                    eta = fmt(remainingMs);
+                  }
                 }
                 return (
                   <div className="space-y-1">

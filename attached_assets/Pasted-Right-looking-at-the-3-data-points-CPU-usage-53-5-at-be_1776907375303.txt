@@ -1,0 +1,114 @@
+Right — looking at the 3 data points:
+
+CPU usage: 53.5% (at best, elsewhere it was 67%)
+Memory: 52.0% (fine, ~4GB of 8GB)
+CSU scrape: ~8m 35s left at 59/299 → still ~10 min more to finish, and you've seen it take 2+ hours on full runs
+
+So the server has ~47% CPU headroom being wasted. You could be finishing CSU in half the time.
+Here's the precise instruction for Replit:
+
+Paste this to Replit agent:
+
+PERFORMANCE: Server CPU at 53% during peak scrape — 47% of a 4 vCPU server is idle while scraping CSU takes 2+ hours
+Server: DigitalOcean Basic Intel / 4 vCPUs / 8 GB RAM. During a live Charles Sturt scrape (299 courses), DigitalOcean Insights panel shows CPU=53.5%, Memory=52.0%. That means only ~2 vCPUs are being used. The other 2 are idle.
+Impact: CSU (299 courses) currently takes 2+ hours. With proper parallelism it should take 30-45 min.
+
+ROOT CAUSE — investigate:
+
+In scrape.ts, find and share the current values of:
+
+CONCURRENCY
+BROWSER_CONCURRENCY
+RETRY_CONCURRENCY
+HEAVY_HOSTS list (does it include csu.edu.au or study.csu.edu.au?)
+isHeavyBatchHost() logic
+
+
+Check worker pool size in ecosystem.config.cjs — is there instances set? Should we use pm2 cluster mode with 4 instances (matches 4 vCPUs)?
+
+
+FIX — Scale concurrency to 4-core server:
+typescript// At top of scrape.ts
+import os from 'os';
+const CPU_COUNT = os.cpus().length; // = 4 on user's server
+
+// Hosts known to rate-limit aggressively — keep conservative
+const HEAVY_HOSTS = new Set([
+  'torrens.edu.au',  // confirmed bot protection
+  // do NOT add csu.edu.au here unless proven to block — currently safe to parallelize
+]);
+
+const isHeavyBatchHost = (hostname: string) =>
+  HEAVY_HOSTS.has(hostname) || hostname.endsWith('.torrens.edu.au');
+
+// Concurrency tiers
+const CONCURRENCY = isHeavyBatchHost(hostname) 
+  ? 4  // heavy: 4 parallel requests max
+  : Math.min(32, CPU_COUNT * 8);  // normal: 32 for 4 vCPUs
+
+const BROWSER_CONCURRENCY = isHeavyBatchHost(hostname)
+  ? 2  // heavy: only 2 headless browsers at once (memory-bound)
+  : Math.min(12, CPU_COUNT * 3);  // normal: 12 for 4 vCPUs
+
+const RETRY_CONCURRENCY = isHeavyBatchHost(hostname)
+  ? 2
+  : Math.min(16, CPU_COUNT * 4);  // normal: 16 for 4 vCPUs
+Confirm study.csu.edu.au is NOT in HEAVY_HOSTS. User's tests show CSU serves pages fast without rate-limiting. Currently it might be tagged as heavy, artificially throttling to 3 parallel browsers.
+
+FIX 2 — Parallelize the per-course vision step when it runs:
+Currently each course fetches images sequentially for vision scan. If vision is needed (rare after the HTML short-circuit from previous commit), batch 3 images in parallel:
+typescript// Old: sequential
+for (const img of candidateImages.slice(0, 3)) {
+  const result = await callGeminiVision(img);
+  if (hasCompleteEnglishData(result)) break;
+}
+
+// New: 3 images in parallel, first complete result wins
+const images = candidateImages.slice(0, 3);
+const result = await Promise.any(
+  images.map(img => 
+    callGeminiVision(img).then(r => 
+      hasCompleteEnglishData(r) ? r : Promise.reject('incomplete')
+    )
+  )
+).catch(() => null);
+
+FIX 3 — Verify PM2 not blocking multi-core:
+Check ecosystem.config.cjs. If it has instances: 1, the Node process is single-threaded and can only use 1 CPU. But workers are separate processes so this is probably OK. Still verify:
+bashpm2 describe uni-api | grep -iE "instances|exec_mode"
+If exec_mode: fork and instances: 1, that's fine because scrape-workers are spawned separately. If it's cluster mode, that's even better. Don't change if it works.
+
+FIX 4 — Verify OS file descriptor / socket limits:
+With 32+ parallel HTTP requests, we need sufficient ulimits. Check for errors like EMFILE: too many open files in pm2 logs. If present, add to ecosystem.config.cjs:
+javascriptmodule.exports = {
+  apps: [{
+    name: 'uni-api',
+    // ...existing config
+    env: {
+      UV_THREADPOOL_SIZE: '16',  // boost libuv threadpool from 4 to 16
+      NODE_OPTIONS: '--max-old-space-size=4096',  // 4GB heap
+    },
+    max_memory_restart: '2048M',  // already set
+  }]
+};
+
+DELIVERY:
+
+Report current values of CONCURRENCY, BROWSER_CONCURRENCY, RETRY_CONCURRENCY, HEAVY_HOSTS list
+Apply fixes 1, 2, 3 (skip fix 4 unless EMFILE errors present)
+Build, commit, push with message "Scale scrape concurrency to 4-core server (CPU_COUNT * N), parallelize vision"
+Reply with:
+
+Before/after concurrency values
+Confirmation CSU is not in HEAVY_HOSTS
+Commit hash
+
+
+
+Target metric:
+
+CSU (299 courses) completes in under 45 minutes (was 2+ hours)
+Server CPU peaks above 80% during scrape (was 53%)
+Server memory stays below 85% (8GB total, so under 6.8GB used)
+
+After push I'll deploy and kick off CSU re-scrape to measure improvement.
