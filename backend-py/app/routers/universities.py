@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import Course, University
+from app.schemas.course import CourseListResponse, CourseRead
 from app.schemas.university import (
     UniversityCreate,
     UniversityListResponse,
@@ -82,6 +83,31 @@ async def get_university(uni_id: int, db: Annotated[AsyncSession, Depends(get_db
     cc_stmt = select(func.count(Course.id)).where(Course.university_id == uni_id)
     cc = (await db.execute(cc_stmt)).scalar_one()
     return _to_read(u, int(cc))
+
+
+@router.get("/universities/{uni_id}/courses", response_model=CourseListResponse)
+async def get_university_courses(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=500),
+) -> CourseListResponse:
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+    stmt = select(Course).where(Course.university_id == uni_id)
+    if status_filter:
+        stmt = stmt.where(Course.status == status_filter)
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    stmt = stmt.order_by(desc(Course.updated_at)).offset((page - 1) * limit).limit(limit)
+    rows = (await db.execute(stmt)).scalars().all()
+    return CourseListResponse(
+        data=[CourseRead.model_validate(r) for r in rows],
+        total=int(total),
+        page=page,
+        limit=limit,
+    )
 
 
 @router.post("/universities", response_model=UniversityRead, status_code=status.HTTP_201_CREATED)

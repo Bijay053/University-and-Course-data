@@ -9,15 +9,28 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services.scraper.extractors import ai_fallback, duration, english_test, fee, intake
+from app.services.scraper.extractors import (
+    ai_fallback,
+    course_name,
+    duration,
+    eligibility,
+    english_test,
+    fee,
+    intake,
+    location,
+)
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.http_fetcher import fetch_html
+from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
 
 
 # Each entry: (module, kwargs the extractor accepts beyond html/url)
 _EXTRACTORS = (
+    (course_name, ()),
+    (location, ()),
+    (eligibility, ()),
     (fee, ("country",)),
     (english_test, ()),
     (intake, ()),
@@ -84,4 +97,10 @@ async def extract_course(
                 }
             )
 
-    return {"url": url, "payload": payload, "evidence": evidence}
+    footer = build_course_page_provenance_footer(payload)
+    return {
+        "url": url,
+        "payload": payload,
+        "evidence": evidence,
+        "provenance_footer": footer,
+    }
