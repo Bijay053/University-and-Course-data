@@ -37,6 +37,48 @@ A centralized admin portal for managing university course data including courses
 
 Tables: `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging table for scraped data review), `import_jobs`
 
+## Production Deployment
+
+- **Server**: DigitalOcean droplet at `159.65.152.72` (Ubuntu 24.04)
+- **Repo path on production**: `/root/University-and-Course-data` (NOT `/opt/app` — that is a Replit container path and must never be used)
+- **Process manager**: pm2 with `ecosystem.config.cjs`
+- **Env file**: `/root/.env.backup` (real `DATABASE_URL`, `GEMINI_API_KEY`, etc.)
+- **Database**: Local PostgreSQL — db `university_portal`, user `uniportal`
+- **SSH credentials are NOT available in the Replit env** — the user runs deploys themselves. Always provide commands in the format below.
+
+### Standard deploy command (full)
+```bash
+cd /root/University-and-Course-data && \
+git pull && \
+pnpm install --frozen-lockfile && \
+pnpm --filter @workspace/api-server run build && \
+pnpm --filter @workspace/university-portal run build && \
+source /root/.env.backup && \
+pm2 delete uni-api && \
+pm2 start ecosystem.config.cjs && \
+pm2 save
+```
+
+### When schema changes are needed
+Add this step BEFORE the builds:
+```bash
+pnpm --filter @workspace/db push --force
+```
+
+### Frontend-only changes
+Skip the api-server build, skip pm2 delete/start (Nginx serves the new bundle automatically):
+```bash
+cd /root/University-and-Course-data && git pull && pnpm install --frozen-lockfile && \
+pnpm --filter @workspace/university-portal run build
+```
+
+### Verification commands user runs after deploy
+```bash
+git log -1 --oneline                                              # confirm commit deployed
+curl -s http://localhost/ | grep -oE 'assets/index-[A-Za-z0-9-]+\.js'   # confirm new bundle served
+pm2 env 0 | grep -E "DATABASE_URL|GEMINI|UV_THREADPOOL"            # confirm pm2 has correct env
+```
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
