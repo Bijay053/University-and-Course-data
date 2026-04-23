@@ -23,10 +23,15 @@ async def _client():
         timeout=30,
         follow_redirects=True,
         headers={
+            # Many university sites refuse anything that looks like a bot. We
+            # use a real browser UA and accept-headers so plain HTML pages load.
             "User-Agent": (
-                "Mozilla/5.0 (Linux; UniportalBot/1.0; +https://example.com) "
-                "AppleWebKit/537.36 Chrome/124"
-            )
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         },
     ) as c:
         yield c
