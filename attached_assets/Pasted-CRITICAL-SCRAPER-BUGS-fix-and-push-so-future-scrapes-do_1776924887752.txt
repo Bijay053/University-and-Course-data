@@ -1,0 +1,259 @@
+CRITICAL SCRAPER BUGS — fix and push so future scrapes don't re-introduce these issues
+Production investigation on 2026-04-23 revealed multiple data quality bugs. SQL hotfixes have been applied to clean existing data, but the scraper code itself must be fixed so future scrapes don't re-create the same garbage.
+
+ENVIRONMENT FACTS (confirmed from production)
+
+Production repo path: /root/University-and-Course-data (NOT /opt/app)
+english_requirements schema is normalized (one row per test_type):
+course_id | test_type | listening | speaking | writing | reading | overall | test_name
+test_type values seen: IELTS, PTE, TOEFL, Cambridge CAE, Duolingo
+Standard deploy command:
+bashcd /root/University-and-Course-data && git pull && pnpm install --frozen-lockfile && \
+pnpm --filter @workspace/api-server run build && \
+pnpm --filter @workspace/university-portal run build && \
+source /root/.env.backup && pm2 delete uni-api && pm2 start ecosystem.config.cjs && pm2 save
+
+
+
+BUG 1 — Scraper strips "of"/"in" prepositions from course names
+Production impact: 148 out of 184 CSU courses had names like "Bachelor Business Studies" instead of "Bachelor of Business Studies". Actual page title at https://study.csu.edu.au/international/courses/bachelor-business-studies is "Bachelor of Business Studies".
+SQL hotfix applied (148 courses fixed):
+sqlUPDATE courses 
+SET name = regexp_replace(name, '^(Bachelor|Master|Diploma|Doctor) ([A-Z])', '\1 Of \2')
+WHERE university_id=4 AND name NOT LIKE '% of %' AND name NOT LIKE '% in %';
+-- Similar for Graduate Certificate/Diploma, Undergraduate Certificate
+Scraper fix needed in course-name extraction/normalization:
+
+The cleaning pipeline strips "of", "in", "and" etc. as if they were stopwords. Stop doing that for course names — keep all words from the original page title.
+Only strip leading/trailing noise:
+
+University name prefix ("Charles Sturt — ")
+"Overview" / "Course details" suffix
+Pagination markers, breadcrumb residue
+
+
+Add URL-slug validation: If the extracted name is "Bachelor X" but the URL slug contains "bachelor-of-X", prefer the slug-derived name. Example:
+typescriptfunction validateNameAgainstSlug(extractedName: string, url: string): string {
+  const slug = url.split('/').pop() ?? '';
+  const slugWords = slug.toLowerCase().split('-');
+  const nameWords = extractedName.toLowerCase().split(/\s+/);
+  
+  // If slug has "of"/"in"/"and" but extracted name doesn't, reconstruct from slug
+  const prepositions = ['of', 'in', 'and'];
+  const slugHasPrep = slugWords.some(w => prepositions.includes(w));
+  const nameHasPrep = nameWords.some(w => prepositions.includes(w));
+  
+  if (slugHasPrep && !nameHasPrep) {
+    // Reconstruct from slug with Title Case
+    return slug.split('-').map(w => 
+      prepositions.includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)
+    ).join(' ');
+  }
+  return extractedName;
+}
+
+Write a test case that covers "Bachelor Business Studies" (extracted) with URL bachelor-business-studies should stay as-is, but URL bachelor-of-business-studies should become "Bachelor of Business Studies".
+
+
+BUG 2 — Evidence panel shows stale/wrong "selected" rows vs actual course record
+Production example (course "Bachelor Business Studies", CSU):
+FieldEvidence panel says "selected ✓"Actual course record hasduration1 year3 YearduolingoOverall60 (accepted)NULL (not saved)
+Evidence rows are also duplicated — 2 identical rows per field per course, suggesting the insert logic runs twice or isn't idempotent.
+Scraper fixes needed:
+
+Fix selected flag alignment: After the pipeline decides the final value for a field, mark ONLY the evidence row whose value matches as selected=true, set all others to false. If no evidence row matches the final value (because final value was computed/derived), insert a synthetic evidence row with page_type='derived' and selected=true.
+Make evidence inserts idempotent. Use ON CONFLICT (scraped_course_id, field_key, candidate_value, source_url) DO NOTHING (or similar unique constraint). Remove duplicate rows existing in DB:
+sqlDELETE FROM scraped_field_evidence a
+WHERE a.id > (
+  SELECT MIN(b.id) FROM scraped_field_evidence b
+  WHERE b.scraped_course_id = a.scraped_course_id
+    AND b.field_key = a.field_key
+    AND b.candidate_value IS NOT DISTINCT FROM a.candidate_value
+    AND b.source_url IS NOT DISTINCT FROM a.source_url
+);
+
+Evidence panel UI — at the top of each field group, show the final value currently on the course record alongside the evidence candidates. Make mismatches visually obvious (e.g., red warning icon if selected=true row's value ≠ actual course value).
+Duration "1 year vs 3 year" specific issue: CSU page shows primary duration "3 years full-time" with alternative "1 year accelerated". Scraper extracted the accelerated one. Fix: prefer longer/standard duration when multiple are listed; accelerated/fast-track durations should be stored in a separate accelerated_duration field, not overwrite duration.
+
+
+BUG 3 — PTE/TOEFL/Duolingo not extracted from CSU concordance table
+Production data:
+UniversityIELTS rowsPTE rowsTOEFL rowsDuolingoCAECSU (id=4)173 ✓1 ❌0 ❌0 ❌5Torrens (id=3)74 ✓74 ✓74 ✓3974
+Torrens sibling-cache backfill works perfectly. CSU version does not. The CSU concordance page at https://study.csu.edu.au/international/how-to-apply/course-entry-requirements has this exact table:
+IELTSTOEFL IBTLanguageCertMETPTE AcademicTOEFL PBT6.0606553505506.5797058585777.094756265N/A7.5102806773N/A
+All the scraper needs to do: when a course's IELTS is extracted, look up that IELTS row in the concordance table and pull the matching PTE, TOEFL, etc. scores into english_requirements rows.
+Fix:
+
+On first CSU course in a scrape run, fetch and parse the concordance page once, cache the IELTS-to-everything mapping.
+For every subsequent CSU course, after IELTS is extracted, insert matching PTE/TOEFL/CAE/LanguageCert rows from the cache.
+Same sibling-cache pattern as Torrens — which works.
+
+Write the cache as a reusable ConcordanceTable class so it's easy to add per-university support going forward.
+
+BUG 4 — Garbage values in course_location field
+Production examples cleaned today (57 rows set to NULL):
+
+"test" (placeholder)
+"On Campus" (study mode, not location)
+"If you're having trouble accessing Google Search, please click here..." (error message)
+"Port Macquarie, Jilin Uni - Finance & Economics, Tianjin University of Commerce, Yangzhou University, Yunnan Uni-Finance & Economics" (exchange partner list, not location)
+"Session 1 : March 2" (date label)
+"SPACE University of Hong Kong" (partner uni, not campus)
+
+SQL hotfix applied — cleaned via:
+sqlUPDATE courses SET course_location = NULL
+WHERE course_location ILIKE '%Session %' 
+   OR course_location ILIKE '%Google%' 
+   OR course_location ILIKE '%click here%' 
+   OR course_location = 'test' 
+   OR course_location ILIKE '%feedback%' 
+   OR course_location ILIKE '%trouble accessing%'
+   OR course_location ILIKE '%Jilin%'
+   OR course_location ILIKE '%Tianjin%'
+   OR course_location ILIKE '%Yangzhou%'
+   OR course_location ILIKE '%Yunnan%'
+   OR course_location ILIKE '%SPACE University%'
+   OR LENGTH(course_location) > 150;
+Scraper fix needed — add validation in course_location extraction:
+typescriptconst VALID_AU_CAMPUSES = new Set([
+  // Major AU cities
+  'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', 
+  'hobart', 'canberra', 'darwin', 'gold coast', 'newcastle',
+  // CSU campuses
+  'bathurst', 'albury-wodonga', 'albury', 'wodonga', 'dubbo', 
+  'port macquarie', 'wagga wagga', 'orange', 'canberra',
+  // USQ campuses
+  'toowoomba', 'springfield', 'ipswich',
+  // Other common
+  'holmesglen', 'external', 'online', 'uni wide'
+]);
+
+const LOCATION_BLOCKLIST_PATTERNS = [
+  /click here/i,
+  /google/i,
+  /feedback/i,
+  /trouble accessing/i,
+  /session \d/i,
+  /^test$/i,
+  /^on campus$/i,
+  /^external$/i,
+  /\bjilin\b|\btianjin\b|\byangzhou\b|\byunnan\b/i,  // exchange partner artefacts
+];
+
+function validateCourseLocation(raw: string | null): string | null {
+  if (!raw) return null;
+  if (raw.length > 150) return null;  // too long = prose, not location
+  
+  // Reject blocklist patterns
+  for (const pattern of LOCATION_BLOCKLIST_PATTERNS) {
+    if (pattern.test(raw)) return null;
+  }
+  
+  // Split on comma, validate each piece against known campus list
+  const parts = raw.split(',').map(p => p.trim().toLowerCase());
+  const validParts = parts.filter(p => 
+    VALID_AU_CAMPUSES.has(p) || 
+    // Allow if it's 2-30 chars and no weird chars
+    (p.length >= 2 && p.length <= 30 && /^[a-z\s-]+$/.test(p))
+  );
+  
+  if (validParts.length === 0) return null;
+  
+  // Return original casing from raw, filtered to valid parts
+  return raw.split(',')
+    .map(p => p.trim())
+    .filter((_, i) => validParts.includes(parts[i]))
+    .join(', ') || null;
+}
+Also: don't use "On Campus" as a location value — that belongs in study_mode. When scraper sees "On Campus" in a cell it thinks is location, skip it (it's the study mode label).
+
+BUG 5 — CSU courses still missing fee/duration/intake (speedup regression)
+Known from earlier session — 148/184 CSU courses have NULL international_fee. The speedup commit (0a4bcda) short-circuited fee extraction when page had IELTS text but no visible fee.
+Fix: If a course page has structured data (JSON-LD, tables, sidebar) but the fee/duration parsers return null, don't short-circuit — always queue vision-scan or PDF extraction as a fallback. The "IELTS found = skip vision" heuristic is too aggressive.
+Add a new scrape mode: "Repair Scrape" — targets only courses with NULL critical fields (fee, duration, intakes) and fills them via vision-scan. Admin triggers from the Scraping page:
+[Repair Scrape] → Select University → Shows "15 courses missing data" → [Start Repair]
+Only re-scrapes courses where courses.international_fee IS NULL OR courses.duration IS NULL OR NOT EXISTS (SELECT 1 FROM intakes WHERE course_id = courses.id).
+
+BACKFILL MIGRATION (for idempotency in future fresh deploys)
+Add this as a Drizzle migration file so if the DB is ever wiped and re-imported, the same cleanup runs automatically:
+sql-- migrations/XXXX_clean_course_names_and_locations.sql
+
+-- Restore "Of" in CSU course names where it was stripped
+UPDATE courses 
+SET name = regexp_replace(name, '^(Bachelor|Master|Diploma|Doctor) ([A-Z])', '\1 Of \2')
+WHERE name NOT LIKE '% of %' 
+  AND name NOT LIKE '% in %'
+  AND name NOT LIKE '% Of %'
+  AND name ~ '^(Bachelor|Master|Diploma|Doctor) [A-Z]'
+  AND name NOT LIKE 'Bachelor Honours%'
+  AND name NOT LIKE 'Master Honours%';
+
+UPDATE courses 
+SET name = regexp_replace(name, '^Graduate Certificate ([A-Z])', 'Graduate Certificate Of \1')
+WHERE name NOT LIKE '% of %' AND name NOT LIKE '% Of %' AND name NOT LIKE '% in %'
+  AND name ~ '^Graduate Certificate [A-Z]';
+
+UPDATE courses 
+SET name = regexp_replace(name, '^Graduate Diploma ([A-Z])', 'Graduate Diploma Of \1')
+WHERE name NOT LIKE '% of %' AND name NOT LIKE '% Of %' AND name NOT LIKE '% in %'
+  AND name ~ '^Graduate Diploma [A-Z]';
+
+UPDATE courses 
+SET name = regexp_replace(name, '^Undergraduate Certificate ([A-Z])', 'Undergraduate Certificate Of \1')
+WHERE name NOT LIKE '% of %' AND name NOT LIKE '% Of %' AND name NOT LIKE '% in %'
+  AND name ~ '^Undergraduate Certificate [A-Z]';
+
+-- Clean garbage course_location
+UPDATE courses SET course_location = NULL
+WHERE course_location ILIKE '%Session %' 
+   OR course_location ILIKE '%Google%' 
+   OR course_location ILIKE '%click here%' 
+   OR course_location = 'test' 
+   OR course_location ILIKE '%feedback%' 
+   OR course_location ILIKE '%trouble accessing%'
+   OR course_location ILIKE '%Jilin%'
+   OR course_location ILIKE '%Tianjin%'
+   OR course_location ILIKE '%Yangzhou%'
+   OR course_location ILIKE '%Yunnan%'
+   OR course_location ILIKE '%SPACE University%'
+   OR LENGTH(course_location) > 150;
+
+-- De-duplicate scraped_field_evidence rows
+DELETE FROM scraped_field_evidence a
+WHERE a.id > (
+  SELECT MIN(b.id) FROM scraped_field_evidence b
+  WHERE b.scraped_course_id = a.scraped_course_id
+    AND b.field_key = a.field_key
+    AND b.candidate_value IS NOT DISTINCT FROM a.candidate_value
+    AND b.source_url IS NOT DISTINCT FROM a.source_url
+);
+
+-- Refresh search view
+REFRESH MATERIALIZED VIEW CONCURRENTLY course_search_view;
+
+DELIVERY
+Ship in 3 commits so I can deploy progressively:
+Commit 1 — Data integrity rules in scraper
+
+Fix course name extraction (keep prepositions, URL slug validation)
+Fix course_location validation (blocklist + whitelist)
+Add migration file with backfill SQL
+Commit message: "Scraper: preserve prepositions in course names, validate locations"
+
+Commit 2 — Evidence panel truth alignment
+
+Fix selected=true flag to match actual course record
+Make evidence inserts idempotent (unique constraint or ON CONFLICT)
+Evidence UI shows final value at top + warning if selected row mismatches
+Commit message: "Evidence panel: align selected flag with saved course values + deduplicate"
+
+Commit 3 — Concordance table parser + repair scrape
+
+Per-university concordance cache (IELTS → PTE/TOEFL/CAE/DET mapping)
+Backfill all CSU courses' missing tests from concordance
+New "Repair Scrape" mode targeting only courses with NULL critical fields
+Commit message: "Concordance table extraction + repair scrape mode for missing fields"
+
+After each commit, push to main. I'll deploy and verify.
+Reply with all 3 commit hashes + confirmation that all tests pass (especially the course name regex tests).
+Deploy path: /root/University-and-Course-data

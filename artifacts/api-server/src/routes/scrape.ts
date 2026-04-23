@@ -62,6 +62,8 @@ import {
   pickEffectiveCourseTemplate,
   type CoursePageTemplate,
 } from "../lib/course-page-template.js";
+import { validateNameAgainstSlug } from "../lib/course-name-normalizer.js";
+import { validateCourseLocation } from "../lib/course-location-validator.js";
 import type { AnyNode, Element } from "domhandler";
 import type { Cheerio } from "cheerio";
 import {
@@ -1650,7 +1652,12 @@ function extractWithCheerio(
   const $ = cheerio.load(html);
   const text = extractVisibleBodyTextFromHtml(html).slice(0, MAX_EXTRACT_TEXT_CHARS);
   const preferredUrl = preferInternationalCourseUrl(url);
-  const data: Partial<CourseData> = { courseName: name, courseWebsite: preferredUrl, language: "English" };
+  // Reconstruct missing prepositions ("of", "in", "and") from the URL slug.
+  // Production bug: 148/184 CSU courses came in as "Bachelor Business Studies"
+  // because page-title cleanup dropped the preposition. The slug
+  // bachelor-of-business-studies makes the real name recoverable.
+  const reconstructedName = validateNameAgainstSlug(name, preferredUrl);
+  const data: Partial<CourseData> = { courseName: reconstructedName, courseWebsite: preferredUrl, language: "English" };
   applyCsuStructuredCourseData(html, preferredUrl, data);
 
   const pageTemplate = detectCoursePageTemplate(html, preferredUrl);
@@ -4958,6 +4965,22 @@ async function stageCourse(
   reviewContext?: CourseReviewContext,
 ): Promise<StageCourseResult> {
   if (!courseData.courseName) return { saved: false, reason: "missing course name" };
+
+  // Last-line-of-defence cleanups before persisting:
+  // (a) Re-apply slug-based preposition reconstruction in case the AI
+  //     extraction path produced a "Bachelor X" name when the URL says
+  //     bachelor-of-X. extractWithCheerio already runs this, but the
+  //     AI/fallback paths don't always go through it.
+  if (courseData.courseName && courseData.courseWebsite) {
+    courseData.courseName = validateNameAgainstSlug(courseData.courseName, courseData.courseWebsite);
+  }
+  // (b) Reject obvious junk in courseLocation (Google error blurbs,
+  //     "On Campus" study-mode label, foreign exchange-partner unis,
+  //     prose >150 chars, etc.) before it ever hits the DB.
+  if (courseData.courseLocation) {
+    const cleaned = validateCourseLocation(courseData.courseLocation);
+    courseData.courseLocation = cleaned ?? undefined;
+  }
 
   if (courseData.domesticOnly) {
     if (job) addLog(job, "status", { message: `Skipped (domestic only): "${courseData.courseName.slice(0, 60)}"`, phase: "validate" });
