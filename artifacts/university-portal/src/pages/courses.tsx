@@ -19,7 +19,7 @@ const DEGREE_COLORS: Record<string, string> = {
   "English Language": "bg-gray-100 text-gray-700",
   "Bachelor Dual Degree": "bg-blue-100 text-blue-800",
   "Master Dual Degree": "bg-purple-100 text-purple-800",
-  "Dual Degree": "bg-indigo-100 text-indigo-800",
+  "Dual Degree": "bg-red-100 text-red-800",
 };
 
 const ALL = "__all__";

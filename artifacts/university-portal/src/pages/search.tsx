@@ -244,7 +244,7 @@ export default function SearchPage() {
   return (
     <div className="space-y-4">
       {/* ── Hero search bar ────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 rounded-2xl p-6 shadow-lg">
+      <div className="bg-gradient-to-r from-[#0F172A] via-[#7F1D1D] to-[#DC2626] rounded-2xl p-6 shadow-lg">
         <div className="text-white mb-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <GraduationCap className="w-6 h-6" /> Find Your Perfect Course
@@ -280,7 +280,7 @@ export default function SearchPage() {
         <aside className="bg-white rounded-xl border p-4 space-y-4 self-start lg:sticky lg:top-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm flex items-center gap-2">
-              <Filter className="w-4 h-4 text-indigo-600" /> Filters
+              <Filter className="w-4 h-4 text-red-600" /> Filters
             </h2>
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
           </div>
@@ -370,7 +370,7 @@ export default function SearchPage() {
 
             {/* ── Advanced Filter ── */}
             <AccordionItem value="advanced">
-              <AccordionTrigger className="text-sm font-semibold text-indigo-700">
+              <AccordionTrigger className="text-sm font-semibold text-red-700">
                 Advanced Filter
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
@@ -440,7 +440,7 @@ export default function SearchPage() {
 
             {/* ── English Proficiency Exam ── */}
             <AccordionItem value="english">
-              <AccordionTrigger className="text-sm font-semibold text-indigo-700">
+              <AccordionTrigger className="text-sm font-semibold text-red-700">
                 English Proficiency Exam
               </AccordionTrigger>
               <AccordionContent className="space-y-2 pt-2">
@@ -509,7 +509,7 @@ export default function SearchPage() {
               {loading ? (
                 <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</span>
               ) : data ? (
-                <span><strong className="text-indigo-700">{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
+                <span><strong className="text-red-700">{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
                   <span className="text-xs text-gray-400 ml-2">({data.took_ms}ms)</span></span>
               ) : "—"}
             </div>
@@ -548,21 +548,21 @@ export default function SearchPage() {
               if (r.intakes.length > 0) meta.push({ icon: <Calendar className="w-3.5 h-3.5" />, text: r.intakes.join(", ") });
 
               return (
-                <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-indigo-300 transition-all">
+                <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-red-300 transition-all">
                   <div className="flex gap-4">
                     {r.university.logo_url ? (
                       <img src={r.university.logo_url} alt={r.university.name} className="w-16 h-16 object-contain rounded-lg border bg-white p-1 flex-shrink-0" />
                     ) : (
-                      <div className="w-16 h-16 rounded-lg border bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg border bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center text-red-600 text-xs font-bold flex-shrink-0">
                         {r.university.name.split(" ").slice(0, 2).map((s) => s[0]).join("")}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <Link href={`/courses/${r.id}`}>
-                        <h3 className="font-semibold text-base text-gray-900 leading-snug hover:text-indigo-700 cursor-pointer">{r.course_name}</h3>
+                        <h3 className="font-semibold text-base text-gray-900 leading-snug hover:text-red-700 cursor-pointer">{r.course_name}</h3>
                       </Link>
                       <Link href={`/universities/${r.university.id}`}>
-                        <p className="text-sm text-gray-600 mt-0.5 hover:text-indigo-700 cursor-pointer inline-flex items-center gap-1">
+                        <p className="text-sm text-gray-600 mt-0.5 hover:text-red-700 cursor-pointer inline-flex items-center gap-1">
                           <BookOpen className="w-3.5 h-3.5" /> {r.university.name}
                         </p>
                       </Link>
@@ -574,7 +574,7 @@ export default function SearchPage() {
                         </div>
                       )}
                       <div className="flex flex-wrap gap-1.5 mt-2.5">
-                        {r.degree_level && <Badge variant="secondary" className="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100">{r.degree_level}</Badge>}
+                        {r.degree_level && <Badge variant="secondary" className="text-[10px] bg-red-50 text-red-700 hover:bg-red-100">{r.degree_level}</Badge>}
                         {r.category && <Badge variant="outline" className="text-[10px]">{r.category}</Badge>}
                         {r.english_requirements.ielts_overall && (
                           <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-700">
@@ -595,12 +595,12 @@ export default function SearchPage() {
                         {inTray ? "In Compare" : "Compare"}
                       </Button>
                       <Link href={`/courses/${r.id}`}>
-                        <Button size="sm" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                        <Button size="sm" className="w-full bg-red-600 hover:bg-red-700">
                           View Details
                         </Button>
                       </Link>
                       {r.course_url && (
-                        <a href={r.course_url} target="_blank" rel="noreferrer" className="text-[11px] text-gray-500 hover:text-indigo-600 inline-flex items-center justify-center gap-1">
+                        <a href={r.course_url} target="_blank" rel="noreferrer" className="text-[11px] text-gray-500 hover:text-red-600 inline-flex items-center justify-center gap-1">
                           <Globe2 className="w-3 h-3" /> Website
                         </a>
                       )}
@@ -642,7 +642,7 @@ export default function SearchPage() {
               ))}
             </div>
             <Button variant="ghost" size="sm" onClick={clearCompare}>Clear</Button>
-            <Button size="sm" onClick={goCompare} disabled={tray.length < 2} className="bg-indigo-600 hover:bg-indigo-700">
+            <Button size="sm" onClick={goCompare} disabled={tray.length < 2} className="bg-red-600 hover:bg-red-700">
               Compare {tray.length} Course{tray.length === 1 ? "" : "s"} →
             </Button>
           </div>

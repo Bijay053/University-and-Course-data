@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import brandLogo from "@assets/image_1776917782083.png";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -53,8 +54,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-[100dvh] flex w-full bg-muted/40">
       {/* Desktop Sidebar */}
       <div className="w-64 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col flex-shrink-0">
-        <div className="h-14 flex items-center px-4 font-bold tracking-tight text-lg border-b border-sidebar-border">
-          UniAdmin Portal
+        <div className="h-14 flex items-center gap-2 px-4 font-bold tracking-tight border-b border-sidebar-border">
+          <img src={brandLogo} alt="Study Info Centre" className="h-8 w-auto" />
+          <span className="text-sm leading-tight">Study Info Centre</span>
         </div>
         <div className="flex-1 py-4 overflow-y-auto">
           <NavLinks />
@@ -76,8 +78,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="h-14 flex items-center justify-between px-4 font-bold tracking-tight text-lg border-b border-sidebar-border">
-          UniAdmin Portal
+        <div className="h-14 flex items-center justify-between px-4 font-bold tracking-tight border-b border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <img src={brandLogo} alt="Study Info Centre" className="h-8 w-auto" />
+            <span className="text-sm leading-tight">Study Info Centre</span>
+          </div>
           <button
             onClick={() => setMobileOpen(false)}
             className="p-1 rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground"
@@ -101,7 +106,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="font-semibold text-sm text-muted-foreground md:hidden">UniAdmin Portal</div>
+            <div className="flex items-center gap-2 md:hidden">
+              <img src={brandLogo} alt="Study Info Centre" className="h-7 w-auto" />
+              <div className="font-semibold text-sm text-muted-foreground">Study Info Centre</div>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">

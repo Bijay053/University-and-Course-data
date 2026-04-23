@@ -95,7 +95,7 @@ export default function CourseDetail() {
       </Link>
 
       {/* Hero */}
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+      <div className="bg-gradient-to-r from-[#0F172A] to-[#DC2626] rounded-2xl p-6 text-white shadow-lg">
         <Badge className="bg-white/20 text-white hover:bg-white/30 mb-2">
           <BookOpen className="w-3 h-3 mr-1" />Course
         </Badge>
@@ -213,9 +213,9 @@ export default function CourseDetail() {
               <CardContent>
                 <ul className="space-y-2">
                   {acad.map((a) => (
-                    <li key={a.id} className="text-sm border-l-2 border-indigo-200 pl-3">
+                    <li key={a.id} className="text-sm border-l-2 border-red-200 pl-3">
                       <strong>{a.academicLevel ?? "Requirement"}</strong>
-                      {a.academicScore != null && <>: <span className="text-indigo-700">{a.academicScore} {a.scoreType ?? ""}</span></>}
+                      {a.academicScore != null && <>: <span className="text-red-700">{a.academicScore} {a.scoreType ?? ""}</span></>}
                       {a.academicCountry && <span className="text-gray-500"> ({a.academicCountry})</span>}
                     </li>
                   ))}
@@ -294,7 +294,7 @@ export default function CourseDetail() {
               </Link>
               {c.courseWebsite && (
                 <a href={c.courseWebsite} target="_blank" rel="noreferrer">
-                  <Button className="w-full bg-indigo-600 hover:bg-indigo-700">
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
                     <Globe2 className="w-4 h-4 mr-1" /> Official Page
                   </Button>
                 </a>

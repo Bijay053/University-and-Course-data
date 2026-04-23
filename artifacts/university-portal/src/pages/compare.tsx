@@ -195,7 +195,7 @@ export default function ComparePage() {
           variant="default"
           size="sm"
           onClick={() => window.print()}
-          className="bg-indigo-600 hover:bg-indigo-700"
+          className="bg-red-600 hover:bg-red-700"
         >
           <Download className="w-4 h-4 mr-1" /> Download PDF
         </Button>
@@ -223,10 +223,10 @@ export default function ComparePage() {
                     )}
                     <div className="min-w-0">
                       <Link href={`/courses/${c.id}`}>
-                        <div className="font-semibold text-sm leading-tight hover:text-indigo-700 cursor-pointer">{c.course_name}</div>
+                        <div className="font-semibold text-sm leading-tight hover:text-red-700 cursor-pointer">{c.course_name}</div>
                       </Link>
                       <Link href={`/universities/${c.university.id}`}>
-                        <div className="text-xs text-gray-500 mt-0.5 hover:text-indigo-700 cursor-pointer">{c.university.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 hover:text-red-700 cursor-pointer">{c.university.name}</div>
                       </Link>
                     </div>
                   </div>

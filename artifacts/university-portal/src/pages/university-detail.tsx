@@ -1885,7 +1885,7 @@ export default function UniversityDetail() {
               {assessNotes.length} insight{assessNotes.length !== 1 ? "s" : ""} across {new Set(assessNotes.map(n => n.country)).size} countr{new Set(assessNotes.map(n => n.country)).size !== 1 ? "ies" : "y"}
             </p>
             <Button size="sm" onClick={() => { setAssessAddCountry(""); setAssessAddText(""); setAssessShowAdd(true); }}
-              className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white">
+              className="gap-1.5 bg-red-600 hover:bg-red-700 text-white">
               <Plus className="w-3.5 h-3.5" /> Add Key Insight
             </Button>
           </div>
@@ -1895,13 +1895,13 @@ export default function UniversityDetail() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setAssessCountry("__all__")}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === "__all__" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === "__all__" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200 hover:border-red-300"}`}>
                 All countries
               </button>
               {Array.from(new Set(assessNotes.map(n => n.country))).sort().map(c => (
                 <button key={c}
                   onClick={() => setAssessCountry(c)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === c ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${assessCountry === c ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200 hover:border-red-300"}`}>
                   {c}
                 </button>
               ))}
@@ -1925,14 +1925,14 @@ export default function UniversityDetail() {
             .map(note => (
               <div key={note.id} className="border rounded-xl overflow-hidden bg-white">
                 {/* Note header */}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-100">
                   <div className="flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-indigo-600" />
-                    <span className="font-semibold text-sm text-indigo-800">{note.country}</span>
+                    <ClipboardList className="w-4 h-4 text-red-600" />
+                    <span className="font-semibold text-sm text-red-800">{note.country}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => { setAssessEditNote(note); setAssessEditCountry(note.country); setAssessEditText(note.raw_text); }}
-                      className="p-1.5 rounded hover:bg-indigo-100 text-indigo-600 cursor-pointer" title="Edit note">
+                      className="p-1.5 rounded hover:bg-red-100 text-red-600 cursor-pointer" title="Edit note">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => setAssessDeleteNote(note)}
@@ -2032,13 +2032,13 @@ export default function UniversityDetail() {
           <Dialog open={assessShowAdd} onOpenChange={setAssessShowAdd}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Add Key Insight</DialogTitle>
+                <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-red-600" /> Add Key Insight</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Country</Label>
                   <select value={assessAddCountry} onChange={e => setAssessAddCountry(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer">
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 cursor-pointer">
                     <option value="">Select country...</option>
                     {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -2048,13 +2048,13 @@ export default function UniversityDetail() {
                   <p className="text-xs text-muted-foreground mb-2">Paste any plain text — structured or unstructured. AI will extract the cards automatically (banks, sponsors, scholarship, turnaround times, etc.).</p>
                   <textarea value={assessAddText} onChange={e => setAssessAddText(e.target.value)}
                     rows={12} placeholder={"Example:\nAcceptable banks:\nAll A-class banks — accepted\n\nUnder 18:\nNot allowed\n\nSponsor requirements:\nTypes: Parents, Siblings, Grandparents\nMin income: AUD 30,000/yr\nBank statement: 1 year\n\nTurnaround times:\nOffer: 48 hours\nGTE: 4 days\nCoE: 4 days"}
-                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-red-300" />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAssessShowAdd(false)} disabled={assessAdding}>Cancel</Button>
                 <Button disabled={!assessAddCountry || !assessAddText.trim() || assessAdding}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-red-600 hover:bg-red-700 text-white"
                   onClick={async () => {
                     setAssessAdding(true);
                     try {
@@ -2089,13 +2089,13 @@ export default function UniversityDetail() {
           <Dialog open={!!assessEditNote} onOpenChange={v => { if (!v) setAssessEditNote(null); }}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-indigo-600" /> Edit Key Insight</DialogTitle>
+                <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-red-600" /> Edit Key Insight</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Country</Label>
                   <select value={assessEditCountry} onChange={e => setAssessEditCountry(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer">
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 cursor-pointer">
                     <option value="">Select country...</option>
                     {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -2104,13 +2104,13 @@ export default function UniversityDetail() {
                   <Label className="text-sm font-medium mb-1.5 block">Key Insights (plain text)</Label>
                   <textarea value={assessEditText} onChange={e => setAssessEditText(e.target.value)}
                     rows={12}
-                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-red-300" />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAssessEditNote(null)} disabled={assessEditing}>Cancel</Button>
                 <Button disabled={!assessEditCountry || !assessEditText.trim() || assessEditing}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-red-600 hover:bg-red-700 text-white"
                   onClick={async () => {
                     if (!assessEditNote) return;
                     setAssessEditing(true);
@@ -2236,8 +2236,8 @@ export default function UniversityDetail() {
 
           {/* Bulk actions bar */}
           {rawSelectedIds.size > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
-              <span className="font-medium text-indigo-700">
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm">
+              <span className="font-medium text-red-700">
                 {rawSelectedIds.size} course{rawSelectedIds.size !== 1 ? "s" : ""} selected
               </span>
               <div className="flex items-center gap-1 ml-1">
@@ -2246,7 +2246,7 @@ export default function UniversityDetail() {
                   variant="outline"
                   disabled={bulkMapRunning || bulkApproveRunning}
                   onClick={() => handleBulkMap(false)}
-                  className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                  className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-100"
                 >
                   <GitMerge className="h-3.5 w-3.5 mr-1" />
                   {bulkMapRunning ? "Mapping…" : "Map Backup (Fill Empty)"}
@@ -2444,7 +2444,7 @@ export default function UniversityDetail() {
                               <button
                                 onClick={() => openBackupMap(c)}
                                 title={mappedIds.has(c.id) ? "Backup mapped — map again" : "Map from Backup"}
-                                className={`p-1 rounded cursor-pointer ${mappedIds.has(c.id) ? "text-teal-600 hover:bg-teal-100 bg-teal-50" : "text-indigo-500 hover:bg-indigo-100"}`}
+                                className={`p-1 rounded cursor-pointer ${mappedIds.has(c.id) ? "text-teal-600 hover:bg-teal-100 bg-teal-50" : "text-red-500 hover:bg-red-100"}`}
                               >
                                 <GitMerge className="w-3.5 h-3.5" />
                               </button>
@@ -2610,7 +2610,7 @@ export default function UniversityDetail() {
         <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <GitMerge className="w-5 h-5 text-indigo-500" />
+              <GitMerge className="w-5 h-5 text-red-500" />
               Map from Backup
             </DialogTitle>
             {backupMapData && (
@@ -2746,14 +2746,14 @@ export default function UniversityDetail() {
                   variant="outline"
                   onClick={() => applyBackupMap(false)}
                   disabled={backupMapApplying}
-                  className="cursor-pointer border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  className="cursor-pointer border-red-300 text-red-700 hover:bg-red-50"
                 >
                   {backupMapApplying ? "Applying…" : "Fill Empty Fields Only"}
                 </Button>
                 <Button
                   onClick={() => applyBackupMap(true)}
                   disabled={backupMapApplying}
-                  className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="cursor-pointer bg-red-600 hover:bg-red-700 text-white"
                 >
                   {backupMapApplying ? "Applying…" : "Overwrite All"}
                 </Button>
