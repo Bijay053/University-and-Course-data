@@ -269,105 +269,68 @@ export default function SearchPage() {
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
           </div>
 
-          <Accordion type="multiple" defaultValue={["intakes", "fee", "duration", "advanced", "english"]} className="w-full">
-            {/* Intakes */}
-            <AccordionItem value="intakes">
-              <AccordionTrigger className="text-sm">Intakes</AccordionTrigger>
-              <AccordionContent className="pt-1">
-                <MultiSelect
-                  options={intakeOptions}
-                  value={selectedIntakes}
-                  onChange={(v) => { setSelectedIntakes(v); resetPage(); }}
-                  placeholder="Any intake"
-                  searchPlaceholder="Search intakes..."
-                  maxBadgeCount={3}
-                />
+          <Accordion
+            type="multiple"
+            defaultValue={["country", "qualification", "grading", "english", "other", "intakes", "duration", "fee"]}
+            className="w-full"
+          >
+            {/* 1. Country of Residence */}
+            <AccordionItem value="country">
+              <AccordionTrigger className="text-sm">
+                Country of Residence <span className="text-red-500 ml-0.5">*</span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2">
+                <Select value={country || "any"} onValueChange={(v) => { setCountry(v === "any" ? "" : v); resetPage(); }}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">— Any —</SelectItem>
+                    {(options?.countries ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </AccordionContent>
             </AccordionItem>
 
-            {/* Duration */}
-            <AccordionItem value="duration">
-              <AccordionTrigger className="text-sm">Duration (years)</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-2">
-                <Slider
-                  value={durationRange}
-                  min={0} max={6} step={0.5}
-                  onValueChange={(v) => { setDurationRange(v as [number, number]); resetPage(); }}
-                />
-                <p className="text-xs text-gray-500">{durationRange[0]} — {durationRange[1]} years</p>
+            {/* 2. Highest Qualification Studied */}
+            <AccordionItem value="qualification">
+              <AccordionTrigger className="text-sm">
+                Highest Qualification Studied <span className="text-red-500 ml-0.5">*</span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2">
+                <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); setScheme(""); setOutOf(""); setGradingScore(""); resetPage(); }}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">— Any —</SelectItem>
+                    {(options?.qualifications ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </AccordionContent>
             </AccordionItem>
 
-            {/* Fee */}
-            <AccordionItem value="fee">
-              <AccordionTrigger className="text-sm">Tuition Fee (AUD/yr)</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-2">
-                <Slider
-                  value={feeRange}
-                  min={0} max={100000} step={1000}
-                  onValueChange={(v) => { setFeeRange(v as [number, number]); resetPage(); }}
-                />
-                <p className="text-xs text-gray-500">${feeRange[0].toLocaleString()} — ${feeRange[1].toLocaleString()}</p>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* ── Advanced Filter ── */}
-            <AccordionItem value="advanced">
-              <AccordionTrigger className="text-sm font-semibold text-red-700">
-                Advanced Filter
+            {/* 3. Grading Scheme — linked to qualification */}
+            <AccordionItem value="grading">
+              <AccordionTrigger className="text-sm">
+                {qualification ? `${qualification} Grading Scheme` : "Grading Scheme"}
               </AccordionTrigger>
               <AccordionContent className="space-y-3 pt-2">
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    Country of Residence <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={country || "any"} onValueChange={(v) => { setCountry(v === "any" ? "" : v); resetPage(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">— Any —</SelectItem>
-                      {(options?.countries ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select
+                  value={scheme || "any"}
+                  onValueChange={(v) => { setScheme(v === "any" ? "" : v); setOutOf(""); resetPage(); }}
+                  disabled={!qualification}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={qualification ? "Choose scheme" : "Pick qualification first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">— Any —</SelectItem>
+                    <SelectItem value="GPA">GPA</SelectItem>
+                    <SelectItem value="Percentage">Percentage</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!qualification && (
+                  <p className="text-[11px] text-gray-500">Select a qualification above to enter your grade.</p>
+                )}
 
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    Highest Qualification Studied <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); setScheme(""); setOutOf(""); setGradingScore(""); resetPage(); }}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">— Any —</SelectItem>
-                      {(options?.qualifications ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Grading scheme is linked to qualification: only enabled
-                    once a qualification is selected, and the labels reflect
-                    that choice (e.g. "Bachelor Grading Scheme"). */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    {qualification ? `${qualification} Grading Scheme` : "Grading Scheme"}
-                  </Label>
-                  <Select
-                    value={scheme || "any"}
-                    onValueChange={(v) => { setScheme(v === "any" ? "" : v); setOutOf(""); resetPage(); }}
-                    disabled={!qualification}
-                  >
-                    <SelectTrigger className="h-9"><SelectValue placeholder={qualification ? "Choose scheme" : "Pick qualification first"} /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">— Any —</SelectItem>
-                      <SelectItem value="GPA">GPA</SelectItem>
-                      <SelectItem value="Percentage">Percentage</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {!qualification && (
-                    <p className="text-[11px] text-gray-500 mt-1">Select a qualification above to enter your grade.</p>
-                  )}
-                </div>
-
-                {/* Out of — only when GPA is chosen */}
+                {/* Out of + GPA score — only when GPA chosen */}
                 {qualification && scheme === "GPA" && (
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -383,9 +346,7 @@ export default function SearchPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">
-                        {qualification} GPA
-                      </Label>
+                      <Label className="text-xs text-gray-600 mb-1 block">{qualification} GPA</Label>
                       <Input
                         type="number" step="0.01" min="0"
                         value={gradingScore}
@@ -397,12 +358,10 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* Percentage entry — only when Percentage chosen */}
+                {/* Percentage score — only when Percentage chosen */}
                 {qualification && scheme === "Percentage" && (
                   <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      {qualification} Percentage (%)
-                    </Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">{qualification} Percentage (%)</Label>
                     <Input
                       type="number" step="0.01" min="0" max="100"
                       value={gradingScore}
@@ -415,11 +374,9 @@ export default function SearchPage() {
               </AccordionContent>
             </AccordionItem>
 
-            {/* ── English Proficiency Exam ── */}
+            {/* 4. English Proficiency Exam */}
             <AccordionItem value="english">
-              <AccordionTrigger className="text-sm font-semibold text-red-700">
-                English Proficiency Exam
-              </AccordionTrigger>
+              <AccordionTrigger className="text-sm">English Proficiency Exam</AccordionTrigger>
               <AccordionContent className="space-y-2 pt-2">
                 <Select value={englishExam || "any"} onValueChange={(v) => { setEnglishExam(v === "any" ? "" : v); resetPage(); }}>
                   <SelectTrigger className="h-9"><SelectValue placeholder="Choose exam" /></SelectTrigger>
@@ -431,40 +388,38 @@ export default function SearchPage() {
                   </SelectContent>
                 </Select>
                 {englishExam && (
-                  <>
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <div>
-                        <Label className="text-xs text-gray-600">Overall</Label>
-                        <Input type="number" step="0.5" placeholder="Score"
-                          value={eOverall} onChange={(e) => { setEOverall(e.target.value); resetPage(); }} className="h-9" />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Reading</Label>
-                        <Input type="number" step="0.5" placeholder="Score"
-                          value={eReading} onChange={(e) => { setEReading(e.target.value); resetPage(); }} className="h-9" />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Writing</Label>
-                        <Input type="number" step="0.5" placeholder="Score"
-                          value={eWriting} onChange={(e) => { setEWriting(e.target.value); resetPage(); }} className="h-9" />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Listening</Label>
-                        <Input type="number" step="0.5" placeholder="Score"
-                          value={eListening} onChange={(e) => { setEListening(e.target.value); resetPage(); }} className="h-9" />
-                      </div>
-                      <div className="col-span-2">
-                        <Label className="text-xs text-gray-600">Speaking</Label>
-                        <Input type="number" step="0.5" placeholder="Score"
-                          value={eSpeaking} onChange={(e) => { setESpeaking(e.target.value); resetPage(); }} className="h-9" />
-                      </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <Label className="text-xs text-gray-600">Overall</Label>
+                      <Input type="number" step="0.5" placeholder="Score"
+                        value={eOverall} onChange={(e) => { setEOverall(e.target.value); resetPage(); }} className="h-9" />
                     </div>
-                  </>
+                    <div>
+                      <Label className="text-xs text-gray-600">Reading</Label>
+                      <Input type="number" step="0.5" placeholder="Score"
+                        value={eReading} onChange={(e) => { setEReading(e.target.value); resetPage(); }} className="h-9" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">Writing</Label>
+                      <Input type="number" step="0.5" placeholder="Score"
+                        value={eWriting} onChange={(e) => { setEWriting(e.target.value); resetPage(); }} className="h-9" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">Listening</Label>
+                      <Input type="number" step="0.5" placeholder="Score"
+                        value={eListening} onChange={(e) => { setEListening(e.target.value); resetPage(); }} className="h-9" />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs text-gray-600">Speaking</Label>
+                      <Input type="number" step="0.5" placeholder="Score"
+                        value={eSpeaking} onChange={(e) => { setESpeaking(e.target.value); resetPage(); }} className="h-9" />
+                    </div>
+                  </div>
                 )}
               </AccordionContent>
             </AccordionItem>
 
-            {/* ── Other Exam ── */}
+            {/* 5. Other Exam (GMAT/GRE) */}
             <AccordionItem value="other">
               <AccordionTrigger className="text-sm">Other Exam (GMAT/GRE)</AccordionTrigger>
               <AccordionContent className="pt-2">
@@ -474,6 +429,47 @@ export default function SearchPage() {
                   onChange={(e) => { setOtherExam(e.target.value); resetPage(); }}
                   className="h-9"
                 />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* 6. Intakes */}
+            <AccordionItem value="intakes">
+              <AccordionTrigger className="text-sm">Intakes</AccordionTrigger>
+              <AccordionContent className="pt-1">
+                <MultiSelect
+                  options={intakeOptions}
+                  value={selectedIntakes}
+                  onChange={(v) => { setSelectedIntakes(v); resetPage(); }}
+                  placeholder="Any intake"
+                  searchPlaceholder="Search intakes..."
+                  maxBadgeCount={3}
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* 7. Duration */}
+            <AccordionItem value="duration">
+              <AccordionTrigger className="text-sm">Duration (years)</AccordionTrigger>
+              <AccordionContent className="space-y-2 pt-2">
+                <Slider
+                  value={durationRange}
+                  min={0} max={6} step={0.5}
+                  onValueChange={(v) => { setDurationRange(v as [number, number]); resetPage(); }}
+                />
+                <p className="text-xs text-gray-500">{durationRange[0]} — {durationRange[1]} years</p>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* 8. Tuition Fee */}
+            <AccordionItem value="fee">
+              <AccordionTrigger className="text-sm">Tuition Fee (AUD/yr)</AccordionTrigger>
+              <AccordionContent className="space-y-2 pt-2">
+                <Slider
+                  value={feeRange}
+                  min={0} max={100000} step={1000}
+                  onValueChange={(v) => { setFeeRange(v as [number, number]); resetPage(); }}
+                />
+                <p className="text-xs text-gray-500">${feeRange[0].toLocaleString()} — ${feeRange[1].toLocaleString()}</p>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
