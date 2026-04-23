@@ -335,6 +335,108 @@ export default function Scraping() {
   const [academicRequirementsPageUrl, setAcademicRequirementsPageUrl] = useState("");
   const [fastMode, setFastMode] = useState(false);
 
+  // ── Scrape History (persistent, browseable after a run completes) ────────
+  type HistoryRun = {
+    runtimeJobId: string;
+    universityId: number | null;
+    universityName: string | null;
+    url: string | null;
+    status: string;
+    totalFound: number | null;
+    imported: number | null;
+    skipped: number | null;
+    errors: number | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    errorMessage: string | null;
+    durationMs: number | null;
+    stagedCount: number;
+    approvedCount: number;
+    rejectedCount: number;
+  };
+  type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
+  type HistoryStagedCourse = {
+    id: number; courseName: string | null; status: string | null; autoPublishStatus: string | null;
+    eligibilityStatus: string | null; ieltsOverall: string | null; pteOverall: string | null;
+    toeflOverall: string | null; internationalFee: string | null; duration: string | null;
+    durationTerm: string | null; category: string | null; degreeLevel: string | null;
+  };
+  const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
+  const [historyDetail, setHistoryDetail] = useState<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] } | null>(null);
+  const [historyView, setHistoryView] = useState<"logs" | "courses">("logs");
+  const [historyLogFilter, setHistoryLogFilter] = useState("");
+
+  const fetchHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/scrape/history?limit=50");
+      const data = await readResponseJson<{ runs: HistoryRun[] }>(res);
+      setHistoryRuns(data?.runs ?? []);
+    } catch {
+      // Non-fatal — empty state will render.
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  const openHistoryDetail = useCallback(async (runtimeJobId: string, view: "logs" | "courses") => {
+    if (expandedHistoryId === runtimeJobId && historyView === view) {
+      setExpandedHistoryId(null);
+      return;
+    }
+    setExpandedHistoryId(runtimeJobId);
+    setHistoryView(view);
+    setHistoryLogFilter("");
+    setHistoryDetailLoading(true);
+    setHistoryDetail(null);
+    try {
+      const res = await fetch(`/api/scrape/history/${runtimeJobId}`);
+      const data = await readResponseJson<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] }>(res);
+      setHistoryDetail({ logs: data?.logs ?? [], stagedCourses: data?.stagedCourses ?? [] });
+    } catch {
+      setHistoryDetail({ logs: [], stagedCourses: [] });
+    } finally {
+      setHistoryDetailLoading(false);
+    }
+  }, [expandedHistoryId, historyView]);
+
+  useEffect(() => {
+    void fetchHistory();
+  }, [fetchHistory]);
+
+  const formatHistoryDuration = (ms: number | null): string => {
+    if (!ms || ms < 0) return "—";
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    if (m === 0) return `${s}s`;
+    return `${m}m ${s}s`;
+  };
+
+  const formatHistoryDate = (iso: string | null): string => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+
+  const historyStatusBadge = (status: string) => {
+    const map: Record<string, { label: string; cls: string }> = {
+      completed: { label: "✓", cls: "bg-green-100 text-green-700" },
+      completed_with_errors: { label: "⚠", cls: "bg-amber-100 text-amber-700" },
+      failed: { label: "✗", cls: "bg-red-100 text-red-700" },
+      stopped: { label: "■", cls: "bg-gray-200 text-gray-700" },
+      running: { label: "●", cls: "bg-blue-100 text-blue-700" },
+      queued: { label: "…", cls: "bg-gray-100 text-gray-600" },
+      awaiting_approval: { label: "?", cls: "bg-yellow-100 text-yellow-700" },
+    };
+    const s = map[status] ?? { label: status, cls: "bg-gray-100 text-gray-600" };
+    return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-mono ${s.cls}`}>{s.label}</span>;
+  };
+
   const { data: uniData } = useListUniversities({ limit: 100 });
 
   const fetchJobs = async () => {
@@ -2259,6 +2361,150 @@ export default function Scraping() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Scrape History ─────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Scrape History</h2>
+          <Button variant="outline" size="sm" onClick={fetchHistory} disabled={loadingHistory}>
+            <RefreshCw className={`w-4 h-4 mr-1 ${loadingHistory ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+        {loadingHistory && historyRuns.length === 0 ? (
+          <div className="border rounded-xl p-10 text-center text-gray-400">Loading…</div>
+        ) : historyRuns.length === 0 ? (
+          <div className="border rounded-xl p-10 text-center text-gray-400">
+            <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p>No scrape runs yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {historyRuns.map((run) => {
+              const isExpanded = expandedHistoryId === run.runtimeJobId;
+              return (
+                <div key={run.runtimeJobId} className="border rounded-xl bg-white overflow-hidden">
+                  <div className="p-3 sm:p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {historyStatusBadge(run.status)}
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-800 truncate">
+                          {run.universityName ?? "(unknown university)"}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {formatHistoryDate(run.startedAt)} &bull; {formatHistoryDuration(run.durationMs)}
+                          {run.url ? <> &bull; <span className="text-gray-400">{run.url}</span></> : null}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-600 whitespace-nowrap">
+                      <span>Found: <span className="font-semibold text-gray-800">{run.totalFound ?? 0}</span></span>
+                      <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
+                      <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
+                      <span>Rejected: <span className="font-semibold text-red-700">{run.rejectedCount}</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={isExpanded && historyView === "logs" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => void openHistoryDetail(run.runtimeJobId, "logs")}
+                      >
+                        View Logs
+                      </Button>
+                      <Button
+                        variant={isExpanded && historyView === "courses" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => void openHistoryDetail(run.runtimeJobId, "courses")}
+                      >
+                        View Courses
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t bg-gray-50 p-3 sm:p-4">
+                      {historyDetailLoading ? (
+                        <div className="text-center text-gray-400 py-6">Loading details…</div>
+                      ) : historyView === "logs" ? (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Input
+                              placeholder="Filter log lines…"
+                              value={historyLogFilter}
+                              onChange={(e) => setHistoryLogFilter(e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                              {historyDetail?.logs.length ?? 0} entries
+                            </span>
+                          </div>
+                          <div className="max-h-96 overflow-auto bg-black text-green-200 font-mono text-xs rounded p-3">
+                            {(historyDetail?.logs ?? [])
+                              .filter((l) => {
+                                if (!historyLogFilter) return true;
+                                const f = historyLogFilter.toLowerCase();
+                                return (
+                                  l.event.toLowerCase().includes(f) ||
+                                  String(l.message ?? "").toLowerCase().includes(f) ||
+                                  String(l.phase ?? "").toLowerCase().includes(f)
+                                );
+                              })
+                              .map((l) => (
+                                <div key={l.sequence} className="whitespace-pre-wrap break-words leading-relaxed">
+                                  <span className="text-gray-500">[{l.event}]</span>
+                                  {l.phase ? <span className="text-blue-300"> [{String(l.phase)}]</span> : null}
+                                  {l.message ? <> {String(l.message)}</> : null}
+                                </div>
+                              ))}
+                            {(historyDetail?.logs.length ?? 0) === 0 && (
+                              <div className="text-gray-500">No log lines recorded.</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-2">
+                            {historyDetail?.stagedCourses.length ?? 0} staged courses
+                          </div>
+                          <div className="max-h-96 overflow-auto border rounded bg-white">
+                            <table className="w-full text-xs">
+                              <thead className="bg-gray-100 sticky top-0">
+                                <tr>
+                                  <th className="text-left p-2 font-medium text-gray-600">Course</th>
+                                  <th className="text-left p-2 font-medium text-gray-600">Level</th>
+                                  <th className="text-left p-2 font-medium text-gray-600">Category</th>
+                                  <th className="text-center p-2 font-medium text-gray-600">Status</th>
+                                  <th className="text-right p-2 font-medium text-gray-600">Fee</th>
+                                  <th className="text-center p-2 font-medium text-gray-600">IELTS</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {(historyDetail?.stagedCourses ?? []).map((c) => (
+                                  <tr key={c.id} className="hover:bg-gray-50">
+                                    <td className="p-2 text-gray-800">{c.courseName ?? "—"}</td>
+                                    <td className="p-2 text-gray-600">{c.degreeLevel ?? "—"}</td>
+                                    <td className="p-2 text-gray-600">{c.category ?? "—"}</td>
+                                    <td className="p-2 text-center text-gray-600">{c.status ?? "—"}</td>
+                                    <td className="p-2 text-right text-gray-700">{c.internationalFee ?? "—"}</td>
+                                    <td className="p-2 text-center text-gray-600">{c.ieltsOverall ?? "—"}</td>
+                                  </tr>
+                                ))}
+                                {(historyDetail?.stagedCourses.length ?? 0) === 0 && (
+                                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">No staged courses recorded for this run.</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div>
         <h2 className="text-lg font-semibold mb-3">University Coverage</h2>

@@ -1,0 +1,115 @@
+FEATURE REQUEST: Persistent Scrape History page
+Currently when a scrape completes, the user can:
+
+See live logs only during the scrape (console output)
+See the "Review Scraped Courses" table only right after scrape finishes
+
+Problem: After navigating to another page or closing the browser, BOTH disappear. User can't go back later and see "What did the CSU scrape 2 days ago actually extract? What was in the log? What courses were skipped?"
+The "University Coverage" cards at the bottom of /scraping just link to the external university website, not to the scrape history. That's unhelpful.
+
+FEATURE TO BUILD: Scrape History page
+New page at /scraping/history (or new tab "History" on the Scraping page). Shows a table of all past scrape runs with expandable per-run details.
+
+Backend — endpoints:
+typescript// List recent scrape runs (paginated)
+router.get("/scrape/history", async (req, res) => {
+  const limit = parseInt(req.query.limit as string) || 50;
+  const rows = await db.execute(sql`
+    SELECT 
+      j.runtime_job_id,
+      j.university_id,
+      j.university_name,
+      j.status,
+      j.total_found,
+      j.imported,
+      j.errors,
+      j.started_at,
+      j.completed_at,
+      j.error_message,
+      EXTRACT(EPOCH FROM (COALESCE(j.completed_at, NOW()) - j.started_at))/60 as duration_minutes,
+      (SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id = j.runtime_job_id) as staged_count,
+      (SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id = j.runtime_job_id AND status='approved') as approved_count,
+      (SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id = j.runtime_job_id AND status='rejected') as rejected_count
+    FROM scrape_runtime_jobs j
+    ORDER BY j.started_at DESC
+    LIMIT ${limit}
+  `);
+  res.json(rows);
+});
+
+// Get full details of one run including logs and staged courses
+router.get("/scrape/history/:jobId", async (req, res) => {
+  const { jobId } = req.params;
+  
+  const job = await db.execute(sql`
+    SELECT * FROM scrape_runtime_jobs WHERE runtime_job_id = ${jobId}
+  `);
+  
+  const logs = await db.execute(sql`
+    SELECT sequence, event, payload, created_at 
+    FROM scrape_runtime_logs 
+    WHERE runtime_job_id = ${jobId}
+    ORDER BY sequence ASC
+  `);
+  
+  const stagedCourses = await db.execute(sql`
+    SELECT id, course_name, status, auto_publish_status, eligibility_status,
+      ielts_overall, pte_overall, toefl_overall, international_fee, duration, 
+      duration_term, category, degree_level
+    FROM scraped_courses 
+    WHERE scrape_job_id = ${jobId}
+    ORDER BY course_name ASC
+  `);
+  
+  res.json({ job: job[0], logs, stagedCourses });
+});
+
+Frontend — new History tab on /scraping:
+Add a tab/section above "University Coverage":
+┌──────────────────────────────────────────────────────────────────┐
+│ [AI Scraper] [Excel Import] [History] ← new tab                   │
+├──────────────────────────────────────────────────────────────────┤
+│ Recent Scrape Runs                                 [Refresh]     │
+│                                                                   │
+│ ┌────────────────────────────────────────────────────────────┐  │
+│ │ ▼ Charles Sturt university    Apr 23, 02:28  17m 44s  ✓    │  │
+│ │   Found: 299 | Staged: 184 | Approved: 173 | Rejected: 11  │  │
+│ │                                                             │  │
+│ │   [View Logs] [View Courses]                                │  │
+│ └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│ ┌────────────────────────────────────────────────────────────┐  │
+│ │ ▼ torrens                     Apr 23, 02:13  14m 51s  ✓    │  │
+│ │   Found: 103 | Staged: 75 | Approved: 74 | Rejected: 1     │  │
+│ └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│ ┌────────────────────────────────────────────────────────────┐  │
+│ │ ▼ vit                         Apr 23, 01:06   6m 48s  ✓    │  │
+│ │   Found: 30 | Staged: 30 | Approved: 30 | Rejected: 0      │  │
+│ └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+Click "View Logs" → opens modal/expands section showing the full scrape log lines (same as live console output during the scrape). Scrollable, searchable.
+Click "View Courses" → opens modal showing the Review Scraped Courses table for that run (same data shown right after scrape).
+
+Fix University Coverage card click behavior:
+Currently clicking a university card redirects to the external university website. That's wrong.
+Change: Clicking a card should go to /universities/:id (the internal page showing Courses / Key Insights / English / etc). That's much more useful — user wants to see their data, not visit the external site.
+
+DELIVERY:
+
+Add the 2 backend endpoints
+Add the History tab/section to /scraping page
+Fix the University Coverage card links (internal route, not external website)
+Build both frontend and backend
+Commit: "Scrape History page: persistent logs + staged courses browseable after run"
+Push to main
+Reply with commit hash + screenshots of:
+
+History tab list
+Expanded log view for one completed run
+Expanded staged courses view for one completed run
+
+
+
+After push I'll deploy and verify. No backend schema changes needed — everything reads from existing scrape_runtime_jobs, scrape_runtime_logs, and scraped_courses tables.

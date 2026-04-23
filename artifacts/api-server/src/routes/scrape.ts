@@ -11422,6 +11422,104 @@ router.get("/scrape/active", async (_req: Request, res: Response): Promise<void>
   }
 });
 
+// Scrape history list — paginated, newest first. Reads from existing
+// scrape_runtime_jobs + scraped_courses tables; no schema changes.
+router.get("/scrape/history", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limitRaw = parseInt(String(req.query.limit ?? "50"), 10);
+    const limit = Math.max(1, Math.min(Number.isFinite(limitRaw) ? limitRaw : 50, 200));
+    const offsetRaw = parseInt(String(req.query.offset ?? "0"), 10);
+    const offset = Math.max(0, Number.isFinite(offsetRaw) ? offsetRaw : 0);
+    const result = await pool.query(
+      `SELECT
+         j.runtime_job_id      AS "runtimeJobId",
+         j.university_id       AS "universityId",
+         j.university_name     AS "universityName",
+         j.url                 AS "url",
+         j.status              AS "status",
+         j.total_found         AS "totalFound",
+         j.imported            AS "imported",
+         j.skipped             AS "skipped",
+         j.errors              AS "errors",
+         j.started_at          AS "startedAt",
+         j.completed_at        AS "completedAt",
+         j.error_message       AS "errorMessage",
+         EXTRACT(EPOCH FROM (COALESCE(j.completed_at, NOW()) - j.started_at)) * 1000 AS "durationMs",
+         (SELECT COUNT(*)::int FROM scraped_courses sc WHERE sc.scrape_job_id = j.runtime_job_id) AS "stagedCount",
+         (SELECT COUNT(*)::int FROM scraped_courses sc WHERE sc.scrape_job_id = j.runtime_job_id AND sc.status = 'approved') AS "approvedCount",
+         (SELECT COUNT(*)::int FROM scraped_courses sc WHERE sc.scrape_job_id = j.runtime_job_id AND sc.status = 'rejected') AS "rejectedCount"
+       FROM scrape_runtime_jobs j
+       ORDER BY j.started_at DESC NULLS LAST
+       LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    );
+    res.json({ runs: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Full detail for one scrape run: job row, ordered logs, and staged courses.
+router.get("/scrape/history/:jobId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const jobId = paramString(req, "jobId");
+    const [jobResult, logsResult, coursesResult] = await Promise.all([
+      pool.query(
+        `SELECT
+           runtime_job_id  AS "runtimeJobId",
+           university_id   AS "universityId",
+           university_name AS "universityName",
+           url             AS "url",
+           status          AS "status",
+           total_found     AS "totalFound",
+           imported        AS "imported",
+           skipped         AS "skipped",
+           errors          AS "errors",
+           started_at      AS "startedAt",
+           completed_at    AS "completedAt",
+           error_message   AS "errorMessage",
+           fast_mode       AS "fastMode",
+           job_type        AS "jobType",
+           EXTRACT(EPOCH FROM (COALESCE(completed_at, NOW()) - started_at)) * 1000 AS "durationMs"
+         FROM scrape_runtime_jobs
+         WHERE runtime_job_id = $1
+         LIMIT 1`,
+        [jobId],
+      ),
+      pool.query(
+        `SELECT sequence, event, payload, created_at AS "createdAt"
+         FROM scrape_runtime_logs
+         WHERE runtime_job_id = $1
+         ORDER BY sequence ASC`,
+        [jobId],
+      ),
+      pool.query(
+        `SELECT id, course_name AS "courseName", status, auto_publish_status AS "autoPublishStatus",
+                eligibility_status AS "eligibilityStatus",
+                ielts_overall AS "ieltsOverall", pte_overall AS "pteOverall", toefl_overall AS "toeflOverall",
+                international_fee AS "internationalFee", duration, duration_term AS "durationTerm",
+                category, degree_level AS "degreeLevel"
+         FROM scraped_courses
+         WHERE scrape_job_id = $1
+         ORDER BY course_name ASC NULLS LAST`,
+        [jobId],
+      ),
+    ]);
+    const job = jobResult.rows[0] ?? null;
+    if (!job) {
+      res.status(404).json({ error: `Scrape run ${jobId} not found` });
+      return;
+    }
+    const logs = logsResult.rows.map((r) => {
+      const payload = r.payload && typeof r.payload === "object" ? r.payload : {};
+      return { sequence: r.sequence, event: r.event, createdAt: r.createdAt, ...payload };
+    });
+    res.json({ job, logs, stagedCourses: coursesResult.rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 
 router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
   try {

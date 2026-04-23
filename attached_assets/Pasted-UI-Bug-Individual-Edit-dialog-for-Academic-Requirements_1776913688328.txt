@@ -1,0 +1,128 @@
+UI Bug: Individual Edit dialog for Academic Requirements missing dropdowns that exist in Bulk Edit
+On http://159.65.152.72/universities/4 (Charles Sturt) → Academic Requirements tab:
+Bulk Add Academic dialog (screenshot 2) correctly shows:
+
+Academic Level as dropdown (Select level ▼)
+Score Type as dropdown (%, GPA, etc.)
+
+Edit Academic Requirement (individual) dialog (screenshot 1) incorrectly shows:
+
+Academic Level as plain text input ❌
+Score Type as plain text input (no dropdown) ❌
+When Score Type = GPA, no "out of" option appears ❌
+
+Both dialogs should have the same rich controls. The individual Edit dialog is a regression or was built separately.
+
+THREE FIXES NEEDED:
+Fix 1 — Make individual Edit dialog match Bulk Edit
+Find the "Edit Academic Requirement" modal component (likely AcademicRequirementEditModal.tsx or similar in artifacts/university-portal/src/components/ or pages/). Replace the Academic Level text input with the same dropdown used in Bulk Edit:
+typescript<Select value={academicLevel} onValueChange={setAcademicLevel}>
+  <SelectTrigger>
+    <SelectValue placeholder="Select level" />
+  </SelectTrigger>
+  <SelectContent>
+    {academicLevelOptions.map(opt => (
+      <SelectItem key={opt.id} value={opt.name}>{opt.name}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+Do the same for Score Type. When Score Type is "GPA", show an additional "Out of" field (like Bulk Edit does).
+Important: The dropdown should have the current saved value pre-selected (e.g., "Master's degree or equivalent qualification in a relevant field") so the user sees the existing value when opening the edit dialog.
+Fix 2 — Pre-populate Academic Level dropdown with scraped values
+The scraped courses have free-text values like:
+
+"Master's degree or equivalent qualification in a relevant field"
+"Completion of an undergraduate degree with a strong science background..."
+
+These should auto-populate into the dropdown options (deduplicated). Currently Bulk Edit shows "Select level" placeholder but the dropdown options list is empty or hardcoded.
+Behavior needed:
+
+Dropdown combines: predefined levels (from settings) + dynamically discovered levels (from scraped data)
+User can type a custom value that doesn't exist yet (combobox behavior)
+
+Use a combobox / autocomplete pattern:
+typescript<Combobox
+  options={[...predefinedLevels, ...discoveredLevels]}
+  value={academicLevel}
+  onChange={setAcademicLevel}
+  allowCustom={true}
+  placeholder="Select or type level"
+/>
+Fix 3 — Add "Manage Academic Levels" setting in UI
+User wants to manage the list of Academic Level options centrally (like a dictionary).
+Backend — new table:
+sqlCREATE TABLE academic_level_options (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed with common values
+INSERT INTO academic_level_options (name, sort_order) VALUES
+  ('High School Certificate', 1),
+  ('Diploma / Advanced Diploma', 2),
+  ('Bachelor''s degree', 3),
+  ('Bachelor''s degree with Honours', 4),
+  ('Graduate Certificate / Diploma', 5),
+  ('Master''s degree', 6),
+  ('Master''s degree or equivalent qualification in a relevant field', 7),
+  ('Doctorate / PhD', 8);
+Backend — new endpoints:
+typescriptrouter.get("/settings/academic-levels", async (_req, res) => {
+  const rows = await db.query(`SELECT * FROM academic_level_options ORDER BY sort_order`);
+  res.json(rows);
+});
+
+router.post("/settings/academic-levels", async (req, res) => {
+  const { name } = req.body;
+  const result = await db.query(
+    `INSERT INTO academic_level_options (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING *`,
+    [name]
+  );
+  res.json(result.rows[0]);
+});
+
+router.delete("/settings/academic-levels/:id", async (req, res) => {
+  await db.query(`DELETE FROM academic_level_options WHERE id = $1`, [req.params.id]);
+  res.json({ success: true });
+});
+Frontend — new Settings page:
+Add a new route /settings/academic-levels in the sidebar. Or add it under an existing Settings section. UI:
+┌─────────────────────────────────────────┐
+│  Academic Level Options                 │
+│  ─────────────────────────────────────  │
+│  Manage the dropdown list used when     │
+│  adding or editing academic requirements│
+│                                          │
+│  [ + Add Level ]                         │
+│                                          │
+│  1. High School Certificate        [🗑]  │
+│  2. Diploma / Advanced Diploma     [🗑]  │
+│  3. Bachelor's degree              [🗑]  │
+│  4. Master's degree                [🗑]  │
+│  ...                                     │
+└─────────────────────────────────────────┘
+Reorderable via drag or up/down arrows. The ordering controls how they appear in the Edit dropdown.
+Fix 4 (nice-to-have) — Same treatment for Score Type
+Also make Score Type a managed dropdown. Common values:
+
+%
+GPA / 4.0
+GPA / 5.0
+GPA / 7.0
+ATAR
+Other (free text)
+
+When "GPA" is selected, show an additional "Out of" numeric field (already works in Bulk Edit — port the same logic to Individual Edit).
+
+DELIVERY:
+
+Apply fixes 1, 2, 3, 4
+Migration: create academic_level_options table + seed data
+Build both frontend and backend
+Commit with message "Academic Requirements: managed dropdowns, match bulk-edit UX, settings page for level options"
+Push to main
+Reply with commit hash + screenshot of the new individual Edit dialog + screenshot of the Settings page
+
+After push I'll deploy and verify end-to-end in production.
