@@ -69,7 +69,7 @@ function int(v: unknown, def: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(n)));
 }
 
-/** Map known english_exam values to MV column names. */
+/** Map known english_exam values to MV column names (overall pivot). */
 const ENGLISH_EXAM_COLS: Record<string, string> = {
   IELTS: "ielts_overall",
   PTE: "pte_overall",
@@ -78,6 +78,17 @@ const ENGLISH_EXAM_COLS: Record<string, string> = {
   CAMBRIDGE: "cae_overall",
   DET: "duolingo_overall",
   DUOLINGO: "duolingo_overall",
+};
+
+/** Map UI exam name to actual english_requirements.test_type values. */
+const ENGLISH_EXAM_TEST_TYPES: Record<string, string[]> = {
+  IELTS: ["IELTS"],
+  PTE: ["PTE"],
+  TOEFL: ["TOEFL"],
+  CAE: ["CAE", "Cambridge", "Cambridge CAE"],
+  CAMBRIDGE: ["CAE", "Cambridge", "Cambridge CAE"],
+  DET: ["Duolingo", "DET"],
+  DUOLINGO: ["Duolingo", "DET"],
 };
 
 /** Build the WHERE for /search/courses from request query params. */
@@ -124,21 +135,79 @@ function buildSearchWhere(q: Request["query"]): SqlBuilder {
   if (feeMax !== null) b.add(`international_fee <= ?`, feeMax);
 
   const exam = typeof q.english_exam === "string" ? q.english_exam.trim().toUpperCase() : "";
-  const examScore = num(q.english_score_min); // user's score
-  if (exam && ENGLISH_EXAM_COLS[exam]) {
-    const col = ENGLISH_EXAM_COLS[exam];
-    if (examScore !== null) {
-      // Course requirement must be met by the user's score.
-      b.add(`(${col} IS NOT NULL AND ${col} <= ?)`, examScore);
-    } else {
-      b.add(`${col} IS NOT NULL`);
+  const examScore = num(q.english_score_min); // legacy: overall band
+  const overall = num(q.english_overall) ?? examScore;
+  const reading = num(q.english_reading);
+  const writing = num(q.english_writing);
+  const listening = num(q.english_listening);
+  const speaking = num(q.english_speaking);
+  const hasBand = overall != null || reading != null || writing != null || listening != null || speaking != null;
+  if (exam && ENGLISH_EXAM_TEST_TYPES[exam]) {
+    const testTypes = ENGLISH_EXAM_TEST_TYPES[exam];
+    if (hasBand) {
+      // Course must have a row for this test_type where every band the user
+      // supplied meets the course's required band (course_required <= user_score).
+      const conds: string[] = ["er.course_id = course_search_view.id", "er.test_type = ANY(?::text[])"];
+      const vals: unknown[] = [testTypes];
+      const addBand = (col: string, val: number | null) => {
+        if (val == null) return;
+        conds.push(`(er.${col} IS NULL OR er.${col} <= ?)`);
+        vals.push(val);
+      };
+      addBand("overall", overall);
+      addBand("reading", reading);
+      addBand("writing", writing);
+      addBand("listening", listening);
+      addBand("speaking", speaking);
+      b.add(
+        `EXISTS (SELECT 1 FROM english_requirements er WHERE ${conds.join(" AND ")})`,
+        ...vals,
+      );
+    } else if (ENGLISH_EXAM_COLS[exam]) {
+      // No bands provided — just require the course offers this exam.
+      b.add(`${ENGLISH_EXAM_COLS[exam]} IS NOT NULL`);
     }
   }
 
-  // application_fee_max — column not in current schema; skipped silently.
-  // country_residence / highest_qualification / grading_scheme / other_exam:
-  // these would require joining academic_requirements with country/level
-  // matching logic. Not part of Phase 1 — silently ignored if provided.
+  // ── Academic requirements: country / qualification / grading scheme ──
+  const country = typeof q.country_residence === "string" ? q.country_residence.trim() : "";
+  const qual = typeof q.highest_qualification === "string" ? q.highest_qualification.trim() : "";
+  const scheme = typeof q.grading_scheme === "string" ? q.grading_scheme.trim() : "";
+  const outOf = typeof q.grading_out_of === "string" ? q.grading_out_of.trim() : "";
+  const score = num(q.grading_score);
+  if (country || qual || (scheme && outOf) || score != null) {
+    const conds: string[] = ["ar.course_id = course_search_view.id"];
+    const vals: unknown[] = [];
+    // Treat NULLs as "matches any" — most academic_requirement rows in
+    // the dataset only specify the level, leaving country / score_type /
+    // score blank. Strict equality would exclude virtually everything.
+    if (country) { conds.push("(ar.academic_country IS NULL OR ar.academic_country = ?)"); vals.push(country); }
+    if (qual) { conds.push("(ar.academic_level IS NULL OR ar.academic_level = ?)"); vals.push(qual); }
+    if (scheme && outOf) {
+      conds.push("(ar.score_type IS NULL OR ar.score_type = ?)");
+      vals.push(`${scheme}/${outOf}`);
+    } else if (scheme) {
+      conds.push("(ar.score_type IS NULL OR ar.score_type ILIKE ?)");
+      vals.push(`${scheme}%`);
+    }
+    if (score != null) {
+      conds.push("(ar.academic_score IS NULL OR ar.academic_score <= ?)");
+      vals.push(score);
+    }
+    b.add(
+      `EXISTS (SELECT 1 FROM academic_requirements ar WHERE ${conds.join(" AND ")})`,
+      ...vals,
+    );
+  }
+
+  // ── Other exam (e.g. GMAT, GRE) — ILIKE on courses.other_test ──
+  const otherExam = typeof q.other_exam === "string" ? q.other_exam.trim() : "";
+  if (otherExam) {
+    b.add(
+      `EXISTS (SELECT 1 FROM courses c2 WHERE c2.id = course_search_view.id AND c2.other_test ILIKE ?)`,
+      `%${otherExam}%`,
+    );
+  }
 
   return b;
 }
@@ -227,7 +296,7 @@ router.get("/search/courses", async (req: Request, res: Response) => {
       ),
       pool.query(
         `SELECT m AS name, COUNT(*)::int AS count
-         FROM course_search_view csv, UNNEST(coalesce(csv.intakes, ARRAY[]::text[])) m
+         FROM course_search_view, UNNEST(coalesce(course_search_view.intakes, ARRAY[]::text[])) m
          ${whereClause}
          GROUP BY m ORDER BY count DESC, name ASC LIMIT 50`,
         facetsValues,
@@ -383,6 +452,78 @@ router.get("/search/compare", async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err: (err as Error).message }, "courses/compare failed");
     res.status(500).json({ error: "compare_failed", message: (err as Error).message });
+  }
+});
+
+/* ─────────────────── GET /api/search/options ───────────────────
+ * Returns the dropdown values for the Advanced Filter sidebar:
+ *   - countries / qualifications / schemes pulled from
+ *     academic_requirements distinct values
+ *   - exams pulled from english_requirements distinct test_types
+ *   - universities (id + name) for the university dropdown
+ * Cached in-memory for 60s — these change infrequently.
+ */
+let optionsCache: { at: number; data: unknown } | null = null;
+router.get("/search/options", async (_req: Request, res: Response) => {
+  try {
+    if (optionsCache && Date.now() - optionsCache.at < 60_000) {
+      return res.json(optionsCache.data);
+    }
+    await warmup();
+    const [countries, qualifications, schemes, exams, universities] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT academic_country AS v FROM academic_requirements
+          WHERE academic_country IS NOT NULL AND academic_country <> '' ORDER BY 1`,
+      ),
+      pool.query(
+        `SELECT DISTINCT academic_level AS v FROM academic_requirements
+          WHERE academic_level IS NOT NULL AND academic_level <> '' ORDER BY 1`,
+      ),
+      pool.query(
+        `SELECT DISTINCT score_type AS v FROM academic_requirements
+          WHERE score_type IS NOT NULL AND score_type <> '' ORDER BY 1`,
+      ),
+      pool.query(
+        `SELECT DISTINCT test_type AS v FROM english_requirements
+          WHERE test_type IS NOT NULL AND test_type <> '' ORDER BY 1`,
+      ),
+      pool.query(
+        `SELECT DISTINCT university_id AS id, university_name AS name
+           FROM course_search_view ORDER BY university_name`,
+      ),
+    ]);
+
+    // Decompose score_type "GPA/4" into (scheme=GPA, outOf=4) options.
+    const schemeMap = new Map<string, Set<string>>();
+    for (const r of schemes.rows) {
+      const raw: string = r.v;
+      const idx = raw.indexOf("/");
+      const scheme = idx > 0 ? raw.slice(0, idx) : raw;
+      const out = idx > 0 ? raw.slice(idx + 1) : "";
+      if (!schemeMap.has(scheme)) schemeMap.set(scheme, new Set());
+      if (out) schemeMap.get(scheme)!.add(out);
+    }
+
+    const data = {
+      countries: countries.rows.map((r) => r.v),
+      qualifications: qualifications.rows.map((r) => r.v),
+      grading_schemes: Array.from(schemeMap.entries()).map(([scheme, outs]) => ({
+        scheme,
+        out_of: Array.from(outs).sort((a, b) => Number(a) - Number(b)),
+      })),
+      english_exams: exams.rows.map((r) => {
+        const v = String(r.v);
+        if (v === "Cambridge" || v === "Cambridge CAE" || v === "CAE") return "CAE";
+        if (v === "Duolingo" || v === "DET") return "DET";
+        return v;
+      }).filter((v, i, arr) => arr.indexOf(v) === i),
+      universities: universities.rows.map((r) => ({ id: r.id, name: r.name })),
+    };
+    optionsCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, "search/options failed");
+    res.status(500).json({ error: "options_failed", message: (err as Error).message });
   }
 });
 

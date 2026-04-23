@@ -14,6 +14,7 @@ import Backup from "@/pages/backup";
 import SettingsAcademicLevels from "@/pages/settings-academic-levels";
 import SearchPage from "@/pages/search";
 import ComparePage from "@/pages/compare";
+import CourseDetail from "@/pages/course-detail";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/settings/academic-levels" component={SettingsAcademicLevels} />
         <Route path="/search" component={SearchPage} />
         <Route path="/compare" component={ComparePage} />
+        <Route path="/courses/:id" component={CourseDetail} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

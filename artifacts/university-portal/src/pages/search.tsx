@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Search, MapPin, X, Filter, Scale, ExternalLink, Loader2 } from "lucide-react";
+import {
+  Search, MapPin, X, Filter, Scale, ExternalLink, Loader2,
+  GraduationCap, Calendar, DollarSign, Clock, BookOpen, Globe2, Award,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { MultiSelect } from "@/components/multi-select";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const COMPARE_KEY = "courseCompareTray";
@@ -47,6 +50,14 @@ type SearchResponse = {
   };
 };
 
+type OptionsResponse = {
+  countries: string[];
+  qualifications: string[];
+  grading_schemes: { scheme: string; out_of: string[] }[];
+  english_exams: string[];
+  universities: { id: number; name: string }[];
+};
+
 function loadCompareTray(): number[] {
   try {
     const raw = sessionStorage.getItem(COMPARE_KEY);
@@ -61,41 +72,65 @@ function saveCompareTray(ids: number[]) {
 }
 
 function formatFee(amount: number | null, currency: string | null, term: string | null) {
-  if (amount == null) return "Fee not listed";
+  if (amount == null) return null;
   const cur = currency || "AUD";
   const t = term ? ` / ${term}` : "";
   return `${cur} ${Math.round(amount).toLocaleString()}${t}`;
 }
 function formatDuration(d: number | null, term: string | null) {
-  if (d == null) return "—";
+  if (d == null) return null;
   const unit = term || "Year";
-  return `${d} ${unit}${d !== 1 ? (unit.endsWith("s") ? "" : "s") : ""}`;
+  return `${d} ${unit}${d !== 1 && !unit.endsWith("s") ? "s" : ""}`;
 }
 
 export default function SearchPage() {
   const [, setLocation] = useLocation();
 
-  // ─── filter state ───────────────────────────────────────────
+  // ─── core filters ──────────────────────────────────────
   const [q, setQ] = useState("");
   const [location, setLocFilter] = useState("");
-  const [selectedUnis, setSelectedUnis] = useState<number[]>([]);
+  const [selectedUnis, setSelectedUnis] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [selectedIntakes, setSelectedIntakes] = useState<string[]>([]);
   const [feeRange, setFeeRange] = useState<[number, number]>([0, 100000]);
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 6]);
-  const [englishExam, setEnglishExam] = useState<string>("");
-  const [englishScore, setEnglishScore] = useState<string>("");
   const [sort, setSort] = useState("relevance");
   const [page, setPage] = useState(1);
 
-  // ─── data state ────────────────────────────────────────────
+  // ─── advanced (academic) filters ───────────────────────
+  const [country, setCountry] = useState("");
+  const [qualification, setQualification] = useState("");
+  const [scheme, setScheme] = useState("");
+  const [outOf, setOutOf] = useState("");
+  const [gradingScore, setGradingScore] = useState("");
+
+  // ─── english (per-band) filters ────────────────────────
+  const [englishExam, setEnglishExam] = useState("");
+  const [eOverall, setEOverall] = useState("");
+  const [eReading, setEReading] = useState("");
+  const [eWriting, setEWriting] = useState("");
+  const [eListening, setEListening] = useState("");
+  const [eSpeaking, setESpeaking] = useState("");
+
+  // ─── other exam ────────────────────────────────────────
+  const [otherExam, setOtherExam] = useState("");
+
+  // ─── data ──────────────────────────────────────────────
   const [data, setData] = useState<SearchResponse | null>(null);
+  const [options, setOptions] = useState<OptionsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tray, setTray] = useState<number[]>(loadCompareTray());
 
-  // Listen for compare tray changes from other parts of the page.
+  // Fetch dropdown options once.
+  useEffect(() => {
+    fetch(`${BASE}/api/search/options`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((j) => j && setOptions(j))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     const handler = () => setTray(loadCompareTray());
     window.addEventListener("compareTrayChange", handler);
@@ -106,7 +141,6 @@ export default function SearchPage() {
     };
   }, []);
 
-  // Build the request URL from the current filter state.
   const requestUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
@@ -120,15 +154,25 @@ export default function SearchPage() {
     if (durationRange[0] > 0) params.set("duration_years_min", String(durationRange[0]));
     if (durationRange[1] < 6) params.set("duration_years_max", String(durationRange[1]));
     if (englishExam) params.set("english_exam", englishExam);
-    if (englishScore.trim()) params.set("english_score_min", englishScore.trim());
+    if (eOverall) params.set("english_overall", eOverall);
+    if (eReading) params.set("english_reading", eReading);
+    if (eWriting) params.set("english_writing", eWriting);
+    if (eListening) params.set("english_listening", eListening);
+    if (eSpeaking) params.set("english_speaking", eSpeaking);
+    if (country) params.set("country_residence", country);
+    if (qualification) params.set("highest_qualification", qualification);
+    if (scheme) params.set("grading_scheme", scheme);
+    if (outOf) params.set("grading_out_of", outOf);
+    if (gradingScore) params.set("grading_score", gradingScore);
+    if (otherExam.trim()) params.set("other_exam", otherExam.trim());
     if (sort) params.set("sort", sort);
     if (page > 1) params.set("page", String(page));
     params.set("limit", "20");
     return `${BASE}/api/search/courses?${params.toString()}`;
   }, [q, location, selectedUnis, selectedCategories, selectedLevels, selectedIntakes,
-      feeRange, durationRange, englishExam, englishScore, sort, page]);
+      feeRange, durationRange, englishExam, eOverall, eReading, eWriting, eListening, eSpeaking,
+      country, qualification, scheme, outOf, gradingScore, otherExam, sort, page]);
 
-  // Debounce: wait 300ms after the URL stabilizes before firing.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchRef = useRef<AbortController | null>(null);
   useEffect(() => {
@@ -153,44 +197,62 @@ export default function SearchPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [requestUrl]);
 
-  // Reset to page 1 whenever any non-page filter changes.
   const resetPage = useCallback(() => setPage(1), []);
 
-  const toggleInArray = <T,>(arr: T[], val: T): T[] =>
-    arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
-
   const addToCompare = (id: number) => {
-    if (tray.includes(id)) return;
-    if (tray.length >= MAX_COMPARE) return;
+    if (tray.includes(id) || tray.length >= MAX_COMPARE) return;
     saveCompareTray([...tray, id]);
   };
   const removeFromCompare = (id: number) => saveCompareTray(tray.filter((x) => x !== id));
   const clearCompare = () => saveCompareTray([]);
   const goCompare = () => setLocation(`/compare?ids=${tray.join(",")}`);
 
-  // For the compare tray, we need the names of the selected courses. We
-  // remember them as the user adds courses (so they survive page navigation
-  // within /search). When tray changes externally we may not have a label —
-  // fall back to "Course #ID".
   const labelMap = useRef<Record<number, string>>({});
   useEffect(() => {
-    if (data?.results) {
-      for (const r of data.results) labelMap.current[r.id] = r.course_name;
-    }
+    if (data?.results) for (const r of data.results) labelMap.current[r.id] = r.course_name;
   }, [data]);
 
   const clearAllFilters = () => {
     setQ(""); setLocFilter(""); setSelectedUnis([]); setSelectedCategories([]);
     setSelectedLevels([]); setSelectedIntakes([]); setFeeRange([0, 100000]);
-    setDurationRange([0, 6]); setEnglishExam(""); setEnglishScore(""); setSort("relevance"); setPage(1);
+    setDurationRange([0, 6]); setEnglishExam("");
+    setEOverall(""); setEReading(""); setEWriting(""); setEListening(""); setESpeaking("");
+    setCountry(""); setQualification(""); setScheme(""); setOutOf(""); setGradingScore("");
+    setOtherExam(""); setSort("relevance"); setPage(1);
   };
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
+  // Universities options for the dropdown — prefer faceted (filtered) when present, else full.
+  const uniOptions = useMemo(() => {
+    const facets = data?.facets.universities ?? [];
+    if (facets.length > 0) {
+      return facets.map((f) => ({ value: String(f.id), label: f.name, count: f.count }));
+    }
+    return (options?.universities ?? []).map((u) => ({ value: String(u.id), label: u.name }));
+  }, [data, options]);
+
+  const intakeOptions = useMemo(() => {
+    return (data?.facets.intakes ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }));
+  }, [data]);
+
+  const currentSchemeOuts = useMemo(() => {
+    if (!scheme || !options) return [] as string[];
+    return options.grading_schemes.find((s) => s.scheme === scheme)?.out_of ?? [];
+  }, [scheme, options]);
+
   return (
     <div className="space-y-4">
-      {/* ── Top bar ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border p-4 sticky top-0 z-10">
+      {/* ── Hero search bar ────────────────────────────────── */}
+      <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 rounded-2xl p-6 shadow-lg">
+        <div className="text-white mb-4">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <GraduationCap className="w-6 h-6" /> Find Your Perfect Course
+          </h1>
+          <p className="text-blue-100 text-sm mt-1">
+            Search across {options?.universities.length ?? "all"} universities and thousands of programs.
+          </p>
+        </div>
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -198,7 +260,7 @@ export default function SearchPage() {
               value={q}
               onChange={(e) => { setQ(e.target.value); resetPage(); }}
               placeholder="Search course name or keywords..."
-              className="pl-9 h-11"
+              className="pl-9 h-12 bg-white border-0 shadow-sm text-base"
             />
           </div>
           <div className="md:w-72 relative">
@@ -207,59 +269,80 @@ export default function SearchPage() {
               value={location}
               onChange={(e) => { setLocFilter(e.target.value); resetPage(); }}
               placeholder="City or country (e.g. Sydney)"
-              className="pl-9 h-11"
+              className="pl-9 h-12 bg-white border-0 shadow-sm text-base"
             />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
         {/* ── Filters ──────────────────────────────────────── */}
-        <aside className="bg-white rounded-xl border p-4 space-y-4 self-start lg:sticky lg:top-[88px]">
+        <aside className="bg-white rounded-xl border p-4 space-y-4 self-start lg:sticky lg:top-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm flex items-center gap-2"><Filter className="w-4 h-4" /> Filters</h2>
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-600" /> Filters
+            </h2>
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
           </div>
 
-          <Accordion type="multiple" defaultValue={["fee", "duration", "english", "intakes", "level"]} className="w-full">
-            <AccordionItem value="english">
-              <AccordionTrigger className="text-sm">English Proficiency</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
-                <Select value={englishExam || "none"} onValueChange={(v) => { setEnglishExam(v === "none" ? "" : v); resetPage(); }}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Choose exam" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Any —</SelectItem>
-                    {["IELTS", "PTE", "TOEFL", "CAE", "DET"].map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {englishExam && (
-                  <Input
-                    type="number" step="0.5" placeholder="Your score (e.g. 6.5)"
-                    value={englishScore}
-                    onChange={(e) => { setEnglishScore(e.target.value); resetPage(); }}
-                    className="h-9"
-                  />
-                )}
+          <Accordion type="multiple" defaultValue={["uni", "intakes", "fee", "duration", "level", "advanced", "english"]} className="w-full">
+            {/* University */}
+            <AccordionItem value="uni">
+              <AccordionTrigger className="text-sm">University</AccordionTrigger>
+              <AccordionContent className="pt-1">
+                <MultiSelect
+                  options={uniOptions}
+                  value={selectedUnis}
+                  onChange={(v) => { setSelectedUnis(v); resetPage(); }}
+                  placeholder="Any university"
+                  searchPlaceholder="Search universities..."
+                />
               </AccordionContent>
             </AccordionItem>
 
+            {/* Intakes */}
             <AccordionItem value="intakes">
               <AccordionTrigger className="text-sm">Intakes</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                {(data?.facets.intakes ?? []).slice(0, 12).map((f) => (
-                  <label key={f.name} className="flex items-center gap-2 text-sm py-0.5">
-                    <Checkbox
-                      checked={selectedIntakes.includes(f.name)}
-                      onCheckedChange={() => { setSelectedIntakes((arr) => toggleInArray(arr, f.name)); resetPage(); }}
-                    />
-                    <span className="flex-1">{f.name}</span>
-                    <span className="text-gray-400 text-xs">{f.count}</span>
-                  </label>
-                ))}
-                {(data?.facets.intakes ?? []).length === 0 && <p className="text-xs text-gray-400">No intakes match.</p>}
+              <AccordionContent className="pt-1">
+                <MultiSelect
+                  options={intakeOptions}
+                  value={selectedIntakes}
+                  onChange={(v) => { setSelectedIntakes(v); resetPage(); }}
+                  placeholder="Any intake"
+                  searchPlaceholder="Search intakes..."
+                  maxBadgeCount={3}
+                />
               </AccordionContent>
             </AccordionItem>
 
+            {/* Degree level */}
+            <AccordionItem value="level">
+              <AccordionTrigger className="text-sm">Degree Level</AccordionTrigger>
+              <AccordionContent className="pt-1">
+                <MultiSelect
+                  options={(data?.facets.degree_levels ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
+                  value={selectedLevels}
+                  onChange={(v) => { setSelectedLevels(v); resetPage(); }}
+                  placeholder="Any level"
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Category */}
+            <AccordionItem value="cat">
+              <AccordionTrigger className="text-sm">Category</AccordionTrigger>
+              <AccordionContent className="pt-1">
+                <MultiSelect
+                  options={(data?.facets.categories ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }))}
+                  value={selectedCategories}
+                  onChange={(v) => { setSelectedCategories(v); resetPage(); }}
+                  placeholder="Any category"
+                  searchPlaceholder="Search categories..."
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Duration */}
             <AccordionItem value="duration">
               <AccordionTrigger className="text-sm">Duration (years)</AccordionTrigger>
               <AccordionContent className="space-y-2 pt-2">
@@ -272,6 +355,7 @@ export default function SearchPage() {
               </AccordionContent>
             </AccordionItem>
 
+            {/* Fee */}
             <AccordionItem value="fee">
               <AccordionTrigger className="text-sm">Tuition Fee (AUD/yr)</AccordionTrigger>
               <AccordionContent className="space-y-2 pt-2">
@@ -284,51 +368,135 @@ export default function SearchPage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="level">
-              <AccordionTrigger className="text-sm">Degree Level</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                {(data?.facets.degree_levels ?? []).slice(0, 12).map((f) => (
-                  <label key={f.name} className="flex items-center gap-2 text-sm py-0.5">
-                    <Checkbox
-                      checked={selectedLevels.includes(f.name)}
-                      onCheckedChange={() => { setSelectedLevels((arr) => toggleInArray(arr, f.name)); resetPage(); }}
+            {/* ── Advanced Filter ── */}
+            <AccordionItem value="advanced">
+              <AccordionTrigger className="text-sm font-semibold text-indigo-700">
+                Advanced Filter
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2">
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    Country of Residence <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={country || "any"} onValueChange={(v) => { setCountry(v === "any" ? "" : v); resetPage(); }}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">— Any —</SelectItem>
+                      {(options?.countries ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    Highest Qualification Studied <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); resetPage(); }}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">— Any —</SelectItem>
+                      {(options?.qualifications ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    Grading Scheme (12th)
+                  </Label>
+                  <Select value={scheme || "any"} onValueChange={(v) => { setScheme(v === "any" ? "" : v); setOutOf(""); resetPage(); }}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">— Any —</SelectItem>
+                      {(options?.grading_schemes ?? []).map((s) => <SelectItem key={s.scheme} value={s.scheme}>{s.scheme}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Out of</Label>
+                    <Select value={outOf || "any"} onValueChange={(v) => { setOutOf(v === "any" ? "" : v); resetPage(); }} disabled={!scheme}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">— Any —</SelectItem>
+                        {currentSchemeOuts.map((o) => <SelectItem key={o} value={o}>Out of {o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Grading Score</Label>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      value={gradingScore}
+                      onChange={(e) => { setGradingScore(e.target.value); resetPage(); }}
+                      placeholder="e.g. 3.5"
+                      className="h-9"
                     />
-                    <span className="flex-1">{f.name}</span>
-                    <span className="text-gray-400 text-xs">{f.count}</span>
-                  </label>
-                ))}
+                  </div>
+                </div>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="category">
-              <AccordionTrigger className="text-sm">Category</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                {(data?.facets.categories ?? []).slice(0, 15).map((f) => (
-                  <label key={f.name} className="flex items-center gap-2 text-sm py-0.5">
-                    <Checkbox
-                      checked={selectedCategories.includes(f.name)}
-                      onCheckedChange={() => { setSelectedCategories((arr) => toggleInArray(arr, f.name)); resetPage(); }}
-                    />
-                    <span className="flex-1 truncate" title={f.name}>{f.name}</span>
-                    <span className="text-gray-400 text-xs">{f.count}</span>
-                  </label>
-                ))}
+            {/* ── English Proficiency Exam ── */}
+            <AccordionItem value="english">
+              <AccordionTrigger className="text-sm font-semibold text-indigo-700">
+                English Proficiency Exam
+              </AccordionTrigger>
+              <AccordionContent className="space-y-2 pt-2">
+                <Select value={englishExam || "any"} onValueChange={(v) => { setEnglishExam(v === "any" ? "" : v); resetPage(); }}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Choose exam" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">— Any —</SelectItem>
+                    {(options?.english_exams ?? ["IELTS", "PTE", "TOEFL", "CAE", "DET"]).map((e) =>
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {englishExam && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <Label className="text-xs text-gray-600">Overall</Label>
+                        <Input type="number" step="0.5" placeholder="Score"
+                          value={eOverall} onChange={(e) => { setEOverall(e.target.value); resetPage(); }} className="h-9" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-600">Reading</Label>
+                        <Input type="number" step="0.5" placeholder="Score"
+                          value={eReading} onChange={(e) => { setEReading(e.target.value); resetPage(); }} className="h-9" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-600">Writing</Label>
+                        <Input type="number" step="0.5" placeholder="Score"
+                          value={eWriting} onChange={(e) => { setEWriting(e.target.value); resetPage(); }} className="h-9" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-600">Listening</Label>
+                        <Input type="number" step="0.5" placeholder="Score"
+                          value={eListening} onChange={(e) => { setEListening(e.target.value); resetPage(); }} className="h-9" />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs text-gray-600">Speaking</Label>
+                        <Input type="number" step="0.5" placeholder="Score"
+                          value={eSpeaking} onChange={(e) => { setESpeaking(e.target.value); resetPage(); }} className="h-9" />
+                      </div>
+                    </div>
+                  </>
+                )}
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="university">
-              <AccordionTrigger className="text-sm">University</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1 max-h-64 overflow-y-auto">
-                {(data?.facets.universities ?? []).slice(0, 30).map((f) => (
-                  <label key={f.id} className="flex items-center gap-2 text-sm py-0.5">
-                    <Checkbox
-                      checked={selectedUnis.includes(Number(f.id))}
-                      onCheckedChange={() => { setSelectedUnis((arr) => toggleInArray(arr, Number(f.id))); resetPage(); }}
-                    />
-                    <span className="flex-1 truncate" title={f.name}>{f.name}</span>
-                    <span className="text-gray-400 text-xs">{f.count}</span>
-                  </label>
-                ))}
+            {/* ── Other Exam ── */}
+            <AccordionItem value="other">
+              <AccordionTrigger className="text-sm">Other Exam (GMAT/GRE)</AccordionTrigger>
+              <AccordionContent className="pt-2">
+                <Input
+                  placeholder="e.g. GMAT, GRE"
+                  value={otherExam}
+                  onChange={(e) => { setOtherExam(e.target.value); resetPage(); }}
+                  className="h-9"
+                />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -336,12 +504,12 @@ export default function SearchPage() {
 
         {/* ── Results ─────────────────────────────────────── */}
         <main className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-2 bg-white rounded-xl border px-4 py-3">
             <div className="text-sm text-gray-700">
               {loading ? (
                 <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</span>
               ) : data ? (
-                <span><strong>{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
+                <span><strong className="text-indigo-700">{data.total.toLocaleString()}</strong> course{data.total === 1 ? "" : "s"} found
                   <span className="text-xs text-gray-400 ml-2">({data.took_ms}ms)</span></span>
               ) : "—"}
             </div>
@@ -370,30 +538,49 @@ export default function SearchPage() {
             {(data?.results ?? []).map((r) => {
               const inTray = tray.includes(r.id);
               const trayFull = tray.length >= MAX_COMPARE && !inTray;
+              const fee = formatFee(r.international_fee, r.currency, r.fee_term);
+              const dur = formatDuration(r.duration, r.duration_term);
+              const cityCountry = r.course_location || [r.university.city, r.university.country].filter(Boolean).join(", ");
+              const meta: Array<{ icon: React.ReactNode; text: string }> = [];
+              if (cityCountry) meta.push({ icon: <MapPin className="w-3.5 h-3.5" />, text: cityCountry });
+              if (fee) meta.push({ icon: <DollarSign className="w-3.5 h-3.5" />, text: fee });
+              if (dur) meta.push({ icon: <Clock className="w-3.5 h-3.5" />, text: dur });
+              if (r.intakes.length > 0) meta.push({ icon: <Calendar className="w-3.5 h-3.5" />, text: r.intakes.join(", ") });
+
               return (
-                <div key={r.id} className="bg-white rounded-xl border p-4 hover:shadow-md transition-shadow">
+                <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-indigo-300 transition-all">
                   <div className="flex gap-4">
                     {r.university.logo_url ? (
-                      <img src={r.university.logo_url} alt={r.university.name} className="w-14 h-14 object-contain rounded border bg-gray-50 flex-shrink-0" />
+                      <img src={r.university.logo_url} alt={r.university.name} className="w-16 h-16 object-contain rounded-lg border bg-white p-1 flex-shrink-0" />
                     ) : (
-                      <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] font-medium flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg border bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                         {r.university.name.split(" ").slice(0, 2).map((s) => s[0]).join("")}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base text-gray-900 leading-snug">{r.course_name}</h3>
-                      <p className="text-sm text-gray-600 mt-0.5">{r.university.name}</p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
-                        {(r.course_location || r.university.city) && (
-                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.course_location || `${r.university.city}, ${r.university.country}`}</span>
-                        )}
-                        <span>💰 {formatFee(r.international_fee, r.currency, r.fee_term)}</span>
-                        <span>⏱ {formatDuration(r.duration, r.duration_term)}</span>
-                        {r.intakes.length > 0 && <span>📅 {r.intakes.join(", ")}</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {r.degree_level && <Badge variant="secondary" className="text-[10px]">{r.degree_level}</Badge>}
+                      <Link href={`/courses/${r.id}`}>
+                        <h3 className="font-semibold text-base text-gray-900 leading-snug hover:text-indigo-700 cursor-pointer">{r.course_name}</h3>
+                      </Link>
+                      <Link href={`/universities/${r.university.id}`}>
+                        <p className="text-sm text-gray-600 mt-0.5 hover:text-indigo-700 cursor-pointer inline-flex items-center gap-1">
+                          <BookOpen className="w-3.5 h-3.5" /> {r.university.name}
+                        </p>
+                      </Link>
+                      {meta.length > 0 && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
+                          {meta.map((m, i) => (
+                            <span key={i} className="flex items-center gap-1">{m.icon} {m.text}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        {r.degree_level && <Badge variant="secondary" className="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100">{r.degree_level}</Badge>}
                         {r.category && <Badge variant="outline" className="text-[10px]">{r.category}</Badge>}
+                        {r.english_requirements.ielts_overall && (
+                          <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-700">
+                            <Award className="w-3 h-3 mr-0.5" />IELTS {r.english_requirements.ielts_overall}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 flex-shrink-0">
@@ -407,11 +594,14 @@ export default function SearchPage() {
                         <Scale className="w-4 h-4 mr-1" />
                         {inTray ? "In Compare" : "Compare"}
                       </Button>
+                      <Link href={`/courses/${r.id}`}>
+                        <Button size="sm" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                          View Details
+                        </Button>
+                      </Link>
                       {r.course_url && (
-                        <a href={r.course_url} target="_blank" rel="noreferrer">
-                          <Button variant="outline" size="sm" className="w-full">
-                            View <ExternalLink className="w-3 h-3 ml-1" />
-                          </Button>
+                        <a href={r.course_url} target="_blank" rel="noreferrer" className="text-[11px] text-gray-500 hover:text-indigo-600 inline-flex items-center justify-center gap-1">
+                          <Globe2 className="w-3 h-3" /> Website
                         </a>
                       )}
                     </div>
@@ -427,7 +617,6 @@ export default function SearchPage() {
             )}
           </div>
 
-          {/* ── Pagination ────────────────────────────────── */}
           {data && data.total > data.limit && (
             <div className="flex items-center justify-center gap-2 pt-4">
               <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Prev</Button>
@@ -438,9 +627,8 @@ export default function SearchPage() {
         </main>
       </div>
 
-      {/* ── Compare tray (floating) ──────────────────────── */}
       {tray.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-20 px-4 py-3">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl z-20 px-4 py-3">
           <div className="max-w-6xl mx-auto flex items-center gap-3 flex-wrap">
             <span className="text-sm font-medium">{tray.length} of {MAX_COMPARE} courses selected</span>
             <div className="flex flex-wrap gap-2 flex-1">
@@ -454,7 +642,7 @@ export default function SearchPage() {
               ))}
             </div>
             <Button variant="ghost" size="sm" onClick={clearCompare}>Clear</Button>
-            <Button size="sm" onClick={goCompare} disabled={tray.length < 2}>
+            <Button size="sm" onClick={goCompare} disabled={tray.length < 2} className="bg-indigo-600 hover:bg-indigo-700">
               Compare {tray.length} Course{tray.length === 1 ? "" : "s"} →
             </Button>
           </div>
