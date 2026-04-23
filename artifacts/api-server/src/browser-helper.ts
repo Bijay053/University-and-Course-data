@@ -121,6 +121,14 @@ export async function fetchPageWithBrowser(
     clickRequirementsTab?: boolean;
     expandAccordions?: boolean;
     timeoutMs?: number;
+    /**
+     * CSU course pages (study.csu.edu.au) hydrate the
+     * `ocb_metadata.course_offerings` JSON client-side. The default 2s
+     * settle is not always long enough. When this flag is true, we
+     * additionally wait (up to 6s) for the substring "ocb_metadata"
+     * OR a known CSU campus chip to appear in the DOM before snapshot.
+     */
+    waitForCsuOfferings?: boolean;
   } = {},
 ): Promise<BrowserPageResult | null> {
   const {
@@ -129,6 +137,7 @@ export async function fetchPageWithBrowser(
     clickRequirementsTab = true,
     expandAccordions = true,
     timeoutMs = 30_000,
+    waitForCsuOfferings = false,
   } = opts;
 
   let playwright: typeof import("playwright") | null = null;
@@ -174,6 +183,24 @@ export async function fetchPageWithBrowser(
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
     // Extra settle time for JS widgets
     await page.waitForTimeout(2000);
+
+    // CSU course pages hydrate `ocb_metadata.course_offerings` after
+    // initial load. Wait for either the JSON blob OR a recognizable
+    // campus-block heading to appear; fall through silently after the
+    // 6s budget so we still snapshot whatever is rendered.
+    if (waitForCsuOfferings) {
+      await page
+        .waitForFunction(
+          () => {
+            const html = document.documentElement?.outerHTML ?? "";
+            if (html.includes("ocb_metadata.course_offerings")) return true;
+            const txt = (document.body?.innerText || "").toLowerCase();
+            return /\bwhere you can study\b|\bcampus(?:es)?\b/.test(txt);
+          },
+          { timeout: 6000, polling: 500 },
+        )
+        .catch(() => { /* continue with whatever rendered */ });
+    }
 
     const snapshots: string[] = [];
 

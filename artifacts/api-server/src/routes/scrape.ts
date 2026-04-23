@@ -7970,7 +7970,7 @@ async function sampleBatchPageTemplateHint(
   }
 }
 
-function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): boolean {
+function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>, url?: string): boolean {
   // No course name at all → likely fully JS-rendered, worth trying browser.
   if (!data.courseName) return true;
   const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
@@ -7983,6 +7983,13 @@ function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>): bool
   const hasLocation = !!(data.courseLocation && data.courseLocation.trim().length > 2);
   const hasIntakes  = !!data.intakeMonths?.length;
   if (data.studyMode !== "Online" && !hasLocation && !hasIntakes) return true;
+  // CSU-specific: study.csu.edu.au hydrates the campus list (`ocb_metadata.course_offerings`)
+  // client-side. Even when the static page yields English/fee/duration, the campus
+  // chips can be empty — and the textual fallback in csu-campus-fallback.ts cannot
+  // recover them when the heading itself is rendered by JS. Escalate to a browser
+  // fetch (which will wait for the offerings JSON) whenever the CSU course page
+  // came back without a courseLocation.
+  if (url && isCsuCoursePage(url) && !hasLocation && data.studyMode !== "Online") return true;
   // Two or more key fields found → static extraction is working; no browser needed.
   return [hasFee, hasEnglish, hasDuration, hasDegree].filter(Boolean).length < 2;
 }
@@ -8621,6 +8628,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
               clickRequirementsTab: true,
               expandAccordions: true,
               timeoutMs: 25_000,
+              waitForCsuOfferings: isCsuCoursePage(link.url),
             })
           );
 
@@ -10916,6 +10924,7 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
                 clickRequirementsTab: true,
                 expandAccordions: true,
                 timeoutMs: 25_000,
+                waitForCsuOfferings: isCsuCoursePage(link.url),
               })
             );
             if (browserResult?.mainHtml || browserResult?.requirementsHtml) {
@@ -10925,13 +10934,14 @@ export async function runNoAiScrapeJob(job: ScrapeJob, config: ScrapeConfig, uni
             }
           } else {
             const quickData = extractWithCheerio(cHtml, link.url, link.name, undefined, batchPageTemplate, feedbackHints);
-            if (needsBrowserFallback(quickData)) {
+            if (needsBrowserFallback(quickData, link.url)) {
               const browserResult = await browserSem(() =>
                 fetchPageWithBrowser(link.url, {
                   clickInternational: true,
                   clickRequirementsTab: true,
                   expandAccordions: true,
                   timeoutMs: 25_000,
+                  waitForCsuOfferings: isCsuCoursePage(link.url),
                 })
               );
               if (browserResult?.mainHtml || browserResult?.requirementsHtml) {
