@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services.scraper.extractors import duration, english_test, fee, intake
+from app.services.scraper.extractors import ai_fallback, duration, english_test, fee, intake
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.http_fetcher import fetch_html
 
@@ -26,7 +26,11 @@ _EXTRACTORS = (
 
 
 async def extract_course(
-    url: str, *, country: str | None = None, html: str | None = None
+    url: str,
+    *,
+    country: str | None = None,
+    html: str | None = None,
+    use_ai_fallback: bool = True,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence."""
     if html is None:
@@ -61,5 +65,23 @@ async def extract_course(
                     # First-write-wins so the highest-confidence result (which
                     # the extractor returned first) is preserved.
                     payload.setdefault(k, v)
+
+    if use_ai_fallback:
+        try:
+            ai_filled = await ai_fallback.fill_missing(payload, html=html, url=url)
+        except Exception as exc:  # never break extraction on AI failure
+            log.warning("AI fallback errored on %s: %s", url, exc)
+            ai_filled = {}
+        for k, v in ai_filled.items():
+            payload.setdefault(k, v)
+            evidence.append(
+                {
+                    "field_key": k,
+                    "value": v,
+                    "confidence": 0.5,
+                    "method": "ai_fallback",
+                    "snippet": None,
+                }
+            )
 
     return {"url": url, "payload": payload, "evidence": evidence}

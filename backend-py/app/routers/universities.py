@@ -1,9 +1,12 @@
 """University CRUD endpoints. Path layout mirrors the Node API exactly."""
 from __future__ import annotations
 
-from typing import Annotated
+import csv
+import io
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import ValidationError
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -131,6 +134,91 @@ async def update_university(
     await db.commit()
     await db.refresh(u)
     return _to_read(u)
+
+
+@router.post("/universities/bulk-import", status_code=status.HTTP_200_OK)
+async def bulk_import_universities(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+    file: UploadFile = File(...),
+) -> dict[str, Any]:
+    """Bug #6 fix: CSV bulk import for universities.
+
+    CSV must have a header row including at least: name, country, city.
+    Optional columns: website, scrape_url, featured, featured_priority.
+    Each row is validated through ``UniversityCreate`` so the same rules
+    apply (no 'Unknown', dedupe by lowercase name).
+    """
+    if file.content_type and "csv" not in file.content_type and "text" not in file.content_type:
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not UTF-8 text") from None
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV has no header row")
+
+    headers = {h.strip().lower() for h in reader.fieldnames if h}
+    required = {"name", "country", "city"}
+    missing = required - headers
+    if missing:
+        raise HTTPException(
+            status_code=400, detail=f"Missing columns: {', '.join(sorted(missing))}"
+        )
+
+    created = 0
+    skipped = 0
+    errors: list[dict[str, Any]] = []
+
+    for line_no, row in enumerate(reader, start=2):  # header is line 1
+        clean = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+        if not any(clean.values()):
+            continue
+
+        body_payload: dict[str, Any] = {
+            "name": clean.get("name", ""),
+            "country": clean.get("country", ""),
+            "city": clean.get("city", ""),
+        }
+        for opt in ("website", "scrape_url"):
+            if clean.get(opt):
+                body_payload[opt] = clean[opt]
+        if clean.get("featured"):
+            body_payload["featured"] = clean["featured"].lower() in {"1", "true", "yes", "y"}
+        if clean.get("featured_priority"):
+            try:
+                body_payload["featured_priority"] = int(clean["featured_priority"])
+            except ValueError:
+                pass
+
+        try:
+            body = UniversityCreate(**body_payload)
+        except ValidationError as ve:
+            errors.append({"line": line_no, "name": body_payload.get("name"), "error": ve.errors()[0]["msg"]})
+            continue
+
+        existing_stmt = select(University.id).where(
+            func.lower(University.name) == body.name.lower()
+        )
+        if (await db.execute(existing_stmt)).first():
+            skipped += 1
+            continue
+
+        payload = body.model_dump(exclude_none=True)
+        for url_key in ("website", "scrape_url"):
+            if url_key in payload and payload[url_key] is not None:
+                payload[url_key] = str(payload[url_key])
+        db.add(University(**payload))
+        created += 1
+
+    await db.commit()
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.delete("/universities/{uni_id}", status_code=status.HTTP_204_NO_CONTENT)
