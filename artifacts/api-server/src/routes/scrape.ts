@@ -3463,6 +3463,47 @@ function extractDurationFromDom($: ReturnType<typeof cheerio.load>, data: Partia
     if (idx >= 0) push(parentText.slice(idx + label.length));
   });
 
+  // Production bug: CSU "Bachelor of Business Studies" stored 1 year (the
+  // accelerated/fast-track variant) when the page lists "3 years full-time"
+  // as the standard duration. Prefer the standard (longest) duration and
+  // ignore candidates that are explicitly tagged as accelerated.
+  const STANDARD_UNIT_RANK: Record<string, number> = { Year: 4, Semester: 3, Trimester: 3, Month: 2, Week: 1 };
+  const isAccelerated = (text: string) =>
+    /\b(accelerat(?:ed|ion)|fast[- ]?track|condensed|intensive\s*(?:mode|stream|study)|advanced\s*standing|recognition\s*of\s*prior\s*learning|RPL|credit\s*for\s*previous\s*study)\b/i.test(text);
+  type Parsed = { source: string; amount: number; unit: string; weight: number };
+  const parsed: Parsed[] = [];
+  for (const candidate of candidates) {
+    if (isAccelerated(candidate)) continue;
+    const m =
+      candidate.match(/\b(?:course\s*duration|duration|course\s*length|program\s*length|study\s*duration)\b[\s:.-]{0,40}(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)\b/i) ||
+      candidate.match(/\bfull[- ]?time\b[\s:.-]{0,20}(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)\b/i) ||
+      candidate.match(/\b(\d+(?:\.\d+)?)\s*(years?|yrs?|months?|weeks?|trimesters?|semesters?)\s*(?:full[- ]?time)?\b/i);
+    if (!m) continue;
+    const amount = parseFloat(m[1]);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const unitLower = m[2].toLowerCase();
+    let unit: string | null = null;
+    if (/year|yr/.test(unitLower)) unit = "Year";
+    else if (/month/.test(unitLower)) unit = "Month";
+    else if (/week/.test(unitLower)) unit = "Week";
+    else if (/trimester/.test(unitLower)) unit = "Trimester";
+    else if (/semester/.test(unitLower)) unit = "Semester";
+    if (!unit) continue;
+    // Approximate normalisation to weeks for ranking (Year=52, Sem=20, Tri=14, Month=4, Week=1).
+    const weeks = unit === "Year" ? amount * 52
+      : unit === "Semester" ? amount * 20
+      : unit === "Trimester" ? amount * 14
+      : unit === "Month" ? amount * 4
+      : amount;
+    parsed.push({ source: candidate, amount, unit, weight: weeks * 100 + (STANDARD_UNIT_RANK[unit] ?? 0) });
+  }
+  if (parsed.length > 0) {
+    parsed.sort((a, b) => b.weight - a.weight);
+    const winner = parsed[0];
+    return applyDurationCandidate(data, winner.amount.toString(), winner.unit);
+  }
+
+  // Fallback: original behaviour (first candidate that parses).
   for (const candidate of candidates) {
     if (extractDurationFromTextBlock(candidate, data)) return true;
   }
@@ -4919,22 +4960,30 @@ function buildSnapshotNotes(snapshot: CourseReviewSnapshot): string[] {
 
 async function persistReviewArtifacts(scrapedCourseId: number, snapshot: CourseReviewSnapshot) {
   if (snapshot.candidates.length > 0) {
-    await db.insert(scrapedFieldEvidenceTable).values(snapshot.candidates.map((candidate) => ({
-      scrapedCourseId,
-      fieldKey: candidate.fieldKey,
-      candidateValue: candidate.candidateValue,
-      normalizedValue: candidate.normalizedValue,
-      sourceUrl: candidate.sourceUrl,
-      pageType: candidate.pageType,
-      extractionMethod: candidate.extractionMethod,
-      rawText: candidate.rawText,
-      snippet: candidate.snippet,
-      confidence: candidate.confidence,
-      decisionScore: candidate.decisionScore,
-      validationStatus: candidate.validationStatus,
-      decisionStatus: candidate.decisionStatus,
-      selected: candidate.selected,
-    })));
+    // Idempotent insert: the unique index
+    //   (scraped_course_id, field_key,
+    //    COALESCE(candidate_value,''), COALESCE(source_url,''))
+    // added in migration 0001 prevents the duplicate evidence rows that
+    // appeared in production when a course was re-staged in the same job.
+    await db
+      .insert(scrapedFieldEvidenceTable)
+      .values(snapshot.candidates.map((candidate) => ({
+        scrapedCourseId,
+        fieldKey: candidate.fieldKey,
+        candidateValue: candidate.candidateValue,
+        normalizedValue: candidate.normalizedValue,
+        sourceUrl: candidate.sourceUrl,
+        pageType: candidate.pageType,
+        extractionMethod: candidate.extractionMethod,
+        rawText: candidate.rawText,
+        snippet: candidate.snippet,
+        confidence: candidate.confidence,
+        decisionScore: candidate.decisionScore,
+        validationStatus: candidate.validationStatus,
+        decisionStatus: candidate.decisionStatus,
+        selected: candidate.selected,
+      })))
+      .onConflictDoNothing();
   }
 
   if (snapshot.conflicts.length > 0) {

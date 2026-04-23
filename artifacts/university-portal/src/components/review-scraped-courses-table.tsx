@@ -77,7 +77,55 @@ function MissingBadge({ title }: { title: string }) {
   );
 }
 
-function EvidencePanel({ evidence }: { evidence: ReviewEvidenceItem[] }) {
+/**
+ * Map evidence field_key → the matching value on the saved course record.
+ * Used by EvidencePanel to show the actual final value at the top of each
+ * field group and flag any mismatch with the row marked `selected=true`.
+ */
+function finalValueForField(course: ReviewStagedCourse, fieldKey: string): string | null {
+  const v = (x: unknown): string | null => {
+    if (x === null || x === undefined || x === "") return null;
+    if (Array.isArray(x)) return x.length > 0 ? x.join(", ") : null;
+    return String(x);
+  };
+  switch (fieldKey) {
+    case "courseName":        return v(course.courseName);
+    case "courseLocation":    return v(course.courseLocation);
+    case "duration":          return course.duration != null && course.duration !== "" ? `${course.duration} ${course.durationTerm ?? ""}`.trim() : null;
+    case "studyMode":         return v(course.studyMode);
+    case "degreeLevel":       return v(course.degreeLevel);
+    case "internationalFee":  return course.internationalFee != null && course.internationalFee !== "" ? `${course.currency ?? "AUD"} ${course.internationalFee}` : null;
+    case "ieltsOverall":      return v(course.ieltsOverall);
+    case "pteOverall":        return v(course.pteOverall);
+    case "toeflOverall":      return v(course.toeflOverall);
+    case "cambridgeOverall":  return v(course.cambridgeOverall);
+    case "duolingoOverall":   return v(course.duolingoOverall);
+    case "intakeMonths":      return v(course.intakeMonths);
+    default:                  return null;
+  }
+}
+
+/**
+ * Loose equality: trim, lower-case, strip currency markers, compare as
+ * numeric when both sides parse, otherwise string compare. Used to decide
+ * whether the `selected=true` evidence row actually matches the value the
+ * scraper persisted on the course.
+ */
+function looselyEqual(a: string | null, b: string | null): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/\b(aud|a\$|usd|gbp|\$|£)\s*/gi, "").trim();
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  const pa = parseFloat(na.replace(/,/g, ""));
+  const pb = parseFloat(nb.replace(/,/g, ""));
+  if (Number.isFinite(pa) && Number.isFinite(pb)) return Math.abs(pa - pb) < 1e-6;
+  // year vs years tolerance
+  return na.replace(/s$/, "") === nb.replace(/s$/, "");
+}
+
+function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; course?: ReviewStagedCourse }) {
   const grouped = useMemo(() => {
     const m = new Map<string, ReviewEvidenceItem[]>();
     for (const e of evidence) {
@@ -99,11 +147,27 @@ function EvidencePanel({ evidence }: { evidence: ReviewEvidenceItem[] }) {
         <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
           Evidence sources ({evidence.length} total across {grouped.length} field{grouped.length === 1 ? "" : "s"})
         </div>
-        {grouped.map(([fieldKey, items]) => (
-          <div key={fieldKey} className="bg-white border border-slate-200 rounded overflow-hidden">
-            <div className="px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-xs font-mono font-semibold text-slate-700">
-              {fieldKey}
-              <span className="ml-2 text-slate-400 font-normal">— {items.length} candidate{items.length === 1 ? "" : "s"}</span>
+        {grouped.map(([fieldKey, items]) => {
+          const finalValue = course ? finalValueForField(course, fieldKey) : null;
+          const selected = items.find((it) => it.selected) ?? null;
+          const selectedValue = selected?.normalizedValue ?? selected?.candidateValue ?? null;
+          const mismatch = !!course && !looselyEqual(finalValue, selectedValue);
+          return (
+          <div key={fieldKey} className={`bg-white border rounded overflow-hidden ${mismatch ? "border-red-300" : "border-slate-200"}`}>
+            <div className={`px-3 py-1.5 border-b text-xs font-mono font-semibold flex items-center gap-2 ${mismatch ? "bg-red-50 border-red-200 text-red-800" : "bg-slate-100 border-slate-200 text-slate-700"}`}>
+              <span>{fieldKey}</span>
+              <span className={mismatch ? "text-red-600 font-normal" : "text-slate-400 font-normal"}>— {items.length} candidate{items.length === 1 ? "" : "s"}</span>
+              {course ? (
+                <span className="ml-auto text-[11px] font-sans font-normal flex items-center gap-1.5">
+                  {mismatch ? <AlertTriangle className="w-3.5 h-3.5 text-red-600" aria-label="Selected evidence does not match the saved course value" /> : null}
+                  <span className={mismatch ? "text-red-700" : "text-slate-500"}>
+                    Final on record:&nbsp;
+                  </span>
+                  <span className={`font-mono ${mismatch ? "text-red-800 font-semibold" : "text-slate-700"}`}>
+                    {finalValue ?? <span className="italic text-slate-400 font-normal">(empty)</span>}
+                  </span>
+                </span>
+              ) : null}
             </div>
             <table className="w-full text-xs">
               <tbody>
@@ -166,7 +230,8 @@ function EvidencePanel({ evidence }: { evidence: ReviewEvidenceItem[] }) {
               </tbody>
             </table>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -336,7 +401,7 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                   {showEvidence && isOpen ? (
                     <tr>
                       <td colSpan={15} className="p-0">
-                        <EvidencePanel evidence={course.evidence ?? []} />
+                        <EvidencePanel evidence={course.evidence ?? []} course={course} />
                       </td>
                     </tr>
                   ) : null}
