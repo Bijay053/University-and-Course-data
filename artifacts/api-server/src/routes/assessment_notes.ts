@@ -144,6 +144,40 @@ router.get("/universities/:id/assessment-notes", async (req, res): Promise<void>
     "SELECT * FROM assessment_notes WHERE university_id = $1 ORDER BY country, created_at DESC",
     [uniId],
   );
+
+  // ── Lazy backfill ──────────────────────────────────────────────────────
+  // Notes created before the Gemini parser was wired (or while GEMINI_API_KEY
+  // was unset) were stored with an empty parsed_data array, which makes the
+  // frontend fall back to the plain "Raw notes:" block. On every GET we
+  // re-parse any such note so the card UI shows up on the next render.
+  // We do this in-band (await) so the very first page load shows cards —
+  // there are usually only 1–3 notes per university so latency stays low,
+  // and once persisted we never re-parse again.
+  if (GEMINI_API_KEY) {
+    const stale = result.rows.filter(r => {
+      const pd = r.parsed_data;
+      return !Array.isArray(pd) || pd.length === 0;
+    });
+    if (stale.length > 0) {
+      await Promise.all(stale.map(async (row) => {
+        const id = row.id as number;
+        const rawText = row.raw_text as string;
+        try {
+          const parsed = await parseWithGemini(rawText);
+          if (parsed.length > 0) {
+            await pool.query(
+              `UPDATE assessment_notes SET parsed_data = $1, updated_at = NOW() WHERE id = $2`,
+              [JSON.stringify(parsed), id],
+            );
+            row.parsed_data = parsed;
+          }
+        } catch {
+          // Swallow — fall through to raw_text rendering on the client.
+        }
+      }));
+    }
+  }
+
   res.json(result.rows);
 });
 

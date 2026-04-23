@@ -978,7 +978,7 @@ export default function UniversityDetail() {
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "courses", label: "Courses", icon: <BookOpen className="w-4 h-4" />, count: uni ? total : undefined },
-    { key: "assessment", label: "Assessment Notes", icon: <ClipboardList className="w-4 h-4" /> },
+    { key: "assessment", label: "Key Insights", icon: <ClipboardList className="w-4 h-4" /> },
     { key: "english", label: "English Proficiency", icon: <Languages className="w-4 h-4" /> },
     { key: "academic", label: "Academic Requirements", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "scholarships", label: "Scholarships", icon: <Award className="w-4 h-4" /> },
@@ -1831,11 +1831,11 @@ export default function UniversityDetail() {
           {/* Header row */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">
-              {assessNotes.length} note{assessNotes.length !== 1 ? "s" : ""} across {new Set(assessNotes.map(n => n.country)).size} countr{new Set(assessNotes.map(n => n.country)).size !== 1 ? "ies" : "y"}
+              {assessNotes.length} insight{assessNotes.length !== 1 ? "s" : ""} across {new Set(assessNotes.map(n => n.country)).size} countr{new Set(assessNotes.map(n => n.country)).size !== 1 ? "ies" : "y"}
             </p>
             <Button size="sm" onClick={() => { setAssessAddCountry(""); setAssessAddText(""); setAssessShowAdd(true); }}
               className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white">
-              <Plus className="w-3.5 h-3.5" /> Add Assessment Note
+              <Plus className="w-3.5 h-3.5" /> Add Key Insight
             </Button>
           </div>
 
@@ -1864,7 +1864,7 @@ export default function UniversityDetail() {
           {!assessLoading && assessNotes.length === 0 && (
             <div className="border rounded-xl p-12 text-center text-muted-foreground">
               <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No assessment notes yet. Click "Add Assessment Note" to get started.</p>
+              <p>No insights yet. Click "Add Key Insight" to get started.</p>
             </div>
           )}
 
@@ -1981,7 +1981,7 @@ export default function UniversityDetail() {
           <Dialog open={assessShowAdd} onOpenChange={setAssessShowAdd}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Add Assessment Note</DialogTitle>
+                <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Add Key Insight</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
@@ -1993,7 +1993,7 @@ export default function UniversityDetail() {
                   </select>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium mb-1.5 block">Assessment Notes (plain text)</Label>
+                  <Label className="text-sm font-medium mb-1.5 block">Key Insights (plain text)</Label>
                   <p className="text-xs text-muted-foreground mb-2">Paste any plain text — structured or unstructured. AI will extract the cards automatically (banks, sponsors, scholarship, turnaround times, etc.).</p>
                   <textarea value={assessAddText} onChange={e => setAssessAddText(e.target.value)}
                     rows={12} placeholder={"Example:\nAcceptable banks:\nAll A-class banks — accepted\n\nUnder 18:\nNot allowed\n\nSponsor requirements:\nTypes: Parents, Siblings, Grandparents\nMin income: AUD 30,000/yr\nBank statement: 1 year\n\nTurnaround times:\nOffer: 48 hours\nGTE: 4 days\nCoE: 4 days"}
@@ -2038,7 +2038,7 @@ export default function UniversityDetail() {
           <Dialog open={!!assessEditNote} onOpenChange={v => { if (!v) setAssessEditNote(null); }}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-indigo-600" /> Edit Assessment Note</DialogTitle>
+                <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-indigo-600" /> Edit Key Insight</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
@@ -2050,7 +2050,7 @@ export default function UniversityDetail() {
                   </select>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium mb-1.5 block">Assessment Notes (plain text)</Label>
+                  <Label className="text-sm font-medium mb-1.5 block">Key Insights (plain text)</Label>
                   <textarea value={assessEditText} onChange={e => setAssessEditText(e.target.value)}
                     rows={12}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
@@ -2098,7 +2098,7 @@ export default function UniversityDetail() {
                 <DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="w-4 h-4" /> Delete Note</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-gray-600 py-2">
-                Are you sure you want to delete the assessment note for <strong>{assessDeleteNote?.country}</strong>? This cannot be undone.
+                Are you sure you want to delete the insight for <strong>{assessDeleteNote?.country}</strong>? This cannot be undone.
               </p>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAssessDeleteNote(null)} disabled={assessDeleting}>Cancel</Button>
