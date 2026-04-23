@@ -1701,7 +1701,7 @@ function extractWithCheerio(
   // fallback that scans for known CSU campus city names under campus-related
   // headings / sentences. No-op when the structured-data path already filled
   // courseLocation, and no-op for non-CSU URLs.
-  applyCsuTextualCampusFallback($, html, preferredUrl, data as { courseLocation?: string });
+  applyCsuTextualCampusFallback($, html, preferredUrl, data);
 
   const pageTemplate = detectCoursePageTemplate(html, preferredUrl);
   const effectiveTemplate = pickEffectiveCourseTemplate(batchPageTemplateHint ?? null, pageTemplate);

@@ -36,8 +36,6 @@ const CSU_KNOWN_CAMPUSES: ReadonlyArray<{ canonical: string; pattern: RegExp }> 
 const CSU_CAMPUS_LABEL_RE =
   /^(?:where\s+you\s+can\s+study|study\s+(?:mode\s+and\s+)?locations?|campus(?:es)?(?:\s+locations?)?|available\s+(?:at|in|on(?:\s+campus)?)|delivered\s+(?:at|in)|on[- ]?campus\s+locations?|where\s+to\s+study|locations?)\b\s*[:\-–]?$/i;
 
-const MAX_TEXT_CHARS = 50000;
-
 export function isCsuCoursePage(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
@@ -45,23 +43,6 @@ export function isCsuCoursePage(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Strip <script>/<style>/<noscript> blocks and HTML tags to get a flat
- * visible-text approximation suitable for sentence-level scanning. Kept local
- * to this module so the unit tests don't have to pull in the heavier scraper
- * helpers in routes/scrape.ts.
- */
-function visibleText(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 /**
@@ -169,11 +150,6 @@ export function applyCsuTextualCampusFallback(
       harvestFromText(elText);
     });
   }
-  // The flat-visible-text path is intentionally removed — it was the main
-  // false-positive vector. If a CSU page has neither a recognized heading
-  // nor a contained anchor phrase, we leave courseLocation null and let the
-  // validator surface the missing-location warning rather than guessing.
-  void html; void MAX_TEXT_CHARS; void visibleText;
 
   if (found.size === 0 && !onlineMentioned) return;
 
