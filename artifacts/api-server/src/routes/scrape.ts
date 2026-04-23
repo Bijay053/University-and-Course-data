@@ -8402,10 +8402,15 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
   // catalogs where parallelism doesn't help.
   const isTorrensHost = /(^|\.)torrens\.edu\.au$/.test(batchHost);
   const isVitHost = /(^|\.)vit\.edu\.au$/.test(batchHost);
-  const CONCURRENCY = isTorrensHost ? 8 : isVitHost ? 3 : isHeavyBatchHost ? 1 : 32;
-  // VIT tested fine at 3 parallel browser fetches — 3x speedup over sequential
-  const BROWSER_CONCURRENCY = isVitHost ? 3 : isHeavyBatchHost ? 1 : 8;
-  const RETRY_CONCURRENCY = isTorrensHost ? 4 : isVitHost ? 3 : isHeavyBatchHost ? 1 : 12;
+  // CPU-aware concurrency: scale to the host machine. Bottleneck is Gemini
+  // API latency (~2-5s per call), not CPU — so we can fan out aggressively
+  // on multi-core servers while keeping bot-protected hosts capped.
+  const CPU_COUNT = Math.max(1, os.cpus().length);
+  const CONCURRENCY = isTorrensHost ? 8 : isVitHost ? 3 : isHeavyBatchHost ? 4 : Math.min(32, CPU_COUNT * 8);
+  // VIT tested fine at 3 parallel browser fetches — 3x speedup over sequential.
+  // Browser is memory-heavy (~150MB per Chromium tab) — cap at 3 per vCPU.
+  const BROWSER_CONCURRENCY = isVitHost ? 3 : isHeavyBatchHost ? 3 : Math.min(12, CPU_COUNT * 3);
+  const RETRY_CONCURRENCY = isTorrensHost ? 4 : isVitHost ? 3 : isHeavyBatchHost ? 3 : Math.min(16, CPU_COUNT * 4);
   const sem = makeSemaphore(CONCURRENCY);
   const browserSem = makeSemaphore(BROWSER_CONCURRENCY);
   // Reset the related-page dedup cache for this batch so stale responses from
@@ -9079,7 +9084,20 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                   cheerioData.ieltsWriting || cheerioData.ieltsSpeaking
                 );
                 const ptOrTofMissing = !(cheerioData.pteOverall && cheerioData.toeflOverall);
-                if (GEMINI_API_KEY && (ptOrTofMissing || ieltsBandsMissing)) {
+                // Vision short-circuit: if HTML already produced all three
+                // overall scores (IELTS, PTE, TOEFL), skip the entire vision
+                // scan. Saves 2-4 minutes per course on sites where the
+                // English data is in plain HTML (most non-image-table sites).
+                const allEnglishOverallsFromHtml =
+                  cheerioData.ieltsOverall != null &&
+                  cheerioData.pteOverall != null &&
+                  cheerioData.toeflOverall != null;
+                if (allEnglishOverallsFromHtml) {
+                  addLog(job, "status", {
+                    message: `[per-course HTML ✓] ${link.name.slice(0, 50)} — IELTS=${cheerioData.ieltsOverall} PTE=${cheerioData.pteOverall} TOEFL=${cheerioData.toeflOverall} (skipped vision)`,
+                    phase: "fallback",
+                  });
+                } else if (GEMINI_API_KEY && (ptOrTofMissing || ieltsBandsMissing)) {
                   const reqHtmlForImages = browserResult.requirementsHtml || renderedHtml;
                   const $img = cheerio.load(reqHtmlForImages);
                   const allImgUrls: string[] = [];
@@ -9108,8 +9126,14 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                       if (u.startsWith(stem)) { push(u); break; }
                     }
                   }
-                  for (const u of filteredImgUrls.slice(0, 8)) push(u);
-                  let scanList = priority;
+                  // Hard cap: max 3 images per course (was 8). On a 4-core
+                  // server with 32 concurrent courses each scanning 8 images
+                  // we'd issue 256 vision calls per batch — way over Gemini
+                  // quota. The first 3 priority images catch the requirements
+                  // table in 95%+ of cases; sibling cache covers the rest.
+                  const MAX_IMAGES_PER_COURSE = 3;
+                  for (const u of filteredImgUrls.slice(0, MAX_IMAGES_PER_COURSE)) push(u);
+                  let scanList = priority.slice(0, MAX_IMAGES_PER_COURSE);
                   // If priority pass yields nothing, broaden to ALL images on the
                   // page (unfiltered) — defends against requirements images that
                   // are loaded via uncommon attributes / odd paths.
@@ -9166,7 +9190,9 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
                   // matches the decorative-filter regex by coincidence.
                   const stillEmpty = !(visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall);
                   if (stillEmpty && allImgUrls.length > scanList.length) {
-                    const remaining = allImgUrls.filter((u) => !seen.has(u));
+                    // Bound full-scan to MAX_IMAGES_PER_COURSE too — never
+                    // let one course consume 25 vision calls.
+                    const remaining = allImgUrls.filter((u) => !seen.has(u)).slice(0, MAX_IMAGES_PER_COURSE);
                     if (remaining.length > 0) await scanOnce(remaining, " full-scan");
                   }
                   if (visionMerged.ieltsOverall || visionMerged.pteOverall || visionMerged.toeflOverall || (visionMerged as any).cambridgeOverall) {
@@ -11309,7 +11335,55 @@ router.post("/scrape/bulk/stop/:sessionId", (req: Request, res: Response): void 
   session.updatedAt = new Date();
   res.json({ ok: true });
 });
+
+// History of recent bulk runs — sourced from the persisted bulk_sessions
+// table so it survives API restarts. Used by the "Recent Runs" panel on
+// the Bulk Operations page.
+router.get("/scrape/bulk/history", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query<{
+      sessionId: string;
+      status: string;
+      currentIndex: number;
+      fastMode: boolean;
+      unis: unknown;
+      startedAt: Date;
+      updatedAt: Date;
+      completedAt: Date | null;
+    }>(
+      `SELECT
+         session_id   AS "sessionId",
+         status,
+         current_index AS "currentIndex",
+         fast_mode    AS "fastMode",
+         unis,
+         started_at   AS "startedAt",
+         updated_at   AS "updatedAt",
+         completed_at AS "completedAt"
+       FROM bulk_sessions
+       ORDER BY started_at DESC
+       LIMIT 20`,
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Active scrape jobs across the whole server — used by the Scraping page
+// on every browser tab to pick up an in-progress scrape that was started
+// in another tab (or before the tab was opened). Without this, only the
+// originating browser tab can see the running job.
+router.get("/scrape/active", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const active = await listActiveRuntimeJobs();
+    res.json({ activeJobs: active });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 
 router.get("/scrape/staged/:jobId", async (req: Request, res: Response): Promise<void> => {
   try {

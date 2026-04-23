@@ -622,7 +622,28 @@ export default function Scraping() {
       setScrapeLogs([]);
       setScrapeResult(null);
       pollJobStatus(savedJobId);
+      return;
     }
+    // Cross-tab sync: no job in sessionStorage, but maybe another browser
+    // tab (or the API server itself, after a restart) has a scrape running.
+    // Pick it up so every tab on /scraping shows the live progress.
+    let cancelled = false;
+    fetch("/api/scrape/active")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { activeJobs?: Array<{ runtimeJobId: string; universityName?: string | null }> } | null) => {
+        if (cancelled || !data?.activeJobs?.length) return;
+        const job = data.activeJobs[0];
+        if (!job?.runtimeJobId) return;
+        setActiveJobId(job.runtimeJobId);
+        if (job.universityName) setScrapeUniName(job.universityName);
+        setScraping(true);
+        setScrapeLogs([{ event: "status", message: `Resumed in-progress scrape (${job.universityName ?? "unknown"}) from another tab/session.` }]);
+        setScrapeResult(null);
+        sessionStorage.setItem("activeScrapeJob", job.runtimeJobId);
+        pollJobStatus(job.runtimeJobId);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [pollJobStatus]);
 
   const stopScraping = useCallback(async () => {

@@ -63,6 +63,16 @@ type BulkSessionData = {
   unis: BulkUniEntry[];
 };
 
+type BulkHistoryEntry = {
+  sessionId: string;
+  status: string;
+  currentIndex: number;
+  unis: Array<BulkUniEntry & { durationMs?: number; totalFound?: number; geminiCallCount?: number }>;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "bulkScrapeSessionId";
 const POLL_INTERVAL = 3000;
@@ -226,6 +236,18 @@ export default function Bulk() {
       })
       .catch(() => {});
   }, []);
+
+  // ── Recent bulk runs history (server-persisted) ───────────────────────────
+  const [history, setHistory] = useState<BulkHistoryEntry[]>([]);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const loadHistory = useCallback(() => {
+    fetch("/api/scrape/bulk/history")
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: BulkHistoryEntry[]) => Array.isArray(rows) ? setHistory(rows) : setHistory([]))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   // Initialise selectedIds when universities load
   useEffect(() => {
@@ -667,6 +689,91 @@ export default function Bulk() {
             <span className="flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 text-red-400" /> Error</span>
             <span className="flex items-center gap-1"><div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300" /> Queued</span>
           </div>
+
+          {/* ── Recent Runs (server-persisted history) ───────────────────── */}
+          {history.length > 0 && (
+            <div className="mt-6 border-t pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Recent Runs</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Last {Math.min(history.length, 20)} bulk-scrape sessions, persisted across server restarts.</p>
+                </div>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={loadHistory}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {(showAllHistory ? history : history.slice(0, 5)).map((h) => {
+                  const isOpen = expandedHistoryId === h.sessionId;
+                  const startedDate = new Date(h.startedAt);
+                  const endedDate = h.completedAt ? new Date(h.completedAt) : new Date(h.updatedAt);
+                  const durMin = Math.round((endedDate.getTime() - startedDate.getTime()) / 60000);
+                  const doneN = h.unis?.filter(u => u.status === "done").length ?? 0;
+                  const errN = h.unis?.filter(u => u.status === "error").length ?? 0;
+                  const stoppedN = h.unis?.filter(u => u.status === "stopped").length ?? 0;
+                  return (
+                    <div key={h.sessionId} className="rounded-lg border border-gray-200 bg-white">
+                      <button
+                        onClick={() => setExpandedHistoryId(isOpen ? null : h.sessionId)}
+                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-900">{startedDate.toLocaleString()}</span>
+                            <Badge variant="outline" className={
+                              h.status === "completed" ? "text-green-700 border-green-200 bg-green-50" :
+                              h.status === "stopped"   ? "text-amber-700 border-amber-200 bg-amber-50" :
+                              h.status === "running"   ? "text-blue-700 border-blue-200 bg-blue-50" :
+                                                         "text-gray-600 border-gray-200 bg-gray-50"
+                            }>{h.status}</Badge>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {h.unis?.length ?? 0} universities · {doneN} done · {errN} error · {stoppedN} stopped · {durMin} min
+                          </p>
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div className="border-t border-gray-100 px-3 py-2 space-y-1">
+                          {(h.unis ?? []).map((u, i) => (
+                            <div key={`${h.sessionId}-${i}`} className="flex items-start gap-2 text-xs py-1">
+                              <span className="w-5 text-gray-400 shrink-0">{i + 1}.</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-gray-900 truncate">{u.name}</span>
+                                  <StatusBadge status={u.status} />
+                                  {typeof u.imported === "number" && u.imported > 0 && (
+                                    <span className="text-gray-500">{u.imported} imported{typeof u.totalFound === "number" && u.totalFound > 0 ? ` / ${u.totalFound} found` : ""}</span>
+                                  )}
+                                  {typeof u.durationMs === "number" && u.durationMs > 0 && (
+                                    <span className="text-gray-400">· {Math.round(u.durationMs / 1000)}s</span>
+                                  )}
+                                  {typeof u.geminiCallCount === "number" && (
+                                    <span className="text-gray-400">· {u.geminiCallCount} gemini</span>
+                                  )}
+                                </div>
+                                {u.error && (
+                                  <p className="text-red-500 mt-0.5 break-words">{u.error}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {history.length > 5 && (
+                <button
+                  onClick={() => setShowAllHistory(!showAllHistory)}
+                  className="mt-3 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  {showAllHistory ? "Show only recent 5" : `Show all ${history.length} runs`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

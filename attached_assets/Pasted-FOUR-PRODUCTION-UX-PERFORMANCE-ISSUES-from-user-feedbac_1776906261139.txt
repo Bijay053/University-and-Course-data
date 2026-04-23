@@ -1,0 +1,125 @@
+FOUR PRODUCTION UX/PERFORMANCE ISSUES from user feedback:
+
+ISSUE 1: No persistent log history for Bulk Scrape (user can't see what happened overnight)
+User ran bulk scrape at night, came back next day, and saw only stale status (Done/Stopped badges) but NO log output from last night's run. Can't tell why Torrens stopped or how long each university took.
+Fix — Add per-session persistent logs:
+The bulk_sessions table exists now (from last commit). Add a new column or use existing unis JSONB to store per-university logs:
+sqlALTER TABLE bulk_sessions ADD COLUMN IF NOT EXISTS log_summary JSONB DEFAULT '[]'::jsonb;
+Write to it during the run:
+typescript// Inside runOneBulkUniversity after completion
+await db.execute(sql`
+  UPDATE bulk_sessions 
+  SET log_summary = log_summary || ${JSON.stringify([{
+    timestamp: new Date().toISOString(),
+    universityId: entry.universityId,
+    universityName: entry.name,
+    status: entry.status,
+    imported: entry.imported,
+    found: entry.totalFound,
+    durationMs: entry.durationMs,
+    error: entry.error ?? null,
+    geminiCalls: entry.geminiCallCount ?? null,
+  }])}::jsonb
+  WHERE session_id = ${sessionId}
+`);
+Add endpoint to retrieve historical bulk sessions:
+typescriptrouter.get("/scrape/bulk/history", async (_req, res) => {
+  const rows = await db.execute(sql`
+    SELECT session_id, status, started_at, completed_at, log_summary,
+      jsonb_array_length(unis) as total_unis
+    FROM bulk_sessions
+    ORDER BY started_at DESC
+    LIMIT 20
+  `);
+  res.json(rows);
+});
+Frontend: show history on Bulk Upload page. Add a "Recent Runs" section below the queue that lists the last 10 bulk sessions with expandable per-university log details (timestamp, duration, imported, error).
+
+ISSUE 2: Scraping page doesn't show in-progress scrapes when opened in a new browser tab
+User opens /scraping page in Browser A, starts a VIT scrape, it's running. Opens /scraping in Browser B at the same time — shows empty state, no indicator that a scrape is running.
+Root cause: The page loads in-progress state from local React state, not from the server. Job info lives only in the browser that started it.
+Fix — Load active jobs from server on page mount:
+Create endpoint that returns any currently-running scrape:
+typescriptrouter.get("/scrape/active", async (_req, res) => {
+  const running = await db.query.scrapeRuntimeJobsTable.findMany({
+    where: (j, { inArray }) => inArray(j.status, ['running', 'queued']),
+    orderBy: (j, { desc }) => desc(j.startedAt),
+    limit: 5,
+  });
+  res.json({ activeJobs: running });
+});
+On the Scraping page, useEffect on mount:
+typescriptuseEffect(() => {
+  fetch('/api/scrape/active')
+    .then(r => r.json())
+    .then(data => {
+      if (data.activeJobs?.length > 0) {
+        const job = data.activeJobs[0];
+        setCurrentJobId(job.runtimeJobId);
+        setUniversityName(job.universityName);
+        setIsRunning(true);
+        // Then start polling the status endpoint like normal
+      }
+    });
+}, []);
+This way any browser tab on the Scraping page picks up whatever is currently running.
+
+ISSUE 3: CPU underutilized on 4 vCPU / 8 GB RAM server — CSU took 2+ hours for 197 courses
+User's DigitalOcean server: Basic Intel / 4 vCPUs / 8 GB RAM. CSU scrape ran for 2 hours on 197 courses ≈ 37 seconds per course. That's brutal. CPU was idle most of the time (per ps aux earlier — workers at 0.1% CPU).
+The bottleneck is Gemini API latency, not CPU. But we can massively parallelize since CPU is free.
+Fix — Increase concurrency for non-bot-protected sites:
+In scrape.ts, find the concurrency config:
+typescriptconst CONCURRENCY = isTorrensHost ? 8 : isHeavyBatchHost ? 3 : 32;
+const BROWSER_CONCURRENCY = isHeavyBatchHost ? 2 : 8;
+Change to use server resources:
+typescript// Detect available CPU cores
+const CPU_COUNT = require('os').cpus().length; // = 4 on user's server
+
+// For heavy/bot-protected hosts, keep low
+const CONCURRENCY = isTorrensHost ? 8 : isHeavyBatchHost ? 4 : Math.min(32, CPU_COUNT * 8);
+
+// Browser is memory-heavy — scale to 3 per vCPU
+const BROWSER_CONCURRENCY = isHeavyBatchHost ? 3 : Math.min(12, CPU_COUNT * 3);
+
+// Retry pass can be more aggressive
+const RETRY_CONCURRENCY = isTorrensHost ? 4 : isHeavyBatchHost ? 3 : Math.min(16, CPU_COUNT * 4);
+Most important — classify study.csu.edu.au (Charles Sturt) as non-heavy host if its bot protection is weak. Test by checking if current isHeavyBatchHost flag includes CSU. If it does, remove it unless they actually block parallel requests.
+Check this list in scrape.ts:
+typescriptconst HEAVY_HOSTS = [...]; // Look for csu.edu.au, study.csu.edu.au
+If CSU is in there, test without it first. Run a small sample scrape on CSU with BROWSER_CONCURRENCY = 6 — if it doesn't rate-limit, keep it.
+
+ISSUE 4: CSU scrape wastes most time on per-course Gemini vision (courses have static HTML, don't need vision)
+Looking at the Torrens logs earlier, each course took 3-4 minutes because of [per-course vision full-scan] scanning 25 image(s)... — vision on 25 images per course is absurd when the English data is in the HTML.
+Fix — Short-circuit vision when HTML already has IELTS+PTE+TOEFL:
+In the per-course loop, after static HTML extraction:
+typescript// After static/HTML extraction
+if (courseData.ieltsOverall && courseData.pteOverall && courseData.toeflOverall) {
+  // Complete data from HTML — skip vision entirely
+  addLog(job, 'status', { 
+    message: `[per-course HTML ✓] ${courseName} — IELTS=${courseData.ieltsOverall} PTE=${courseData.pteOverall} TOEFL=${courseData.toeflOverall} (skipped vision)` 
+  });
+  return courseData;
+}
+
+// Only run vision if HTML was INCOMPLETE
+// ... existing vision code
+Also cap image scanning — hard limit 3 images max per course, not 25:
+typescriptconst MAX_IMAGES_PER_COURSE = 3;
+for (const img of candidateImages.slice(0, MAX_IMAGES_PER_COURSE)) {
+  // ...
+  if (hasCompleteEnglishData(result)) break; // stop on first success
+}
+
+DELIVERY:
+
+Apply all 4 fixes
+Build, commit, push to main with message "Bulk history logs, cross-tab sync, higher concurrency, vision short-circuit"
+Reply with:
+
+Screenshot/mock of the new "Recent Runs" history UI
+Log excerpt from a test CSU scrape showing [per-course HTML ✓] (HTML-only, skipped vision) for at least some courses
+The new CPU_COUNT * N concurrency values that will run on a 4-core server
+
+
+
+After push I'll deploy and run a full 6-university bulk test. Target: 6 universities × ~10-15 min avg = complete in under 90 min (was taking 2+ hours for just CSU alone).
