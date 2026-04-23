@@ -514,10 +514,19 @@ async function runBulkSessionLoop(session: BulkSession): Promise<void> {
   await persistBulkSession(session);
 
   // ── First pass ─────────────────────────────────────────────────────────
+  // On a fresh session every entry starts as "pending". On a resumed session
+  // (after API restart) entries may already be done/skipped/error/stopped —
+  // we skip those here. The retry pass below picks up error/stopped entries
+  // that still have attempts remaining; done/skipped are never re-run.
   for (let i = 0; i < session.unis.length; i++) {
     if ((session.status as string) === "stopped") break;
     const entry = session.unis[i];
     if (!entry) continue;
+    if (entry.status !== "pending") {
+      // Already processed in a previous (interrupted) run — skip.
+      console.log(`[BULK ${i + 1}/${total}] ${entry.name} — skip (status=${entry.status} from previous run)`);
+      continue;
+    }
     session.currentIndex = i;
     session.updatedAt = new Date();
     await persistBulkSession(session);
@@ -594,21 +603,22 @@ export async function resumeBulkSessionsOnStartup(): Promise<void> {
         updatedAt: new Date(),
         fastMode: row.fastMode,
       };
-      // Mark anything that was "running" mid-restart as "error" with retry-eligible
-      // status; the loop's retry pass will re-attempt it.
+      // Mark anything that was "running" mid-restart as "error" with
+      // retry-eligible status; runBulkSessionLoop's retry pass will re-attempt
+      // it (attempts < 2). The first pass iterates all entries but skips any
+      // entry whose status is not "pending", so done/skipped/error stay as-is
+      // through the first pass and only get retried via the retry pass.
+      let resumedRunningCount = 0;
       for (const u of session.unis) {
         if (u.status === "running") {
           u.status = "error";
           u.error = "Interrupted by API restart — will be retried";
+          resumedRunningCount++;
         }
       }
-      // Skip entries already done/skipped, resume from the first pending/error one.
-      const firstPending = session.unis.findIndex((u) => u.status === "pending");
-      if (firstPending >= 0) {
-        // Truncate the loop to start from firstPending by setting currentIndex,
-        // but the loop iterates from 0 — instead, mark earlier non-pending as
-        // already-processed (their status already reflects what happened).
-      }
+      const pendingCount = session.unis.filter((u) => u.status === "pending").length;
+      const doneCount   = session.unis.filter((u) => u.status === "done").length;
+      console.log(`[BULK-RESUME] session=${session.sessionId} done=${doneCount} pending=${pendingCount} interrupted=${resumedRunningCount}`);
       bulkSessions.set(session.sessionId, session);
       void runBulkSessionLoop(session).catch((err) => {
         console.error(`[BULK-RESUME] session ${session.sessionId} loop crashed`, err);
