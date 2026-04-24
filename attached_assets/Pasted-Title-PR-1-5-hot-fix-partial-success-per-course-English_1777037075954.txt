@@ -1,0 +1,30 @@
+Title: PR-1.5 hot-fix partial success — per-course English-test parser still broken
+Pulled 36f30ee to prod. Ran fresh VIT scrape job_24323bbb8715 (24 courses, 17 min wall time).
+3 of 4 regressions FIXED ✅:
+
+B16 counter mismatch: counter=24, actual_rows=24 ✓
+study_mode: 23/24 On Campus (was 0/24, all wrongly Blended) ✓
+duration: 0/24 bad (was 6/24 with masters@10yr) ✓
+MBA sample looks great: On Campus | 2 Year | $28k-$48k
+
+1 regression NOT fixed — per-course English test extraction:
+browser_ok=0   browser_empty=19   ← 100% failure
+vision_ok=20   vision_empty=18    ← partial
+has_pte=11/24  has_toefl=11/24  has_cae=11/24
+avg_completeness=67.5% (baseline yesterday: 99.6%)
+Smoking gun (still applies):
+$ curl -s https://vit.edu.au/mba/mba-project-management | grep -i ielts
+<li>IELTS Academic: Overall score 6.5, with no band below 6.0, or</li>
+<th colspan="2"><strong>IELTS (Academic)</strong></th>
+<th colspan="5"><strong>PTE (Academic)</strong></th>
+<th colspan="5"><strong>TOEFL IBT Overall</strong></th>
+<th colspan="2"><strong>(CAE) Cambridge English scale score</strong></th>
+Plain HTML, no JS. Every per-course log line still says IELTS=— PTE=— TOEFL=— CAE=—. networkidle wait was the wrong fix — waiting longer doesn't help when the parser can't find data that's already there.
+Where the IELTS/PTE/TOEFL values that DID land (11/24) came from: AI fallback, not the parser. I suspect that's also why values look suspiciously uniform across MBA courses (PTE=50 TOEFL=80 on every MBA spec, regardless of actual page content) — AI is guessing IELTS-equivalent numbers, not reading the table.
+Asks:
+
+The per-course browser extractor (presumably english_test.extract invoked from per_course_browser.py) needs to parse VIT's <th>IELTS (Academic)</th> / <th>PTE (Academic)</th> table-header pattern, not just the inline-list pattern.
+Why does vision OCR find data on 20 pages but only 11 rows end up with PTE? There's a path where vision data isn't reaching the staged row.
+Compare PR-1's per_course_browser.py selectors against yesterday's working baseline (scrape_1776931855716_5iku7v — 14/14 100% extraction). Whatever was changed in PR-1 broke VIT's table layout handling.
+
+Repro: curl -s https://vit.edu.au/mba/mba-project-management > /tmp/vit.html then point your browser-extractor at the file — should reproduce immediately, no Playwright/network needed.

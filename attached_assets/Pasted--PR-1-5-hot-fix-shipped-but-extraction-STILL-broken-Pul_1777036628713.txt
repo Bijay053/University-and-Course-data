@@ -1,0 +1,32 @@
+🚨 PR-1.5 hot-fix shipped but extraction STILL broken
+Pulled 36f30ee to prod, ran fresh VIT scrape (job_24323bbb8715). The 6 fixes are live (verified). But per-course extraction is still returning empty data on most URLs.
+Smoking gun: data IS in the HTML, parser fails to find it
+bash$ curl -s https://vit.edu.au/mba/mba-project-management | grep -i ielts
+IELTS Academic: Overall score 6.5, with no band below 6.0
+<th>IELTS (Academic)</th>
+<th>PTE (Academic)</th>
+<th>TOEFL IBT</th>
+<th>(CAE) Cambridge English scale score</th>
+Plain HTML, no JavaScript needed. A bare curl sees the data. But scraper logs say:
+[per-course browser ✓] https://vit.edu.au/mba/mba-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+Browser fetch returns the page successfully but extractor fails to parse it. The networkidle wait change in PR-1.5 didn't help because waiting longer was never the problem — the parser itself is broken on VIT's HTML structure.
+Mid-scrape stats
+After 12 courses processed:
+
+browser_with_data: 0
+browser_empty: 12 (100% failure rate)
+vision_with_data: 12 (vision IS extracting — at least some)
+vision_empty: 8
+
+So per_course_vision.py is partially working, per_course_browser.py is completely broken on VIT.
+Hypothesis
+The English Test extractor expects a specific HTML structure (rows of IELTS = X, PTE = Y) that yesterday's good scrape (Node-based or pre-PR-1 Python) handled. After PR-1, something in per_course_browser.py or its english_test extractor is targeting selectors that don't exist on VIT's table-based layout (which uses <th>IELTS (Academic)</th> headers + multi-row tables with "no band < 5.0" cells).
+Repro
+Job: job_24323bbb8715 on prod (159.65.152.72)
+URL that fails extraction but has the data: https://vit.edu.au/mba/mba-project-management
+Run curl -s https://vit.edu.au/mba/mba-project-management > /tmp/vit.html then point your per_course_browser extractor at the file directly — should reproduce instantly.
+Asks
+
+Why is per_course_browser.py returning empty for VIT pages whose HTML clearly contains IELTS/PTE/TOEFL/CAE in plain <th> and <li> tags?
+Why is per_course_vision.py finding data 60% of the time (12 of 20 attempts) but it's not reaching the staged row?
+Compare PR-1's extractor selectors against yesterday's working extraction (scrape_1776931855716_5iku7v) — which selector regressed?
