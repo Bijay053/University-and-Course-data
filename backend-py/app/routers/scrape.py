@@ -123,6 +123,12 @@ async def start_scrape(
             detail=f"University not found (id={body.university_id}, url={body.url}, name={body.university_name})"
         )
     job_id = f"job_{uuid.uuid4().hex[:12]}"
+    # request_payload MUST be Node-StartRuntimePayload-compatible because the
+    # Node API server's scrape-worker may also claim queued rows in prod (it
+    # races with the Python Celery worker). Node reads `requestPayload.url` /
+    # `requestPayload.universityId`; if those are missing it raises
+    # "URL is empty" before the job even starts. Keep both camelCase (Node) and
+    # snake_case (Python convenience) keys so either worker is happy.
     job = ScrapeRuntimeJob(
         runtime_job_id=job_id,
         university_id=uni.id,
@@ -131,7 +137,16 @@ async def start_scrape(
         job_type="single",
         status="queued",
         fast_mode=body.fast_mode,
-        request_payload={"university_id": uni.id, "fast_mode": body.fast_mode},
+        request_payload={
+            "url": uni.scrape_url,
+            "universityId": uni.id,
+            "universityName": uni.name,
+            "universityCountry": uni.country,
+            "fastMode": body.fast_mode,
+            # snake_case duplicates kept so Python code can read either style.
+            "university_id": uni.id,
+            "fast_mode": body.fast_mode,
+        },
     )
     db.add(job)
     await db.commit()
@@ -160,6 +175,8 @@ async def start_bulk(
         if not uni:
             continue
         job_id = f"job_{uuid.uuid4().hex[:12]}"
+        # See start_scrape comment: payload must be Node-compatible because the
+        # Node worker may also claim queued jobs in prod.
         db.add(
             ScrapeRuntimeJob(
                 runtime_job_id=job_id,
@@ -170,6 +187,13 @@ async def start_bulk(
                 status="queued",
                 fast_mode=body.fast_mode,
                 request_payload={
+                    "url": uni.scrape_url,
+                    "universityId": uni.id,
+                    "universityName": uni.name,
+                    "universityCountry": uni.country,
+                    "fastMode": body.fast_mode,
+                    "bulkMode": True,
+                    # snake_case duplicates kept so Python code can read either style.
                     "session_id": session_id,
                     "university_id": uni.id,
                     "fast_mode": body.fast_mode,

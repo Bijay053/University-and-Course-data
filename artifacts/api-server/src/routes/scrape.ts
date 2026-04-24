@@ -11380,12 +11380,29 @@ export async function executeRuntimeScrapeJob(runtimeJobId: string): Promise<voi
       await runNoAiScrapeJob(job, rescrapePayload.config, rescrapePayload.universityId, runtimeJobId);
     } else {
       const startPayload = payload as unknown as StartRuntimePayload;
+      // Defensive fallbacks to the row columns. The Python /scrape endpoint
+      // historically wrote request_payload without `url`/`universityId` (snake_case
+      // only), and when this Node worker raced Celery to claim the job it
+      // crashed with "URL is empty" before doing any work. The columns are the
+      // source of truth — read those when the payload is incomplete.
+      const fallbackUrl =
+        (typeof startPayload.url === "string" && startPayload.url) ||
+        record.url ||
+        "";
+      const fallbackUniId =
+        (typeof startPayload.universityId === "number" && startPayload.universityId) ||
+        record.universityId ||
+        0;
+      const fallbackCountry =
+        startPayload.universityCountry ??
+        ((payload as Record<string, unknown>).universityCountry as string | undefined) ??
+        undefined;
       await runScrapeJob(
         job,
-        startPayload.url,
-        startPayload.universityId,
+        fallbackUrl,
+        fallbackUniId,
         runtimeJobId,
-        startPayload.universityCountry,
+        fallbackCountry,
         startPayload.manualPages,
       );
     }
