@@ -1,0 +1,113 @@
+Evidence Review
+GDITS-Graduate Diploma of Information Technology and Systems
+Eligibility: review - Missing: description, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+cambridge_overall
+needs_review
+/ equivalence_table
+confidence 80%
+176.0
+equivalence table row IELTS=6.5
+https://vit.edu.au/mits/gdits
+category
+needs_review
+/ category:det
+confidence 70%
+Computer Science & IT
+Graduate Diploma of Information Technology and Systems
+https://vit.edu.au/mits/gdits
+course_location
+needs_review
+/ location.text_block
+confidence 50%
+Sydney, Melbourne, Adelaide, Geelong
+Sydney, Melbourne, Adelaide, Geelong
+https://vit.edu.au/mits/gdits
+course_name
+needs_review
+/ course_name.h1
+confidence 90%
+Graduate Diploma of Information Technology and Systems
+Graduate Diploma of Information Technology and Systems
+https://vit.edu.au/mits/gdits
+degree_level
+needs_review
+/ degree_level:name
+confidence 90%
+Graduate Certificate
+Graduate Diploma of Information Technology and Systems
+https://vit.edu.au/mits/gdits
+duration
+needs_review
+/ regex
+confidence 75%
+1.0
+Introduction Overview Course Content Entry Requirements Tuition Fees FAQ's Student Type Domestic International Learning Mode Online 2026 intakes: 02-Mar-2026 25-May-2026 3-Aug-2026 7-Sep-2026 7-Dec-2026 Duration 1 Year (Full-Time Non-Cognat
+https://vit.edu.au/mits/gdits
+duration_unit
+needs_review
+/ ai_fallback
+confidence 50%
+years
+https://vit.edu.au/mits/gdits
+duration_value
+needs_review
+/ ai_fallback
+confidence 50%
+1.0
+https://vit.edu.au/mits/gdits
+ielts_overall
+needs_review
+/ regex
+confidence 85%
+6.5
+Graduate Diploma in Information Technology and Systems | VIT Australia BITS Bachelor of Information Technology and Systems (BITS) BITS focuses on delivering knowledge and skills in computer networking
+https://vit.edu.au/mits/gdits
+intake_months
+needs_review
+/ regex
+confidence 70%
+["March", "May", "August", "September", "December"]
+arning Mode Online 2026 intakes: 02-Mar-2026 25-May-2026 3-Aug-2026 7-Sep-2026 7-Dec-2026 Duration 1 Year (Full-Time Non-Cognate) Fees $18,000 ($2250/unit) - 8 Units You are considered a Domestic Student If you are An Australian citizen or
+https://vit.edu.au/mits/gdits
+international_eligible
+needs_review
+/ eligibility.positive
+confidence 85%
+True
+CRICOS Code: 114823B
+https://vit.edu.au/mits/gdits
+international_fee
+needs_review
+/ regex
+confidence 100%
+18000
+Domestic International Learning Mode Online 2026 intakes: 02-Mar-2026 25-May-2026 3-Aug-2026 7-Sep-2026 7-Dec-2026 Duration 1 Year (Full-Time Non-Cognate) Fees $18,000 ($2250/unit) - 8 Units You are considered a Domestic Student If you are
+https://vit.edu.au/mits/gdits
+pte_overall
+needs_review
+/ equivalence_table
+confidence 80%
+55.0
+equivalence table row IELTS=6.5
+https://vit.edu.au/mits/gdits
+study_mode
+needs_review
+/ study_mode:rule
+confidence 70%
+On Campus
+d Systems.” --> Delivery Mode Face to Face / Blended On-line Full Time P
+https://vit.edu.au/mits/gdits
+sub_category
+needs_review
+/ category:det
+confidence 70%
+Information Systems
+Graduate Diploma of Information Technology and Systems
+https://vit.edu.au/mits/gdits
+toefl_overall
+needs_review
+/ equivalence_table
+confidence 80%
+81.0
+equivalence table row IELTS=6.5
+https://vit.edu.au/mits/gdits
