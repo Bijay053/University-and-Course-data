@@ -40,6 +40,24 @@ log = logging.getLogger(__name__)
 _AI_FALLBACK_TIMEOUT_SEC = 60
 
 
+def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any]) -> None:
+    """Translate AI's `duration_value` / `duration_unit` keys into the
+    canonical `duration` / `duration_term` keys used by the staged-course
+    schema. Mutates ``ai_filled`` in place. Only fills when the rule
+    extractor hasn't already populated the canonical key, so a confident
+    regex hit always beats an AI guess. See B20 root-cause notes."""
+    if "duration" not in payload and ai_filled.get("duration_value") is not None:
+        try:
+            ai_filled["duration"] = float(ai_filled["duration_value"])
+        except (TypeError, ValueError):
+            pass
+    if "duration_term" not in payload and ai_filled.get("duration_unit"):
+        from app.services.scraper.extractors.duration import _normalise_unit
+        term = _normalise_unit(str(ai_filled["duration_unit"]))
+        if term:
+            ai_filled["duration_term"] = term
+
+
 # Each entry: (module, kwargs the extractor accepts beyond html/url).
 # degree_level + study_mode were missing before Bug C — without them the
 # Review table's Level / Mode columns showed "--" for every staged course
@@ -207,6 +225,12 @@ async def extract_course(
                 kind="ai_fallback_done",
                 filled=list(ai_filled.keys()),
             )
+        # AI returns duration as `duration_value` + `duration_unit` (kept
+        # separate so the prompt can constrain each field independently).
+        # The staged-course schema uses `duration` (real) +
+        # `duration_term` (Year/Month/Week/...). Translate before merging
+        # so AI-filled units don't silently drop on the floor. See B20.
+        _apply_ai_duration_mapping(payload, ai_filled)
         for k, v in ai_filled.items():
             payload.setdefault(k, v)
             evidence.append(

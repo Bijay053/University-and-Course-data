@@ -101,8 +101,9 @@ _MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
 # classifies "On Campus" correctly via the fallback path, so we don't
 # lose coverage by requiring the delimiter here.
 _LABEL_RE = re.compile(
-    rf"\b(?:mode\s+of\s+(?:study|attendance|delivery)|study\s+mode|"
-    rf"delivery\s+mode|attendance\s+mode|study\s+method)\b\s*[:\-–]\s*"
+    rf"\b(?:mode\s+of\s+(?:study|attendance|delivery|learning)|study\s+mode|"
+    rf"delivery\s+mode|attendance\s+mode|study\s+method|"
+    rf"learning\s+(?:mode|method)|delivery\s+method)\b\s*[:\-–]\s*"
     rf"((?:{_MODE_TOKEN})(?:{_MODE_JOINER}(?:{_MODE_TOKEN}))*)",
     re.IGNORECASE,
 )

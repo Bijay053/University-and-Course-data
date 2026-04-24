@@ -119,6 +119,17 @@ def test_alternate_label_synonyms():
         assert _classify(f"<dl><dt>{label}:</dt><dd>Online</dd></dl>") == "Online"
 
 
+def test_learning_mode_label_recognised():
+    """B20: VIT and similar pages label the field 'Learning Mode' /
+    'Learning Method' / 'Delivery Method' rather than the more common
+    'Mode of Study'. Without these synonyms the label-first path falls
+    through to the bare-keyword fallback, which is fragile against
+    enquiry-form noise (the literal string 'Blended' on the dropdown).
+    Make sure all three new label synonyms are first-class."""
+    for label in ("Learning Mode", "Learning Method", "Mode of Learning", "Delivery Method"):
+        assert _classify(f"<dl><dt>{label}:</dt><dd>On Campus</dd></dl>") == "On Campus"
+
+
 def test_label_requires_delimiter_to_avoid_prose_false_positive():
     """Code-review regression: without a required colon/dash delimiter,
     `_LABEL_RE` matched prose like `learn about mode of study online`

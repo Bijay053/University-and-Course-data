@@ -222,3 +222,37 @@ SQL as `/repair/missing` to discover targets so UI and worker stay aligned.
 endpoint validation (missing/unknown/non-int id), URL-less course
 rejection, no-targets short-circuit, blank-only back-fill, and
 existing-english skip. Full suite: 282 passed, 1 skipped.
+
+## Mode/Duration Extraction Hardening (PR-1.5 B20)
+
+User report: VIT staging showed every course with Mode="Blended" and a
+duration with no unit (e.g. Bachelor "3" rather than "3 Years"). Two
+distinct latent bugs:
+
+- **Mode**: VIT pages label the field "Learning Mode" — a synonym not
+  in `_LABEL_RE` (`backend-py/app/services/scraper/extractors/study_mode.py`).
+  The label-first path missed, falling through to the bare-keyword
+  fallback, which on VIT pages can pick up the literal word "Blended"
+  from the embedded enquiry-form `<select>` ("Online Studies / On Campus
+  / Blended"). Added `learning mode`, `learning method`, `mode of
+  learning`, and `delivery method` to the labelled-field regex so VIT's
+  `<dt>Learning Mode</dt><dd>On Campus</dd>` layout is now first-class.
+- **Duration**: AI fallback returns the model's answer under
+  `duration_value` + `duration_unit` (matching the prompt the model is
+  shown), but the staged-course schema reads `duration` + `duration_term`.
+  The merge in `single_course.py` (`payload.setdefault(k, v)`) copied
+  the AI keys verbatim — so when the rule extractor failed to match a
+  page's duration the AI's answer was silently dropped on the floor and
+  the row landed with no unit. New helper
+  `_apply_ai_duration_mapping(payload, ai_filled)` translates
+  `duration_value`→`duration` (float coercion) and `duration_unit`→
+  `duration_term` (via the existing `_normalise_unit` from the duration
+  extractor, which knows `years`/`months`/`weeks`/`semesters`/`trimesters`).
+  Mapping only fires when the canonical key is *missing* from the
+  payload, so a confident regex hit always beats an AI guess.
+
+**Regression tests**: `tests/test_single_course_ai_mapping.py` (7 tests:
+years/months/weeks translation, rule-extractor priority, missing-fields
+no-op, junk-unit rejection, non-numeric value safety) +
+`tests/test_study_mode.py::test_learning_mode_label_recognised`. Full
+suite: 290 passed, 1 skipped.
