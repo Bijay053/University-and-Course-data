@@ -1,0 +1,75 @@
+Full migration audit needed — please do this BEFORE more bug fixes.
+The pattern this whole session has been: I find an endpoint missing or broken, you fix it, I find the next, you fix it. We've done this 15+ times. Each user-facing feature reveals another endpoint that was never ported from Node.
+What I need: a complete migration audit. Every Node feature must be verified ported to Python. Every endpoint, every behavior, every detail.
+Step 1 — Endpoint inventory
+bash# In your repo:
+# List every Node route
+grep -rn "router\.\(get\|post\|put\|patch\|delete\)" artifacts/api-server/src/routes/ \
+  | sed 's/.*router\.\(\w*\)("\([^"]*\)".*/\1 \2/' \
+  | sort -u > /tmp/node_routes.txt
+
+# List every Python route
+grep -rn "@router\.\(get\|post\|put\|patch\|delete\)" backend-py/app/routers/ \
+  | sed 's/.*@router\.\(\w*\)("\([^"]*\)".*/\1 \2/' \
+  | sort -u > /tmp/python_routes.txt
+
+# Diff
+diff /tmp/node_routes.txt /tmp/python_routes.txt
+Post the diff. Every line in Node not in Python is a missing endpoint and a P0 bug.
+Step 2 — Service-layer inventory
+Beyond routes, audit Node's service layer too:
+
+artifacts/api-server/src/services/ — every file, every exported function
+artifacts/api-server/src/workers/ — every worker behavior
+artifacts/api-server/src/scrapers/ — every scraper module (engines, extractors, fallbacks, vision, sitemap, classifiers, AI categorization, sibling cache, fee computation, English test parsing, eligibility decision, completeness scoring, etc.)
+artifacts/api-server/src/utils/ — helpers, formatters, validators
+artifacts/api-server/src/middleware/ — auth, logging, CORS, rate-limiting
+
+For each, confirm: ported to Python? Missing? Partial?
+Step 3 — Frontend → API contract verification
+The React UI is the source of truth for what the API must expose. Grep the bundled JS for every fetch URL:
+bashgrep -oE 'fetch\(`?["'\'']/api/[^"`'\'']*' artifacts/university-portal/dist/public/assets/index-*.js \
+  | sort -u
+Every URL the UI calls must be hit-able and return the shape the UI expects. For each endpoint, verify the response shape (camelCase aliases, nested objects like university{}, english_requirements{}, evidence arrays, conflicts, etc.).
+Step 4 — Worker / background-job audit
+Node had: scrape-worker.mjs (job claim loop), in-process intervals, possibly cron-style cleanups. Confirm Python's Celery worker covers ALL of:
+
+Job claim with atomic UPDATE-then-status transition
+Per-course extract → stage with evidence persistence
+Stale-row cleanup at scrape start
+Sample-validation phase
+Sitemap probe
+Per-page page-type classification
+Per-course browser fallback (Playwright)
+Per-course vision OCR fallback (Gemini Vision)
+Sibling cache backfill (undergraduate/postgraduate)
+Total-fee computation (per-unit × unit-count)
+AI category sub-classification (batched)
+Course-name title-casing + acronym preservation
+Eligibility decision with human-readable reason text
+Completeness scoring
+Auto-publish status with conditional logic
+Bulk operations queue
+Excel import worker
+Snapshot + backup worker
+Assessment notes Gemini parsing (already done)
+
+Step 5 — Schema parity audit
+Confirm every Drizzle table on Node has a SQLAlchemy model on Python with same columns. Anything Node writes that Python doesn't read (or vice versa) is a silent data-loss bug waiting to bite.
+Step 6 — Behavioral parity audit
+Even where Python has the endpoint, behavior may differ. For each scrape pipeline stage, verify Python output matches Node output on the same input. Use ASA as the canonical fixture (we have its data, PDFs, expected staged-course shape from your dev preview).
+Specifically diff every column on a staged course row between dev (Node) and prod (Python) for the same university:
+sql-- Run on both DBs against the same university scrape
+SELECT * FROM scraped_courses WHERE university_id = X ORDER BY id LIMIT 1;
+Every NULL on prod that's populated on dev is a missing extractor/processor.
+Step 7 — Deliverable
+Give me back a single document with three sections:
+
+Missing endpoints — table of (method, path, Node handler file, what UI page calls it, port priority)
+Missing service-layer functionality — list of (Node module/function, what it does, Python equivalent or "missing", port priority)
+Behavioral diffs — list of (feature, Node behavior, Python behavior, root cause)
+
+Then fix them all in batched PRs (group related items per PR, not 50 separate commits).
+Once done, the prod system should be 100% functionally equivalent to your dev preview. Currently it's somewhere around 60-70% based on the bugs we've found.
+
+Why this matters: Bijay needs to ship this to a client. Every "Save failed" toast and every 404 erodes trust. Better to spend a focused day doing a complete audit than another two days finding bugs reactively.

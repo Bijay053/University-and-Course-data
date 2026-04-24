@@ -1,0 +1,25 @@
+4 more prod bugs (in addition to the data-quality items already sent):
+Bug H — View Logs modal in Scrape History shows only [status] placeholders, no log content
+Click "View Logs" on any past scrape in the Scrape History list → modal opens, shows 51 entries each labeled [status] with NO message text. The actual log message string is missing.
+Likely the historical-log endpoint returns event field but not message (or returns payload raw and UI looks for payload.message). Live log on the scraping page works fine — it's only the history-list modal that's broken.
+Endpoint to check: probably /api/scrape/history/:jobId/logs or /api/scrape/jobs/:id/logs. Mirror live log shape exactly.
+Bug I — Bulk Operations "Start Queue (6 universities)" button does nothing
+/bulk page → checkboxes selected → click "Start Queue (6 universities)" → nothing happens. No POST request fires (verify in Network tab), no error in console (or maybe one — see Bug L below).
+Endpoint should be POST /api/scrape/bulk. Either the UI handler is broken or the endpoint doesn't exist on Python backend. Implement endpoint + verify UI submits to it correctly.
+Bug J — Settings → Academic Level Options "Add Level" returns 405 Method Not Allowed
+/settings/academic-levels → type a level name → click "Add Level" → toast shows:
+Failed to add
+{"detail":"Method Not Allowed"}
+The endpoint exists but only accepts wrong verb (probably GET-only or PUT-only when UI sends POST). Same likely for delete and reorder.
+Add full CRUD: GET/POST/PUT/DELETE /api/settings/academic-levels (or whatever the UI calls). Mirror Node behavior.
+Bug K — Dashboard endpoint 404
+Browser console flood:
+GET http://159.65.152.72/api/dashboard/stats 404 (Not Found)
+Endpoint /api/dashboard/stats was never ported from Node. Dashboard page can't load. Implement to return whatever shape Node was returning (university count, course count, recent scrape stats, etc.).
+Pattern: several settings/admin/dashboard endpoints were never ported from Node. Please grep artifacts/api-server/src/routes/ for every route and audit which ones are still missing on FastAPI. Likely candidates: dashboard, settings/*, bulk operations, history/logs. Port them all in one pass — don't make me find them one at a time.
+Priority for this batch:
+
+K (dashboard 404 — every page load floods console)
+I (bulk button — completely non-functional)
+J (settings — admin can't configure levels)
+H (history logs — minor; live log works)

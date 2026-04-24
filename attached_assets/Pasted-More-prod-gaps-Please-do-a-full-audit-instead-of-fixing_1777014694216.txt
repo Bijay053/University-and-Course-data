@@ -1,0 +1,38 @@
+More prod gaps. Please do a full audit instead of fixing one at a time:
+Bug L — Acronyms tab missing in prod nav
+Your dev shows /settings/acronyms page (Course Name Acronyms — manage MBA/BBUS/GDBA-style acronyms). Prod sidebar has no Acronyms entry; route doesn't render. Both the page and full CRUD endpoints (GET/POST/DELETE /api/settings/acronyms) need to be ported.
+Bug M — Excel Import not working (/bulk page → "Excel Import" tab)
+No upload happens or upload succeeds but no courses appear. Endpoint likely missing: POST /api/import/excel (or similar). Port from Node.
+Bug N — Bulk Edit English Proficiency fails with Error: {"detail":"Not Found"}
+University detail page → "Bulk Edit English" → fill IELTS form → Apply to 353 Courses → 404. Endpoint likely PATCH /api/courses/bulk/english or similar. Port from Node.
+Bug O — Bulk Edit Academic Requirements not working (same university bulk panel)
+Same shape as Bug N. Likely PATCH /api/courses/bulk/academic-requirements. Port.
+Bug P — Bulk Add Scholarship not working
+Same shape. Likely POST /api/courses/bulk/scholarship. Port.
+Bug Q — Edit/Delete in Raw Data tab not working
+University detail page → Courses tab → click edit (✏️) on any course → fill form → "Save Changes" → toast "Error: Save failed". Same for delete (🗑).
+Endpoints needed: PUT /api/courses/{id}, DELETE /api/courses/{id}. Likely missing or returning wrong shape.
+
+STOP fixing one at a time. Please do this:
+
+Open artifacts/api-server/src/routes/ and list every Node route (method + path).
+Open backend-py/app/routers/ and list every Python route.
+Diff them. Anything Node had that Python doesn't is a P0 bug.
+Port them all in one PR.
+Then write an integration test that boots FastAPI, hits each endpoint with a representative payload (use the React UI's actual fetch calls as the source of truth), and asserts a non-404/non-500 response. Add this to CI so this kind of regression can't happen again.
+After endpoints are aligned, do a manual UI walkthrough on prod (159.65.152.72) of every major feature:
+
+Dashboard
+Course Search (all filters)
+Universities list + each detail tab (Courses, Key Insights, Raw Data, Bulk Edit panels)
+Scraping (single + Bulk + History → View Logs + Review modal)
+Bulk Upload (Excel Import + Bulk Scrape)
+Data Backup (snapshot + restore)
+Settings (Academic Levels, Acronyms, anything else)
+Edit/Delete on courses + universities + assessment notes + acronyms
+
+
+
+Document every page that loads with errors, every button that does nothing, every modal that returns 404/405, every "Save failed" toast.
+Then fix them all in one batch.
+The current pattern is: I find a bug, you fix it in 30 mins, I find the next bug, repeat. We've done this 12+ times today. Faster to get a full inventory once than play whack-a-mole.
