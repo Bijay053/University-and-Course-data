@@ -67,3 +67,53 @@ def test_percent_online_alone_stays_online():
     # No on-campus signal → not Blended; the bare 'online' word triggers
     # the Online fallback.
     assert _classify("Up to 33% online delivery") == "Online"
+
+
+# --- ASA prod-bug regression -------------------------------------------------
+
+
+def test_label_priority_beats_marketing_copy():
+    """Bug: 7 of 9 ASA prod rows staged as Online because the bare-keyword
+    fallback fired on marketing copy ("explore our online courses") before
+    checking the actual `Mode of study: On Campus` cell. The label-first
+    detector must take precedence."""
+    asa_like = (
+        '<nav><a href="/online-courses">Explore our online courses</a></nav>'
+        "<h1>Bachelor of Business</h1>"
+        "<dl><dt>Mode of study:</dt><dd>On Campus</dd></dl>"
+        "<p>Study online and on-campus is also available for select intakes.</p>"
+    )
+    assert _classify(asa_like) == "On Campus"
+
+
+def test_label_value_token_capture_stops_at_unrelated_words():
+    """The label-value capture must stop at the first non-mode token so a
+    flattened HTML run like `On Campus Study online and on campus is also
+    available...` doesn't accidentally classify as Blended via the
+    `online and on campus` substring buried in unrelated copy."""
+    flattened = (
+        "Mode of study: On Campus Study online and on campus is also available."
+    )
+    assert _classify(flattened) == "On Campus"
+
+
+def test_explicit_blended_label_value():
+    """A label whose value names both modes ("On Campus and Online") is the
+    canonical Blended signal."""
+    assert _classify("<dl><dt>Study mode:</dt><dd>On Campus and Online</dd></dl>") == "Blended"
+
+
+def test_online_label_beats_campus_mention_elsewhere():
+    """Inverse of the ASA bug: a page that says `Mode of study: Online` but
+    mentions a campus visit elsewhere must remain Online."""
+    page = (
+        "<dl><dt>Mode of study:</dt><dd>Online</dd></dl>"
+        "<p>Visit our campus on open day to learn more.</p>"
+    )
+    assert _classify(page) == "Online"
+
+
+def test_alternate_label_synonyms():
+    """Operator-friendly label synonyms must all work — Node accepted these."""
+    for label in ("Mode of study", "Study mode", "Delivery mode", "Mode of attendance"):
+        assert _classify(f"<dl><dt>{label}:</dt><dd>Online</dd></dl>") == "Online"

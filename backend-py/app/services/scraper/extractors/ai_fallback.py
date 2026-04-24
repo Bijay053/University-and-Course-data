@@ -22,8 +22,25 @@ _FIELD_HINTS: dict[str, str] = {
     "fee_currency": "ISO currency code of the international tuition (AUD, USD, GBP, etc.).",
     "ielts_overall": "Required IELTS overall band score (e.g. 6.5). Number only.",
     "intake_months": "List of intake month numbers (1-12) when this course starts.",
-    "duration_value": "Course duration as a number.",
-    "duration_unit": 'Duration unit ("years" or "months").',
+    # Bug: prod ASA Masters rows showed duration=5 because the page text
+    # contained "5 units of 8 credit points each across 2 years" and the
+    # vague old hint ("Course duration as a number") let Gemini return 5.
+    # The regex extractor has _CREDIT_POINT_CONTEXT to defend against this
+    # but the AI fallback was unguarded. Be explicit: total elapsed time,
+    # ignore credit points / unit counts / per-trimester loads.
+    "duration_value": (
+        "Total program duration from enrolment to graduation, full-time. "
+        "Report ONLY the elapsed time (e.g. 2 for a 2-year Masters, "
+        "3 for a 3-year Bachelors). DO NOT report credit-point counts, "
+        "unit counts, or per-trimester subject loads. If the page says "
+        "'5 units of 8 credit points across 2 years' the answer is 2 (years), "
+        "not 5."
+    ),
+    "duration_unit": (
+        'Unit for duration_value. Use "years" for programs measured in years '
+        '(typical Bachelors/Masters), "months" for short programs. NEVER use '
+        '"units" or "credit points".'
+    ),
 }
 
 _PROMPT_TEMPLATE = """You are a strict data extractor for a university course page.

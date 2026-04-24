@@ -108,3 +108,32 @@ async def test_fill_missing_handles_malformed_json():
     with patch.object(ai_fallback.gemini_client, "generate", side_effect=_fake_gen):
         out = await ai_fallback.fill_missing({}, html=HTML_SAMPLE, url="x")
     assert out == {}
+
+
+# --- Prod-bug regression: duration prompt clarity ----------------------------
+
+
+def test_duration_value_hint_excludes_credit_points():
+    """Bug: prod ASA Masters rows showed duration=5 because the page text
+    said `5 units of 8 credit points each across 2 years` and the vague
+    old hint (`Course duration as a number`) let Gemini return 5. The
+    revised hint must explicitly forbid credit-point / unit-count
+    interpretation. This test guards the prompt text so it doesn't drift
+    back to the vague one-liner.
+    """
+    hint = ai_fallback._FIELD_HINTS["duration_value"]
+    lower = hint.lower()
+    # Must explicitly mention the credit-point trap so Gemini knows to
+    # ignore it.
+    assert "credit" in lower or "credit-point" in lower
+    assert "unit" in lower
+    # Must give an explicit example so the model learns the pattern.
+    assert "2" in hint or "3" in hint
+
+
+def test_duration_unit_hint_forbids_units_or_credit_points():
+    """The unit hint must also be explicit — `years` or `months`, never
+    `units` or `credit points`."""
+    hint = ai_fallback._FIELD_HINTS["duration_unit"]
+    assert "year" in hint.lower()
+    assert "never" in hint.lower() or "not" in hint.lower()

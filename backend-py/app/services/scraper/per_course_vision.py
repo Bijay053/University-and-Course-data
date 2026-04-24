@@ -76,6 +76,7 @@ _VISION_PROMPT: Final = (
     "  PTE overall: 58\n"
     "  TOEFL iBT: 79\n"
     "  Cambridge Advanced: 176\n"
+    "  Duolingo English Test: 105\n"
     "Include the score exactly as shown. Do NOT add commentary, "
     "headings, or markdown. If a value is not present, omit the line "
     "— never guess. If the image is decorative (logo/banner/icon) "

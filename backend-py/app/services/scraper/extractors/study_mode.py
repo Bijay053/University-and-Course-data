@@ -67,9 +67,64 @@ _ON_CAMPUS_RE = re.compile(
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 
+# Authoritative label-style declarations. Almost every reputable course
+# page surfaces the delivery mode as a key/value pair in the course
+# summary card or on the dedicated info page — `Mode of study:`,
+# `Study mode:`, `Delivery mode:`, `Mode of attendance:` etc. When a page
+# emits one of these explicit labels we trust the value next to the
+# label and skip the broad keyword scan entirely.
+#
+# This is the bug that caused 7 of 9 ASA prod rows to stage as `Online`:
+# ASA's marketing copy mentions "online courses" / "online study options"
+# in nav and footer text. The old fallback (Pattern 2 then bare-`online`
+# Pattern 4) matched those phrases first and returned "Online" before
+# checking the actual `Mode of study: On Campus` cell on the course page.
+#
+# Capture is *token-restricted*: we explicitly list the words that can
+# appear inside a mode value (on/campus/online/blended/hybrid/and/&/...)
+# and stop capturing as soon as we hit anything else. This matters
+# because tag-stripping flattens `<dd>On Campus</dd><p>Study online...`
+# into `On Campus Study online...` — without the token cap the value
+# capture greedily grabs the next paragraph and triggers Blended via
+# "online and on campus" appearing in unrelated marketing copy.
+_MODE_TOKEN = (
+    r"on[\s\-]?campus|online|blended|hybrid|mixed[\s\-]?mode|"
+    r"distance(?:\s+(?:learning|education))?|in[\s\-]?person|"
+    r"face[\s\-]?to[\s\-]?face|onshore|remote"
+)
+_MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
+_LABEL_RE = re.compile(
+    rf"\b(?:mode\s+of\s+(?:study|attendance|delivery)|study\s+mode|"
+    rf"delivery\s+mode|attendance\s+mode|study\s+method)\b\s*[:\-–]?\s*"
+    rf"((?:{_MODE_TOKEN})(?:{_MODE_JOINER}(?:{_MODE_TOKEN}))*)",
+    re.IGNORECASE,
+)
+
+# Map a label *value* to a canonical study-mode label. Order matters —
+# Blended must match before On Campus / Online so a value like
+# "On Campus and Online" goes to Blended (the multi-mode case) rather
+# than the first-keyword winner.
+_VALUE_TO_LABEL: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"blended|hybrid|mixed", re.I), "Blended"),
+    (re.compile(r"on[\s\-]?campus\s*(?:and|or|&|/|,)\s*online|online\s*(?:and|or|&|/|,)\s*on[\s\-]?campus", re.I), "Blended"),
+    (re.compile(r"on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face|onshore", re.I), "On Campus"),
+    (re.compile(r"online|distance|remote", re.I), "Online"),
+)
+
 
 def _strip_tags(html: str) -> str:
     return _WS_RE.sub(" ", _TAG_RE.sub(" ", html or ""))
+
+
+def _classify_label_value(value: str) -> str | None:
+    """Map the raw text after a `Mode of study:` label to a canonical
+    label, or ``None`` when the value is gibberish (e.g. label was found
+    but followed by an unrelated word in noisy HTML).
+    """
+    for pattern, label in _VALUE_TO_LABEL:
+        if pattern.search(value):
+            return label
+    return None
 
 
 def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
@@ -77,17 +132,32 @@ def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
 
     Order of operations:
 
-    1. If the page text contains both an on-campus signal AND a "% online"
+    1. **Label detection first.** Scan for ``Mode of study:`` / ``Study
+       mode:`` / ``Delivery mode:`` etc. and use the value next to the
+       label as authoritative. This beats the broad keyword scan because
+       course pages often mention "online" in unrelated copy (footer
+       links, marketing) — without label-priority that bled into 7 of 9
+       prod ASA rows showing as "Online".
+    2. If the page text contains both an on-campus signal AND a "% online"
        phrase (e.g. "Onshore — required to attend on campus, allowed up to
        33% online") classify as Blended even when the literal word
        "blended" is absent. Mirrors Node's
        `review-engine.ts` heuristic — without it, courses with mixed
        delivery rules show as plain "On Campus" and the operator can't
        tell them apart from purely in-person courses.
-    2. Fall through to the labelled pattern set (Blended → Online →
+    3. Fall through to the labelled pattern set (Blended → Online →
        On Campus → bare "Online").
     """
     plain = _strip_tags(page_text)
+
+    label_match = _LABEL_RE.search(plain)
+    if label_match:
+        value = label_match.group(1).strip()
+        canonical = _classify_label_value(value)
+        if canonical:
+            start = max(0, label_match.start() - 20)
+            end = min(len(plain), label_match.end() + 20)
+            return canonical, plain[start:end].strip()
 
     pct = _PERCENT_ONLINE_RE.search(plain)
     if pct and _ON_CAMPUS_RE.search(plain):

@@ -92,6 +92,25 @@ def _ielts(text: str) -> dict[str, float] | None:
                 "speaking": float(speak_m.group(1)) if speak_m else None,
             }
 
+    # Pattern 4.5 (vision-friendly bare overall): "IELTS overall: 6.5"
+    # — the format Gemini Vision returns per the per_course_vision prompt
+    # template. Pattern 5 below uses `[^a-z0-9]{0,50}?` between "ielts"
+    # and the digit, but the word "overall" between them blocks the
+    # match (it's letters). Without this pattern, prod ASA scrape showed
+    # IELTS=— for every staged course even when vision OCR printed
+    # `IELTS overall: 6.0`. Placed AFTER patterns 1-4 so a richer match
+    # (with "no band below" / per-skill subscores) wins, but BEFORE
+    # Pattern 5 so this exact-shape match wins over ambiguous broad hits.
+    m = re.search(
+        r"\bielts(?:\s+academic)?\s+overall[\s:.\-]{0,5}([4-9](?:\.[0-9])?)\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 4 <= ov <= 9:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
     # Pattern 5: broad "minimum IELTS 6.0", "IELTS 6.0 or higher", "IELTS: 6.5"
     broad = re.search(
         r"(?:minimum\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,50}?([4-9](?:\.[05])?)",
@@ -149,6 +168,24 @@ def _pte(text: str) -> dict[str, float] | None:
         # unrelated numbers from neighbouring rows.
         if 10 <= ov <= 90 and 10 <= mn <= ov:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+    # Pattern 2.5 (vision-friendly bare overall): "PTE overall: 50" /
+    # "PTE Academic overall 58" — Gemini Vision's own response format
+    # per the per_course_vision prompt template. Pattern 3 below uses
+    # `[^a-z0-9]{0,40}?` between "pte" and the digit, but the word
+    # "overall" between them blocks the match (it's letters). Without
+    # this pattern, prod ASA scrape showed PTE=— for every staged
+    # course even when vision OCR printed `PTE overall: 50`. Placed
+    # before Pattern 3 so the explicit "overall" shape wins.
+    m = re.search(
+        r"\bpte(?:\s+academic)?\s+overall[\s:.\-]{0,5}([1-9][0-9])\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 10 <= ov <= 90:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
     # Pattern 3 (broad): "PTE 50" / "PTE: 50"
     m = re.search(
         r"pte(?:\s+academic)?[^a-z0-9]{0,40}?([1-9][0-9])\b", text, re.I

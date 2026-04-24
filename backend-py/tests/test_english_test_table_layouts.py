@@ -113,3 +113,67 @@ def test_full_pdf_table_extracts_all_five():
     assert toefl is not None and toefl["overall"] == 60
     assert et._cambridge(txt) == 169.0
     assert et._duolingo(txt) == 95.0
+
+
+# --- T207/T208 vision-output prod-bug regression ----------------------------
+
+
+def test_ielts_bare_overall_format_from_gemini_vision():
+    """Bug: prod ASA scrape showed IELTS=— for every staged course even
+    when per_course_vision printed `IELTS overall: 6.0`. The other
+    patterns require either `no band below X` or per-skill subscores; the
+    bare-overall shape produced by Gemini Vision wasn't covered. Pattern
+    4.5 fixes this — must extract 6.0 cleanly from the OCR format."""
+    text = (
+        "IELTS overall: 6.0\n"
+        "PTE overall: 50\n"
+        "TOEFL iBT: 60\n"
+        "Cambridge Advanced: 169\n"
+    )
+    res = et._ielts(text)
+    assert res is not None and res["overall"] == 6.0
+
+
+def test_pte_bare_overall_format_from_gemini_vision():
+    """Same bug for PTE: vision OCR text `PTE overall: 50` must parse."""
+    text = (
+        "IELTS overall: 6.0\n"
+        "PTE overall: 50\n"
+        "TOEFL iBT: 60\n"
+    )
+    res = et._pte(text)
+    assert res is not None and res["overall"] == 50
+
+
+def test_vision_format_full_dump_extracts_all_five():
+    """End-to-end on the exact text Gemini Vision returns per the
+    per_course_vision prompt — must extract IELTS, PTE, TOEFL, CAE,
+    Duolingo (one of which was missing in prod)."""
+    text = (
+        "IELTS overall: 6.5\n"
+        "IELTS listening: 6.0\n"
+        "PTE overall: 58\n"
+        "TOEFL iBT: 79\n"
+        "Cambridge Advanced: 176\n"
+        "Duolingo English Test: 105\n"
+    )
+    assert et._ielts(text) is not None
+    assert et._ielts(text)["overall"] == 6.5
+    assert et._pte(text) is not None
+    assert et._pte(text)["overall"] == 58
+    assert et._toefl(text) is not None
+    assert et._toefl(text)["overall"] == 79
+    assert et._cambridge(text) == 176.0
+    assert et._duolingo(text) == 105.0
+
+
+def test_rich_pattern_still_wins_over_bare_overall():
+    """Regression guard: when both `IELTS overall 6.5 with no band below
+    6.0` AND a separate bare overall appear, the rich Pattern 1 (with
+    subscores) must win — Pattern 4.5 only fires as a fallback."""
+    text = "IELTS Academic overall 6.5 with no individual band below 6.0."
+    res = et._ielts(text)
+    assert res is not None
+    assert res["overall"] == 6.5
+    # Pattern 1 fills all subscores; Pattern 4.5 leaves them None.
+    assert res.get("listening") == 6.0
