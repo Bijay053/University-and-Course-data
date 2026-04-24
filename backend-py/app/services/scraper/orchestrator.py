@@ -104,6 +104,44 @@ _MAX_PARALLEL_FETCH = 4
 # this window to age in, so they are unaffected during normal use.
 _STALE_DEDUP_MINUTES = 10
 
+# How often the background poller re-reads ``stop_requested`` from the DB
+# while a scrape is running. The UI's POST to /api/scrape/stop/{jobId}
+# only flips a flag — the worker has to notice. 3s is the same cadence
+# the UI polls /status with, so a stop click typically takes 3–6s to
+# observably halt new work.
+_STOP_POLL_INTERVAL_SEC = 3
+
+
+async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
+    """Background task: tail ``stop_requested`` so the worker can bail.
+
+    Uses its own AsyncSession because the orchestrator holds ``db`` open
+    for the whole run. Sets ``stop_flag[0] = True`` once the user has
+    clicked Stop; the orchestrator's gather/staging loop checks the flag
+    at safe breakpoints and exits cleanly.
+    """
+    from sqlalchemy import text as _text
+    while not stop_flag[0]:
+        try:
+            async with AsyncSessionLocal() as poll_db:
+                row = (await poll_db.execute(
+                    _text(
+                        "SELECT stop_requested FROM scrape_runtime_jobs "
+                        "WHERE runtime_job_id = :j"
+                    ),
+                    {"j": runtime_job_id},
+                )).first()
+            if row and row[0]:
+                stop_flag[0] = True
+                log.info("stop_requested observed for job %s", runtime_job_id)
+                return
+        except Exception as exc:  # noqa: BLE001 — never crash the poller
+            log.warning("stop poller read failed for %s: %s", runtime_job_id, exc)
+        try:
+            await asyncio.sleep(_STOP_POLL_INTERVAL_SEC)
+        except asyncio.CancelledError:
+            return
+
 
 async def _extract_only(
     link: dict, country: str | None, uni_pdf_data: dict | None = None, emit=None
@@ -212,6 +250,47 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
+
+    # Stop signalling: shared list-of-bool (mutable across closures) plus a
+    # background poller that watches scrape_runtime_jobs.stop_requested. The
+    # API endpoint POST /api/scrape/stop/{jobId} (and its alias) flips that
+    # column; without this poller the worker never noticed and "Stop Scrape"
+    # silently did nothing past flipping a DB flag.
+    stop_flag: list[bool] = [False]
+    stop_poll_task = asyncio.create_task(_stop_poller(runtime_job_id, stop_flag))
+
+    async def _finalize_stopped() -> dict:
+        """Mark the job as user-stopped and emit a terminal log row."""
+        log.info("Scrape %s stopped by user request", runtime_job_id)
+        await emit(
+            "status",
+            "Stopped by user — no further courses will be processed",
+            phase="complete",
+            kind="stopped",
+            level="warn",
+        )
+        await emit(
+            "done",
+            f"══ STOPPED ══ Found:{summary.get('discovered', 0)} | "
+            f"Staged:{summary.get('staged', 0)} | "
+            f"Skipped:{summary.get('skipped', 0)} | "
+            f"Errors:{summary.get('errors', 0)}",
+            phase="complete",
+            totalFound=summary.get("discovered", 0),
+            imported=summary.get("staged", 0),
+            skipped=summary.get("skipped", 0),
+            errors=summary.get("errors", 0),
+            level="warn",
+        )
+        job.status = "stopped"
+        job.total_found = summary.get("discovered", 0)
+        job.imported = summary.get("staged", 0)
+        job.skipped = summary.get("skipped", 0)
+        job.errors = summary.get("errors", 0)
+        job.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+        return {"ok": True, "stopped": True, **summary}
+
     try:
         # Snapshot uni fields to plain locals — the session will be used
         # by other coroutines during gather() and we must NOT touch `uni`.
@@ -275,6 +354,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         async def _bounded(link: dict) -> dict:
             async with sem:
+                # Stop check INSIDE the semaphore so all queued coroutines
+                # waiting on the sem also short-circuit once the user has
+                # clicked Stop. Returning a sentinel keeps gather() honest
+                # — the staging loop already filters non-dict results.
+                if stop_flag[0]:
+                    return {
+                        "name": (link.get("name") or "").strip() or "?",
+                        "url": link.get("url"),
+                        "error": "stopped",
+                    }
                 progress[0] += 1
                 idx = progress[0]
                 nm = (link.get("name") or "").strip() or link.get("url", "?")
@@ -296,6 +385,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         results = await asyncio.gather(
             *[_bounded(lk) for lk in links], return_exceptions=True
         )
+
+        # Honor stop request observed during the gather phase before we
+        # spend any time on staging. Anything already extracted is dropped
+        # — no half-staged batch lands in scraped_courses.
+        if stop_flag[0]:
+            return await _finalize_stopped()
 
         # T206: sibling-cache back-fill. Runs after every per-course
         # extract has settled but BEFORE staging — by then we've seen
@@ -322,6 +417,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         # 2) Staging phase — serial writes through one fresh session per course.
         for r in results:
+            # Stop check between rows: lets the user interrupt mid-batch.
+            # Anything left in ``results`` at this point came back from the
+            # gather phase BEFORE the stop click — we drop it on the floor
+            # rather than persist a partial batch the user just cancelled.
+            if stop_flag[0]:
+                return await _finalize_stopped()
             if isinstance(r, Exception):
                 summary["errors"] += 1
                 log.warning("worker raised: %s", r)
@@ -460,3 +561,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.error_message = str(exc)[:1000]
         await db.commit()
         return {"ok": False, "reason": str(exc), **summary}
+    finally:
+        # Always tear the poller down — it holds its own AsyncSession and
+        # would keep ticking past the worker process otherwise. Setting
+        # the flag first lets the `await asyncio.sleep` exit cleanly on
+        # the next tick; cancel() is the safety net for the in-flight DB
+        # roundtrip case.
+        stop_flag[0] = True
+        stop_poll_task.cancel()
+        try:
+            await stop_poll_task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass

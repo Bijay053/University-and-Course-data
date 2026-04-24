@@ -16,6 +16,7 @@ slot the original extractor populated wins over the browser pass.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -24,6 +25,22 @@ from app.services.scraper.extractors import english_test
 from app.services.scraper.extractors.base import ExtractionResult
 
 log = logging.getLogger(__name__)
+
+# Hard ceiling on the entire browser-fallback round-trip for ONE course.
+# browser_pool.fetch_html already passes a 30s timeout to page.goto, but
+# page.content(), context teardown, and the per-call semaphore acquire
+# can each block past that — and a single hung page can wedge the whole
+# Celery worker (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min,
+# zero log output). asyncio.wait_for is unconditional: if the wrapped
+# coroutine doesn't return within the budget, it gets cancelled and we
+# move on. 45s comfortably covers a real slow-but-working page (Akamai
+# challenge + 1.5s settle + content + teardown ≈ 8–12s typical) while
+# bounding worst-case at one fallback attempt per course.
+_BROWSER_FETCH_TIMEOUT_SEC = 45
+# Re-running the english extractor on rendered HTML is pure CPU — no
+# network. Anything past 15s here means a runaway regex or a 50MB DOM,
+# both of which we'd rather skip than block on.
+_REEXTRACT_TIMEOUT_SEC = 15
 
 # The four slot keys we care about — IELTS overall, PTE overall, TOEFL
 # overall, Cambridge Advanced English overall. If any of these are
@@ -76,7 +93,31 @@ async def maybe_browser_refetch(
             url=url,
         )
     try:
-        rendered = await browser_pool.fetch_html(url)
+        rendered = await asyncio.wait_for(
+            browser_pool.fetch_html(url),
+            timeout=_BROWSER_FETCH_TIMEOUT_SEC,
+        )
+    except asyncio.TimeoutError:
+        # Hard ceiling hit. Log a warning BEFORE the abort so the celery
+        # journal has a breadcrumb (the prod incident had zero log lines
+        # during the 32min hang — even an error would have helped).
+        log.warning(
+            "browser fallback exceeded %ss on URL %s — aborting this course",
+            _BROWSER_FETCH_TIMEOUT_SEC,
+            url,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[FALLBACK] timeout: per-course browser exceeded "
+                f"{_BROWSER_FETCH_TIMEOUT_SEC}s on {url} — moving on",
+                phase="fallback",
+                kind="per_course_browser_timeout",
+                url=url,
+                timeout_seconds=_BROWSER_FETCH_TIMEOUT_SEC,
+                level="warn",
+            )
+        return {}, [], None
     except Exception as exc:  # noqa: BLE001 — never abort on browser failure
         log.warning("per_course_browser fetch %s failed: %s", url, exc)
         if emit:
@@ -100,7 +141,18 @@ async def maybe_browser_refetch(
         return {}, [], None
 
     try:
-        results: list[ExtractionResult] = await english_test.extract(rendered, url)
+        results: list[ExtractionResult] = await asyncio.wait_for(
+            english_test.extract(rendered, url),
+            timeout=_REEXTRACT_TIMEOUT_SEC,
+        )
+    except asyncio.TimeoutError:
+        log.warning(
+            "english_test re-extract exceeded %ss on rendered %s — aborting",
+            _REEXTRACT_TIMEOUT_SEC,
+            url,
+        )
+        # Return the rendered HTML so vision-OCR can still try its pass.
+        return {}, [], rendered
     except Exception as exc:  # noqa: BLE001
         log.warning("english_test re-extract failed on rendered %s: %s", url, exc)
         return {}, [], rendered
