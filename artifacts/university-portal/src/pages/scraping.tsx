@@ -1528,12 +1528,35 @@ export default function Scraping() {
                 );
               })()}
 
-              {scraping && !progressLog && !awaitingApproval && (
-                <div className="flex items-center gap-2 text-sm text-blue-600">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
-                </div>
-              )}
+              {scraping && !progressLog && !awaitingApproval && (() => {
+                // Pre-progress phase (discovery, sitemap fetch, candidate
+                // sampling) can take 30s–2min before the per-course loop
+                // emits its first ``progress`` event. Show an elapsed
+                // counter here so the UI doesn't look frozen — same
+                // ``scrapeStartTime`` baseline + ``now`` ticker as the
+                // progress block above so it stays in sync once total
+                // becomes known and the bar takes over.
+                let elapsed: string | null = null;
+                if (scrapeStartTime) {
+                  const s = Math.max(0, Math.round((now - scrapeStartTime) / 1000));
+                  const m = Math.floor(s / 60);
+                  const r = s % 60;
+                  elapsed = m > 0 ? `${m}m ${r}s` : `${r}s`;
+                }
+                return (
+                  <div className="flex items-center justify-between gap-2 text-sm text-blue-600">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span className="truncate">{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
+                    </div>
+                    {elapsed && (
+                      <span className="text-xs text-gray-400 tabular-nums shrink-0">
+                        ({elapsed} elapsed)
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               {awaitingApproval && (
                 <div className="border-2 border-amber-300 bg-amber-50 rounded-xl p-5 space-y-4">
