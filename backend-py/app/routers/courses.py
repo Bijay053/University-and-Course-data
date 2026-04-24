@@ -61,6 +61,7 @@ async def list_courses(
     # LEFT JOIN fees + add camelCase fields the UI expects
     course_ids = [r.id for r in rows]
     fees_map: dict = {}
+    eng_map: dict = {}
     if course_ids:
         from sqlalchemy import text
         fee_rows = (await db.execute(text("""
@@ -78,6 +79,37 @@ async def list_courses(
                 "feeYear": fr.fee_year,
                 "currency": fr.currency,
             }
+
+        # B7: surface english_requirements rows on each course so the
+        # UI's English Proficiency tab renders. The tab filters
+        # `c.ieltsOverall || c.pteOverall || c.toeflOverall || ...`
+        # — those camelCase fields didn't exist on the response, so
+        # the tab was always empty even when 29 rows existed in the
+        # english_requirements table for ASA's 8 courses.
+        #
+        # The table has multiple rows per course (one per test_type:
+        # IELTS / PTE / TOEFL / Other), so we bucket by normalized
+        # test_type. If the same course has duplicate rows for the
+        # same test_type (shouldn't, but no UNIQUE constraint), the
+        # newest wins via ORDER BY created_at DESC + first-write-wins.
+        eng_rows = (await db.execute(text("""
+            SELECT course_id, test_type, test_name,
+                   listening, speaking, writing, reading, overall
+            FROM english_requirements
+            WHERE course_id = ANY(:ids)
+            ORDER BY course_id, created_at DESC
+        """), {"ids": course_ids})).all()
+        for er in eng_rows:
+            bucket = eng_map.setdefault(er.course_id, {})
+            tt = (er.test_type or "").upper().strip()
+            if tt == "IELTS" and "ielts" not in bucket:
+                bucket["ielts"] = er
+            elif tt == "PTE" and "pte" not in bucket:
+                bucket["pte"] = er
+            elif tt == "TOEFL" and "toefl" not in bucket:
+                bucket["toefl"] = er
+            elif tt not in {"IELTS", "PTE", "TOEFL"} and "other" not in bucket:
+                bucket["other"] = er
 
     course_aliases = {
         "university_id": "universityId",
@@ -122,6 +154,34 @@ async def list_courses(
             "fee_year": None, "feeYear": None,
             "currency": None,
         }))
+
+        # B7: surface english bands. Always emit ALL keys (with None
+        # fallback) so the UI doesn't have to guard against undefined.
+        b = eng_map.get(r.id, {})
+        i = b.get("ielts"); p = b.get("pte"); t = b.get("toefl"); o = b.get("other")
+        d["ieltsListening"] = i.listening if i else None
+        d["ieltsSpeaking"]  = i.speaking  if i else None
+        d["ieltsWriting"]   = i.writing   if i else None
+        d["ieltsReading"]   = i.reading   if i else None
+        d["ieltsOverall"]   = i.overall   if i else None
+        d["pteListening"]   = p.listening if p else None
+        d["pteSpeaking"]    = p.speaking  if p else None
+        d["pteWriting"]     = p.writing   if p else None
+        d["pteReading"]     = p.reading   if p else None
+        d["pteOverall"]     = p.overall   if p else None
+        d["toeflListening"] = t.listening if t else None
+        d["toeflSpeaking"]  = t.speaking  if t else None
+        d["toeflWriting"]   = t.writing   if t else None
+        d["toeflReading"]   = t.reading   if t else None
+        d["toeflOverall"]   = t.overall   if t else None
+        # Other-test name falls back to test_type so e.g. test_type
+        # "Cambridge" with no test_name still labels the row.
+        d["otherEnglishTestName"] = (o.test_name if o else None) or (o.test_type if o else None)
+        d["otherEnglishListening"] = o.listening if o else None
+        d["otherEnglishSpeaking"]  = o.speaking  if o else None
+        d["otherEnglishWriting"]   = o.writing   if o else None
+        d["otherEnglishReading"]   = o.reading   if o else None
+        d["otherEnglishOverall"]   = o.overall   if o else None
         out.append(d)
     return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
 

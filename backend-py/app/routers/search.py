@@ -41,6 +41,37 @@ async def search_courses(
     intake_month: str | None = None,
     max_fee: float | None = None,
     max_ielts: float | None = None,
+    # B5: the /search UI sends ~14 filter params that the previous
+    # implementation silently ignored. The MV `course_search_view`
+    # actually has the columns we need for most of them (location,
+    # intakes, fee, duration_years, per-exam overall scores,
+    # category/sub_category) — they were just never wired. The ones
+    # that DO require a join (per-band English bands beyond overall,
+    # academic/grading filters, country_residence, other_exam) stay
+    # accepted-but-noop for now so the UI keeps building URLs without
+    # 422s and we can ship them in a follow-up. See bottom of handler.
+    location: str | None = None,
+    intakes: str | None = None,         # CSV: "Spring,Fall"
+    fee_min: float | None = None,
+    fee_max: float | None = None,
+    duration_years_min: float | None = None,
+    duration_years_max: float | None = None,
+    english_exam: str | None = None,    # IELTS|PTE|TOEFL|CAE|DUOLINGO
+    english_overall: float | None = None,
+    category: str | None = None,
+    sub_category: str | None = None,
+    sort: str | None = None,            # relevance|fee_asc|fee_desc|duration|name
+    # Accepted-but-noop (require academic_requirements/english_requirements join):
+    english_reading: float | None = None,        # noqa: ARG001
+    english_writing: float | None = None,        # noqa: ARG001
+    english_listening: float | None = None,      # noqa: ARG001
+    english_speaking: float | None = None,       # noqa: ARG001
+    country_residence: str | None = None,        # noqa: ARG001
+    highest_qualification: str | None = None,    # noqa: ARG001
+    grading_scheme: str | None = None,           # noqa: ARG001
+    grading_out_of: str | None = None,           # noqa: ARG001
+    grading_score: str | None = None,            # noqa: ARG001
+    other_exam: str | None = None,               # noqa: ARG001
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> SearchCourseResponse:
@@ -75,7 +106,88 @@ async def search_courses(
         where.append("(c.ielts_overall IS NULL OR c.ielts_overall <= :max_ielts)")
         params["max_ielts"] = max_ielts
 
+    # B5: location is a free-text city/region match. UI feeds either a
+    # university_city OR a course_location string ("Sydney Campus"),
+    # so OR them with case-insensitive ILIKE on both columns.
+    if location and location.strip():
+        where.append(
+            "(lower(c.university_city) ILIKE :loc OR lower(c.course_location) ILIKE :loc)"
+        )
+        params["loc"] = f"%{location.strip().lower()}%"
+
+    # B5: intakes CSV → array overlap. Empty tokens after split are
+    # ignored so "?intakes=" is a no-op rather than a "match nothing" bug.
+    if intakes:
+        intake_list = [s.strip() for s in intakes.split(",") if s.strip()]
+        if intake_list:
+            where.append("c.intakes && (:intake_list)::text[]")
+            params["intake_list"] = intake_list
+
+    # B5: fee_min/fee_max are the slider's two ends. NULLs always
+    # match the lower bound (so "fee_min=0" doesn't drop unpriced
+    # courses) but only match the upper bound when the slider is at
+    # its max — handled UI-side by omitting the param entirely.
+    if fee_min is not None and fee_min > 0:
+        where.append("(c.international_fee IS NOT NULL AND c.international_fee >= :fee_min)")
+        params["fee_min"] = fee_min
+    if fee_max is not None:
+        where.append("(c.international_fee IS NULL OR c.international_fee <= :fee_max)")
+        params["fee_max"] = fee_max
+
+    # B5: duration_years already pre-computed on the MV (real column
+    # `duration_years`). NULL is treated as "matches" so courses with
+    # missing duration data aren't silently dropped.
+    if duration_years_min is not None and duration_years_min > 0:
+        where.append("(c.duration_years IS NULL OR c.duration_years >= :dy_min)")
+        params["dy_min"] = duration_years_min
+    if duration_years_max is not None:
+        where.append("(c.duration_years IS NULL OR c.duration_years <= :dy_max)")
+        params["dy_max"] = duration_years_max
+
+    # B5: english_exam picks which of the per-exam overall columns to
+    # filter on. The MV has overall scores for all five tests
+    # (ielts/pte/toefl/cae/duolingo). english_overall is the user's
+    # achievable score → keep courses requiring AT MOST that.
+    if english_exam and english_overall is not None:
+        col_map = {
+            "IELTS": "c.ielts_overall",
+            "PTE": "c.pte_overall",
+            "TOEFL": "c.toefl_overall",
+            "CAE": "c.cae_overall",
+            "DUOLINGO": "c.duolingo_overall",
+        }
+        col = col_map.get(english_exam.upper().strip())
+        if col:
+            where.append(f"({col} IS NULL OR {col} <= :eng_overall)")
+            params["eng_overall"] = english_overall
+
+    if category:
+        where.append("c.category = :cat")
+        params["cat"] = category
+    if sub_category:
+        where.append("c.sub_category = :sub_cat")
+        params["sub_cat"] = sub_category
+
     where_sql = " AND ".join(where) if where else "TRUE"
+
+    # B5: sort param. Default behaviour (no sort) preserves the
+    # legacy "relevance when q present, alphabetical otherwise" order.
+    sort_clause = (
+        ("rank DESC NULLS LAST, " if q else "") + "c.course_name"
+    )
+    if sort:
+        s = sort.strip().lower()
+        if s == "fee_asc":
+            sort_clause = "c.international_fee ASC NULLS LAST, c.course_name"
+        elif s == "fee_desc":
+            sort_clause = "c.international_fee DESC NULLS LAST, c.course_name"
+        elif s in ("duration", "duration_asc"):
+            sort_clause = "c.duration_years ASC NULLS LAST, c.course_name"
+        elif s == "duration_desc":
+            sort_clause = "c.duration_years DESC NULLS LAST, c.course_name"
+        elif s in ("name", "alpha"):
+            sort_clause = "c.course_name ASC"
+        # else fall through to relevance/alpha default
 
     rank_select = (
         "ts_rank(c.search_tsv, plainto_tsquery('english', :q)) AS rank" if q else "NULL AS rank"
@@ -96,7 +208,7 @@ async def search_courses(
                {rank_select}
         FROM course_search_view c
         WHERE {where_sql}
-        ORDER BY {"rank DESC NULLS LAST, " if q else ""}c.course_name
+        ORDER BY {sort_clause}
         LIMIT :limit OFFSET :offset
     """
     count_sql = f"SELECT COUNT(*) FROM course_search_view c WHERE {where_sql}"
