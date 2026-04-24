@@ -44,8 +44,15 @@ async def extract_course(
     country: str | None = None,
     html: str | None = None,
     use_ai_fallback: bool = True,
+    uni_pdf_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence."""
+    """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
+
+    ``uni_pdf_data`` is the (optional) result of
+    :func:`app.services.scraper.pipelines.university_pdfs.load_university_pdf_data`,
+    used as a *last-resort* fallback for fee/IELTS fields that the per-page
+    extractors and AI fallback could not fill.
+    """
     if html is None:
         html = await fetch_html(url)
     if not html:
@@ -94,6 +101,42 @@ async def extract_course(
                     "confidence": 0.5,
                     "method": "ai_fallback",
                     "snippet": None,
+                }
+            )
+
+    # Last-resort: backfill from university-level PDFs (fee schedule,
+    # admissions/IELTS policy). Only fills keys still missing after
+    # page extractors + AI. Each filled key emits a provenance row that
+    # credits the source PDF URL.
+    if uni_pdf_data:
+        fee_block = uni_pdf_data.get("fee") or {}
+        english_block = uni_pdf_data.get("english") or {}
+        fees_pdf_url = uni_pdf_data.get("fees_pdf_url")
+        reqs_pdf_url = uni_pdf_data.get("requirements_pdf_url")
+        for k, v in fee_block.items():
+            if v is None or k in payload:
+                continue
+            payload[k] = v
+            evidence.append(
+                {
+                    "field_key": k,
+                    "value": v,
+                    "confidence": 0.7,
+                    "method": "uni_pdf:fees",
+                    "snippet": fees_pdf_url,
+                }
+            )
+        for k, v in english_block.items():
+            if v is None or k in payload:
+                continue
+            payload[k] = v
+            evidence.append(
+                {
+                    "field_key": k,
+                    "value": v,
+                    "confidence": 0.7,
+                    "method": "uni_pdf:requirements",
+                    "snippet": reqs_pdf_url,
                 }
             )
 

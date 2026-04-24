@@ -27,10 +27,14 @@ field_keys = (
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
 def _ielts(text: str) -> dict[str, float] | None:
     # Pattern 1: "IELTS overall 6.0 with no band below 5.5"
+    # — also matches "Academic IELTS Overall 6.0, with no band below 5.5"
+    #   (PDF policy phrasing; allow leading "Academic " prefix and a
+    #    short punctuation bridge between the overall score and the
+    #    "no band below" clause).
     m = re.search(
-        r"ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*([0-9]+(?:\.[0-9]+)?)\s*"
-        r"(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+below|minimum\s+of|"
-        r"no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
+        r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*([0-9]+(?:\.[0-9]+)?)"
+        r"[^a-z0-9]{0,15}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:below|less\s+than)|"
+        r"minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
         text,
         re.I,
     )

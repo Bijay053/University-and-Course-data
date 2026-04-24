@@ -20,6 +20,7 @@ from app.database import AsyncSessionLocal
 from app.models import ScrapeRuntimeJob, University
 from app.services.scraper.discovery import discover_course_links
 from app.services.scraper.pipelines.single_course import extract_course
+from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
 
 log = logging.getLogger(__name__)
@@ -47,12 +48,14 @@ _MAX_COURSES_PER_JOB = 60
 _MAX_PARALLEL_FETCH = 4
 
 
-async def _extract_only(link: dict, country: str | None) -> dict:
+async def _extract_only(
+    link: dict, country: str | None, uni_pdf_data: dict | None = None
+) -> dict:
     """Network-bound work — safe to parallelise across coroutines."""
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
     try:
-        out = await extract_course(url, country=country)
+        out = await extract_course(url, country=country, uni_pdf_data=uni_pdf_data)
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
     return {"name": name, "url": url, **out}
@@ -93,6 +96,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         uni_name = uni.name
         uni_country = uni.country
         uni_scrape_url = uni.scrape_url or ""
+        uni_scrape_config = dict(uni.scrape_config) if uni.scrape_config else None
         # Use the URL captured on the job at API time, fall back to uni snapshot.
         scrape_url = (job.url or "").strip() or uni_scrape_url.strip()
         if not scrape_url:
@@ -113,6 +117,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.total_found = len(links)
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
+
+        # University-level PDF data (fee schedule, admissions/IELTS policy)
+        # — fetched ONCE per job, used as last-resort fallback for every course.
+        try:
+            uni_pdf_data = await load_university_pdf_data(uni_scrape_config, uni_country)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("uni-pdf load failed: %s", exc)
+            uni_pdf_data = {}
+        if uni_pdf_data:
+            await emit(
+                "status",
+                f"Loaded uni-level PDF data: fee={'yes' if uni_pdf_data.get('fee') else 'no'} english={'yes' if uni_pdf_data.get('english') else 'no'}",
+                phase="discover",
+                pdf_fee=bool(uni_pdf_data.get("fee")),
+                pdf_english=bool(uni_pdf_data.get("english")),
+            )
+
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
         # 1) Extraction phase — parallel network calls, no DB shared state.
@@ -120,7 +141,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         async def _bounded(link: dict) -> dict:
             async with sem:
-                return await _extract_only(link, uni_country)
+                return await _extract_only(link, uni_country, uni_pdf_data or None)
 
         results = await asyncio.gather(
             *[_bounded(lk) for lk in links], return_exceptions=True
