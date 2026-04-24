@@ -1,0 +1,491 @@
+[INFO ] Resumed in-progress scrape (asa) from another tab/session.
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.asahe.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/: listing (5 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +5 candidates (total 5) — https://www.asahe.edu.au/
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +5 candidates (total 10) — https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 10 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (10 pages)...
+[EXTRACT ] [EXTRACT] 1/10: Bachelor of Professional Accounting
+[EXTRACT ] [EXTRACT] 2/10: Master of Information Technology Artificial Intelligence
+[EXTRACT ] [EXTRACT] 3/10: Master of Project Management
+[EXTRACT ] [EXTRACT] 4/10: Master of Software Application Development
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-project-management
+[EXTRACT ] [EXTRACT] 5/10: Master of Information Technology Cyber Security
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 6/10: Bachelor of Business International Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 7/10: Bachelor of Business Hospitality Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/10: Bachelor of Business Technology Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 9/10: Bachelor of Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 10/10: Master of Information Technology (Software Application Development)
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=85.0
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Information Technology Artificial Intelligence
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] skipped Master of Software Application Development: fetch_failed
+[STAGE ] [STAGE] saved: Master of Information Technology Cyber Security
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[INFO ] [INFO ] [TIMING] Total: 3m 54s | Courses: 9 | Avg: 26.0s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:10 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Staged 9 courses, 0 skipped, 1 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.asahe.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/: listing (5 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +5 candidates (total 5) — https://www.asahe.edu.au/
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +5 candidates (total 10) — https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 10 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (10 pages)...
+[EXTRACT ] [EXTRACT] 1/10: Bachelor of Professional Accounting
+[EXTRACT ] [EXTRACT] 2/10: Master of Information Technology Artificial Intelligence
+[EXTRACT ] [EXTRACT] 3/10: Master of Project Management
+[EXTRACT ] [EXTRACT] 4/10: Master of Software Application Development
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-project-management
+[EXTRACT ] [EXTRACT] 5/10: Master of Information Technology Cyber Security
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 6/10: Bachelor of Business International Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 7/10: Bachelor of Business Hospitality Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/10: Bachelor of Business Technology Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 9/10: Bachelor of Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 10/10: Master of Information Technology (Software Application Development)
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=85.0
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Information Technology Artificial Intelligence
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] skipped Master of Software Application Development: fetch_failed
+[STAGE ] [STAGE] saved: Master of Information Technology Cyber Security
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[INFO ] [INFO ] [TIMING] Total: 3m 54s | Courses: 9 | Avg: 26.0s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:10 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Staged 9 courses, 0 skipped, 1 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.asahe.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/: listing (5 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +5 candidates (total 5) — https://www.asahe.edu.au/
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +5 candidates (total 10) — https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 10 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (10 pages)...
+[EXTRACT ] [EXTRACT] 1/10: Bachelor of Professional Accounting
+[EXTRACT ] [EXTRACT] 2/10: Master of Information Technology Artificial Intelligence
+[EXTRACT ] [EXTRACT] 3/10: Master of Project Management
+[EXTRACT ] [EXTRACT] 4/10: Master of Software Application Development
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-project-management
+[EXTRACT ] [EXTRACT] 5/10: Master of Information Technology Cyber Security
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 6/10: Bachelor of Business International Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 7/10: Bachelor of Business Hospitality Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/10: Bachelor of Business Technology Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 9/10: Bachelor of Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 10/10: Master of Information Technology (Software Application Development)
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=85.0
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Information Technology Artificial Intelligence
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] skipped Master of Software Application Development: fetch_failed
+[STAGE ] [STAGE] saved: Master of Information Technology Cyber Security
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[INFO ] [INFO ] [TIMING] Total: 3m 54s | Courses: 9 | Avg: 26.0s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:10 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Staged 9 courses, 0 skipped, 1 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.asahe.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/: listing (5 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +5 candidates (total 5) — https://www.asahe.edu.au/
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +5 candidates (total 10) — https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 10 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (10 pages)...
+[EXTRACT ] [EXTRACT] 1/10: Bachelor of Professional Accounting
+[EXTRACT ] [EXTRACT] 2/10: Master of Information Technology Artificial Intelligence
+[EXTRACT ] [EXTRACT] 3/10: Master of Project Management
+[EXTRACT ] [EXTRACT] 4/10: Master of Software Application Development
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-project-management
+[EXTRACT ] [EXTRACT] 5/10: Master of Information Technology Cyber Security
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 6/10: Bachelor of Business International Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 7/10: Bachelor of Business Hospitality Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/10: Bachelor of Business Technology Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 9/10: Bachelor of Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 10/10: Master of Information Technology (Software Application Development)
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=85.0
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Information Technology Artificial Intelligence
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] skipped Master of Software Application Development: fetch_failed
+[STAGE ] [STAGE] saved: Master of Information Technology Cyber Security
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[INFO ] [INFO ] [TIMING] Total: 3m 54s | Courses: 9 | Avg: 26.0s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:10 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Staged 9 courses, 0 skipped, 1 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+[INFO ] Fetching https://www.asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.asahe.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/: listing (5 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +5 candidates (total 5) — https://www.asahe.edu.au/
+[DISCOVER] [DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +5 candidates (total 10) — https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 10 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (10 pages)...
+[EXTRACT ] [EXTRACT] 1/10: Bachelor of Professional Accounting
+[EXTRACT ] [EXTRACT] 2/10: Master of Information Technology Artificial Intelligence
+[EXTRACT ] [EXTRACT] 3/10: Master of Project Management
+[EXTRACT ] [EXTRACT] 4/10: Master of Software Application Development
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-project-management
+[EXTRACT ] [EXTRACT] 5/10: Master of Information Technology Cyber Security
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 6/10: Bachelor of Business International Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 7/10: Bachelor of Business Hospitality Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/10: Bachelor of Business Technology Management
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 9/10: Bachelor of Business
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 10/10: Master of Information Technology (Software Application Development)
+[FALLBACK] [FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course browser ✓] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [FALLBACK] [per-course vision img 0/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=60.0 CAE=169.0
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [FALLBACK] [per-course vision img 6/6] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=— PTE=— TOEFL=85.0 CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=85.0
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Information Technology Artificial Intelligence
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] skipped Master of Software Application Development: fetch_failed
+[STAGE ] [STAGE] saved: Master of Information Technology Cyber Security
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[INFO ] [INFO ] [TIMING] Total: 3m 54s | Courses: 9 | Avg: 26.0s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:10 | Staged:9 | Skipped:0 | Errors:0
+[INFO ] Staged 9 courses, 0 skipped, 1 fetch errors
