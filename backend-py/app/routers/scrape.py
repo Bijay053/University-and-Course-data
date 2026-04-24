@@ -492,17 +492,18 @@ async def staged_one(
 @router.get("/staged/{sc_id}/review")
 async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     """Return all data needed for the course review modal."""
-    sc = await db.get(ScrapedCourse, sc_id)
-    if not sc:
+    from sqlalchemy import text as _t
+    row = (await db.execute(
+        _t("SELECT * FROM scraped_courses WHERE id = :i"), {"i": sc_id}
+    )).mappings().first()
+    if not row:
         raise HTTPException(status_code=404, detail="Staged course not found")
 
-    # Collect every column on the model as a dict
     out = {}
-    for col in sc.__table__.columns:
-        v = getattr(sc, col.name)
+    for k, v in dict(row).items():
         if hasattr(v, "isoformat"):
             v = v.isoformat()
-        out[col.name] = v
+        out[k] = v
 
     # UI may expect nested shape similar to live courses
     out["fees"] = {
