@@ -283,6 +283,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         university_id=uni_id,
                         course_name=r["name"],
                         payload=payload,
+                        # Bug D: pass per-field evidence so it lands in
+                        # scraped_field_evidence and the review modal can
+                        # render it instead of a blank body.
+                        evidence=r.get("evidence") or [],
+                        source_url=r.get("url"),
                     )
                 if res.saved:
                     summary["staged"] += 1

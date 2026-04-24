@@ -9,15 +9,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.services.scraper.category import classify_category
 from app.services.scraper.extractors import (
     ai_fallback,
     course_name,
+    degree_level,
     duration,
     eligibility,
     english_test,
     fee,
     intake,
     location,
+    study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.http_fetcher import fetch_html
@@ -26,7 +29,10 @@ from app.services.scraper.provenance import build_course_page_provenance_footer
 log = logging.getLogger(__name__)
 
 
-# Each entry: (module, kwargs the extractor accepts beyond html/url)
+# Each entry: (module, kwargs the extractor accepts beyond html/url).
+# degree_level + study_mode were missing before Bug C — without them the
+# Review table's Level / Mode columns showed "--" for every staged course
+# and auto_publish_status was permanently stuck on "pending_review".
 _EXTRACTORS = (
     (course_name, ()),
     (location, ()),
@@ -35,6 +41,8 @@ _EXTRACTORS = (
     (english_test, ()),
     (intake, ()),
     (duration, ()),
+    (degree_level, ()),
+    (study_mode, ()),
 )
 
 
@@ -63,7 +71,18 @@ async def extract_course(
     evidence: list[dict[str, Any]] = []
 
     for module, extra_keys in _EXTRACTORS:
-        kwargs = {k: country for k in extra_keys if k == "country"}
+        kwargs: dict[str, Any] = {}
+        for k in extra_keys:
+            if k == "country":
+                kwargs["country"] = country
+        # degree_level accepts an optional ``course_name`` so it can read
+        # the H1-level title without re-parsing <title>. Pass whatever the
+        # course_name extractor already produced (it runs first in the
+        # tuple, so payload['course_name'] is populated by the time we
+        # reach degree_level). Falls through harmlessly when the kwarg
+        # isn't supported by this extractor.
+        if module is degree_level and payload.get("course_name"):
+            kwargs["course_name"] = payload["course_name"]
         try:
             results: list[ExtractionResult] = await module.extract(html, url, **kwargs)
         except Exception as exc:  # one extractor must never break the others
@@ -170,6 +189,25 @@ async def extract_course(
                     "confidence": 0.7,
                     "method": "uni_pdf:requirements",
                     "snippet": reqs_pdf_url,
+                }
+            )
+
+    # Rule-based category classifier — runs after every other slot is
+    # populated so we can use the (possibly AI-filled) course_name. The
+    # Review table's Category column reads scraped_courses.category; without
+    # this step every row showed NULL. Skip if an extractor already produced
+    # a category (none currently do, but keeps the pipeline future-proof).
+    if "category" not in payload or not payload.get("category"):
+        cat = classify_category(payload.get("course_name") or "")
+        if cat:
+            payload["category"] = cat
+            evidence.append(
+                {
+                    "field_key": "category",
+                    "value": cat,
+                    "confidence": 0.6,
+                    "method": "category:rule",
+                    "snippet": payload.get("course_name"),
                 }
             )
 

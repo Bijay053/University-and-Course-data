@@ -531,7 +531,12 @@ async def staged_one(
 
 @router.get("/staged/{sc_id}/review")
 async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
-    """Return all data needed for the course review modal."""
+    """Return all data needed for the course review modal.
+
+    Bug D: this used to omit the per-field evidence rows entirely, leaving
+    the Evidence Review modal blank. Now it pulls the rows from
+    ``scraped_field_evidence`` and includes them under ``evidence``.
+    """
     from sqlalchemy import text as _t
     row = (await db.execute(
         _t("SELECT * FROM scraped_courses WHERE id = :i"), {"i": sc_id}
@@ -560,6 +565,57 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
         "duolingo_overall": out.get("duolingo_overall"),
     }
     out["intakes"] = out.get("intake_months") or []
+
+    # Bug D: pull per-field evidence rows. Empty array (not missing key) so
+    # the UI can distinguish "no evidence yet" from "we forgot to load it".
+    ev_rows = (await db.execute(
+        _t(
+            "SELECT id, field_key, candidate_value, normalized_value, source_url, "
+            "page_type, extraction_method, snippet, confidence, decision_score, "
+            "validation_status, decision_status, selected, created_at "
+            "FROM scraped_field_evidence "
+            "WHERE scraped_course_id = :i "
+            "ORDER BY field_key, confidence DESC NULLS LAST, id"
+        ),
+        {"i": sc_id},
+    )).mappings().all()
+
+    evidence: list[dict] = []
+    for ev in ev_rows:
+        ev_dict = dict(ev)
+        # Normalize datetime to ISO so JSON encoding succeeds.
+        ts = ev_dict.get("created_at")
+        if hasattr(ts, "isoformat"):
+            ev_dict["created_at"] = ts.isoformat()
+        # camelCase aliases — the UI was written against the Node response shape.
+        ev_dict["fieldKey"] = ev_dict["field_key"]
+        ev_dict["candidateValue"] = ev_dict["candidate_value"]
+        ev_dict["normalizedValue"] = ev_dict["normalized_value"]
+        ev_dict["sourceUrl"] = ev_dict["source_url"]
+        ev_dict["pageType"] = ev_dict["page_type"]
+        ev_dict["extractionMethod"] = ev_dict["extraction_method"]
+        ev_dict["decisionScore"] = ev_dict["decision_score"]
+        ev_dict["validationStatus"] = ev_dict["validation_status"]
+        ev_dict["decisionStatus"] = ev_dict["decision_status"]
+        evidence.append(ev_dict)
+
+    out["evidence"] = evidence
+    # Group by field_key so the modal can render per-field cards without
+    # doing the bucketing itself.
+    by_field: dict[str, list[dict]] = {}
+    for ev in evidence:
+        by_field.setdefault(ev["field_key"], []).append(ev)
+    out["evidenceByField"] = by_field
+
+    # camelCase aliases for the eligibility / publish-readiness fields the
+    # review table reads. Existing snake_case keys are preserved for any
+    # Python consumer.
+    out["eligibilityStatus"] = out.get("eligibility_status")
+    out["eligibilityReason"] = out.get("eligibility_reason")
+    out["autoPublishStatus"] = out.get("auto_publish_status")
+    out["decisionScore"] = out.get("decision_score")
+    out["completeness"] = out.get("completeness")
+
     out["stagedCourse"] = dict(out)  # UI accesses Ut.stagedCourse
     out["course"] = dict(out)        # UI accesses Ut.course
     out["ok"] = True
