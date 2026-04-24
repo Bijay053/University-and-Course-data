@@ -353,3 +353,32 @@ NOT cover. All six fixes below land together.
   university surfaces with genuinely divergent postgrad requirements.
 
 **Test summary**: 301 passed, 1 skipped (was 292+1; +9 new regression tests).
+
+### 7. IELTS/PTE/TOEFL "Overall score X" prose blocked all patterns (commit fd14a6a)
+- **Symptom**: After PR-1.5 hot-fix #1 (commit 36f30ee) deployed, prod
+  job_24323bbb8715 (VIT, 12 courses) STILL showed `browser_empty=12/12`
+  and `vision_with_data=12/20` (60%). Page prose plainly states
+  `IELTS Academic: Overall score 6.5, with no band below 6.0`.
+- **Root cause**: every `_ielts` / `_pte` / `_toefl` pattern in
+  `extractors/english_test.py` required `overall\s*<digit>` — they did
+  NOT allow the literal word "score" (or "band"/"of") between
+  "Overall" and the number. VIT's phrasing put "score" there, so all
+  five IELTS patterns and the rich PTE/TOEFL twins failed. The same
+  bug also throttled `per_course_vision`, which feeds Gemini output
+  back through `english_test.extract`.
+- **Fix**: insert optional
+  `(?:score\s+|band\s+|score\s+of\s+|of\s+)?` bridge after
+  `overall\s*` in IELTS pattern 1, PTE pattern 1, TOEFL pattern 1.
+  Tail constraint (`with no band/skill/section below`) is unchanged,
+  so no false-positive regressions.
+- **Coverage**: 3 new regression tests in `tests/test_extractors.py`
+  using actual VIT prose for IELTS/PTE/TOEFL. End-to-end verified
+  against `/tmp/vit.html`: extractor now returns
+  `ielts_overall=6.5, ielts_listening=6.0`.
+- **Test summary**: 304 passed, 1 skipped (was 301+1; +3 new).
+- **Out of scope (deferred)**: PTE/TOEFL/CAE on VIT only appear in the
+  equivalence-table image, not prose. Vision still owns those (60%
+  hit-rate). Lifting to ~100% needs a real table parser.
+- **Adjacent variants noted but not fixed**: phrasings like
+  `overall band score 6.5` or `overall IELTS score of 6.5` are still
+  unsupported by pattern 1; they have not been observed in the wild.
