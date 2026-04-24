@@ -42,7 +42,7 @@ Course page text (truncated):
 """
 
 
-def _trim_text(html: str, *, max_chars: int = 8000) -> str:
+def _trim_text(html: str, *, max_chars: int = 25000) -> str:
     text = html_to_text(html)
     if len(text) <= max_chars:
         return text
@@ -54,14 +54,39 @@ def _trim_text(html: str, *, max_chars: int = 8000) -> str:
 def _parse_json(raw: str) -> dict[str, Any]:
     if not raw:
         return {}
+    # Strip ```json ... ``` fences
+    raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+    raw = re.sub(r"\s*```$", "", raw)
+    # Try greedy match first
     m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not m:
-        return {}
-    try:
-        data = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return {}
-    return data if isinstance(data, dict) else {}
+    if m:
+        try:
+            data = json.loads(m.group(0))
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            pass
+    # Fallback: parse line-by-line "key": value pairs even if JSON is truncated
+    out: dict[str, Any] = {}
+    for line in raw.splitlines():
+        m2 = re.match(r'\s*"([^"]+)"\s*:\s*(.+?),?\s*$', line)
+        if not m2:
+            continue
+        key, val_str = m2.group(1), m2.group(2).rstrip(",").strip()
+        if val_str == "null":
+            out[key] = None
+        elif val_str.startswith('"') and val_str.endswith('"'):
+            out[key] = val_str[1:-1]
+        elif val_str.startswith("["):
+            try:
+                out[key] = json.loads(val_str.rstrip(","))
+            except Exception:
+                pass
+        else:
+            try:
+                out[key] = float(val_str) if "." in val_str else int(val_str)
+            except ValueError:
+                out[key] = val_str
+    return out
 
 
 def _coerce(field_key: str, value: Any) -> Any | None:
@@ -109,7 +134,7 @@ async def fill_missing(
     prompt = _PROMPT_TEMPLATE.format(
         fields_block=fields_block, url=url, text=_trim_text(html)
     )
-    resp = await gemini_client.generate(prompt, max_output_tokens=512)
+    resp = await gemini_client.generate(prompt, max_output_tokens=2048)
     if resp.skipped:
         log.info("AI fallback skipped for %s: %s", url, resp.skip_reason)
         return {}

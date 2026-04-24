@@ -224,6 +224,7 @@ async def get_status(
         "errorMessage": job.error_message,
         "logs": logs,
         "events": logs,
+        "logIndex": max((l["sequence"] for l in logs), default=since),
         "ok": True,
     }
 
