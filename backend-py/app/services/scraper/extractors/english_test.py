@@ -31,8 +31,15 @@ def _ielts(text: str) -> dict[str, float] | None:
     #   (PDF policy phrasing; allow leading "Academic " prefix and a
     #    short punctuation bridge between the overall score and the
     #    "no band below" clause).
+    # — also matches "IELTS Academic: Overall score 6.5, with no band below 6.0"
+    #   (VIT prose phrasing; the optional `(?:score\s+|band\s+|of\s+)?`
+    #    bridge between "overall" and the digit was missing in PR-1 and
+    #    caused 100% of VIT staged rows to land with IELTS=— even though
+    #    the prose plainly says it. Same fix below for PTE/TOEFL).
     m = re.search(
-        r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*([0-9]+(?:\.[0-9]+)?)"
+        r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*"
+        r"(?:score\s+|band\s+|score\s+of\s+|of\s+)?"
+        r"([0-9]+(?:\.[0-9]+)?)"
         r"[^a-z0-9]{0,15}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:below|less\s+than)|"
         r"minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
         text,
@@ -132,8 +139,13 @@ def _ielts(text: str) -> dict[str, float] | None:
 # --- PTE (10-90) -------------------------------------------------------------
 def _pte(text: str) -> dict[str, float] | None:
     # Pattern 1 (rich): "PTE Academic 50 with no skill below 36"
+    # — also matches "PTE Academic: Overall score 58, with no communicative
+    #   skill below 50" (VIT-style prose where "score" sits between
+    #   "overall" and the digit; same regression class as IELTS pattern 1).
     m = re.search(
-        r"pte(?:\s+academic)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*"
+        r"pte(?:\s+academic)?[^a-z0-9]{0,20}"
+        r"(?:overall\s*(?:score\s+|band\s+|score\s+of\s+|of\s+)?)?"
+        r"([0-9]+(?:\.[0-9]+)?)\s*"
         r"(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|"
         r"no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
         text,
@@ -199,8 +211,13 @@ def _pte(text: str) -> dict[str, float] | None:
 
 # --- TOEFL (0-120) -----------------------------------------------------------
 def _toefl(text: str) -> dict[str, float] | None:
+    # Pattern 1 (rich): "TOEFL iBT 60 with no section below 12"
+    # — also matches "TOEFL iBT: Overall score 87, with no section below 17"
+    #   (VIT-style prose; same regression class as IELTS pattern 1).
     m = re.search(
-        r"toefl(?:\s+ibt)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*"
+        r"toefl(?:\s+ibt)?[^a-z0-9]{0,20}"
+        r"(?:overall\s*(?:score\s+|band\s+|score\s+of\s+|of\s+)?)?"
+        r"([0-9]+(?:\.[0-9]+)?)\s*"
         r"(?:with\s*)?(?:no\s+(?:band|section|subscore)\s+below|minimum\s+of|"
         r"no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
         text,

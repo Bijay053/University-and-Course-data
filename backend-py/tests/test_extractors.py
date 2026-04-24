@@ -84,6 +84,40 @@ def test_english_duolingo_and_cambridge():
     assert out["duolingo_overall"].value == 110.0
 
 
+# --- VIT regression: PR-1.5 hot-fix #2 ---------------------------------------
+# Real prose copied from https://vit.edu.au/mba/mba-project-management. Before
+# the fix, all 5 IELTS patterns (and their PTE/TOEFL twins) blocked on the word
+# "score" sitting between "Overall" and the digit, so 100% of VIT staged rows
+# landed with IELTS=— even though the page plainly stated 6.5.
+def test_english_ielts_overall_score_x_with_no_band_below_y():
+    html = (
+        "<p>English test results IELTS Academic: Overall score 6.5, "
+        "with no band below 6.0, or Equivalent results in another approved test.</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://vit.edu.au"))}
+    assert "ielts_overall" in out
+    n = out["ielts_overall"].normalized
+    assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
+
+
+def test_english_pte_overall_score_x_with_no_skill_below_y():
+    html = (
+        "<p>PTE Academic: Overall score 58, with no communicative skill below 50.</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://vit.edu.au"))}
+    assert out["pte_overall"].normalized["pte_overall"] == 58.0
+    assert out["pte_overall"].normalized["pte_listening"] == 50.0
+
+
+def test_english_toefl_overall_score_x_with_no_section_below_y():
+    html = (
+        "<p>TOEFL iBT: Overall score 87, with no section below 17.</p>"
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://vit.edu.au"))}
+    assert out["toefl_overall"].normalized["toefl_overall"] == 87.0
+    assert out["toefl_overall"].normalized["toefl_listening"] == 17.0
+
+
 # --- Intake ------------------------------------------------------------------
 def test_intake_parses_keyword_window():
     html = "<p>Available intakes: February, July and September.</p>"
