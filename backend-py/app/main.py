@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import import_routes as _import_routes
+from app.routers import backup as _backup
 from app.routers import (
     acronyms,
     auth,
@@ -65,3 +66,4 @@ app.include_router(scrape.router, prefix="/api/scrape", tags=["scrape"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")
+app.include_router(_backup.router, prefix="/api", tags=["backup"])
