@@ -135,11 +135,33 @@ async def search_courses(
             d["internationalFee"] = 0
             d["international_fee"] = 0
         out.append(d)
+    # Build facets — UI expects {facets: {intakes, degree_levels, locations, universities}}
+    # Each facet item: {name, count}. Use simple aggregate query.
+    from collections import Counter
+    intake_counter: Counter = Counter()
+    degree_counter: Counter = Counter()
+    location_counter: Counter = Counter()
+    uni_counter: Counter = Counter()
+    for d in out:
+        for m in (d.get("intake_months") or []):
+            if m: intake_counter[m] += 1
+        if d.get("degree_level"): degree_counter[d["degree_level"]] += 1
+        if d.get("course_location"): location_counter[d["course_location"]] += 1
+        if d.get("university_name"): uni_counter[d["university_name"]] += 1
+
+    facets = {
+        "intakes": [{"name": k, "count": v} for k, v in intake_counter.most_common()],
+        "degreeLevels": [{"name": k, "count": v} for k, v in degree_counter.most_common()],
+        "degree_levels": [{"name": k, "count": v} for k, v in degree_counter.most_common()],
+        "locations": [{"name": k, "count": v} for k, v in location_counter.most_common()],
+        "universities": [{"name": k, "count": v} for k, v in uni_counter.most_common()],
+    }
     return JSONResponse(content={
         "results": out,
         "total": int(total or 0),
         "page": page,
         "limit": limit,
+        "facets": facets,
     })
 
 
@@ -235,15 +257,21 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
         ).scalar_one()
     except Exception as exc:
         log.error("search_stats SQL failed: %s", exc)
-        return JSONResponse(content={"total_universities": 0, "totalUniversities": 0, "total_courses": 0, "totalCourses": 0, "countries": 0, "average_fee": 0, "averageFee": 0})
+        return JSONResponse(content={"total_universities": 0, "totalUniversities": 0, "total_courses": 0, "totalCourses": 0, "universities_with_courses": 0, "universitiesWithCourses": 0, "countries": 0, "average_fee": 0, "averageFee": 0})
 
     tu = int(total_unis or 0)
     tc = int(total_courses or 0)
     co = int(countries or 0)
     af = float(avg_fee) if avg_fee is not None else 0
+    # Count unis that actually have courses (not just total registered)
+    uwc = (await db.execute(text(
+        "SELECT COUNT(DISTINCT university_id) FROM courses WHERE status = 'active'"
+    ))).scalar_one()
+    uwc = int(uwc or 0)
     return JSONResponse(content={
         "total_universities": tu, "totalUniversities": tu,
         "total_courses": tc, "totalCourses": tc,
+        "universities_with_courses": uwc, "universitiesWithCourses": uwc,
         "countries": co,
         "average_fee": af, "averageFee": af,
     })
