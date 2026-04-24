@@ -108,6 +108,9 @@ def _is_nav(url: str) -> bool:
     return any(h in lurl for h in _NAV_URL_HINTS)
 
 
+_SITEMAP_FALLBACK_THRESHOLD = 5
+
+
 async def discover_course_links(
     start_url: str,
     *,
@@ -115,13 +118,34 @@ async def discover_course_links(
     max_courses: int = 200,
     emit=None,
 ) -> list[dict]:
-    """BFS crawl from start_url. Returns ``[{url, name}]`` for each course-like link.
+    """BFS crawl from ``start_url`` with rule-based page-type classification
+    and a sitemap fallback when the crawl yields too few candidates.
+
+    Returns ``[{url, name}]`` for each course-like link, deduped by URL.
+
+    Pipeline:
+
+    1. BFS-crawl from ``start_url``. For each fetched page, run the
+       rule-based classifier (:func:`page_type.classify_page`) — when a
+       page is identified as a real course-detail page we DO NOT follow
+       its navigation links (would waste the per-page budget on
+       guaranteed dead ends). Listing/unknown pages contribute their
+       course links and may have nav links followed at depth 0.
+    2. If the crawl produces fewer than
+       :data:`_SITEMAP_FALLBACK_THRESHOLD` candidates, probe the
+       institution's ``sitemap.xml`` (and ``robots.txt`` for non-standard
+       sitemap locations). New, deduped course URLs are merged in.
 
     ``emit`` is an optional async callable ``emit(event, message, **kwargs)``
     used to stream per-page progress into the runtime log so the UI panel
     can show what discovery is doing turn-by-turn. When ``None`` the crawler
     is silent (preserves the existing test signature).
     """
+    # Lazy imports — avoid a circular import via discovery → sitemap →
+    # discovery (sitemap reuses our regex constants).
+    from app.services.scraper.page_type import classify_page
+    from app.services.scraper.sitemap import discover_from_sitemap
+
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
@@ -154,23 +178,72 @@ async def discover_course_links(
                     kind="page_fetch_fail",
                 )
             continue
-        ext = _LinkExtractor()
+
+        # Classify the page first. Listing pages get their links harvested
+        # AND may have nav links followed; detail pages only contribute
+        # themselves (no nav drill-in); unknown pages still get the legacy
+        # link-extraction treatment so we don't regress on sites whose
+        # template the classifier doesn't recognise.
         try:
-            ext.feed(html)
+            classification = classify_page(html, url)
         except Exception:
-            continue
+            classification = {"page_type": "unknown", "course_links": [], "reason": "classify failed"}
+        ptype = classification.get("page_type", "unknown")
+
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] classified {url}: {ptype} ({classification.get('reason', '')})",
+                phase="discover",
+                kind="page_classified",
+                page_type=ptype,
+            )
+
         before = len(found)
-        for href, text in ext.links:
-            full = _resolve(href, url, origin)
-            if not full or full in found:
+
+        # Take the classifier's curated list when it found any — those
+        # have already been deduped, junk-filtered, and resolved against
+        # the page's origin.
+        for link in classification.get("course_links", []) or []:
+            u = link.get("url")
+            n = link.get("name") or ""
+            if not u or u in found:
                 continue
-            if _looks_like_course(full, text):
-                if not _JUNK_TEXT.match(text or ""):
-                    found[full] = text or full.rsplit("/", 1)[-1]
-                if len(found) >= max_courses:
-                    break
-            elif depth < 1 and _is_nav(full) and full not in visited:
-                queue.append((full, depth + 1))
+            found[u] = n
+            if len(found) >= max_courses:
+                break
+
+        # ALWAYS run the legacy link sweep for listing/unknown pages.
+        # The classifier curates COURSE links, but real catalogues are
+        # spread across multiple listing pages reached via nav links —
+        # if we skip this pass on a listing page that happens to surface
+        # a few featured courses, the BFS never reaches the rest of the
+        # catalogue. We only suppress this pass on `detail` pages: a
+        # single course page's nav links would just send the crawler
+        # back into the course we're already extracting from, wasting
+        # the per-page budget.
+        #
+        # We deliberately re-run `_looks_like_course` here too so that
+        # course links the classifier missed (unusual link templates,
+        # text outside the 5–180-char window) still get harvested.
+        if ptype != "detail" and len(found) < max_courses:
+            ext = _LinkExtractor()
+            try:
+                ext.feed(html)
+            except Exception:
+                continue
+            for href, text in ext.links:
+                full = _resolve(href, url, origin)
+                if not full or full in found:
+                    continue
+                if _looks_like_course(full, text):
+                    if not _JUNK_TEXT.match(text or ""):
+                        found[full] = text or full.rsplit("/", 1)[-1]
+                    if len(found) >= max_courses:
+                        break
+                elif depth < 1 and _is_nav(full) and full not in visited:
+                    queue.append((full, depth + 1))
+
         added = len(found) - before
         if emit:
             await emit(
@@ -182,5 +255,33 @@ async def discover_course_links(
                 added=added,
                 total=len(found),
             )
+
+    # Sitemap fallback when the homepage crawl yields too few candidates.
+    # Many universities (e.g. those with JS-driven catalogues) link only
+    # a handful of "featured" courses from the homepage but publish the
+    # full catalogue in sitemap.xml.
+    if len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin:
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] Crawl yielded only {len(found)} candidate(s) "
+                f"(< {_SITEMAP_FALLBACK_THRESHOLD}); trying sitemap fallback",
+                phase="discover",
+                kind="sitemap_trigger",
+                crawl_total=len(found),
+            )
+        try:
+            sitemap_courses = await discover_from_sitemap(origin, emit=emit)
+        except Exception as exc:
+            log.warning("sitemap fallback failed for %s: %s", origin, exc)
+            sitemap_courses = []
+        for c in sitemap_courses:
+            u = c.get("url")
+            n = c.get("name") or ""
+            if not u or u in found:
+                continue
+            found[u] = n
+            if len(found) >= max_courses:
+                break
 
     return [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]

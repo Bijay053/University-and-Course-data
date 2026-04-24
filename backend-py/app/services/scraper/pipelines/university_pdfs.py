@@ -24,9 +24,15 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
+
 from app.services.scraper.extractors import english_test, fee
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.pdf_fetcher import download_pdf_text
+from app.services.scraper.pdf_vision import extract_via_vision
+
+_VISION_TIMEOUT_S = 30.0
+_VISION_MAX_BYTES = 12 * 1024 * 1024
 
 log = logging.getLogger(__name__)
 
@@ -73,33 +79,141 @@ def _first_filled(results: list[ExtractionResult], keys: tuple[str, ...]) -> dic
     return out
 
 
-async def _parse_fee_pdf(url: str, country: str | None) -> dict[str, Any]:
-    text = await download_pdf_text(url)
-    if not text:
-        return {}
-    html = _wrap_text_as_html(text)
+async def _download_raw_pdf(url: str) -> bytes:
+    """Fetch the raw PDF bytes once so we can feed both ``pypdf`` and the
+    vision-OCR fallback without two round-trips. Returns ``b""`` on any
+    error — vision degrades to "no fallback" the same way."""
+    if not url:
+        return b""
     try:
-        results = await fee.extract(html, url, country=country)
+        async with httpx.AsyncClient(
+            timeout=_VISION_TIMEOUT_S, follow_redirects=True
+        ) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code != 200:
+                return b""
+            content = r.content
+            if len(content) > _VISION_MAX_BYTES:
+                return b""
+            # Light MIME guard — some uni sites return 200 + HTML when the
+            # PDF link is broken.
+            ct = (r.headers.get("content-type") or "").lower()
+            if "pdf" not in ct and not content.startswith(b"%PDF"):
+                return b""
+            return content
     except Exception as exc:  # noqa: BLE001
-        log.warning("fee extractor failed on PDF %s: %s", url, exc)
+        log.debug("_download_raw_pdf failed for %s: %s", url, exc)
+        return b""
+
+
+async def _vision_fallback_text(pdf_bytes: bytes, kind: str, url: str, emit) -> str:
+    """Render a PDF and ask Gemini Vision to dump its facts as text.
+
+    ``kind`` is "fee" or "requirements" — used only for the verbose log
+    line. Returns "" when vision is disabled, fails, or yields nothing."""
+    if not pdf_bytes:
+        return ""
+    if emit:
+        await emit(
+            "status",
+            f"[FALLBACK] vision OCR on {kind} PDF: {url}",
+            phase="extract",
+            kind="pdf_vision_start",
+        )
+    text = await extract_via_vision(pdf_bytes)
+    if emit:
+        msg = (
+            f"[FALLBACK] vision OCR {kind} PDF returned {len(text)} chars"
+            if text
+            else f"[FALLBACK] vision OCR {kind} PDF returned nothing (skipped or empty)"
+        )
+        await emit(
+            "status",
+            msg,
+            phase="extract",
+            kind="pdf_vision_done",
+            chars=len(text),
+        )
+    return text
+
+
+async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, Any]:
+    raw = await _download_raw_pdf(url)
+    if not raw:
         return {}
-    out = _first_filled(results, _FEE_KEYS)
+    text = ""
+    try:
+        # ``download_pdf_text`` re-fetches the URL; instead reuse the
+        # bytes we already have via the in-memory ``PdfReader`` path.
+        from io import BytesIO
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(BytesIO(raw))
+        text = "\n".join((p.extract_text() or "") for p in reader.pages[:80])
+    except Exception as exc:  # noqa: BLE001
+        log.debug("fee PDF text extraction failed for %s: %s", url, exc)
+        text = ""
+
+    out: dict[str, Any] = {}
+    if text:
+        html = _wrap_text_as_html(text)
+        try:
+            results = await fee.extract(html, url, country=country)
+            out = _first_filled(results, _FEE_KEYS)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("fee extractor failed on PDF %s: %s", url, exc)
+
+    # Vision fallback fires when the text path returned no usable fee data
+    # — typically a scanned/image-only PDF.
+    if not out:
+        vision_text = await _vision_fallback_text(raw, "fee", url, emit)
+        if vision_text:
+            html = _wrap_text_as_html(vision_text)
+            try:
+                results = await fee.extract(html, url, country=country)
+                out = _first_filled(results, _FEE_KEYS)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("fee extractor failed on vision text for %s: %s", url, exc)
     if out:
         log.info("fee PDF %s yielded %s", url, sorted(out))
     return out
 
 
-async def _parse_requirements_pdf(url: str) -> dict[str, Any]:
-    text = await download_pdf_text(url)
-    if not text:
+async def _parse_requirements_pdf(url: str, emit=None) -> dict[str, Any]:
+    raw = await _download_raw_pdf(url)
+    if not raw:
         return {}
-    html = _wrap_text_as_html(text)
+    text = ""
     try:
-        results = await english_test.extract(html, url)
+        from io import BytesIO
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(BytesIO(raw))
+        text = "\n".join((p.extract_text() or "") for p in reader.pages[:80])
     except Exception as exc:  # noqa: BLE001
-        log.warning("english extractor failed on PDF %s: %s", url, exc)
-        return {}
-    out = _first_filled(results, _ENGLISH_KEYS)
+        log.debug("requirements PDF text extraction failed for %s: %s", url, exc)
+        text = ""
+
+    out: dict[str, Any] = {}
+    if text:
+        html = _wrap_text_as_html(text)
+        try:
+            results = await english_test.extract(html, url)
+            out = _first_filled(results, _ENGLISH_KEYS)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("english extractor failed on PDF %s: %s", url, exc)
+
+    if not out:
+        vision_text = await _vision_fallback_text(raw, "requirements", url, emit)
+        if vision_text:
+            html = _wrap_text_as_html(vision_text)
+            try:
+                results = await english_test.extract(html, url)
+                out = _first_filled(results, _ENGLISH_KEYS)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("english extractor failed on vision text for %s: %s", url, exc)
     if out:
         log.info("requirements PDF %s yielded %s", url, sorted(out))
     return out
@@ -108,6 +222,8 @@ async def _parse_requirements_pdf(url: str) -> dict[str, Any]:
 async def load_university_pdf_data(
     scrape_config: dict[str, Any] | None,
     country: str | None,
+    *,
+    emit=None,
 ) -> dict[str, Any]:
     """Read both PDFs (if configured) and return uni-level fallback data.
 
@@ -122,13 +238,17 @@ async def load_university_pdf_data(
 
     Empty dict if neither PDF is configured or both failed. Safe to call
     even when ``scrape_config`` is ``None``.
+
+    ``emit`` is the same async log-callback used elsewhere in the
+    pipeline; when provided, vision-OCR fallback emits ``[FALLBACK]``
+    lines so reviewers can see when AI is reading a scanned PDF.
     """
     pages = ((scrape_config or {}).get("uniPages") or {})
     fees_pdf_url = (pages.get("feesPdf") or "").strip()
     reqs_pdf_url = (pages.get("requirementsPdf") or "").strip()
 
-    fee_data = await _parse_fee_pdf(fees_pdf_url, country) if fees_pdf_url else {}
-    english_data = await _parse_requirements_pdf(reqs_pdf_url) if reqs_pdf_url else {}
+    fee_data = await _parse_fee_pdf(fees_pdf_url, country, emit=emit) if fees_pdf_url else {}
+    english_data = await _parse_requirements_pdf(reqs_pdf_url, emit=emit) if reqs_pdf_url else {}
 
     out: dict[str, Any] = {}
     if fee_data:

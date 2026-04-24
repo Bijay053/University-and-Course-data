@@ -42,12 +42,46 @@ _FEE_HTML_NOFEE = """\
 """
 
 
+def _patch_pdf_pipeline(monkeypatch, fee_text="", req_text=""):
+    """Bypass the real httpx + pypdf path. ``_download_raw_pdf`` returning
+    a non-empty bytes value is enough to make the pipeline proceed; the
+    text it would have extracted is injected via the PdfReader patch."""
+
+    async def fake_download_raw(url):
+        if "fee" in url:
+            return b"%PDF-fake-fee-bytes" if fee_text else b""
+        if "req" in url or "policy" in url:
+            return b"%PDF-fake-req-bytes" if req_text else b""
+        return b""
+
+    class _FakePage:
+        def __init__(self, text):
+            self._text = text
+
+        def extract_text(self):
+            return self._text
+
+    class _FakeReader:
+        def __init__(self, fp):
+            data = fp.getvalue() if hasattr(fp, "getvalue") else fp
+            if b"fee" in data:
+                self.pages = [_FakePage(fee_text)]
+            elif b"req" in data:
+                self.pages = [_FakePage(req_text)]
+            else:
+                self.pages = []
+
+    monkeypatch.setattr(university_pdfs, "_download_raw_pdf", fake_download_raw)
+    # pypdf.PdfReader is imported INSIDE the parse functions, so patch the
+    # real symbol — both _parse_fee_pdf and _parse_requirements_pdf pick
+    # up the patched version on next import.
+    import pypdf
+    monkeypatch.setattr(pypdf, "PdfReader", _FakeReader)
+
+
 @pytest.mark.asyncio
 async def test_load_university_pdf_data_parses_fee(monkeypatch):
-    async def fake_download(url):
-        return _FEE_PDF_TEXT if "fee" in url else ""
-
-    monkeypatch.setattr(university_pdfs, "download_pdf_text", fake_download)
+    _patch_pdf_pipeline(monkeypatch, fee_text=_FEE_PDF_TEXT)
 
     result = await university_pdfs.load_university_pdf_data(
         {"uniPages": {"feesPdf": "https://example.com/fees.pdf"}},
@@ -63,10 +97,7 @@ async def test_load_university_pdf_data_parses_fee(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_load_university_pdf_data_parses_ielts(monkeypatch):
-    async def fake_download(url):
-        return _REQ_PDF_TEXT if "req" in url or "policy" in url else ""
-
-    monkeypatch.setattr(university_pdfs, "download_pdf_text", fake_download)
+    _patch_pdf_pipeline(monkeypatch, req_text=_REQ_PDF_TEXT)
 
     result = await university_pdfs.load_university_pdf_data(
         {"uniPages": {"requirementsPdf": "https://example.com/policy.pdf"}},
@@ -162,3 +193,40 @@ async def test_extract_course_pdf_does_not_overwrite_existing(monkeypatch):
     methods = {(e.get("field_key"), e.get("method")) for e in out["evidence"]}
     assert ("international_fee", "uni_pdf:fees") not in methods
     assert ("ielts_overall", "uni_pdf:requirements") not in methods
+
+
+@pytest.mark.asyncio
+async def test_vision_not_invoked_when_text_extraction_succeeds(monkeypatch):
+    """Regression: vision OCR is the LAST resort. If text extraction
+    yields a usable fee/IELTS payload, ``extract_via_vision`` must NOT
+    be called — it costs Gemini quota and slows the pipeline.
+    """
+    _patch_pdf_pipeline(monkeypatch, fee_text=_FEE_PDF_TEXT, req_text=_REQ_PDF_TEXT)
+
+    vision_calls: list[bytes] = []
+
+    async def spy_vision(pdf_bytes, **_kw):
+        vision_calls.append(pdf_bytes)
+        return "should not appear"
+
+    # Patch in both modules — pipeline imports it lazily but the symbol
+    # is bound at the module that owns the function.
+    import app.services.scraper.pdf_vision as pv
+    monkeypatch.setattr(pv, "extract_via_vision", spy_vision)
+
+    out = await university_pdfs.load_university_pdf_data(
+        {
+            "uniPages": {
+                "feesPdf": "https://example.com/fees.pdf",
+                "requirementsPdf": "https://example.com/policy.pdf",
+            }
+        },
+        country="Australia",
+    )
+    # Both extractors produced data from text, so vision must not have run.
+    assert "fee" in out
+    assert "english" in out
+    assert vision_calls == [], (
+        "vision OCR was invoked even though text extraction succeeded — "
+        "this would silently double Gemini cost on every healthy PDF"
+    )
