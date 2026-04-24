@@ -423,3 +423,32 @@ NOT cover. All six fixes below land together.
   image-only equivalence tables (rare on AU/UK uni sites). For
   pages that render the table as HTML (the common case), structured
   parsing is both cheaper and 100% accurate.
+
+### 9. CSU browser-fallback never escalated on the AI path
+- **Symptom**: study.csu.edu.au course pages with no static campus list
+  (offerings JSON hydrated client-side) still returned with empty
+  `courseLocation` even when a browser fetch would have recovered it.
+- **Root cause**: `needsBrowserFallback` in
+  `artifacts/api-server/src/routes/scrape.ts` has a CSU-specific rule
+  (`if (url && isCsuCoursePage(url) && !hasLocation && studyMode !==
+  "Online") return true;`) that only fires when the URL is passed in.
+  The no-AI call site already passed `link.url`; the AI-path call site
+  was calling it as `needsBrowserFallback(quickData)` without the URL,
+  so the CSU branch silently no-op'd on the hot path.
+- **Fix**:
+  1. AI-path call site now passes `link.url`.
+  2. Function extracted from `routes/scrape.ts` into a dedicated module
+     `artifacts/api-server/src/lib/needs-browser-fallback.ts` (with a
+     small structural input type `BrowserFallbackInput`) so it can be
+     unit-tested without dragging in the full scrape.ts dependency
+     graph (gemini, drizzle, browser-helper).
+  3. Both call sites import the helper from the new module.
+- **Coverage**: new test file
+  `artifacts/api-server/src/routes/needs-browser-fallback.test.ts`
+  with 6 cases — missing `courseLocation` on CSU, whitespace-only
+  `courseLocation`, online-only CSU exemption, populated
+  `courseLocation` no-op, non-CSU host not falsely triggered, and
+  URL-omitted legacy-caller safety.
+- **Result**: Node tests 89/93 pass (same 4 unrelated pre-existing
+  failures as before this change). Python tests unchanged at
+  308 passed / 1 skipped. API server build + restart clean.
