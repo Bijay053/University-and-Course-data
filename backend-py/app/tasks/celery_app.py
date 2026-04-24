@@ -2,6 +2,10 @@
 
     celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info
 
+Run beat (daily snapshot scheduler) with:
+
+    celery -A app.tasks.celery_app beat --loglevel=info
+
 If Redis isn't reachable, the FastAPI process still boots — only the
 ``.delay()`` call from the API will quietly fail (and the job stays in
 ``queued`` state for manual retry).
@@ -9,6 +13,7 @@ If Redis isn't reachable, the FastAPI process still boots — only the
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import settings
 
@@ -16,7 +21,13 @@ celery_app = Celery(
     "uniportal",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.tasks.scrape_tasks"],
+    # Both the per-job scrape tasks and the daily snapshot live under
+    # tasks/ — keep them in one ``include`` list so a single worker
+    # process can serve both queues.
+    include=[
+        "app.tasks.scrape_tasks",
+        "app.tasks.snapshot_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -27,4 +38,29 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    # Diff item L (MIGRATION_AUDIT.md §6): daily snapshot at 03:00 UTC.
+    # The Node ``daily-backup.ts`` ran hourly and short-circuited when
+    # today's row already existed (catch-up safety net for missed
+    # windows). Beat gives us a precise once-per-day fire instead. We
+    # accept the trade-off: if the worker is down at 03:00, the daily
+    # row is skipped that day — operationally simpler than re-deriving
+    # the catch-up logic, and the snapshot tables only need to reflect
+    # *some* daily-ish history, not strict every-day coverage. A
+    # missed-day catch-up can be added later by reusing the existing
+    # ``triggered_by="manual"`` code path.
+    #
+    # Note: every call to ``snapshot_editable_tables`` inserts a fresh
+    # snapshot row regardless of whether one already exists for today
+    # — manual + scheduled runs on the same date will produce two
+    # rows. That's fine (the snapshot history is keyed on
+    # ``backed_up_at``, not on the day), but it's not idempotent at
+    # the day grain.
+    beat_schedule={
+        "snapshot-editable-tables-daily": {
+            "task": "tasks.snapshot.editable",
+            "schedule": crontab(hour=3, minute=0),
+            "args": (),
+            "options": {"queue": "scrape"},
+        },
+    },
 )

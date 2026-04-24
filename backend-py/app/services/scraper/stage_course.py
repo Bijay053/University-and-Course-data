@@ -27,7 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import ScrapedCourse, ScrapedFieldEvidence
 from app.services.auto_publish import should_auto_publish
+from app.services.scraper.category import map_course_to_category
 from app.services.scraper.completeness import compute_completeness, decide_eligibility
+from app.services.scraper.guards import is_generic_course_category_name
 
 log = logging.getLogger(__name__)
 
@@ -118,6 +120,33 @@ async def stage_course(
     if len(name) < 3:
         return StageResult(False, "course_name too short")
 
+    # Diff item G (MIGRATION_AUDIT.md §6): reject staging when course_name
+    # is just a catalogue header ("Business", "Master's Degrees", "Single
+    # Subjects"). These slip through when discovery walks a category
+    # landing page and treats every nav item as a real course; keeping
+    # them out of scraped_courses is cheaper than rejecting them later
+    # in the review modal.
+    if is_generic_course_category_name(name):
+        return StageResult(False, "rejected: generic category page")
+
+    # Diff item R (MIGRATION_AUDIT.md §6): category safety net. The
+    # single_course pipeline runs map_course_to_category before staging,
+    # but courses that arrive via other code paths (or future paths) can
+    # still land with an empty category. Re-run the keyword pre-map here
+    # so every staged row has the best category we can compute from the
+    # course name alone — the body-text classifier and AI fallbacks
+    # already ran upstream and don't re-run here.
+    if not payload.get("category"):
+        try:
+            det = map_course_to_category(name)
+        except Exception as exc:  # noqa: BLE001 — never let categorisation abort staging
+            log.warning("category safety-net failed for %s: %s", name, exc)
+            det = None
+        if det:
+            payload["category"] = det.get("category")
+            if not payload.get("sub_category"):
+                payload["sub_category"] = det.get("sub_category")
+
     # Bug #7: skip if a recent rejection exists (window = settings.rejection_block_days).
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.rejection_block_days)
     recent_rejection = (
@@ -192,6 +221,37 @@ async def stage_course(
         await db.rollback()
         return StageResult(False, f"evidence persistence failed: {exc}")
 
+    # Diff item I (MIGRATION_AUDIT.md §6): cross-evidence conflict
+    # detection. Runs after evidence rows are flushed (so they have IDs
+    # the FieldConflict.evidence_a_id/b_id FKs can reference) but before
+    # commit, so the conflict rows land in the same transaction. Wrapped
+    # in try/except — a detector failure must never block the staging
+    # itself, the modal can render without conflicts.
+    #
+    # IMPORTANT: AsyncSessionLocal is configured with autoflush=False, so
+    # `_persist_evidence` only db.add()'d the rows — they don't exist
+    # at the database level until we explicitly flush. Without this
+    # flush the detector's SELECT returns zero rows and we'd silently
+    # produce no conflicts. (Caught by code review on PR-1.)
+    conflicts_written = 0
+    if evidence_count:
+        try:
+            await db.flush()
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "evidence flush before conflict detection failed for sc %s: %s",
+                sc.id, exc,
+            )
+        try:
+            from app.services.review.conflicts import detect_and_persist_conflicts
+
+            conflicts_written = await detect_and_persist_conflicts(db, sc.id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "conflict detection failed for sc %s (uni %s): %s",
+                sc.id, university_id, exc,
+            )
+
     try:
         await db.commit()
     except Exception as exc:  # noqa: BLE001
@@ -203,5 +263,9 @@ async def stage_course(
         True,
         "staged",
         scraped_course_id=sc.id,
-        extra={"evidence_rows": evidence_count, "completeness": sc.completeness},
+        extra={
+            "evidence_rows": evidence_count,
+            "completeness": sc.completeness,
+            "conflicts": conflicts_written,
+        },
     )

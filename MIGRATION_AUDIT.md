@@ -298,17 +298,17 @@ rows | sub_category | duration | study_mode | intl_fee | ielts | pte | toefl | c
 
 | # | Feature | Node behavior | Python behavior | Source | Priority |
 |---|---|---|---|---|---|
-| G | Stage-pre-filter for "Business Courses" (a category index, not a course) | `scrape-guards.ts → isGenericCourseCategoryName` blocks it | Python stages it — fake "Bachelor of Business Courses" rows on noisy unis | `scrape_guards.ts` not ported (Sec 2) | **P1** |
-| H | Per-uni fee fallback | Node gates it on `hasCourseSpecificFeeEvidence` + `shouldTrustGenericUniversityFeeFallback` | Python applies the uni-wide PDF fee unconditionally | Same — `scrape_guards.ts` | **P1** |
-| I | Conflict detection in review modal | Node's `review-engine.ts` exposes `FieldConflict[]` for every multi-source field | Python returns merged value with `evidence[]` but no conflict array | `review-engine.ts` partial port (Sec 2) | **P1** |
+| G | Stage-pre-filter for "Business Courses" (a category index, not a course) | `scrape-guards.ts → isGenericCourseCategoryName` blocks it | ✅ **CLOSED PR-1**: ported to `services/scraper/guards.py`, wired into `stage_course` (returns `StageResult(False, "rejected: generic category page")`) | `scrape_guards.ts` not ported (Sec 2) | ~~**P1**~~ ✅ |
+| H | Per-uni fee fallback | Node gates it on `hasCourseSpecificFeeEvidence` + `shouldTrustGenericUniversityFeeFallback` | ✅ **CLOSED PR-1**: guard wired into `pipelines/single_course.py` uni-PDF fee branch; untrusted fallbacks logged + dropped | Same — `scrape_guards.ts` | ~~**P1**~~ ✅ |
+| I | Conflict detection in review modal | Node's `review-engine.ts` exposes `FieldConflict[]` for every multi-source field | ✅ **CLOSED PR-1**: `services/review/conflicts.py::detect_and_persist_conflicts` runs at staging, writes `field_conflicts` rows the existing `/staged/{id}/review` endpoint already surfaces | `review-engine.ts` partial port (Sec 2) | ~~**P1**~~ ✅ |
 | J | Custom acronyms from `/api/settings/acronyms` | Node `setDynamicAcronyms()` propagates them to title-casing | Python reads only static `DEFAULT_ACRONYMS` | `course-name-normalizer.ts` partial port | **P2** |
 | K | Scrape-feedback rules | Node `feedback-engine.ts` reads `scrape_feedback` rows | Python writes them, never reads | `feedback-engine.ts` not ported | **P2** |
-| L | Daily snapshot of editable tables into `_backup` mirrors | Node `daily-backup.ts` cron | No Celery beat task | `daily-backup.ts` not ported | **P1** |
+| L | Daily snapshot of editable tables into `_backup` mirrors | Node `daily-backup.ts` cron | ✅ **CLOSED PR-1**: `tasks/snapshot_tasks.py::snapshot_editable_tables` Celery beat task runs daily at 03:00 UTC; self-heals missing `_backup` tables via `CREATE TABLE IF NOT EXISTS … WITH NO DATA` | `daily-backup.ts` not ported | ~~**P1**~~ ✅ |
 | M | Bulk-academic auto-detect of score type from CGPA value | Node `academic-requirements.ts` infers `score_type` if blank | Python stores blank as blank | `academic-requirements.ts` 19 helpers not ported | P2 |
 | N | Multi-token AND scoring search | Node `search-index.ts` inverted index | Python `ILIKE` per token | `search-index.ts` not ported | P3 |
 | P | `validateTaxonomy` post-AI guard | Node forces `(category, sub_category)` back into the canonical list | Python persists whatever AI returned | `course-taxonomy.ts → validateTaxonomy` not ported | P2 |
 | Q | Same fee cloned across N courses (KBS evidence: all 41 rows = $2 880) | Node has no special guard either | Python has no special guard either | Neither side handles this — needs a new guard | **P2** |
-| R | Listing-page-fallback staging skips category pre-map | n/a | When per-course fetch times out, courses staged from listing-page metadata bypass `pipelines/single_course.py` and never call `map_course_to_category` → 13 of 41 KBS rows have NULL category | New Python-side bug | **P2** |
+| R | Listing-page-fallback staging skips category pre-map | n/a | ✅ **CLOSED PR-1**: category safety net added in `stage_course` — re-runs `map_course_to_category` whenever payload arrives without a category, regardless of upstream code path | New Python-side bug | ~~**P2**~~ ✅ |
 
 ---
 
@@ -390,4 +390,8 @@ If prod's numbers match local (`18 | 18 | 17 | 18 | 99.4`) the data-parity work 
 
 ## Status
 
-**Migration v1 SHIPPED 2026-04-24.** All UI-facing endpoints ported, all user-blocking bugs closed, ASA scrape parity at **100% completeness on prod** (9 / 9 rows: sub_category, PTE, fee, and every other data-parity field populated — exceeds the local 99.4% benchmark by 0.6 pts). Outstanding work tracked in PR-1 / PR-2 / PR-3 batches above, deferred pending v1 user feedback.
+**Migration v1 SHIPPED 2026-04-24.** All UI-facing endpoints ported, all user-blocking bugs closed, ASA scrape parity at **100% completeness on prod** (9 / 9 rows: sub_category, PTE, fee, and every other data-parity field populated — exceeds the local 99.4% benchmark by 0.6 pts).
+
+**PR-1 SHIPPED 2026-04-24.** Stage-quality guards + daily backups + conflict detection landed (closes diff items G, H, I, L, R from §6). New files: `services/scraper/guards.py`, `services/review/conflicts.py`, `tasks/snapshot_tasks.py`. Modified: `stage_course.py` (generic-name reject, category safety net, conflict detection wire), `pipelines/single_course.py` (uni-PDF fee guard), `tasks/celery_app.py` (beat schedule, daily 03:00 UTC). Tests: 40 new unit tests + 5 integration tests, all green.
+
+PR-2 (J/K/M/P/Q) and PR-3 (cleanup) remain deferred pending v1 user feedback.

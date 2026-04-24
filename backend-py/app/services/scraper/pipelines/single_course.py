@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 from app.services.scraper.category import classify_category, map_course_to_category
+from app.services.scraper.guards import should_trust_generic_university_fee_fallback
 from app.services.scraper.extractors import (
     ai_fallback,
     course_name,
@@ -192,19 +193,59 @@ async def extract_course(
         english_block = uni_pdf_data.get("english") or {}
         fees_pdf_url = uni_pdf_data.get("fees_pdf_url")
         reqs_pdf_url = uni_pdf_data.get("requirements_pdf_url")
-        for k, v in fee_block.items():
-            if v is None or k in payload:
-                continue
-            payload[k] = v
-            evidence.append(
-                {
-                    "field_key": k,
-                    "value": v,
-                    "confidence": 0.7,
-                    "method": "uni_pdf:fees",
-                    "snippet": fees_pdf_url,
-                }
-            )
+
+        # Diff item H (MIGRATION_AUDIT.md §6): gate the uni-wide fee PDF
+        # fallback on course-specific evidence. Without this, every
+        # Bachelor on the catalogue inherits the same single dollar
+        # amount from the generic /international-fees page (Torrens v1
+        # symptom).
+        #
+        # The guard is text-based, so we can only run it when the loader
+        # surfaces ``fee_text`` (the raw extracted PDF text we'd grep for
+        # course-name tokens). Today ``load_university_pdf_data`` only
+        # returns the parsed numbers, not the source text — wiring that
+        # through is a follow-up. Until then, fail-OPEN when no text is
+        # available (preserves v1 behavior) and fail-CLOSED only when the
+        # caller has supplied text we can actually evaluate against.
+        # (Code-review feedback on PR-1: avoid silently dropping every
+        # uni-PDF fallback now that we lack the text channel.)
+        fee_search_text = uni_pdf_data.get("fee_text") or ""
+        fee_amount = fee_block.get("international_fee")
+        unique_amounts = (
+            [int(fee_amount)] if isinstance(fee_amount, (int, float)) else []
+        )
+        trust_fee_fallback = True
+        if fee_block and fees_pdf_url and fee_search_text:
+            try:
+                trust_fee_fallback = should_trust_generic_university_fee_fallback(
+                    fees_pdf_url,
+                    payload.get("course_name") or "",
+                    fee_search_text,
+                    unique_amounts,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("fee-guard failed for %s: %s", fees_pdf_url, exc)
+                trust_fee_fallback = False
+            if not trust_fee_fallback:
+                log.info(
+                    "[FEE] uni-PDF fallback skipped for %s — no course-specific evidence",
+                    payload.get("course_name"),
+                )
+
+        if trust_fee_fallback:
+            for k, v in fee_block.items():
+                if v is None or k in payload:
+                    continue
+                payload[k] = v
+                evidence.append(
+                    {
+                        "field_key": k,
+                        "value": v,
+                        "confidence": 0.7,
+                        "method": "uni_pdf:fees",
+                        "snippet": fees_pdf_url,
+                    }
+                )
         for k, v in english_block.items():
             if v is None or k in payload:
                 continue
