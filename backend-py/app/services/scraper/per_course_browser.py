@@ -37,11 +37,6 @@ log = logging.getLogger(__name__)
 # challenge + 1.5s settle + content + teardown ≈ 8–12s typical) while
 # bounding worst-case at one fallback attempt per course.
 _BROWSER_FETCH_TIMEOUT_SEC = 45
-# Re-running the english extractor on rendered HTML is pure CPU — no
-# network. Anything past 15s here means a runaway regex or a 50MB DOM,
-# both of which we'd rather skip than block on.
-_REEXTRACT_TIMEOUT_SEC = 15
-
 # The four slot keys we care about — IELTS overall, PTE overall, TOEFL
 # overall, Cambridge Advanced English overall. If any of these are
 # already populated we skip the browser pass entirely (the page DID
@@ -141,18 +136,16 @@ async def maybe_browser_refetch(
         return {}, [], None
 
     try:
-        results: list[ExtractionResult] = await asyncio.wait_for(
-            english_test.extract(rendered, url),
-            timeout=_REEXTRACT_TIMEOUT_SEC,
-        )
-    except asyncio.TimeoutError:
-        log.warning(
-            "english_test re-extract exceeded %ss on rendered %s — aborting",
-            _REEXTRACT_TIMEOUT_SEC,
-            url,
-        )
-        # Return the rendered HTML so vision-OCR can still try its pass.
-        return {}, [], rendered
+        # NOTE: english_test.extract is `async def` but contains no await
+        # points — it's a pure-CPU regex pipeline. asyncio.wait_for cannot
+        # preempt CPU-bound code without yield points, so wrapping this
+        # call in wait_for would be dead code (the timer never fires until
+        # the function returns on its own). If the extractor is ever
+        # rewritten to do async I/O (HTML streaming, etc.) re-add the
+        # wait_for then. Today, runaway-regex protection has to live
+        # INSIDE the extractor itself (length caps, non-backtracking
+        # patterns) — see extractors/english_test.py.
+        results: list[ExtractionResult] = await english_test.extract(rendered, url)
     except Exception as exc:  # noqa: BLE001
         log.warning("english_test re-extract failed on rendered %s: %s", url, exc)
         return {}, [], rendered

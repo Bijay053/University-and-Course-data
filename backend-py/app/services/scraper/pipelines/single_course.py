@@ -6,6 +6,7 @@ fields; a missing extractor simply leaves its slot empty.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -28,6 +29,15 @@ from app.services.scraper.http_fetcher import fetch_html
 from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
+
+
+# Hard ceiling on the AI fallback Gemini call. Same bug class as the
+# Playwright hang that started this hot-fix chain — if Gemini stalls
+# (network, model-side queueing, retries inside the SDK), we would
+# freeze a whole worker. 60s comfortably covers a real slow-but-working
+# call (vision-capable Gemini calls are typically 10–25s) while
+# bounding worst-case at one stall per course.
+_AI_FALLBACK_TIMEOUT_SEC = 60
 
 
 # Each entry: (module, kwargs the extractor accepts beyond html/url).
@@ -152,7 +162,32 @@ async def extract_course(
                 missing=missing,
             )
         try:
-            ai_filled = await ai_fallback.fill_missing(payload, html=html, url=url)
+            # Hard ceiling so a hung Gemini call cannot wedge a worker
+            # the same way the Playwright incident did. On timeout the
+            # underlying SDK call is cancelled and we fall through to
+            # the existing "AI failure" path — extraction proceeds
+            # without AI fill, which is the same UX as a model error.
+            ai_filled = await asyncio.wait_for(
+                ai_fallback.fill_missing(payload, html=html, url=url),
+                timeout=_AI_FALLBACK_TIMEOUT_SEC,
+            )
+        except asyncio.TimeoutError:
+            log.warning(
+                "AI fallback exceeded %ss on %s — aborting this course's AI pass",
+                _AI_FALLBACK_TIMEOUT_SEC,
+                url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[FALLBACK] AI fallback exceeded "
+                    f"{_AI_FALLBACK_TIMEOUT_SEC}s on {url} — moving on without AI fill",
+                    phase="extract",
+                    kind="ai_fallback_timeout",
+                    timeout_seconds=_AI_FALLBACK_TIMEOUT_SEC,
+                    level="warn",
+                )
+            ai_filled = {}
         except Exception as exc:  # never break extraction on AI failure
             log.warning("AI fallback errored on %s: %s", url, exc)
             if emit:
