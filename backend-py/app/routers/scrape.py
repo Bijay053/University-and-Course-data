@@ -11,7 +11,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -338,22 +338,45 @@ async def approve_alias(job_id: str, body: dict | None = None) -> dict:
 
 @router.get("/active")
 async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    """Mirror Node's `{activeJobs: [...]}` shape — scraping.tsx polls
+    `data.activeJobs` directly. Returning `{data, ok}` left the page's
+    elapsed-timer dead and silently broke the cross-tab live restore.
+    Order: running > awaiting_approval > queued, then most recent — UI
+    picks index 0 to bind the live progress bar to.
+    """
     rows = (await db.execute(
         select(ScrapeRuntimeJob)
-        .where(ScrapeRuntimeJob.status.in_(["queued", "running"]))
-        .order_by(desc(ScrapeRuntimeJob.started_at))
+        .where(
+            ScrapeRuntimeJob.status.in_(
+                ["queued", "running", "awaiting_approval"]
+            )
+        )
+        .order_by(
+            case(
+                (ScrapeRuntimeJob.status == "running", 0),
+                (ScrapeRuntimeJob.status == "awaiting_approval", 1),
+                else_=2,
+            ),
+            desc(ScrapeRuntimeJob.started_at),
+        )
         .limit(50)
     )).scalars().all()
-    return {"data": [
-        {
-            "jobId": r.runtime_job_id,
-            "runtimeJobId": r.runtime_job_id,
-            "universityName": r.university_name,
-            "status": r.status,
-            "current": r.current or 0,
-            "total": r.total_found or 0,
-        } for r in rows
-    ], "ok": True}
+    return {
+        "activeJobs": [
+            {
+                "id": r.runtime_job_id,
+                "jobId": r.runtime_job_id,
+                "runtimeJobId": r.runtime_job_id,
+                "universityId": r.university_id,
+                "universityName": r.university_name,
+                "status": r.status,
+                "startedAt": r.started_at.isoformat() if r.started_at else None,
+                "current": r.current or 0,
+                "total": r.total_found or 0,
+            }
+            for r in rows
+        ]
+    }
 
 
 @router.get("/history")
@@ -424,15 +447,38 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Logs (if scrape_runtime_logs table exists)
+    # Logs (if scrape_runtime_logs table exists). Bug H fix: mirror the
+    # /status/{job_id} shape so the "View Logs" modal in Scrape History
+    # actually shows the log line text. Previously we returned the raw
+    # JSONB payload only, so each row rendered as "[event]" with no
+    # message body — operators couldn't audit a past scrape at all.
     logs = []
     try:
         from sqlalchemy import text
+
+        from app.services.scraper.orchestrator import infer_log_level
+
         rows = await db.execute(text(
-            "SELECT sequence, event, payload FROM scrape_runtime_logs "
+            "SELECT sequence, event, payload, created_at FROM scrape_runtime_logs "
             "WHERE runtime_job_id = :j ORDER BY sequence"
         ), {"j": job_id})
-        logs = [{"sequence": r[0], "event": r[1], "payload": r[2]} for r in rows.fetchall()]
+        for seq, event, payload, created_at in rows.fetchall():
+            pl = payload if isinstance(payload, dict) else {}
+            msg = pl.get("message", "")
+            level = pl.get("level") or infer_log_level(msg)
+            entry = {
+                "sequence": seq,
+                "event": event,
+                "message": msg,
+                "payload": payload,
+                "createdAt": created_at.isoformat() if created_at else None,
+                "level": level,
+            }
+            for k, v in pl.items():
+                if k in entry or k == "message":
+                    continue
+                entry[k] = v
+            logs.append(entry)
     except Exception:
         pass
     
@@ -470,27 +516,129 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     }
 
 
-@router.get("/last-runs")
-async def last_runs(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
-    """Latest job per university."""
-    from sqlalchemy import func
-    rows = (await db.execute(
-        select(ScrapeRuntimeJob)
-        .order_by(ScrapeRuntimeJob.university_id, desc(ScrapeRuntimeJob.started_at))
-    )).scalars().all()
-    seen = {}
+@router.get("/export")
+async def export_scraped_courses(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    universityId: int | None = Query(default=None),
+    jobId: str | None = Query(default=None),
+    format: str = Query(default="json"),
+):
+    """Bug fix: bulk.tsx "Export CSV"/"Export JSON" buttons download via
+    `/api/scrape/export?universityId=N&format=csv|json`. The Python
+    backend never had this route — clicking Export 404'd silently. Mirror
+    Node's payload shape exactly (raw `scraped_courses` row + joined
+    `university_name`)."""
+    from datetime import datetime as _dt
+
+    from fastapi.responses import PlainTextResponse, Response
+    from sqlalchemy import text
+
+    conditions: list[str] = []
+    params: dict = {}
+    if universityId is not None:
+        conditions.append("sc.university_id = :uid")
+        params["uid"] = universityId
+    if jobId:
+        conditions.append("sc.scrape_job_id = :jid")
+        params["jid"] = jobId
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    rows = (
+        await db.execute(
+            text(
+                f"""
+            SELECT sc.*, u.name AS university_name
+            FROM scraped_courses sc
+            JOIN universities u ON sc.university_id = u.id
+            {where}
+            ORDER BY sc.created_at DESC
+            """
+            ),
+            params,
+        )
+    ).mappings().all()
+
+    uni_slug = (
+        f"uni{universityId}" if universityId else (f"job_{jobId}" if jobId else "all")
+    )
+    ts = _dt.utcnow().date().isoformat()
+
+    if format == "csv":
+        if not rows:
+            return []
+        headers = list(rows[0].keys())
+
+        def _esc(v) -> str:
+            if v is None:
+                return ""
+            s = ";".join(str(x) for x in v) if isinstance(v, list) else str(v)
+            if "," in s or '"' in s or "\n" in s:
+                return '"' + s.replace('"', '""') + '"'
+            return s
+
+        lines = [",".join(headers)]
+        for r in rows:
+            lines.append(",".join(_esc(r[h]) for h in headers))
+        body = "\n".join(lines)
+        return PlainTextResponse(
+            body,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="courses_{uni_slug}_{ts}.csv"'
+            },
+        )
+
+    # default: JSON download. Stringify dates so json.dumps doesn't choke.
+    import json as _json
+
+    out_rows = []
     for r in rows:
-        if r.university_id not in seen:
-            seen[r.university_id] = r
-    return {"data": [
-        {
-            "universityId": r.university_id,
-            "universityName": r.university_name,
-            "lastRunAt": r.started_at.isoformat() if r.started_at else None,
+        d = dict(r)
+        for k, v in list(d.items()):
+            if hasattr(v, "isoformat"):
+                d[k] = v.isoformat()
+        out_rows.append(d)
+    return Response(
+        content=_json.dumps(out_rows),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="courses_{uni_slug}_{ts}.json"'
+        },
+    )
+
+
+@router.get("/last-runs")
+async def last_runs(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
+    """Bug fix: bulk.tsx does
+        ``rows.forEach(r => map[r.university_id] = r)``
+    on the bare array — it expects snake_case keys, not the wrapped
+    ``{data, ok}`` shape. Mirror Node's
+    ``SELECT DISTINCT ON (university_id)`` query exactly so the
+    "Last scrape" column on the bulk page renders for every uni.
+    """
+    rows = (
+        await db.execute(
+            select(ScrapeRuntimeJob)
+            .where(ScrapeRuntimeJob.status.in_(["completed", "stopped", "error", "done"]))
+            .where(ScrapeRuntimeJob.university_id.is_not(None))
+            .order_by(
+                ScrapeRuntimeJob.university_id, desc(ScrapeRuntimeJob.runtime_job_id)
+            )
+        )
+    ).scalars().all()
+    seen: dict[int, dict] = {}
+    for r in rows:
+        if r.university_id in seen:
+            continue
+        seen[r.university_id] = {
+            "university_id": r.university_id,
+            "university_name": r.university_name,
             "status": r.status,
-            "imported": r.imported or 0,
-        } for r in seen.values()
-    ], "ok": True}
+            "imported": int(r.imported or 0),
+            "total_found": int(r.total_found or 0),
+            "runtime_job_id": r.runtime_job_id,
+        }
+    return list(seen.values())
 
 
 @router.post("/rescrape")
@@ -733,33 +881,349 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     return out
 
 
-@router.get("/bulk/history")
-async def bulk_history() -> dict:
-    return {"data": [], "ok": True}
+# ─── Bulk session endpoints ───────────────────────────────────────────────
+# Bug I fix. The bulk page does:
+#   POST /bulk/start  {unis: [{id, name?, scrapeUrl?}], fastMode?} → {sessionId}
+#   GET  /bulk/status/{sessionId}  → {sessionId, status, currentIndex, total,
+#                                     startedAt, updatedAt, unis: [...]}
+#   POST /bulk/stop/{sessionId}    → {sessionId, stopped: true}
+#   GET  /bulk/active              → [BulkSessionData, ...]
+#   GET  /bulk/history             → [BulkHistoryEntry, ...]
+# Previously these were stubs that returned `{status: "unknown"}` so the UI's
+# "Start Queue" button fired but the polling never showed progress and the
+# session was never persisted. Replace with a real implementation backed by
+# the existing `bulk_sessions` table joined to `scrape_runtime_jobs`.
+
+_TERMINAL_STATUSES = {"done", "completed", "error", "failed", "stopped", "skipped"}
 
 
-@router.get("/bulk/active")
-async def bulk_active() -> dict:
-    return {"data": [], "ok": True}
+def _job_status_to_uni_status(job_status: str | None, stop_requested: bool) -> str:
+    if stop_requested and job_status not in {"done", "completed"}:
+        return "stopped"
+    if job_status in {"done", "completed"}:
+        return "done"
+    if job_status in {"error", "failed"}:
+        return "error"
+    if job_status == "running":
+        return "running"
+    return "pending"
 
 
-@router.get("/bulk/status/{session_id}")
-async def bulk_status(session_id: str) -> dict:
-    return {"sessionId": session_id, "status": "unknown", "data": [], "ok": True}
+async def _bulk_session_payload(
+    db: AsyncSession, sess, *, include_history_extras: bool = False
+) -> dict:
+    """Hydrate a BulkSession row by joining to scrape_runtime_jobs."""
+    job_ids = [u.get("jobId") for u in (sess.unis or []) if u.get("jobId")]
+    jobs_by_id: dict[str, ScrapeRuntimeJob] = {}
+    if job_ids:
+        rows = (
+            await db.execute(
+                select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id.in_(job_ids))
+            )
+        ).scalars().all()
+        jobs_by_id = {r.runtime_job_id: r for r in rows}
 
+    unis_out: list[dict] = []
+    completed_count = 0
+    current_index = -1
+    for idx, u in enumerate(sess.unis or []):
+        job_id = u.get("jobId")
+        job = jobs_by_id.get(job_id) if job_id else None
+        if job is None:
+            unis_out.append(
+                {
+                    "uniId": u.get("uniId"),
+                    "name": u.get("name"),
+                    "jobId": job_id,
+                    "status": u.get("status", "pending"),
+                    "imported": 0,
+                    "found": 0,
+                    "staged": 0,
+                }
+            )
+            continue
+        derived = _job_status_to_uni_status(job.status, bool(job.stop_requested))
+        if derived in _TERMINAL_STATUSES:
+            completed_count += 1
+        if derived == "running":
+            current_index = idx
+        entry = {
+            "uniId": u.get("uniId") or job.university_id,
+            "name": u.get("name") or job.university_name,
+            "jobId": job_id,
+            "status": derived,
+            "imported": int(job.imported or 0),
+            "found": int(job.total_found or 0),
+            "staged": int(job.imported or 0),
+        }
+        if job.error_message:
+            entry["error"] = job.error_message
+        if include_history_extras:
+            entry["totalFound"] = int(job.total_found or 0)
+            if job.started_at and job.completed_at:
+                entry["durationMs"] = int(
+                    (job.completed_at - job.started_at).total_seconds() * 1000
+                )
+        unis_out.append(entry)
 
-@router.post("/bulk/stop/{session_id}")
-async def bulk_stop(session_id: str) -> dict:
-    return {"sessionId": session_id, "stopped": True, "ok": True}
+    total = len(sess.unis or [])
+    # Derive overall status from jobs unless explicitly stopped.
+    if sess.status == "stopped":
+        overall = "stopped"
+    elif total > 0 and completed_count >= total:
+        overall = "completed"
+    else:
+        overall = "running"
+
+    if current_index < 0:
+        # First not-yet-terminal index, or last index if everything done
+        for idx, u in enumerate(unis_out):
+            if u["status"] not in _TERMINAL_STATUSES:
+                current_index = idx
+                break
+        else:
+            current_index = max(total - 1, 0)
+
+    payload = {
+        "sessionId": sess.session_id,
+        "status": overall,
+        "currentIndex": current_index,
+        "total": total,
+        "startedAt": sess.started_at.isoformat() if sess.started_at else None,
+        "updatedAt": sess.updated_at.isoformat() if sess.updated_at else None,
+        "unis": unis_out,
+    }
+    if include_history_extras:
+        payload["completedAt"] = (
+            sess.completed_at.isoformat() if sess.completed_at else None
+        )
+    return payload
 
 
 @router.post("/bulk/start")
-async def bulk_start_alias(
-    body: BulkScrapeBody,
+async def bulk_start(
+    body: dict,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> BulkScrapeResponse:
-    """Alias for /bulk that UI uses."""
-    return await start_bulk(body, db)
+) -> dict:
+    """Bug I fix: real bulk-start that the React Bulk page actually calls.
+
+    Accepts the UI shape ``{unis: [{id, name?, scrapeUrl?}], fastMode?}``
+    instead of the legacy ``BulkScrapeBody`` shape (which 422'd and the UI
+    swallowed silently). Persists a BulkSession row, queues a
+    scrape_runtime_jobs row per university, and returns ``{sessionId}``.
+    """
+    from app.models import BulkSession
+
+    unis_in = body.get("unis") or []
+    if not isinstance(unis_in, list) or not unis_in:
+        raise HTTPException(status_code=400, detail="unis is required")
+    fast_mode = bool(body.get("fastMode", False))
+
+    session_id = f"bulk_{uuid.uuid4().hex[:12]}"
+    unis_payload: list[dict] = []
+    queued_jobs: list[str] = []
+
+    for u in unis_in:
+        try:
+            uid = int(u.get("id"))
+        except (TypeError, ValueError):
+            continue
+        uni = await db.get(University, uid)
+        if not uni:
+            continue
+        job_id = f"job_{uuid.uuid4().hex[:12]}"
+        db.add(
+            ScrapeRuntimeJob(
+                runtime_job_id=job_id,
+                university_id=uni.id,
+                university_name=uni.name,
+                url=uni.scrape_url,
+                job_type="bulk",
+                status="queued",
+                fast_mode=fast_mode,
+                request_payload={
+                    "url": uni.scrape_url,
+                    "universityId": uni.id,
+                    "universityName": uni.name,
+                    "universityCountry": uni.country,
+                    "fastMode": fast_mode,
+                    "bulkMode": True,
+                    "session_id": session_id,
+                    "university_id": uni.id,
+                    "fast_mode": fast_mode,
+                },
+            )
+        )
+        queued_jobs.append(job_id)
+        unis_payload.append(
+            {
+                "uniId": uni.id,
+                "name": uni.name,
+                "jobId": job_id,
+                "status": "pending",
+            }
+        )
+
+    if not queued_jobs:
+        raise HTTPException(status_code=400, detail="no valid universities")
+
+    db.add(
+        BulkSession(
+            session_id=session_id,
+            status="running",
+            current_index=-1,
+            fast_mode=fast_mode,
+            unis=unis_payload,
+        )
+    )
+    await db.commit()
+
+    # Best-effort enqueue. If Celery's broker is unreachable the rows stay
+    # 'queued' and a periodic reaper / next start call picks them up.
+    try:
+        from app.tasks.scrape_tasks import scrape_university
+
+        for jid in queued_jobs:
+            scrape_university.delay(jid)
+    except Exception:
+        pass
+
+    return {"sessionId": session_id, "queued": len(queued_jobs)}
+
+
+async def _reconstruct_bulk_from_runtime_jobs(
+    db: AsyncSession, session_id: str
+):
+    """Fallback path for sessions started via the legacy `/bulk` endpoint
+    (which doesn't write a `bulk_sessions` row). Group runtime jobs by
+    `request_payload->>'session_id'` and synthesize a BulkSession-like
+    object so the polling UI still works for cross-stack callers.
+    """
+    from sqlalchemy import text
+
+    from app.models import BulkSession
+
+    rows = (
+        await db.execute(
+            text(
+                "SELECT runtime_job_id, university_id, university_name, status, "
+                "started_at, completed_at "
+                "FROM scrape_runtime_jobs "
+                "WHERE request_payload->>'session_id' = :sid "
+                "ORDER BY started_at ASC"
+            ),
+            {"sid": session_id},
+        )
+    ).all()
+    if not rows:
+        return None
+    unis_payload = [
+        {
+            "uniId": r.university_id,
+            "name": r.university_name,
+            "jobId": r.runtime_job_id,
+            "status": "pending",
+        }
+        for r in rows
+    ]
+    started = min((r.started_at for r in rows if r.started_at), default=None)
+    completeds = [r.completed_at for r in rows if r.completed_at]
+    completed = max(completeds) if len(completeds) == len(rows) else None
+    sess = BulkSession(
+        session_id=session_id,
+        status="running" if completed is None else "completed",
+        current_index=-1,
+        fast_mode=False,
+        unis=unis_payload,
+    )
+    sess.started_at = started
+    sess.updated_at = started
+    sess.completed_at = completed
+    return sess
+
+
+@router.get("/bulk/status/{session_id}")
+async def bulk_status(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    from app.models import BulkSession
+
+    sess = await db.get(BulkSession, session_id)
+    if not sess:
+        sess = await _reconstruct_bulk_from_runtime_jobs(db, session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Bulk session not found")
+        # Synthetic session — render but don't persist completed_at side-effects
+        return await _bulk_session_payload(db, sess)
+    payload = await _bulk_session_payload(db, sess)
+    # Persist completed-once: when we observe terminal state, snapshot
+    # completed_at so the history list can render duration without
+    # re-deriving it on every poll.
+    if payload["status"] in {"completed", "stopped"} and not sess.completed_at:
+        from datetime import datetime, timezone
+
+        sess.status = payload["status"]
+        sess.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+    return payload
+
+
+@router.post("/bulk/stop/{session_id}")
+async def bulk_stop(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    from datetime import datetime, timezone
+
+    from app.models import BulkSession
+
+    sess = await db.get(BulkSession, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Bulk session not found")
+    sess.status = "stopped"
+    sess.completed_at = datetime.now(timezone.utc)
+    job_ids = [u.get("jobId") for u in (sess.unis or []) if u.get("jobId")]
+    if job_ids:
+        rows = (
+            await db.execute(
+                select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id.in_(job_ids))
+            )
+        ).scalars().all()
+        for r in rows:
+            if r.status not in {"done", "completed", "error", "failed"}:
+                r.stop_requested = True
+    await db.commit()
+    return {"sessionId": session_id, "stopped": True, "ok": True}
+
+
+@router.get("/bulk/active")
+async def bulk_active(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
+    from app.models import BulkSession
+
+    rows = (
+        await db.execute(
+            select(BulkSession)
+            .where(BulkSession.status == "running")
+            .order_by(desc(BulkSession.started_at))
+            .limit(20)
+        )
+    ).scalars().all()
+    return [await _bulk_session_payload(db, r) for r in rows]
+
+
+@router.get("/bulk/history")
+async def bulk_history(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
+    from app.models import BulkSession
+
+    rows = (
+        await db.execute(
+            select(BulkSession)
+            .order_by(desc(BulkSession.started_at))
+            .limit(50)
+        )
+    ).scalars().all()
+    return [await _bulk_session_payload(db, r, include_history_extras=True) for r in rows]
 
 
 
