@@ -55,21 +55,55 @@ def test_slugs_for_host_returns_generic_for_unknown_host() -> None:
         assert forbidden not in slugs
 
 
-def test_slugs_for_host_appends_vit_brand_slugs() -> None:
-    """The vit.edu.au host adds its brand slugs *after* the generic set."""
+def test_slugs_for_host_puts_brand_slugs_first() -> None:
+    """The vit.edu.au host returns brand slugs FIRST so the 3-empty
+    early-exit cannot starve them. Without this ordering, a VIT scrape
+    where ``bachelor/master/diploma`` 404 would short-circuit before
+    ``bbus/mits/mba`` ever got probed and the 24 → 30 expansion would
+    silently fail (architect-flagged regression in 260f824)."""
     slugs = home_page_redirect._slugs_for_host("vit.edu.au")
-    # Generic slugs come first (cheap short-circuit on a working hit).
-    assert slugs[: len(home_page_redirect._GENERIC_CATEGORY_SLUGS)] == \
-        home_page_redirect._GENERIC_CATEGORY_SLUGS
-    # And the VIT brand slugs are appended.
-    for required in ("bits", "mits", "mba", "bbus", "vocational", "elicos"):
-        assert required in slugs
+    brand = ("bits", "mits", "mba", "bbus", "vocational", "elicos")
+    # Brand slugs occupy positions 0..len(brand)-1.
+    assert slugs[: len(brand)] == brand
+    # Generic slugs come AFTER the brand slugs.
+    assert slugs[len(brand):] == home_page_redirect._GENERIC_CATEGORY_SLUGS
 
 
 def test_slugs_for_host_is_case_insensitive() -> None:
     """A capitalised host (``VIT.edu.au``) still hits the VIT entry."""
     slugs = home_page_redirect._slugs_for_host("VIT.edu.au")
     assert "bits" in slugs
+
+
+def test_slugs_for_host_strips_www_prefix() -> None:
+    """Real VIT URLs often resolve via ``www.vit.edu.au`` — that must
+    still hit the host-specific slug list."""
+    assert "bits" in home_page_redirect._slugs_for_host("www.vit.edu.au")
+
+
+def test_slugs_for_host_strips_port() -> None:
+    """A host with an explicit port (``vit.edu.au:443``) still matches
+    the bare-host dict key."""
+    assert "bits" in home_page_redirect._slugs_for_host("vit.edu.au:443")
+
+
+def test_slugs_for_host_strips_user_info() -> None:
+    """Pathological but defensive — user-info on the netloc shouldn't
+    break host matching."""
+    assert "bits" in home_page_redirect._slugs_for_host("user:pass@vit.edu.au")
+
+
+def test_normalise_host_examples() -> None:
+    """Direct unit coverage of the normaliser used by _slugs_for_host."""
+    n = home_page_redirect._normalise_host
+    assert n("vit.edu.au") == "vit.edu.au"
+    assert n("VIT.EDU.AU") == "vit.edu.au"
+    assert n("www.vit.edu.au") == "vit.edu.au"
+    assert n("vit.edu.au:443") == "vit.edu.au"
+    assert n("WWW.vit.edu.au:8080") == "vit.edu.au"
+    assert n("u:p@www.vit.edu.au:443") == "vit.edu.au"
+    assert n("") == ""
+    assert n(None) == ""  # type: ignore[arg-type]
 
 
 def test_expand_does_not_leak_vit_slugs_to_csu(

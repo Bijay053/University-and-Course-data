@@ -156,15 +156,47 @@ _HOST_CATEGORY_SLUGS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _slugs_for_host(host: str) -> tuple[str, ...]:
-    """Return the slug list to probe for ``host`` — generic + host-specific.
+def _normalise_host(host: str) -> str:
+    """Lower-case, strip ``www.`` prefix, drop any port — so e.g.
+    ``WWW.vit.edu.au:443`` matches the bare dict key ``vit.edu.au``.
 
-    Generic slugs come first so a working ``?category=master`` short-
-    circuits before the loop touches a host-specific slug.
+    A raw ``parsed.netloc`` includes user-info, port, and any case
+    quirks; without normalisation a real VIT URL like
+    ``https://www.vit.edu.au/course-list`` would miss the host-specific
+    slug list and fall back to generic-only — the exact regression
+    that motivated this helper.
     """
-    host = (host or "").lower()
-    extra = _HOST_CATEGORY_SLUGS.get(host, ())
-    return _GENERIC_CATEGORY_SLUGS + extra
+    h = (host or "").lower().strip()
+    # Drop user-info if present (``user:pass@host``).
+    if "@" in h:
+        h = h.rsplit("@", 1)[1]
+    # Drop port.
+    if ":" in h:
+        h = h.split(":", 1)[0]
+    # Drop common ``www.`` cosmetic prefix.
+    if h.startswith("www."):
+        h = h[4:]
+    return h
+
+
+def _slugs_for_host(host: str) -> tuple[str, ...]:
+    """Return the slug list to probe for ``host``.
+
+    For hosts with an entry in :data:`_HOST_CATEGORY_SLUGS`, the host-
+    specific brand slugs are returned **first** so the 3-empty-slug
+    early-exit cannot starve them — without this, a VIT scrape where
+    ``bachelor/master/diploma`` all 404 would short-circuit before
+    ``bbus/mits/mba`` ever got probed and the 24 → 30 expansion would
+    silently fail. For hosts with no host-specific entry, only generic
+    slugs are returned.
+    """
+    h = _normalise_host(host)
+    extra = _HOST_CATEGORY_SLUGS.get(h, ())
+    if extra:
+        # Host-specific slugs FIRST — they're the high-value targets
+        # for hosts that actually use category-filter URLs.
+        return extra + _GENERIC_CATEGORY_SLUGS
+    return _GENERIC_CATEGORY_SLUGS
 
 
 #: Backward-compatible flat alias kept for any caller (or test) that
