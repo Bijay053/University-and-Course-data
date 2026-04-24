@@ -1,0 +1,36 @@
+ Migration is functionally complete on prod. Reporting back with the full state.
+Confirmed working after the latest pull (commit 9134597):
+
+✅ Bug H — history logs endpoint (works after fresh scrape generates rows)
+✅ Bug I — bulk endpoint returns {sessionId, queued:N, ok:true}
+✅ Bug J — academic-levels POST creates option correctly
+✅ Bug K — dashboard stats returns 200
+✅ Bug L — acronyms returns {defaults: 37, custom: 0}
+✅ Bug M — Excel import endpoint exists
+✅ Bugs N/O/P — bulk-english, bulk-academic, bulk-scholarships endpoints ported
+✅ Bug Q — PUT /staged/{id} edit endpoint ported
+✅ Per-course CRUD (intakes, fees, english, academic, scholarships) ported
+✅ Backup match + apply endpoints ported
+✅ Repair stub endpoints ported
+
+Confirmed working from earlier batches:
+
+✅ T201–T211 scraper data parity (sub_category, total fee rollup, sibling cache, per-course browser, per-course vision, TIMING+DONE emit, log color levels, etc.)
+✅ All imports load on prod (per_course_browser, per_course_vision, sibling_cache, orchestrator, playwright)
+✅ Celery + Redis healthy, no Node interference (PM2 deleted, no Node workers running)
+✅ Stale-row cleanup at scrape start
+✅ Verbose log emissions ([DISCOVER]/[CLASSIFY]/[SAMPLE✓]/[EXTRACT]/[FALLBACK]/[STAGE])
+✅ Eligibility reason text format
+✅ Course name title-casing
+✅ Fresh ASA scrape produces 9/9 staged courses with full data
+
+Single observation, not a bug: the full pipeline now takes ~5–7 minutes per university (browser fallback + per-course vision OCR is slow). Earlier "0 staged" reports were polling too soon (3 min). With a 5-minute wait, scrapes complete normally.
+
+Outstanding items (low priority, do when convenient):
+
+Migration audit doc — the 7-step MIGRATION_AUDIT.md you said you'd produce. Even though everything appears to work, a written audit covering (a) endpoint diff, (b) service-layer diff, (c) behavioral diff Node→Python, would let me confidently retire the Node artifacts/api-server directory from the repo. Right now it's dead weight.
+artifacts/api-server removal — once the audit confirms no remaining Node-only behavior, delete that directory entirely. It still confuses both of us into thinking dual workers are an issue.
+Manual UI walkthrough on prod (159.65.152.72) — I haven't clicked through every page since this batch landed. If you have time to click through Dashboard, Course Search, Universities (each tab), Scraping (start + history + review modal), Bulk Upload (both tabs), Data Backup, and Settings (Academic Levels + Acronyms + anything else), you'll find any UI-side gaps the integration tests didn't catch.
+
+No urgency on any of this. The system is shippable as-is. Bijay is going to rest.
+Thanks for the marathon work today — 17+ hours of agent collaboration shipped a complete Node→Python migration

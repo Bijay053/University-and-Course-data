@@ -1,0 +1,371 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Apr 24 08:26:55 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.0% of 231.44GB
+  Memory usage:          11%
+  Swap usage:            0%
+  Processes:             166
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+2 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Fri Apr 24 06:33:20 2026 from 198.211.111.194
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git pull --ff-only origin main
+
+cd /root/University-and-Course-data/backend-py
+source /root/.env.backup
+source venv/bin/activate
+
+systemctl restart uni-api-py
+systemctl restart uni-celery
+sleep 4
+
+echo "=== 1. What's now installed? ==="
+git log --oneline | head -10
+
+echo ""
+echo "=== 2. Test the Bug fixes from this batch ==="
+
+echo "Bug K (dashboard):"
+curl -s -o /dev/null -w "  /api/dashboard/stats: HTTP %{http_code}\n" http://127.0.0.1:8000/api/dashboard/stats
+
+echo ""
+echo "Bug J (academic-levels):"
+curl -s -X POST http://127.0.0.1:8000/api/settings/academic-levels \
+  -H "Content-Type: application/json" \
+  -d '{"name":"test"}' | head -c 200
+echo ""
+
+echo ""
+echo "Bug L (acronyms):"
+curl -s "http://127.0.0.1:8000/api/settings/acronyms" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print('  defaults:', len(d.get('defaults',[])))
+print('  custom:', len(d.get('custom',[])))
+"
+
+echo ""
+echo "Bug I (bulk):"
+curl -s -X POST http://127.0.0.1:8000/api/scrape/bulk \
+  -H "Content-Type: application/json" \
+  -d '{"universityIds":[2,3]}' | head -c 200
+echo ""
+
+echo ""
+echo "Bug H (history logs):"
+LATEST=$(psql "$DATABASE_URL" -t -c "SELECT runtime_job_id FROM scrape_runtime_jobs WHERE university_id=2 ORDER BY started_at DESC LIMIT 1;" | tr -d ' ')
+curl -s "http://127.0.0.1:8000/api/scrape/history/$LATEST/logs" | python3 -c "
+"RDER BY sequence DESC LIMIT 10;age' FROM scrape_runtime_logs n3 -c "onolingo_overall,id IS NULL;" > /dev/null
+remote: Enumerating objects: 137, done.
+remote: Counting objects: 100% (137/137), done.
+remote: Compressing objects: 100% (55/55), done.
+remote: Total 102 (delta 73), reused 76 (delta 47), pack-reused 0 (from 0)
+Receiving objects: 100% (102/102), 92.98 KiB | 2.16 MiB/s, done.
+Resolving deltas: 100% (73/73), completed with 33 local objects.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f7d0d43..9134597  main       -> origin/main
+Updating f7d0d43..9134597
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx                      |   19 +
+ ...d-issues-to-fix-Bug-E-Log-colors-missing-in-prod-Y_1777012913309.txt |   43 ++
+ ...e-prod-bugs-in-addition-to-the-data-quality-items-_1777014473406.txt |   25 +
+ ...migration-audit-needed-please-do-this-BEFORE-more-_1777014810257.txt |   75 +++
+ ...prod-gaps-Please-do-a-full-audit-instead-of-fixing_1777014694216.txt |   38 ++
+ ...ction-scraper-is-producing-wrong-incomplete-data-v_1777013230465.txt |   34 +
+ backend-py/app/main.py                                                  |    2 +
+ backend-py/app/routers/acronyms.py                                      |  285 +++++++-
+ backend-py/app/routers/dashboard.py                                     |  129 +++-
+ backend-py/app/routers/health.py                                        |    4 +
+ backend-py/app/routers/per_course_resources.py                          |  733 +++++++++++++++++++++
+ backend-py/app/routers/scrape.py                                        | 1119 ++++++++++++++++++++++++++++++--
+ backend-py/app/routers/universities.py                                  |   27 +-
+ backend-py/app/services/scraper/category.py                             |   92 +++
+ backend-py/app/services/scraper/completeness.py                         |   39 +-
+ backend-py/app/services/scraper/extractors/course_name.py               |   24 +
+ backend-py/app/services/scraper/extractors/duration.py                  |   25 +-
+ backend-py/app/services/scraper/extractors/english_test.py              |   52 ++
+ backend-py/app/services/scraper/extractors/fee.py                       |   99 ++-
+ backend-py/app/services/scraper/extractors/study_mode.py                |   40 +-
+ backend-py/app/services/scraper/orchestrator.py                         |  109 +++-
+ backend-py/app/services/scraper/per_course_browser.py                   |  152 +++++
+ backend-py/app/services/scraper/per_course_vision.py                    |  253 ++++++++
+ backend-py/app/services/scraper/pipelines/single_course.py              |   70 +-
+ backend-py/app/services/scraper/pipelines/university_pdfs.py            |  110 +++-
+ backend-py/app/services/scraper/sibling_cache.py                        |  176 +++++
+ backend-py/tests/test_completeness.py                                   |    5 +-
+ backend-py/tests/test_data_parity_priorities.py                         |  244 +++++++
+ backend-py/tests/test_english_test_table_layouts.py                     |  115 ++++
+ backend-py/tests/test_log_level_inference.py                            |   60 ++
+ backend-py/tests/test_pdf_fee_pickamounts.py                            |  118 ++++
+ backend-py/tests/test_prod_bug_fixes_hijk.py                            |  296 +++++++++
+ backend-py/tests/test_route_parity.py                                   |  431 ++++++++++++
+ backend-py/tests/test_scraper_pipeline_parity.py                        |  378 +++++++++++
+ backend-py/tests/test_stage_evidence_and_review.py                      |   22 +-
+ backend-py/tests/test_study_mode.py                                     |   23 +
+ replit.md                                                               |   47 ++
+ 37 files changed, 5407 insertions(+), 106 deletions(-)
+ create mode 100644 attached_assets/Pasted-3-prod-issues-to-fix-Bug-E-Log-colors-missing-in-prod-Y_1777012913309.txt
+ create mode 100644 attached_assets/Pasted-4-more-prod-bugs-in-addition-to-the-data-quality-items-_1777014473406.txt
+ create mode 100644 attached_assets/Pasted-Full-migration-audit-needed-please-do-this-BEFORE-more-_1777014810257.txt
+ create mode 100644 attached_assets/Pasted-More-prod-gaps-Please-do-a-full-audit-instead-of-fixing_1777014694216.txt
+ create mode 100644 attached_assets/Pasted-Production-scraper-is-producing-wrong-incomplete-data-v_1777013230465.txt
+ create mode 100644 backend-py/app/routers/per_course_resources.py
+ create mode 100644 backend-py/app/services/scraper/per_course_browser.py
+ create mode 100644 backend-py/app/services/scraper/per_course_vision.py
+ create mode 100644 backend-py/app/services/scraper/sibling_cache.py
+ create mode 100644 backend-py/tests/test_data_parity_priorities.py
+ create mode 100644 backend-py/tests/test_english_test_table_layouts.py
+ create mode 100644 backend-py/tests/test_log_level_inference.py
+ create mode 100644 backend-py/tests/test_pdf_fee_pickamounts.py
+ create mode 100644 backend-py/tests/test_prod_bug_fixes_hijk.py
+ create mode 100644 backend-py/tests/test_route_parity.py
+ create mode 100644 backend-py/tests/test_scraper_pipeline_parity.py
+=== 1. What's now installed? ===
+9134597 Document route-parity close-out (Bugs L-Q) in replit.md
+bfe50d7 Route parity batch: port missing UI endpoints + integration test
+a819ff1 Scraper pipeline parity (T201-T211): close out + address review
+ce6cb4f Document Python scraper parity status (T201-T211) in replit.md
+203226a Scraper parity tests: address architect review (T209 + T205 de-dup)
+73be8dc Scraper pipeline parity (T201-T210): tighten reason format + UI level colors
+cc7f724 Fix prod bugs H/I/J/K: port missing Node routes to FastAPI
+5510539 Add missing administrative and bulk operation functionalities to the backend
+21da323 feat(scraper): port 9 Node→Python data-parity priorities
+303bc9d Fix Bug F + Bug G + Bug E: review modal, PDF data, log colors
+
+=== 2. Test the Bug fixes from this batch ===
+Bug K (dashboard):
+  /api/dashboard/stats: HTTP 200
+
+Bug J (academic-levels):
+{"option":{"id":10,"name":"test","sortOrder":10,"createdAt":"2026-04-24T08:28:46.231372+00:00"}}
+
+Bug L (acronyms):
+  defaults: 37
+  custom: 0
+
+Bug I (bulk):
+{"sessionId":"bulk_0f7b46553efd","queued":2,"ok":true}
+
+Bug H (history logs):
+  log entries: 0
+
+=== 3. Full clean test scrape with all features ===
+Triggered: job_ee2537fb4679
+Wait 3 minutes (full pipeline takes longer now with browser+vision)...
+
+=== 4. Verify FULL data parity — should match Replit's dev ===
+(0 rows)
+
+
+=== 5. /staged endpoint shape ===
+Has courses: True
+Has lastScrape: True
+Course count: 0
+lastScrape.duration: None
+lastScrape.startedAt: 2026-04-24T08:28:47.528487+00:00
+
+=== 6. Final job log entries ===
+ sequence | ?column? 
+----------+----------
+(0 rows)
+
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data/backend-py
+source /root/.env.backup
+source venv/bin/activate
+
+echo "=== 1. Is celery alive? ==="
+systemctl status uni-celery --no-pager | head -10
+
+echo ""
+echo "=== 2. Job status ==="
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, status, error_message, started_at::time, completed_at::time
+FROM scrape_runtime_jobs WHERE university_id=2 ORDER BY started_at DESC LIMIT 3;
+"
+
+echo ""
+echo "=== 3. Celery stderr in last 5 minutes ==="
+journalctl -u uni-celery --since "5 minutes ago" --no-pager | tail -40
+
+echo ""
+echo "=== 4. Restart celery and re-trigger ==="
+systemctl restart uni-celery
+sleep 4
+
+JOB=$(curl -s -X POST http://127.0.0.1:8000/api/scrape/start \
+  -H "Content-Type: application/json" \
+  -d '{"universityId": 2, "fastMode": false}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('jobId'))")
+echo "New job: $JOB"
+echo "Wait 4 minutes (full pipeline w/ browser+vision)..."
+sleep 240
+
+echo ""
+echo "=== 5. Result ==="
+psql "$DATABASE_URL" -c "
+SELECT status, current||'/'||total_found as progress, imported, skipped, error_message
+FROM scrape_runtime_jobs WHERE runtime_job_id='$JOB';
+"
+
+psql "$DATABASE_URL" -c "
+SELECT course_name, degree_level, sub_category, 
+       international_fee, fee_term,
+       ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall,
+       study_mode, completeness, eligibility_status
+FROM scraped_courses WHERE scrape_job_id='$JOB' LIMIT 3;
+" -x
+=== 1. Is celery alive? ===
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-04-24 08:28:42 UTC; 6min ago
+   Main PID: 515944 (celery)
+      Tasks: 70 (limit: 9483)
+     Memory: 252.1M (peak: 540.1M)
+        CPU: 27.723s
+     CGroup: /system.slice/uni-celery.service
+             ├─515944 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+             ├─515988 /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/node /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/package/cli.js run-driver
+
+=== 2. Job status ===
+       runtime_job_id        |  status   |         error_message         |   started_at    | completed_at 
+-----------------------------+-----------+-------------------------------+-----------------+--------------
+ scrape_1776813365018_prelp4 | completed |                               | 23:16:05.019    | 23:17:44.913
+ scrape_1776784594000_jbey7a | completed |                               | 15:16:34.003    | 15:26:16.866
+ job_4171d5ca7ab5            | failed    | Scraping failed: URL is empty | 13:02:26.272998 | 13:02:26.401
+(3 rows)
+
+
+=== 3. Celery stderr in last 5 minutes ===
+-- No entries --
+
+=== 4. Restart celery and re-trigger ===
+New job: job_bc920b97b9b8
+Wait 4 minutes (full pipeline w/ browser+vision)...
+
+=== 5. Result ===
+ status | progress | imported | skipped | error_message 
+--------+----------+----------+---------+---------------
+ queued | 0/0      |        0 |       0 | 
+(1 row)
+
+(0 rows)
+
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data/backend-py
+source /root/.env.backup
+source venv/bin/activate
+
+echo "=== 1. Confirm Node is dead ==="
+pm2 list 2>/dev/null
+ps aux | grep -E "node.*scrape" | grep -v grep || echo "✅ No Node workers"
+
+echo ""
+echo "=== 2. Celery alive, AND can it import the new modules? ==="
+systemctl status uni-celery --no-pager | head -10
+journalctl -u uni-celery --since "10 minutes ago" --no-pager | grep -iE "error|traceback|exception|importerror|modulenot" | tail -30
+
+echo ""
+echo "=== 3. Test imports manually ==="
+python <<'PYEOF'
+try:
+    from app.services.scraper.per_course_browser import *
+    print("✅ per_course_browser imports")
+except Exception as e:
+    print(f"❌ per_course_browser FAILED: {type(e).__name__}: {e}")
+
+try:
+    from app.services.scraper.per_course_vision import *
+    print("✅ per_course_vision imports")
+except Exception as e:
+    print(f"❌ per_course_vision FAILED: {type(e).__name__}: {e}")
+
+try:
+    from app.services.scraper.sibling_cache import *
+    print("✅ sibling_cache imports")
+except Exception as e:
+    print(f"❌ sibling_cache FAILED: {type(e).__name__}: {e}")
+
+try:
+    from app.services.scraper.orchestrator import run_scrape
+    print("✅ orchestrator imports")
+except Exception as e:
+    print(f"❌ orchestrator FAILED: {type(e).__name__}: {e}")
+
+try:
+    from playwright.async_api import async_playwright
+    print("✅ playwright installed")
+except Exception as e:
+    print(f"❌ playwright NOT INSTALLED: {e}")
+"ROM scrape_runtime_jobs WHERE runtime_job_id='$JOB';nd as progress -30)")
+=== 1. Confirm Node is dead ===
+[PM2] Spawning PM2 daemon with pm2_home=/root/.pm2
+[PM2] PM2 Successfully daemonized
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+✅ No Node workers
+
+=== 2. Celery alive, AND can it import the new modules? ===
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-04-24 08:36:26 UTC; 7min ago
+   Main PID: 516316 (celery)
+      Tasks: 68 (limit: 9483)
+     Memory: 241.9M (peak: 555.6M)
+        CPU: 24.001s
+     CGroup: /system.slice/uni-celery.service
+             ├─516316 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+             ├─516331 /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/node /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/package/cli.js run-driver
+
+=== 3. Test imports manually ===
+✅ per_course_browser imports
+✅ per_course_vision imports
+✅ sibling_cache imports
+✅ orchestrator imports
+✅ playwright installed
+
+=== 4. Is Redis running? ===
+PONG
+
+=== 5. Are tasks queued in Redis? ===
+(integer) 0
+
+=== 6. Force restart celery + trigger ===
+Job: job_670598356dd3
+
+=== 7. Did celery pick it up? ===
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: State 'stop-sigterm' timed out. Killing.
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Killing process 516316 (celery) with signal SIGKILL.
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Killing process 516331 (MainThread) with signal SIGKILL.
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Failed to kill control group /system.slice/uni-celery.service, ignoring: Invalid argument
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Main process exited, code=killed, status=9/KILL
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Failed with result 'timeout'.
+Apr 24 08:45:50 university-and-course-data systemd[1]: Stopped uni-celery.service - University Portal Celery Worker (background scraping).
+Apr 24 08:45:50 university-and-course-data systemd[1]: uni-celery.service: Consumed 24.197s CPU time, 555.6M memory peak, 0B memory swap peak.
+Apr 24 08:45:50 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+
+=== 8. Job status ===
+ status  | error_message | progress 
+---------+---------------+----------
+ running |               | 0/10
+(1 row)
+
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
