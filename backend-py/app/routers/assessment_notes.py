@@ -237,24 +237,31 @@ async def list_notes(
 
     # Lazy backfill: any rows persisted with empty parsed_data (older notes
     # or notes saved while GEMINI_API_KEY was unset) are re-parsed in-band.
-    # Identical strategy and ordering to the Node route — kept in-band so
-    # the very first page render shows cards.
+    # Identical strategy to the Node route — best-effort, swallow per-row
+    # errors so the GET always returns notes even if one update fails.
+    # Each row gets its own commit so a single DB error never aborts the
+    # whole batch (matches Node's per-row try/catch in routes/assessment_notes.ts).
     stale = [r for r in rows if not isinstance(r.parsed_data, list) or not r.parsed_data]
     for r in stale:
         try:
             parsed = await _parse_with_gemini(r.raw_text)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("assessment-notes: backfill parse failed id=%s: %s", r.id, exc)
-            continue
-        if parsed:
+            if not parsed:
+                continue
             await db.execute(
                 update(AssessmentNote)
                 .where(AssessmentNote.id == r.id)
                 .values(parsed_data=parsed)
             )
+            await db.commit()
             r.parsed_data = parsed
-    if stale:
-        await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("assessment-notes: backfill failed id=%s: %s", r.id, exc)
+            try:
+                await db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            # Fall through — return whatever parsed_data is on the row
+            # (typically [] or null), client will show raw_text.
 
     return JSONResponse([_row_to_dict(r) for r in rows])
 
