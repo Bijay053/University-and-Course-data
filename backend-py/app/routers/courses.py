@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,9 +63,35 @@ async def list_courses(
                 "currency": fr.currency,
             }
 
+    course_aliases = {
+        "university_id": "universityId",
+        "degree_level": "degreeLevel",
+        "study_mode": "studyMode",
+        "course_location": "courseLocation",
+        "course_website": "courseWebsite",
+        "duration_term": "durationTerm",
+        "study_load": "studyLoad",
+        "international_eligible": "internationalEligible",
+        "on_campus_available": "onCampusAvailable",
+        "delivery_mode": "deliveryMode",
+        "student_market": "studentMarket",
+        "eligibility_status": "eligibilityStatus",
+        "approval_status": "approvalStatus",
+        "approval_score": "approvalScore",
+        "approved_at": "approvedAt",
+        "created_at": "createdAt",
+        "updated_at": "updatedAt",
+    }
     out = []
     for r in rows:
-        d = CourseRead.model_validate(r).model_dump(mode="json")
+        d = {col.name: getattr(r, col.name, None) for col in r.__table__.columns}
+        from datetime import datetime as _dt
+        for k, v in list(d.items()):
+            if isinstance(v, _dt):
+                d[k] = v.isoformat()
+        for snake, camel in course_aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
         # Add camelCase aliases for course fields
         d["universityId"] = d.get("university_id")
         d["degreeLevel"] = d.get("degree_level")
@@ -80,7 +107,7 @@ async def list_courses(
             "currency": None,
         }))
         out.append(d)
-    return {"data": out, "total": int(total), "page": page, "limit": limit}
+    return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
 
 
 @router.get("/courses/{course_id}", response_model=CourseRead)

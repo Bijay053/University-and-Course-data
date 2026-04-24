@@ -100,6 +100,30 @@ class UniversityRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    def model_dump(self, *args, **kwargs) -> dict:
+        d = super().model_dump(*args, **kwargs)
+        # camelCase aliases for UI compatibility
+        aliases = {
+            "scrape_url": "scrapeUrl",
+            "fee_page_url": "feePageUrl",
+            "requirements_page_url": "requirementsPageUrl",
+            "academic_requirements_page_url": "academicRequirementsPageUrl",
+            "scholarship_page_url": "scholarshipPageUrl",
+            "logo_url": "logoUrl",
+            "course_count": "courseCount",
+            "featured_priority": "featuredPriority",
+            "created_at": "createdAt",
+            "updated_at": "updatedAt",
+        }
+        for snake, camel in aliases.items():
+            if snake in d and camel not in d:
+                v = d[snake]
+                # JSON serialize datetime
+                if hasattr(v, "isoformat"):
+                    v = v.isoformat()
+                d[camel] = v
+        return d
+
 
 class UniversityListResponse(BaseModel):
     data: list[UniversityRead]
@@ -114,27 +138,3 @@ class BulkImportResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
-# --- UI camelCase compatibility shim ---
-_CAMEL_ALIASES = {
-    "scrape_url": "scrapeUrl",
-    "fee_page_url": "feePageUrl",
-    "requirements_page_url": "requirementsPageUrl",
-    "academic_requirements_page_url": "academicRequirementsPageUrl",
-    "scholarship_page_url": "scholarshipPageUrl",
-    "logo_url": "logoUrl",
-    "course_count": "courseCount",
-    "featured_priority": "featuredPriority",
-    "created_at": "createdAt",
-    "updated_at": "updatedAt",
-}
-
-_orig_uni_dump = UniversityRead.model_dump
-
-def _uni_dump_with_camel(self, *args, **kwargs):
-    d = _orig_uni_dump(self, *args, **kwargs)
-    for snake, camel in _CAMEL_ALIASES.items():
-        if snake in d and camel not in d:
-            d[camel] = d[snake]
-    return d
-
-UniversityRead.model_dump = _uni_dump_with_camel

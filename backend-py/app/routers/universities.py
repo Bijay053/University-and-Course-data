@@ -6,6 +6,7 @@ import io
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,13 +68,37 @@ async def list_universities(
     stmt = stmt.offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).all()
 
-    # Return as plain dicts so model_dump (with camelCase shim) runs
-    return {
-        "data": [_to_read(u, cc).model_dump() for u, cc in rows],
+    # Build response manually with both snake and camelCase keys
+    aliases = {
+        "scrape_url": "scrapeUrl",
+        "fee_page_url": "feePageUrl",
+        "requirements_page_url": "requirementsPageUrl",
+        "academic_requirements_page_url": "academicRequirementsPageUrl",
+        "scholarship_page_url": "scholarshipPageUrl",
+        "logo_url": "logoUrl",
+        "course_count": "courseCount",
+        "featured_priority": "featuredPriority",
+        "created_at": "createdAt",
+        "updated_at": "updatedAt",
+    }
+    out = []
+    for u, cc in rows:
+        d = {col.name: getattr(u, col.name, None) for col in u.__table__.columns}
+        from datetime import datetime as _dt
+        for k, v in list(d.items()):
+            if isinstance(v, _dt):
+                d[k] = v.isoformat()
+        d["course_count"] = int(cc)
+        for snake, camel in aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
+        out.append(d)
+    return JSONResponse(content={
+        "data": out,
         "total": int(total),
         "page": page,
         "limit": limit,
-    }
+    })
 
 
 @router.get("/universities/{uni_id}")
