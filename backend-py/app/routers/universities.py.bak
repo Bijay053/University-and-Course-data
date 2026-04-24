@@ -32,7 +32,7 @@ def _to_read(u: University, course_count: int = 0) -> UniversityRead:
     )
 
 
-@router.get("/universities")
+@router.get("/universities", response_model=UniversityListResponse)
 async def list_universities(
     db: Annotated[AsyncSession, Depends(get_db)],
     q: str | None = None,
@@ -67,23 +67,22 @@ async def list_universities(
     stmt = stmt.offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).all()
 
-    # Return as plain dicts so model_dump (with camelCase shim) runs
-    return {
-        "data": [_to_read(u, cc).model_dump() for u, cc in rows],
-        "total": int(total),
-        "page": page,
-        "limit": limit,
-    }
+    return UniversityListResponse(
+        data=[_to_read(u, cc) for u, cc in rows],
+        total=int(total),
+        page=page,
+        limit=limit,
+    )
 
 
-@router.get("/universities/{uni_id}")
+@router.get("/universities/{uni_id}", response_model=UniversityRead)
 async def get_university(uni_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> UniversityRead:
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
     cc_stmt = select(func.count(Course.id)).where(Course.university_id == uni_id)
     cc = (await db.execute(cc_stmt)).scalar_one()
-    return _to_read(u, int(cc)).model_dump()
+    return _to_read(u, int(cc))
 
 
 @router.get("/universities/{uni_id}/courses", response_model=CourseListResponse)
@@ -269,35 +268,3 @@ async def delete_university(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
     await db.delete(u)
     await db.commit()
-
-
-def _to_camel_uni(u) -> dict:
-    """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
-    if hasattr(u, '__table__'):
-        d = {c.name: getattr(u, c.name, None) for c in u.__table__.columns}
-    elif isinstance(u, dict):
-        d = dict(u)
-    else:
-        return u
-    # Convert datetimes to iso
-    from datetime import datetime
-    for k, v in list(d.items()):
-        if isinstance(v, datetime):
-            d[k] = v.isoformat()
-    # Add camelCase aliases
-    aliases = {
-        'scrape_url': 'scrapeUrl',
-        'fee_page_url': 'feePageUrl',
-        'requirements_page_url': 'requirementsPageUrl',
-        'academic_requirements_page_url': 'academicRequirementsPageUrl',
-        'scholarship_page_url': 'scholarshipPageUrl',
-        'logo_url': 'logoUrl',
-        'course_count': 'courseCount',
-        'featured_priority': 'featuredPriority',
-        'created_at': 'createdAt',
-        'updated_at': 'updatedAt',
-    }
-    for snake, camel in aliases.items():
-        if snake in d:
-            d[camel] = d[snake]
-    return d

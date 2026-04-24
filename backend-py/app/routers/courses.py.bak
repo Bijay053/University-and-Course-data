@@ -14,7 +14,7 @@ from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, Cou
 router = APIRouter()
 
 
-@router.get("/courses")
+@router.get("/courses", response_model=CourseListResponse)
 async def list_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
     university_id: int | None = None,
@@ -41,46 +41,12 @@ async def list_courses(
     stmt = stmt.order_by(desc(Course.updated_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
 
-    # LEFT JOIN fees + add camelCase fields the UI expects
-    course_ids = [r.id for r in rows]
-    fees_map: dict = {}
-    if course_ids:
-        from sqlalchemy import text
-        fee_rows = (await db.execute(text("""
-            SELECT DISTINCT ON (course_id) course_id, international_fee, fee_term, fee_year, currency
-            FROM fees WHERE course_id = ANY(:ids)
-            ORDER BY course_id, created_at DESC
-        """), {"ids": course_ids})).all()
-        for fr in fee_rows:
-            fees_map[fr.course_id] = {
-                "international_fee": fr.international_fee,
-                "internationalFee": fr.international_fee,
-                "fee_term": fr.fee_term,
-                "feeTerm": fr.fee_term,
-                "fee_year": fr.fee_year,
-                "feeYear": fr.fee_year,
-                "currency": fr.currency,
-            }
-
-    out = []
-    for r in rows:
-        d = CourseRead.model_validate(r).model_dump(mode="json")
-        # Add camelCase aliases for course fields
-        d["universityId"] = d.get("university_id")
-        d["degreeLevel"] = d.get("degree_level")
-        d["studyMode"] = d.get("study_mode")
-        d["courseLocation"] = d.get("course_location")
-        d["courseWebsite"] = d.get("course_website")
-        d["durationTerm"] = d.get("duration_term")
-        # Merge in fees (always include keys, even null)
-        d.update(fees_map.get(r.id, {
-            "international_fee": None, "internationalFee": None,
-            "fee_term": None, "feeTerm": None,
-            "fee_year": None, "feeYear": None,
-            "currency": None,
-        }))
-        out.append(d)
-    return {"data": out, "total": int(total), "page": page, "limit": limit}
+    return CourseListResponse(
+        data=[CourseRead.model_validate(r) for r in rows],
+        total=int(total),
+        page=page,
+        limit=limit,
+    )
 
 
 @router.get("/courses/{course_id}", response_model=CourseRead)
