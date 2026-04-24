@@ -33,10 +33,26 @@ log = logging.getLogger(__name__)
 # Celery worker (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min,
 # zero log output). asyncio.wait_for is unconditional: if the wrapped
 # coroutine doesn't return within the budget, it gets cancelled and we
-# move on. 45s comfortably covers a real slow-but-working page (Akamai
-# challenge + 1.5s settle + content + teardown ≈ 8–12s typical) while
-# bounding worst-case at one fallback attempt per course.
-_BROWSER_FETCH_TIMEOUT_SEC = 45
+# move on. 60s comfortably covers a real slow-but-working SPA page
+# (Akamai + networkidle + 3s settle + content + teardown ≈ 12–25s
+# typical) while bounding worst-case at one fallback attempt per
+# course. Bumped from 45 → 60 in PR-1.5 alongside the wait-strategy
+# upgrade below — prod regression on VIT showed every per-course
+# browser pass extracting empty data because the table hydrated AFTER
+# the load event. networkidle + a 3s settle catches the post-load XHR.
+_BROWSER_FETCH_TIMEOUT_SEC = 60
+# Tell Playwright to wait for the network to go idle (≥500ms with no
+# in-flight requests) instead of bailing at domcontentloaded. SPAs
+# render the english requirements <table> via an XHR after DCL fires;
+# without networkidle we grab the skeleton HTML and english_test.extract
+# returns nothing (PR-1.5 prod regression: VIT MBA pages staged with
+# IELTS/PTE/TOEFL/CAE all empty on 23/24 URLs).
+_BROWSER_WAIT_UNTIL = "networkidle"
+# Extra static wait after the load event. Some pages hydrate after
+# networkidle has fired (animation-driven reveal, intersection-observer
+# lazy-load on a tab/accordion). 3s is enough to catch a one-shot
+# hydration without doubling the per-course budget.
+_BROWSER_SETTLE_MS = 3000
 # The four slot keys we care about — IELTS overall, PTE overall, TOEFL
 # overall, Cambridge Advanced English overall. If any of these are
 # already populated we skip the browser pass entirely (the page DID
@@ -89,7 +105,11 @@ async def maybe_browser_refetch(
         )
     try:
         rendered = await asyncio.wait_for(
-            browser_pool.fetch_html(url),
+            browser_pool.fetch_html(
+                url,
+                wait_until=_BROWSER_WAIT_UNTIL,
+                settle_ms=_BROWSER_SETTLE_MS,
+            ),
             timeout=_BROWSER_FETCH_TIMEOUT_SEC,
         )
     except asyncio.TimeoutError:

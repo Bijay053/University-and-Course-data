@@ -83,8 +83,31 @@ class BrowserPool:
             finally:
                 await ctx.close()
 
-    async def fetch_html(self, url: str, *, wait_until: str = "domcontentloaded", timeout: int = 30000) -> str | None:
-        """Fetch a URL via real browser and return HTML. Returns None on failure."""
+    async def fetch_html(
+        self,
+        url: str,
+        *,
+        wait_until: str = "domcontentloaded",
+        timeout: int = 30000,
+        settle_ms: int = 1500,
+    ) -> str | None:
+        """Fetch a URL via real browser and return HTML. Returns None on failure.
+
+        ``wait_until`` controls how long Playwright waits for the page event:
+            * ``"domcontentloaded"`` — fast (default, used by discovery).
+            * ``"load"`` — waits for window.onload (CSS, images).
+            * ``"networkidle"`` — waits for ≥500ms with no in-flight requests.
+              Use this for JS-heavy SPAs that render the requirements table
+              after an XHR (VIT, etc.). Costs 1–3s extra per page but is
+              necessary for the per-course fallback (T207) — without it we
+              see the pre-render skeleton and extract empty english slots.
+
+        ``settle_ms`` is an extra static wait after the load event fires.
+        Defaults to 1500ms; bump to ~3000ms for SPA-style pages where the
+        requirements table is hydrated client-side after the load event
+        completes (PR-1.5 prod regression: VIT MBA pages returned empty
+        from the browser fallback because the table hadn't hydrated yet).
+        """
         try:
             async with self.page() as page:
                 # Set referer to look like coming from Google
@@ -97,7 +120,7 @@ class BrowserPool:
                     log.warning("browser fetch %s -> %s", url, resp.status)
                     return None
                 # Give Akamai/JS a moment to settle
-                await page.wait_for_timeout(1500)
+                await page.wait_for_timeout(settle_ms)
                 html = await page.content()
                 return html
         except Exception as exc:

@@ -34,10 +34,14 @@ log = logging.getLogger(__name__)
 # Hard ceiling on the AI fallback Gemini call. Same bug class as the
 # Playwright hang that started this hot-fix chain — if Gemini stalls
 # (network, model-side queueing, retries inside the SDK), we would
-# freeze a whole worker. 60s comfortably covers a real slow-but-working
-# call (vision-capable Gemini calls are typically 10–25s) while
-# bounding worst-case at one stall per course.
-_AI_FALLBACK_TIMEOUT_SEC = 60
+# freeze a whole worker. PR-1.5 prod regression on VIT showed the 60s
+# ceiling firing on multiple courses (`AI fallback exceeded 60s on
+# https://vit.edu.au/mba — moving on without AI fill`) when the prompt
+# had to fill many missing fields against a long page; bumping to 120s
+# matches the Node-era timeout and gives a vision-capable Gemini call
+# room to finish a multi-field extract on a heavy page (typical 10–25s,
+# worst-case 60–90s during a model-side queueing event).
+_AI_FALLBACK_TIMEOUT_SEC = 120
 
 
 def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any]) -> None:

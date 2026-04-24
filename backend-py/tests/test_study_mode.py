@@ -179,3 +179,52 @@ def test_label_requires_delimiter_to_avoid_prose_false_positive():
     # isn't triggered with a phantom value.
     from app.services.scraper.extractors.study_mode import _LABEL_RE
     assert _LABEL_RE.search(prose_with_phrase) is None
+
+
+# ──────────────────────────────────────────────────────────────────
+# PR-1.5 prod-regression coverage: bare blended/hybrid keyword
+# Job_01cec454ebd2 (VIT) staged 24 courses — 100% defaulted to
+# "Blended" because the keyword pattern matched marketing copy
+# ("blended learning environment", "blended teaching approach")
+# anywhere on the page. The patterns now require an explicit
+# delivery noun (delivery|mode|format|program(me)?) right after
+# the keyword. These tests lock the contract in.
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_bare_blended_marketing_copy_does_not_default_to_blended():
+    from app.services.scraper.extractors.study_mode import classify_study_mode
+    # Sentences that mention 'blended'/'hybrid'/'mixed' without a
+    # delivery-method noun must NOT classify as Blended — they're
+    # marketing fluff, not delivery descriptions.
+    for txt in (
+        "We provide a blended learning environment for all students.",
+        "Our blended teaching approach combines theory and practice.",
+        "A blended team of academics and industry experts.",
+        "Our hybrid teaching style supports diverse learners.",
+        "Mixed cohort sizes keep classes engaging.",
+        "VIT offers a blended community of local and international students.",
+    ):
+        out, _ = classify_study_mode(txt)
+        assert out is None, (
+            f"PR-1.5 regression: marketing copy should NOT classify as Blended.\n"
+            f"  text: {txt!r}\n  got:  {out!r}"
+        )
+
+
+def test_blended_with_delivery_noun_still_classifies_as_blended():
+    """Sanity check that the tightened pattern still catches real
+    blended-delivery signals — only the bare keyword case is rejected."""
+    from app.services.scraper.extractors.study_mode import classify_study_mode
+    for txt in (
+        "Mixed mode delivery is available.",
+        "hybrid program with online and on-campus components",
+        "Blended delivery allows flexible study.",
+        "Hybrid mode supports both in-person and remote study.",
+        "Blended format suits working professionals.",
+    ):
+        out, _ = classify_study_mode(txt)
+        assert out == "Blended", (
+            f"tightened pattern broke a real blended signal.\n"
+            f"  text: {txt!r}\n  got:  {out!r}"
+        )

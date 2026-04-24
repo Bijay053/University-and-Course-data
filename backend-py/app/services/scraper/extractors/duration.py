@@ -46,6 +46,37 @@ _CREDIT_POINT_CONTEXT = re.compile(
     r"per\s+(?:trimester|semester|term))\b",
     re.I,
 )
+# PR-1.5 prod regression: VIT MBA rows staged with duration=10 Year because
+# the loose fallback pattern 3 (`\b<num>\s*<unit>\b`) matched "10 years" in
+# unrelated copy ("over 10 years of industry partnerships",
+# "celebrating 10 years", "10 years experience"). Pattern 3 now ONLY fires
+# inside a sentence that also names a duration-related concept — without
+# this guard ANY "<num> <unit>" anywhere on the page can win the
+# weight-by-weeks tournament and clobber the real program length.
+#
+# Patterns 1 and 2 are already context-bound (require an explicit duration
+# label or "full-time"), so they're not gated on this filter.
+_DURATION_CONTEXT = re.compile(
+    r"\b(course|programme?|degree|study|studies|complete|completion|"
+    r"duration|length|full[- ]?time|part[- ]?time|fulltime|parttime|"
+    r"qualification|enrolment|enrol|takes|lasting|over\s+\d|spread\s+over)\b",
+    re.I,
+)
+# Negative context — even when a duration-context word appears nearby, a
+# few specific phrases mean the number is NOT a program length:
+#   • "experience" / "years experience" — staff bio, industry tenure.
+#   • "established" / "founded" / "since 19xx" — institutional history.
+#   • "partnership" / "anniversary" / "celebrating" — marketing copy.
+# Match anywhere in the same sentence; if any of these fire we skip the
+# pattern-3 hit entirely, even if a (course|program|...) keyword is also
+# in the sentence (e.g. "celebrating 10 years of our MBA program" —
+# "program" passes _DURATION_CONTEXT but "celebrating" disqualifies it).
+_DURATION_ANTI_CONTEXT = re.compile(
+    r"\b(experience|established|founded|since\s+(?:19|20)\d{2}|"
+    r"anniversar(?:y|ies)|celebrat(?:e|ing|ion|ed)|partnership|"
+    r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry)\b",
+    re.I,
+)
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
 
@@ -79,9 +110,22 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # Skip sentences that are talking about credit-point structure rather
         # than program duration — see _CREDIT_POINT_CONTEXT comment.
         credit_context = bool(_CREDIT_POINT_CONTEXT.search(s))
-        for pat in _PATTERNS:
+        # PR-1.5: pre-compute duration / anti-duration context so the loose
+        # pattern-3 fallback can gate on them. Patterns 1 and 2 already
+        # have their own context (duration label / "full-time"), so they
+        # don't need either gate.
+        duration_context = bool(_DURATION_CONTEXT.search(s))
+        anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+        for pat_idx, pat in enumerate(_PATTERNS):
             m = pat.search(s)
             if not m:
+                continue
+            # Pattern 3 (loose `<num> <unit>` fallback) is the source of
+            # false positives like "10 years experience" → duration=10.
+            # Demand a positive duration-context word in the same
+            # sentence AND no anti-context. Patterns 0 and 1 are already
+            # context-bound and unaffected.
+            if pat_idx == 2 and (not duration_context or anti_duration_context):
                 continue
             try:
                 amount = float(m.group(1))

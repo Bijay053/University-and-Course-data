@@ -256,3 +256,100 @@ years/months/weeks translation, rule-extractor priority, missing-fields
 no-op, junk-unit rejection, non-numeric value safety) +
 `tests/test_study_mode.py::test_learning_mode_label_recognised`. Full
 suite: 290 passed, 1 skipped.
+
+## PR-1.5 Prod Regression Hot-Fix (Apr 2026)
+
+After PR-1.5 B19/B20 shipped, prod job_01cec454ebd2 (VIT, 24 courses) and
+job_440a0e26c6df (CSU, 9 courses) surfaced four new defects that B20 did
+NOT cover. All six fixes below land together.
+
+### 1. Browser fallback returned empty extracts on SPA pages
+- **Symptom**: VIT pages staged with IELTS/PTE/TOEFL/CAE empty on 23/24
+  URLs even after the per-course browser pass; vision fallback also empty.
+- **Root cause**: `browser_pool.fetch_html` defaulted to
+  `wait_until="domcontentloaded"` + a fixed 1.5s settle. VIT's
+  english-requirements `<table>` is hydrated by a post-DCL XHR, so we
+  grabbed the skeleton HTML and english_test.extract returned nothing.
+- **Fix**: `browser_pool.fetch_html` now accepts a `settle_ms`
+  parameter; `per_course_browser` uses
+  `wait_until="networkidle"` + `settle_ms=3000` and bumps the
+  hard ceiling 45→60s (`_BROWSER_FETCH_TIMEOUT_SEC`).
+
+### 2. AI fallback timing out on heavy pages
+- **Symptom**: `AI fallback exceeded 60s on https://vit.edu.au/mba —
+  moving on without AI fill` on multiple courses.
+- **Fix**: `_AI_FALLBACK_TIMEOUT_SEC` 60→120s (matches Node-era
+  budget; vision-capable Gemini calls take 60–90s on heavy pages
+  during model-side queueing events).
+
+### 3. study_mode defaulted to "Blended" on every VIT row
+- **Symptom**: 100% of VIT's 24 staged rows had `study_mode='Blended'`,
+  even MBA which is on-campus only.
+- **Root cause**: B20 added `<select>`/`<form>`/`<nav>` noise stripping,
+  but bare `\b(blended|hybrid|mixed[-]mode)\b` still matched marketing
+  copy outside those blocks ("blended learning environment", "blended
+  teaching approach"). One match anywhere on the page wins.
+- **Fix**: pattern 1 of `_MODE_PATTERNS` now requires the keyword to be
+  immediately followed by an explicit delivery noun
+  (`delivery|mode|format|program(me)?`). Multi-mode combos
+  ("On Campus and Online") still fire on their own.
+- **Coverage**: `tests/test_study_mode.py` adds
+  `test_bare_blended_marketing_copy_does_not_default_to_blended` (6
+  cases) and `test_blended_with_delivery_noun_still_classifies_as_blended`
+  (5 cases).
+
+### 4. duration=10 Year on VIT MBA / Master rows
+- **Symptom**: every VIT postgrad row staged with duration=10 Year.
+- **Root cause**: pattern 3 (loose `\b<num>\s*<unit>\b` fallback) matched
+  "over 10 years of industry partnerships" in the page footer; that hit
+  beat the legitimate 2-year MBA duration in the weight-by-weeks
+  tournament because 10*52 > 2*52.
+- **Fix**: `extractors/duration.py` adds `_DURATION_CONTEXT` (positive
+  filter — sentence must contain a duration-related word) and
+  `_DURATION_ANTI_CONTEXT` (negative filter — `experience`,
+  `established`, `celebrating`, `partnership`, etc.). Pattern 3 now
+  ONLY fires inside a sentence that passes both gates. Patterns 1 and 2
+  are already context-bound and unaffected.
+- **Coverage**: `tests/test_extractors.py` adds 5 new cases (rejects
+  staff tenure / anniversaries / institutional history; preserves
+  loose-fallback success when duration context is present; legitimate
+  signal still wins over noise in multi-sentence text).
+
+### 5. Counter mismatch: imported=9 vs DB COUNT(*)=0
+- **Symptom**: job_440a0e26c6df reported `imported=9` but
+  `SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id=...` returned
+  0 — operator chasing phantom rows.
+- **Root cause**: `_clear_stale_dedup` deleted EVERY pending row older
+  than 10 min for a university, including rows from a previous
+  *successfully completed* run. Scrape #2 (>10 min later) wiped scrape
+  #1's 9 reviewer rows during its own dedup pass before its own staging
+  started, and scrape #1's in-memory `imported` counter was already
+  reported.
+- **Fix (twofold)**:
+  1. `_clear_stale_dedup` now adds `NOT EXISTS (SELECT 1 FROM
+     scrape_runtime_jobs WHERE status IN ('completed','running'))` to
+     the DELETE — only failed/stopped/orphaned-job rows are cleaned up.
+  2. Post-staging in `run_scrape` re-reads
+     `COUNT(*) FROM scraped_courses WHERE scrape_job_id=:rid` and
+     uses that as the authoritative `staged` count; warns loudly in
+     both server log and live job log on any drift so future
+     regressions surface immediately.
+- **Coverage**: `tests/test_stale_dedup_cleanup.py` adds
+  `test_clear_stale_dedup_preserves_rows_from_completed_jobs` and
+  `test_clear_stale_dedup_preserves_rows_from_running_jobs`.
+
+### 6. Sibling cache cross-contamination (DOCUMENTED, NOT FIXED)
+- **Symptom**: every postgraduate course at VIT got the same English
+  requirements (IELTS=6.5/PTE=58/TOEFL=87/CAE=176) because /mba was
+  the only URL that successfully extracted them and the sibling cache
+  filled the rest.
+- **Decision**: this is **by design**. The sibling cache buckets by
+  degree level (`undergraduate|postgraduate|unknown`) so MBA-spec rows
+  share their parent MBA's requirements (which is correct — they are
+  the same university policy). The fix to defects 1+2 above (real
+  extracts succeed for more URLs) is the proper remediation; the
+  sibling cache only ever fills missing slots, never overwrites real
+  extractions. Bucket can be narrowed to per-category later if a
+  university surfaces with genuinely divergent postgrad requirements.
+
+**Test summary**: 301 passed, 1 skipped (was 292+1; +9 new regression tests).

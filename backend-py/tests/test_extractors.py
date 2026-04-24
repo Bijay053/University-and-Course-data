@@ -116,3 +116,52 @@ def test_duration_handles_months():
     out = _run(duration.extract(html, "https://x"))
     n = out[0].normalized
     assert n["duration"] == 18.0 and n["duration_term"] == "Month"
+
+
+# PR-1.5 prod regression: VIT MBA staged duration=10 Year because the loose
+# `<num> <unit>` fallback (pattern 3) matched marketing copy like
+# "over 10 years of industry partnerships". Tests below lock the contract:
+# pattern 3 only fires when a duration-context word is in the same sentence
+# AND no anti-context (experience/established/celebrating/...) is present.
+def test_duration_rejects_years_experience_marketing_copy():
+    """`10 years experience` is staff tenure, not program length."""
+    html = "<p>Our staff have over 10 years experience in industry.</p>"
+    out = _run(duration.extract(html, "https://x"))
+    assert out == [], f"PR-1.5 regression: should not match staff tenure, got {out!r}"
+
+
+def test_duration_rejects_anniversary_marketing_copy():
+    html = "<p>Celebrating 10 years of academic excellence.</p>"
+    out = _run(duration.extract(html, "https://x"))
+    assert out == [], f"PR-1.5 regression: anniversary copy should not match, got {out!r}"
+
+
+def test_duration_rejects_established_year_marketing_copy():
+    html = "<p>Established in 2014, with 10 years of industry partnerships.</p>"
+    out = _run(duration.extract(html, "https://x"))
+    assert out == [], f"PR-1.5 regression: institutional history should not match, got {out!r}"
+
+
+def test_duration_loose_fallback_still_matches_when_context_is_present():
+    """Pattern-3 fallback still wins when duration context IS in the
+    sentence — full-time without an explicit 'Course duration:' label."""
+    html = "<p>Full-time study takes 4 years to complete.</p>"
+    out = _run(duration.extract(html, "https://x"))
+    n = out[0].normalized
+    assert n["duration"] == 4.0 and n["duration_term"] == "Year"
+
+
+def test_duration_real_signal_wins_over_marketing_noise():
+    """Multi-sentence: the legitimate duration sentence must beat the
+    rejected marketing-copy sentence — proves the filter rejects the
+    bad signal entirely, not just demotes it."""
+    html = """
+    <p>Established 10 years ago by a team with 20 years experience.</p>
+    <p>Course duration is 2 years full-time.</p>
+    """
+    out = _run(duration.extract(html, "https://x"))
+    assert len(out) >= 1, "real duration signal should still extract"
+    n = out[0].normalized
+    assert n["duration"] == 2.0 and n["duration_term"] == "Year", (
+        f"real 2-year duration should win, got {n!r}"
+    )

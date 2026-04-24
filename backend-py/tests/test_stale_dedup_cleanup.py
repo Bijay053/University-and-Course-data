@@ -121,3 +121,100 @@ async def test_clear_stale_dedup_returns_zero_when_nothing_stale():
         assert cleared == 0
     finally:
         await _cleanup(prefix)
+
+
+# ──────────────────────────────────────────────────────────────────
+# PR-1.5 prod-regression coverage: counter-vs-rows mismatch
+# Root cause was _clear_stale_dedup wiping pending rows from a
+# previous *completed* job before scrape #2 staged anything.
+# Job_440a0e26c6df reported imported=9 with COUNT(*)=0; this test
+# locks in the contract that completed-job rows survive cleanup.
+# ──────────────────────────────────────────────────────────────────
+
+
+async def _insert_runtime_job(runtime_job_id: str, uni_id: int, status: str) -> None:
+    """Create a row in scrape_runtime_jobs so the EXISTS subquery in
+    _clear_stale_dedup can find it. status ∈ {'completed','running','failed'}."""
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+    async with AsyncSessionLocal() as db:
+        rj = ScrapeRuntimeJob(
+            runtime_job_id=runtime_job_id,
+            university_id=uni_id,
+            job_type="full",
+            status=status,
+        )
+        db.add(rj)
+        await db.commit()
+
+
+async def _delete_runtime_job(runtime_job_id: str) -> None:
+    from sqlalchemy import text as _text
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            _text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :rid"),
+            {"rid": runtime_job_id},
+        )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_clear_stale_dedup_preserves_rows_from_completed_jobs():
+    """Pending rows whose source job is COMPLETED must survive cleanup —
+    they're rows the user is still reviewing in the staging table.
+    Wiping them caused job_440a0e26c6df's COUNT(*)=0 vs imported=9
+    debugging-hell mismatch in PR-1.5 prod."""
+    uni_a, _ = await _pick_two_universities()
+    prefix = f"test_completed_{uuid.uuid4().hex[:8]}_"
+    completed_job = prefix + "completed_job"
+    failed_job = prefix + "failed_job"
+    orphan_job = prefix + "orphan_job"
+    try:
+        # Three old pending rows under different runtime-job statuses.
+        await _insert_runtime_job(completed_job, uni_a, "completed")
+        await _insert_runtime_job(failed_job, uni_a, "failed")
+        # orphan_job intentionally has no scrape_runtime_jobs entry —
+        # this is the "scraper crashed before flushing the job row"
+        # case the cleanup was originally built for.
+        from_completed = await _insert(completed_job, uni_a, prefix + "from-completed", "pending", age_min=30)
+        from_failed = await _insert(failed_job, uni_a, prefix + "from-failed", "pending", age_min=30)
+        from_orphan = await _insert(orphan_job, uni_a, prefix + "from-orphan", "pending", age_min=30)
+
+        async with AsyncSessionLocal() as db:
+            cleared = await _clear_stale_dedup(db, uni_a, minutes=10)
+
+        # Failed-job and orphan rows: gone. Completed-job row: kept.
+        assert cleared == 2, f"expected 2 deletions (failed + orphan), got {cleared}"
+        assert await _exists(from_completed), (
+            "completed-job pending row MUST survive — it's the staged-for-review "
+            "data behind the imported counter (root cause of job_440a0e26c6df "
+            "counter-vs-rows mismatch)"
+        )
+        assert not await _exists(from_failed), "failed-job pending row should be cleared"
+        assert not await _exists(from_orphan), "orphan-job pending row should be cleared"
+    finally:
+        await _cleanup(prefix)
+        for jid in (completed_job, failed_job):
+            await _delete_runtime_job(jid)
+
+
+@pytest.mark.asyncio
+async def test_clear_stale_dedup_preserves_rows_from_running_jobs():
+    """Pending rows whose source job is RUNNING must survive too —
+    a concurrent scrape is still actively writing them. Wiping
+    them mid-flight would corrupt the in-flight job's output."""
+    uni_a, _ = await _pick_two_universities()
+    prefix = f"test_running_{uuid.uuid4().hex[:8]}_"
+    running_job = prefix + "running_job"
+    try:
+        await _insert_runtime_job(running_job, uni_a, "running")
+        # Backdate 30 min — would normally be cleared by the age check.
+        from_running = await _insert(running_job, uni_a, prefix + "from-running", "pending", age_min=30)
+
+        async with AsyncSessionLocal() as db:
+            cleared = await _clear_stale_dedup(db, uni_a, minutes=10)
+
+        assert cleared == 0, "running-job pending rows MUST NOT be cleared mid-flight"
+        assert await _exists(from_running)
+    finally:
+        await _cleanup(prefix)
+        await _delete_runtime_job(running_job)

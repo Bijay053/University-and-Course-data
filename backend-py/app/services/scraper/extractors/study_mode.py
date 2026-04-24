@@ -26,8 +26,18 @@ field_key = "study_mode"
 _MODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
-            r"\b(blended|hybrid|mixed[\s\-]?mode|on[\s\-]?campus\s+(?:and|&)\s+online|"
-            r"online\s+(?:and|&)\s+on[\s\-]?campus)\b",
+            # PR-1.5 prod regression: bare `\bblended\b` matched marketing
+            # copy ("blended learning environment", "blended teaching
+            # approach") on every VIT page and forced study_mode='Blended'
+            # for all 24 staged courses. Require an explicit delivery
+            # noun to follow the keyword (delivery / mode / format /
+            # program / programme) so generic uses don't fire. Multi-mode
+            # combos ("On Campus and Online") are still authoritative on
+            # their own — those phrases only ever describe course delivery.
+            r"\b(blended|hybrid|mixed[\s\-]?mode)[\s\-]+"
+            r"(delivery|mode|format|program(?:me)?)\b|"
+            r"\bon[\s\-]?campus\s+(?:and|&)\s+online\b|"
+            r"\bonline\s+(?:and|&)\s+on[\s\-]?campus\b",
             re.IGNORECASE,
         ),
         "Blended",

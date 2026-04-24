@@ -175,15 +175,35 @@ async def _clear_stale_dedup(
     scrape runs only ever leave ``pending`` rows behind (status defaults to
     ``'pending'`` and the scraper never auto-rejects), so narrowing to
     ``pending`` cures the symptom without trampling reviewer history.
+
+    PR-1.5 prod regression: the original query deleted EVERY pending row
+    older than 10 minutes for the university, including rows from a
+    previous *successfully completed* run. This caused the counter-vs-
+    actual-rows mismatch in job_440a0e26c6df (CSU): scrape #1 staged 9
+    rows and reported imported=9; scrape #2 launched >10 min later
+    wiped all 9 pending rows during its own dedup pass before staging
+    started, leaving COUNT(*) FROM scraped_courses WHERE
+    scrape_job_id='job_440a0e26c6df' = 0 against an imported=9 counter.
+    Fix: only clear rows whose source job is NOT completed and NOT
+    currently running. Rows from completed jobs survive (the user is
+    still reviewing them); rows from running jobs survive (a concurrent
+    scrape is still writing them); rows from failed/stopped/orphaned
+    jobs are safe to wipe (they're the genuine left-overs this cleanup
+    was built for).
     """
     from sqlalchemy import text as _text
     res = await db.execute(
         _text(
             """
-            DELETE FROM scraped_courses
-            WHERE university_id = :uid
-              AND status = 'pending'
-              AND created_at < NOW() - (:m || ' minutes')::interval
+            DELETE FROM scraped_courses sc
+            WHERE sc.university_id = :uid
+              AND sc.status = 'pending'
+              AND sc.created_at < NOW() - (:m || ' minutes')::interval
+              AND NOT EXISTS (
+                  SELECT 1 FROM scrape_runtime_jobs j
+                  WHERE j.runtime_job_id = sc.scrape_job_id
+                    AND j.status IN ('completed', 'running')
+              )
             """
         ),
         {"uid": university_id, "m": str(minutes)},
@@ -538,6 +558,49 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             errors=summary.get("errors", 0),
             level="success",
         )
+        # PR-1.5: post-run sanity check on the imported counter.
+        # Prod regression on job_440a0e26c6df reported imported=9 against a
+        # DB COUNT(*)=0. Root cause was the over-aggressive _clear_stale_dedup
+        # (fixed above), but a divergence between the in-memory counter and
+        # the actual row count is a debugging-hell-class symptom — it makes
+        # operators chase phantom rows that never landed. Re-read the truth
+        # from the DB and use that as the authoritative number; warn loudly
+        # in the live log AND server log on any drift so future regressions
+        # surface immediately instead of silently lying. Best-effort: a
+        # transient SELECT failure must never block the job from finalizing.
+        from sqlalchemy import text as _text
+        try:
+            actual_staged = (await db.execute(
+                _text(
+                    "SELECT COUNT(*) FROM scraped_courses "
+                    "WHERE scrape_job_id = :rid"
+                ),
+                {"rid": runtime_job_id},
+            )).scalar() or 0
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "post-run row-count check failed for %s: %s — "
+                "leaving counter as-is", runtime_job_id, exc,
+            )
+            actual_staged = None
+        if actual_staged is not None and actual_staged != summary["staged"]:
+            log.warning(
+                "imported counter (%d) != actual rows in db (%d) for job %s "
+                "— using actual row count",
+                summary["staged"], actual_staged, runtime_job_id,
+            )
+            await emit(
+                "status",
+                f"[STAGE] counter reconciled: in-memory staged={summary['staged']} "
+                f"vs db rows={actual_staged} — using db count "
+                f"(prevents counter-vs-rows mismatch debugging hell)",
+                phase="stage",
+                kind="counter_reconciled",
+                in_memory=summary["staged"],
+                db_rows=actual_staged,
+                level="warn",
+            )
+            summary["staged"] = actual_staged
         await emit("status", f"Staged {summary['staged']} courses, {summary['skipped']} skipped, {summary['fetch_failed']} fetch errors", phase="complete", **summary)
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0
