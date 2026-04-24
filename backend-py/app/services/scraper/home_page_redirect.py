@@ -132,12 +132,47 @@ _ERROR_URL_RE = re.compile(
 )
 
 
-# Common category slug names used by course-list pages (VIT-style).
-# Mirrors Node ``COURSE_CATEGORY_SLUGS`` (routes/scrape.ts:6968-6972).
-COURSE_CATEGORY_SLUGS: tuple[str, ...] = (
-    "bits", "mits", "mba", "bbus", "vocational", "elicos",
+# Category slug configuration — split into a generic set tried on every
+# host and a per-host map only tried for that host. Keeps VIT-specific
+# slugs (`bits`, `mits`, `mba`, `bbus`, etc.) from leaking onto other
+# universities that happen to use a ``/course-finder``-shaped listing
+# path. Mirrors the Node config split (routes/scrape.ts:6968-6972 +
+# host-overrides table) but reorganised for clarity.
+
+#: Slugs that name a degree level — universally meaningful, so they're
+#: safe to probe on any host that exposes a category-filter listing.
+_GENERIC_CATEGORY_SLUGS: tuple[str, ...] = (
     "bachelor", "master", "diploma", "certificate", "graduate",
     "undergraduate", "postgraduate", "phd", "honours",
+)
+
+#: Slugs that name a *brand* (BBus, BITs, MITs, MBA, …) or a VIT
+#: program family (vocational, elicos). These are only meaningful on
+#: the listed host — probing them on CSU/USQ/UTAS would waste 4 HEAD
+#: requests per slug for zero recall. Keys MUST be the bare host
+#: (no scheme, no port, no leading dot).
+_HOST_CATEGORY_SLUGS: dict[str, tuple[str, ...]] = {
+    "vit.edu.au": ("bits", "mits", "mba", "bbus", "vocational", "elicos"),
+}
+
+
+def _slugs_for_host(host: str) -> tuple[str, ...]:
+    """Return the slug list to probe for ``host`` — generic + host-specific.
+
+    Generic slugs come first so a working ``?category=master`` short-
+    circuits before the loop touches a host-specific slug.
+    """
+    host = (host or "").lower()
+    extra = _HOST_CATEGORY_SLUGS.get(host, ())
+    return _GENERIC_CATEGORY_SLUGS + extra
+
+
+#: Backward-compatible flat alias kept for any caller (or test) that
+#: imported the old tuple directly. New code should call
+#: :func:`_slugs_for_host` instead.
+COURSE_CATEGORY_SLUGS: tuple[str, ...] = (
+    _GENERIC_CATEGORY_SLUGS
+    + tuple(s for slugs in _HOST_CATEGORY_SLUGS.values() for s in slugs)
 )
 
 
@@ -354,8 +389,13 @@ async def expand_course_list_with_categories(
     extra: list[dict[str, Any]] = []
     consecutive_empty = 0
 
+    # Compose the slug list per-host — generic slugs always, plus any
+    # host-specific brand slugs. Prevents e.g. CSU from getting probed
+    # for ``bits``/``mits``/``mba``/``bbus`` (VIT-only program names).
+    host_slugs = _slugs_for_host(parsed.netloc)
+
     async with httpx.AsyncClient(http2=False) as client:
-        for slug in COURSE_CATEGORY_SLUGS:
+        for slug in host_slugs:
             if consecutive_empty >= _CATEGORY_EXPAND_EARLY_EXIT:
                 # Host clearly doesn't use category-filter URLs — bail.
                 break

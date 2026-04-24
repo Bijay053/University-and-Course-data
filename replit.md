@@ -522,12 +522,17 @@ full data. Five missing features were ported:
    uses `setdefault`-style first-write-wins.
 4. **Category-filtered listing expansion**
    `app/services/scraper/home_page_redirect.py::expand_course_list_with_categories`
-   — for known category slugs (`bbus`, `mits`, `mba`, `bachelor`,
-   `master`, …), HEAD-probes 4 URL variants per slug
+   — for known category slugs, HEAD-probes 4 URL variants per slug
    (`?course_categories[0]=`, `?category=`, `?type=`, `/{slug}`),
    fetches the first that 200s, harvests new course links via the
-   existing `_looks_like_course` filter. Path-gated to listing roots
-   only (regex `/(course-list|course-finder|courses?|programs?)/?$`).
+   existing `_looks_like_course` filter. Slugs are split into
+   `_GENERIC_CATEGORY_SLUGS` (degree-level names: `bachelor`, `master`,
+   `diploma`, `certificate`, …, tried on every host) and
+   `_HOST_CATEGORY_SLUGS` (host-keyed dict; `vit.edu.au` maps to brand
+   slugs `bits`, `mits`, `mba`, `bbus`, `vocational`, `elicos`, only
+   probed on that host). Path-gated to VIT-shaped listing roots
+   (`/course-list`, `/course-finder`, `/course-guide`); 3-empty-slug
+   early-exit caps the worst-case cost at ~12 HEAD probes.
 5. **Browser "International" toggle action**
    `browser_pool.py::fetch_html(click_international=True)` runs an
    in-page JS evaluator that finds a radio / checkbox / link / button
@@ -542,9 +547,36 @@ full data. Five missing features were ported:
 "ieltsSpeaking":5.5}` immediately after the FastAPI restart — exactly
 the values the Node scraper produces.
 
-**Tests:** 23 new unit tests across
+**Tests:** 37 new unit tests across
 `tests/test_home_page_redirect.py`,
 `tests/test_per_course_modal.py`,
-`tests/test_vit_static_extract.py`. Existing 38 regression tests still
-pass (data-parity, discovery-regression, browser-fallback-timeout,
-scraper-pipeline-parity, completeness).
+`tests/test_vit_static_extract.py`,
+`tests/test_category_expand.py` (host-config split, slug-leak
+invariant), and
+`tests/test_browser_international_toggle.py` (mocked Playwright page,
+verifies toggle JS routing + post-click waits + silent-error
+behaviour). Existing 38 regression tests still pass (data-parity,
+discovery-regression, browser-fallback-timeout, scraper-pipeline-
+parity, completeness). Total: 75 passing.
+
+**Hardening (architect-driven follow-ups, commit `12d15f7`):**
+- Toggle JS now captures `location.href` before click and returns
+  false if the click navigated away — prevents a nav-menu
+  "International" link from being treated as a successful fee-toggle
+  click. Strategy 2 (text-based) skips elements wrapped in
+  `<nav>`/`<header>`/`<footer>` and no longer considers `<a>` tags.
+- Category expansion path-regex tightened from
+  `/(course-list|course-finder|courses?|programs?)/?$` to only the
+  VIT-shaped paths (`/course-list`, `/course-finder`, `/course-guide`).
+  Generic `/courses` and `/programs` paths excluded.
+
+**Outstanding gaps vs Node** (not yet ported, tracked for PR-5):
+- `[fix3]` short-circuit (skip requirements-page vision-AI when modal
+  returned complete IELTS+PTE+TOEFL+CAE — `scrape.ts:8276`). Would
+  cut per-course time to ~0.1s on VIT.
+- `[browser ✓ intl]` log line with `international_toggle_scripted[N]`
+  strategy attribution.
+- `[SMART]` discovery prefix + sitemap-first candidate discovery
+  (`scrape.ts:10367`). Python uses `[DISCOVER]` BFS path.
+- `detect_course_listing_page` Step-3 GET-content fallback
+  (`scrape.ts:7071-7077`) for hosts that reject HEAD but serve GET.

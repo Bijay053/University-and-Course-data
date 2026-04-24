@@ -136,29 +136,30 @@ def test_expand_merges_new_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
     """For a /course-list listing URL, an HTTP HEAD-probe success on a
     category variant fetches the page and merges any new course links.
 
-    The fixture mocks the FIRST slug (``bits``) because the early-exit
-    short-circuit (3 consecutive empty slugs) would otherwise fire
-    before reaching a slug that's deeper in the slug list."""
+    The fixture mocks ``bachelor`` (the first slug in
+    ``_GENERIC_CATEGORY_SLUGS``) so it's reached before the 3-consecutive-
+    empty short-circuit fires. Generic slugs are probed FIRST regardless
+    of host, so this test covers the common path on every uni."""
 
-    bits_html = """
+    bachelor_html = """
     <html><body>
-      <a href="/courses/bits-software-engineering">BITS - Software Engineering</a>
-      <a href="/courses/bits-cybersecurity">BITS - Cybersecurity</a>
+      <a href="/courses/bachelor-of-business">Bachelor of Business</a>
+      <a href="/courses/bachelor-of-it">Bachelor of IT</a>
       <a href="/about">About</a>
     </body></html>
     """
 
     def _client_factory(*args: Any, **kwargs: Any) -> _FakeAsyncClient:
-        # Only the bits variant 200s; everything else 404s.
+        # Only the bachelor variant 200s; everything else 404s.
         return _FakeAsyncClient(
             {
-                "https://vit.edu.au/course-list?course_categories[0]=bits": _FakeResponse(200),
+                "https://vit.edu.au/course-list?course_categories[0]=bachelor": _FakeResponse(200),
             }
         )
 
     async def _fake_fetch(url: str) -> str:
-        if url == "https://vit.edu.au/course-list?course_categories[0]=bits":
-            return bits_html
+        if url == "https://vit.edu.au/course-list?course_categories[0]=bachelor":
+            return bachelor_html
         return ""
 
     monkeypatch.setattr(home_page_redirect.httpx, "AsyncClient", _client_factory)
@@ -172,8 +173,8 @@ def test_expand_merges_new_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     urls = {c["url"] for c in result}
     assert "https://vit.edu.au/courses/mba" in urls  # original preserved
-    assert "https://vit.edu.au/courses/bits-software-engineering" in urls
-    assert "https://vit.edu.au/courses/bits-cybersecurity" in urls
+    assert "https://vit.edu.au/courses/bachelor-of-business" in urls
+    assert "https://vit.edu.au/courses/bachelor-of-it" in urls
     # /about should NOT make it through — it doesn't look like a course.
     assert "https://vit.edu.au/about" not in urls
 
