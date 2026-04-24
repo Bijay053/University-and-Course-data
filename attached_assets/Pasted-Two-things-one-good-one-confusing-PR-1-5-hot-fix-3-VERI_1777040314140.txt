@@ -1,0 +1,38 @@
+Two things — one good, one confusing.
+
+**PR-1.5 hot-fix #3 VERIFIED on prod** ✅
+
+job_1d33814f4632 (VIT, 24 courses, 13m 55s):
+- has_pte: 24/24 (was 11/24 broken, was 11/24 after hot-fix #1)
+- has_toefl: 24/24 (was 11/24)
+- has_cae: 24/24 (was 11/24)
+- on_campus: 23/24 (was 0/24)
+- bad_duration (masters > 5 yrs): 0 (was 6)
+- avg_completeness: 67.5%
+
+The BeautifulSoup table parser in english_test.py worked. Full PR-1.5 regression chain (hot-fix #1 + #2 + #3) is closed on prod.
+
+The 67.5% completeness is a **separate** issue — missing description/academicLevel/academicScore/otherRequirement. Not caused by PR-1.5, was never green. Please file as its own ticket, don't mix with PR-1.5 verification.
+
+---
+
+**Now the confusing part** ⚠️
+
+The UI log feed I saw during my test shows output like:
+- `[SMART] Discovering candidate sources (sitemap + listing page + API)`
+- `[SAMPLE✓] ✓ Confirmed course (detail metadata): "Bachelor Of Business"`
+- `[per-course modal ✓] Bbus Business Technology — IELTS=6 PTE=47 TOEFL=67 CAE=169 [0.1s]`
+- `[browser ✓ intl] ... international_toggle_scripted[0]`
+- `[VIT static fallback ✓] ... recovered duration=3 Year, intakes=March,May,August...`
+- `[fix3] Course-page modal provided complete English data — SKIPPING requirements-page vision-AI`
+- `Using university: VIT (ID: 16)` — note ID=16 uppercase VIT
+
+None of those strings exist in backend-py/. Prod logs show `[per-course browser ✓]`, `[per-course vision img X/6]`, `[FALLBACK] AI enriching`, university_id=6 lowercase vit. Different codebase entirely.
+
+**Questions:**
+1. Is `artifacts/api-server/` still actively developed after yesterday's migration audit said Node was dead? Those `[per-course modal ✓]` / `[SMART]` / `[SAMPLE✓]` / `[fix3]` log prefixes look like they come from there.
+2. Which scraper is intended to run in production — Python (backend-py/) or Node (artifacts/api-server/)?
+3. The Node one clearly extracts VIT data in 0.1s per course with perfect modal parsing and a VIT static fallback. Was this work coordinated with the Python migration, or is it parallel/unaware?
+4. If Node is the intended prod scraper, prod currently isn't running it — DigitalOcean has pure Python services (no Node processes, empty pm2 list). Need clarity on deployment target.
+
+Please respond before the next PR. If Node is dead, let's delete artifacts/api-server/ as PR-3 planned. If Node is alive, we need to revisit the migration decision. Can't be both.

@@ -1,0 +1,152 @@
+# PR-4: VIT parity port (Node → Python)
+
+## Objective
+Port 5 missing VIT-specific features from Node `artifacts/api-server/` to Python `backend-py/` so prod matches the Replit preview's VIT quality. Keep architecture generic: pipeline stays university-agnostic, host-specific behaviour goes behind hooks/config.
+
+## Context
+- Prod VIT (job_1d33814f4632, 2026-04-24 14:00 UTC): 24/24 PTE, TOEFL, CAE after PR-1.5 hot-fix #3. 67.5% avg_completeness because description/academicLevel/academicScore/otherRequirement still missing.
+- Replit's Node scraper hits VIT in 0.1s/course with modal extractor + int'l toggle + static fallback. That's what we're porting.
+- Do NOT remove english_test.py regex bridge (hot-fix #2, fd14a6a) or BeautifulSoup table parser (hot-fix #3, f54ebf8). They're needed for other unis.
+
+## Estimate requested
+Please return an estimate before starting. Ballpark: 6-10 hrs.
+
+---
+
+## T001: Home-page → /course-list redirect
+New module `backend-py/app/services/scraper/home_page_redirect.py` exposing `detect_course_listing_page(home_url, html) -> str | None`.
+
+Port Node `detectCourseListingPage` (routes/scrape.ts:6974-7081): HEAD-probe high-priority paths, then weighted link-scan, then broad HEAD-probe fallback.
+
+Wire into `discovery.py::discover_course_links` early: if start_url path is `/` or empty, call detector, switch start_url to redirect target before BFS, emit `Home page detected → course listing at ...`.
+
+**Acceptance:** Called with `https://vit.edu.au/` returns `https://vit.edu.au/course-list`. Must NOT redirect for non-home URLs (e.g. `https://study.csu.edu.au/courses/bachelor-of-nursing` stays as-is).
+
+---
+
+## T002: Per-course modal extractor
+New module `backend-py/app/services/scraper/per_course_modal.py` exposing `extract_modal_english(html, course_name, degree_level) -> dict`.
+
+Port Node per-course modal scan (routes/scrape.ts:8754-8917): find `.modal` / `[role=dialog]` containing IELTS+PTE+TOEFL, parse `<table>` rows, classify cells into ielts/pte/toefl/cae, pick row whose IELTS is closest to degree-level target (5.5 cert/diploma, 6.0 bachelor, 6.5 masters/MBA).
+
+Also extract IELTS sub-bands (L/R/W/S) using the three Node patterns: A "no individual band below X.X", B explicit Listening/Reading/Writing/Speaking, C short-form L X.X R X.X.
+
+**Pipeline order (this is critical, do not change):**
+1. Static parse — `english_test.extract()` in english_test.py (includes PR-1.5 table parser, keep intact)
+2. **Modal extractor** — NEW, runs only if step 1 left ielts/pte/toefl/cae empty
+3. Per-course browser refetch (maybe_browser_refetch)
+4. Per-course vision
+5. Gemini AI fallback
+
+Modal goes between static and browser, NOT before static. Rationale: static is fast and already handles non-modal tables via hot-fix #3.
+
+Emit `[per-course modal ✓] {name} — IELTS=… PTE=… TOEFL=… CAE=…` or `[per-course modal ✗] {name} — {reason}`.
+
+**Acceptance:** Given VIT BBus HTML returns `{"ielts_overall": 6.0, "pte_overall": 47, "toefl_overall": 67, "cambridge_overall": 169, "ielts_listening": 5.5, ...}`.
+
+---
+
+## T003: VIT static fallback (duration / intakes / location)
+New module `backend-py/app/services/scraper/vit_static_extract.py` exposing `apply_vit_summary_extraction(url, html, payload)`.
+
+Port Node `applyVitSummaryExtraction` (routes/scrape.ts:3619-3735): label-walk over `<strong>`/`<b>`, find labels matching intake/location/duration regexes, harvest values from next `<ul>`/`<ol>` siblings or inline text, normalise.
+
+**Reuse existing normalisers:** call `extractors.intake.extract` / `extractors.duration.extract` / `extractors.location.extract` for actual parsing. Only the DOM-finding logic is VIT-specific.
+
+Wire into `single_course.py` AFTER per-course browser fallback, ONLY when host is vit.edu.au AND duration OR intake OR location still missing. Use a fresh HTTP fetch (the browser pass clicks the int'l toggle and strips the static narrative).
+
+Emit `[VIT static fallback ✓] {name} — recovered duration=…, intakes=…, location=…`.
+
+**Acceptance:** Given VIT BBus static HTML, merges `duration_value=3, duration_unit="Year", intake_text="March,May,August,September,December", location_text="Melbourne, Sydney, Adelaide, Geelong"`.
+
+---
+
+## T004: Category-filtered listing expansion
+**Blocked by:** T001
+
+New function `expand_course_list_with_categories(listing_url, candidates) -> list[dict]`.
+
+Port Node `expandCourseListWithCategories` (routes/scrape.ts:7087-7131). HEAD-probe category variants on the listing path.
+
+**Split slug list into two configs:**
+- `_GENERIC_CATEGORY_SLUGS`: bachelor, master, diploma, certificate (tried on any university)
+- `_HOST_CATEGORY_SLUGS`: dict, e.g. `{"vit.edu.au": ["bits", "mits", "mba", "bbus", "vocational", "elicos"]}` — only tried on matching host
+
+Reason: we don't want CSU to get HEAD-probed for `/bits` and `/mits`.
+
+Wire into `discovery.py` after home-page redirect resolves to a /course-list-style path.
+
+**Acceptance:** VIT discovered count 24 → 30. CSU/USQ/UTAS counts unchanged.
+
+---
+
+## T005: Browser "International" toggle action
+**Blocked by:** T002
+
+Add `click_international: bool = False` kwarg to `browser_pool.fetch_html`. When true, after goto + settle, run JS evaluator that finds radio/checkbox/`<a>` whose value/text matches "international", click it, wait network-idle + 1.2s.
+
+Port from Node browser-helper.ts:260-340.
+
+Add `_INTL_TOGGLE_HOSTS = {"vit.edu.au"}` constant at top of `per_course_browser.py`. Update `maybe_browser_refetch` to pass `click_international=True` when URL host is in this set.
+
+**Acceptance:** VIT browser fetch with toggle clicked exposes the international fee block in rendered HTML.
+
+---
+
+## T006a: Unit tests
+**Blocked by:** T001, T002, T003, T004, T005
+
+- `test_home_page_redirect.py` with mocked HEAD responses
+- `test_per_course_modal.py` with a fixture HTML snippet from VIT BBus
+- `test_vit_static_extract.py` with a fixture from VIT BBus static HTML
+- `test_category_expand.py` asserting VIT-only slugs don't leak to other hosts
+- `test_browser_international_toggle.py` with mocked Playwright
+
+All must pass: `pytest backend-py/tests/ -x`.
+
+---
+
+## T006b: Integration test (full VIT scrape)
+**Blocked by:** T006a
+
+Run Python scraper end-to-end against VIT. Assert:
+- discovered ≥ 30 (was 24 on 4/24)
+- has_pte = total, has_toefl = total, has_cae = total
+- has_intake ≥ 0.9 × total
+- has_location ≥ 0.9 × total  
+- avg_completeness ≥ 85% (was 67.5% on 4/24)
+- duration ≤ 10 min (was 14 min on 4/24)
+
+---
+
+## T007: Regression check on existing universities
+**Blocked by:** T006a
+
+T001 + T004 change discovery for ALL hosts. Run full scrape against each existing uni, assert each completes with ≥ prior imported count:
+- USQ (id=1) — prior 16
+- torrens (id=3) — prior 21
+- CSU (id=4) — prior 14
+- UTAS (id=5) — prior 9 or more
+
+Any regression = block merge.
+
+---
+
+## T006c: Commit + push
+**Blocked by:** T006b, T007
+
+One commit per logical unit (not one per task):
+- commit 1: T001 + T004 (discovery changes)
+- commit 2: T002 + T005 (modal + browser toggle)
+- commit 3: T003 (VIT static fallback)
+- commit 4: tests + replit.md Section 10 update
+
+Use documented AUTH= flow. Record SHAs in reply.
+
+---
+
+## What NOT to do
+- Don't delete `english_test.py` regex bridge or BeautifulSoup table parser — needed for non-VIT
+- Don't hardcode VIT into generic modules — use host config dicts
+- Don't skip T007 regression check
+- Don't bundle T001 + T002 + T003 into one commit
