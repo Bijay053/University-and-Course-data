@@ -145,9 +145,34 @@ async def discover_course_links(
     # discovery (sitemap reuses our regex constants).
     from app.services.scraper.page_type import classify_page
     from app.services.scraper.sitemap import discover_from_sitemap
+    from app.services.scraper.home_page_redirect import (
+        _is_home_page,
+        detect_course_listing_page,
+        expand_course_list_with_categories,
+    )
 
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # ── Home-page → course-listing redirect (T001) ──────────────────────
+    # When the caller hands us the marketing home page (path is "/" or
+    # empty), VIT-style universities won't yield any course links from
+    # the home-page DOM. Detect the real catalogue URL via HEAD-probe +
+    # link-scan and switch start_url before BFS begins. Without this,
+    # the Python crawler used to fall back to the sitemap (yielding ~24
+    # candidates) instead of using the per-listing pagination Node uses
+    # (yielding ~30).
+    if _is_home_page(start_url):
+        home_html = await fetch_html(start_url) or ""
+        redirect = None
+        try:
+            redirect = await detect_course_listing_page(start_url, home_html, emit=emit)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("home_page_redirect failed for %s: %s", start_url, exc)
+        if redirect and redirect != start_url:
+            start_url = redirect
+            parsed = urlparse(start_url)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
 
     queue: list[tuple[str, int]] = [(start_url, 0)]
     visited: set[str] = set()
@@ -276,6 +301,31 @@ async def discover_course_links(
             log.warning("sitemap fallback failed for %s: %s", origin, exc)
             sitemap_courses = []
         for c in sitemap_courses:
+            u = c.get("url")
+            n = c.get("name") or ""
+            if not u or u in found:
+                continue
+            found[u] = n
+            if len(found) >= max_courses:
+                break
+
+    # ── Category-filter expansion (T004) ────────────────────────────────
+    # VIT-style course-list pages expose category filters (?course_categories
+    # [0]=bbus, ?category=master, …). Each filter shows a different slice
+    # of the catalogue, and the union covers more courses than the
+    # unfiltered listing alone (24 → 30 on VIT). Only fires when the
+    # listing path matches the expand-eligible regex inside
+    # ``expand_course_list_with_categories``.
+    if found and len(found) < max_courses and origin:
+        existing_list = [{"url": u, "name": n} for u, n in found.items()]
+        try:
+            expanded = await expand_course_list_with_categories(
+                start_url, existing_list, emit=emit
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("category expansion failed for %s: %s", start_url, exc)
+            expanded = existing_list
+        for c in expanded:
             u = c.get("url")
             n = c.get("name") or ""
             if not u or u in found:

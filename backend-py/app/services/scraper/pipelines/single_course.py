@@ -139,6 +139,64 @@ async def extract_course(
                     # the extractor returned first) is preserved.
                     payload.setdefault(k, v)
 
+    # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
+    # the per-course browser pass because (a) it's pure-CPU (no Playwright
+    # spin-up, no network), (b) the english_test extractor often misses
+    # the values when they live ONLY inside a hidden modal, and (c) a
+    # successful modal pass populates the english slots so the browser
+    # fallback no-ops on its first gate. Only fires when at least one
+    # english slot is still empty — paying for BeautifulSoup parse on a
+    # page whose IELTS already extracted is wasted work.
+    _ENGLISH_SLOTS_FOR_MODAL = (
+        "ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall",
+    )
+    if any(payload.get(k) in (None, "", 0) for k in _ENGLISH_SLOTS_FOR_MODAL):
+        try:
+            from app.services.scraper.per_course_modal import extract_modal_english
+
+            modal_filled = extract_modal_english(
+                html,
+                course_name=payload.get("course_name") or "",
+                degree_level=payload.get("degree_level") or "",
+            )
+            modal_summary = modal_filled.pop("__modal_summary", None)
+            for k, v in modal_filled.items():
+                if v in (None, "", 0):
+                    continue
+                if k in payload and payload.get(k) not in (None, "", 0):
+                    continue
+                payload[k] = v
+                evidence.append(
+                    {
+                        "field_key": k,
+                        "value": v,
+                        "confidence": 0.9,
+                        "method": "per_course_modal",
+                        "snippet": modal_summary,
+                    }
+                )
+            if emit and modal_filled:
+                await emit(
+                    "status",
+                    f"[per-course modal ✓] {payload.get('course_name', url)[:40]} — "
+                    f"{modal_summary or ''}",
+                    phase="extract",
+                    kind="per_course_modal_done",
+                    url=url,
+                    filled=list(modal_filled.keys()),
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("per_course_modal failed on %s: %s", url, exc)
+            if emit:
+                await emit(
+                    "status",
+                    f"[per-course modal ✗] {payload.get('course_name', url)[:40]} — "
+                    f"{str(exc)[:80]}",
+                    phase="extract",
+                    kind="per_course_modal_error",
+                    url=url,
+                )
+
     # T207/T208: per-course browser + vision fallback. Run BEFORE the AI
     # fallback because (a) they're cheaper, (b) AI hallucinates plausible
     # numbers when the page is image-only and the browser/vision pass
@@ -165,6 +223,63 @@ async def extract_course(
         evidence.extend(vision_evidence)
     except Exception as exc:  # noqa: BLE001 — never break extraction here
         log.warning("per-course browser/vision fallback errored on %s: %s", url, exc)
+
+    # T003: VIT-specific static fallback for duration / intake / location.
+    # The per-course browser pass clicks the "International students"
+    # toggle which strips the static narrative paragraph (`<p><strong>
+    # Duration:</strong> Usually a 3 year course...</p>`) from the
+    # rendered DOM. We re-parse the original static HTML to recover
+    # those fields. Only fires when at least one of the three slots is
+    # still missing AND the URL is a vit.edu.au page.
+    try:
+        from app.services.scraper.vit_static_extract import (
+            apply_vit_summary_extraction,
+            is_vit_url,
+        )
+        if is_vit_url(url):
+            need_dur = payload.get("duration") in (None, "", 0) or not payload.get("duration_term")
+            need_int = payload.get("intake_text") in (None, "")
+            need_loc = payload.get("location_text") in (None, "")
+            if need_dur or need_int or need_loc:
+                vit_filled = apply_vit_summary_extraction(url, html, payload)
+                for k, v in vit_filled.items():
+                    if v in (None, "", 0):
+                        continue
+                    if payload.get(k) not in (None, "", 0):
+                        continue
+                    payload[k] = v
+                    evidence.append(
+                        {
+                            "field_key": k,
+                            "value": v,
+                            "confidence": 0.85,
+                            "method": "vit_static_fallback",
+                            "snippet": None,
+                        }
+                    )
+                if emit and vit_filled:
+                    parts = []
+                    if vit_filled.get("duration") is not None:
+                        parts.append(
+                            f"duration={vit_filled.get('duration')}"
+                            f"{vit_filled.get('duration_term', '')}"
+                        )
+                    if vit_filled.get("intake_text"):
+                        parts.append(f"intakes={vit_filled['intake_text']}")
+                    if vit_filled.get("location_text"):
+                        parts.append(f"location={vit_filled['location_text']}")
+                    await emit(
+                        "status",
+                        f"[VIT static fallback ✓] "
+                        f"{payload.get('course_name', url)[:40]} — "
+                        f"recovered {', '.join(parts)}",
+                        phase="fallback",
+                        kind="vit_static_done",
+                        url=url,
+                        filled=list(vit_filled.keys()),
+                    )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("vit_static_extract failed on %s: %s", url, exc)
 
     if use_ai_fallback:
         # Note which slots are still empty so the UI can show *what* the AI

@@ -484,3 +484,67 @@ NOT cover. All six fixes below land together.
   fallbacks because they sit inside the same extract loop.
 - **Tests**: 308 passed, 1 skipped (unchanged baseline — change is purely
   additive log emission).
+
+
+## VIT Parity Port (Apr 2026, Node→Python)
+
+**Goal:** close the per-course completeness gap between the legacy
+Node `artifacts/api-server` scraper and the Python rewrite under
+`backend-py`. On VIT pages, prod (DigitalOcean, Python) was returning
+~24 candidates with empty IELTS sub-bands and missing duration / intake
+/ location, while preview (Replit, Node) returned ~30 candidates with
+full data. Five missing features were ported:
+
+1. **Home-page → course-listing redirect**
+   `app/services/scraper/home_page_redirect.py::detect_course_listing_page`
+   — HEAD-probes 12 high-priority paths (`/course-list`,
+   `/study/degrees-and-courses`, `/courses`, …), falls back to a link-
+   scan with weighted scoring (URL-pattern + link-text), then a broad
+   HEAD-probe over 17 common catalogue paths. Wired into
+   `discovery.py::discover_course_links`; only fires when `start_url`'s
+   path is `/`. Strong URL patterns are anchored to end-of-path so a
+   leaf URL like `/courses/bachelor-of-business` never wins.
+2. **Per-course Bootstrap-modal English-test extractor**
+   `app/services/scraper/per_course_modal.py::extract_modal_english`
+   — locates `.modal/[role=dialog]` containers, parses concordance
+   tables, picks the row whose IELTS is closest to the degree-level
+   target (5.5 cert/diploma · 6.0 bachelor · 6.5 master/MBA), and
+   recovers IELTS sub-bands (L/R/W/S) via three regex patterns (A/A2/B/C).
+   Wired into `single_course.py` BEFORE per-course-browser; gated on
+   any english slot being empty so it's a no-op when primary extraction
+   already filled IELTS/PTE/TOEFL/CAE.
+3. **VIT static fallback for duration / intake / location**
+   `app/services/scraper/vit_static_extract.py::apply_vit_summary_extraction`
+   — re-parses the static (server-rendered) HTML to recover the
+   `<p><strong>Duration:</strong>` narrative paragraph and intake-list
+   `<ul>`s that the per-course-browser pass strips when it clicks the
+   "International students" toggle. Host-gated on `vit.edu.au`; merge
+   uses `setdefault`-style first-write-wins.
+4. **Category-filtered listing expansion**
+   `app/services/scraper/home_page_redirect.py::expand_course_list_with_categories`
+   — for known category slugs (`bbus`, `mits`, `mba`, `bachelor`,
+   `master`, …), HEAD-probes 4 URL variants per slug
+   (`?course_categories[0]=`, `?category=`, `?type=`, `/{slug}`),
+   fetches the first that 200s, harvests new course links via the
+   existing `_looks_like_course` filter. Path-gated to listing roots
+   only (regex `/(course-list|course-finder|courses?|programs?)/?$`).
+5. **Browser "International" toggle action**
+   `browser_pool.py::fetch_html(click_international=True)` runs an
+   in-page JS evaluator that finds a radio / checkbox / link / button
+   matching `/international|overseas|offshore/`, clicks it, then waits
+   for network-idle + 1.2 s. Wired into `per_course_browser.py` via
+   `_needs_international_toggle(url)` (host whitelist:
+   `vit.edu.au`).
+
+**Live verification:** the Bachelor of Business worker emitted
+`G-db-insert-payload :: Bachelor of Business :: {"ieltsOverall":6,
+"ieltsListening":5.5,"ieltsReading":5.5,"ieltsWriting":5.5,
+"ieltsSpeaking":5.5}` immediately after the FastAPI restart — exactly
+the values the Node scraper produces.
+
+**Tests:** 23 new unit tests across
+`tests/test_home_page_redirect.py`,
+`tests/test_per_course_modal.py`,
+`tests/test_vit_static_extract.py`. Existing 38 regression tests still
+pass (data-parity, discovery-regression, browser-fallback-timeout,
+scraper-pipeline-parity, completeness).

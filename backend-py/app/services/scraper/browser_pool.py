@@ -16,6 +16,73 @@ _REAL_UA = (
     "Chrome/124.0.0.0 Safari/537.36"
 )
 
+# T005: JavaScript that finds the "International students" toggle on a
+# course page (radio / checkbox / link / button) and clicks it.
+# Mirrors Node ``browser-helper.ts`` lines 260-340.
+#
+# Strategy:
+# 1. Direct radio/checkbox: ``input[value*="international" i]`` —
+#    most VIT pages put the toggle as a radio button.
+# 2. Tab/link/button by visible text: any clickable whose text
+#    contains "international" and not already aria-selected/active.
+# 3. Aria-controls / data-target wrappers around an "international"
+#    label.
+#
+# Returns true (boolean) when something was clicked, false otherwise.
+# The click is fire-and-forget: any errors are swallowed so a missing
+# toggle doesn't break the wider browser fetch.
+_INTERNATIONAL_TOGGLE_JS = r"""
+() => {
+  const isHidden = (el) => {
+    if (!el) return true;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return true;
+    const rect = el.getBoundingClientRect();
+    return rect.width === 0 && rect.height === 0;
+  };
+  const isAlreadyActive = (el) => {
+    if (!el) return false;
+    if (el.checked === true) return true;
+    if (el.getAttribute && el.getAttribute('aria-selected') === 'true') return true;
+    if (el.classList && (el.classList.contains('active') ||
+        el.classList.contains('selected') || el.classList.contains('is-active'))) {
+      return true;
+    }
+    return false;
+  };
+  // Strategy 1: input[type=radio|checkbox] whose value/name matches.
+  const inputs = Array.from(document.querySelectorAll(
+    'input[type="radio"], input[type="checkbox"]'));
+  for (const input of inputs) {
+    const v = (input.value || '').toLowerCase();
+    const n = (input.name || '').toLowerCase();
+    const id = (input.id || '').toLowerCase();
+    if (!/international|overseas|offshore/.test(v + ' ' + n + ' ' + id)) continue;
+    if (isHidden(input) || isAlreadyActive(input)) continue;
+    try { input.click(); return true; } catch (e) {}
+    // If the input is hidden behind a label, click the label instead.
+    const label = document.querySelector('label[for="' + input.id + '"]');
+    if (label) { try { label.click(); return true; } catch (e) {} }
+  }
+  // Strategy 2: clickable text element whose text contains "international".
+  const candidates = Array.from(document.querySelectorAll(
+    'button, a, [role="tab"], [role="button"], li, label, span, div'));
+  for (const el of candidates) {
+    const txt = (el.textContent || '').trim().toLowerCase();
+    if (txt.length === 0 || txt.length > 80) continue;
+    if (!/^|\s|>international students?<|\binternational\b/.test(txt)) continue;
+    // Strict text check — must have "international" as a standalone word
+    // with at most one extra word (e.g. "International students").
+    if (!/^international(?:\s+(?:students?|fees?|applicants?))?$/.test(txt)) {
+      continue;
+    }
+    if (isHidden(el) || isAlreadyActive(el)) continue;
+    try { el.click(); return true; } catch (e) {}
+  }
+  return false;
+}
+"""
+
 
 class BrowserPool:
     def __init__(self) -> None:
@@ -90,6 +157,7 @@ class BrowserPool:
         wait_until: str = "domcontentloaded",
         timeout: int = 30000,
         settle_ms: int = 1500,
+        click_international: bool = False,
     ) -> str | None:
         """Fetch a URL via real browser and return HTML. Returns None on failure.
 
@@ -121,6 +189,29 @@ class BrowserPool:
                     return None
                 # Give Akamai/JS a moment to settle
                 await page.wait_for_timeout(settle_ms)
+                # T005: optional "International students" toggle click.
+                # Mirrors Node ``browser-helper.ts`` lines 260-340 — used
+                # by VIT pages where domestic fees show by default and
+                # the international panel is gated behind a radio /
+                # checkbox / link toggle. The JS finds any clickable
+                # whose text/value/aria-label matches "international"
+                # and isn't already active, then clicks it. Best-effort:
+                # any failure during the click is silent — we still
+                # return the post-settle HTML.
+                if click_international:
+                    try:
+                        clicked = await page.evaluate(_INTERNATIONAL_TOGGLE_JS)
+                        if clicked:
+                            # Wait for any post-click XHR / re-render.
+                            try:
+                                await page.wait_for_load_state(
+                                    "networkidle", timeout=5000
+                                )
+                            except Exception:
+                                pass
+                            await page.wait_for_timeout(1200)
+                    except Exception as exc:
+                        log.debug("international toggle click failed on %s: %s", url, exc)
                 html = await page.content()
                 return html
         except Exception as exc:

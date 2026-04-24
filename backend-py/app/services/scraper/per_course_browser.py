@@ -19,10 +19,24 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any, Awaitable, Callable
+from urllib.parse import urlparse
 
 from app.services.scraper.browser_pool import pool as browser_pool
 from app.services.scraper.extractors import english_test
 from app.services.scraper.extractors.base import ExtractionResult
+
+# T005: hosts where the per-course browser pass should also click the
+# "International students" toggle to surface the international fees /
+# admissions panel. Add new hosts here as we encounter them.
+_INTERNATIONAL_TOGGLE_HOSTS = ("vit.edu.au",)
+
+
+def _needs_international_toggle(url: str) -> bool:
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    return any(host.endswith(h) for h in _INTERNATIONAL_TOGGLE_HOSTS)
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +123,7 @@ async def maybe_browser_refetch(
                 url,
                 wait_until=_BROWSER_WAIT_UNTIL,
                 settle_ms=_BROWSER_SETTLE_MS,
+                click_international=_needs_international_toggle(url),
             ),
             timeout=_BROWSER_FETCH_TIMEOUT_SEC,
         )
