@@ -97,7 +97,7 @@ async def list_courses(
                    listening, speaking, writing, reading, overall
             FROM english_requirements
             WHERE course_id = ANY(:ids)
-            ORDER BY course_id, created_at DESC
+            ORDER BY course_id, created_at DESC, id DESC
         """), {"ids": course_ids})).all()
         for er in eng_rows:
             bucket = eng_map.setdefault(er.course_id, {})
