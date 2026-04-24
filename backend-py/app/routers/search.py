@@ -130,10 +130,46 @@ async def search_courses(
         for snake, camel in aliases.items():
             if snake in d:
                 d[camel] = d[snake]
-        # Ensure internationalFee always exists (UI calls .toLocaleString)
-        if d.get("internationalFee") is None:
-            d["internationalFee"] = 0
+
+        # Required by UI: id (alias for course_id)
+        d["id"] = d.get("course_id")
+
+        # Required by UI: result.intakes (always array)
+        d["intakes"] = d.get("intake_months") or []
+
+        # Required by UI: nested university object
+        d["university"] = {
+            "id": d.get("university_id"),
+            "name": d.get("university_name") or "",
+            "city": d.get("uni_city") or "",
+            "country": d.get("uni_country") or "",
+            "featured": bool(d.get("uni_featured") or False),
+            "logo_url": d.get("uni_logo_url"),
+            "logoUrl": d.get("uni_logo_url"),
+        }
+
+        # Required by UI: english_requirements nested object
+        d["english_requirements"] = {
+            "ielts_overall": d.get("ielts_overall"),
+            "pte_overall": None,
+            "toefl_overall": None,
+            "cae_overall": None,
+            "duolingo_overall": None,
+        }
+
+        # Currency / fee_term / fee_yearly — UI reads them on the result
+        d.setdefault("currency", "AUD")
+        d.setdefault("fee_term", "Year")
+        if d.get("international_fee") is None:
             d["international_fee"] = 0
+            d["internationalFee"] = 0
+        d.setdefault("international_fee_yearly", d.get("international_fee") or 0)
+        d.setdefault("internationalFeeYearly", d.get("international_fee") or 0)
+
+        # Optional fields UI checks (with falsy guards but better defined)
+        d.setdefault("category", None)
+        d.setdefault("course_url", d.get("course_website"))
+        d.setdefault("courseUrl", d.get("course_website"))
         out.append(d)
     # Build facets — UI expects {facets: {intakes, degree_levels, locations, universities}}
     # Each facet item: {name, count}. Use simple aggregate query.
