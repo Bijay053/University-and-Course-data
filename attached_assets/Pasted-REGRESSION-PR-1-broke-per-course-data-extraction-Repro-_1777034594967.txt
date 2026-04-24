@@ -1,0 +1,29 @@
+REGRESSION: PR-1 broke per-course data extraction
+Repro: Latest VIT scrape on prod = runtime_job_id=job_01cec454ebd2 (2026-04-24 12:11)
+Symptoms (24 staged rows):
+
+11/24 have PTE/TOEFL/CAE — was 14/14 yesterday on dev (99.6% completeness)
+avg completeness 67.5% — was 99.6% before PR-1
+0/24 study_mode='On Campus' — all 24 = "Blended" (wrong; VIT MBA pages clearly say On Campus)
+6/24 master's courses have duration=10 years (correct: 1.5–2 years)
+One sample row: MBA - Information Systems Specialisation — study_mode=Blended, duration=10 Year, completeness=69%
+
+Root cause from logs (scrape_runtime_logs WHERE runtime_job_id='job_01cec454ebd2'):
+[per-course browser ✓] https://vit.edu.au/mits — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-finance — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-information-systems — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 6/6] https://vit.edu.au/mba/mba-finance — IELTS=— PTE=— TOEFL=— CAE=—
+... [all 23 of 24 URLs return empty extractions]
+Only https://vit.edu.au/mba extracted real values. Every other VIT URL: browser opened, vision processed all 6 images, but no values came out. Then those single /mba values appear to be cross-contaminating other rows in single_course.py.
+Also: [FALLBACK] AI fallback exceeded 60s on https://vit.edu.au/mba — moving on without AI fill — your 60s AI timeout fires before fallback completes for some URLs.
+Suspected files (PR-1 commit c1fb6a5 + follow-ups):
+
+backend-py/app/services/scraper/per_course_browser.py — extractor returning empty when page actually has data
+backend-py/app/services/scraper/per_course_vision.py — OCR returning empty
+backend-py/app/services/scraper/pipelines/single_course.py — possibly cross-contaminating rows from one URL's fallback into other rows
+backend-py/app/services/scraper/guards.py — may be filtering valid extractions
+backend-py/app/services/scraper/stage_course.py — duration/study_mode mapping wrong
+
+Separate bug: Counter lies. job_440a0e26c6df (CSU, 2026-04-24 01:40) reports imported=9, total_found=9, status=completed but SELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id='job_440a0e26c6df' returns 0. Orchestrator increments counter without persisting rows.
+Comparison: Yesterday's VIT scrape scrape_1776931855716_5iku7v = 14 rows, 99.6% completeness, all PTE/TOEFL/CAE filled. After PR-1 commits c1fb6a5 → aebbf33, the extractor regressed.
+Ask: Diagnose on dev with VIT scrape. Why does browser fetch return empty for vit.edu.au pages? Did stage-quality guards (G/H — is_generic_course_category_name, has_course_specific_fee_evidence) cause the per-course browser/vision results to be discarded silently? Why is the /mba data appearing on other courses? Also fix the counter-vs-actual-rows mismatch.

@@ -1,0 +1,74 @@
+🚨 REGRESSION: PR-1 broke per-course data extraction on prod
+After PR-1 commits (c1fb6a5 through aebbf33) shipped to prod, the scraper's data quality has collapsed from 99.6% → 67.5% completeness. The browser fetch + vision OCR fallbacks are firing but returning empty data on nearly every URL.
+Repro case
+Job: runtime_job_id=job_01cec454ebd2 (VIT, 2026-04-24 12:11 UTC, prod)
+Before vs After
+MetricBefore PR-1 (yesterday, scrape_1776931855716_5iku7v)After PR-1 (today, job_01cec454ebd2)Rows staged1424PTE filled14/14 (100%)11/24 (46%)TOEFL filled14/14 (100%)11/24 (46%)CAE filled14/14 (100%)11/24 (46%)study_mode='On Campus'9/140/24 (all "Blended")Master's with duration > 5 years06/24 (10 years on MBA rows)Avg completeness99.6%67.5%
+Sample bad row from scraped_courses WHERE scrape_job_id='job_01cec454ebd2'
+course_name        | MBA - Information Systems Specialisation
+degree_level       | Master's
+sub_category       | MBA
+study_mode         | Blended           ← wrong, VIT MBA is On Campus
+duration           | 10                ← wrong, MBA is ~2 years
+duration_term      | Year
+ielts_overall      | 6.5
+pte_overall        | 58
+toefl_overall      | 87
+cambridge_overall  | 176
+international_fee  | 48000
+fee_term           | Annual
+completeness       | 69
+eligibility_reason | Missing: description, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+Smoking gun from scrape_runtime_logs
+The browser opened pages and vision processed images, but extracted NOTHING on every URL except /mba:
+[per-course browser ✓] https://vit.edu.au/mits/gcits — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mits — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-finance — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-information-systems — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-leadership-and-management — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://vit.edu.au/mba/mba-tourism-and-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+
+[per-course vision img 6/6] https://vit.edu.au/mits — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 6/6] https://vit.edu.au/mba/mba-finance — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 6/6] https://vit.edu.au/mba/gcba — IELTS=— PTE=— TOEFL=— CAE=—
+... (all 23/24 URLs return empty)
+
+[per-course vision img 1/6] https://vit.edu.au/mba — IELTS=6.5 PTE=58.0 TOEFL=87.0 CAE=176.0   ← only success
+
+[FALLBACK] AI fallback exceeded 60s on https://vit.edu.au/mba — moving on without AI fill
+Two distinct problems:
+
+Browser + vision fallbacks return empty data on URLs that clearly contain it (these pages load fine in a real browser).
+The one successful /mba extraction's values appear to be cross-contaminating other rows — those IELTS/PTE/TOEFL/CAE values in the MBA - Information Systems row look like they came from /mba, not from /mba/mba-information-systems (which logged empty).
+The 60s AI timeout is firing — fallback bails before completing on some URLs.
+
+Suspected files (introduced/touched in PR-1)
+
+backend-py/app/services/scraper/per_course_browser.py — extractor returning empty when page has data
+backend-py/app/services/scraper/per_course_vision.py — OCR returning empty on most pages
+backend-py/app/services/scraper/pipelines/single_course.py — likely the cross-contamination source
+backend-py/app/services/scraper/guards.py — may be silently discarding valid extractions (is_generic_course_category_name, has_course_specific_fee_evidence, should_trust_generic_university_fee_fallback)
+backend-py/app/services/scraper/stage_course.py — study_mode defaulting to "Blended" + duration mapping producing 10 years for MBA
+
+Separate bug — counter lies
+runtime_job_id=job_440a0e26c6df (CSU, 2026-04-24 01:40, prod):
+status: completed
+imported: 9
+total_found: 9
+current: 9
+errors: 0
+But:
+sqlSELECT COUNT(*) FROM scraped_courses WHERE scrape_job_id='job_440a0e26c6df';
+-- returns 0
+Orchestrator is incrementing the counter without persisting rows. This makes the UI show "9 courses imported" when the database has none — debugging hell.
+Asks
+
+Diagnose why per_course_browser.py extracts empty data from VIT pages (try a direct repro on dev: scrape VIT, check logs for IELTS=— PTE=— TOEFL=— patterns).
+Find the cross-contamination: why do /mba extracted values end up on other MBA-specialisation rows?
+Fix study_mode defaulting to "Blended" — should be "On Campus" when not explicitly stated otherwise, or stay null.
+Fix duration=10 for masters — that's parsing nonsense.
+Fix the counter-vs-actual-rows mismatch in the orchestrator (job_440a0e26c6df is the repro).
+Increase the 60s AI fallback timeout to something realistic like 120s, or make the timeout per-page-type.
+
+Yesterday's scrape_1776931855716_5iku7v (VIT, pre-PR-1) is the gold reference — same university, 99.6% completeness, all fields filled correctly.
