@@ -194,3 +194,31 @@ checks: (1) route-table membership (no framework 404), (2) live smoke (no 5xx,
 no unrouted 404), (3) JSON-shape contracts the UI actually destructures
 (`{courses: [...]}`, `{results, summary}`, `appliedFields[]`,
 top-level 409 `{error, conflicts}`). 3/3 green.
+
+## Repair Scrape (PR-1.5 B18)
+
+`POST /api/scrape/repair/start` runs a "back-fill only" pass for courses
+already in the DB whose key fields are blank. Frontend (`university-detail.tsx`
+`startRepairScrape`) sends `{universityId}` only — backend re-runs the same
+SQL as `/repair/missing` to discover targets so UI and worker stay aligned.
+
+- Service: `backend-py/app/services/scraper/repair.py:run_repair` reuses
+  the orchestrator's `_emit`, `_extract_only`, and `infer_log_level`
+  helpers. Skips discovery entirely; for each `(course_id, url)` target
+  it extracts and **only fills blank scalar Course fields** (never
+  overwrites existing values). Inserts `EnglishRequirement` rows only
+  when the course has zero existing rows.
+- Celery task: `app/tasks/scrape_tasks.py:repair_university` (name
+  `scrape.repair`), mirrors `scrape_university`'s engine.dispose dance.
+- Job row: `ScrapeRuntimeJob` written with `job_type='repair'` and
+  `request_payload.repair_targets = [{course_id, url}, ...]`.
+- **Worker routing**: Node `scrape-worker.mjs` claim query in
+  `artifacts/api-server/src/services/scrape-runtime-jobs.ts:478` filters
+  `AND (job_type IS NULL OR job_type IN ('single','bulk'))` so repair
+  jobs are exclusively handled by the Python Celery worker (Node would
+  otherwise treat them as a fresh discovery scrape).
+
+**Regression test**: `backend-py/tests/test_repair_scrape.py` (7 tests):
+endpoint validation (missing/unknown/non-int id), URL-less course
+rejection, no-targets short-circuit, blank-only back-fill, and
+existing-english skip. Full suite: 282 passed, 1 skipped.

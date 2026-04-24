@@ -13,6 +13,7 @@ import logging
 
 from app.database import AsyncSessionLocal, engine
 from app.services.scraper.orchestrator import run_scrape
+from app.services.scraper.repair import run_repair
 from app.tasks.celery_app import celery_app
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,16 @@ async def _async_scrape(runtime_job_id: str) -> None:
         await run_scrape(db, runtime_job_id)
 
 
+async def _async_repair(runtime_job_id: str) -> None:
+    # Same engine.dispose() dance as the scrape task — Celery worker is
+    # sync, asyncio.run() spins a fresh loop per task and any pooled
+    # asyncpg connection from a previous task is bound to a now-closed
+    # loop ("Future attached to a different loop").
+    await engine.dispose()
+    async with AsyncSessionLocal() as db:
+        await run_repair(db, runtime_job_id)
+
+
 @celery_app.task(name="scrape.university", bind=True, max_retries=0)
 def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     log.info("Celery task scrape_university start id=%s", runtime_job_id)
@@ -35,6 +46,26 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         log.exception("Task failed id=%s: %s", runtime_job_id, exc)
         # Mark job failed in DB so UI sees real status. No retry — the loop
         # issue won't fix itself on retry.
+        try:
+            asyncio.run(_mark_failed(runtime_job_id, str(exc)))
+        except Exception:
+            pass
+        return {"ok": False, "id": runtime_job_id, "error": str(exc)}
+
+
+@celery_app.task(name="scrape.repair", bind=True, max_retries=0)
+def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
+    """Re-extract a known list of course URLs and back-fill missing
+    ``courses`` / ``english_requirements`` data. Mirrors
+    ``scrape_university`` exactly so the worker boot path, asyncpg
+    pool dispose, failure-mark fallback and Celery retry semantics
+    are identical for both job types."""
+    log.info("Celery task repair_university start id=%s", runtime_job_id)
+    try:
+        asyncio.run(_async_repair(runtime_job_id))
+        return {"ok": True, "id": runtime_job_id}
+    except Exception as exc:
+        log.exception("Repair task failed id=%s: %s", runtime_job_id, exc)
         try:
             asyncio.run(_mark_failed(runtime_job_id, str(exc)))
         except Exception:

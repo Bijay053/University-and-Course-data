@@ -1846,19 +1846,122 @@ async def repair_start(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict:
-    """Trigger a re-scrape pass over courses missing required fields. We
-    don't have the saved scrape-config plumbing yet, so this returns the
-    same shape Node returns when the config is absent (400) — the UI
-    already surfaces it as a clear toast."""
+    """Queue a repair-scrape job for the given university.
+
+    Re-extracts every active course on this university whose row is
+    missing a critical field (``duration``, ``course_location``, or any
+    ``english_requirements`` row), then back-fills the live ``courses``
+    table directly. No AI / discovery cost — we already have the URL on
+    file from the original scrape.
+
+    Body: ``{universityId: int}``. Response shape mirrors what the
+    React Repair dialog (``university-detail.tsx::startRepairScrape``)
+    consumes — ``jobId``, ``count``, ``rejectedForeignIds``, ``message``.
+    """
+    import uuid as _uuid
+
+    from app.models import University
+
     university_id = body.get("universityId")
     if not university_id:
         raise HTTPException(status_code=400, detail="University ID is required")
-    from app.models import University
+    try:
+        uid = int(university_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="University ID must be an integer")
 
-    uni = await db.get(University, int(university_id))
+    uni = await db.get(University, uid)
     if uni is None:
         raise HTTPException(status_code=404, detail="University not found")
-    raise HTTPException(
-        status_code=400,
-        detail="No saved scraping config. Run a full AI scrape first.",
+
+    # Re-use the same "missing fields" definition as ``repair_missing``
+    # so the count the user saw in the dialog and the count we queue
+    # cannot drift. Pull ``course_website`` so we can reject any row
+    # without a URL — those would just error in the worker and waste
+    # a heartbeat slot.
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT c.id, c.course_website
+                FROM courses c
+                WHERE c.university_id = :uid
+                  AND c.status = 'active'
+                  AND (
+                    c.duration IS NULL
+                    OR c.course_location IS NULL OR btrim(c.course_location) = ''
+                    OR (SELECT COUNT(*) FROM english_requirements er
+                        WHERE er.course_id = c.id) = 0
+                  )
+                """
+            ),
+            {"uid": uid},
+        )
+    ).all()
+
+    targets: list[dict] = []
+    rejected: list[int] = []
+    for r in rows:
+        url = (r[1] or "").strip()
+        if url:
+            targets.append({"course_id": int(r[0]), "url": url})
+        else:
+            # ``rejectedForeignIds`` is the historical name from the Node
+            # response shape — kept here so the UI's destructure
+            # (``data?.rejectedForeignIds``) keeps working without a
+            # second renamed field.
+            rejected.append(int(r[0]))
+
+    if not targets:
+        return {
+            "jobId": None,
+            "count": 0,
+            "rejectedForeignIds": rejected,
+            "message": (
+                "No courses with a saved URL need repair."
+                if not rejected
+                else (
+                    f"{len(rejected)} course(s) need repair but have no "
+                    "course_website on file — re-run a full AI scrape first."
+                )
+            ),
+        }
+
+    job_id = f"repair_{_uuid.uuid4().hex[:12]}"
+    job = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=uni.id,
+        university_name=uni.name,
+        url=uni.scrape_url,
+        job_type="repair",
+        status="queued",
+        request_payload={
+            "universityId": uni.id,
+            "universityName": uni.name,
+            "universityCountry": uni.country,
+            "repair_targets": targets,
+            # snake_case duplicates kept so future Python callers can
+            # read either style — same convention as the start endpoint.
+            "university_id": uni.id,
+        },
     )
+    db.add(job)
+    await db.commit()
+
+    # Best-effort enqueue — if the broker is down the row stays
+    # ``queued`` and the next worker poll will pick it up. Matches the
+    # silent-fail pattern used by ``/scrape/start`` above (no module
+    # logger is defined in this router).
+    try:
+        from app.tasks.scrape_tasks import repair_university
+
+        repair_university.delay(job_id)
+    except Exception:
+        pass
+
+    return {
+        "jobId": job_id,
+        "count": len(targets),
+        "rejectedForeignIds": rejected,
+        "message": f"Repair scrape queued for {len(targets)} course(s).",
+    }

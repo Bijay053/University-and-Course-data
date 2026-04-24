@@ -476,6 +476,7 @@ export async function claimNextRuntimeJob(workerId: string, workerPid: number): 
         SELECT runtime_job_id
         FROM scrape_runtime_jobs
         WHERE status = 'queued'
+          AND (job_type IS NULL OR job_type <> 'repair')
         ORDER BY created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
