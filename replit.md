@@ -147,3 +147,24 @@ All routes served at `/api/...`:
 - **Re-scrape (No AI)**: After initial AI scrape, saved `scrapeConfig` (course links + uni pages) enables zero-cost re-scraping using only HTML/regex extraction
 - **Scrape config persistence**: `scrapeConfig` JSONB saved on universities table with courseLinks, uniPages, resolvedUrl, lastScrapedAt
 - **Auto-fill URL**: Frontend auto-fills scrape URL when a university is selected from dropdown (uses saved `scrapeUrl`)
+
+## Python Scraper Parity (T201–T211)
+
+`backend-py/` is a FastAPI + SQLAlchemy async + Celery + Playwright rewrite of the
+Node scraper. As of commit `203226a`, the Python pipeline is at data-parity with
+the Node implementation across these features:
+
+- **T201** course-name slug detection + title-casing (`extractors/course_name.py`)
+- **T202** duration term suffix (Year/Month) + Masters credit-points fix (`extractors/duration.py`)
+- **T203** Per-Unit → Full-Course fee multiplier (`extractors/fee.py`)
+- **T204** category keyword pre-map before AI classification (`category.py:map_course_to_category` + `[CATEGORY det]` log)
+- **T205** eligibility reason in Node format: `"Publish blocked: ... | Validation: ... | Missing: ... | Warnings: ..."` (`completeness.py:decide_eligibility`)
+- **T206** sibling-cache english-test back-fill across degree bucket (`sibling_cache.py:backfill_english_from_siblings`)
+- **T207** per-course browser fetch fallback (`per_course_browser.py`)
+- **T208** per-course Gemini Vision OCR for image-only english tables (`per_course_vision.py`)
+- **T209** orchestrator emits `[INFO ] [TIMING]` line + typed `done` event (`══ DONE ══`) consumed by the React log viewer at `scraping.tsx:1630`
+- **T210** UI log rows colour-coded by `level` field (`scraping.tsx` `levelColor` map ~L1595) with phase/event fallbacks for legacy rows
+
+**Regression tests**: `backend-py/tests/test_scraper_pipeline_parity.py` (19 tests) pins T201–T206 + T209.
+T207/T208 are network-bound — covered by manual smoke runs, not pytest.
+Full suite: 207 passed, 1 skipped.
