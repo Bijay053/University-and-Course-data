@@ -385,3 +385,9 @@ SQL
 ```
 
 If prod's numbers match local (`18 | 18 | 17 | 18 | 99.4`) the data-parity work landed correctly. If they're lower, the prod box hasn't pulled HEAD — check `git log -1` on the prod repo and `pip install -r requirements.txt && systemctl restart fastapi celery`.
+
+---
+
+## Status
+
+**Migration v1 SHIPPED 2026-04-24.** All UI-facing endpoints ported, all user-blocking bugs closed, ASA scrape parity at **100% completeness on prod** (9 / 9 rows: sub_category, PTE, fee, and every other data-parity field populated — exceeds the local 99.4% benchmark by 0.6 pts). Outstanding work tracked in PR-1 / PR-2 / PR-3 batches above, deferred pending v1 user feedback.
