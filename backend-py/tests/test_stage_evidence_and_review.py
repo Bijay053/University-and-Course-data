@@ -157,6 +157,21 @@ async def test_stage_course_persists_completeness_and_evidence():
         sample = body["evidence"][0]
         for k in ("fieldKey", "candidateValue", "extractionMethod", "sourceUrl"):
             assert k in sample
+
+        # Bug F: the modal destructures `course` (camelCase StagedCourse
+        # shape) and `conflicts` (array). When either is undefined the
+        # React tree throws on `reviewDetail.conflicts.length`. Pin both.
+        assert isinstance(body.get("conflicts"), list)
+        assert "course" in body and isinstance(body["course"], dict)
+        course = body["course"]
+        assert course["courseName"] == "Bachelor of Computer Science"
+        # Spot-check that camelCase, not snake_case, made it into `course`.
+        assert "internationalFee" in course
+        assert "ieltsOverall" in course
+        assert "autoPublishStatus" in course
+        # Snake_case keys must NOT leak into `course`.
+        assert "course_name" not in course
+        assert "auto_publish_status" not in course
     finally:
         await _cleanup(job_id)
 

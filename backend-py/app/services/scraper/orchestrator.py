@@ -25,6 +25,48 @@ from app.services.scraper.stage_course import stage_course
 
 log = logging.getLogger(__name__)
 
+
+# Bug E: ordered (prefix-or-keyword, level) pairs the UI uses to colour
+# log lines. We tag every emit with one of these so the front-end can
+# style errors red, warnings amber, [SAMPLE✓] green, etc., without
+# having to re-parse messages in the browser. The order matters —
+# more-specific tags must be checked before generic ones (a "[STAGE]
+# error" line should be red, not the neutral "stage" colour).
+_LEVEL_RULES: tuple[tuple[str, str], ...] = (
+    ("[ERROR]", "error"),
+    ("[STAGE] error", "error"),
+    ("[STAGE] exception", "error"),
+    ("[STAGE] failed", "error"),
+    ("[STAGE] skipped", "warn"),
+    ("[STAGE] dedup", "warn"),
+    ("[STAGE] saved", "success"),
+    ("[STAGE] staged", "success"),
+    ("[SAMPLE\u2713]", "success"),
+    ("[SAMPLE]", "info"),
+    ("[DISCOVER]", "discover"),
+    ("[CLASSIFY]", "discover"),
+    ("[EXTRACT]", "extract"),
+    ("[FALLBACK]", "fallback"),
+    ("[STAGE]", "stage"),
+)
+
+
+def infer_log_level(message: str) -> str:
+    """Map a log message to a UI colour bucket.
+
+    Lower-cased, substring match. Public so the level-inference unit test
+    can call it directly without standing up a runtime job. Returns
+    ``"info"`` when no rule matches — the UI default.
+    """
+    if not message:
+        return "info"
+    lowered = message.lower()
+    for needle, level in _LEVEL_RULES:
+        if needle.lower() in lowered:
+            return level
+    return "info"
+
+
 async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str, payload: dict | None = None) -> None:
     """Write a row to ``scrape_runtime_logs`` so the UI can show progress.
 
@@ -137,6 +179,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # (runtime_job_id, sequence) index, dropping log rows to the floor.
         seq = _seq[0]
         _seq[0] += 1
+        # Bug E: derive a UI-facing colour bucket from the message prefix
+        # unless the caller passed an explicit ``level`` (which always wins).
+        # Stamped into the JSONB payload so the React log viewer can style
+        # rows without re-parsing the message.
+        if "level" not in kw:
+            kw["level"] = infer_log_level(message)
         await _emit(db, runtime_job_id, seq, event, message, kw or None)
     await emit("status", "Worker claimed queued scrape job", phase="queue")
 

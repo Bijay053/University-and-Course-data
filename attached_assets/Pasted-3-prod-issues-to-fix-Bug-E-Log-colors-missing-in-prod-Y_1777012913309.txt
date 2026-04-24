@@ -1,0 +1,43 @@
+3 prod issues to fix:
+Bug E — Log colors missing in prod
+Your dev shows colored log tags: green [SAMPLE✓], blue [DISCOVER], yellow [EXTRACT], red [ERROR], etc.
+Prod shows ALL logs as plain [INFO] color even though messages have the right tags inside. The UI must be color-coding by event or level or phase field on each log entry, but our backend always sends event="status" with no level field.
+Fix: when emitting verbose logs, classify the level so UI can color them. Suggest:
+
+[DISCOVER]/[CLASSIFY] → level: "discover" or phase: "discover"
+[SAMPLE✓] → level: "success"
+[EXTRACT] → level: "extract"
+[FALLBACK] → level: "fallback"
+[STAGE] skipped → level: "warn"
+[ERROR] → level: "error"
+
+Whatever field/values your dev UI is reading — please mirror that.
+Bug F — Evidence Review modal crashes browser
+Click the eye icon (👁) on any staged course → modal opens but JS crashes:
+Uncaught TypeError: Cannot read properties of undefined (reading 'length')
+  at _P (index-BDcM4hBk.js:68:115261)
+Endpoint returns evidence (verified — 20 rows, eligibilityStatus, autoPublishStatus all present), but UI expects some array field that's undefined. Likely missing one of: conflicts, fields, evidenceByField[someKey], or course itself.
+Please look at the React staged-review component, run /api/scrape/staged/{id}/review against any prod course, and add the missing field/array to the response.
+Sample response we're returning right now:
+json{
+  "evidence": [...20 items...],
+  "evidenceByField": {...},
+  "eligibilityStatus": "review",
+  "autoPublishStatus": "review",
+  "completeness": 69
+}
+What additional keys does the dev review modal need?
+Bug G — Course details wrong in prod vs dev
+Same scrape (ASA, same PDFs, same source URLs):
+
+Dev: A$58,080/Full Course | IELTS=6 | PTE=50 | TOEFL=60 | CAE=169 | DET=105 | Mode=On Campus | Location=Sydney
+Prod: A$19,360/Per Unit | IELTS=6 | PTE/TOEFL/CAE/DET all blank | Mode=blank | Location=Sydney
+
+Differences:
+
+Fee — dev computes total ($19,360 × 3 units = ~$58,080)? Or extracts a different number from the PDF? Prod takes the per-unit number raw.
+PTE/TOEFL/CAE/DET — dev's requirements PDF parser extracts all 5 English tests; prod only gets IELTS.
+Mode — dev shows "On Campus"/"Blended"; prod blank despite course pages literally saying "Onshore – required to attend on campus, allowed up to 33% online".
+
+The university_pdfs.py + english_test.py + study_mode.py extractors need to match dev's logic. Please align.
+Order: F (modal crash, makes review unusable) → G (wrong data, makes review meaningless) → E (cosmetic colors).

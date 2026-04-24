@@ -44,3 +44,26 @@ def test_extract_returns_extraction_result():
     assert out[0].field_key == "study_mode"
     assert out[0].value == "On Campus"
     assert out[0].normalized == {"study_mode": "On Campus"}
+
+
+# --- Bug G regression tests --------------------------------------------------
+
+
+def test_onshore_recognised_as_on_campus():
+    # AU CRICOS PDFs say "Onshore - International students must be in
+    # Australia" — Node maps this to On Campus and so must we.
+    assert _classify("Onshore — International students attend on campus") == "On Campus"
+    assert _classify("Required to attend on campus") == "On Campus"
+
+
+def test_percent_online_with_on_campus_is_blended():
+    # "33% online" alone is not enough — but combined with an on-campus
+    # signal the course is officially blended.
+    txt = "Onshore — required to attend on campus. Up to 33% online study permitted."
+    assert _classify(txt) == "Blended"
+
+
+def test_percent_online_alone_stays_online():
+    # No on-campus signal → not Blended; the bare 'online' word triggers
+    # the Online fallback.
+    assert _classify("Up to 33% online delivery") == "Online"

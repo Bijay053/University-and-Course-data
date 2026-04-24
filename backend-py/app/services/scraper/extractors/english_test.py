@@ -112,6 +112,7 @@ def _ielts(text: str) -> dict[str, float] | None:
 
 # --- PTE (10-90) -------------------------------------------------------------
 def _pte(text: str) -> dict[str, float] | None:
+    # Pattern 1 (rich): "PTE Academic 50 with no skill below 36"
     m = re.search(
         r"pte(?:\s+academic)?[^a-z0-9]{0,20}(?:overall\s*)?([0-9]+(?:\.[0-9]+)?)\s*"
         r"(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|"
@@ -123,6 +124,32 @@ def _pte(text: str) -> dict[str, float] | None:
         ov, mn = float(m.group(1)), float(m.group(2))
         if 10 <= ov <= 90 and 10 <= mn <= 90:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+    # Pattern 2 (table): "PTE Academic | 50 | 36"  /  "PTE  50  36"
+    # PDF tables flatten to whitespace-separated runs after pypdf
+    # extraction. Two adjacent numbers in the PTE band → overall + min.
+    # Bug G: Without this, ASA's requirements PDF emits IELTS but
+    # nothing else because the table layout breaks the rich pattern.
+    #
+    # Negative-lookahead `(?:(?!\bpte\b).)` between the two numbers
+    # prevents the false match the architect flagged: prose like
+    # "PTE 70 then PTE 80" used to be parsed as overall=70 / min=80,
+    # fabricating a subscore from a comparison sentence. Requiring no
+    # second `pte` mention between the captured numbers narrows the
+    # match to a single row.
+    m = re.search(
+        r"pte(?:\s+academic)?(?:(?!\bpte\b)[^\n0-9]){1,60}?([1-9][0-9])\b"
+        r"(?:(?!\bpte\b)[^\n0-9]){1,40}?([1-9][0-9])\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        # The minimum-skill score must not exceed the overall — that's
+        # the second sanity gate against accidentally pairing two
+        # unrelated numbers from neighbouring rows.
+        if 10 <= ov <= 90 and 10 <= mn <= ov:
+            return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+    # Pattern 3 (broad): "PTE 50" / "PTE: 50"
     m = re.search(
         r"pte(?:\s+academic)?[^a-z0-9]{0,40}?([1-9][0-9])\b", text, re.I
     )
@@ -146,10 +173,27 @@ def _toefl(text: str) -> dict[str, float] | None:
         ov, mn = float(m.group(1)), float(m.group(2))
         if 0 <= ov <= 120 and 0 <= mn <= 30:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+    # Table layout: "TOEFL iBT  60  12" or "TOEFL | 60 | 12".
+    m = re.search(
+        r"toefl(?:\s+ibt)?[^\n0-9]{1,60}?([0-9]{2,3})\b[^\n0-9]{1,40}?([0-9]{1,2})\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        if 0 <= ov <= 120 and 0 <= mn <= 30:
+            return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
     m = re.search(r"toefl(?:\s+ibt)?[:\s]+([0-9]{2,3})", text, re.I)
     if m:
         ov = float(m.group(1))
         if 0 <= ov <= 120:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+    # Loosest fallback: "TOEFL ... 60" within a short window — covers
+    # PDFs that render "TOEFL iBT     60" with multiple spaces.
+    m = re.search(r"toefl(?:\s+ibt)?[^\n0-9]{1,60}?([0-9]{2,3})\b", text, re.I)
+    if m:
+        ov = float(m.group(1))
+        if 30 <= ov <= 120:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
     return None
 
@@ -159,6 +203,10 @@ def _cambridge(text: str) -> float | None:
     for pat in (
         r"(?:cambridge|cae|c1\s*advanced)[^0-9]{0,40}?(\d{3})",
         r"(\d{3})[^0-9]{0,20}(?:cambridge|cae|c1\s*advanced)",
+        # Table layout — wider window between label and number to clear
+        # the cells in between. Capped at 80 chars so we don't cross row
+        # boundaries.
+        r"(?:cambridge|cae|c1\s*advanced)[^\n0-9]{1,80}?(\d{3})",
     ):
         m = re.search(pat, text, re.I)
         if m:
@@ -173,6 +221,10 @@ def _duolingo(text: str) -> float | None:
     for pat in (
         r"duolingo(?:\s+english\s+test)?[:\s]*(?:overall\s*(?:score\s*)?(?:of\s*)?)?(\d{2,3})",
         r"\bDET\b[:\s]+(\d{2,3})",
+        # Table layout: "Duolingo English Test  105"
+        r"duolingo(?:\s+english\s+test)?[^\n0-9]{1,80}?(\d{2,3})",
+        # Bare DET in a table row.
+        r"\bDET\b[^\n0-9]{1,40}?(\d{2,3})",
     ):
         m = re.search(pat, text, re.I)
         if m:

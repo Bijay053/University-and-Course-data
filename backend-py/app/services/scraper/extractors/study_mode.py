@@ -18,6 +18,11 @@ from app.services.scraper.extractors.base import ExtractionResult
 field_key = "study_mode"
 
 # Higher-priority modes first (they imply on-campus + online both exist).
+# Match Node's review-engine.ts vocabulary plus AU-specific phrasing.
+# "On campus" includes the AU "onshore" idiom (CRICOS courses commonly
+# describe overseas-student delivery as "Onshore - required to attend
+# on campus"). "% online" appearing alongside any on-campus signal is a
+# Blended marker even without the literal word "blended".
 _MODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
@@ -36,7 +41,8 @@ _MODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (
         re.compile(
-            r"\b(on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face)\b",
+            r"\b(on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face|onshore|"
+            r"required\s+to\s+attend\s+(?:on\s+)?campus|attend\s+on\s+campus)\b",
             re.IGNORECASE,
         ),
         "On Campus",
@@ -45,6 +51,17 @@ _MODE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # specific patterns above didn't fire. Kept last so e.g. "online and
     # on-campus" is still classified as Blended.
     (re.compile(r"\bonline\b", re.IGNORECASE), "Online"),
+)
+
+# Detects "X% online" / "up to X% online" anywhere in the text — paired
+# with an on-campus signal, this means Blended (a course that's mostly
+# in-person but officially permits some online study).
+_PERCENT_ONLINE_RE = re.compile(
+    r"\b(?:up\s+to\s+)?\d{1,3}\s*%\s+online\b", re.IGNORECASE
+)
+_ON_CAMPUS_RE = re.compile(
+    r"\b(?:on[\s\-]?campus|onshore|attend\s+on\s+campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face)\b",
+    re.IGNORECASE,
 )
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -56,8 +73,27 @@ def _strip_tags(html: str) -> str:
 
 
 def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
-    """Return (study_mode, snippet)."""
+    """Return (study_mode, snippet).
+
+    Order of operations:
+
+    1. If the page text contains both an on-campus signal AND a "% online"
+       phrase (e.g. "Onshore — required to attend on campus, allowed up to
+       33% online") classify as Blended even when the literal word
+       "blended" is absent. Mirrors Node's
+       `review-engine.ts` heuristic — without it, courses with mixed
+       delivery rules show as plain "On Campus" and the operator can't
+       tell them apart from purely in-person courses.
+    2. Fall through to the labelled pattern set (Blended → Online →
+       On Campus → bare "Online").
+    """
     plain = _strip_tags(page_text)
+
+    pct = _PERCENT_ONLINE_RE.search(plain)
+    if pct and _ON_CAMPUS_RE.search(plain):
+        start = max(0, pct.start() - 60)
+        return "Blended", plain[start : pct.end() + 60].strip()
+
     for pattern, label in _MODE_PATTERNS:
         m = pattern.search(plain)
         if m:

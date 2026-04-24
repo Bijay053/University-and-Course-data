@@ -1,0 +1,34 @@
+Production scraper is producing wrong/incomplete data vs your dev preview. Side-by-side using the same uni (ASA, id=2 in prod / id=9 in dev), same scrape config, same source PDFs:
+FieldDev (correct)Prod (wrong)Intl. FeeA$58,080 / Full CourseA$19,360 / Per Unit ❌PTE50— ❌TOEFL60— ❌CAE169 / 176169 (always, even Masters) ❌DET (Duolingo)105 / 115100 (always) ❌Master IELTS6.56.0 (Bachelor's value) ❌Master CAE176169 (Bachelor's value) ❌ModeOn Campus / BlendedOnline (wrong for everything) ❌Course LocationSydney / Sydney, AustraliaSydney only ❌Score / Completeness100%69% ❌Publish statusready (or review with reason)review (always, no reason) ❌Eligibility statuseligible (with ⚠ Publish blocked: ... reason text)review (no reason) ❌Duration display"3 Year" / "2 Year""3" / "5" ❌ (Master shows 5 wtf, should be 2)Course name capitalization"Bachelor of Business Hospitality Management""bachelor-of-business-hospitality-management" (slug, ugly) ❌
+Plus prod scraping log is missing all the rich detail your dev shows:
+Dev log shows: [CLASSIFY] Page type: listing — 9 course links found, [DISCOVER] [SMART] Discovering candidate sources (sitemap + listing page + API)..., [DISCOVER] Sitemap: found 9 course URLs total, [SAMPLE✓] ✓ Confirmed course (detail metadata): "...", [DISCOVER] Phase 2: Researching 18 candidates, [DISCOVER] High confidence: 12/12 samples valid (100%), [FALLBACK] [per-course browser ✓] ... — IELTS=6 PTE=..., [FALLBACK] [per-course vision] scanning 3 image(s) in parallel..., [FALLBACK] [per-course vision img 1/3] ... ieltsOverall=6 ieltsListening=5.5 ..., [FALLBACK] [per-course vision ✓] ... IELTS=6 PTE=50 TOEFL=60 CAE=169, [EXTRACT ] [sibling cache ↻ backfill undergraduate] ... PTE=50 TOEFL=60 CAE=169, [INFO ] Classifying 18 courses with AI (batched)..., [INFO ] [CATEGORY det] ... → Tourism & Hospitality / Hospitality Management, [INFO ] [TIMING] Total: 6m 46s | Courses: 18 | Avg: 22s/course | Concurrency: HTTP=4 Browser=3, ══ DONE ══ Found:18 | Staged:9 | Skipped:9 | Errors:0.
+Prod log only shows: [DISCOVER] classified ...: listing (5 course links found), [DISCOVER] Page 1/25: +5 candidates, [EXTRACT] N/10: ..., [FALLBACK] AI enriching ... (missing: international_fee, ...), [FALLBACK] AI filled 2 field(s) on ...: duration_value, duration_unit, [STAGE] saved: ..., [STAGE] skipped ...: fetch_failed, Staged 9 courses, 0 skipped, 1 fetch errors.
+What's missing on prod:
+
+Per-course browser fetch with English-test extraction — [FALLBACK] [per-course browser ✓] <name> — IELTS=N PTE=N TOEFL=N. Prod doesn't fetch the per-course requirements page with a browser to get IELTS overrides for Masters (vs uni-level PDF default). Why all our Masters show IELTS=6 instead of 6.5.
+Vision OCR for image-only fee/requirements tables — [FALLBACK] [per-course vision img 1/3] ... ieltsOverall=6.5 ieltsListening=6 ieltsSpeaking=6 .... ASA has the test scores in IMAGES on each course page. Without vision OCR we get nothing for PTE/TOEFL/CAE/DET. The Replit B work claimed to add pdf_vision.py but we're not seeing per-course image vision firing on prod.
+Sibling cache back-fill — [EXTRACT ] [sibling cache ↻ backfill undergraduate] ... PTE=50 TOEFL=60 CAE=169. After vision OCR finds values for one course, dev caches by course-level (undergraduate/postgraduate) and back-fills siblings. We don't have this.
+AI category sub-classification — [CATEGORY det] ... → Tourism & Hospitality / Hospitality Management. We have the classifier but don't sub-classify ("Hospitality Management" gets bucketed as "Business & Management" instead of "Tourism & Hospitality").
+Total fee computation — when fee_term is "Per Unit", multiply by total units (e.g. 24 units * $19,360/unit / 3 years = ~$58,080/year? — your dev computes "Full Course"). Need the unit-count parser + multiplier.
+Course name title-casing — strip - from slugs and Title Case when course name extractor returns a slug (e.g. bachelor-of-business → Bachelor of Business).
+Eligibility & publish-blocked reason text — even when status is "review", show the actual reason like ⚠ Publish blocked: Needs review: duolingoOverall | Warnings: missing academic requirement. We have eligibility_status but not the human-readable reason payload.
+Duration with unit suffix — store "3 Year" / "2 Year" not just 3 / 5. (And the 5 for Masters is a bug in itself — should be 2 — likely conflating year count with credit point count.)
+TIMING line — emit [INFO ] [TIMING] Total: Xm Ys | Courses: N | Avg: Zs/course | Concurrency: HTTP=4 Browser=3 and ══ DONE ══ Found: N | Staged: N | Skipped: N | Errors: N at the end.
+Time elapsed in UI — the "Last scrape: 9 courses staged in 6m 55s • Started 2026-04-24 06:38 UTC • 9 skipped" line in dev's review-table header. Prod is missing this entirely.
+Log color-coding — see prior request, still all [INFO] color in prod.
+
+The pattern: the prod scraper is running a stripped-down version of the dev pipeline. The advanced "smart" mode (sitemap probe + sample-validation phase + per-course browser fetch + vision OCR + sibling cache + AI category det) seems to either not exist on prod or is gated behind a flag that's off.
+Please align the prod pipeline with dev exactly. The whole point of the migration was data parity. Right now we have the migration, but the data is worse than what your dev produced.
+Priority order:
+
+Per-course browser fetch + vision OCR for ASA-style image tables (without this, all Masters have wrong IELTS, no PTE/TOEFL/CAE/DET detail)
+Total fee computation ($58,080 vs $19,360)
+Course name title-casing (slugs are unprofessional)
+Eligibility/publish-blocked reason text (operator can't review without knowing why)
+Sibling cache back-fill
+AI category sub-classification
+Duration unit display
+TIMING line + last-scrape duration in UI
+Log color-coding (Bug E from before)
+
+Tests should pin every one of these against ASA fixtures so we don't ship another regression.

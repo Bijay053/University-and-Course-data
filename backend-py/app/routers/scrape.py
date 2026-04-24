@@ -6,6 +6,7 @@ available, returning a 503).
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated
 
@@ -251,17 +252,24 @@ async def get_status(
               "WHERE runtime_job_id = :j AND sequence > :s ORDER BY sequence"),
         {"j": job_id, "s": since}
     )).all()
+    # Bug E: surface the colour-coding ``level`` field that
+    # ``orchestrator.emit`` stamps into the JSONB payload. Falling back
+    # to a fresh inference call keeps old log rows (written before the
+    # orchestrator started populating ``level``) coloured correctly too.
+    from app.services.scraper.orchestrator import infer_log_level
     logs = []
     for r in log_rows:
         seq, event, payload, created_at = r
-        msg = (payload or {}).get("message", "") if isinstance(payload, dict) else ""
+        pl = payload if isinstance(payload, dict) else {}
+        msg = pl.get("message", "")
+        level = pl.get("level") or infer_log_level(msg)
         logs.append({
             "sequence": seq,
             "event": event,
             "message": msg,
             "payload": payload,
             "createdAt": created_at.isoformat() if created_at else None,
-            "level": "info",
+            "level": level,
         })
 
     return {
@@ -529,6 +537,25 @@ async def staged_one(
 
 
 
+_SNAKE_TO_CAMEL_RE = re.compile(r"_([a-z])")
+
+
+def _camel(s: str) -> str:
+    """snake_case → camelCase. Pure helper so the response dict and the
+    React StagedCourse type stay in sync without per-field aliasing."""
+    return _SNAKE_TO_CAMEL_RE.sub(lambda m: m.group(1).upper(), s)
+
+
+def _row_to_camel(row: dict) -> dict:
+    """Convert a scraped_courses dict to camelCase keys + ISO datetimes."""
+    out: dict = {}
+    for k, v in row.items():
+        if hasattr(v, "isoformat"):
+            v = v.isoformat()
+        out[_camel(k)] = v
+    return out
+
+
 @router.get("/staged/{sc_id}/review")
 async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     """Return all data needed for the course review modal.
@@ -536,6 +563,13 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     Bug D: this used to omit the per-field evidence rows entirely, leaving
     the Evidence Review modal blank. Now it pulls the rows from
     ``scraped_field_evidence`` and includes them under ``evidence``.
+
+    Bug F: the React component reads ``reviewDetail.conflicts.length`` and
+    ``reviewDetail.course.courseName`` — both undefined caused the
+    "Cannot read properties of undefined (reading 'length')" crash. Now
+    the response always contains a ``course`` object (camelCase, mirroring
+    the StagedCourse TS type) and a ``conflicts`` array (queried from
+    ``field_conflicts``; empty when none — never undefined).
     """
     from sqlalchemy import text as _t
     row = (await db.execute(
@@ -544,11 +578,19 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     if not row:
         raise HTTPException(status_code=404, detail="Staged course not found")
 
+    row_dict = dict(row)
     out = {}
-    for k, v in dict(row).items():
+    for k, v in row_dict.items():
         if hasattr(v, "isoformat"):
             v = v.isoformat()
         out[k] = v
+
+    # Bug F: build a clean camelCase StagedCourse object the React modal
+    # destructures. Mirrors the TS `StagedCourse` type — courseName,
+    # ieltsOverall, autoPublishStatus, etc. Built once here so we can
+    # attach it as `course` (and `stagedCourse` for legacy callers) without
+    # leaking snake_case keys into the same object.
+    course_obj = _row_to_camel(row_dict)
 
     # UI may expect nested shape similar to live courses
     out["fees"] = {
@@ -616,8 +658,35 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     out["decisionScore"] = out.get("decision_score")
     out["completeness"] = out.get("completeness")
 
-    out["stagedCourse"] = dict(out)  # UI accesses Ut.stagedCourse
-    out["course"] = dict(out)        # UI accesses Ut.course
+    # Bug F: query field_conflicts so the modal can render mismatch
+    # warnings. Returns an empty array (never undefined) when there are
+    # none — that's what stops `reviewDetail.conflicts.length` from
+    # crashing the page.
+    conflict_rows = (await db.execute(
+        _t(
+            "SELECT id, field_key, value_a, value_b, reason, status "
+            "FROM field_conflicts WHERE scraped_course_id = :i ORDER BY id"
+        ),
+        {"i": sc_id},
+    )).mappings().all()
+    conflicts = [
+        {
+            "id": c["id"],
+            "fieldKey": c["field_key"],
+            "valueA": c["value_a"],
+            "valueB": c["value_b"],
+            "reason": c["reason"],
+            "status": c["status"],
+        }
+        for c in conflict_rows
+    ]
+    out["conflicts"] = conflicts
+
+    # `course` MUST be camelCase (StagedCourse type). `stagedCourse` is
+    # kept as a snake_case+camelCase hybrid for legacy paths that read
+    # individual fields directly from the response root.
+    out["course"] = course_obj
+    out["stagedCourse"] = dict(out)
     out["ok"] = True
     return out
 

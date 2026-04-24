@@ -22,6 +22,7 @@ This module:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -137,6 +138,83 @@ async def _vision_fallback_text(pdf_bytes: bytes, kind: str, url: str, emit) -> 
     return text
 
 
+_AMOUNT_RE = re.compile(r"\$\s*([\d,]+(?:\.\d+)?)")
+_FEE_YEAR_RE = re.compile(r"\b(20\d{2})\b")
+
+
+def _pick_amounts_from_pdf_text(text: str) -> dict[str, Any]:
+    """Port of Node's ``pickAmounts`` heuristic for fee PDFs.
+
+    Rationale (Bug G): the single-page ``fee.extract`` extractor scores
+    candidates by proximity to a tuition cue word ("international", "fee",
+    "tuition"), then returns the single best-scoring candidate. That works
+    on web pages — but fee PDFs typically lay tuition out as a multi-row
+    table where ALL the candidates appear next to the same cue, so the
+    scorer misses the obvious signal: the LARGEST amount in the document
+    is the full-course (international) tuition, not a per-trimester
+    instalment. Result: prod was reporting per-trimester or per-unit fees
+    as the international fee.
+
+    This helper mirrors Node's ``extractFeesFromPdf``:
+
+    * Dedupe all ``$X,XXX[.XX]`` amounts in the 1k–200k window.
+    * Pick the max.
+    * Mark as "Full Course" when there are ≥3 unique amounts, OR the max
+      is ≥1.4× the next-largest, OR the text mentions "full course".
+    * Per Unit when "per unit" appears anywhere.
+    * Else "Annual".
+    * Currency hard-coded to AUD (matches Node — every uni in scope is AU).
+    """
+    amounts: list[int] = []
+    for m in _AMOUNT_RE.finditer(text):
+        try:
+            n = round(float(m.group(1).replace(",", "")))
+        except ValueError:
+            continue
+        if 1000 < n < 200000:
+            amounts.append(n)
+    if not amounts:
+        return {}
+
+    unique = sorted(set(amounts))
+    # Architect-flagged edge case: a single ``$5,000`` deposit alongside
+    # an ``AUD 25,000`` tuition (no $ sign) used to short-circuit the
+    # cue-aware ``fee.extract`` and return the deposit. With only one
+    # ``$`` amount in the document we have no signal that it is
+    # tuition vs. a deposit / textbook fee / scholarship value, so
+    # we defer to ``fee.extract`` (which reads ``AUD 25,000`` style
+    # amounts too) by returning empty. Two or more candidates is the
+    # "real fee table" signal that justifies short-circuiting.
+    if len(unique) < 2:
+        return {}
+
+    chosen = unique[-1]
+    next_largest = unique[-2] if len(unique) > 1 else None
+
+    looks_like_full_course = (
+        len(unique) >= 3
+        or (next_largest is not None and chosen >= next_largest * 1.4)
+        or bool(re.search(r"\bfull\s+course\b", text, re.I))
+    )
+
+    if looks_like_full_course:
+        term = "Full Course"
+    elif re.search(r"\bper\s+unit\b", text, re.I):
+        term = "Per Unit"
+    else:
+        term = "Annual"
+
+    out: dict[str, Any] = {
+        "international_fee": chosen,
+        "currency": "AUD",
+        "fee_term": term,
+    }
+    year_match = _FEE_YEAR_RE.search(text)
+    if year_match:
+        out["fee_year"] = int(year_match.group(1))
+    return out
+
+
 async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, Any]:
     raw = await _download_raw_pdf(url)
     if not raw:
@@ -157,24 +235,32 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
 
     out: dict[str, Any] = {}
     if text:
-        html = _wrap_text_as_html(text)
-        try:
-            results = await fee.extract(html, url, country=country)
-            out = _first_filled(results, _FEE_KEYS)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("fee extractor failed on PDF %s: %s", url, exc)
+        # Bug G: try the PDF-specific pickAmounts heuristic FIRST. The
+        # single-page fee extractor is preserved as a safety net for the
+        # rare case where the PDF is actually a one-page web-style page
+        # with a single tuition number.
+        out = _pick_amounts_from_pdf_text(text)
+        if not out:
+            html = _wrap_text_as_html(text)
+            try:
+                results = await fee.extract(html, url, country=country)
+                out = _first_filled(results, _FEE_KEYS)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("fee extractor failed on PDF %s: %s", url, exc)
 
     # Vision fallback fires when the text path returned no usable fee data
     # — typically a scanned/image-only PDF.
     if not out:
         vision_text = await _vision_fallback_text(raw, "fee", url, emit)
         if vision_text:
-            html = _wrap_text_as_html(vision_text)
-            try:
-                results = await fee.extract(html, url, country=country)
-                out = _first_filled(results, _FEE_KEYS)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("fee extractor failed on vision text for %s: %s", url, exc)
+            out = _pick_amounts_from_pdf_text(vision_text)
+            if not out:
+                html = _wrap_text_as_html(vision_text)
+                try:
+                    results = await fee.extract(html, url, country=country)
+                    out = _first_filled(results, _FEE_KEYS)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("fee extractor failed on vision text for %s: %s", url, exc)
     if out:
         log.info("fee PDF %s yielded %s", url, sorted(out))
     return out
