@@ -8,11 +8,16 @@ subscores) before falling through to a broad "<TEST> <number>" match.
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
+from bs4 import BeautifulSoup
+
 from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
+
+log = logging.getLogger(__name__)
 
 
 field_keys = (
@@ -325,15 +330,245 @@ def _emit(test: str, scores: dict[str, float] | float | None, snippet: str) -> l
     return out
 
 
+# --- Equivalence-table fallback (PR-1.5 hot-fix #3) --------------------------
+# Many AU/UK universities (VIT, Macquarie, etc.) only state IELTS in plain
+# prose and bury PTE/TOEFL/CAE inside a multi-row equivalence <table>:
+#
+#   | IELTS | PTE  | TOEFL | CAE |
+#   | 6.5   | 55   | 81    | 176 |
+#
+# The regex extractors below cannot read this layout — they search prose, not
+# table cells, so the table values look like noise to them. Vision OCR on the
+# table image is unreliable (in prod we saw 20 vision hits but only 11 PTE
+# rows landed because vision often grabs the wrong cell). Parsing the HTML
+# directly is both cheaper and accurate.
+#
+# Strategy: after the prose extractors run, if we have an IELTS overall but
+# are missing PTE/TOEFL/CAE, look up the matching IELTS row in the page's
+# equivalence table and fill from there. Only fills missing slots — never
+# overwrites a higher-confidence prose extraction.
+
+# Order matters — TOEFL/PTE/Cambridge headers commonly reference "as per
+# IELTS website" as flavour text, so IELTS must be the last thing we check.
+def _classify_test_label(label_lc: str) -> str | None:
+    if "toefl" in label_lc:
+        return "toefl"
+    if "pte" in label_lc:
+        return "pte"
+    if "cambridge" in label_lc or re.search(r"\bcae\b", label_lc):
+        return "cambridge"
+    if "duolingo" in label_lc or re.search(r"\bdet\b", label_lc):
+        return "duolingo"
+    if "kite" in label_lc:
+        # KITE (Kaplan International Tools for English) is not a slot we score.
+        return None
+    if "ielts" in label_lc:
+        return "ielts"
+    return None
+
+
+def _is_equivalence_table(table) -> bool:
+    """A test-equivalence table mentions IELTS plus at least one other test."""
+    headers = " ".join(th.get_text(" ", strip=True) for th in table.find_all("th"))
+    headers_lc = headers.lower()
+    if "ielts" not in headers_lc:
+        return False
+    return any(t in headers_lc for t in ("pte", "toefl", "cambridge", "cae", "duolingo"))
+
+
+def _parse_equivalence_table(table) -> dict[float, dict[str, float]]:
+    """Return ``{ielts_overall: {pte: x, toefl: y, cambridge: z, ...}, ...}``.
+
+    Handles two-row headers (group + sub-column) and rowspan/colspan cells.
+    Returns an empty dict on any parse failure — never raises.
+    """
+    try:
+        thead = table.find("thead")
+        header_rows = thead.find_all("tr") if thead else []
+        if len(header_rows) < 2:
+            # Single-header tables (rare for equivalence layouts) — skip.
+            return {}
+
+        # Expand row-1 colspans → per-column test-group name.
+        group_per_col: list[str | None] = []
+        for th in header_rows[0].find_all(["th", "td"]):
+            label = th.get_text(" ", strip=True).lower()
+            span = int(th.get("colspan", "1") or "1")
+            group_per_col.extend([_classify_test_label(label)] * span)
+
+        # Expand row-2 colspans → per-column sub-label ("overall", "Listening", ...).
+        sub_per_col: list[str] = []
+        for th in header_rows[1].find_all(["th", "td"]):
+            label = th.get_text(" ", strip=True).lower()
+            span = int(th.get("colspan", "1") or "1")
+            sub_per_col.extend([label] * span)
+
+        n = max(len(group_per_col), len(sub_per_col))
+        group_per_col += [None] * (n - len(group_per_col))
+        sub_per_col += [""] * (n - len(sub_per_col))
+
+        # Map each test → column index of its 'overall'.
+        overall_col: dict[str, int] = {}
+        for i, (g, s) in enumerate(zip(group_per_col, sub_per_col)):
+            if g and s == "overall" and g not in overall_col:
+                overall_col[g] = i
+        # IELTS sometimes labels its first column with prose like "band score"
+        # rather than the literal "overall" — fall back to the leftmost
+        # IELTS-group column when that happens.
+        if "ielts" not in overall_col:
+            for i, g in enumerate(group_per_col):
+                if g == "ielts":
+                    overall_col["ielts"] = i
+                    break
+        if "ielts" not in overall_col:
+            return {}
+
+        tbody = table.find("tbody")
+        if not tbody:
+            return {}
+
+        out: dict[float, dict[str, float]] = {}
+        # rowspan carry-over: column index → (text, remaining_rows).
+        carry: dict[int, list] = {}
+        for tr in tbody.find_all("tr"):
+            cells: dict[int, str] = {}
+            # Apply current carry first.
+            for col, entry in list(carry.items()):
+                cells[col] = entry[0]
+                entry[1] -= 1
+                if entry[1] <= 0:
+                    del carry[col]
+            # Now walk this row's <td>s, skipping columns already filled.
+            col = 0
+            for td in tr.find_all("td"):
+                while col in cells and col < n:
+                    col += 1
+                if col >= n:
+                    break
+                text = td.get_text(" ", strip=True)
+                colspan = int(td.get("colspan", "1") or "1")
+                rowspan = int(td.get("rowspan", "1") or "1")
+                for k in range(colspan):
+                    cells[col + k] = text
+                    if rowspan > 1:
+                        carry[col + k] = [text, rowspan - 1]
+                col += colspan
+
+            ielts_text = cells.get(overall_col["ielts"], "").strip()
+            mm = re.match(r"^([0-9]+(?:\.[0-9]+)?)$", ielts_text)
+            if not mm:
+                continue
+            ielts_val = float(mm.group(1))
+            if not (4 <= ielts_val <= 9):
+                continue
+
+            row_data: dict[str, float] = {}
+            for test, c in overall_col.items():
+                if test == "ielts":
+                    continue
+                t = cells.get(c, "").strip()
+                m2 = re.match(r"^([0-9]+(?:\.[0-9]+)?)$", t)
+                if not m2:
+                    continue
+                v = float(m2.group(1))
+                # Apply per-test sanity bounds.
+                if test == "pte" and not (10 <= v <= 90):
+                    continue
+                if test == "toefl" and not (0 <= v <= 120):
+                    continue
+                if test == "cambridge" and not (140 <= v <= 230):
+                    continue
+                if test == "duolingo" and not (50 <= v <= 160):
+                    continue
+                row_data[test] = v
+
+            if row_data:
+                out[ielts_val] = row_data
+        return out
+    except Exception as exc:  # noqa: BLE001 — never break extraction here
+        log.debug("_parse_equivalence_table failed: %s", exc)
+        return {}
+
+
+def _equivalence_fallback(
+    html: str, results: list[ExtractionResult]
+) -> list[ExtractionResult]:
+    """Fill missing PTE/TOEFL/CAE/Duolingo from the page's equivalence table.
+
+    Only fires when (a) the prose extractors found an IELTS overall,
+    (b) at least one of PTE/TOEFL/CAE/Duolingo is still missing,
+    (c) the page contains a parseable equivalence table whose IELTS row
+    matches the extracted IELTS overall.
+    """
+    found = {r.field_key for r in results}
+    if "ielts_overall" not in found:
+        return []
+    needed = {"pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall"}
+    missing = needed - found
+    if not missing:
+        return []
+
+    # The IELTS overall we already extracted from prose (top result wins).
+    ielts_overall = next(
+        (r.normalized.get("ielts_overall") for r in results
+         if r.field_key == "ielts_overall" and r.normalized),
+        None,
+    )
+    if ielts_overall is None:
+        return []
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception as exc:  # noqa: BLE001
+        log.debug("_equivalence_fallback: BS4 parse failed: %s", exc)
+        return []
+
+    extra: list[ExtractionResult] = []
+    for table in soup.find_all("table"):
+        if not _is_equivalence_table(table):
+            continue
+        mapping = _parse_equivalence_table(table)
+        # Allow a small float tolerance (e.g. extracted 6.5 matches table 6.5).
+        match_key = next(
+            (k for k in mapping if abs(k - float(ielts_overall)) < 0.05),
+            None,
+        )
+        if match_key is None:
+            continue
+        row = mapping[match_key]
+        snippet = f"equivalence table row IELTS={match_key}"
+        for test, val in row.items():
+            field_key = f"{test}_overall"
+            if field_key not in missing:
+                continue
+            extra.append(
+                ExtractionResult(
+                    field_key=field_key,
+                    value=val,
+                    normalized={field_key: val},
+                    confidence=0.8,  # high — direct cell read, no OCR
+                    snippet=snippet,
+                    method="equivalence_table",
+                )
+            )
+            missing.discard(field_key)
+        if not missing:
+            break
+    return extra
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     text = compact(html_to_text(html))
     if not text:
         return []
     snippet = text[:500]
-    return [
+    results: list[ExtractionResult] = [
         *_emit("ielts", _ielts(text), snippet),
         *_emit("pte", _pte(text), snippet),
         *_emit("toefl", _toefl(text), snippet),
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),
     ]
+    # Last-resort: equivalence-table lookup for tests not captured by prose.
+    results.extend(_equivalence_fallback(html, results))
+    return results

@@ -118,6 +118,112 @@ def test_english_toefl_overall_score_x_with_no_section_below_y():
     assert out["toefl_overall"].normalized["toefl_listening"] == 17.0
 
 
+# --- Equivalence-table fallback (PR-1.5 hot-fix #3) --------------------------
+# Real VIT layout, distilled. Page prose only states IELTS=6.5; PTE/TOEFL/CAE
+# live exclusively in this multi-row equivalence table. Before the parser was
+# added, has_pte/toefl/cae rates dropped from 99.6% to ~45% in prod because
+# vision OCR couldn't reliably pick the right cell from the table image.
+_VIT_EQUIV_TABLE_HTML = """
+<p>English test results IELTS Academic: Overall score 6.5, with no band below 6.0.</p>
+<table>
+  <thead>
+    <tr>
+      <th colspan="2"><strong>IELTS (Academic)</strong></th>
+      <th colspan="5"><strong>PTE (Academic)</strong></th>
+      <th colspan="5"><strong>TOEFL IBT Overall (as per IELTS website)</strong></th>
+      <th colspan="2"><strong>(CAE) Cambridge English scale score</strong></th>
+      <th colspan="2"><strong>(KITE) Kaplan</strong></th>
+    </tr>
+    <tr>
+      <th>overall</th><th>No band less than</th>
+      <th>overall</th><th>Listening</th><th>Reading</th><th>Speaking</th><th>Writing</th>
+      <th>overall</th><th>Listening</th><th>Reading</th><th>Speaking</th><th>Writing</th>
+      <th>overall</th><th> </th>
+      <th>overall</th><th> </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2"><strong>5.5</strong></td><td rowspan="2"><strong>5</strong></td>
+      <td rowspan="2"><strong>39</strong></td><td colspan="4">no band &lt; 5.0</td>
+      <td rowspan="2"><strong>51</strong></td><td colspan="4">no band &lt; 5.0</td>
+      <td rowspan="2"><strong>162</strong></td><td>no band &lt; 5.0</td>
+      <td rowspan="2"><strong>410</strong></td><td>no band &lt; 5.0</td>
+    </tr>
+    <tr><td>33</td><td>36</td><td>24</td><td>29</td><td>8</td><td>8</td><td>14</td><td>9</td><td>160</td><td>373</td></tr>
+    <tr>
+      <td rowspan="2"><strong>6.5</strong></td><td rowspan="2"><strong>6</strong></td>
+      <td rowspan="2"><strong>55</strong></td><td colspan="4">no band &lt; 6.0</td>
+      <td rowspan="2"><strong>81</strong></td><td colspan="4">no band &lt; 6.0</td>
+      <td rowspan="2"><strong>176</strong></td><td>no band &lt; 6.0</td>
+      <td rowspan="2"><strong>478</strong></td><td>no band &lt; 6.0</td>
+    </tr>
+    <tr><td>47</td><td>48</td><td>54</td><td>51</td><td>16</td><td>16</td><td>19</td><td>19</td><td>169</td><td>444</td></tr>
+  </tbody>
+</table>
+"""
+
+
+def test_english_equivalence_table_fills_pte_toefl_cae_when_only_ielts_in_prose():
+    out = {
+        r.field_key: r
+        for r in _run(english_test.extract(_VIT_EQUIV_TABLE_HTML, "https://vit.edu.au"))
+    }
+    assert out["ielts_overall"].value == 6.5
+    assert out["ielts_overall"].method == "regex"
+    # PTE/TOEFL/CAE come from the IELTS=6.5 row of the equivalence table.
+    assert out["pte_overall"].value == 55.0
+    assert out["pte_overall"].method == "equivalence_table"
+    assert out["toefl_overall"].value == 81.0
+    assert out["toefl_overall"].method == "equivalence_table"
+    assert out["cambridge_overall"].value == 176.0
+    assert out["cambridge_overall"].method == "equivalence_table"
+
+
+def test_english_equivalence_table_does_not_overwrite_prose_extraction():
+    """When prose already gave us PTE, the table fallback must not clobber it."""
+    html = (
+        "<p>IELTS Academic: Overall score 6.5, with no band below 6.0. "
+        "PTE Academic: Overall score 58, with no communicative skill below 50.</p>"
+        + _VIT_EQUIV_TABLE_HTML.split("</p>", 1)[1]
+    )
+    results = _run(english_test.extract(html, "https://vit.edu.au"))
+    pte_results = [r for r in results if r.field_key == "pte_overall"]
+    # Should have only one PTE result and it must come from prose, not table.
+    assert len(pte_results) == 1
+    assert pte_results[0].value == 58.0
+    assert pte_results[0].method == "regex"
+
+
+def test_english_equivalence_table_skipped_when_no_ielts_extracted():
+    """No prose IELTS → no anchor for the table lookup → no fallback fires."""
+    html = _VIT_EQUIV_TABLE_HTML.replace(
+        "English test results IELTS Academic: Overall score 6.5, with no band below 6.0.",
+        "English requirements: contact admissions for details.",
+    )
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://vit.edu.au"))}
+    assert "ielts_overall" not in out
+    assert "pte_overall" not in out
+    assert "toefl_overall" not in out
+
+
+def test_english_equivalence_table_ignores_non_equivalence_tables():
+    """A page with a fees table and IELTS prose must not match the fees table."""
+    html = """
+    <p>IELTS Academic: Overall score 6.5, with no band below 6.0.</p>
+    <table>
+      <thead><tr><th>Year</th><th>Tuition</th></tr></thead>
+      <tbody><tr><td>2026</td><td>$28000</td></tr></tbody>
+    </table>
+    """
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://x"))}
+    assert out["ielts_overall"].value == 6.5
+    # No PTE/TOEFL/CAE because this table isn't an equivalence table.
+    assert "pte_overall" not in out
+    assert "toefl_overall" not in out
+    assert "cambridge_overall" not in out
+
+
 # --- Intake ------------------------------------------------------------------
 def test_intake_parses_keyword_window():
     html = "<p>Available intakes: February, July and September.</p>"
