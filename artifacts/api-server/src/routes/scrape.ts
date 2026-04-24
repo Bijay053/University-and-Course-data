@@ -31,6 +31,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { fetchPageWithBrowser, siteNeedsBrowser } from "../browser-helper.js";
 import { applyCsuTextualCampusFallback } from "../lib/csu-campus-fallback.js";
+import { needsBrowserFallback } from "../lib/needs-browser-fallback.js";
 import { extractEnglishWithCascade } from "../lib/english-cascade.js";
 import { fillFromConcordance } from "../lib/concordance-cache.js";
 import { refreshCourseSearchView } from "../services/search-index.js";
@@ -8021,29 +8022,10 @@ async function sampleBatchPageTemplateHint(
   }
 }
 
-function needsBrowserFallback(data: ReturnType<typeof extractWithCheerio>, url?: string): boolean {
-  // No course name at all → likely fully JS-rendered, worth trying browser.
-  if (!data.courseName) return true;
-  const hasEnglish  = !!(data.ieltsOverall || data.pteOverall || data.toeflOverall);
-  // If no English test found at all, ALWAYS try browser — the requirement block is
-  // almost certainly behind a JS-rendered tab / accordion (e.g. ASA, VU, UEL).
-  if (!hasEnglish) return true;
-  const hasFee      = !!data.internationalFee;
-  const hasDuration = !!data.duration;
-  const hasDegree   = !!data.degreeLevel;
-  const hasLocation = !!(data.courseLocation && data.courseLocation.trim().length > 2);
-  const hasIntakes  = !!data.intakeMonths?.length;
-  if (data.studyMode !== "Online" && !hasLocation && !hasIntakes) return true;
-  // CSU-specific: study.csu.edu.au hydrates the campus list (`ocb_metadata.course_offerings`)
-  // client-side. Even when the static page yields English/fee/duration, the campus
-  // chips can be empty — and the textual fallback in csu-campus-fallback.ts cannot
-  // recover them when the heading itself is rendered by JS. Escalate to a browser
-  // fetch (which will wait for the offerings JSON) whenever the CSU course page
-  // came back without a courseLocation.
-  if (url && isCsuCoursePage(url) && !hasLocation && data.studyMode !== "Online") return true;
-  // Two or more key fields found → static extraction is working; no browser needed.
-  return [hasFee, hasEnglish, hasDuration, hasDegree].filter(Boolean).length < 2;
-}
+// `needsBrowserFallback` was extracted to `../lib/needs-browser-fallback.ts`
+// so the helper can be unit-tested without dragging in the full
+// `routes/scrape.ts` dependency graph (gemini-client, browser-helper, etc.).
+// The two call sites in this file already import the helper at the top.
 
 async function scrapeCourseBatch(
   courseLinks: { url: string; name: string }[],
@@ -8715,7 +8697,7 @@ Use null for any test not mentioned. Return ONLY valid JSON.`;
           // Content-aware browser escalation: if cheerio can't get critical fields,
           // the page may be JS-rendered — try browser once as a fallback.
           const quickData = extractWithCheerio(cHtml, link.url, link.name, universityCountry, batchPageTemplate, feedbackHints);
-          if (!disableBrowserForHeavyHost && needsBrowserFallback(quickData)) {
+          if (!disableBrowserForHeavyHost && needsBrowserFallback(quickData, link.url)) {
             const browserResult = await runBrowser();
             if (browserResult?.mainHtml || browserResult?.requirementsHtml) {
               cHtml = browserResult?.mainHtml || browserResult?.requirementsHtml || cHtml;
