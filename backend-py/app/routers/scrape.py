@@ -59,6 +59,11 @@ def _staged_row_to_dict(r) -> dict:
     d["feeYear"] = r.fee_year
     d["eligibilityStatus"] = r.eligibility_status
     d["autoPublishStatus"] = r.auto_publish_status
+    # T205: surface the publish-blocked reason so the Review modal can
+    # render the warning banner. Was previously dropped on the floor —
+    # the column existed but never made it onto the wire.
+    d["eligibilityReason"] = r.eligibility_reason
+    d["eligibility_reason"] = r.eligibility_reason
     # UI uses these short names too
     d["level"] = r.degree_level
     d["intake"] = r.intake_months
@@ -263,14 +268,28 @@ async def get_status(
         pl = payload if isinstance(payload, dict) else {}
         msg = pl.get("message", "")
         level = pl.get("level") or infer_log_level(msg)
-        logs.append({
+        # T210/T209: the React log viewer reads ``log.phase``,
+        # ``log.totalFound``, ``log.imported``, ``log.skipped``,
+        # ``log.errors``, ``log.status``, ``log.name``,
+        # ``log.sampleResult`` directly off the entry — not off
+        # ``log.payload.<x>``. Mirror Node's status payload by
+        # spreading the JSONB fields onto the top level. Without
+        # this, the colour-coding switch always fell through to the
+        # neutral grey branch and the "══ DONE ══" event row never
+        # rendered any of its counters.
+        entry = {
             "sequence": seq,
             "event": event,
             "message": msg,
             "payload": payload,
             "createdAt": created_at.isoformat() if created_at else None,
             "level": level,
-        })
+        }
+        for k, v in pl.items():
+            if k in entry or k == "message":
+                continue
+            entry[k] = v
+        logs.append(entry)
 
     return {
         "id": job.runtime_job_id,
@@ -515,14 +534,37 @@ async def staged_one(
     """Handle both /staged/123 (single course by id) and /staged/job_xxx (all staged for job)."""
     from app.models import ScrapedCourse
     
-    # If it looks like a job_id, return list of staged courses for that job
+    # If it looks like a job_id, return BOTH the staged courses and the
+    # job summary so the UI's "Last scrape: …" banner has the data it
+    # needs without a second round-trip. Mirrors Node's response shape
+    # (routes/scrape.ts:6884) — older callers that expected a bare array
+    # still work because the React fetch (scraping.tsx:489) treats
+    # ``Array.isArray(payload)`` as the legacy branch.
     if sc_id_or_job.startswith("job_"):
         rows = (await db.execute(
             select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
-        # UI expects bare array — simple, JSON-safe shape only
-        return [_staged_row_to_dict(s) for s in rows]
+        courses = [_staged_row_to_dict(s) for s in rows]
+        job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
+        last_scrape = None
+        if job:
+            duration_ms: int | None = None
+            if job.started_at and job.completed_at:
+                duration_ms = int(
+                    (job.completed_at - job.started_at).total_seconds() * 1000
+                )
+            last_scrape = {
+                "jobId": job.runtime_job_id,
+                "startedAt": job.started_at.isoformat() if job.started_at else None,
+                "completedAt": job.completed_at.isoformat() if job.completed_at else None,
+                "durationMs": duration_ms,
+                "totalFound": job.total_found or 0,
+                "staged": job.imported or 0,
+                "skipped": job.skipped or 0,
+                "errors": job.errors or 0,
+            }
+        return {"courses": courses, "lastScrape": last_scrape}
     
     # Otherwise treat as integer sc_id
     try:

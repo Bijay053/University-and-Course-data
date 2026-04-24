@@ -82,6 +82,71 @@ def _detect_currency(ctx: str, country: str | None) -> str:
     return "AUD"
 
 
+_UNIT_COUNT_RE = re.compile(r"\b(\d{1,3})\s+units?\b", re.IGNORECASE)
+_CREDIT_POINT_RE = re.compile(
+    r"\b(\d{2,4})\s+credit\s+points?\b", re.IGNORECASE
+)
+_CP_PER_UNIT_RE = re.compile(
+    r"\b(\d{1,2})\s+credit\s+points?\s+(?:per|each)\b|"
+    r"\bunits?\s+of\s+(\d{1,2})\s+credit\s+points?\b",
+    re.IGNORECASE,
+)
+
+
+def _find_total_units(text: str) -> int | None:
+    """Best-effort total-unit count for a degree program.
+
+    Returns the largest plausible value because the Node side observed
+    pages that mention both per-trimester unit loads ("4 units per trimester")
+    and the total ("24 units total"). For credit-point structures we divide
+    by the per-unit credit-point load (default 8 — the Australian standard;
+    overridden when the page explicitly says "12 credit points each", etc).
+    """
+    candidates: list[int] = []
+    for m in _UNIT_COUNT_RE.finditer(text):
+        n = int(m.group(1))
+        # 4-60 captures realistic programmes (Bachelor ≈ 24, Masters ≈ 12).
+        if 4 <= n <= 60:
+            candidates.append(n)
+    cp_per_unit = 8
+    for m in _CP_PER_UNIT_RE.finditer(text):
+        raw = m.group(1) or m.group(2)
+        if raw and 4 <= int(raw) <= 24:
+            cp_per_unit = int(raw)
+            break
+    for m in _CREDIT_POINT_RE.finditer(text):
+        cp = int(m.group(1))
+        if 48 <= cp <= 480:
+            derived = cp // cp_per_unit
+            if 4 <= derived <= 60:
+                candidates.append(derived)
+    if not candidates:
+        return None
+    return max(candidates)
+
+
+def _maybe_compute_full_course(amount: int, fee_term: str, text: str) -> tuple[int, str] | None:
+    """If fee is per-unit and a unit count is parseable, compute the
+    full-course total and re-tag.
+
+    Returns ``(total_amount, "Full Course")`` on success, ``None`` when no
+    unit count is recoverable. Caller decides whether to override the
+    extracted fee.
+    """
+    if fee_term != "Per Unit":
+        return None
+    units = _find_total_units(text)
+    if not units:
+        return None
+    total = amount * units
+    # Final sanity gate — protect against a per-unit value that was
+    # actually mis-parsed (e.g. an Annual fee tagged Per Unit from a
+    # noisy paragraph). Real full-course totals sit in $20K-$500K.
+    if not (15_000 <= total <= 500_000):
+        return None
+    return total, "Full Course"
+
+
 def _normalize_fee_term(ctx: str) -> str:
     if re.search(r"per\s*trimester|per\s*trim\b", ctx, re.I):
         return "Trimester"
@@ -113,6 +178,11 @@ def _extract_year(ctx: str) -> int | None:
     return None
 
 
+_PER_UNIT_HINT_RE = re.compile(
+    r"per\s*(?:credit\s*)?(?:unit|point|credit|subject|module)", re.IGNORECASE
+)
+
+
 def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
     """Yield (amount, currency_token_in_match, surrounding_context)."""
     for m in _AMOUNT_RE.finditer(text):
@@ -122,12 +192,19 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
             amount = int(float(raw.replace(",", "")))
         except ValueError:
             continue
-        # Sanity: real-world international tuition is roughly $5K-$200K.
-        if amount < 5000 or amount > 200_000:
-            continue
+        # Compute the local context first so the per-unit floor can use
+        # it. Per-unit tuition typically sits at $1.5K-$8K per subject;
+        # the standard $5K floor would reject every legitimate per-unit
+        # fee (the user's exact T203 bug). Drop to $1.5K when the
+        # surrounding window mentions "per unit" so the rollup branch
+        # downstream gets a chance to multiply it back up to a Full
+        # Course total.
         start = max(0, m.start() - 160)
         end = min(len(text), m.end() + 160)
         ctx = text[start:end]
+        floor = 1_500 if _PER_UNIT_HINT_RE.search(ctx) else 5_000
+        if amount < floor or amount > 200_000:
+            continue
         # Salary filter: reject only when the *nearest* salary cue is closer
         # to the amount than the nearest tuition/fee/international cue.
         anchor = m.start() - start  # offset of the amount inside ctx
@@ -183,6 +260,18 @@ async def extract(
     if not (_TUITION_CTX.search(ctx) or _INTL_CTX.search(ctx)):
         return []
     currency = _detect_currency(ctx, country)
+    fee_term = _normalize_fee_term(ctx)
+    method = "regex"
+    # Per-Unit → Full Course rollup (T203). Mirrors Node's behaviour at
+    # routes/scrape.ts:2102: when a per-unit fee is detected and the page
+    # also discloses a total-unit count, prefer the rolled-up Full Course
+    # value so the Review table shows the full programme cost rather than
+    # a per-subject sticker shock. Falls back silently when no unit count
+    # is parseable.
+    rollup = _maybe_compute_full_course(amount, fee_term, text)
+    if rollup is not None:
+        amount, fee_term = rollup
+        method = "regex+per_unit_rollup"
     return [
         ExtractionResult(
             field_key="international_fee",
@@ -190,11 +279,11 @@ async def extract(
             normalized={
                 "international_fee": amount,
                 "currency": currency,
-                "fee_term": _normalize_fee_term(ctx),
+                "fee_term": fee_term,
                 "fee_year": _extract_year(ctx),
             },
             confidence=min(1.0, 0.4 + score * 0.1),
             snippet=ctx[:240],
-            method="regex",
+            method=method,
         )
     ]

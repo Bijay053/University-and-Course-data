@@ -29,6 +29,26 @@ _NON_COURSE_PREFIX = re.compile(
 )
 
 
+_SLUG_LIKE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+){2,}$")
+
+
+def _looks_like_slug(text: str) -> bool:
+    """Detect URL-style slugs (``bachelor-of-business``).
+
+    Triggered when the cleaned candidate is a single all-lowercase token
+    with two or more hyphens — that pattern is unambiguous (real titles use
+    spaces, not hyphens, between distinct words). One-hyphen survivors like
+    ``co-op`` or ``part-time`` are deliberately *not* matched so we never
+    mangle legitimate compound words.
+    """
+    return bool(_SLUG_LIKE.fullmatch(text.strip()))
+
+
+def _unslug(text: str) -> str:
+    """Replace hyphens with spaces so the slug can flow through ``_smart_case``."""
+    return text.replace("-", " ")
+
+
 def _smart_case(text: str) -> str:
     words = re.split(r"(\s+)", text.strip())
     out: list[str] = []
@@ -60,6 +80,10 @@ def _clean(raw: str) -> str | None:
     txt = _TITLE_SUFFIX.sub("", txt).strip(" -|·•")
     if not txt or len(txt) < 3 or len(txt) > 200:
         return None
+    # Slug like "bachelor-of-business" → "Bachelor of Business". Done before
+    # ``_smart_case`` so the prepositions/acronym rules apply uniformly.
+    if _looks_like_slug(txt):
+        txt = _unslug(txt)
     return _smart_case(txt)
 
 

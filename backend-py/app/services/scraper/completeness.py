@@ -137,8 +137,16 @@ def decide_eligibility(sc: ScrapedCourse, completeness: CompletenessResult) -> E
             f"completeness {completeness.score}% < {settings.min_completeness_for_auto_publish}%"
         )
 
+    # T205: build the human-readable reason string the UI surfaces verbatim.
+    # Format mirrors Node's ``buildReviewNotes`` (routes/scrape.ts:4977 +
+    # 12227) so prod and the dev API write the same shape into
+    # ``scraped_courses.eligibility_reason``:
+    #   "Publish blocked: Needs review: <blockers> | Warnings: <warnings>"
+    # The "Publish blocked: " prefix is part of the stored value (not a UI
+    # boilerplate) so the same string is useful in API responses, log
+    # exports, and the React modal without per-surface prefixing.
     if blockers:
-        parts = [f"Needs review: {', '.join(blockers)}"]
+        parts = [f"Publish blocked: Needs review: {', '.join(blockers)}"]
         if warnings:
             parts.append(f"Warnings: {', '.join(warnings)}")
         return EligibilityDecision(
@@ -148,7 +156,7 @@ def decide_eligibility(sc: ScrapedCourse, completeness: CompletenessResult) -> E
     if warnings and completeness.score < settings.min_completeness_for_auto_publish:
         return EligibilityDecision(
             status="review",
-            reason=f"Warnings: {', '.join(warnings)}",
+            reason=f"Publish blocked: Warnings: {', '.join(warnings)}",
             blockers=[],
             warnings=warnings,
         )

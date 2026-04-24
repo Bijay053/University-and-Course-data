@@ -297,6 +297,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             *[_bounded(lk) for lk in links], return_exceptions=True
         )
 
+        # T206: sibling-cache back-fill. Runs after every per-course
+        # extract has settled but BEFORE staging — by then we've seen
+        # the high-quality english-test slots from siblings that did
+        # extract them, and we want every staged row to benefit. Mutates
+        # the per-course payload dicts in place.
+        try:
+            from app.services.scraper.sibling_cache import (
+                backfill_english_from_siblings,
+            )
+
+            sibling_dicts = [r for r in results if isinstance(r, dict)]
+            fills = await backfill_english_from_siblings(sibling_dicts, emit=emit)
+            if fills:
+                log.info("sibling-cache backfilled %d slot(s) across siblings", fills)
+        except Exception as exc:  # noqa: BLE001 — never abort the run on cache failure
+            log.warning("sibling-cache backfill failed: %s", exc)
+            await emit(
+                "status",
+                f"[EXTRACT] [sibling cache ✗] {exc}",
+                phase="extract",
+                kind="sibling_cache_error",
+            )
+
         # 2) Staging phase — serial writes through one fresh session per course.
         for r in results:
             if isinstance(r, Exception):
@@ -371,7 +394,43 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # Heartbeat between batches so the admin UI sees progress.
             job.heartbeat_at = datetime.now(timezone.utc)
 
-        # If every result blew up, mark the job failed instead of completed.
+        # T209: emit a single human-readable TIMING line + a typed DONE
+        # event so the React log viewer can render the "══ DONE ══"
+        # summary row. ``event="done"`` triggers the dedicated UI branch
+        # at scraping.tsx:1630 — the typed payload (totalFound /
+        # imported / skipped / errors) is what the row prints. Mirrors
+        # Node's emitDone (routes/scrape.ts:14442).
+        finished_at = datetime.now(timezone.utc)
+        elapsed_sec = max(
+            0,
+            int((finished_at - (job.started_at or finished_at)).total_seconds()),
+        )
+        course_count = summary.get("staged", 0) or summary.get("discovered", 0) or 1
+        avg_per_course = elapsed_sec / max(1, course_count)
+        mins, secs = divmod(elapsed_sec, 60)
+        await emit(
+            "status",
+            f"[INFO ] [TIMING] Total: {mins}m {secs}s | Courses: {course_count} "
+            f"| Avg: {avg_per_course:.1f}s/course "
+            f"| Concurrency: HTTP={_MAX_PARALLEL_FETCH} Browser=3",
+            phase="complete",
+            elapsed_seconds=elapsed_sec,
+            avg_seconds_per_course=avg_per_course,
+            level="info",
+        )
+        await emit(
+            "done",
+            f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
+            f"Staged:{summary.get('staged', 0)} | "
+            f"Skipped:{summary.get('skipped', 0)} | "
+            f"Errors:{summary.get('errors', 0)}",
+            phase="complete",
+            totalFound=summary.get("discovered", 0),
+            imported=summary.get("staged", 0),
+            skipped=summary.get("skipped", 0),
+            errors=summary.get("errors", 0),
+            level="success",
+        )
         await emit("status", f"Staged {summary['staged']} courses, {summary['skipped']} skipped, {summary['fetch_failed']} fetch errors", phase="complete", **summary)
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0

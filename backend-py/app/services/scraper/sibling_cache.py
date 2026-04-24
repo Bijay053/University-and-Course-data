@@ -1,0 +1,176 @@
+"""Sibling-cache back-fill (T206).
+
+Many universities publish a single English-language requirement table
+that applies to *all* undergraduate (or all postgraduate) courses, then
+omit those scores from individual course pages. The per-course
+extractors honestly emit nothing, the AI fallback can't invent values,
+and the rows stage with empty IELTS/PTE/TOEFL/CAE — even though one of
+their siblings did extract the table successfully.
+
+Mirrors Node's ``backfillEnglishFromSiblings`` (routes/scrape.ts:9381).
+The bucket key is the degree-level group ("undergraduate" /
+"postgraduate") so a Bachelor's table never bleeds into a Doctorate
+row. Within a bucket we take the *modal* value (most-frequent across
+siblings) so a one-off outlier doesn't drag the whole bucket.
+
+Public entry-point: :func:`backfill_english_from_siblings`. It runs
+AFTER the per-course extract phase, BEFORE staging — that ordering is
+load-bearing because the cache must observe the high-quality slot
+values from siblings that did manage to extract them.
+"""
+from __future__ import annotations
+
+import logging
+from collections import Counter
+from typing import Any, Awaitable, Callable, Final
+
+log = logging.getLogger(__name__)
+
+_ENGLISH_SLOTS: Final = (
+    "ielts_overall",
+    "pte_overall",
+    "toefl_overall",
+    "cambridge_overall",
+)
+
+_UNDERGRAD_HINTS: Final = (
+    "bachelor", "undergraduate", "diploma", "certificate", "associate",
+    "foundation", "bridging", "honours",
+)
+_POSTGRAD_HINTS: Final = (
+    "master", "postgraduate", "doctor", "phd", "graduate certificate",
+    "graduate diploma", "doctorate",
+)
+
+
+def _bucket_for(payload: dict[str, Any]) -> str:
+    """Return ``"undergraduate"``, ``"postgraduate"`` or ``"unknown"``.
+
+    Looks at ``degree_level`` first (cheap, set by the degree_level
+    extractor) then falls back to keyword-matching the course name. The
+    "unknown" bucket is its own pool — it's better to share a value
+    among the unknowns than to splash a Master's score onto an
+    unidentified Bachelor's.
+    """
+    lvl = (payload.get("degree_level") or "").lower()
+    if any(h in lvl for h in _POSTGRAD_HINTS):
+        return "postgraduate"
+    if any(h in lvl for h in _UNDERGRAD_HINTS):
+        return "undergraduate"
+    name = (payload.get("course_name") or "").lower()
+    if any(h in name for h in _POSTGRAD_HINTS):
+        return "postgraduate"
+    if any(h in name for h in _UNDERGRAD_HINTS):
+        return "undergraduate"
+    return "unknown"
+
+
+def _build_bucket_cache(
+    results: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Build ``{bucket: {slot: most_common_value}}``.
+
+    Ignores empty / None slots and only emits a slot when at least one
+    sibling has a value (so back-fill never invents data). Ties on
+    frequency are broken by Counter's insertion order, which matches
+    the per-course gather() return order — deterministic across runs.
+    """
+    buckets: dict[str, dict[str, Counter]] = {}
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        payload = r.get("payload") or {}
+        bucket = _bucket_for(payload)
+        slot_counters = buckets.setdefault(
+            bucket, {k: Counter() for k in _ENGLISH_SLOTS}
+        )
+        for k in _ENGLISH_SLOTS:
+            v = payload.get(k)
+            if v in (None, "", 0):
+                continue
+            slot_counters[k][v] += 1
+    cache: dict[str, dict[str, Any]] = {}
+    for bucket, counters in buckets.items():
+        slot_values: dict[str, Any] = {}
+        for k, counter in counters.items():
+            if not counter:
+                continue
+            most_common = counter.most_common(1)[0][0]
+            slot_values[k] = most_common
+        if slot_values:
+            cache[bucket] = slot_values
+    return cache
+
+
+async def backfill_english_from_siblings(
+    results: list[dict[str, Any]],
+    *,
+    emit: Callable[..., Awaitable[None]] | None = None,
+) -> int:
+    """Mutate ``results`` in place, filling empty english slots from
+    same-bucket siblings.
+
+    Returns the total number of slot-fills performed across the run so
+    the orchestrator can fold it into its summary metrics. Per-bucket
+    log lines are emitted as
+    ``[EXTRACT] [sibling cache ↻ backfill <bucket>] ielts_overall=6.5
+    pte_overall=58 ...``.
+    """
+    cache = _build_bucket_cache(results)
+    if not cache:
+        return 0
+
+    if emit:
+        for bucket, slot_values in cache.items():
+            scores = " ".join(
+                f"{k}={v}" for k, v in sorted(slot_values.items())
+            )
+            await emit(
+                "status",
+                f"[EXTRACT] [sibling cache ↻ build {bucket}] {scores}",
+                phase="extract",
+                kind="sibling_cache_build",
+                bucket=bucket,
+                values=dict(slot_values),
+            )
+
+    fills_total = 0
+    backfilled_per_bucket: dict[str, int] = {}
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        payload = r.get("payload") or r.setdefault("payload", {})
+        evidence = r.setdefault("evidence", [])
+        bucket = _bucket_for(payload)
+        slot_values = cache.get(bucket) or {}
+        if not slot_values:
+            continue
+        for k, v in slot_values.items():
+            existing = payload.get(k)
+            if existing not in (None, "", 0):
+                continue
+            payload[k] = v
+            evidence.append(
+                {
+                    "field_key": k,
+                    "value": v,
+                    "confidence": 0.55,
+                    "method": f"sibling_cache:{bucket}",
+                    "snippet": f"sibling-cache backfill from {bucket} bucket",
+                }
+            )
+            fills_total += 1
+            backfilled_per_bucket[bucket] = backfilled_per_bucket.get(bucket, 0) + 1
+
+    if emit and backfilled_per_bucket:
+        for bucket, n in backfilled_per_bucket.items():
+            await emit(
+                "status",
+                f"[EXTRACT] [sibling cache ↻ backfill {bucket}] "
+                f"{n} slot(s) filled across siblings",
+                phase="extract",
+                kind="sibling_cache_backfill",
+                bucket=bucket,
+                fills=n,
+            )
+    return fills_total

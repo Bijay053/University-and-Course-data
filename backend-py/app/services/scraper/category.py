@@ -122,6 +122,13 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "Hospitality, Tourism & Events",
         (
+            # Multi-word phrases first so "Hospitality Management" beats
+            # the bare "business" / "management" matches in Business &
+            # Management. Without these, prod was bucketing every
+            # "Master of Hospitality Management" as Business & Management
+            # — exact bug the user reported.
+            "hospitality management", "hotel management", "tourism management",
+            "event management", "culinary arts",
             "hospitality", "tourism", "event", "hotel", "culinary",
             "restaurant", "wine ",
         ),
@@ -168,6 +175,91 @@ def _score(name: str) -> dict[str, int]:
         if score:
             scores[category] = score
     return scores
+
+
+# Sub-category fine-grained mapping. Each tuple: (parent_category, sub_label,
+# keywords). Matched against the course name in order; first hit wins. Mirrors
+# Node's `mapCourseToCategory` (routes/scrape.ts:9966) so both pipelines emit
+# the same controlled vocabulary into ``scraped_courses.sub_category``. Without
+# this, ``sub_category`` was always NULL and the Review table's "Field" column
+# fell back to the parent category, hiding the more specific signal an
+# operator needs to triage a course (e.g. "Hospitality Management" vs
+# "Tourism" both showing as "Hospitality, Tourism & Events").
+_SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    # Multi-word phrases first so the more-specific keyword wins.
+    ("Hospitality, Tourism & Events", "Hospitality Management", ("hospitality management", "hotel management")),
+    ("Hospitality, Tourism & Events", "Tourism Management",     ("tourism management", "tourism")),
+    ("Hospitality, Tourism & Events", "Event Management",       ("event management", "event ")),
+    ("Hospitality, Tourism & Events", "Culinary Arts",          ("culinary arts", "culinary", "restaurant")),
+    ("Business & Management",     "MBA",                    ("mba", "master of business administration")),
+    ("Business & Management",     "Accounting",             ("accounting", "accountancy")),
+    ("Business & Management",     "Finance",                ("finance", "banking", "actuarial")),
+    ("Business & Management",     "Marketing",              ("marketing",)),
+    ("Business & Management",     "Project Management",     ("project management",)),
+    ("Business & Management",     "International Business", ("international business",)),
+    ("Business & Management",     "Supply Chain & Logistics", ("supply chain", "logistics")),
+    ("Business & Management",     "Human Resources",        ("human resource", "hr management")),
+    ("Business & Management",     "Entrepreneurship",       ("entrepreneurship",)),
+    ("Computer Science & IT",     "Data Science",           ("data science", "data analytics")),
+    ("Computer Science & IT",     "Cyber Security",         ("cyber",)),
+    ("Computer Science & IT",     "Artificial Intelligence", ("artificial intelligence", "machine learning")),
+    ("Computer Science & IT",     "Software Engineering",   ("software engineering", "software development")),
+    ("Computer Science & IT",     "Information Systems",    ("information systems", "information technology", "it management")),
+    ("Engineering & Technology",  "Mechanical Engineering", ("mechanical engineering", "mechatronic")),
+    ("Engineering & Technology",  "Civil Engineering",      ("civil engineering",)),
+    ("Engineering & Technology",  "Electrical Engineering", ("electrical engineering",)),
+    ("Engineering & Technology",  "Biomedical Engineering", ("biomedical engineering",)),
+    ("Engineering & Technology",  "Chemical Engineering",   ("chemical engineering",)),
+    ("Medicine & Health",     "Nursing",                ("nursing", "midwifery")),
+    ("Medicine & Health",     "Pharmacy",               ("pharmacy",)),
+    ("Medicine & Health",     "Physiotherapy",          ("physiotherapy",)),
+    ("Medicine & Health",     "Public Health",          ("public health",)),
+    ("Medicine & Health",     "Psychology",             ("psychology",)),
+    ("Medicine & Health",     "Dentistry",              ("dentistry", "dental")),
+    ("Education & Social Work",   "Early Childhood",        ("early childhood",)),
+    ("Education & Social Work",   "Social Work",            ("social work",)),
+    ("Education & Social Work",   "Teaching",               ("teaching",)),
+    ("Education & Social Work",   "TESOL",                  ("tesol",)),
+    ("Architecture, Building & Design", "Architecture",     ("architecture",)),
+    ("Architecture, Building & Design", "Interior Design",  ("interior design",)),
+    ("Architecture, Building & Design", "Construction",     ("construction",)),
+    ("Architecture, Building & Design", "Graphic Design",   ("graphic design",)),
+    ("Media & Communications",    "Journalism",             ("journalism",)),
+    ("Media & Communications",    "Public Relations",       ("public relations",)),
+    ("Media & Communications",    "Film & Screen",          ("film", "screen")),
+    ("Media & Communications",    "Digital Media",          ("digital media", "broadcasting")),
+    ("Law & Legal Studies",       "Juris Doctor",           ("juris doctor", "jd ")),
+    ("Law & Legal Studies",       "Criminal Justice",       ("criminal justice", "criminology")),
+    ("Science & Mathematics",     "Biotechnology",          ("biotechnology", "genetics")),
+    ("Science & Mathematics",     "Physics",                ("physics",)),
+    ("Science & Mathematics",     "Chemistry",              ("chemistry", "biochemistry")),
+    ("Science & Mathematics",     "Mathematics",            ("mathematics", "statistics")),
+    ("Agriculture & Environmental Science", "Sustainability", ("sustainability",)),
+    ("Agriculture & Environmental Science", "Agriculture",   ("agriculture", "agribusiness", "horticulture")),
+)
+
+
+def map_course_to_category(course_name: str) -> dict | None:
+    """Return ``{"category": str, "sub_category": str}`` if a confident
+    keyword pre-map fires, otherwise ``None``.
+
+    Runs BEFORE :func:`classify_category` so well-known compound titles
+    (e.g. "Master of Hospitality Management") are pinned to the correct
+    bucket without relying on the body-text heuristics that were tied 1-1
+    by bare-keyword matches. Matching is whole-word, case-insensitive,
+    first-hit-wins.
+    """
+    if not course_name:
+        return None
+    n = course_name.lower()
+    for category, sub_label, keywords in _SUB_CATEGORY_MAP:
+        for kw in keywords:
+            kw_clean = kw.strip()
+            if not kw_clean:
+                continue
+            if re.search(r"\b" + re.escape(kw_clean) + r"\b", n):
+                return {"category": category, "sub_category": sub_label}
+    return None
 
 
 def classify_category(course_name: str) -> str | None:

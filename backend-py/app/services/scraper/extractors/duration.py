@@ -36,6 +36,16 @@ _ACCELERATED = re.compile(
     r"credit\s+for\s+previous\s+study)\b",
     re.I,
 )
+# Sentences that mention credit points/units in the same span as a number+year
+# match are credit-point talk (e.g. "Masters: 5 units of 8 credit points each
+# across 2 years"), not the actual program duration. Without this filter, the
+# extractor caught `5 units` and emitted "5 Year" for postgrad courses — exact
+# bug the user reported (Masters showing 5 instead of 2).
+_CREDIT_POINT_CONTEXT = re.compile(
+    r"\b(credit\s+points?|cp\b|subjects?\s+(?:per|of)|units?\s+(?:per|of)|"
+    r"per\s+(?:trimester|semester|term))\b",
+    re.I,
+)
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
 
@@ -66,6 +76,9 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     for s in sentences:
         if _ACCELERATED.search(s):
             continue
+        # Skip sentences that are talking about credit-point structure rather
+        # than program duration — see _CREDIT_POINT_CONTEXT comment.
+        credit_context = bool(_CREDIT_POINT_CONTEXT.search(s))
         for pat in _PATTERNS:
             m = pat.search(s)
             if not m:
@@ -77,13 +90,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             unit = _normalise_unit(m.group(2))
             if not unit:
                 continue
+            # Demote (don't drop) credit-point sentences so a real
+            # duration sentence elsewhere wins, but if the page only ever
+            # mentions duration in a credit-point sentence we still emit
+            # something rather than nothing.
+            weight_mod = 0.01 if credit_context else 1.0
             # Cap depending on unit so we reject only true outliers
             # (e.g. "120 weeks" is 2 years, fine; "200 years" is junk).
             cap = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}[unit]
             if not (0 < amount <= cap):
                 continue
             weeks = amount * _WEEKS[unit]
-            parsed.append((weeks * 100 + _UNIT_RANK[unit], amount, unit, s.strip()[:240]))
+            parsed.append((
+                (weeks * 100 + _UNIT_RANK[unit]) * weight_mod,
+                amount,
+                unit,
+                s.strip()[:240],
+            ))
             break  # one match per sentence is enough
 
     if not parsed:

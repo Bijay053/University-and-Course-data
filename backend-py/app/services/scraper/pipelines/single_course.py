@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services.scraper.category import classify_category
+from app.services.scraper.category import classify_category, map_course_to_category
 from app.services.scraper.extractors import (
     ai_fallback,
     course_name,
@@ -106,6 +106,33 @@ async def extract_course(
                     # the extractor returned first) is preserved.
                     payload.setdefault(k, v)
 
+    # T207/T208: per-course browser + vision fallback. Run BEFORE the AI
+    # fallback because (a) they're cheaper, (b) AI hallucinates plausible
+    # numbers when the page is image-only and the browser/vision pass
+    # provides ground truth that AI can use as additional context (when
+    # we then run AI). Both helpers are no-ops when the english slots
+    # are already populated.
+    rendered_html: str | None = None
+    try:
+        from app.services.scraper.per_course_browser import maybe_browser_refetch
+        from app.services.scraper.per_course_vision import maybe_vision_refetch
+
+        browser_filled, browser_evidence, rendered_html = await maybe_browser_refetch(
+            url, payload, emit=emit
+        )
+        for k, v in browser_filled.items():
+            payload.setdefault(k, v)
+        evidence.extend(browser_evidence)
+
+        vision_filled, vision_evidence = await maybe_vision_refetch(
+            url, rendered_html, payload, emit=emit
+        )
+        for k, v in vision_filled.items():
+            payload.setdefault(k, v)
+        evidence.extend(vision_evidence)
+    except Exception as exc:  # noqa: BLE001 — never break extraction here
+        log.warning("per-course browser/vision fallback errored on %s: %s", url, exc)
+
     if use_ai_fallback:
         # Note which slots are still empty so the UI can show *what* the AI
         # is being asked to fill (helpful when diagnosing weak per-page
@@ -197,8 +224,43 @@ async def extract_course(
     # Review table's Category column reads scraped_courses.category; without
     # this step every row showed NULL. Skip if an extractor already produced
     # a category (none currently do, but keeps the pipeline future-proof).
-    if "category" not in payload or not payload.get("category"):
-        cat = classify_category(payload.get("course_name") or "")
+    cname = payload.get("course_name") or ""
+    # T204: keyword-based pre-map sets BOTH category and sub_category from
+    # well-known compound titles ("Hospitality Management" → Tourism &
+    # Hospitality / Hospitality Management). Runs first; the body-text
+    # classify_category fallback only fires when no pre-map keyword hit.
+    det = map_course_to_category(cname)
+    if det:
+        if not payload.get("category"):
+            payload["category"] = det["category"]
+            evidence.append(
+                {
+                    "field_key": "category",
+                    "value": det["category"],
+                    "confidence": 0.7,
+                    "method": "category:det",
+                    "snippet": cname,
+                }
+            )
+        if not payload.get("sub_category"):
+            payload["sub_category"] = det["sub_category"]
+            evidence.append(
+                {
+                    "field_key": "sub_category",
+                    "value": det["sub_category"],
+                    "confidence": 0.7,
+                    "method": "category:det",
+                    "snippet": cname,
+                }
+            )
+        if emit:
+            await emit(
+                "status",
+                f"[CATEGORY det] {cname[:40]} → {det['category']} / {det['sub_category']}",
+                phase="classify",
+            )
+    if not payload.get("category"):
+        cat = classify_category(cname)
         if cat:
             payload["category"] = cat
             evidence.append(
@@ -207,7 +269,7 @@ async def extract_course(
                     "value": cat,
                     "confidence": 0.6,
                     "method": "category:rule",
-                    "snippet": payload.get("course_name"),
+                    "snippet": cname,
                 }
             )
 
