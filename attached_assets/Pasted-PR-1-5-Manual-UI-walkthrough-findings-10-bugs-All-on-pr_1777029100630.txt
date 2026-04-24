@@ -1,0 +1,41 @@
+PR-1.5 — Manual UI walkthrough findings (10 bugs). All on prod 159.65.152.72. Group with PR-1 since they touch the same areas.
+B4 — University detail page shows global course count instead of per-uni count
+ASA detail page header shows "Courses 353" but SELECT COUNT(*) FROM courses WHERE university_id=2 returns 8. The 353 actually = SELECT COUNT(*) FROM courses (global, returns 352). UI is calling the wrong endpoint or stripping the filter. Affects every university detail page.
+B5 — Search filters are non-functional
+/search page → all 6 filters (Country of Residence, Highest Qualification, Grading Scheme, English Proficiency, Field, etc.) accept input but don't change result count. UI state holds the filter values but they're never sent to /api/search/courses. Either UI doesn't include them in the query string, or backend ignores them.
+B6 — Bulk Add Academic Requirement: toast says "1 requirement added" but DB has 0 rows
+Universities → Academic Requirements tab → Bulk Add → fill form → Apply. UI shows toast "Bulk update applied · 1 requirement added". Database query for ASA: 0 rows in academic_requirements. Likely also broken for Bulk Add Scholarship (0 rows in scholarships for ASA).
+Endpoint returns success but doesn't insert. Check the bulk-academic and bulk-scholarship handlers in routers/per_course_resources.py.
+B7 — English Proficiency tab shows empty despite 29 rows in DB
+ASA has 29 rows in english_requirements for its 8 courses, but the English Proficiency tab on /universities/2 shows nothing. Backend has data; UI not displaying. Either the GET endpoint returns nothing or UI is filtering them out.
+B8 — Acronyms tab missing from sidebar nav
+Audit confirms /settings/acronyms route ported. But sidebar Settings menu has no Acronyms entry. Users can only reach via direct URL. Add nav link in settings/sidebar.tsx.
+B9 — TIMING line not appearing in scraping log UI
+Backend emits [TIMING] Total: Xm Ys | Courses: N | Avg: Zs/course and ══ DONE ══ Found:N | Staged:N | Skipped:N | Errors:N — verified in scrape_runtime_logs. UI scraping page log doesn't render them. UI filter excludes phase=done events, or React renderer doesn't match these tags.
+B10 — Scrape History "View Courses" button missing
+Past scrapes in /scraping history list show "View Logs" button but no "View Courses" button. Add a button that opens the staged-courses-from-this-job view (route already exists: /scraping/jobs/{jobId}/courses or similar).
+B11 — Browser fallback hangs indefinitely (already reported, still happening)
+Job job_2dc0ba6bf4c9 ran 32 minutes at 0/10 progress. Need 45s per-page hard timeout in per_course_browser.py. If page.goto() or page.wait_for_load_state() exceeds 45s, abort that course, log [FALLBACK] timeout, move on. Also log WARN before timeout so we can diagnose hangs.
+B12 — UI Stop button non-functional
+/scraping → click Stop → button shows "Stopping..." indefinitely. No POST request fires (verify in Network tab). Either implement POST /api/scrape/{job_id}/stop to revoke celery task + mark job stopped, or remove the button.
+B13 — Doubled log prefix
+UI shows [FALLBACK] [FALLBACK] [per-course browser ✓]... — duplicate [FALLBACK]. Backend already emits [FALLBACK] and UI prepends [FALLBACK] again from level field. Pick one source.
+B14 — Key Insights save takes 30+ seconds
+"Add Key Insight" → paste → Save → spinner runs ~30s before completing. Gemini parse is synchronous in the request handler. Either:
+
+Move Gemini parse to background task, return immediately with status=parsing, UI polls
+OR save raw text immediately, parse in background
+
+Currently UI looks frozen.
+Diagnosis context:
+ source                   | count
+--------------------------|-------
+ courses                  |     8     ← real ASA course count
+ scraped_courses approved |     8     
+ scraped_courses pending  |     9    
+ english_requirements     |    29    ← exists but UI hides
+ academic_requirements    |     0    ← bulk-add lies about saving
+ scholarships             |     0    ← same
+ assessment_notes         |     1    ← saves but slow
+Total courses across all 6 unis: 352 (= the bogus "353" header).
+Priority: B4, B5, B6, B7 are P0 (data integrity / core search broken). B11, B12 are P0 (operational). Rest P1.

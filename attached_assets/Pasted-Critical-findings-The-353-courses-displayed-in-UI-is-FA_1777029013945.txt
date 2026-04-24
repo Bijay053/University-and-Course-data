@@ -1,0 +1,56 @@
+Critical findings:
+The "353 courses" displayed in UI is FAKE DATA. Database actually has 8 courses for ASA. The 353 number is a hardcoded UI value or pulling from wrong source.
+courses table (real)         : 8     ← actual data
+scraped_courses approved     : 8     ← matches
+scraped_courses pending      : 9     ← waiting review
+
+UI shows                     : 353   ← FALSE
+Other findings:
+
+english_requirements: 29 rows exist — but UI says they don't show
+academic_requirements: 0 rows — bulk-add UI returns "1 requirement added" toast but nothing was saved
+scholarships: 0 rows — same issue probably
+assessment_notes: 1 row — Key Insights does save (slow but works)
+courses table column: course_name doesn't exist — schema differs from scraped_courses
+
+Let me verify the column name and write the bug report:
+bashcd /root/University-and-Course-data/backend-py
+source /root/.env.backup
+source venv/bin/activate
+
+echo "=== courses table schema ==="
+psql "$DATABASE_URL" -c "\d courses" | head -30
+
+echo ""
+echo "=== Where does the 353 come from? ==="
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM courses;"
+Run + paste. Then I'll send Replit a clean batch report covering everything.
+While that runs, here's the bug report draft for you to review:
+
+
+PR-1.5 — Bugs found in manual UI walkthrough
+B4 — UI displays 353 courses for ASA but database has 8
+University detail page shows "Courses 353" in tab header. Database query: SELECT COUNT(*) FROM courses WHERE university_id=2 returns 8. The 353 is wrong — likely UI hardcoded, pulling from total courses count across all unis, or pulling from a stale endpoint.
+B5 — Search filters don't actually filter
+/search page → typing "bachelor of nurseng" returns 0 (correct, no such course) but selecting any filter (Country/Qualification/Grading/English/Field/Country of Residence) doesn't filter results — count stays the same. Filter inputs are wired to UI state but not sent to the API call.
+B6 — Bulk Add Academic Requirement: toast says "1 requirement added" but DB has 0 rows
+Universities → Academic Requirements tab → Bulk Add → fill form → Apply. Toast shows "Bulk update applied · 1 requirement added". But SELECT COUNT(*) FROM academic_requirements WHERE course_id IN (SELECT id FROM courses WHERE university_id=2) returns 0. The UI lies — the data is not being saved.
+Same likely for Bulk Add Scholarship (DB has 0 rows for ASA).
+B7 — English Proficiency tab shows empty despite 29 rows in DB
+ASA has 29 english_requirements rows in DB but the English Proficiency tab on the university detail page shows nothing. UI not querying right endpoint, or endpoint not returning ASA's data.
+B8 — Acronyms tab still missing from sidebar
+/settings/acronyms route exists per audit but no sidebar entry to navigate there. Users can only reach it by typing the URL.
+B9 — TIMING line not appearing in scraping log UI
+Backend emits [TIMING] Total: Xm Ys | Courses: N | Avg: Zs/course and ══ DONE ══ Found:N | Staged:N | Skipped:N | Errors:N (verified in DB logs) but UI scraping log doesn't render them. Either the UI filter excludes phase=done events, or the React renderer isn't matching them.
+B10 — Scrape History "View Courses" button missing
+Past scrapes in /scraping history list have a "View Logs" button but no "View Courses" button to see what was staged. Add it.
+B11 — Browser fallback hangs indefinitely (already reported)
+Confirmed again: Job job_2dc0ba6bf4c9 ran 32 minutes at 0/10 progress. Need 45s per-page timeout in per_course_browser.py.
+B12 — UI Stop button doesn't actually stop scrape
+Click "Stop" → button shows "Stopping..." forever. No POST to a stop endpoint fires. Either implement /api/scrape/{job_id}/stop to revoke celery task + mark job stopped, or remove the button.
+B13 — Doubled log prefix in UI
+Log lines render as [FALLBACK] [FALLBACK] [per-course browser ✓]... — duplicate [FALLBACK] tag. Either backend emits it or UI prepends it twice.
+B14 — Key Insights save takes 30+ seconds
+"Add Key Insight" → paste text → Save → spinner runs ~30s before completing. Gemini call is synchronous in the request handler. Make it async or move to background task with status polling.
+
+All P0/P1. Group with PR-1 work since they're discovered during walkthrough of the same areas you're touching.
