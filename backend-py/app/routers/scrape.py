@@ -169,12 +169,36 @@ async def stop_job(
 # ----- UI-COMPAT ALIASES (match Node API surface) -----
 
 @router.get("/status/{job_id}")
-async def get_status(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+async def get_status(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    since: int = 0,
+) -> dict:
     """UI polls this every 2s. Match Node's payload shape."""
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    # Build runtime logs since 'since' index (UI sends ?since=N)
+
+    # Fetch new logs since requested sequence
+    from sqlalchemy import text as _text
+    log_rows = (await db.execute(
+        _text("SELECT sequence, event, payload, created_at FROM scrape_runtime_logs "
+              "WHERE runtime_job_id = :j AND sequence > :s ORDER BY sequence"),
+        {"j": job_id, "s": since}
+    )).all()
+    logs = []
+    for r in log_rows:
+        seq, event, payload, created_at = r
+        msg = (payload or {}).get("message", "") if isinstance(payload, dict) else ""
+        logs.append({
+            "sequence": seq,
+            "event": event,
+            "message": msg,
+            "payload": payload,
+            "createdAt": created_at.isoformat() if created_at else None,
+            "level": "info",
+        })
+
     return {
         "id": job.runtime_job_id,
         "runtimeJobId": job.runtime_job_id,
@@ -198,8 +222,8 @@ async def get_status(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) 
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
         "errorMessage": job.error_message,
-        "logs": [],
-        "events": [],
+        "logs": logs,
+        "events": logs,
         "ok": True,
     }
 
