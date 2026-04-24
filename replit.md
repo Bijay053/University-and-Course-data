@@ -452,3 +452,35 @@ NOT cover. All six fixes below land together.
 - **Result**: Node tests 89/93 pass (same 4 unrelated pre-existing
   failures as before this change). Python tests unchanged at
   308 passed / 1 skipped. API server build + restart clean.
+
+### 10. Live progress bar / elapsed timer / ETA missing on the scrape page (Apr 2026)
+- **Symptom**: While a scrape was running on a 24-course university (e.g.
+  VIT), the UI only showed the per-course-vision counter `[per-course
+  vision img 0/6]` next to the URL — no overall `1/24` bar, no elapsed
+  time, no estimated time remaining. The "Scraping in Background…"
+  badge stayed green but the user had no sense of progress.
+- **Root cause**: The React UI in
+  `artifacts/university-portal/src/pages/scraping.tsx` renders the
+  progress bar (with `current/total`, ETA, and elapsed labels) only when
+  it finds a log row with `event === "progress"` carrying `current` and
+  `total` fields. The legacy Node backend emitted such rows
+  (`artifacts/api-server/src/routes/scrape.ts:8642 / 10950`) but the
+  Python rewrite (`backend-py/app/services/scraper/orchestrator.py` and
+  `repair.py`) only emitted `event="status"` rows like
+  `[EXTRACT] N/total: <name>`. The frontend filter at
+  `scraping.tsx:1140` (`scrapeLogs.findLast(l => l.event === "progress")`)
+  therefore never matched, and the entire bar / timer / ETA block was
+  skipped.
+- **Fix**: alongside each existing `[EXTRACT] N/total` status emit in the
+  per-course loops of both `orchestrator.py` and `repair.py`, also emit
+  a structured `event="progress"` row with `current=idx, total=total,
+  courseName=name, url=...`. The status row is preserved for the
+  textual log; the new progress row drives the bar.
+- **Result**: as soon as the first parallel extract grabs a slot (idx=1),
+  the bar renders with `1/24`, the elapsed counter starts ticking
+  every second from `scrapeStartTime`, and ETA appears once at least
+  one course has finished (so a per-item pace is computable). Bar and
+  timer remain visible during long per-course-vision / per-course-browser
+  fallbacks because they sit inside the same extract loop.
+- **Tests**: 308 passed, 1 skipped (unchanged baseline — change is purely
+  additive log emission).

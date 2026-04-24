@@ -173,6 +173,19 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
                 total=total,
                 url=url,
             )
+            # Mirror the orchestrator: emit a structured `progress` event so
+            # the frontend's progress bar (current/total + elapsed + ETA)
+            # renders during repair runs too. The status emit above keeps
+            # the textual `[EXTRACT] N/total: name` line in the live log.
+            await emit(
+                "progress",
+                f"Repairing {idx}/{total}: {course.name}",
+                phase="extract",
+                current=idx,
+                total=total,
+                courseName=course.name,
+                url=url,
+            )
 
             res = await _extract_only(
                 {"name": course.name, "url": url}, uni_country, None, emit=emit

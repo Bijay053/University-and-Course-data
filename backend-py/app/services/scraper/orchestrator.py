@@ -396,6 +396,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     total=total,
                     url=link.get("url"),
                 )
+                # Also emit a structured `progress` log row so the frontend
+                # progress bar (which keys off event="progress" with
+                # `current`/`total` fields) renders the live N/total counter,
+                # elapsed time, and ETA. The status emit above keeps the
+                # familiar `[EXTRACT] N/total: name` line in the textual log.
+                await emit(
+                    "progress",
+                    f"Fetching {idx}/{total}: {nm}",
+                    phase="extract",
+                    current=idx,
+                    total=total,
+                    courseName=nm,
+                    url=link.get("url"),
+                )
                 # Pass the emit hook into extract_course so AI fallback can
                 # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
                 return await _extract_only(
