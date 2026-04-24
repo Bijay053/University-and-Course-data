@@ -201,6 +201,145 @@ async def search_courses(
     })
 
 
+@router.get("/compare")
+async def search_compare(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ids: str = Query(..., description="CSV of course ids, max 5 — `?ids=1,2,3`"),
+) -> JSONResponse:
+    """Course-comparison payload for the `/compare` UI page.
+
+    Ports Node ``GET /api/search/compare`` (``artifacts/api-server/src/
+    routes/search.ts:644``). The UI calls this with up to 5 course ids and
+    expects ``{courses: [...]}`` where each course bundles the materialised
+    view row plus its full english + academic requirement lists.
+
+    Without this endpoint the React Compare page (``pages/compare.tsx:77``)
+    receives 404 and shows ``error: "Not Found"`` — the only P0 missing
+    endpoint identified in MIGRATION_AUDIT.md.
+    """
+    raw = [s.strip() for s in (ids or "").split(",") if s.strip()]
+    if not raw:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "ids_required", "message": "Provide ids=1,2,3 (max 5)"},
+        )
+    # Mirror Node's tolerant `map(Number).filter(Number.isInteger && >0)`
+    # behaviour: silently drop non-numeric tokens and only return
+    # ``ids_invalid`` when *nothing* parsed. ``?ids=1,abc`` therefore
+    # succeeds with course 1 — the architect review caught this divergence.
+    int_ids: list[int] = []
+    for s in raw:
+        try:
+            n = int(s)
+        except ValueError:
+            continue
+        if n > 0:
+            int_ids.append(n)
+    if not int_ids:
+        return JSONResponse(status_code=400, content={"error": "ids_invalid"})
+    if len(int_ids) > 5:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "too_many_ids", "message": "Compare supports at most 5 courses"},
+        )
+
+    try:
+        mv_rows = (
+            await db.execute(
+                text("SELECT * FROM course_search_view WHERE id = ANY(:ids)"),
+                {"ids": int_ids},
+            )
+        ).mappings().all()
+        eng_rows = (
+            await db.execute(
+                text(
+                    "SELECT course_id, test_type, test_name, overall, "
+                    "listening, reading, writing, speaking "
+                    "FROM english_requirements WHERE course_id = ANY(:ids)"
+                ),
+                {"ids": int_ids},
+            )
+        ).mappings().all()
+        acad_rows = (
+            await db.execute(
+                text(
+                    "SELECT course_id, academic_level, academic_score, "
+                    "score_type, academic_country "
+                    "FROM academic_requirements WHERE course_id = ANY(:ids)"
+                ),
+                {"ids": int_ids},
+            )
+        ).mappings().all()
+    except Exception as exc:  # noqa: BLE001 — match Node's 500 fallback
+        log.error("search_compare SQL failed: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "compare_failed", "message": str(exc)},
+        )
+
+    eng_by_course: dict[int, list[dict]] = {}
+    for r in eng_rows:
+        d = dict(r)
+        eng_by_course.setdefault(int(d["course_id"]), []).append(d)
+    acad_by_course: dict[int, list[dict]] = {}
+    for r in acad_rows:
+        d = dict(r)
+        acad_by_course.setdefault(int(d["course_id"]), []).append(d)
+
+    # Preserve the request order — UI renders columns left-to-right in this order.
+    by_id = {int(r["id"]): dict(r) for r in mv_rows}
+    courses: list[dict] = []
+    for cid in int_ids:
+        r = by_id.get(cid)
+        if not r:
+            continue
+        # ``international_fee_yearly`` is read straight from the view
+        # column when present. Node does the same — its
+        # ``r.international_fee_yearly == null ? null : Number(...)`` line
+        # reduces to ``null`` whenever the view didn't compute the value,
+        # so we mirror that exactly instead of inventing a yearly figure
+        # from the raw fee (which would be wrong for Full Course / Total
+        # / Trimester fee terms).
+        intl_fee = r.get("international_fee")
+        intl_fee_yearly_raw = r.get("international_fee_yearly")
+        intl_fee_yearly = (
+            None if intl_fee_yearly_raw is None else float(intl_fee_yearly_raw)
+        )
+        courses.append(
+            {
+                "id": r.get("id"),
+                "course_name": r.get("course_name"),
+                "university": {
+                    "id": r.get("university_id"),
+                    "name": r.get("university_name"),
+                    "logo_url": r.get("logo_url"),
+                    "city": r.get("university_city"),
+                    "country": r.get("university_country"),
+                    "website": r.get("university_website"),
+                },
+                "course_location": r.get("course_location"),
+                "degree_level": r.get("degree_level"),
+                "category": r.get("category"),
+                "sub_category": r.get("sub_category"),
+                "duration": r.get("duration"),
+                "duration_term": r.get("duration_term"),
+                "duration_years": r.get("duration_years"),
+                "study_mode": r.get("study_mode"),
+                "intakes": r.get("intakes") or [],
+                "international_fee": intl_fee,
+                "international_fee_yearly": intl_fee_yearly,
+                "currency": r.get("currency"),
+                "fee_term": r.get("fee_term"),
+                "application_fee": r.get("application_fee"),
+                "course_url": r.get("course_website"),
+                "english_requirements": eng_by_course.get(cid, []),
+                "academic_requirements": acad_by_course.get(cid, []),
+            }
+        )
+
+    return JSONResponse(content={"courses": courses})
+
+
 @router.get("/options")
 async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchOptionsResponse:
     try:
