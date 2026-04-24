@@ -109,15 +109,34 @@ def _is_nav(url: str) -> bool:
 
 
 async def discover_course_links(
-    start_url: str, *, max_pages: int = 25, max_courses: int = 200
+    start_url: str,
+    *,
+    max_pages: int = 25,
+    max_courses: int = 200,
+    emit=None,
 ) -> list[dict]:
-    """BFS crawl from start_url. Returns ``[{url, name}]`` for each course-like link."""
+    """BFS crawl from start_url. Returns ``[{url, name}]`` for each course-like link.
+
+    ``emit`` is an optional async callable ``emit(event, message, **kwargs)``
+    used to stream per-page progress into the runtime log so the UI panel
+    can show what discovery is doing turn-by-turn. When ``None`` the crawler
+    is silent (preserves the existing test signature).
+    """
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
     queue: list[tuple[str, int]] = [(start_url, 0)]
     visited: set[str] = set()
     found: dict[str, str] = {}
+
+    if emit:
+        await emit(
+            "status",
+            f"[DISCOVER] Crawling from {start_url} (max {max_pages} pages, "
+            f"max {max_courses} candidates)",
+            phase="discover",
+            kind="crawl_start",
+        )
 
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
@@ -127,12 +146,20 @@ async def discover_course_links(
 
         html = await fetch_html(url)
         if not html:
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] Page {len(visited)}/{max_pages}: fetch failed — {url}",
+                    phase="discover",
+                    kind="page_fetch_fail",
+                )
             continue
         ext = _LinkExtractor()
         try:
             ext.feed(html)
         except Exception:
             continue
+        before = len(found)
         for href, text in ext.links:
             full = _resolve(href, url, origin)
             if not full or full in found:
@@ -144,5 +171,16 @@ async def discover_course_links(
                     break
             elif depth < 1 and _is_nav(full) and full not in visited:
                 queue.append((full, depth + 1))
+        added = len(found) - before
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] Page {len(visited)}/{max_pages}: +{added} candidates "
+                f"(total {len(found)}) — {url}",
+                phase="discover",
+                kind="page_done",
+                added=added,
+                total=len(found),
+            )
 
     return [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]

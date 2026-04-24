@@ -45,6 +45,7 @@ async def extract_course(
     html: str | None = None,
     use_ai_fallback: bool = True,
     uni_pdf_data: dict[str, Any] | None = None,
+    emit=None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -87,11 +88,43 @@ async def extract_course(
                     payload.setdefault(k, v)
 
     if use_ai_fallback:
+        # Note which slots are still empty so the UI can show *what* the AI
+        # is being asked to fill (helpful when diagnosing weak per-page
+        # extraction on a new university template).
+        _ai_target_keys = (
+            "international_fee", "domestic_fee", "ielts_overall",
+            "duration_text", "intake_text", "location_text",
+        )
+        missing = [k for k in _ai_target_keys if k not in payload or payload.get(k) is None]
+        if emit:
+            await emit(
+                "status",
+                f"[FALLBACK] AI enriching {url} (missing: {', '.join(missing) if missing else 'none'})",
+                phase="extract",
+                kind="ai_fallback_start",
+                missing=missing,
+            )
         try:
             ai_filled = await ai_fallback.fill_missing(payload, html=html, url=url)
         except Exception as exc:  # never break extraction on AI failure
             log.warning("AI fallback errored on %s: %s", url, exc)
+            if emit:
+                await emit(
+                    "status",
+                    f"[FALLBACK] AI fallback errored on {url}: {exc}",
+                    phase="extract",
+                    kind="ai_fallback_error",
+                )
             ai_filled = {}
+        if emit and ai_filled:
+            await emit(
+                "status",
+                f"[FALLBACK] AI filled {len(ai_filled)} field(s) on {url}: "
+                f"{', '.join(ai_filled.keys())}",
+                phase="extract",
+                kind="ai_fallback_done",
+                filled=list(ai_filled.keys()),
+            )
         for k, v in ai_filled.items():
             payload.setdefault(k, v)
             evidence.append(
