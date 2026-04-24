@@ -143,7 +143,7 @@ async def search_courses(
     })
 
 
-@router.get("/options", response_model=SearchOptionsResponse)
+@router.get("/options")
 async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchOptionsResponse:
     try:
         countries = (
@@ -203,18 +203,18 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
         ]
     except Exception as exc:
         log.error("search_options SQL failed: %s", exc)
-        return SearchOptionsResponse()
+        return JSONResponse(content={"countries": [], "cities": [], "universities": [], "degree_levels": [], "degreeLevels": [], "intake_months": [], "intakeMonths": []})
 
-    return SearchOptionsResponse(
-        countries=list(countries),
-        cities=list(cities),
-        universities=[dict(u) for u in unis],
-        degree_levels=list(degree_levels),
-        intake_months=intake_months,
-    )
+    return JSONResponse(content={
+        "countries": list(countries),
+        "cities": list(cities),
+        "universities": [dict(u) for u in unis],
+        "degree_levels": list(degree_levels), "degreeLevels": list(degree_levels),
+        "intake_months": intake_months, "intakeMonths": intake_months,
+    })
 
 
-@router.get("/stats", response_model=SearchStatsResponse)
+@router.get("/stats")
 async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchStatsResponse:
     try:
         total_unis = (await db.execute(text("SELECT COUNT(*) FROM universities"))).scalar_one()
@@ -235,11 +235,15 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
         ).scalar_one()
     except Exception as exc:
         log.error("search_stats SQL failed: %s", exc)
-        return SearchStatsResponse()
+        return JSONResponse(content={"total_universities": 0, "totalUniversities": 0, "total_courses": 0, "totalCourses": 0, "countries": 0, "average_fee": 0, "averageFee": 0})
 
-    return SearchStatsResponse(
-        total_universities=int(total_unis or 0),
-        total_courses=int(total_courses or 0),
-        countries=int(countries or 0),
-        average_fee=float(avg_fee) if avg_fee is not None else None,
-    )
+    tu = int(total_unis or 0)
+    tc = int(total_courses or 0)
+    co = int(countries or 0)
+    af = float(avg_fee) if avg_fee is not None else 0
+    return JSONResponse(content={
+        "total_universities": tu, "totalUniversities": tu,
+        "total_courses": tc, "totalCourses": tc,
+        "countries": co,
+        "average_fee": af, "averageFee": af,
+    })
