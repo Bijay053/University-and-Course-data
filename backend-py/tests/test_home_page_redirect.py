@@ -134,27 +134,31 @@ def test_expand_skips_non_listing_paths() -> None:
 
 def test_expand_merges_new_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
     """For a /course-list listing URL, an HTTP HEAD-probe success on a
-    category variant fetches the page and merges any new course links."""
+    category variant fetches the page and merges any new course links.
 
-    bbus_html = """
+    The fixture mocks the FIRST slug (``bits``) because the early-exit
+    short-circuit (3 consecutive empty slugs) would otherwise fire
+    before reaching a slug that's deeper in the slug list."""
+
+    bits_html = """
     <html><body>
-      <a href="/courses/bbus-marketing">BBus - Marketing Specialisation</a>
-      <a href="/courses/bbus-hr">BBus - HR Specialisation</a>
+      <a href="/courses/bits-software-engineering">BITS - Software Engineering</a>
+      <a href="/courses/bits-cybersecurity">BITS - Cybersecurity</a>
       <a href="/about">About</a>
     </body></html>
     """
 
     def _client_factory(*args: Any, **kwargs: Any) -> _FakeAsyncClient:
-        # Only the bbus variant 200s; everything else 404s.
+        # Only the bits variant 200s; everything else 404s.
         return _FakeAsyncClient(
             {
-                "https://vit.edu.au/course-list?course_categories[0]=bbus": _FakeResponse(200),
+                "https://vit.edu.au/course-list?course_categories[0]=bits": _FakeResponse(200),
             }
         )
 
     async def _fake_fetch(url: str) -> str:
-        if url == "https://vit.edu.au/course-list?course_categories[0]=bbus":
-            return bbus_html
+        if url == "https://vit.edu.au/course-list?course_categories[0]=bits":
+            return bits_html
         return ""
 
     monkeypatch.setattr(home_page_redirect.httpx, "AsyncClient", _client_factory)
@@ -168,7 +172,47 @@ def test_expand_merges_new_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     urls = {c["url"] for c in result}
     assert "https://vit.edu.au/courses/mba" in urls  # original preserved
-    assert "https://vit.edu.au/courses/bbus-marketing" in urls
-    assert "https://vit.edu.au/courses/bbus-hr" in urls
+    assert "https://vit.edu.au/courses/bits-software-engineering" in urls
+    assert "https://vit.edu.au/courses/bits-cybersecurity" in urls
     # /about should NOT make it through — it doesn't look like a course.
     assert "https://vit.edu.au/about" not in urls
+
+
+def test_expand_early_exit_short_circuits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the first 3 slugs add zero candidates (signal: host doesn't
+    use category-filter URLs at all), the loop bails early instead of
+    probing all 17 slugs × 4 variants = 68 wasted HEAD requests."""
+    head_calls: list[str] = []
+
+    class _CountingClient(_FakeAsyncClient):
+        def __init__(self) -> None:
+            super().__init__({})
+
+        async def head(self, url: str, **kwargs: Any) -> _FakeResponse:  # noqa: ANN401
+            head_calls.append(url)
+            return _FakeResponse(404)
+
+    def _client_factory(*args: Any, **kwargs: Any) -> _CountingClient:
+        return _CountingClient()
+
+    monkeypatch.setattr(home_page_redirect.httpx, "AsyncClient", _client_factory)
+    _run(
+        home_page_redirect.expand_course_list_with_categories(
+            "https://vit.edu.au/course-list", []
+        )
+    )
+    # 3 slugs (bits, mits, mba) × 4 variants each = 12 HEAD probes max.
+    # Without the early-exit, 17 slugs × 4 = 68.
+    assert len(head_calls) <= 12, f"expected ≤12 HEAD probes, got {len(head_calls)}"
+
+
+def test_expand_skips_generic_courses_path() -> None:
+    """``/courses`` (a generic listing path) is no longer expand-eligible
+    because non-VIT sites almost never use ``?course_categories[0]=``,
+    and probing 17 × 4 = 68 HEADs per non-VIT host wastes throughput."""
+    result = _run(
+        home_page_redirect.expand_course_list_with_categories(
+            "https://swinburne.edu.au/courses", [{"url": "x", "name": "y"}]
+        )
+    )
+    assert result == [{"url": "x", "name": "y"}]

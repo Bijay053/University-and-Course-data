@@ -306,11 +306,21 @@ async def detect_course_listing_page(
 # Category-filter expansion (T004)
 # ---------------------------------------------------------------------------
 
-# Only try category expansion on short listing paths — once we're already
-# on a filtered page, re-applying filters just produces empty results.
+# Only try category expansion on listing paths that look like they use
+# category-filter URLs (the VIT-style ``/course-list``, ``/course-finder``,
+# ``/course-guide`` family). Generic ``/courses`` or ``/programs`` paths
+# are excluded because they almost never use ``?course_categories[0]=``
+# query strings, and probing 17 slugs × 4 variants per non-VIT site
+# would cost ~68 redundant HEAD requests with zero recall benefit.
 _CATEGORY_EXPAND_PATH_RE = re.compile(
-    r"/(course-list|course-finder|courses?|programs?|programmes?)/?$", re.I
+    r"/(course-list|course-finder|course-guide)/?$", re.I
 )
+
+# Short-circuit category expansion when this many consecutive slugs add
+# zero candidates — strong signal the host doesn't use category-filter
+# URLs at all. Caps the worst-case cost at ~3 slugs × 4 variants = 12
+# HEAD probes when expansion accidentally fires on a non-VIT-shaped site.
+_CATEGORY_EXPAND_EARLY_EXIT = 3
 
 
 async def expand_course_list_with_categories(
@@ -342,9 +352,13 @@ async def expand_course_list_with_categories(
 
     seen: set[str] = {c.get("url", "") for c in existing if c.get("url")}
     extra: list[dict[str, Any]] = []
+    consecutive_empty = 0
 
     async with httpx.AsyncClient(http2=False) as client:
         for slug in COURSE_CATEGORY_SLUGS:
+            if consecutive_empty >= _CATEGORY_EXPAND_EARLY_EXIT:
+                # Host clearly doesn't use category-filter URLs — bail.
+                break
             variants = (
                 f"{origin}{base_path}?course_categories[0]={slug}",
                 f"{origin}{base_path}?category={slug}",
@@ -407,6 +421,10 @@ async def expand_course_list_with_categories(
                             slug=slug,
                             added=len(extra) - added_before,
                         )
+            if harvested_this_slug:
+                consecutive_empty = 0
+            else:
+                consecutive_empty += 1
             # Yield to event loop occasionally so a long expansion doesn't
             # starve the orchestrator.
             await asyncio.sleep(0)

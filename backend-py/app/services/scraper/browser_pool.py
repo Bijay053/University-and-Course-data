@@ -50,7 +50,16 @@ _INTERNATIONAL_TOGGLE_JS = r"""
     }
     return false;
   };
+  // Pre-click fingerprint: capture state we can compare against after
+  // the click to verify the page genuinely toggled to international view
+  // (mirrors Node browser-helper before/after-state check). Without this,
+  // a nav-menu "International" link could be clicked instead of the
+  // intended fee/eligibility toggle.
+  const beforeUrl = location.href;
+  const beforeBodyLen = (document.body && document.body.innerText || '').length;
   // Strategy 1: input[type=radio|checkbox] whose value/name matches.
+  // These are the safest targets — they cannot navigate the page away
+  // and almost always belong to a fee/eligibility toggle group.
   const inputs = Array.from(document.querySelectorAll(
     'input[type="radio"], input[type="checkbox"]'));
   for (const input of inputs) {
@@ -65,19 +74,38 @@ _INTERNATIONAL_TOGGLE_JS = r"""
     if (label) { try { label.click(); return true; } catch (e) {} }
   }
   // Strategy 2: clickable text element whose text contains "international".
+  // Filter aggressively to avoid clicking a nav-menu / footer link that
+  // would navigate away from the course page.
   const candidates = Array.from(document.querySelectorAll(
-    'button, a, [role="tab"], [role="button"], li, label, span, div'));
+    'button, [role="tab"], [role="button"], li, label, span, div'));
   for (const el of candidates) {
     const txt = (el.textContent || '').trim().toLowerCase();
     if (txt.length === 0 || txt.length > 80) continue;
-    if (!/^|\s|>international students?<|\binternational\b/.test(txt)) continue;
     // Strict text check — must have "international" as a standalone word
     // with at most one extra word (e.g. "International students").
     if (!/^international(?:\s+(?:students?|fees?|applicants?))?$/.test(txt)) {
       continue;
     }
     if (isHidden(el) || isAlreadyActive(el)) continue;
-    try { el.click(); return true; } catch (e) {}
+    // Skip elements wrapped in a nav/header/footer — those are
+    // overwhelmingly site navigation, not fee toggles.
+    let inNav = false;
+    let p = el.parentElement;
+    while (p) {
+      const tag = p.tagName.toLowerCase();
+      if (tag === 'nav' || tag === 'header' || tag === 'footer') { inNav = true; break; }
+      p = p.parentElement;
+    }
+    if (inNav) continue;
+    try { el.click(); } catch (e) { continue; }
+    // Post-click verification: if the click navigated us away from the
+    // course page, we clicked the wrong thing — return false so the
+    // Python caller doesn't treat the post-click HTML as the toggle
+    // result. (Browser hasn't reloaded yet at this point but will if
+    // the click resolved to <a href>; the location.href check catches
+    // SPA-style pushState navigations too.)
+    if (location.href !== beforeUrl) return false;
+    return true;
   }
   return false;
 }
