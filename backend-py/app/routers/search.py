@@ -1,4 +1,3 @@
-from fastapi.responses import JSONResponse
 """Public course search endpoints. Reads from the existing materialized view
 ``course_search_view`` so the user-facing search behaviour stays identical
 to Node. The view is created/refreshed by the existing Drizzle migrations.
@@ -14,6 +13,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
