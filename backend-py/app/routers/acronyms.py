@@ -193,9 +193,108 @@ async def academic_levels_reorder(
     return {"success": True, "updated": updated}
 
 
+import re
+
+# Mirror Node's DEFAULT_ACRONYMS list so the React Settings page can render
+# the same "built-in" badges and we can reject duplicate adds with the same
+# 409 message users are used to. Keep in sync with
+# artifacts/api-server/src/lib/course-name-normalizer.ts:DEFAULT_ACRONYMS.
+DEFAULT_ACRONYMS: set[str] = {
+    "MBA", "BBA", "BBUS", "GDBA", "MIT", "MSC", "BSC", "MSW", "BSW",
+    "JD", "LLB", "LLM", "MA", "BA", "MS", "BS", "BCOM", "MCOM", "BFA",
+    "MFA", "PHD", "EDD", "DBA", "MD", "DDS", "DVM", "PGD", "PGCERT",
+    "GCERT", "MEng", "BEng", "MEd", "BEd", "MArch", "BArch", "MN", "BN",
+}
+
+_ACRONYM_RE = re.compile(r"^[A-Z][A-Z0-9]*$")
+
+
+def _normalize_acronym(raw: object) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    cleaned = raw.strip().upper()
+    if not cleaned or len(cleaned) > 16:
+        return None
+    if not _ACRONYM_RE.match(cleaned):
+        return None
+    return cleaned
+
+
+def _acronym_dict(r: CourseAcronymOption) -> dict:
+    return {
+        "id": r.id,
+        "acronym": r.acronym,
+        "note": r.note,
+        "createdAt": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
 @router.get("/acronyms")
-async def acronyms(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
+async def acronyms(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    """Settings → Acronyms list. Returns ``{defaults, custom}`` so the UI
+    can show built-in entries (read-only) alongside the user's custom
+    entries — matches Node's response shape (Bug L)."""
     rows = (
-        await db.execute(select(CourseAcronymOption).order_by(CourseAcronymOption.acronym))
+        await db.execute(
+            select(CourseAcronymOption).order_by(CourseAcronymOption.acronym)
+        )
     ).scalars().all()
-    return [{"id": r.id, "acronym": r.acronym, "note": r.note} for r in rows]
+    return {
+        "defaults": sorted(DEFAULT_ACRONYMS),
+        "custom": [_acronym_dict(r) for r in rows],
+    }
+
+
+@router.post("/acronyms")
+async def acronyms_create(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict, Body(...)],
+) -> dict:
+    """Add or upsert a custom acronym (Bug L). Validation matches Node:
+    1-16 chars, must start with a letter, A-Z + 0-9 only.
+    """
+    acronym = _normalize_acronym(body.get("acronym"))
+    if not acronym:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "acronym must be 1-16 letters/digits starting with a letter "
+                "(e.g. MBA, BBUS, GDBA)"
+            ),
+        )
+    if acronym in DEFAULT_ACRONYMS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{acronym} is already a built-in acronym; no need to add it.",
+        )
+    note_raw = body.get("note")
+    note = (
+        note_raw.strip()[:200]
+        if isinstance(note_raw, str) and note_raw.strip()
+        else None
+    )
+    stmt = (
+        pg_insert(CourseAcronymOption)
+        .values(acronym=acronym, note=note)
+        .on_conflict_do_update(
+            index_elements=[CourseAcronymOption.acronym],
+            set_={"note": note},
+        )
+        .returning(CourseAcronymOption)
+    )
+    row = (await db.execute(stmt)).scalar_one()
+    await db.commit()
+    return {"option": _acronym_dict(row)}
+
+
+@router.delete("/acronyms/{acronym_id}")
+async def acronyms_delete(
+    acronym_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    row = await db.get(CourseAcronymOption, acronym_id)
+    if row is None:
+        return {"success": True, "deleted": 0}
+    await db.delete(row)
+    await db.commit()
+    return {"success": True, "deleted": 1}

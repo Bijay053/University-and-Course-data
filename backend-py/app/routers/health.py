@@ -14,7 +14,11 @@ router = APIRouter()
 
 
 @router.get("/health")
+@router.get("/healthz")
 async def health() -> dict:
+    """Liveness probe. Both ``/health`` and ``/healthz`` aliases exist so
+    deployment health checks (which historically pointed at /healthz)
+    keep working alongside the older /health URL."""
     return {
         "status": "ok",
         "service": "uniportal-py",

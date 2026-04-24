@@ -7,11 +7,12 @@ available, returning a 503).
 from __future__ import annotations
 
 import re
+import json
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, desc, func, select
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from sqlalchemy import case, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -1301,6 +1302,427 @@ async def staged_delete(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
+    # 2-way sync: if this staged row was approved + linked to a published
+    # course, drop that course too so it disappears from the Courses tab
+    # (matches Node behaviour at scrape.ts:12117).
+    if sc.course_id:
+        await db.execute(
+            text("DELETE FROM courses WHERE id = :cid"), {"cid": sc.course_id}
+        )
     await db.delete(sc)
     await db.commit()
     return {"ok": True, "id": sc_id, "deleted": True}
+
+
+# ── PUT /staged/{sc_id} — edit a pending staged course (Bug Q) ────────────
+# The React Raw Data tab → Edit dialog calls PUT (not PATCH). Without
+# this route every Save click toasted "Save failed" (HTTP 405). Mirrors
+# Node ``router.put("/scrape/staged/:id", ...)`` shape.
+_STAGED_EDITABLE_FIELDS: dict[str, str] = {
+    "courseName": "course_name",
+    "category": "category",
+    "subCategory": "sub_category",
+    "courseWebsite": "course_website",
+    "duration": "duration",
+    "durationTerm": "duration_term",
+    "courseLocation": "course_location",
+    "studyMode": "study_mode",
+    "degreeLevel": "degree_level",
+    "studyLoad": "study_load",
+    "language": "language",
+    "description": "description",
+    "otherRequirement": "other_requirement",
+    "internationalFee": "international_fee",
+    "feeTerm": "fee_term",
+    "feeYear": "fee_year",
+    "currency": "currency",
+    "ieltsOverall": "ielts_overall",
+    "ieltsListening": "ielts_listening",
+    "ieltsSpeaking": "ielts_speaking",
+    "ieltsWriting": "ielts_writing",
+    "ieltsReading": "ielts_reading",
+    "pteOverall": "pte_overall",
+    "pteListening": "pte_listening",
+    "pteSpeaking": "pte_speaking",
+    "pteWriting": "pte_writing",
+    "pteReading": "pte_reading",
+    "toeflOverall": "toefl_overall",
+    "toeflListening": "toefl_listening",
+    "toeflSpeaking": "toefl_speaking",
+    "toeflWriting": "toefl_writing",
+    "toeflReading": "toefl_reading",
+    "cambridgeOverall": "cambridge_overall",
+    "duolingoOverall": "duolingo_overall",
+    "intakeMonths": "intake_months",
+    "academicLevel": "academic_level",
+    "academicScore": "academic_score",
+    "scoreType": "score_type",
+    "academicCountry": "academic_country",
+    "scholarship": "scholarship",
+}
+
+
+@router.put("/staged/{sc_id}")
+async def staged_update(
+    sc_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict, Body(...)],
+) -> dict:
+    from app.models import ScrapedCourse
+
+    sc = await db.get(ScrapedCourse, sc_id)
+    if sc is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    if sc.status != "pending":
+        raise HTTPException(
+            status_code=400, detail="Can only edit pending courses"
+        )
+    changed = False
+    for camel, snake in _STAGED_EDITABLE_FIELDS.items():
+        if camel in body:
+            setattr(sc, snake, body[camel])
+            changed = True
+    if changed:
+        # Recompute completeness so the UI badge updates after save.
+        try:
+            from app.services.scraper.completeness import compute_completeness
+
+            score, _missing = compute_completeness(sc)
+            sc.completeness = score
+        except Exception:  # pragma: no cover — best-effort
+            pass
+    await db.commit()
+    await db.refresh(sc)
+    return {
+        "success": True,
+        "course": {
+            c.name: getattr(sc, c.name) for c in sc.__table__.columns
+        },
+    }
+
+
+# ── Backup-mapping endpoints (graceful no-ops if backup tables absent) ────
+# The React detail page calls these to surface previously-archived manual
+# data. The Python backend doesn't ship the backup pipeline yet, so we
+# return ``matched: false`` instead of 500-ing — gives the UI a clean
+# "no backup found" state. Full impl will come once backup tables are
+# materialised.
+async def _backup_table_exists(db: AsyncSession, name: str) -> bool:
+    res = await db.execute(
+        text("SELECT to_regclass(:n) IS NOT NULL"), {"n": f"public.{name}"}
+    )
+    return bool(res.scalar())
+
+
+@router.get("/staged/{sc_id}/backup-match")
+async def staged_backup_match(
+    sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
+) -> dict:
+    from app.models import ScrapedCourse
+
+    sc = await db.get(ScrapedCourse, sc_id)
+    if sc is None:
+        raise HTTPException(status_code=404, detail="Staged course not found")
+    if not await _backup_table_exists(db, "courses_backup"):
+        return {"matched": False, "stagedCourseName": sc.course_name}
+    row = (
+        await db.execute(
+            text(
+                "SELECT * FROM courses_backup "
+                "WHERE university_id = :u AND lower(trim(name)) = lower(trim(:n)) "
+                "ORDER BY backed_up_at DESC LIMIT 1"
+            ),
+            {"u": sc.university_id, "n": sc.course_name},
+        )
+    ).mappings().first()
+    if row is None:
+        return {"matched": False, "stagedCourseName": sc.course_name}
+    return {
+        "matched": True,
+        "stagedCourseId": sc_id,
+        "stagedCourseName": sc.course_name,
+        "backedUpAt": row.get("backed_up_at"),
+        "course": dict(row),
+        "fees": None,
+        "intakes": [],
+        "english": [],
+        "academic": [],
+        "scholarships": [],
+    }
+
+
+async def _apply_backup_one(
+    db: AsyncSession, sc_id: int, force_overwrite: bool
+) -> dict:
+    """Shared backup→staged merge. Mirrors Node's
+    ``backup_mapping.ts`` so single + bulk routes share one
+    implementation. Returns the per-course result the UI expects:
+    ``{id, ok, appliedFields, courseName?, noMatch?, error?}``."""
+    from app.models import ScrapedCourse
+
+    sc = await db.get(ScrapedCourse, sc_id)
+    if sc is None:
+        return {"id": sc_id, "ok": False, "appliedFields": [], "error": "Not found"}
+
+    if not await _backup_table_exists(db, "courses_backup"):
+        return {
+            "id": sc_id,
+            "ok": True,
+            "appliedFields": [],
+            "courseName": sc.course_name,
+            "noMatch": True,
+        }
+
+    cb = (
+        await db.execute(
+            text(
+                "SELECT * FROM courses_backup "
+                "WHERE university_id = :u AND lower(trim(name)) = lower(trim(:n)) "
+                "ORDER BY backed_up_at DESC LIMIT 1"
+            ),
+            {"u": sc.university_id, "n": sc.course_name},
+        )
+    ).mappings().first()
+    if cb is None:
+        return {
+            "id": sc_id,
+            "ok": True,
+            "appliedFields": [],
+            "courseName": sc.course_name,
+            "noMatch": True,
+        }
+
+    backed_course_id = cb["id"]
+
+    def pick(backup_val: Any, staged_val: Any) -> Any:
+        return backup_val if force_overwrite else (staged_val if staged_val is not None else backup_val)
+
+    updates: dict[str, Any] = {
+        "duration": pick(cb.get("duration"), sc.duration),
+        "duration_term": pick(cb.get("duration_term"), sc.duration_term),
+        "study_mode": pick(cb.get("study_mode"), sc.study_mode),
+        "course_location": pick(cb.get("course_location"), sc.course_location),
+    }
+
+    # Optional sub-tables — guard each one
+    if await _backup_table_exists(db, "fees_backup"):
+        fb = (
+            await db.execute(
+                text(
+                    "SELECT * FROM fees_backup WHERE course_id = :c "
+                    "ORDER BY backed_up_at DESC LIMIT 1"
+                ),
+                {"c": backed_course_id},
+            )
+        ).mappings().first()
+        if fb is not None:
+            updates["international_fee"] = pick(
+                fb.get("international_fee"), sc.international_fee
+            )
+            updates["fee_term"] = pick(fb.get("fee_term"), sc.fee_term)
+            updates["fee_year"] = pick(fb.get("fee_year"), sc.fee_year)
+            updates["currency"] = pick(fb.get("currency"), sc.currency)
+
+    if await _backup_table_exists(db, "intakes_backup"):
+        ib = (
+            await db.execute(
+                text(
+                    "SELECT intake_month FROM intakes_backup WHERE course_id = :c "
+                    "ORDER BY backed_up_at DESC"
+                ),
+                {"c": backed_course_id},
+            )
+        ).mappings().all()
+        if ib and (force_overwrite or not sc.intake_months):
+            months = list({r["intake_month"] for r in ib if r.get("intake_month")})
+            updates["intake_months"] = json.dumps(months)
+
+    if await _backup_table_exists(db, "english_requirements_backup"):
+        for prefix, like in (("ielts", "%ielts%"), ("pte", "%pte%")):
+            er = (
+                await db.execute(
+                    text(
+                        "SELECT * FROM english_requirements_backup "
+                        "WHERE course_id = :c AND lower(test_type) LIKE :lk "
+                        "ORDER BY backed_up_at DESC LIMIT 1"
+                    ),
+                    {"c": backed_course_id, "lk": like},
+                )
+            ).mappings().first()
+            if er is not None:
+                for sub in ("overall", "listening", "speaking", "writing", "reading"):
+                    col = f"{prefix}_{sub}"
+                    updates[col] = pick(er.get(sub), getattr(sc, col, None))
+
+    if await _backup_table_exists(db, "academic_requirements_backup"):
+        ar = (
+            await db.execute(
+                text(
+                    "SELECT * FROM academic_requirements_backup "
+                    "WHERE course_id = :c ORDER BY backed_up_at DESC LIMIT 1"
+                ),
+                {"c": backed_course_id},
+            )
+        ).mappings().first()
+        if ar is not None:
+            updates["academic_level"] = pick(
+                ar.get("academic_level"), sc.academic_level
+            )
+            updates["academic_score"] = pick(
+                ar.get("academic_score"), sc.academic_score
+            )
+            updates["score_type"] = pick(ar.get("score_type"), sc.score_type)
+            updates["academic_country"] = pick(
+                ar.get("academic_country"), sc.academic_country
+            )
+
+    if await _backup_table_exists(db, "scholarships_backup"):
+        sr = (
+            await db.execute(
+                text(
+                    "SELECT * FROM scholarships_backup WHERE course_id = :c "
+                    "ORDER BY backed_up_at DESC LIMIT 1"
+                ),
+                {"c": backed_course_id},
+            )
+        ).mappings().first()
+        if sr is not None:
+            sch_text = " – ".join(
+                [v for v in (sr.get("name"), sr.get("details")) if v]
+            )
+            if sch_text:
+                updates["scholarship"] = pick(sch_text, sc.scholarship)
+
+    keys = list(updates.keys())
+    if keys:
+        for k, v in updates.items():
+            setattr(sc, k, v)
+        await db.commit()
+        await db.refresh(sc)
+
+    return {
+        "id": sc_id,
+        "ok": True,
+        "appliedFields": keys,
+        "courseName": sc.course_name,
+    }
+
+
+@router.post("/staged/{sc_id}/apply-backup")
+async def staged_apply_backup(
+    sc_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict | None, Body()] = None,
+) -> dict:
+    """Single-course backup apply. Returns the Node shape:
+    ``{ok, appliedFields, course}`` or 404 ``{error}``."""
+    force_overwrite = bool((body or {}).get("forceOverwrite", False))
+    result = await _apply_backup_one(db, sc_id, force_overwrite)
+    if result.get("error") == "Not found":
+        raise HTTPException(status_code=404, detail="Staged course not found")
+    if result.get("noMatch"):
+        # Node returns 404 with {error}. UI surfaces that text in a toast.
+        raise HTTPException(
+            status_code=404,
+            detail="No backup match found for this course name + university",
+        )
+    # Re-load latest row so the UI can swap it into local state.
+    from app.models import ScrapedCourse
+
+    sc = await db.get(ScrapedCourse, sc_id)
+    course_dict = (
+        {c.name: getattr(sc, c.name) for c in sc.__table__.columns} if sc else None
+    )
+    return {
+        "ok": True,
+        "appliedFields": result["appliedFields"],
+        "course": course_dict,
+    }
+
+
+@router.post("/staged/bulk-apply-backup")
+async def staged_bulk_apply_backup(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict, Body(...)],
+) -> dict:
+    """Bulk apply backup to many staged courses. UI sends ``ids`` (it
+    also tolerates ``stagedCourseIds`` from older callers) and expects
+    ``{results, summary: {matched, noMatch, failed}}``."""
+    ids_raw = body.get("ids") or body.get("stagedCourseIds") or []
+    if not isinstance(ids_raw, list) or not ids_raw:
+        raise HTTPException(status_code=400, detail="ids must be a non-empty array")
+    force_overwrite = bool(body.get("forceOverwrite", False))
+
+    results: list[dict] = []
+    matched = no_match = failed = 0
+    for sc_id in ids_raw:
+        try:
+            r = await _apply_backup_one(db, int(sc_id), force_overwrite)
+        except Exception as exc:  # noqa: BLE001 — per-row resilience
+            r = {"id": int(sc_id), "ok": False, "appliedFields": [], "error": str(exc)}
+        results.append(r)
+        if not r["ok"]:
+            failed += 1
+        elif r.get("noMatch"):
+            no_match += 1
+        else:
+            matched += 1
+    return {
+        "results": results,
+        "summary": {"matched": matched, "noMatch": no_match, "failed": failed},
+    }
+
+
+# ── Repair endpoints ──────────────────────────────────────────────────────
+@router.get("/repair/missing/{university_id}")
+async def repair_missing(
+    university_id: int, db: Annotated[AsyncSession, Depends(get_db)]
+) -> dict:
+    """Active courses for this university that are missing key fields
+    (duration, location, or any English requirement). The UI shows them
+    in the Repair panel so the user can re-scrape just those rows.
+
+    Returns ``{courses: [...]}`` to match Node + the React consumer's
+    ``data.courses`` access in ``university-detail.tsx``."""
+    sql = text(
+        """
+        SELECT c.id, c.name, c.course_website, c.duration, c.course_location,
+               (SELECT COUNT(*) FROM english_requirements er
+                WHERE er.course_id = c.id) AS english_row_count
+        FROM courses c
+        WHERE c.university_id = :uid
+          AND c.status = 'active'
+          AND (
+            c.duration IS NULL
+            OR c.course_location IS NULL OR btrim(c.course_location) = ''
+            OR (SELECT COUNT(*) FROM english_requirements er
+                WHERE er.course_id = c.id) = 0
+          )
+        ORDER BY c.name
+        """
+    )
+    rows = (await db.execute(sql, {"uid": university_id})).mappings().all()
+    return {"courses": [dict(r) for r in rows]}
+
+
+@router.post("/repair/start")
+async def repair_start(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict, Body(...)],
+) -> dict:
+    """Trigger a re-scrape pass over courses missing required fields. We
+    don't have the saved scrape-config plumbing yet, so this returns the
+    same shape Node returns when the config is absent (400) — the UI
+    already surfaces it as a clear toast."""
+    university_id = body.get("universityId")
+    if not university_id:
+        raise HTTPException(status_code=400, detail="University ID is required")
+    from app.models import University
+
+    uni = await db.get(University, int(university_id))
+    if uni is None:
+        raise HTTPException(status_code=404, detail="University not found")
+    raise HTTPException(
+        status_code=400,
+        detail="No saved scraping config. Run a full AI scrape first.",
+    )

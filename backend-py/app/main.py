@@ -22,6 +22,7 @@ from app.routers import (
     courses,
     dashboard,
     health,
+    per_course_resources,
     reviews,
     scrape,
     search,
@@ -64,6 +65,7 @@ app.include_router(courses.router, prefix="/api", tags=["courses"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(reviews.router, prefix="/api", tags=["reviews"])
 app.include_router(scrape.router, prefix="/api/scrape", tags=["scrape"])
+app.include_router(per_course_resources.router, prefix="/api", tags=["per-course"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")

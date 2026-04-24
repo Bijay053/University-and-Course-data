@@ -5,7 +5,7 @@ import csv
 import io
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import desc, func, or_, select
@@ -186,6 +186,31 @@ async def update_university(
     await db.commit()
     await db.refresh(u)
     return _to_read(u)
+
+
+@router.patch("/universities/{uni_id}/featured")
+async def update_university_featured(
+    uni_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[dict, Body(...)],
+) -> dict:
+    """Toggle the featured flag (and optional priority) used by the public
+    Course Search ranking. Mirrors Node ``router.patch
+    ("/universities/:id/featured", ...)`` so the React detail-page
+    star button works without changes."""
+    u = await db.get(University, uni_id)
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+    payload = body if isinstance(body, dict) else {}
+    u.featured = bool(payload.get("featured"))
+    raw_priority = payload.get("featuredPriority")
+    try:
+        u.featured_priority = int(raw_priority) if raw_priority is not None else 0
+    except (TypeError, ValueError):
+        u.featured_priority = 0
+    await db.commit()
+    await db.refresh(u)
+    return {c.name: getattr(u, c.name) for c in u.__table__.columns}
 
 
 @router.post("/universities/bulk-import", status_code=status.HTTP_200_OK)
