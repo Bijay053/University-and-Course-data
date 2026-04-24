@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/courses", response_model=SearchCourseResponse)
+@router.get("/courses")
 async def search_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
     q: str | None = None,
@@ -111,12 +111,35 @@ async def search_courses(
         log.error("search_courses SQL failed: %s", exc)
         return SearchCourseResponse(results=[], total=0, page=page, limit=limit)
 
-    return SearchCourseResponse(
-        results=[SearchCourseRow(**dict(r)) for r in rows],
-        total=int(total or 0),
-        page=page,
-        limit=limit,
-    )
+    aliases = {
+        "course_id": "courseId",
+        "course_name": "courseName",
+        "course_location": "courseLocation",
+        "university_id": "universityId",
+        "university_name": "universityName",
+        "degree_level": "degreeLevel",
+        "duration_term": "durationTerm",
+        "international_fee": "internationalFee",
+        "ielts_overall": "ieltsOverall",
+        "intake_months": "intakeMonths",
+    }
+    out = []
+    for r in rows:
+        d = dict(r._mapping) if hasattr(r, "_mapping") else dict(r)
+        for snake, camel in aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
+        # Ensure internationalFee always exists (UI calls .toLocaleString)
+        if d.get("internationalFee") is None:
+            d["internationalFee"] = 0
+            d["international_fee"] = 0
+        out.append(d)
+    return JSONResponse(content={
+        "results": out,
+        "total": int(total or 0),
+        "page": page,
+        "limit": limit,
+    })
 
 
 @router.get("/options", response_model=SearchOptionsResponse)
