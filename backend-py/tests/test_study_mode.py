@@ -119,6 +119,40 @@ def test_alternate_label_synonyms():
         assert _classify(f"<dl><dt>{label}:</dt><dd>Online</dd></dl>") == "Online"
 
 
+def test_select_dropdown_noise_does_not_poison_keyword_fallback():
+    """B20 root cause: VIT pages embed an enquiry-form `<select>` whose
+    options literally read 'Online Studies / On Campus / Blended'. After
+    naive tag stripping the word 'Blended' shows up in the page text,
+    and the keyword fallback (which scans for the literal word) claims
+    the course as Blended even when the actual course is on-campus.
+    With noise-block stripping the dropdown text is removed before
+    classification, so a page whose only mode signal is 'On Campus'
+    must classify as On Campus."""
+    html = (
+        "<h1>Bachelor of Business</h1>"
+        "<p>Delivered fully on campus at our Melbourne CBD site.</p>"
+        # The dropdown — pure form noise, not a course attribute.
+        '<form><select name="study_mode">'
+        "<option>Online Studies</option>"
+        "<option>On Campus</option>"
+        "<option>Blended</option>"
+        "</select></form>"
+    )
+    assert _classify(html) == "On Campus"
+
+
+def test_nav_and_footer_noise_stripped_before_classification():
+    """Site-wide nav and footer often list every delivery option as
+    menu items (`Online courses` / `On-campus courses` / `Blended
+    learning`). Those must not poison the per-page mode classifier."""
+    html = (
+        "<nav><a>Online Courses</a><a>Blended Learning</a></nav>"
+        "<main><p>This Master of Public Health is delivered on campus.</p></main>"
+        "<footer><a>Online study options</a></footer>"
+    )
+    assert _classify(html) == "On Campus"
+
+
 def test_learning_mode_label_recognised():
     """B20: VIT and similar pages label the field 'Learning Mode' /
     'Learning Method' / 'Delivery Method' rather than the more common

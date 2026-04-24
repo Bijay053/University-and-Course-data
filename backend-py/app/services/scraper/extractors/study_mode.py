@@ -66,6 +66,18 @@ _ON_CAMPUS_RE = re.compile(
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+# B20: course pages frequently embed an enquiry-form `<select>` whose
+# options literally read "Online Studies / On Campus / Blended". After
+# tag-stripping that becomes a single line of prose with the word
+# "Blended" in it, which the keyword fallback then claims as the
+# course's mode. Same problem for `<form>` (other study-mode dropdowns)
+# and `<nav>` / `<footer>` (site-wide navigation that lists every
+# delivery option). Strip those *blocks entirely* — including their
+# inner text — before we hand the HTML to the tag stripper.
+_NOISE_BLOCK_RE = re.compile(
+    r"<(select|form|nav|footer|aside)\b[^>]*>.*?</\1\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 # Authoritative label-style declarations. Almost every reputable course
 # page surfaces the delivery mode as a key/value pair in the course
@@ -121,7 +133,8 @@ _VALUE_TO_LABEL: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 def _strip_tags(html: str) -> str:
-    return _WS_RE.sub(" ", _TAG_RE.sub(" ", html or ""))
+    cleaned = _NOISE_BLOCK_RE.sub(" ", html or "")
+    return _WS_RE.sub(" ", _TAG_RE.sub(" ", cleaned))
 
 
 def _classify_label_value(value: str) -> str | None:
