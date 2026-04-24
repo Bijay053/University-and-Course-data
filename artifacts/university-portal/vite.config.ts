@@ -16,7 +16,7 @@ export default defineConfig(async ({ mode }) => {
   }
 
   const basePath = env.BASE_PATH ?? "/";
-  const apiPort = env.API_PORT ?? "8080";
+  const apiPort = env.API_PORT ?? "8000";
   const apiProxyTarget = env.API_PROXY_TARGET ?? `http://127.0.0.1:${apiPort}`;
 
   return {
