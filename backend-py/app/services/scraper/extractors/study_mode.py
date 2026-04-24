@@ -93,9 +93,16 @@ _MODE_TOKEN = (
     r"face[\s\-]?to[\s\-]?face|onshore|remote"
 )
 _MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
+# Delimiter is REQUIRED (`:`, `-`, `–`). Without it the regex fires on
+# unlabelled prose like "learn about mode of study online" and treats
+# that as authoritative — code review caught this exact false positive.
+# When a page uses a `<dt>Mode of study</dt><dd>On Campus</dd>` layout
+# (no colon in the source) the existing bare-keyword pattern set still
+# classifies "On Campus" correctly via the fallback path, so we don't
+# lose coverage by requiring the delimiter here.
 _LABEL_RE = re.compile(
     rf"\b(?:mode\s+of\s+(?:study|attendance|delivery)|study\s+mode|"
-    rf"delivery\s+mode|attendance\s+mode|study\s+method)\b\s*[:\-–]?\s*"
+    rf"delivery\s+mode|attendance\s+mode|study\s+method)\b\s*[:\-–]\s*"
     rf"((?:{_MODE_TOKEN})(?:{_MODE_JOINER}(?:{_MODE_TOKEN}))*)",
     re.IGNORECASE,
 )

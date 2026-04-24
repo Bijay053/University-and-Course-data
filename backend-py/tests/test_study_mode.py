@@ -117,3 +117,20 @@ def test_alternate_label_synonyms():
     """Operator-friendly label synonyms must all work — Node accepted these."""
     for label in ("Mode of study", "Study mode", "Delivery mode", "Mode of attendance"):
         assert _classify(f"<dl><dt>{label}:</dt><dd>Online</dd></dl>") == "Online"
+
+
+def test_label_requires_delimiter_to_avoid_prose_false_positive():
+    """Code-review regression: without a required colon/dash delimiter,
+    `_LABEL_RE` matched prose like `learn about mode of study online`
+    and treated it as authoritative — exactly the kind of footer copy
+    that triggered the original ASA bug. Make sure the label-first path
+    no longer over-fires on bare prose."""
+    prose_with_phrase = "Learn about mode of study online and apply today."
+    # Should NOT classify as Online via the label path; the bare-keyword
+    # fallback may still fire on `online` and that's fine — the point is
+    # that the label-first path doesn't claim authority over noisy prose.
+    # We assert at least that the result isn't the *wrong* On Campus and
+    # ideally Online (via fallback) — i.e. the label-first short-circuit
+    # isn't triggered with a phantom value.
+    from app.services.scraper.extractors.study_mode import _LABEL_RE
+    assert _LABEL_RE.search(prose_with_phrase) is None
