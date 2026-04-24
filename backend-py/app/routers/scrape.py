@@ -26,6 +26,47 @@ from app.schemas.scrape import (
 router = APIRouter()
 
 
+
+
+def _staged_row_to_dict(r) -> dict:
+    """Build complete UI-friendly dict from a ScrapedCourse row (snake + camel keys)."""
+    d = {}
+    for col in r.__table__.columns:
+        v = getattr(r, col.name)
+        if hasattr(v, "isoformat"):
+            v = v.isoformat()
+        d[col.name] = v
+    # camelCase aliases UI expects
+    d["id"] = r.id
+    d["courseName"] = r.course_name
+    d["courseWebsite"] = r.course_website
+    d["universityId"] = r.university_id
+    d["scrapeJobId"] = r.scrape_job_id
+    d["createdAt"] = d.get("created_at")
+    d["internationalFee"] = r.international_fee
+    d["ieltsOverall"] = r.ielts_overall
+    d["pteOverall"] = r.pte_overall
+    d["toeflOverall"] = r.toefl_overall
+    d["cambridgeOverall"] = r.cambridge_overall
+    d["duolingoOverall"] = r.duolingo_overall
+    d["intakeMonths"] = r.intake_months
+    d["intakes"] = r.intake_months or []
+    d["courseLocation"] = r.course_location
+    d["studyMode"] = r.study_mode
+    d["degreeLevel"] = r.degree_level
+    d["feeTerm"] = r.fee_term
+    d["feeYear"] = r.fee_year
+    d["eligibilityStatus"] = r.eligibility_status
+    d["autoPublishStatus"] = r.auto_publish_status
+    # UI uses these short names too
+    d["level"] = r.degree_level
+    d["intake"] = r.intake_months
+    d["field"] = r.category
+    # fees as a number for the simple Intl. Fee column
+    d["fees"] = r.international_fee
+    return d
+
+
 @router.get("/jobs")
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -431,20 +472,7 @@ async def staged_list(
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     # UI expects a bare array (Array.isArray check)
-    return [{
-        "id": r.id,
-        "courseName": r.course_name,
-        "courseWebsite": r.course_website,
-        "universityId": r.university_id,
-        "scrapeJobId": r.scrape_job_id,
-        "status": r.status,
-        "createdAt": r.created_at.isoformat() if r.created_at else None,
-        "fees": getattr(r, "fees", None),
-        "duration": getattr(r, "duration", None),
-        "intake": getattr(r, "intake", None),
-        "level": getattr(r, "level", None),
-        "field": getattr(r, "field", None),
-    } for r in rows]
+    return [_staged_row_to_dict(r) for r in rows]
 
 
 @router.get("/staged/{sc_id_or_job}")
@@ -462,20 +490,7 @@ async def staged_one(
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
         # UI expects bare array — simple, JSON-safe shape only
-        return [{
-            "id": s.id,
-            "courseName": s.course_name,
-            "courseWebsite": s.course_website,
-            "universityId": s.university_id,
-            "scrapeJobId": s.scrape_job_id,
-            "status": s.status,
-            "createdAt": s.created_at.isoformat() if s.created_at else None,
-            "fees": getattr(s, "fees", None),
-            "duration": getattr(s, "duration", None),
-            "intake": getattr(s, "intake", None),
-            "level": getattr(s, "level", None),
-            "field": getattr(s, "field", None),
-        } for s in rows]
+        return [_staged_row_to_dict(s) for s in rows]
     
     # Otherwise treat as integer sc_id
     try:
