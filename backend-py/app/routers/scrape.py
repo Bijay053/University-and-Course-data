@@ -270,6 +270,7 @@ async def stop_job(
 @router.post("/force-cancel-all")
 async def force_cancel_all(
     db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     """B15: nuclear option — mark every non-terminal scrape job stopped.
 
@@ -278,7 +279,13 @@ async def force_cancel_all(
     workers (if any are still alive) will notice stop_requested and
     bail; dead workers' rows are simply marked terminal so /active
     stops returning them.
+
+    Auth-guarded: this is the most destructive scrape operation we
+    expose (kills every running job in one shot). Per-job /stop is
+    intentionally left open for parity with the rest of the scrape
+    surface, but a fleet-wide kill switch needs a logged-in admin.
     """
+    _ = user  # kept for future audit logging
     rows = (await db.execute(
         select(ScrapeRuntimeJob).where(
             ScrapeRuntimeJob.status.in_(["queued", "running", "awaiting_approval"])
@@ -399,17 +406,27 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     picks index 0 to bind the live progress bar to.
 
     B15: also auto-reap stale rows here. The orchestrator updates
-    heartbeat_at every ~3s while alive (orchestrator.py L209/325/496),
-    so a row whose heartbeat is older than 90s is almost certainly a
-    dead worker. Same for queued rows older than 5min that never got
-    picked up. Marking them stopped in-line here means the UI's
-    "Scraping in Background…" never wedges on a crashed worker — it
-    self-heals on the next /active poll.
+    heartbeat_at at claim, after discovery, and between staging
+    batches (orchestrator.py L209/325/496). Long browser-rendered
+    extracts in a single batch can plausibly exceed a couple of
+    minutes, so the threshold is set conservatively at 5 minutes
+    rather than 90s — false-positive reaping a healthy job is much
+    worse than waiting an extra few minutes for a genuinely dead
+    one. Queued rows with no claim_at after 10 minutes are also
+    reaped (Celery normally claims within seconds; >10min means
+    broker dead or worker pool starved).
+
+    Race-safe: the reap is a single conditional UPDATE that
+    re-checks ``status`` and ``heartbeat_at`` in the WHERE clause.
+    If the worker writes a fresh heartbeat between our SELECT and
+    our UPDATE, the predicate fails and rowcount=0 — we leave the
+    row alone and re-include it in the response.
     """
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    from sqlalchemy import update as _update, or_ as _or
     now = _dt.now(_tz.utc)
-    stale_running = now - _td(seconds=90)
-    stale_queued = now - _td(minutes=5)
+    stale_running = now - _td(minutes=5)
+    stale_queued = now - _td(minutes=10)
 
     raw = (await db.execute(
         select(ScrapeRuntimeJob)
@@ -432,23 +449,52 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     rows: list[ScrapeRuntimeJob] = []
     reaped = 0
     for r in raw:
-        # Running/awaiting_approval with stale or missing heartbeat → dead.
-        # Queued for >5min with no claim → dead.
-        is_dead = False
+        # Build the predicate the UPDATE must still satisfy.
+        # If the worker has touched heartbeat_at OR moved status
+        # between our SELECT and our UPDATE, rowcount will be 0 and
+        # we'll include the row in the response (it's alive after all).
         if r.status in ("running", "awaiting_approval"):
-            hb = r.heartbeat_at
-            if hb is None and r.started_at and r.started_at < stale_running:
-                is_dead = True
-            elif hb is not None and hb < stale_running:
-                is_dead = True
+            stmt = (
+                _update(ScrapeRuntimeJob)
+                .where(
+                    ScrapeRuntimeJob.runtime_job_id == r.runtime_job_id,
+                    ScrapeRuntimeJob.status == r.status,
+                    _or(
+                        ScrapeRuntimeJob.heartbeat_at.is_(None),
+                        ScrapeRuntimeJob.heartbeat_at < stale_running,
+                    ),
+                )
+                .values(
+                    status="stopped",
+                    stop_requested=True,
+                    completed_at=now,
+                    error_message="Auto-reaped (worker heartbeat lost)",
+                )
+            )
         elif r.status == "queued":
-            if r.started_at and r.started_at < stale_queued and r.claimed_at is None:
-                is_dead = True
-        if is_dead:
-            await _hard_stop_job(db, r)
-            r.error_message = r.error_message or "Auto-reaped (worker heartbeat lost)"
-            reaped += 1
+            stmt = (
+                _update(ScrapeRuntimeJob)
+                .where(
+                    ScrapeRuntimeJob.runtime_job_id == r.runtime_job_id,
+                    ScrapeRuntimeJob.status == "queued",
+                    ScrapeRuntimeJob.claimed_at.is_(None),
+                    ScrapeRuntimeJob.started_at < stale_queued,
+                )
+                .values(
+                    status="stopped",
+                    stop_requested=True,
+                    completed_at=now,
+                    error_message="Auto-reaped (never claimed by a worker)",
+                )
+            )
+        else:
+            rows.append(r)
             continue
+
+        result = await db.execute(stmt)
+        if result.rowcount and result.rowcount > 0:
+            reaped += 1
+            continue  # row is now terminal, drop from active list
         rows.append(r)
     if reaped:
         await db.commit()

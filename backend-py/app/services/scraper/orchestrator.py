@@ -542,6 +542,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0
         )
+        # B15 terminal-status guard: if another writer (the /active
+        # reaper, /force-cancel-all, or a /stop call) already moved
+        # this job to a terminal status, do NOT clobber it. Otherwise
+        # a worker that crawls back out of a long extract would
+        # silently flip a hard-stopped row back to 'completed' and
+        # the user's Stop click would have been pointless.
+        # Re-read straight from the DB — the in-memory ``job`` is
+        # stale w.r.t. concurrent commits from /active reaper etc.
+        await db.refresh(job, ["status"])
+        if job.status in {"stopped", "failed", "completed"}:
+            log.info(
+                "Scrape %s already terminal (%s) — skipping finalize",
+                runtime_job_id, job.status,
+            )
+            return {"ok": False, "reason": f"already_{job.status}", **summary}
         job.status = "completed" if finished_cleanly else "failed"
         # Always update progress counters from this run.
         job.total_found = summary["discovered"]
@@ -562,6 +577,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
+        # Same terminal-status guard for the exception path. If a
+        # /stop or reaper already finalized us, the exception was
+        # likely caused by the cooperative cancel itself — don't
+        # overwrite the user-facing 'stopped' with 'failed'.
+        try:
+            await db.refresh(job, ["status"])
+        except Exception:  # noqa: BLE001
+            pass
+        if job.status in {"stopped", "failed", "completed"}:
+            return {"ok": False, "reason": f"already_{job.status}", **summary}
         job.status = "failed"
         job.completed_at = datetime.now(timezone.utc)
         job.error_message = str(exc)[:1000]
