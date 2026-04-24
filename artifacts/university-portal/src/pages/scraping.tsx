@@ -1589,6 +1589,24 @@ export default function Scraping() {
                       default:          return "[INFO    ]";
                     }
                   };
+                  // T210: prefer the explicit ``level`` field that the
+                  // orchestrator now stamps onto every log row (mapped from
+                  // the message via infer_log_level). Falls back to the
+                  // event/phase heuristics so older logs still render
+                  // sensibly. error/approval_required/done/sampleResult
+                  // semantics are preserved at the top because they're
+                  // structural (different shapes), not just severity.
+                  const levelColor: Record<string, string> = {
+                    error: "text-red-400",
+                    warn: "text-amber-300",
+                    success: "text-green-400",
+                    info: "text-gray-300",
+                    discover: "text-blue-300",
+                    classify: "text-sky-300",
+                    extract: "text-orange-300",
+                    fallback: "text-yellow-300",
+                    stage: "text-purple-300",
+                  };
                   const logColor =
                     log.event === "error" ? "text-red-400" :
                     log.event === "approval_required" ? "text-amber-400 font-semibold" :
@@ -1598,6 +1616,7 @@ export default function Scraping() {
                     log.event === "done" ? "text-cyan-400 font-bold" :
                     log.event === "status" && log.sampleResult === "valid" ? "text-green-300" :
                     log.event === "status" && log.sampleResult === "rejected" ? "text-red-300" :
+                    (log.level && levelColor[log.level as string]) ? levelColor[log.level as string] :
                     log.event === "status" && log.phase === "discover" ? "text-blue-300" :
                     log.event === "status" && log.phase === "validate" ? "text-purple-300" :
                     log.event === "status" && log.phase === "extract" ? "text-orange-300" :

@@ -197,7 +197,12 @@ async def test_stage_course_review_status_when_blockers_present():
             sc = await db.get(ScrapedCourse, res.scraped_course_id)
             assert sc.eligibility_status == "review"
             assert sc.auto_publish_status == "review"
-            assert sc.eligibility_reason and "Needs review" in sc.eligibility_reason
+            # T205: reason follows Node's buildReviewNotes shape:
+            #   "Publish blocked: <blockers> | Missing: <missing>
+            #    | Warnings: <warnings>"
+            assert sc.eligibility_reason and sc.eligibility_reason.startswith(
+                "Publish blocked: "
+            )
             # Both hard blockers should be named so the modal can show them.
             assert "degreeLevel" in sc.eligibility_reason
             assert "englishTest" in sc.eligibility_reason

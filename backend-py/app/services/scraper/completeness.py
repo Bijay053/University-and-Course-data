@@ -138,25 +138,48 @@ def decide_eligibility(sc: ScrapedCourse, completeness: CompletenessResult) -> E
         )
 
     # T205: build the human-readable reason string the UI surfaces verbatim.
-    # Format mirrors Node's ``buildReviewNotes`` (routes/scrape.ts:4977 +
-    # 12227) so prod and the dev API write the same shape into
+    # Mirrors Node's ``buildReviewNotes`` (routes/scrape.ts: buildReviewNotes)
+    # so prod and the dev API write the same shape into
     # ``scraped_courses.eligibility_reason``:
-    #   "Publish blocked: Needs review: <blockers> | Warnings: <warnings>"
+    #   "Publish blocked: <blockers> | Validation: <val> | Missing: <missing>
+    #    | Warnings: <warnings>"
     # The "Publish blocked: " prefix is part of the stored value (not a UI
     # boilerplate) so the same string is useful in API responses, log
-    # exports, and the React modal without per-surface prefixing.
-    if blockers:
-        parts = [f"Publish blocked: Needs review: {', '.join(blockers)}"]
+    # exports, and the React modal without per-surface prefixing. The
+    # ``Validation`` slot is reserved for a future per-field validation pass
+    # — currently empty so the section is omitted when no items qualify.
+    blocker_labels = list(blockers)
+    # Missing = completeness.missing minus the items already surfaced as
+    # blockers (so we don't double-print "courseName" in two places).
+    missing_extra = [
+        m for m in completeness.missing if m not in set(blocker_labels)
+    ]
+    validation: list[str] = []  # placeholder for future per-field validators
+
+    def _build_reason() -> str | None:
+        parts: list[str] = []
+        if blocker_labels:
+            parts.append(f"Publish blocked: {', '.join(blocker_labels)}")
+        if validation:
+            parts.append(f"Validation: {'; '.join(validation)}")
+        if missing_extra:
+            parts.append(f"Missing: {', '.join(missing_extra)}")
         if warnings:
             parts.append(f"Warnings: {', '.join(warnings)}")
+        return " | ".join(parts) if parts else None
+
+    if blockers:
         return EligibilityDecision(
-            status="review", reason=" | ".join(parts), blockers=blockers, warnings=warnings
+            status="review",
+            reason=_build_reason() or "Publish blocked",
+            blockers=blockers,
+            warnings=warnings,
         )
 
     if warnings and completeness.score < settings.min_completeness_for_auto_publish:
         return EligibilityDecision(
             status="review",
-            reason=f"Publish blocked: Warnings: {', '.join(warnings)}",
+            reason=_build_reason() or "review",
             blockers=[],
             warnings=warnings,
         )

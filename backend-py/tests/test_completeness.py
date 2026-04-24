@@ -62,7 +62,10 @@ def test_eligibility_blockers_route_to_review_status():
     decision = decide_eligibility(sc, comp)
     assert decision.status == "review"
     assert "degreeLevel" in decision.blockers
-    assert "Needs review" in decision.reason
+    # T205: reason follows Node's buildReviewNotes shape:
+    #   "Publish blocked: <blockers> | Validation: <val>
+    #    | Missing: <missing> | Warnings: <warnings>"
+    assert decision.reason.startswith("Publish blocked: degreeLevel")
 
 
 def test_eligibility_ready_when_all_satisfied():
