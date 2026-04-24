@@ -168,3 +168,29 @@ the Node implementation across these features:
 **Regression tests**: `backend-py/tests/test_scraper_pipeline_parity.py` (19 tests) pins T201–T206 + T209.
 T207/T208 are network-bound — covered by manual smoke runs, not pytest.
 Full suite: 207 passed, 1 skipped.
+
+## Python Route Parity (Bugs L–Q close-out)
+
+After T201–T211, a follow-on parity wave was triggered to stop "whack-a-mole"
+bug-fixing on the Node→Python rewrite. The Node API server has many endpoints
+the React UI relies on that were never ported; each missing one surfaced
+in production as a "Save failed" toast.
+
+Closed in commit `bfe50d7`:
+- **Bug L** acronyms POST + DELETE (`acronyms.py`).
+- **Bug M** `/api/import/excel` route registered (already worked; covered by parity test).
+- **Bug N** `POST /api/universities/:id/bulk-english` (`per_course_resources.py`).
+- **Bug O** `POST /api/universities/:id/bulk-academic` (`per_course_resources.py`); 409 conflict body matches Node top-level `{error, conflicts}`, not FastAPI's `{detail:{...}}`.
+- **Bug P** `POST /api/universities/:id/bulk-scholarships` (`per_course_resources.py`).
+- **Bug Q** `PUT /api/scrape/staged/:id` with field whitelist + completeness recompute (`scrape.py`).
+
+Plus full per-course CRUD (intakes, fees, english/academic reqs, scholarships),
+PATCH /universities/:id/featured, /healthz alias, and a complete port of
+Node's `backup_mapping.ts` (apply-backup + bulk-apply-backup + backup-match).
+
+**Regression test**: `backend-py/tests/test_route_parity.py` seeds a throwaway
+university + course and drives every UI fetch via httpx ASGITransport. Three
+checks: (1) route-table membership (no framework 404), (2) live smoke (no 5xx,
+no unrouted 404), (3) JSON-shape contracts the UI actually destructures
+(`{courses: [...]}`, `{results, summary}`, `appliedFields[]`,
+top-level 409 `{error, conflicts}`). 3/3 green.
