@@ -18,9 +18,19 @@ router = APIRouter()
 @router.get("/courses")
 async def list_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
-    university_id: int | None = None,
-    q: str | None = None,
-    degree_level: str | None = None,
+    # B4: the OpenAPI spec declares these params in camelCase
+    # (universityId, degreeLevel, studyMode, search, subCategory)
+    # but FastAPI by default matches function parameter names verbatim.
+    # Without the aliases below the client's ?universityId=11 was
+    # silently dropped and the endpoint returned ALL 353 courses
+    # instead of the 8 belonging to that university — that's the
+    # "fake 353" the UI was showing in the Courses tab header.
+    university_id: int | None = Query(default=None, alias="universityId"),
+    q: str | None = Query(default=None, alias="search"),
+    degree_level: str | None = Query(default=None, alias="degreeLevel"),
+    study_mode: str | None = Query(default=None, alias="studyMode"),
+    category: str | None = None,
+    sub_category: str | None = Query(default=None, alias="subCategory"),
     status_filter: str | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=500),
@@ -35,6 +45,12 @@ async def list_courses(
         )
     if degree_level:
         stmt = stmt.where(Course.degree_level == degree_level)
+    if study_mode:
+        stmt = stmt.where(Course.study_mode == study_mode)
+    if category:
+        stmt = stmt.where(Course.category == category)
+    if sub_category:
+        stmt = stmt.where(Course.sub_category == sub_category)
     if status_filter:
         stmt = stmt.where(Course.status == status_filter)
 

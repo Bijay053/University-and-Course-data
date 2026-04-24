@@ -22,12 +22,13 @@ import logging
 import re
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import AsyncSessionLocal
 from app.dependencies import get_db
 from app.models import AssessmentNote
 from app.services.ai import gemini_client
@@ -266,10 +267,39 @@ async def list_notes(
     return JSONResponse([_row_to_dict(r) for r in rows])
 
 
+async def _parse_and_persist(note_id: int, raw_text: str) -> None:
+    """B14: background task that runs the slow Gemini parse and writes
+    the result back to the row. Opens its own AsyncSession because the
+    request-scoped session from Depends(get_db) is closed by the time
+    BackgroundTasks fires (FastAPI runs tasks AFTER the response is
+    sent). All exceptions are swallowed so a flaky Gemini call never
+    crashes the worker — the next GET will lazy-backfill via the
+    existing list_notes path.
+    """
+    try:
+        parsed = await _parse_with_gemini(raw_text)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("assessment-notes bg: gemini failed for id=%s: %s", note_id, exc)
+        return
+    if not parsed:
+        return
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(AssessmentNote)
+                .where(AssessmentNote.id == note_id)
+                .values(parsed_data=parsed)
+            )
+            await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("assessment-notes bg: persist failed for id=%s: %s", note_id, exc)
+
+
 @router.post("/universities/{uni_id}/assessment-notes", status_code=status.HTTP_201_CREATED)
 async def create_note(
     uni_id: int,
     body: _NoteCreate,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JSONResponse:
     country = (body.country or "").strip()
@@ -277,17 +307,24 @@ async def create_note(
     if not country or not raw_text.strip():
         raise HTTPException(status_code=400, detail="country and rawText required")
 
-    parsed = await _parse_with_gemini(raw_text)
-
+    # B14: insert with parsed_data=[] FIRST and return immediately.
+    # The Gemini parse (10–30s) runs in a background task and updates
+    # parsed_data when done. The "Add Key Insight" Save spinner used
+    # to hang for 30s+ because the Gemini call ran inline in the
+    # request handler. With this change the POST returns in <100ms;
+    # the next GET sees parsed_data=[] briefly and (a) renders the
+    # raw_text fallback OR (b) the lazy-backfill in list_notes
+    # re-parses if the background task hasn't completed yet.
     note = AssessmentNote(
         university_id=uni_id,
         country=country,
         raw_text=raw_text,
-        parsed_data=parsed,
+        parsed_data=[],
     )
     db.add(note)
     await db.commit()
     await db.refresh(note)
+    background_tasks.add_task(_parse_and_persist, note.id, raw_text)
     return JSONResponse(_row_to_dict(note), status_code=status.HTTP_201_CREATED)
 
 
@@ -295,6 +332,7 @@ async def create_note(
 async def update_note(
     note_id: int,
     body: _NoteUpdate,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> JSONResponse:
     existing = await db.get(AssessmentNote, note_id)
@@ -303,13 +341,20 @@ async def update_note(
 
     final_text = body.rawText if body.rawText is not None else existing.raw_text
     final_country = body.country if body.country is not None else existing.country
-    parsed = await _parse_with_gemini(final_text)
 
+    # B14: same pattern as create_note. If the raw text changed we
+    # invalidate parsed_data so the UI can't render stale cards while
+    # the background task re-parses; if only the country was edited,
+    # leave parsed_data alone so the UI stays stable.
+    text_changed = body.rawText is not None and body.rawText != existing.raw_text
     existing.country = final_country
     existing.raw_text = final_text
-    existing.parsed_data = parsed
+    if text_changed:
+        existing.parsed_data = []
     await db.commit()
     await db.refresh(existing)
+    if text_changed:
+        background_tasks.add_task(_parse_and_persist, existing.id, final_text)
     return JSONResponse(_row_to_dict(existing))
 
 

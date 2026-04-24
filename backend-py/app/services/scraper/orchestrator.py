@@ -511,7 +511,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         mins, secs = divmod(elapsed_sec, 60)
         await emit(
             "status",
-            f"[INFO ] [TIMING] Total: {mins}m {secs}s | Courses: {course_count} "
+            # B9 / parity with B13 fix: do NOT prefix the message with
+            # [INFO ] — the React renderer in scraping.tsx already
+            # prepends a phase tag. Doubling it produced
+            # "[INFO    ] [INFO ] [TIMING] ..." which read as garbled
+            # log noise and hid the timing summary the user was looking
+            # for.
+            f"[TIMING] Total: {mins}m {secs}s | Courses: {course_count} "
             f"| Avg: {avg_per_course:.1f}s/course "
             f"| Concurrency: HTTP={_MAX_PARALLEL_FETCH} Browser=3",
             phase="complete",

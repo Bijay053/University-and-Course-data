@@ -1586,6 +1586,11 @@ export default function Scraping() {
                       case "extract":   return "[EXTRACT ]";
                       case "fallback":  return "[FALLBACK]";
                       case "stage":     return "[STAGE   ]";
+                      // B9: orchestrator emits the final TIMING summary
+                      // with phase="complete". Without an explicit case
+                      // it fell through to [INFO    ] and the user lost
+                      // the visual cue that the run had wrapped up.
+                      case "complete":  return "[COMPLETE]";
                       default:          return "[INFO    ]";
                     }
                   };
