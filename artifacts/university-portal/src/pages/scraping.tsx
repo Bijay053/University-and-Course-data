@@ -826,7 +826,32 @@ export default function Scraping() {
     try {
       await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" });
     } catch {}
+    // B15: clear local state immediately. The backend now also flips
+    // status='stopped' synchronously (scrape.py:_hard_stop_job), so
+    // the next /active poll won't return this job. Don't leave the
+    // user staring at "Stopping..." — they pressed Stop, honour it.
+    setScraping(false);
+    setStopping(false);
+    setActiveJobId(null);
+    sessionStorage.removeItem("activeScrapeJob");
   }, [activeJobId]);
+
+  // B15: emergency hatch. If the UI ever wedges (dead worker, stale
+  // row, broker hiccup) the user can nuke every non-terminal job from
+  // the DB so they can start fresh. Backend reaper at /active also
+  // self-heals after 90s, but that's too slow when blocked.
+  const forceCancelAll = useCallback(async () => {
+    if (!confirm("Cancel ALL running scrapes? This cannot be undone.")) return;
+    try {
+      await fetch("/api/scrape/force-cancel-all", { method: "POST" });
+    } catch {}
+    setScraping(false);
+    setStopping(false);
+    setActiveJobId(null);
+    sessionStorage.removeItem("activeScrapeJob");
+    setScrapeLogs([]);
+    setAwaitingApproval(null);
+  }, []);
 
   const handleApproval = useCallback(async (proceed: boolean) => {
     if (!activeJobId) return;
@@ -1412,6 +1437,21 @@ export default function Scraping() {
                 )}
               </Button>
             )}
+            {/* B15: emergency hatch — visible whenever any job is
+                considered active OR when the page just shows
+                "Scraping in Background…" with no logs (i.e. wedged
+                state restored across reload). */}
+            {scraping && (
+              <Button
+                onClick={forceCancelAll}
+                variant="outline"
+                size="lg"
+                className="h-11 px-4 border-red-300 text-red-700 hover:bg-red-50"
+                title="Mark every running scrape as stopped — use if Stop is wedged"
+              >
+                Force Cancel All
+              </Button>
+            )}
           </div>
 
           {(scraping || scrapeLogs.length > 0) && (
@@ -1659,12 +1699,12 @@ export default function Scraping() {
                     </div>
                   );
                 })}
-                {scraping && !awaitingApproval && (
-                  <div className="text-blue-400 animate-pulse">
-                    <Loader2 className="inline w-3 h-3 animate-spin mr-1" />
-                    Processing in background...
-                  </div>
-                )}
+                {/* B16: removed the "Processing in background..."
+                    pulse that lived here. The Start button at the
+                    top already says "Scraping in Background..." with
+                    the same spinner — having both was confusing
+                    dual-state. The waiting-for-approval message
+                    stays because it's a different signal. */}
                 {awaitingApproval && (
                   <div className="text-amber-400 animate-pulse">
                     Waiting for your confirmation above...

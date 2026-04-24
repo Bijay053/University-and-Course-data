@@ -102,13 +102,19 @@ async def list_courses(
         for er in eng_rows:
             bucket = eng_map.setdefault(er.course_id, {})
             tt = (er.test_type or "").upper().strip()
-            if tt == "IELTS" and "ielts" not in bucket:
+            # B7: use startswith so real-world variants like
+            # "IELTS Academic", "TOEFL iBT", "PTE Academic" still
+            # bucket correctly. Exact equality dropped them on prod.
+            if tt.startswith("IELTS") and "ielts" not in bucket:
                 bucket["ielts"] = er
-            elif tt == "PTE" and "pte" not in bucket:
+            elif tt.startswith("PTE") and "pte" not in bucket:
                 bucket["pte"] = er
-            elif tt == "TOEFL" and "toefl" not in bucket:
+            elif tt.startswith("TOEFL") and "toefl" not in bucket:
                 bucket["toefl"] = er
-            elif tt not in {"IELTS", "PTE", "TOEFL"} and "other" not in bucket:
+            elif (
+                not tt.startswith(("IELTS", "PTE", "TOEFL"))
+                and "other" not in bucket
+            ):
                 bucket["other"] = er
 
     course_aliases = {

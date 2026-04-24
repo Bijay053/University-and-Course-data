@@ -224,6 +224,36 @@ async def start_bulk(
     return BulkScrapeResponse(session_id=session_id, queued=len(job_ids))
 
 
+async def _hard_stop_job(db: AsyncSession, job: ScrapeRuntimeJob) -> None:
+    """B15: stop a runtime job HARD.
+
+    Previously this just flipped ``stop_requested = True`` and trusted
+    the orchestrator's 3-second poller to notice. That's the right
+    cooperative behaviour for a still-alive worker, but it leaves the
+    UI blocked when the worker has already crashed: the row keeps
+    status='running' forever, ``/active`` keeps returning it, and the
+    Stop button spins until the user reloads.
+
+    We now also flip status→'stopped' and set completed_at right here.
+    Side effects:
+      • ``/active`` excludes terminal statuses, so the UI's
+        "Scraping in Background…" disappears within the next 2-second
+        poll regardless of worker health.
+      • If the worker IS still alive its poller still sees
+        stop_requested=True and exits cleanly (idempotent — the
+        terminal-status guard in the orchestrator's commit path
+        keeps it from clobbering this row's status).
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    job.stop_requested = True
+    if job.status not in {"completed", "stopped", "error", "failed", "done", "skipped"}:
+        job.status = "stopped"
+        if not job.completed_at:
+            job.completed_at = _dt.now(_tz.utc)
+        if not job.error_message:
+            job.error_message = "Stopped by user"
+
+
 @router.post("/jobs/{job_id}/stop")
 async def stop_job(
     job_id: str,
@@ -232,9 +262,32 @@ async def stop_job(
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    job.stop_requested = True
+    await _hard_stop_job(db, job)
     await db.commit()
     return {"ok": True, "id": job_id}
+
+
+@router.post("/force-cancel-all")
+async def force_cancel_all(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """B15: nuclear option — mark every non-terminal scrape job stopped.
+
+    Exists so a wedged broker, dead worker, or stuck row never
+    permanently blocks the UI from starting fresh. Cooperative
+    workers (if any are still alive) will notice stop_requested and
+    bail; dead workers' rows are simply marked terminal so /active
+    stops returning them.
+    """
+    rows = (await db.execute(
+        select(ScrapeRuntimeJob).where(
+            ScrapeRuntimeJob.status.in_(["queued", "running", "awaiting_approval"])
+        )
+    )).scalars().all()
+    for r in rows:
+        await _hard_stop_job(db, r)
+    await db.commit()
+    return {"ok": True, "cancelled": len(rows)}
 
 
 
@@ -327,7 +380,7 @@ async def stop_alias(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) 
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    job.stop_requested = True
+    await _hard_stop_job(db, job)
     await db.commit()
     return {"message": "Scraping stopped", "imported": job.imported or 0, "ok": True}
 
@@ -344,8 +397,21 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     elapsed-timer dead and silently broke the cross-tab live restore.
     Order: running > awaiting_approval > queued, then most recent — UI
     picks index 0 to bind the live progress bar to.
+
+    B15: also auto-reap stale rows here. The orchestrator updates
+    heartbeat_at every ~3s while alive (orchestrator.py L209/325/496),
+    so a row whose heartbeat is older than 90s is almost certainly a
+    dead worker. Same for queued rows older than 5min that never got
+    picked up. Marking them stopped in-line here means the UI's
+    "Scraping in Background…" never wedges on a crashed worker — it
+    self-heals on the next /active poll.
     """
-    rows = (await db.execute(
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    now = _dt.now(_tz.utc)
+    stale_running = now - _td(seconds=90)
+    stale_queued = now - _td(minutes=5)
+
+    raw = (await db.execute(
         select(ScrapeRuntimeJob)
         .where(
             ScrapeRuntimeJob.status.in_(
@@ -362,6 +428,30 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
         )
         .limit(50)
     )).scalars().all()
+
+    rows: list[ScrapeRuntimeJob] = []
+    reaped = 0
+    for r in raw:
+        # Running/awaiting_approval with stale or missing heartbeat → dead.
+        # Queued for >5min with no claim → dead.
+        is_dead = False
+        if r.status in ("running", "awaiting_approval"):
+            hb = r.heartbeat_at
+            if hb is None and r.started_at and r.started_at < stale_running:
+                is_dead = True
+            elif hb is not None and hb < stale_running:
+                is_dead = True
+        elif r.status == "queued":
+            if r.started_at and r.started_at < stale_queued and r.claimed_at is None:
+                is_dead = True
+        if is_dead:
+            await _hard_stop_job(db, r)
+            r.error_message = r.error_message or "Auto-reaped (worker heartbeat lost)"
+            reaped += 1
+            continue
+        rows.append(r)
+    if reaped:
+        await db.commit()
     return {
         "activeJobs": [
             {
