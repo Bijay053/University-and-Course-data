@@ -382,3 +382,44 @@ NOT cover. All six fixes below land together.
 - **Adjacent variants noted but not fixed**: phrasings like
   `overall band score 6.5` or `overall IELTS score of 6.5` are still
   unsupported by pattern 1; they have not been observed in the wild.
+
+### 8. PTE/TOEFL/CAE buried in equivalence table (commit f54ebf8)
+- **Symptom**: After hot-fix #2 deployed, prod job_24323bbb8715
+  reported `has_pte=11/24, has_toefl=11/24, has_cae=11/24,
+  avg_completeness=67.5%` (baseline 99.6%). VIT MBA pages stated
+  IELTS=6.5 in prose but PTE/TOEFL/CAE only in a multi-row HTML
+  equivalence table. Vision OCR delivered IELTS reliably but only
+  ~45% of PTE/TOEFL/CAE because picking the right cell from a wide
+  table image is fragile.
+- **Root cause**: the Python port had **no HTML table parser** for
+  equivalence layouts. Prose extractors couldn't see `<th>IELTS`/
+  `<th>PTE` columns at all because \`html_to_text\` flattens the table
+  into a wall of unlabelled numbers.
+- **Fix**: \`extractors/english_test.py\` adds three new helpers:
+  - \`_is_equivalence_table\` — header-text heuristic; matches when a
+    \`<table>\` has IELTS plus at least one of PTE/TOEFL/CAE/Duolingo.
+  - \`_parse_equivalence_table\` — handles two-row headers,
+    rowspan/colspan cells, and the common 'TOEFL ... as per IELTS
+    website' flavour text. Returns
+    \`{ielts_overall: {pte, toefl, cambridge, ...}, ...}\`. Per-test
+    sanity bounds applied (PTE 10-90, TOEFL 0-120, CAE 140-230,
+    Duolingo 50-160).
+  - \`_equivalence_fallback\` — runs after the prose extractors; only
+    fills missing slots when (a) IELTS overall was extracted from
+    prose and (b) the table has a row matching that IELTS value.
+    Never overwrites prose results.
+- **Confidence ladder**: prose=0.85 > equivalence_table=0.8 >
+  AI fallback=0.5 — guarantees AI cannot clobber real table data
+  and prose still wins on conflict.
+- **End-to-end on /tmp/vit.html**: now extracts IELTS=6.5 (regex),
+  PTE=55, TOEFL=81, CAE=176 (all equivalence_table). Matches the
+  page's own published values exactly.
+- **Coverage**: 4 new tests in \`tests/test_extractors.py\` —
+  fills missing slots from the real VIT table layout, does NOT
+  overwrite prose extractions, skipped when no IELTS anchor is
+  present, and ignores non-equivalence tables (e.g. fees tables).
+- **Test summary**: 308 passed, 1 skipped (was 304+1; +4 new).
+- **Why not just improve vision**: vision still has a role for
+  image-only equivalence tables (rare on AU/UK uni sites). For
+  pages that render the table as HTML (the common case), structured
+  parsing is both cheaper and 100% accurate.
