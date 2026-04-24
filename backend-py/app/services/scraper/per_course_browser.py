@@ -82,7 +82,7 @@ async def maybe_browser_refetch(
     if emit:
         await emit(
             "status",
-            f"[FALLBACK] [per-course browser ↻] {url}",
+            f"[per-course browser ↻] {url}",
             phase="fallback",
             kind="per_course_browser_start",
             url=url,
@@ -104,7 +104,7 @@ async def maybe_browser_refetch(
         if emit:
             await emit(
                 "status",
-                f"[FALLBACK] timeout: per-course browser exceeded "
+                f"timeout: per-course browser exceeded "
                 f"{_BROWSER_FETCH_TIMEOUT_SEC}s on {url} — moving on",
                 phase="fallback",
                 kind="per_course_browser_timeout",
@@ -118,7 +118,7 @@ async def maybe_browser_refetch(
         if emit:
             await emit(
                 "status",
-                f"[FALLBACK] [per-course browser ✗] {url}: {exc}",
+                f"[per-course browser ✗] {url}: {exc}",
                 phase="fallback",
                 kind="per_course_browser_error",
                 url=url,
@@ -128,7 +128,7 @@ async def maybe_browser_refetch(
         if emit:
             await emit(
                 "status",
-                f"[FALLBACK] [per-course browser ✗] {url}: empty response",
+                f"[per-course browser ✗] {url}: empty response",
                 phase="fallback",
                 kind="per_course_browser_empty",
                 url=url,
@@ -183,7 +183,7 @@ async def maybe_browser_refetch(
 
         await emit(
             "status",
-            f"[FALLBACK] [per-course browser ✓] {url} — "
+            f"[per-course browser ✓] {url} — "
             f"IELTS={_fmt('ielts_overall')} "
             f"PTE={_fmt('pte_overall')} "
             f"TOEFL={_fmt('toefl_overall')} "

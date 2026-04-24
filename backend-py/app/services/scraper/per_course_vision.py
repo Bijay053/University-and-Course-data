@@ -165,7 +165,7 @@ async def maybe_vision_refetch(
     if emit:
         await emit(
             "status",
-            f"[FALLBACK] [per-course vision img 0/{len(candidates)}] {url}",
+            f"[per-course vision img 0/{len(candidates)}] {url}",
             phase="fallback",
             kind="per_course_vision_start",
             url=url,
@@ -240,7 +240,7 @@ async def maybe_vision_refetch(
 
         await emit(
             "status",
-            f"[FALLBACK] [per-course vision img {images_consumed}/{len(candidates)}] "
+            f"[per-course vision img {images_consumed}/{len(candidates)}] "
             f"{url} — IELTS={_fmt('ielts_overall')} "
             f"PTE={_fmt('pte_overall')} TOEFL={_fmt('toefl_overall')} "
             f"CAE={_fmt('cambridge_overall')}",
