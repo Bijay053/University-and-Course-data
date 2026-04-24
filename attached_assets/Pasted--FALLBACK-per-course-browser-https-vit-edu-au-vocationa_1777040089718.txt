@@ -1,0 +1,800 @@
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — moving on without AI fill
+[EXTRACT ] [EXTRACT] 23/24: Advanced Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Sit60322 - Advanced Diploma of Hospitali → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 24/24: Certificate III in Carpentry
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Ict40120 - Certificate Iv in Information → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry: fee_currency, ielts_overall, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=5.5 pte_overall=47.0 toefl_overall=67.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_overall=6.5 pte_overall=55.0 toefl_overall=81.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 31 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Information Technology and Systems (BITS)
+[STAGE ] [STAGE] saved: Master of Information Technology and Systems
+[STAGE ] [STAGE] saved: GDITS-Graduate Diploma of Information Technology and Systems
+[STAGE ] [STAGE] saved: GCITS-Graduate Certificate of Information Technology and Systems
+[STAGE ] [STAGE] saved: Master of Business Administration
+[STAGE ] [STAGE] saved: MBA - Finance Specialisation
+[STAGE ] [STAGE] saved: MBA - Information Systems Specialisation
+[STAGE ] [STAGE] saved: MBA - Leadership and Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Tourism and Hospitality Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Project Management Specialisation
+[STAGE ] [STAGE] saved: GDBA - Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: GCBA - Graduate Certificate of Business Administration
+[STAGE ] [STAGE] saved: Bachelor of Business (BBus)
+[STAGE ] [STAGE] saved: DipBus - Diploma of Business
+[STAGE ] [STAGE] saved: Certificate III in Commercial Cookery
+[STAGE ] [STAGE] saved: Certificate IV in Kitchen Management
+[STAGE ] [STAGE] saved: Certificate III in Patisserie
+[STAGE ] [STAGE] saved: Certificate IV in Patisserie
+[STAGE ] [STAGE] saved: Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Certificate IV in Information Technology
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Advanced Diploma of Information Technology
+[STAGE ] [STAGE] saved: Certificate III in Carpentry
+[INFO ] [TIMING] Total: 13m 55s | Courses: 24 | Avg: 34.8s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:24 | Staged:24 | Skipped:0 | Errors:0
+[INFO ] Staged 24 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 6
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://vit.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +24 candidates (total 24) — https://vit.edu.au/
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-online: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-online
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-on-campus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-on-campus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/course-entry-requirements: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 24) — https://vit.edu.au/resources/course-entry-requirements
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/about/about-us/academic-board: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 24) — https://vit.edu.au/about/about-us/academic-board
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mba: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mba
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bbus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bbus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=vocational: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=vocational
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=elicos: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=elicos
+[DISCOVER] Discovered 24 candidate course links
+[EXTRACT ] Extracting course details (24 pages)...
+[EXTRACT ] [EXTRACT] 1/24: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [EXTRACT] 2/24: Master of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 3/24: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 4/24: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gdits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gcits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/24: Master of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/bits: fee_currency, duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits/gcits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[INFO ] [CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 6/24: MBA - Finance Specialisation
+[EXTRACT ] [EXTRACT] 7/24: MBA - Information Systems Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-information-systems (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-finance (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 8/24: MBA - Leadership and Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-leadership-and-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/mits/gdits: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/24: MBA - Tourism and Hospitality Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-finance: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 10/24: MBA - Project Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-project-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 11/24: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gdba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-information-systems: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 12/24: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gcba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-leadership-and-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 13/24: Bachelor of Business (BBus)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gdba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 14/24: DipBus - Diploma of Business
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/diploma-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-tourism-and-hospitality-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 15/24: Certificate III in Commercial Cookery
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gcba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 16/24: Certificate IV in Kitchen Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 17/24: Certificate III in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/diploma-of-business: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 18/24: Certificate IV in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 19/24: Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course vision img 1/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=6.5 PTE=58.0 TOEFL=88.0 CAE=176.0
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 20/24: Advanced Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[EXTRACT ] [EXTRACT] 21/24: Certificate IV in Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — moving on without AI fill
+[INFO ] [CATEGORY det] Sit50422 - Diploma of Hospitality Manage → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 22/24: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — moving on without AI fill
+[EXTRACT ] [EXTRACT] 23/24: Advanced Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Sit60322 - Advanced Diploma of Hospitali → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 24/24: Certificate III in Carpentry
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Ict40120 - Certificate Iv in Information → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry: fee_currency, ielts_overall, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=5.5 pte_overall=47.0 toefl_overall=67.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_overall=6.5 pte_overall=55.0 toefl_overall=81.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 31 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Information Technology and Systems (BITS)
+[STAGE ] [STAGE] saved: Master of Information Technology and Systems
+[STAGE ] [STAGE] saved: GDITS-Graduate Diploma of Information Technology and Systems
+[STAGE ] [STAGE] saved: GCITS-Graduate Certificate of Information Technology and Systems
+[STAGE ] [STAGE] saved: Master of Business Administration
+[STAGE ] [STAGE] saved: MBA - Finance Specialisation
+[STAGE ] [STAGE] saved: MBA - Information Systems Specialisation
+[STAGE ] [STAGE] saved: MBA - Leadership and Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Tourism and Hospitality Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Project Management Specialisation
+[STAGE ] [STAGE] saved: GDBA - Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: GCBA - Graduate Certificate of Business Administration
+[STAGE ] [STAGE] saved: Bachelor of Business (BBus)
+[STAGE ] [STAGE] saved: DipBus - Diploma of Business
+[STAGE ] [STAGE] saved: Certificate III in Commercial Cookery
+[STAGE ] [STAGE] saved: Certificate IV in Kitchen Management
+[STAGE ] [STAGE] saved: Certificate III in Patisserie
+[STAGE ] [STAGE] saved: Certificate IV in Patisserie
+[STAGE ] [STAGE] saved: Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Certificate IV in Information Technology
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Advanced Diploma of Information Technology
+[STAGE ] [STAGE] saved: Certificate III in Carpentry
+[INFO ] [TIMING] Total: 13m 55s | Courses: 24 | Avg: 34.8s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:24 | Staged:24 | Skipped:0 | Errors:0
+[INFO ] Staged 24 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 6
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://vit.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +24 candidates (total 24) — https://vit.edu.au/
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-online: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-online
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-on-campus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-on-campus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/course-entry-requirements: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 24) — https://vit.edu.au/resources/course-entry-requirements
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/about/about-us/academic-board: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 24) — https://vit.edu.au/about/about-us/academic-board
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mba: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mba
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bbus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bbus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=vocational: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=vocational
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=elicos: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=elicos
+[DISCOVER] Discovered 24 candidate course links
+[EXTRACT ] Extracting course details (24 pages)...
+[EXTRACT ] [EXTRACT] 1/24: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [EXTRACT] 2/24: Master of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 3/24: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 4/24: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gdits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gcits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/24: Master of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/bits: fee_currency, duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits/gcits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[INFO ] [CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 6/24: MBA - Finance Specialisation
+[EXTRACT ] [EXTRACT] 7/24: MBA - Information Systems Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-information-systems (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-finance (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 8/24: MBA - Leadership and Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-leadership-and-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/mits/gdits: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/24: MBA - Tourism and Hospitality Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-finance: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 10/24: MBA - Project Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-project-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 11/24: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gdba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-information-systems: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 12/24: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gcba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-leadership-and-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 13/24: Bachelor of Business (BBus)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gdba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 14/24: DipBus - Diploma of Business
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/diploma-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-tourism-and-hospitality-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 15/24: Certificate III in Commercial Cookery
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gcba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 16/24: Certificate IV in Kitchen Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 17/24: Certificate III in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/diploma-of-business: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 18/24: Certificate IV in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 19/24: Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course vision img 1/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=6.5 PTE=58.0 TOEFL=88.0 CAE=176.0
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 20/24: Advanced Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[EXTRACT ] [EXTRACT] 21/24: Certificate IV in Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — moving on without AI fill
+[INFO ] [CATEGORY det] Sit50422 - Diploma of Hospitality Manage → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 22/24: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — moving on without AI fill
+[EXTRACT ] [EXTRACT] 23/24: Advanced Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Sit60322 - Advanced Diploma of Hospitali → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 24/24: Certificate III in Carpentry
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Ict40120 - Certificate Iv in Information → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry: fee_currency, ielts_overall, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=5.5 pte_overall=47.0 toefl_overall=67.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_overall=6.5 pte_overall=55.0 toefl_overall=81.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 31 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Information Technology and Systems (BITS)
+[STAGE ] [STAGE] saved: Master of Information Technology and Systems
+[STAGE ] [STAGE] saved: GDITS-Graduate Diploma of Information Technology and Systems
+[STAGE ] [STAGE] saved: GCITS-Graduate Certificate of Information Technology and Systems
+[STAGE ] [STAGE] saved: Master of Business Administration
+[STAGE ] [STAGE] saved: MBA - Finance Specialisation
+[STAGE ] [STAGE] saved: MBA - Information Systems Specialisation
+[STAGE ] [STAGE] saved: MBA - Leadership and Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Tourism and Hospitality Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Project Management Specialisation
+[STAGE ] [STAGE] saved: GDBA - Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: GCBA - Graduate Certificate of Business Administration
+[STAGE ] [STAGE] saved: Bachelor of Business (BBus)
+[STAGE ] [STAGE] saved: DipBus - Diploma of Business
+[STAGE ] [STAGE] saved: Certificate III in Commercial Cookery
+[STAGE ] [STAGE] saved: Certificate IV in Kitchen Management
+[STAGE ] [STAGE] saved: Certificate III in Patisserie
+[STAGE ] [STAGE] saved: Certificate IV in Patisserie
+[STAGE ] [STAGE] saved: Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Certificate IV in Information Technology
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Advanced Diploma of Information Technology
+[STAGE ] [STAGE] saved: Certificate III in Carpentry
+[INFO ] [TIMING] Total: 13m 55s | Courses: 24 | Avg: 34.8s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:24 | Staged:24 | Skipped:0 | Errors:0
+[INFO ] Staged 24 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 6
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://vit.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +24 candidates (total 24) — https://vit.edu.au/
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-online: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-online
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-on-campus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-on-campus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/course-entry-requirements: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 24) — https://vit.edu.au/resources/course-entry-requirements
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/about/about-us/academic-board: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 24) — https://vit.edu.au/about/about-us/academic-board
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mba: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mba
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bbus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bbus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=vocational: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=vocational
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=elicos: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=elicos
+[DISCOVER] Discovered 24 candidate course links
+[EXTRACT ] Extracting course details (24 pages)...
+[EXTRACT ] [EXTRACT] 1/24: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [EXTRACT] 2/24: Master of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 3/24: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 4/24: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gdits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gcits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/24: Master of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/bits: fee_currency, duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits/gcits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[INFO ] [CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 6/24: MBA - Finance Specialisation
+[EXTRACT ] [EXTRACT] 7/24: MBA - Information Systems Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-information-systems (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-finance (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 8/24: MBA - Leadership and Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-leadership-and-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/mits/gdits: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/24: MBA - Tourism and Hospitality Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-finance: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 10/24: MBA - Project Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-project-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 11/24: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gdba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-information-systems: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 12/24: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gcba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-leadership-and-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 13/24: Bachelor of Business (BBus)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gdba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 14/24: DipBus - Diploma of Business
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/diploma-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-tourism-and-hospitality-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 15/24: Certificate III in Commercial Cookery
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gcba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 16/24: Certificate IV in Kitchen Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 17/24: Certificate III in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/diploma-of-business: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 18/24: Certificate IV in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 19/24: Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course vision img 1/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=6.5 PTE=58.0 TOEFL=88.0 CAE=176.0
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 20/24: Advanced Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[EXTRACT ] [EXTRACT] 21/24: Certificate IV in Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — moving on without AI fill
+[INFO ] [CATEGORY det] Sit50422 - Diploma of Hospitality Manage → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 22/24: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — moving on without AI fill
+[EXTRACT ] [EXTRACT] 23/24: Advanced Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Sit60322 - Advanced Diploma of Hospitali → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 24/24: Certificate III in Carpentry
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Ict40120 - Certificate Iv in Information → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry: fee_currency, ielts_overall, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=5.5 pte_overall=47.0 toefl_overall=67.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_overall=6.5 pte_overall=55.0 toefl_overall=81.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 31 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Information Technology and Systems (BITS)
+[STAGE ] [STAGE] saved: Master of Information Technology and Systems
+[STAGE ] [STAGE] saved: GDITS-Graduate Diploma of Information Technology and Systems
+[STAGE ] [STAGE] saved: GCITS-Graduate Certificate of Information Technology and Systems
+[STAGE ] [STAGE] saved: Master of Business Administration
+[STAGE ] [STAGE] saved: MBA - Finance Specialisation
+[STAGE ] [STAGE] saved: MBA - Information Systems Specialisation
+[STAGE ] [STAGE] saved: MBA - Leadership and Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Tourism and Hospitality Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Project Management Specialisation
+[STAGE ] [STAGE] saved: GDBA - Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: GCBA - Graduate Certificate of Business Administration
+[STAGE ] [STAGE] saved: Bachelor of Business (BBus)
+[STAGE ] [STAGE] saved: DipBus - Diploma of Business
+[STAGE ] [STAGE] saved: Certificate III in Commercial Cookery
+[STAGE ] [STAGE] saved: Certificate IV in Kitchen Management
+[STAGE ] [STAGE] saved: Certificate III in Patisserie
+[STAGE ] [STAGE] saved: Certificate IV in Patisserie
+[STAGE ] [STAGE] saved: Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Certificate IV in Information Technology
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Advanced Diploma of Information Technology
+[STAGE ] [STAGE] saved: Certificate III in Carpentry
+[INFO ] [TIMING] Total: 13m 55s | Courses: 24 | Avg: 34.8s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:24 | Staged:24 | Skipped:0 | Errors:0
+[INFO ] Staged 24 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 6
+[INFO ] Fetching https://vit.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://vit.edu.au/ (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +24 candidates (total 24) — https://vit.edu.au/
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-online: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-online
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/study-on-campus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 24) — https://vit.edu.au/resources/study-on-campus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/resources/course-entry-requirements: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 24) — https://vit.edu.au/resources/course-entry-requirements
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/about/about-us/academic-board: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 24) — https://vit.edu.au/about/about-us/academic-board
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mits: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mits
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=mba: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=mba
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=bbus: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=bbus
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=vocational: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=vocational
+[DISCOVER] [DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=elicos: listing (24 course links found)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 24) — https://vit.edu.au/course-list?course_categories[0]=elicos
+[DISCOVER] Discovered 24 candidate course links
+[EXTRACT ] Extracting course details (24 pages)...
+[EXTRACT ] [EXTRACT] 1/24: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT ] [EXTRACT] 2/24: Master of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 3/24: GDITS-Graduate Diploma of Information Technology and Systems
+[EXTRACT ] [EXTRACT] 4/24: GCITS-Graduate Certificate of Information Technology and Systems
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gdits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits/gcits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/24: Master of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/bits: fee_currency, duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mits/gcits: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[INFO ] [CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 6/24: MBA - Finance Specialisation
+[EXTRACT ] [EXTRACT] 7/24: MBA - Information Systems Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-information-systems (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-finance (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 8/24: MBA - Leadership and Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-leadership-and-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/mits/gdits: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/24: MBA - Tourism and Hospitality Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-finance: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 10/24: MBA - Project Management Specialisation
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/mba-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-project-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 11/24: GDBA - Graduate Diploma of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gdba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-information-systems: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 12/24: GCBA - Graduate Certificate of Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/mba/gcba (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-leadership-and-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 13/24: Bachelor of Business (BBus)
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gdba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 14/24: DipBus - Diploma of Business
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/diploma-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/mba-tourism-and-hospitality-management: fee_currency, duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 15/24: Certificate III in Commercial Cookery
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/mba/gcba: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 16/24: Certificate IV in Kitchen Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://vit.edu.au/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 17/24: Certificate III in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/diploma-of-business: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 18/24: Certificate IV in Patisserie
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 19/24: Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FALLBACK] [per-course vision img 1/6] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — IELTS=6.5 PTE=58.0 TOEFL=88.0 CAE=176.0
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 20/24: Advanced Diploma of Hospitality Management
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[EXTRACT ] [EXTRACT] 21/24: Certificate IV in Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — moving on without AI fill
+[INFO ] [CATEGORY det] Sit50422 - Diploma of Hospitality Manage → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 22/24: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — moving on without AI fill
+[EXTRACT ] [EXTRACT] 23/24: Advanced Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Sit60322 - Advanced Diploma of Hospitali → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 24/24: Certificate III in Carpentry
+[FALLBACK] [per-course browser ↻] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course browser ✓] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Ict40120 - Certificate Iv in Information → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology: fee_currency, ielts_overall, duration_value, duration_unit
+[INFO ] [CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[FALLBACK] [per-course vision img 6/6] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 4 field(s) on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry: fee_currency, ielts_overall, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=5.5 pte_overall=47.0 toefl_overall=67.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_overall=6.5 pte_overall=55.0 toefl_overall=81.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 31 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Information Technology and Systems (BITS)
+[STAGE ] [STAGE] saved: Master of Information Technology and Systems
+[STAGE ] [STAGE] saved: GDITS-Graduate Diploma of Information Technology and Systems
+[STAGE ] [STAGE] saved: GCITS-Graduate Certificate of Information Technology and Systems
+[STAGE ] [STAGE] saved: Master of Business Administration
+[STAGE ] [STAGE] saved: MBA - Finance Specialisation
+[STAGE ] [STAGE] saved: MBA - Information Systems Specialisation
+[STAGE ] [STAGE] saved: MBA - Leadership and Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Tourism and Hospitality Management Specialisation
+[STAGE ] [STAGE] saved: MBA - Project Management Specialisation
+[STAGE ] [STAGE] saved: GDBA - Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: GCBA - Graduate Certificate of Business Administration
+[STAGE ] [STAGE] saved: Bachelor of Business (BBus)
+[STAGE ] [STAGE] saved: DipBus - Diploma of Business
+[STAGE ] [STAGE] saved: Certificate III in Commercial Cookery
+[STAGE ] [STAGE] saved: Certificate IV in Kitchen Management
+[STAGE ] [STAGE] saved: Certificate III in Patisserie
+[STAGE ] [STAGE] saved: Certificate IV in Patisserie
+[STAGE ] [STAGE] saved: Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE ] [STAGE] saved: Certificate IV in Information Technology
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Advanced Diploma of Information Technology
+[STAGE ] [STAGE] saved: Certificate III in Carpentry
+[INFO ] [TIMING] Total: 13m 55s | Courses: 24 | Avg: 34.8s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:24 | Staged:24 | Skipped:0 | Errors:0
+[INFO ] Staged 24 courses, 0 skipped, 0 fetch errors
