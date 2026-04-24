@@ -277,23 +277,102 @@ def test_t206_backfill_no_op_when_no_sibling_has_data():
     assert n_filled == 0
 
 
+# ─── T205 (regression): Missing must NOT duplicate blocker labels ───────
+def test_t205_missing_section_excludes_fields_already_in_blockers():
+    """If ``courseName`` is BOTH a hard blocker (empty name) AND in the
+    completeness ``missing`` list, the Node format prints it once in
+    Publish blocked and de-dups it from Missing. Pins that behaviour so
+    a refactor of the Missing-filter doesn't reintroduce the duplicate.
+    """
+    sc = ScrapedCourse(
+        scrape_job_id="j", university_id=1,
+        course_name=None, degree_level=None,
+    )
+    comp = compute_completeness(sc)
+    decision = decide_eligibility(sc, comp)
+    blockers_section = decision.reason.split(" | ")[0]
+    assert "courseName" in blockers_section
+    if " | Missing: " in decision.reason:
+        missing_section = decision.reason.split(" | Missing: ", 1)[1].split(" | ")[0]
+        # courseName already named in blockers — must not repeat in Missing.
+        miss_items = [t.strip() for t in missing_section.split(",")]
+        assert "courseName" not in miss_items, (
+            f"courseName leaked into Missing despite being a blocker: "
+            f"{decision.reason}"
+        )
+
+
+def test_t205_no_missing_section_when_completeness_complete():
+    """When the only failure is a single warning (no missing fields),
+    the Missing section is omitted entirely — sections are
+    drop-on-empty per Node spec.
+    """
+    sc = ScrapedCourse(
+        scrape_job_id="j", university_id=1,
+        course_name="Bachelor of Computer Science",
+        degree_level="Bachelor's", category="Computer Science & IT",
+        study_mode="On Campus", course_location="Sydney",
+        duration="3 years", intake_months=["February"],
+        international_fee=45000, description="Great.",
+        academic_level="Year 12", academic_score=85,
+        ielts_overall=6.5, other_requirement="Personal statement",
+    )
+    comp = compute_completeness(sc)
+    decision = decide_eligibility(sc, comp)
+    assert "Missing:" not in decision.reason
+
+
 # ─── T209: TIMING + DONE log line shape ─────────────────────────────────
-@pytest.mark.asyncio
-async def test_t209_orchestrator_emits_timing_and_done_lines(monkeypatch):
-    """Verify the orchestrator emits the `[TIMING]` and `══ DONE ══` lines
-    at the end of a scrape so the UI can render them. Covers regression on
-    the message format the React log viewer's `event === "done"` branch
-    parses (totalFound / imported / skipped / errors).
+def test_t209_infer_log_level_rules():
+    """Cheap unit check — confirms the orchestrator's level inference
+    will flag DONE/TIMING messages with sensible buckets so T210 colour
+    mapping picks them up. Ports the rule-table at the top of
+    orchestrator.py.
     """
     from app.services.scraper.orchestrator import infer_log_level
 
-    # Cheap unit check — confirms the orchestrator's level inference will
-    # flag DONE/TIMING messages with sensible buckets so T210 colour
-    # mapping picks them up. Ports the rule-table at the top of
-    # orchestrator.py.
     assert infer_log_level("[STAGE] saved: Bachelor of X") == "success"
     assert infer_log_level("[ERROR] something") == "error"
     assert infer_log_level("[STAGE] error on Y") == "error"
     assert infer_log_level("[FALLBACK] AI enriching ...") == "fallback"
     assert infer_log_level("[EXTRACT] 1/12: foo") == "extract"
     assert infer_log_level("plain status line") == "info"
+
+
+def test_t209_orchestrator_run_scrape_emits_timing_and_done_payloads():
+    """Source-level sentinel that survives refactors: assert run_scrape
+    actually contains the TIMING + DONE emit calls with the exact
+    payload keys the React log viewer parses
+    (`event="done"` branch at scraping.tsx:1630 reads
+    totalFound / imported / skipped / errors).
+
+    Catches the regression class the architect flagged: if someone
+    refactors run_scrape and removes/renames either the literal log
+    string OR the typed payload keys, the UI would silently stop
+    rendering the DONE row — with only an `infer_log_level` unit test,
+    that regression would land undetected. This test fails loudly.
+    """
+    import inspect
+
+    from app.services.scraper.orchestrator import run_scrape
+
+    src = inspect.getsource(run_scrape)
+
+    # Human-readable TIMING line the operator sees in the log pane.
+    assert "[TIMING]" in src
+    assert "Total:" in src and "Avg:" in src and "Concurrency:" in src
+
+    # The DONE row the React `event === "done"` branch renders.
+    assert "══ DONE ══" in src
+    # Typed payload keys consumed by scraping.tsx's done renderer.
+    for key in ("totalFound", "imported", "skipped", "errors"):
+        assert key in src, (
+            f"DONE payload key {key!r} missing from run_scrape — the "
+            f"React log viewer's done-row branch expects it."
+        )
+
+    # Both rows must be tagged with explicit ``level=`` so T210 colour
+    # mapping picks them up rather than falling through to phase
+    # heuristics.
+    assert 'level="info"' in src or "level='info'" in src
+    assert 'level="success"' in src or "level='success'" in src
