@@ -487,6 +487,44 @@ async def staged_one(
     return {c.name: getattr(sc, c.name) for c in sc.__table__.columns} | {"ok": True}
 
 
+
+
+@router.get("/staged/{sc_id}/review")
+async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+    """Return all data needed for the course review modal."""
+    sc = await db.get(ScrapedCourse, sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Staged course not found")
+
+    # Collect every column on the model as a dict
+    out = {}
+    for col in sc.__table__.columns:
+        v = getattr(sc, col.name)
+        if hasattr(v, "isoformat"):
+            v = v.isoformat()
+        out[col.name] = v
+
+    # UI may expect nested shape similar to live courses
+    out["fees"] = {
+        "international_fee": out.get("international_fee"),
+        "fee_term": out.get("fee_term"),
+        "fee_year": out.get("fee_year"),
+        "currency": out.get("currency"),
+    }
+    out["english_requirements"] = {
+        "ielts_overall": out.get("ielts_overall"),
+        "pte_overall": out.get("pte_overall"),
+        "toefl_overall": out.get("toefl_overall"),
+        "cae_overall": out.get("cambridge_overall"),
+        "duolingo_overall": out.get("duolingo_overall"),
+    }
+    out["intakes"] = out.get("intake_months") or []
+    out["stagedCourse"] = dict(out)  # UI accesses Ut.stagedCourse
+    out["course"] = dict(out)        # UI accesses Ut.course
+    out["ok"] = True
+    return out
+
+
 @router.get("/bulk/history")
 async def bulk_history() -> dict:
     return {"data": [], "ok": True}
