@@ -17,6 +17,7 @@ from app.routers import import_routes as _import_routes
 from app.routers import backup as _backup
 from app.routers import (
     acronyms,
+    assessment_notes,
     auth,
     courses,
     dashboard,
@@ -67,3 +68,4 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(acronyms.router, prefix="/api/settings", tags=["settings"])
 app.include_router(_import_routes.router, prefix="/api")
 app.include_router(_backup.router, prefix="/api", tags=["backup"])
+app.include_router(assessment_notes.router, prefix="/api", tags=["assessment-notes"])
