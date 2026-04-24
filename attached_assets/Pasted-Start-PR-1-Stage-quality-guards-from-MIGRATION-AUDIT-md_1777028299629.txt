@@ -1,0 +1,17 @@
+Start PR-1 (Stage-quality guards) from MIGRATION_AUDIT.md §7.
+Scope:
+
+Port scrape-guards.ts → services/scraper/guards.py. Three pure functions: is_generic_course_category_name(), has_course_specific_fee_evidence(), should_trust_generic_university_fee_fallback(). Unit-testable.
+Wire is_generic_course_category_name into pipelines/single_course.py BEFORE stage_course (closes audit diff G — stops staging fake category pages).
+Wire has_course_specific_fee_evidence + should_trust_generic_university_fee_fallback into extractors/fee.py's uni-PDF fallback branch (closes audit diff H — stops VET courses getting HE fee stamped).
+Port review-engine.ts → resolveCandidates into services/review/conflicts.py. Thicken /api/scrape/staged/:id/review payload to include FieldConflict[] (closes audit diff I — review modal will surface multi-source conflicts).
+Port daily-backup.ts as a Celery beat task (tasks/snapshot_tasks.py) running daily at 03:00 UTC. Add celery beat to systemd if needed (closes audit diff L — apply-backup data stays fresh).
+
+Plus the new bug from today's hung scrape:
+
+Browser fallback hangs indefinitely. Job job_2dc0ba6bf4c9 ran for 32 minutes at 0/10 progress with Playwright chromium alive but zero forward motion — no logs, no aborts. Add per-page hard timeout in per_course_browser.py: if page.goto() or page.wait_for_load_state() exceeds 45s, abort that course, log [FALLBACK] timeout, move on.
+UI Stop button doesn't work. Clicking "Stop Scrape" sets button to "Stopping..." indefinitely but doesn't call any stop endpoint. Either wire it to existing endpoint or add POST /api/scrape/{job_id}/stop that marks job stopped + revokes the celery task.
+Doubled log prefix. UI shows [FALLBACK] [FALLBACK] [per-course browser]... — duplicate tag, looks like emit and renderer both add the prefix. Pick one source.
+
+Add the 3 newly-surfaced bugs to PR-1 since they're discovered during stage-quality work and small enough to bundle.
+Test before pushing — full ASA scrape end-to-end, verify no hangs and review modal shows conflicts. Push when green.
