@@ -359,6 +359,7 @@ export default function Scraping() {
   const [scrapeUniName, setScrapeUniName] = useState("");
   const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
   const [stopping, setStopping] = useState(false);
+  const [showForceCancelDialog, setShowForceCancelDialog] = useState(false);
   const [awaitingApproval, setAwaitingApproval] = useState<ApprovalSummary | null>(null);
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -882,8 +883,12 @@ export default function Scraping() {
   // row, broker hiccup) the user can nuke every non-terminal job from
   // the DB so they can start fresh. Backend reaper at /active also
   // self-heals after 90s, but that's too slow when blocked.
-  const forceCancelAll = useCallback(async () => {
-    if (!confirm("Cancel ALL running scrapes? This cannot be undone.")) return;
+  const forceCancelAll = useCallback(() => {
+    setShowForceCancelDialog(true);
+  }, []);
+
+  const executeForceCancelAll = useCallback(async () => {
+    setShowForceCancelDialog(false);
     try {
       await fetch("/api/scrape/force-cancel-all", { method: "POST" });
     } catch {}
@@ -2198,6 +2203,35 @@ export default function Scraping() {
           </CardContent>
         </Card>
       )}
+
+      {/* Force-cancel confirmation dialog — replaces native browser confirm() */}
+      <Dialog open={showForceCancelDialog} onOpenChange={setShowForceCancelDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <StopCircle className="w-5 h-5 shrink-0" />
+              Cancel All Running Scrapes?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            This will immediately stop every active scrape job and reset the scraper.
+            Any in-progress results will be lost. This cannot be undone.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowForceCancelDialog(false)}>
+              Keep Running
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700"
+              onClick={executeForceCancelAll}
+            >
+              <StopCircle className="w-4 h-4 mr-2" />
+              Cancel All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!rejectingIds} onOpenChange={(o) => {
         if (!o) {
