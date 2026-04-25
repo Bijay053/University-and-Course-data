@@ -123,7 +123,8 @@ _JUNK_LAST_SEG_RE = re.compile(
     r"accommodation|sport|news|events?|blogs?|faq|help|support|overview|"
     r"guide|information|handbook|tips|process|pathway|pathways?|"
     r"class(?:es)?|fair|expo|hub|community|connect|network|info-night|"
-    r"open-day|keydates?|key-dates?|story|stories|testimonials?)$",
+    r"open-day|keydates?|key-dates?|story|stories|testimonials?|"
+    r"two-specialisations?|two-specializations?|specialisations?|specializations?)$",
     re.I,
 )
 

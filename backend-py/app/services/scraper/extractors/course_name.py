@@ -27,7 +27,11 @@ _ACRONYMS = {
     # "V", "I", "X" are skipped — too likely to be the letter, not a numeral.
 }
 _TITLE_SUFFIX = re.compile(
-    r"\s*[\|\-–—:•]\s*(?:[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy)|USQ|CSU|UTS|ANU|UNSW|RMIT|MIT)\s*$",
+    r"\s*[\|\-–—:•]\s*(?:[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy|School)|USQ|CSU|UTS|ANU|UNSW|RMIT|MIT|KBS)\s*$",
+    re.I,
+)
+_DEGREE_QUAL_IN_TITLE_RE = re.compile(
+    r"^\s*(?:master|bachelor|graduate|diploma|certificate|doctor|phd|mba\b|msc\b|bsc\b|bed\b)",
     re.I,
 )
 _NON_COURSE_PREFIX = re.compile(
@@ -113,6 +117,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     title = soup.find("title")
     if title:
         candidates.append(("title", title.get_text(" ", strip=True), 0.6))
+
+    # When both H1 and title are found: if the title (after cleaning) starts
+    # with a degree qualifier (e.g. "MBA – ...") but the H1 does not, the page
+    # is a specialisation sub-page where JS adds the parent degree prefix only
+    # to the <title> (e.g. KBS MBA specialisations). Promote the title so the
+    # full name like "MBA – Tourism and Hospitality Leadership" is used instead
+    # of the bare "Tourism and Hospitality Leadership" from the H1.
+    if len(candidates) == 2:
+        h1_raw, title_raw = candidates[0][1], candidates[1][1]
+        h1_clean = _clean(h1_raw) or ""
+        title_clean = _clean(title_raw) or ""
+        if (
+            title_clean
+            and _DEGREE_QUAL_IN_TITLE_RE.search(title_clean)
+            and not _DEGREE_QUAL_IN_TITLE_RE.search(h1_clean)
+        ):
+            candidates = [("title", title_raw, 0.85), ("h1", h1_raw, 0.6)]
 
     for method, raw, conf in candidates:
         cleaned = _clean(raw)

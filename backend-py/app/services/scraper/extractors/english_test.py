@@ -145,9 +145,11 @@ def _ielts(text: str) -> dict[str, float] | None:
         if 4 <= ov <= 9:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
-    # Pattern 5: broad "minimum IELTS 6.0", "IELTS 6.0 or higher", "IELTS: 6.5"
+    # Pattern 5: broad "minimum IELTS 6.0", "IELTS 6.0 or higher", "IELTS: 6.5",
+    # "IELTS (Academic): 6.5" — bridge uses [^\n0-9] (not [^a-z0-9]) so it
+    # can cross lowercase words like "(Academic)" without stopping early.
     broad = re.search(
-        r"(?:minimum\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,50}?([4-9](?:\.[05])?)",
+        r"(?:minimum\s+)?ielts[^\n0-9]{0,80}?([4-9](?:\.[05])?)",
         text,
         re.I,
     ) or re.search(
@@ -230,9 +232,11 @@ def _pte(text: str) -> dict[str, float] | None:
         if 10 <= ov <= 90:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
 
-    # Pattern 3 (broad): "PTE 50" / "PTE: 50"
+    # Pattern 3 (broad): "PTE 50" / "PTE: 50" / "PTE Academic: 58" /
+    # "PTE (Academic): 58" — bridge uses [^\n0-9] so it can cross lowercase
+    # words like "(Academic): " that [^a-z0-9] would stop at.
     m = re.search(
-        r"pte(?:\s+academic)?[^a-z0-9]{0,40}?([1-9][0-9])\b", text, re.I
+        r"pte[^\n0-9]{0,60}?([1-9][0-9])\b", text, re.I
     )
     if m:
         ov = float(m.group(1))
