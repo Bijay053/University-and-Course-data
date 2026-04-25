@@ -274,3 +274,113 @@ def test_extract_propagates_low_confidence_for_bare_online():
     assert len(out) == 1
     assert out[0].value == "Online"
     assert out[0].confidence == 0.5
+
+
+# ──────────────────────────────────────────────────────────────────
+# PR-6 Bug 2: ASA <strong>Delivery</strong> sibling-div idiom
+#
+# ASA Bachelor of Business literally publishes its delivery mode as
+# adjacent sibling divs:
+#
+#     <div class="course-header-text"><strong>Location</strong></div>
+#     <div class="course-header-text">Sydney, Online</div>
+#     <div class="course-header-text"><strong>Delivery</strong></div>
+#     <div class="course-header-text">Face to Face on campus</div>
+#
+# The pre-fix tag-stripper flattened that to a run of words containing
+# the literal token sequence ``Online Delivery`` (because the Location
+# value ends with "Online" and the next label starts with "Delivery").
+# That collision triggered the Online-keyword regex (`online\s+delivery`)
+# at the WRONG sub-string and the page mis-classified as Online.
+#
+# The fix is structural: a BeautifulSoup pre-pass extracts authoritative
+# `<strong>Label</strong>` → value pairs from the DOM (sibling element,
+# parent's next sibling, or inline text after the strong tag) BEFORE the
+# flattened-text fallback ever runs. Same idiom is used by VIT (with a
+# colon inside the strong tag) so the fix generalises beyond ASA.
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_strong_delivery_sibling_div_classifies_as_on_campus():
+    """Exact ASA structure: <strong>Delivery</strong> in one div, value
+    in the next sibling div. Pre-fix this returned 'Online' because the
+    flattened text contained 'Online Delivery' at the boundary between
+    the previous Location value and this Delivery label."""
+    html = (
+        '<div class="courses-header-text-div w-clearfix">'
+        '<div class="course-header-text"><strong>Location</strong><br/></div>'
+        '<div class="course-header-text">Sydney, Online </div>'
+        '</div>'
+        '<div class="courses-header-text-div w-clearfix">'
+        '<div class="course-header-text"><strong>Delivery</strong><br/></div>'
+        '<div class="course-header-text">Face to Face on campus </div>'
+        '</div>'
+    )
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"ASA <strong>Delivery</strong> sibling-div idiom must classify "
+        f"as On Campus, not {out!r}. Pre-fix returned 'Online' due to "
+        f"flattened-text 'Online Delivery' boundary collision."
+    )
+    assert conf == 0.7, "structural label must be authoritative (0.7)"
+
+
+def test_strong_label_does_not_misfire_on_unrelated_strong_tags():
+    """Robustness: <strong> tags wrapping non-delivery labels (Apply,
+    Contact, marketing copy) must not trigger the structural pre-pass.
+    Only delivery-label vocabulary words (Delivery, Mode, Mode of study,
+    etc.) count."""
+    html = (
+        '<p>This <strong>fully online</strong> course is amazing.</p>'
+        '<a><strong>Apply Now</strong></a>'
+        '<div><strong>Contact Us</strong></div><div>info@uni.edu</div>'
+    )
+    # 'fully online' inside a strong tag still triggers the existing
+    # _MODE_PATTERNS keyword path — that's correct (the page literally
+    # describes the course as "fully online"). Confirm it's via the
+    # keyword path (high confidence), not a hallucinated label hit.
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "Online"
+    # Authoritative keyword (`fully online`) — 0.7, not the bare-online 0.5.
+    assert conf == 0.7
+
+
+def test_strong_label_inline_value_with_colon_classifies():
+    """VIT-style: ``<p><strong>Delivery:</strong> Face to face</p>`` —
+    label and value in the same parent, separated by colon. The
+    structural pre-pass should pick this up the same way it picks up
+    ASA's sibling-div variant."""
+    html = "<p><strong>Delivery:</strong> Face to face</p>"
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus"
+    assert conf == 0.7
+
+
+def test_strong_label_value_blended_when_value_lists_both_modes():
+    """Authoritative label whose value is `On Campus and Online` →
+    Blended (multi-mode case)."""
+    html = (
+        '<div><strong>Mode of study</strong></div>'
+        '<div>On Campus and Online</div>'
+    )
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Blended"
+
+
+def test_asa_full_bachelor_fixture_classifies_as_on_campus():
+    """End-to-end against the saved /courses/bachelor-of-business HTML.
+    Pre-fix: returned 'Online' (production-confirmed).
+    Post-fix: returns 'On Campus', matching the literal page content
+    `<strong>Delivery</strong> Face to Face on campus`."""
+    from pathlib import Path
+    fixture = (
+        Path(__file__).parent / "fixtures" / "asa_bachelor_of_business.html"
+    )
+    html = fixture.read_text()
+    out, snippet, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"ASA Bachelor of Business literally says "
+        f"<strong>Delivery</strong> Face to Face on campus. "
+        f"Got study_mode={out!r} (snippet={snippet!r})."
+    )
+    assert conf == 0.7

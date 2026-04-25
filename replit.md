@@ -813,3 +813,83 @@ extractions exist".
   policy is explicit, not accidental.
 
 Full suite: 387 passed, 1 skipped (was 385+1 → +2 new tests).
+
+## PR-6 Bug 2 — ASA `<strong>Delivery</strong>` mis-classified as Online (Task #19)
+
+### Symptom
+Every ASA on-campus course (e.g. `/courses/bachelor-of-business`)
+staged with `study_mode='Online'` despite the page literally saying:
+
+```html
+<div class="course-header-text"><strong>Delivery</strong></div>
+<div class="course-header-text">Face to Face on campus</div>
+```
+
+### Diagnosis (proved with `/tmp/diagnose_study_mode.py`)
+The previous extractor relied entirely on a tag-stripped flattened
+text run, then walked `_MODE_PATTERNS` in priority order. ASA's
+header is a sequence of sibling-div label/value pairs:
+
+```
+<strong>Location</strong>  Sydney, Online
+<strong>Delivery</strong>  Face to Face on campus
+<strong>Course Duration</strong>  3 years Full Time
+```
+
+Tag-stripping flattens that into:
+`"… Location Sydney, Online Delivery Face to Face on campus Course Duration …"`
+
+`_MODE_PATTERNS[1]` (`online\s+(?:study|delivery|course|mode)`) then
+matches the substring **"Online Delivery"** at the boundary between
+the previous Location *value* ("Sydney, Online") and the next *label*
+("Delivery") — and returns `("Online", …, 0.7)` before
+`_MODE_PATTERNS[2]` (which would have matched "on campus" / "face to
+face") gets a chance.
+
+Diagnostic dump:
+```
+[1] -> Online      match='Online Delivery'  pattern='\\b(fully\\s+online|100%\\s+online|online\\s+(?:study|delivery|c'
+        context: …'AQF Level 7 Location Sydney, Online Delivery Face to Face on campus Course Duration '…
+classify_study_mode -> ('Online', 'AQF Level 7 Location Sydney, Online Delivery Face to Face on campus Course', 0.7)
+```
+
+### Fix design
+Structural pre-pass `_extract_strong_label_value(html)` runs BEFORE
+the flattened-text fallback. It uses BeautifulSoup to find every
+`<strong>` (or `<b>`) whose text matches a delivery-label whitelist
+(Delivery, Study mode, Mode of study/attendance/delivery/learning,
+Delivery method, Learning mode/method, Attendance mode), then walks
+forward in document order via `next_elements` collecting text until
+it hits the next `<strong>`/`<b>`/`<h1-6>`/`<dt>` (cap 300 chars).
+The collected value text is fed to the existing
+`_classify_label_value(value)` and the first canonical hit returns
+`(label, snippet, 0.7)`.
+
+This bypasses tag-stripping entirely for the high-signal case, so
+the boundary-collision class of bugs cannot fire.
+
+### Generality
+Same `<strong>Label</strong>` idiom is used by **VIT** for course
+metadata (`<p><strong>Locations:</strong> Melbourne, Sydney</p>`,
+parsed by `vit_static_extract.py`). The new pre-pass handles BOTH
+shapes (sibling-div for ASA, inline-after-strong for VIT) so the fix
+generalises across AU university templates that emit `<strong>` as a
+field-label tag — not ASA-specific.
+
+### Tests
+- `tests/test_study_mode.py::test_strong_delivery_sibling_div_classifies_as_on_campus`
+  — exact ASA structure (sibling div), pre-fix returned `'Online'`.
+- `tests/test_study_mode.py::test_strong_label_inline_value_with_colon_classifies`
+  — VIT-style `<p><strong>Delivery:</strong> Face to face</p>`.
+- `tests/test_study_mode.py::test_strong_label_does_not_misfire_on_unrelated_strong_tags`
+  — `<strong>Apply</strong>` / `<strong>Contact Us</strong>` skipped;
+  unrelated `<strong>fully online</strong>` still classifies via
+  the keyword path.
+- `tests/test_study_mode.py::test_strong_label_value_blended_when_value_lists_both_modes`
+  — multi-mode value `"On Campus and Online"` → Blended.
+- `tests/test_study_mode.py::test_asa_full_bachelor_fixture_classifies_as_on_campus`
+  — end-to-end against the saved `tests/fixtures/asa_bachelor_of_business.html`
+  (26566 bytes), confirms the actual production page now classifies
+  correctly.
+
+Full suite: 392 passed, 1 skipped (was 387+1 → +5 new tests).

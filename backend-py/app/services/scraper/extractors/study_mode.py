@@ -147,6 +147,35 @@ def _strip_tags(html: str) -> str:
     return _WS_RE.sub(" ", _TAG_RE.sub(" ", cleaned))
 
 
+# PR-6 Bug 2: ASA / VIT publish delivery as `<strong>Delivery</strong>`
+# (or `<strong>Delivery:</strong>`, etc.) and put the value in either
+# the next sibling element (ASA: <div><strong>Delivery</strong></div>
+# <div>Face to Face on campus</div>) or inline after the strong tag
+# (VIT: <p><strong>Delivery:</strong> ...</p>). Tag-stripping flattens
+# both into a single token run; in ASA's case the previous Location
+# value ("Sydney, Online") collides with the next "Delivery" label and
+# the keyword regex fires on the substring "Online Delivery", returning
+# "Online" for an on-campus course.
+#
+# This whitelist is the set of label *words* that, when wrapped by a
+# `<strong>` (or `<b>`) tag, mean "the next text you see is the
+# delivery mode value". Bare `mode` is intentionally excluded — too
+# many false-positive contexts (Test Mode, Edit Mode, …).
+_STRONG_LABEL_RE = re.compile(
+    r"(?:delivery|study\s+mode|study\s+method|delivery\s+mode|"
+    r"delivery\s+method|attendance\s+mode|learning\s+mode|"
+    r"learning\s+method|mode\s+of\s+(?:study|attendance|delivery|learning))",
+    re.IGNORECASE,
+)
+
+# Walk forward from the strong tag at most this many chars of value
+# text. 300 is wide enough for "On Campus and Online" / "Face to Face
+# on campus" / "Blended (mostly online)" while keeping the walk from
+# accumulating unrelated paragraphs on pages that lack a next strong
+# / heading boundary.
+_STRONG_VALUE_CHAR_CAP = 300
+
+
 def _classify_label_value(value: str) -> str | None:
     """Map the raw text after a `Mode of study:` label to a canonical
     label, or ``None`` when the value is gibberish (e.g. label was found
@@ -156,6 +185,82 @@ def _classify_label_value(value: str) -> str | None:
         if pattern.search(value):
             return label
     return None
+
+
+def _extract_strong_label_value(html: str) -> tuple[str | None, str | None]:
+    """Structural pre-pass for `<strong>Delivery</strong>` / sibling-div
+    label/value idioms (ASA, VIT, …). Returns
+    ``(canonical_study_mode, snippet)`` or ``(None, None)``.
+
+    Walks each `<strong>` (or `<b>`) tag whose text matches the
+    delivery-label whitelist (:data:`_STRONG_LABEL_RE`), then collects
+    text in document order from the strong tag forward — across sibling
+    divs, list items, anything — until it hits the next `<strong>`,
+    `<b>`, heading (`h1`-`h6`) or `<dt>`. The collected text is fed to
+    :func:`_classify_label_value`. The first canonical hit wins.
+
+    Why this exists: the previous tag-stripped fallback flattened
+    ASA's `<div><strong>Location</strong></div><div>Sydney, Online
+    </div><div><strong>Delivery</strong></div><div>Face to Face on
+    campus</div>` into a single token run that contained the substring
+    ``Online Delivery`` at the boundary between the Location value
+    and the next label. ``_MODE_PATTERNS[1]`` then matched
+    ``online\\s+delivery`` and returned "Online" — the wrong answer
+    for an on-campus course. The structural pre-pass reads the value
+    from the DOM, never from a flattened token run, so the boundary
+    collision can't fire.
+    """
+    if not html:
+        return None, None
+    try:
+        from bs4 import BeautifulSoup
+        from bs4.element import NavigableString, Tag
+    except ImportError:  # pragma: no cover - bs4 is a hard dep
+        return None, None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None, None
+
+    for strong in soup.find_all(("strong", "b")):
+        label_raw = strong.get_text(" ", strip=True).rstrip(":").strip()
+        if not label_raw or not _STRONG_LABEL_RE.fullmatch(label_raw):
+            continue
+        parts: list[str] = []
+        char_count = 0
+        for node in strong.next_elements:
+            if isinstance(node, Tag):
+                # Stop at the next labelled value or a major section
+                # break — beyond these the text belongs to a different
+                # field entirely.
+                if node is strong:
+                    continue
+                if node.name in ("strong", "b", "h1", "h2", "h3",
+                                 "h4", "h5", "h6", "dt"):
+                    break
+                continue
+            if isinstance(node, NavigableString):
+                text = str(node).strip()
+                if not text:
+                    continue
+                parts.append(text)
+                char_count += len(text) + 1
+                if char_count >= _STRONG_VALUE_CHAR_CAP:
+                    break
+        # Strip leading delimiters carried in from a colon outside the
+        # strong tag (e.g. `<strong>Delivery</strong>: Face to face`).
+        value_text = " ".join(parts).lstrip(":-– ").strip()
+        if not value_text:
+            continue
+        canonical = _classify_label_value(value_text)
+        if canonical:
+            snippet = (
+                f"<strong>{label_raw}</strong> -> "
+                f"{value_text[:80]}"
+            )
+            return canonical, snippet
+    return None, None
 
 
 def classify_study_mode(
@@ -190,6 +295,17 @@ def classify_study_mode(
     or PDF signal override downstream. Returns
     ``(None, None, None)`` when no pattern matches.
     """
+    # PR-6 Bug 2 — structural pre-pass FIRST. The DOM-aware
+    # `<strong>Delivery</strong>` / sibling-div detector reads value
+    # text out of the DOM directly, so it can't be fooled by
+    # tag-stripping boundary collisions like ASA's
+    # `Sydney, Online` + `Delivery` → flattened `Online Delivery`
+    # → wrong "Online" classification. Returns immediately when it
+    # finds a value the canonical-label classifier recognises.
+    strong_label, strong_snippet = _extract_strong_label_value(page_text)
+    if strong_label:
+        return strong_label, strong_snippet, 0.7
+
     plain = _strip_tags(page_text)
 
     label_match = _LABEL_RE.search(plain)
