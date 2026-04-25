@@ -1,0 +1,101 @@
+VIT T007 sweep just completed (university_id=6, 38 courses, 5m 29s, 0 errors). Today's PR-6 fixes verified working with no regression. Five follow-up issues found, varying priority.
+
+**What worked (no action needed):**
+- Discovery: 30 → 38 courses found (T004 category expansion + T001 home redirect both firing). 6 new vocational courses now staged.
+- Sibling cache: `[backfill undergraduate] 34 slot(s) filled across siblings` — per-uni English requirements correctly broadcast across BBus/MBA/MITS variants.
+- Sub_category: parenthetical-priority change from PR-6 didn't break the flat-name fallback path. "Master of Business Administration" → `Business & Management / MBA` correctly. "Bachelor of Information Technology and Systems (BITS)" → `Computer Science & IT / Information Systems` correctly.
+- 33 of 38 courses at 77% completeness, Publish: ready, Eligibility: ready. Same chain working as ASA.
+- Description extractor firing on VIT pages (no `[FALLBACK] AI enriching` lines mention description as missing).
+
+---
+
+**Issue 1 (HIGH): /vocational/ browser timeouts — 10 occurrences, ~5min wall-time cost**
+
+Every `https://vit.edu.au/vocational/*` URL hit the 30s per-course browser timeout:
+```
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+timeout: per-course browser exceeded 30s on https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+```
+
+10 timeouts × 30s = 5 minutes of wall time. The static fallback rescued data on all 10 (`[VIT static fallback ✓] ... — recovered location/intakes`), so end result is fine, but runtime would drop from 5m 29s to ~1-2 min if these resolved cleanly. Hosting `/vocational/` pages might have a heavy embedded widget or third-party script. Please diagnose what specifically is taking >30s on those pages. Options:
+- (a) Different per-host config for vit.edu.au/vocational — longer timeout, or skip browser pass entirely and rely on static
+- (b) Identify the slow load (network tab or Playwright trace) and block whatever it is
+- (c) Skip browser pass for /vocational/* paths since static fallback is sufficient
+
+**Issue 2 (HIGH): 5 vocational courses missing category — Publish: review**
+
+These 5 courses ended up at 69% completeness, Publish: review, Eligibility: review with no Category assigned (column is blank in the staged list view):
+- Certificate III in Carpentry
+- Certificate IV in Patisserie
+- Certificate III in Patisserie
+- Certificate IV in Kitchen Management
+- Certificate III in Commercial Cookery
+
+Meanwhile other vocational certs DID get categorized correctly:
+- Diploma of Hospitality Management → Hospitality, Tourism & Events ✓
+- Cert IV/Diploma/Adv Diploma of Information Technology → Computer Science & IT ✓
+
+The category extractor doesn't have keywords for: "patisserie", "commercial cookery", "kitchen management", "carpentry". Please add:
+- `patisserie` → Hospitality, Tourism & Events / Cookery (or new sub: Patisserie)
+- `commercial cookery` → Hospitality, Tourism & Events / Cookery
+- `kitchen management` → Hospitality, Tourism & Events / Cookery
+- `carpentry` → Trades & Construction (probably a NEW top-level category, since AU vocational education includes lots of trades)
+
+Please check what other vocational/trades categories the system needs. ASA only has degree-level courses but VIT/Torrens/TAFE-equivalent unis will have many. Worth a small audit.
+
+**Issue 3 (MEDIUM): Vocational course name normalization broken**
+
+Look at the staged names:
+```
+Sit40521 - Certificate Iv in Kitchen Man
+Sit30821 - Certificate Iii in Commercial
+Sit31021 - Certificate Iii in Patisserie
+Ict40120 - Certificate Iv in Information
+Cpc30220 - Certificate Iii in Carpentry
+```
+
+Three problems:
+- (a) AQF prefix "Sit40521" / "Ict40120" / "Cpc30220" is the course code, not the name. Should be stripped or moved to a course_code field.
+- (b) Title case is wrong: "Iv" should be "IV", "Iii" should be "III". The acronym preservation logic isn't handling Roman numerals.
+- (c) Some names truncated mid-word: "Kitchen Man" should be "Kitchen Management", "Commercial" should be "Commercial Cookery". Looks like a length-cap issue somewhere in the name extraction or normalization step.
+
+Fix `course_name.py` extractor: (a) strip leading `[A-Z]{3}\d{5}` AQF code patterns, (b) preserve Roman numerals (II/III/IV/V/VI/VII/VIII/IX/X) in title casing, (c) find the truncation bug.
+
+The non-vocational courses look fine ("Bachelor of Information Technology and Systems (BITS)", "MITS - Software Engineering Specialisation") so this only affects vocational paths.
+
+**Issue 4 (LOW): Duration unit normalization for vocational courses**
+
+Vocational courses display weeks instead of months/years:
+```
+Certificate III in Carpentry         — 104 Week
+Adv Diploma of Information Tech      — 104 Week
+Diploma of Information Technology    — 66 Week
+Certificate IV in Information Tech   — 52 Week
+```
+
+104 weeks = 2 years, 52 weeks = 1 year. Convert weeks ≥ 52 to years (rounded), or weeks ≥ 12 to months. Bachelor and Master courses correctly show "3 Year" / "2 Year" because their pages use year units natively. This is just a unit normalization in `duration.py` — if `unit==week` and `value≥52`, convert to years.
+
+**Issue 5 (LOW): eligibility_reason stale recompute (carryover from ASA)**
+
+Flagged this earlier but didn't fix — some courses show `eligibility_reason: Missing: description, ...` even when description IS populated in DB. Likely the eligibility check runs before description.py extractor completes, or the check looks at a stale field. Visible on this VIT scrape too (the 5 vocational courses with empty category also show "Missing: category" even though for the other 33 it's correctly skipped).
+
+---
+
+**Recommended priority order:**
+1. **Issue 1** (vocational timeouts) — biggest UX cost, would cut runtime in half
+2. **Issue 2** (missing categories) — directly affects what's publishable
+3. **Issue 3** (name normalization) — affects search/display quality on staged courses
+4. **Issue 5** (eligibility recompute) — bothers nobody but is a tech-debt smell worth fixing while context is fresh
+5. **Issue 4** (duration units) — cosmetic
+
+**Don't ship as one big PR.** Issues 1 and 2 are independent and both worth their own targeted PRs. Issue 3 is a clean course_name.py edit. Issue 4+5 can pair together or wait.
+
+**ASA + VIT both verified clean for PR-6's actual changes.** Proceeding with T007 on Torrens next would test bugs 4+5 from earlier (junk URL filter, category landing detection — 22 courses → expected ~152), but that's a verification step, not a PR-6 retest. Will run after these issues are filed.

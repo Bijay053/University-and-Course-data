@@ -19,6 +19,12 @@ _ACRONYMS = {
     "MBA", "BBA", "BA", "BS", "BSc", "MSc", "PhD", "ICT", "IT", "AI",
     "MD", "JD", "LLM", "LLB", "ME", "MEng", "EMBA", "GDip", "GCert",
     "MIT", "USQ", "CSU", "UTS", "ANU", "UNSW", "UoN", "RMIT",
+    # Issue 3b: Roman numerals used in AQF course names (Certificate III,
+    # Certificate IV, Diploma etc.). Without these, _smart_case title-cases
+    # "III" as "Iii" and "IV" as "Iv".
+    "II", "III", "IV", "VI", "VII", "VIII", "IX", "XI", "XII",
+    "XIII", "XIV", "XV",
+    # "V", "I", "X" are skipped — too likely to be the letter, not a numeral.
 }
 _TITLE_SUFFIX = re.compile(
     r"\s*[\|\-–—:•]\s*(?:[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy)|USQ|CSU|UTS|ANU|UNSW|RMIT|MIT)\s*$",
@@ -27,6 +33,12 @@ _TITLE_SUFFIX = re.compile(
 _NON_COURSE_PREFIX = re.compile(
     r"^\s*(?:home|study|courses?|programs?)\s*[/>\\:|–-]\s*", re.I
 )
+# Issue 3a: AQF code prefixes on VIT vocational course names.
+# Pages set <h1>SIT40521 - Certificate IV in Kitchen Management</h1>.
+# The code (3 uppercase letters + 5 digits) must be stripped before
+# _smart_case runs, otherwise it becomes "Sit40521 - " in the output.
+# Pattern matches: SIT40521 - , ICT40120 — , CPC30220 – etc.
+_AQF_PREFIX_RE = re.compile(r"^[A-Za-z]{3}\d{5}\s*[-–—]\s*")
 
 
 _SLUG_LIKE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+){2,}$")
@@ -76,6 +88,9 @@ def _clean(raw: str) -> str | None:
     if not raw:
         return None
     txt = re.sub(r"\s+", " ", raw).strip()
+    # Issue 3a: strip AQF code prefix (e.g. "SIT40521 - ") before any
+    # other processing so _smart_case never sees the raw code token.
+    txt = _AQF_PREFIX_RE.sub("", txt).strip()
     txt = _NON_COURSE_PREFIX.sub("", txt)
     txt = _TITLE_SUFFIX.sub("", txt).strip(" -|·•")
     if not txt or len(txt) < 3 or len(txt) > 200:

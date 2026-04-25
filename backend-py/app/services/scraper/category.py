@@ -29,6 +29,7 @@ CATEGORIES = (
     "Hospitality, Tourism & Events",
     "Science & Mathematics",
     "Agriculture & Environmental Science",
+    "Trades & Construction",
 )
 
 # Each tuple: (category, keywords). Keywords are matched as whole-word
@@ -129,6 +130,9 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
             # — exact bug the user reported.
             "hospitality management", "hotel management", "tourism management",
             "event management", "culinary arts",
+            # Issue 2: vocational cookery keywords — VIT vocational courses
+            "commercial cookery", "kitchen management", "patisserie",
+            "cookery", "barista",
             "hospitality", "tourism", "event", "hotel", "culinary",
             "restaurant", "wine ",
         ),
@@ -147,6 +151,22 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "agriculture", "environmental", "environment", "horticulture",
             "forestry", "ecology", "sustainability", "wildlife",
             "agribusiness", "viticulture",
+        ),
+    ),
+    (
+        "Trades & Construction",
+        (
+            # Issue 2: VIT vocational courses — AQF-level trade qualifications
+            # that don't fit Engineering (which is degree-level theory) or
+            # Architecture/Building (which is design-focused). These are
+            # hands-on skilled-trades certificates and diplomas.
+            # NOTE: no generic AQF phrases ("certificate iii in", "diploma of")
+            # — those are too broad and would beat specific keywords from
+            # other categories via word-count weighting.
+            "carpentry", "plumbing", "bricklaying", "concreting",
+            "tiling", "plastering", "electrical trade",
+            "refrigeration", "air conditioning", "hvac",
+            "cabinet making", "joinery", "welding", "boilermaking",
         ),
     ),
 )
@@ -190,6 +210,9 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Hospitality, Tourism & Events", "Hospitality Management", ("hospitality management", "hotel management")),
     ("Hospitality, Tourism & Events", "Tourism Management",     ("tourism management", "tourism")),
     ("Hospitality, Tourism & Events", "Event Management",       ("event management", "event ")),
+    # Issue 2: vocational cookery sub-categories — must come BEFORE
+    # "Culinary Arts" so "commercial cookery" matches Cookery not Culinary Arts.
+    ("Hospitality, Tourism & Events", "Cookery",                ("commercial cookery", "kitchen management", "patisserie", "cookery")),
     ("Hospitality, Tourism & Events", "Culinary Arts",          ("culinary arts", "culinary", "restaurant")),
     ("Business & Management",     "MBA",                    ("mba", "master of business administration")),
     ("Business & Management",     "Accounting",             ("accounting", "accountancy")),
@@ -238,6 +261,13 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Science & Mathematics",     "Mathematics",            ("mathematics", "statistics")),
     ("Agriculture & Environmental Science", "Sustainability", ("sustainability",)),
     ("Agriculture & Environmental Science", "Agriculture",   ("agriculture", "agribusiness", "horticulture")),
+    # Issue 2: Trades & Construction sub-categories for AQF vocational courses.
+    ("Trades & Construction", "Carpentry",           ("carpentry",)),
+    ("Trades & Construction", "Plumbing",            ("plumbing",)),
+    ("Trades & Construction", "Electrical Trades",   ("electrical trade",)),
+    ("Trades & Construction", "Welding & Fabrication", ("welding", "boilermaking", "fabrication")),
+    ("Trades & Construction", "Cabinet Making",      ("cabinet making", "joinery")),
+    ("Trades & Construction", "Refrigeration & HVAC", ("refrigeration", "air conditioning", "hvac")),
 )
 
 

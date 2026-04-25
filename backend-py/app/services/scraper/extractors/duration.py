@@ -117,6 +117,28 @@ def _normalise_unit(raw: str) -> str | None:
     return None
 
 
+def _convert_weeks(amount: float, unit: str) -> tuple[float, str]:
+    """Issue 4: vocational course pages express duration in weeks (e.g.
+    "104 weeks") while degree pages use years natively.  Convert to a
+    human-readable unit so the UI shows "2 Year" instead of "104 Week":
+
+    * weeks ≥ 52  → years  (rounded to nearest 0.5)
+    * weeks ≥ 12  → months (rounded to nearest whole month)
+    * weeks < 12  → keep as weeks
+
+    Non-Week units are returned unchanged.
+    """
+    if unit != "Week":
+        return amount, unit
+    if amount >= 52:
+        years = round(amount / 52 * 2) / 2  # nearest 0.5 year
+        return years, "Year"
+    if amount >= 12:
+        months = round(amount / 4.348)  # 1 month ≈ 4.348 weeks
+        return float(months), "Month"
+    return amount, unit
+
+
 def _classify_duration_value(value: str) -> tuple[float, str] | None:
     """Parse ``<num> <unit>`` from a label-value cell. Returns
     ``(amount, canonical_unit)`` or ``None`` when no plausible
@@ -229,6 +251,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     structural, snippet = _extract_strong_label_value(html)
     if structural is not None:
         amount, unit = structural
+        amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
         return [
             ExtractionResult(
                 field_key="duration",
@@ -300,6 +323,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         return []
     parsed.sort(key=lambda t: t[0], reverse=True)
     _, amount, unit, snippet = parsed[0]
+    amount, unit = _convert_weeks(amount, unit)  # Issue 4: week→year/month
     return [
         ExtractionResult(
             field_key="duration",

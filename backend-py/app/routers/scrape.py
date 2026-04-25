@@ -79,10 +79,30 @@ def _staged_row_to_dict(r) -> dict:
     d["studyMode"] = r.study_mode
     d["feeTerm"] = r.fee_term
     d["feeYear"] = r.fee_year
-    d["eligibilityStatus"] = r.eligibility_status
-    d["autoPublishStatus"] = r.auto_publish_status
-    d["eligibilityReason"] = r.eligibility_reason
-    d["eligibility_reason"] = r.eligibility_reason
+    # Issue 5: recompute completeness + eligibility live from the ORM row
+    # so the UI always reflects the current field state, not the stale
+    # value computed at staging time (e.g. description was NULL when staged
+    # but later populated by AI fallback or a re-run; the stored
+    # eligibility_reason would still say "Missing: description" even though
+    # the field is now filled).  The functions are pure CPU — no DB calls —
+    # so calling them here is cheap even for large list views.
+    try:
+        from app.services.scraper.completeness import compute_completeness, decide_eligibility
+        _comp = compute_completeness(r)
+        _dec = decide_eligibility(r, _comp)
+        d["completeness"] = _comp.score
+        d["completeness_score"] = _comp.score
+        d["eligibilityStatus"] = _dec.status
+        d["eligibility_status"] = _dec.status
+        d["eligibilityReason"] = _dec.reason
+        d["eligibility_reason"] = _dec.reason
+        d["autoPublishStatus"] = r.auto_publish_status  # not recomputed (needs DB)
+    except Exception:
+        # Defensive fallback: surface stored values if recompute fails.
+        d["eligibilityStatus"] = r.eligibility_status
+        d["autoPublishStatus"] = r.auto_publish_status
+        d["eligibilityReason"] = r.eligibility_reason
+        d["eligibility_reason"] = r.eligibility_reason
     # Normalise degree_level: the extractor writes "Bachelor's"/"Master's"
     # but the edit modal's Select only has "Bachelor"/"Master" as options,
     # so the dropdown showed empty.  Strip the possessive suffix here.

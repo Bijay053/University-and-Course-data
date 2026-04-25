@@ -1,0 +1,65 @@
+Ran T007 on CSU (university_id=4, study.csu.edu.au) and the result is fundamentally broken — different problem than ASA/VIT, please don't bundle with the 5 VIT follow-ups.
+
+**Result: 7 staged "courses", only 2 are real**
+
+```
+✓ Bachelor of Education (Primary)       — real course
+✓ Bachelor of Education (Secondary)     — real course
+✗ "Undergraduate"                       — nav section header
+✗ "Postgraduate"                        — nav section header
+✗ "Undergraduate certificates"          — category landing page
+✗ "Discover our Bachelor of Communication" — marketing CTA
+✗ "#2 in Australia for postgraduate starting salaries.* Our rankings" — marketing tagline from a rankings page
+```
+
+29% precision (2 of 7). The good ones got 38-62% completeness, the marketing ones got 23-38%. Total scrape: 1m 49s, 0 errors per the worker, but the data is garbage.
+
+**Root cause: discovery never finds the real course catalog**
+
+From the worker log:
+```
+[DISCOVER] Home page detected → course listing at https://study.csu.edu.au/courses (high-priority probe)
+[DISCOVER] classified https://study.csu.edu.au/courses: unknown (no course links or degree content detected)
+```
+
+The `/courses` URL is a SPA with a search/filter interface. Static HTML has no course links — they're loaded by JS after the user filters. Discovery saw no links, marked it `unknown`, fell through to BFS which then trawled nav pages, info-for pages, career-area pages, etc., and scraped whatever links it found there — mostly navigation and marketing.
+
+Real courses live under `https://study.csu.edu.au/courses/<slug>` (visible from the one that did get found: `/courses/bachelor-education-primary`), but the catalog index doesn't expose them statically.
+
+**Also: 20-second timeout on every page — 8/8 timeouts**
+
+```
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/why-charles-sturt/our-rankings
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/information-for/undergraduate-students
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/information-for/postgraduate-students
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/find-courses/short-courses/undergraduate-certificates
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/career-area/arts-communication/ba-communication
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/find-courses/short-courses/graduate-certificate
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/career-area/education-teaching/bachelor-of-education-secondary
+timeout: per-course browser exceeded 20s on https://study.csu.edu.au/courses/bachelor-education-primary
+```
+
+study.csu.edu.au is a heavy JS-rendered SPA. 20s isn't enough for first paint + content load. Note this is a DIFFERENT timeout than VIT's 30s — wonder why; please verify per-host config has CSU at 20s and whether that's intentional.
+
+**What I want from you:**
+
+Don't patch the existing discovery to band-aid this. CSU needs its own discovery strategy. Please diagnose:
+
+1. **How does CSU expose its course catalog?** Search the source HTML of `https://study.csu.edu.au/courses` and `https://study.csu.edu.au/find-courses` for: API endpoints (XHR/fetch calls), embedded JSON (`__NEXT_DATA__`, `window.__INITIAL_STATE__`), sitemap.xml, or course-list endpoints. CSU likely has a JSON API the SPA calls — if we can hit that directly we skip Playwright entirely.
+
+2. **What's the pattern for course URLs?** From the one that worked: `/courses/bachelor-education-primary`. Are there hundreds like this? Hit `https://study.csu.edu.au/sitemap.xml` (most large WordPress/Drupal sites have one) and grep for `/courses/` to count real course URLs. Also try `/sitemap_index.xml`, `/robots.txt`.
+
+3. **What's the right load strategy for SPA pages?** Either bump the per-host browser timeout for `study.csu.edu.au` to 45s+ AND wait for `networkidle`, OR find the JSON API and bypass browser entirely.
+
+4. **What about the junk URL filter from earlier PR (#5)?** `"Undergraduate"`, `"Postgraduate"`, `"#2 in Australia..."` should never have made it past the discovery URL filter — these aren't course-shaped URLs (`/information-for/postgraduate-students`, `/why-charles-sturt/our-rankings`). Either the filter regressed or it never covered these patterns. Check `_is_known_non_course_url` and `_JUNK_LAST_SEG_RE` from PR-5.
+
+**Diagnose first, propose plan, then code.** This is a CSU-specific architectural problem (SPA + JSON API + real catalog hidden behind JS). Quick patches will produce more garbage like the above. Worth doing properly because Torrens/UNSW/USyd will likely have the same SPA pattern — a CSU adapter is a template.
+
+**Don't ship this as a single PR.** Split into:
+- (a) Filter regression on `"Undergraduate"` / `"Postgraduate"` / nav text URLs (small)
+- (b) CSU JSON-API discovery adapter (medium)
+- (c) Per-host SPA timeout config (small)
+
+**Pausing T007 here.** Won't run Torrens/USQ/UTAS until CSU diagnosis is back. They might have similar SPA architecture and we'd just generate more garbage data.
+
+**ASA + VIT remain clean** — today's PR-6 is verified. This CSU finding is independent of PR-6 (it's exposing pre-existing discovery limitations, not a regression).

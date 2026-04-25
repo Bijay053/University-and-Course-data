@@ -52,6 +52,34 @@ log = logging.getLogger(__name__)
 # networkidle to SPAs that need it; default everyone else to fast
 # `domcontentloaded` with a tight 20s outer ceiling. Add new hosts
 # here when a regression sweep proves they need the slow path.
+# Issue 1: VIT /vocational/* pages embed a heavy third-party widget that
+# prevents networkidle from ever firing, causing every vocational URL to
+# sit for the full 30s outer ceiling (10 courses × 30s = 5min wall-time).
+# The VIT static fallback (vit_static_extract.py) rescues duration /
+# intakes / location from the same static HTML so the end result is fine
+# — we skip the browser pass entirely for these paths rather than wasting
+# the budget on a guaranteed timeout.
+_SKIP_BROWSER_PATH_PREFIXES: dict[str, tuple[str, ...]] = {
+    "vit.edu.au": ("/vocational/",),
+}
+
+
+def _skip_browser_for_url(url: str) -> bool:
+    """Return True for URLs where a host-specific static fallback is
+    sufficient and the browser pass is known to always time out."""
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        path = (parsed.path or "").lower()
+    except Exception:
+        return False
+    for h, prefixes in _SKIP_BROWSER_PATH_PREFIXES.items():
+        if host == h or host.endswith("." + h):
+            if any(path.startswith(p) for p in prefixes):
+                return True
+    return False
+
+
 _NETWORKIDLE_HOSTS: tuple[str, ...] = ("vit.edu.au",)
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
@@ -134,6 +162,22 @@ async def maybe_browser_refetch(
     identically to the "browser disabled" case.
     """
     if not _all_english_empty(payload):
+        return {}, [], None
+
+    # Issue 1: skip browser pass for paths where a static fallback is
+    # sufficient and the browser is known to always time out (e.g. VIT
+    # /vocational/* pages). Log a single info line so the sweep log is
+    # diagnostic without being noisy.
+    if _skip_browser_for_url(url):
+        log.info("per_course_browser: skipping browser pass for %s (static fallback sufficient)", url)
+        if emit:
+            await emit(
+                "status",
+                f"[per-course browser skipped] {url} — vocational static fallback",
+                phase="fallback",
+                kind="per_course_browser_skipped",
+                url=url,
+            )
         return {}, [], None
 
     if emit:
