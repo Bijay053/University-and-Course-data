@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowDown, ArrowUp, Plus, Trash2, RefreshCw } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
+import { SettingsTabs } from "@/components/settings-tabs";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -113,7 +114,11 @@ export default function SettingsAcademicLevels() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold">Academic Level Options</h1>
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
+      <SettingsTabs />
+      <div>
+        <h2 className="text-xl font-semibold">Academic Level Options</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Manage the dropdown list shown when adding or editing academic requirements. The order
           here controls the order in the dropdown.
