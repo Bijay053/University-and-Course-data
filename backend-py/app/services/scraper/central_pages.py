@@ -184,12 +184,34 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             (i for i, h in enumerate(header_cells) if any(k in h for k in ("domestic", "local", "resident"))),
             None,
         )
-        # Fall back: any column with a $ amount
-        fee_col = intl_col if intl_col is not None else dom_col
+        # KBS-style tables use "Subject fee" (per trimester) and "Course fee"
+        # (total program fee) instead of "International"/"Domestic" headers.
+        # Prefer the total-course-fee column as the primary fee value; fall
+        # back to per-unit if that's all that's available.
+        total_col = next(
+            (i for i, h in enumerate(header_cells)
+             if any(k in h for k in ("course fee", "total fee", "program fee", "full fee", "total cost"))),
+            None,
+        )
+        unit_col = next(
+            (i for i, h in enumerate(header_cells)
+             if any(k in h for k in ("subject fee", "unit fee", "per subject", "per unit"))),
+            None,
+        )
+
+        # Column priority: explicit intl > total-course > per-unit > domestic > scan-all
+        primary_fee_col = intl_col if intl_col is not None else (
+            total_col if total_col is not None else (
+                unit_col if unit_col is not None else None
+            )
+        )
 
         # Sniff the per-term from the header row text.
         header_text = " ".join(header_cells)
         per_term = _infer_per_term(header_text)
+        # KBS "Subject fee" implies trimester; "Course fee" implies total program
+        if unit_col is not None and intl_col is None and total_col is None:
+            per_term = per_term or "trimester"
 
         for row in rows[1:]:
             cells = row.find_all(["td", "th"])
@@ -210,12 +232,12 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             intl_fee: float | None = None
             dom_fee: float | None = None
 
-            if intl_col is not None and intl_col < len(cell_texts):
-                intl_fee = _parse_fee_amount(cell_texts[intl_col])
+            if primary_fee_col is not None and primary_fee_col < len(cell_texts):
+                intl_fee = _parse_fee_amount(cell_texts[primary_fee_col])
             if dom_col is not None and dom_col < len(cell_texts):
                 dom_fee = _parse_fee_amount(cell_texts[dom_col])
 
-            # If only one fee column exists, try all remaining cells.
+            # If primary column had no fee, scan remaining cells left-to-right.
             if intl_fee is None and dom_fee is None:
                 for ct in cell_texts[prog_col + 1:]:
                     v = _parse_fee_amount(ct)
@@ -349,24 +371,49 @@ def _is_soft_404(html: str | None) -> bool:
     return "page not found" in lowered or "404" in lowered[:500]
 
 
-async def _fetch_with_browser_fallback(url: str) -> str | None:
-    """Fetch a central page, preferring Playwright so JS-rendered content is visible.
+def _html_has_fee_signal(html: str | None) -> bool:
+    """Return True when the HTML contains at least one plausible fee amount.
 
-    Strategy:
-    1. Try Playwright (JS-rendered, handles SPAs like KBS).  Central pages are
-       fetched only ONCE per scrape job so the browser-spin cost is negligible.
-    2. If Playwright is unavailable (e.g. unit-test environment without a
-       Celery worker), fall back to plain HTTP.
-    3. If both return a soft-404, return whatever was retrieved so callers can
-       decide whether to surface a warning.
+    Used to decide whether a plain-HTTP response is rich enough that we
+    don't need to spin up a Playwright browser for the central fee page.
+    A page with even 3 dollar-sign occurrences almost certainly has a fee
+    table in its static HTML.
     """
-    # ── Playwright first ────────────────────────────────────────────────────
+    if not html:
+        return False
+    return len(_CURRENCY_RE.findall(html)) >= 3
+
+
+async def _fetch_with_browser_fallback(url: str) -> str | None:
+    """Fetch a central page, trying plain HTTP first and Playwright as fallback.
+
+    Strategy (HTTP-first, revised from Playwright-first):
+    1. Plain HTTP — fast, no browser overhead. The vast majority of central
+       fee pages (KBS /international-fees, USyd handbook, UNSW handbook, ANU)
+       serve fee tables as static HTML.  If the HTTP response already contains
+       fee signals (≥3 currency amounts), return it immediately.
+    2. Playwright fallback — used only when HTTP returns a JS-shell (no fee
+       signals detected). Adds ~4 s latency but handles true SPAs.
+
+    Never raises — callers always receive either HTML or None.
+    """
+    # ── 1. Plain HTTP ────────────────────────────────────────────────────────
+    try:
+        html = await fetch_html(url)
+        if _html_has_fee_signal(html):
+            log.info("central_pages: HTTP fetch has fee signals for %s (%d chars)", url, len(html or ""))
+            return html
+        log.info("central_pages: HTTP fetch returned no fee signals for %s — trying browser", url)
+    except Exception as exc:
+        log.warning("central_pages: HTTP fetch failed for %s: %s", url, exc)
+        html = None
+
+    # ── 2. Playwright fallback ───────────────────────────────────────────────
     try:
         from app.services.scraper.browser_pool import pool as browser_pool
 
         async with browser_pool.page() as page:
             await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
-            # Give XHR/React hydration time to paint the real content.
             await page.wait_for_timeout(3_000)
             rendered = await page.content()
             if rendered and len(rendered) > 1000:
@@ -375,9 +422,8 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
     except Exception as exc:
         log.warning("central_pages: browser fetch failed for %s: %s", url, exc)
 
-    # ── HTTP fallback ────────────────────────────────────────────────────────
-    log.info("central_pages: falling back to plain HTTP for %s", url)
-    return await fetch_html(url)
+    # Return whatever HTTP gave us (may be a JS shell, parser will just find 0 records)
+    return html
 
 
 # ---------------------------------------------------------------------------
@@ -493,6 +539,155 @@ async def prefetch_central_pages(
                 )
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Auto-discovery: find a central fee URL from sampled course pages
+# ---------------------------------------------------------------------------
+
+# URL path fragments that strongly suggest a centralized fee schedule.
+# Ordered from most-specific to most-generic.
+_FEE_URL_PATHS = (
+    "/international-fees",
+    "/fees/international",
+    "/tuition-fees/international",
+    "/international-tuition",
+    "/admissions/fees",
+    "/fees/fee-schedule",
+    "/fee-schedule",
+    "/tuition-fees",
+    "/fees",
+    "/tuition",
+    "/costs",
+    "/study-costs",
+)
+
+# Anchor text snippets that suggest a link leads to a fee page.
+_FEE_ANCHOR_TEXT = (
+    "international fees",
+    "international tuition",
+    "tuition fees",
+    "fee schedule",
+    "view all fees",
+    "course fees",
+    "program fees",
+    "study costs",
+)
+
+
+def _extract_fee_link_candidates(html: str, base_domain: str) -> list[str]:
+    """Extract anchor hrefs from *html* that look like centralized fee pages.
+
+    Only returns same-domain URLs (prevents picking up CRICOS or government
+    fee-comparison sites).  Normalises relative hrefs to absolute URLs using
+    *base_domain* (e.g. ``"https://www.kbs.edu.au"``).
+    """
+    try:
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin, urlparse
+    except ImportError:
+        return []
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return []
+
+    parsed_base = urlparse(base_domain)
+    base_netloc = parsed_base.netloc.lower()
+
+    candidates: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href: str = (a.get("href") or "").strip()
+        if not href or href.startswith(("#", "mailto:", "tel:")):
+            continue
+
+        # Resolve relative URLs.
+        abs_url = urljoin(base_domain, href)
+        parsed = urlparse(abs_url)
+
+        # Same-domain check.
+        if parsed.netloc.lower() != base_netloc:
+            continue
+
+        path = parsed.path.lower()
+        anchor_text = a.get_text(" ", strip=True).lower()
+
+        # Path-based signal.
+        path_match = any(path.endswith(fragment) or fragment in path for fragment in _FEE_URL_PATHS)
+        # Anchor-text signal.
+        text_match = any(token in anchor_text for token in _FEE_ANCHOR_TEXT)
+
+        if path_match or text_match:
+            # Normalise: drop query strings and fragments, keep path only.
+            clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+            candidates.append(clean)
+
+    return candidates
+
+
+def _fee_url_specificity(url: str) -> int:
+    """Tiebreaker score: higher = more likely to be the international fee page.
+
+    Used when multiple candidate URLs tie on vote count so that
+    ``/admissions/fees/international-fees`` wins over ``/admissions/fees``.
+    """
+    from urllib.parse import urlparse
+    path = urlparse(url).path.lower()
+    score = 0
+    if "international" in path:
+        score += 10   # highest signal — explicitly for international students
+    if "fee" in path:
+        score += 5
+    score += len(path) // 10  # longer, more-specific paths preferred
+    return score
+
+
+async def discover_fee_url_from_course_pages(
+    course_urls: list[str],
+    base_domain: str,
+    *,
+    max_pages: int = 5,
+) -> str | None:
+    """Sample up to *max_pages* course pages and vote for the most-cited fee URL.
+
+    Uses plain HTTP only (fast, no browser spin-up). Returns the URL that
+    appears most frequently across the sampled pages, or ``None`` when no
+    fee-link candidates are found.
+
+    Each page casts at most one vote per unique candidate URL (deduplication
+    within the page) so a single nav bar can't inflate counts.  When multiple
+    URLs tie on vote count, ``_fee_url_specificity`` breaks the tie in favour
+    of paths containing "international".
+
+    Called by the orchestrator BEFORE ``prefetch_central_pages`` when
+    ``scrape_config.uniPages.feePage`` is not manually configured.
+    """
+    from collections import Counter
+
+    votes: Counter[str] = Counter()
+    sample = course_urls[:max_pages]
+
+    for url in sample:
+        try:
+            html = await fetch_html(url)
+            if html:
+                found = _extract_fee_link_candidates(html, base_domain)
+                # Deduplicate within a single page so nav bars don't inflate counts.
+                votes.update(set(found))
+        except Exception as exc:
+            log.debug("discover_fee_url: fetch failed for %s: %s", url, exc)
+
+    if not votes:
+        return None
+
+    # Primary sort: vote count descending; secondary: specificity descending.
+    winner = max(votes.keys(), key=lambda u: (votes[u], _fee_url_specificity(u)))
+    log.info(
+        "central_pages: auto-discovered fee URL '%s' (votes=%d from %d pages, specificity=%d)",
+        winner, votes[winner], len(sample), _fee_url_specificity(winner),
+    )
+    return winner
 
 
 # ---------------------------------------------------------------------------

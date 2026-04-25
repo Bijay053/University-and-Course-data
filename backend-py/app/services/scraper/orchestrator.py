@@ -441,10 +441,39 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ['entryPage'] ONCE before the course loop, cache results in memory for
         # the duration of this job.  Universities like KBS publish fees and IELTS
         # requirements on a single central page rather than per course.
+        #
+        # Auto-discovery: if no feePage is manually configured in scrape_config,
+        # sample a few discovered course pages and vote for the most-cited fee
+        # URL (anchor-text + path heuristics).  Inject the winner into a local
+        # copy of scrape_config so prefetch_central_pages can fetch it.
         central_data: dict | None = None
         try:
-            from app.services.scraper.central_pages import prefetch_central_pages
-            central_data = await prefetch_central_pages(uni_scrape_config, emit=emit)
+            from app.services.scraper.central_pages import (
+                discover_fee_url_from_course_pages,
+                prefetch_central_pages,
+            )
+
+            effective_config = dict(uni_scrape_config or {})
+            has_fee_page = bool(
+                (effective_config.get("uniPages") or {}).get("feePage")
+            )
+            if not has_fee_page and links:
+                course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
+                base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
+                discovered = await discover_fee_url_from_course_pages(
+                    course_sample, base_domain
+                )
+                if discovered:
+                    await emit(
+                        "status",
+                        f"[CENTRAL] auto-discovered fee page: {discovered}",
+                        phase="discover",
+                        kind="central_fee_discovered",
+                        url=discovered,
+                    )
+                    effective_config.setdefault("uniPages", {})["feePage"] = discovered
+
+            central_data = await prefetch_central_pages(effective_config, emit=emit)
         except Exception as exc:  # noqa: BLE001
             log.warning("central_pages prefetch failed: %s", exc)
             central_data = None

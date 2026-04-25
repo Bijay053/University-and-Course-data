@@ -257,6 +257,12 @@ def should_stage_course(
 
     # Bug B: no international fee after all extraction is done.
     if payload.get("international_fee") is None:
+        # If the university has a centralized fee page configured, the course
+        # may still be open to international students even though the fee
+        # wasn't found in the central table (e.g. a new program not yet listed).
+        # Stage for human review instead of auto-rejecting.
+        if payload.get("has_central_fee_page"):
+            return (True, "accepted")
         return (False, "no_international_fee")
 
     # Bug C: online-only delivery.

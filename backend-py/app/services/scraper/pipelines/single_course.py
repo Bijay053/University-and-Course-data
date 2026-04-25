@@ -683,6 +683,13 @@ async def extract_course(
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)
 
+        # Signal to the staging gate that this university has a centralized fee
+        # page.  Even if this specific course wasn't listed in the table, the
+        # course may still be open to international students — the staging gate
+        # should stage it for human review rather than auto-rejecting it.
+        if central_data.get("fee_page_url"):
+            payload["has_central_fee_page"] = True
+
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The
     # Review table's Category column reads scraped_courses.category; without
