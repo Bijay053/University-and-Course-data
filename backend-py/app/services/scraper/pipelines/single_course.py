@@ -44,55 +44,18 @@ log = logging.getLogger(__name__)
 _AI_FALLBACK_TIMEOUT_SEC = 120
 
 
-# PR-5 Bug 1: when the per-course extractors and AI fallback BOTH fail to
-# fill the english slots and we drop into the uni-level PDF backfill,
-# the PDF publishes a single english tier (typically the bachelor floor).
-# Stamping that tier on every course gives masters identical IELTS/PTE/
-# TOEFL to bachelors — wrong on virtually every Australian provider
-# (prod sweep job_8af4a..., 9/9 ASA courses staged with IELTS=6.0
-# regardless of degree level). Bump the value when the recipient is a
-# postgrad course.
-_POSTGRAD_TOKENS = (
-    "master",
-    "postgraduate",
-    "doctor",
-    "phd",
-    "graduate certificate",
-    "graduate diploma",
-)
-
-
-def _is_postgraduate(payload: dict[str, Any]) -> bool:
-    """Return True when the payload describes a postgrad course.
-
-    Checks ``degree_level`` first (set by the degree_level extractor),
-    falling back to course-name pattern-match for cases where the
-    extractor failed. Mirrors :func:`sibling_cache._bucket_for` semantics
-    intentionally so the two stages bucket consistently.
-    """
-    lvl = (payload.get("degree_level") or "").lower()
-    if any(t in lvl for t in _POSTGRAD_TOKENS):
-        return True
-    name = (payload.get("course_name") or "").lower()
-    return any(t in name for t in ("master of", "doctor of", "phd ", "graduate diploma", "graduate certificate"))
-
-
-def _postgrad_english_bump(slot: str, value: Any) -> Any:
-    """Return the postgrad-adjusted english value for a uni-PDF backfill.
-
-    +0.5 IELTS / +5 TOEFL / +5 PTE is the typical delta most Australian
-    providers publish between bachelor and masters minimums. Cambridge
-    Advanced English overall is left untouched (most providers don't
-    move it across degree levels). Returns the input unchanged when the
-    value isn't numeric or the slot isn't one we know how to bump.
-    """
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        return value
-    if slot == "ielts_overall":
-        return round(float(value) + 0.5, 1)
-    if slot in ("toefl_overall", "pte_overall"):
-        return value + 5
-    return value
+# PR-5 Bug 1 was a postgrad-IELTS bump heuristic against the uni-PDF
+# backfill — REVERTED. The bump masked the real problem: course-page
+# english data is sometimes a screenshot image (e.g. ASA Bachelor of
+# Business publishes the english table as PNG only), so the per-course
+# extractor fills nothing and the uni-PDF backfill — which holds a
+# single bachelor-tier value — gets stamped on every course. Bumping by
+# +0.5 IELTS made masters look plausible without being correct (real
+# masters minimums vary 6.0–7.5 by program). The course-page-wins
+# precedence is already enforced (this function and sibling_cache both
+# skip if the slot is non-empty). The right fix lives elsewhere: OCR
+# the image, parse a per-degree-level PDF, or surface the gap as
+# "needs review" rather than synthesising a number.
 
 
 def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any]) -> None:
@@ -475,21 +438,22 @@ async def extract_course(
                         "snippet": fees_pdf_url,
                     }
                 )
-        # PR-5 Bug 1: bump uni-PDF english values for postgrad courses so
-        # masters don't inherit the bachelor english floor verbatim.
-        is_pg = _is_postgraduate(payload)
+        # Course-page-wins: only fill empty english slots from the
+        # uni-PDF backfill. The PDF's value gets stored verbatim — no
+        # bump or other heuristic. If the PDF only publishes a bachelor
+        # tier, masters courses end up with that tier; that's a known
+        # gap to be solved upstream (per-degree-level PDF parsing or
+        # OCR of course-page screenshots), NOT by guessing here.
         for k, v in english_block.items():
             if v is None or k in payload:
                 continue
-            stored = _postgrad_english_bump(k, v) if is_pg else v
-            payload[k] = stored
+            payload[k] = v
             evidence.append(
                 {
                     "field_key": k,
-                    "value": stored,
+                    "value": v,
                     "confidence": 0.7,
-                    "method": "uni_pdf:requirements"
-                    + (":postgrad_bumped" if is_pg and stored != v else ""),
+                    "method": "uni_pdf:requirements",
                     "snippet": reqs_pdf_url,
                 }
             )

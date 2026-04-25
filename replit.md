@@ -596,29 +596,61 @@ parity, completeness). Total: 75 passing.
 - `detect_course_listing_page` Step-3 GET-content fallback
   (`scrape.ts:7071-7077`) for hosts that reject HEAD but serve GET.
 
-**PR-5 ASA/Torrens regression sweep (in flight, NOT pushed):**
-- Bug 1 (postgrad IELTS bump): `pipelines/single_course.py` bumps
-  IELTS/PTE/TOEFL by 0.5 / 5 / 5 for postgrad payloads (Cambridge
-  unchanged). 9 unit tests in `test_postgrad_english_bump.py`.
-- Bug 2 (study_mode 3-tuple): `extractors/study_mode.py` returns
-  `ExtractionResult(value, confidence, evidence)`; 22 tests cover
-  label-priority, blended-vs-online, low-confidence bare "online".
-- Bug 3 (per-host browser config): `per_course_browser._browser_config_for`
-  returns `(wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)`.
-  Default 20s/15s ceiling (was 60s); VIT keeps 30s/25s for SPA hydration.
-  `browser_pool.fetch_html` catches Playwright `TimeoutError` ONLY and
-  falls back to `page.content()` with 1024-byte floor + Chromium
-  error-page sniff (`neterror`, `chrome-error://`, `ERR_*`). 9+4 tests.
-- Bug 4 (nav/news URL filter): `discovery._is_known_non_course_url` +
-  `_JUNK_LAST_SEG_RE` reject `/stories/`, `/news/`, `/blog/`,
-  `/studying-with-us/`, `/about/`, `/research/`, plus last-segment
-  suffixes (`-events`, `-scholarships`, `-jobs`, …). Wired into
-  `_looks_like_course`. 16 unit tests in `test_discovery_filters.py`.
-- Bug 5 (category-landing drill-in): `discovery._is_category_landing`
-  detects `/courses/{single-segment-without-degree-qualifier}` shapes
-  on `courses/programs/programmes/degrees/study` bases. BFS legacy
-  sweep enqueues these at `depth<2` so the 11 Torrens category pages
-  expand into 152 real courses instead of 22.
+**PR-5 ASA/Torrens regression sweep (status after owner review):**
+
+Owner verdict on the five-bug PR-5: ship Bug 3 alone as PR-5. Bugs 1
+and 2 fixes were rejected as "papering over" the real issue. Bugs 4
+and 5 partially address Torrens but need additional work (real
+catalogue discovery + cross-page nav dedup) before they can land.
+
+- Bug 1 (postgrad IELTS bump) — **REVERTED.** Owner correctly
+  identified the bump as a heuristic that masks the real problem.
+  Diagnosis: `sibling_cache.py:148-152` and `single_course.py` uni-PDF
+  backfill both already enforce course-page-wins (skip-if-set). The
+  ASA Bachelor of Business page publishes its english requirements as
+  a screenshot PNG (`Screenshot%202026-01-19%20104316.png`), so the
+  per-course extractor fills nothing → uni-PDF backfill fires
+  correctly → bachelor-tier value gets stamped on every course
+  including masters. Right fix lives upstream: OCR the screenshot,
+  per-degree-level PDF parsing, or surface the gap as needs-review.
+  `_postgrad_english_bump`, `_is_postgraduate`, `_POSTGRAD_TOKENS`
+  removed from `pipelines/single_course.py`; backfill loop restored to
+  store PDF value verbatim. `test_postgrad_english_bump.py` deleted.
+- Bug 2 (study_mode bare-online confidence 0.5) — **DIAGNOSED, FIX
+  PENDING.** Owner correctly noted lowered confidence is meaningless
+  without a downstream consumer. ASA HTML diagnosis: course page has
+  literal `<strong>Delivery</strong> Face to Face on campus` and
+  `<strong>Location</strong> Sydney, Online` in adjacent
+  `course-header-text` divs. Extractor reads "Online" from the
+  Location field and ignores the explicit Delivery label. Right fix:
+  parse the sibling-div label/value pattern so an explicit
+  `Delivery: Face to Face on campus` beats any keyword match in other
+  fields. The 3-tuple `ExtractionResult` plumbing stays (it's neutral
+  scaffolding); the bare-online confidence change can be removed once
+  the proper Delivery-label extractor lands.
+- Bug 3 (per-host browser config) — **APPROVED, READY TO SHIP.**
+  `_browser_config_for` returns `(wait_until, settle_ms,
+  outer_timeout_sec, goto_timeout_ms)`. Default 20s/15s (was 60s);
+  VIT keeps 30s/25s for SPA hydration. `browser_pool.fetch_html`
+  catches Playwright `TimeoutError` ONLY and falls back to
+  `page.content()` with 1024-byte floor + Chromium error-page sniff
+  (`neterror`, `chrome-error://`, `ERR_*`). 9 + 4 + 2 unit tests.
+  This is what gets pushed as the standalone PR-5.
+- Bug 4 (nav/news URL filter) — **PARTIAL.** Implemented:
+  `discovery._is_known_non_course_url` + `_JUNK_LAST_SEG_RE` reject
+  `/stories/`, `/news/`, `/blog/`, `/studying-with-us/`, `/about/`,
+  `/research/`, plus last-segment suffixes (`-events`,
+  `-scholarships`, `-jobs`, …). Wired into `_looks_like_course`. 16
+  tests. Still missing per owner: cross-page nav dedup ("if same 11
+  links appear on 25 crawled pages, those are nav, not courses").
+- Bug 5 (category-landing drill-in) — **PARTIAL.** Implemented:
+  `discovery._is_category_landing` detects
+  `/courses/{single-segment-without-degree-qualifier}` shapes on
+  `courses/programs/programmes/degrees/study` bases. BFS legacy
+  sweep enqueues these at `depth<2`. Still missing per owner: locate
+  the actual Torrens course directory (152 real courses) — current
+  drill-in alone won't surface them if they live behind a different
+  URL pattern.
 - Evidence Review API fix (LANDED in `routers/scrape.py`):
   `_attach_evidence_bulk` loads evidence with a single
   `WHERE scraped_course_id = ANY(:ids)` query and attaches camelCase
