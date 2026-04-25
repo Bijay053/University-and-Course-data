@@ -47,26 +47,41 @@ log = logging.getLogger(__name__)
 # Celery worker (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min,
 # zero log output). asyncio.wait_for is unconditional: if the wrapped
 # coroutine doesn't return within the budget, it gets cancelled and we
-# move on. 60s comfortably covers a real slow-but-working SPA page
-# (Akamai + networkidle + 3s settle + content + teardown ≈ 12–25s
-# typical) while bounding worst-case at one fallback attempt per
-# course. Bumped from 45 → 60 in PR-1.5 alongside the wait-strategy
-# upgrade below — prod regression on VIT showed every per-course
-# browser pass extracting empty data because the table hydrated AFTER
-# the load event. networkidle + a 3s settle catches the post-load XHR.
+# move on.
 _BROWSER_FETCH_TIMEOUT_SEC = 60
-# Tell Playwright to wait for the network to go idle (≥500ms with no
-# in-flight requests) instead of bailing at domcontentloaded. SPAs
-# render the english requirements <table> via an XHR after DCL fires;
-# without networkidle we grab the skeleton HTML and english_test.extract
-# returns nothing (PR-1.5 prod regression: VIT MBA pages staged with
-# IELTS/PTE/TOEFL/CAE all empty on 23/24 URLs).
-_BROWSER_WAIT_UNTIL = "networkidle"
-# Extra static wait after the load event. Some pages hydrate after
-# networkidle has fired (animation-driven reveal, intersection-observer
-# lazy-load on a tab/accordion). 3s is enough to catch a one-shot
-# hydration without doubling the per-course budget.
-_BROWSER_SETTLE_MS = 3000
+
+# PR-5 Bug 3: per-host wait_until config. PR-1.5 made `networkidle` the
+# universal default to fix VIT's SPA hydration (the english <table>
+# rendered via XHR after DCL fired, so the cheap path saw an empty
+# skeleton). But ASA / Torrens / similar marketing sites embed
+# long-poll widgets (Intercom, Hotjar, GA stream) that prevent the
+# network from EVER going idle, so every per-course browser hit on
+# those hosts ate the full 60s budget and timed out (prod sweep
+# job_8af4a..., 9/9 ASA URLs hit `timeout: per-course browser
+# exceeded 60s`). Allow-list networkidle behavior to the SPA hosts that
+# actually need it; default everyone else to fast `domcontentloaded`.
+# Add new hosts here when a regression sweep proves they need it.
+_NETWORKIDLE_HOSTS: tuple[str, ...] = ("vit.edu.au",)
+_NETWORKIDLE_SETTLE_MS = 3000
+_DEFAULT_SETTLE_MS = 1500
+
+
+def _browser_config_for(url: str) -> tuple[str, int]:
+    """Return (wait_until, settle_ms) for the given URL.
+
+    Hosts in :data:`_NETWORKIDLE_HOSTS` get the slow-but-thorough
+    `networkidle` + 3s settle. Everyone else gets `domcontentloaded` +
+    1.5s settle so a hung XHR widget can't wedge the whole 60s budget.
+    """
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        host = ""
+    if any(host == h or host.endswith("." + h) for h in _NETWORKIDLE_HOSTS):
+        return "networkidle", _NETWORKIDLE_SETTLE_MS
+    return "domcontentloaded", _DEFAULT_SETTLE_MS
+
+
 # The four slot keys we care about — IELTS overall, PTE overall, TOEFL
 # overall, Cambridge Advanced English overall. If any of these are
 # already populated we skip the browser pass entirely (the page DID
@@ -117,12 +132,13 @@ async def maybe_browser_refetch(
             kind="per_course_browser_start",
             url=url,
         )
+    wait_until, settle_ms = _browser_config_for(url)
     try:
         rendered = await asyncio.wait_for(
             browser_pool.fetch_html(
                 url,
-                wait_until=_BROWSER_WAIT_UNTIL,
-                settle_ms=_BROWSER_SETTLE_MS,
+                wait_until=wait_until,
+                settle_ms=settle_ms,
                 click_international=_needs_international_toggle(url),
             ),
             timeout=_BROWSER_FETCH_TIMEOUT_SEC,

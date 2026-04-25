@@ -1,0 +1,49 @@
+Torrens regression test (university_id=3) found 2 NEW bugs on top of the 3 from ASA. T007 is now blocked on 5 distinct prod bugs. Stop pushing code until at least bugs 3, 4, 5 are fixed.
+
+**Bug 4: Discovery treating non-course pages as courses**
+
+Torrens scrape staged 22 "courses" but most aren't courses at all. Examples from the log:
+- "Design" → https://www.torrens.edu.au/courses/design (category landing page)
+- "Health" → /courses/health (category)
+- "Business" → /courses/business (category)
+- "Hospitality", "Technology", "Education", "English language", "Higher Degrees by Research" — all categories
+- "Download a course guide" → /courses/course-guides (navigation page)
+- "Undergraduate courses" → /studying-with-us/study-options/undergraduate-courses (nav)
+- "Postgraduate courses" → /studying-with-us/study-options/postgraduate-courses (nav)
+- "Torrens University's MBA program ranked top 10 globally" → /stories/newsroom/business/... (NEWS ARTICLE)
+
+The discovery classifier is keeping nav, category, and news pages. The same 11 links keep showing up across 25 different crawled pages because they're the SITE NAV, not course links:
+```
+[DISCOVER] classified .../why-study-with-us/student-showcase: listing (11 course links found)
+[DISCOVER] classified .../student-support/success-coaches: listing (11 course links found)
+```
+
+Classifier needs to: (a) detect when a "listing" is actually the site nav by deduping links it sees on every page, (b) strip URLs matching `/stories/`, `/studying-with-us/`, `/courses/{single-word}` (category landings).
+
+**Bug 5: Found 22, Torrens actually has 152 courses**
+
+The real course list is at https://www.torrens.edu.au/courses but the page-level course catalogue isn't being reached. Scraper's BFS hits navigation pages and never drills into the actual course directory.
+
+Either: (a) Torrens needs a host-specific course list URL (like VIT's `/course-list`), or (b) the listing classifier needs to follow course-detail links from the proper /courses page rather than treating /courses/design as a leaf course.
+
+User confirmation: "there are 152 courses in total overall" — we're missing 130.
+
+**Bug 3 confirmed global, not VIT-only**
+
+Every Torrens URL hits `timeout: per-course browser exceeded 60s — moving on`. Same as ASA. The networkidle wait introduced in PR-1.5 hot-fix #1 (for VIT SPA) is hanging on every other site that doesn't reach networkidle. We need:
+- `domcontentloaded` as default `wait_until`
+- networkidle as opt-in for hosts that need it (VIT, maybe a couple others)
+- 15-20s timeout, not 60s
+- After timeout, take whatever HTML rendered and continue — don't bail entirely
+
+**Recap of all 5 bugs**
+
+1. Sibling-cache / PDF stamping same English scores on every course (ASA) — course page must win
+2. study_mode misclassified as Online when course page says On Campus (ASA)
+3. networkidle timeout firing 100% on non-VIT sites (ASA, Torrens, likely all others)
+4. Discovery classifier treating nav/category/news pages as courses (Torrens, possibly all)
+5. Discovery missing actual course pages — only finding 22/152 on Torrens
+
+**Stopping T007 here.** USQ, CSU, UTAS not tested yet. They almost certainly hit Bug 3 and probably Bugs 4+5 too. Fixing 3+4+5 is the priority — those are blocking the entire scraper, not just one university.
+
+PR-4 itself remains verified clean on VIT. These bugs are pre-existing in the discovery + browser layers, not regressions from PR-4.

@@ -11,7 +11,7 @@ from app.services.scraper.extractors import study_mode
 
 
 def _classify(text: str) -> str | None:
-    out, _ = study_mode.classify_study_mode(text)
+    out, _, _ = study_mode.classify_study_mode(text)
     return out
 
 
@@ -205,7 +205,7 @@ def test_bare_blended_marketing_copy_does_not_default_to_blended():
         "Mixed cohort sizes keep classes engaging.",
         "VIT offers a blended community of local and international students.",
     ):
-        out, _ = classify_study_mode(txt)
+        out, _, _ = classify_study_mode(txt)
         assert out is None, (
             f"PR-1.5 regression: marketing copy should NOT classify as Blended.\n"
             f"  text: {txt!r}\n  got:  {out!r}"
@@ -223,8 +223,54 @@ def test_blended_with_delivery_noun_still_classifies_as_blended():
         "Hybrid mode supports both in-person and remote study.",
         "Blended format suits working professionals.",
     ):
-        out, _ = classify_study_mode(txt)
+        out, _, _ = classify_study_mode(txt)
         assert out == "Blended", (
             f"tightened pattern broke a real blended signal.\n"
             f"  text: {txt!r}\n  got:  {out!r}"
         )
+
+
+# ──────────────────────────────────────────────────────────────────
+# PR-5 Bug 2: bare `\bonline\b` is the noisy fallback. When it matches
+# we should still surface the result, but with confidence=0.5 so any
+# location-derived / PDF-derived "On Campus" signal can outrank it
+# downstream. Authoritative signals (label, multi-keyword pattern, %
+# online + on-campus) keep the original 0.7.
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_bare_online_returns_low_confidence():
+    from app.services.scraper.extractors.study_mode import classify_study_mode
+    # Page text that ONLY contains the bare `online` token (typical
+    # marketing/footer copy on ASA-style sites). Should classify as
+    # Online but with the low-confidence flag.
+    out, _, conf = classify_study_mode(
+        "Visit our online portal to track your application status."
+    )
+    assert out == "Online"
+    assert conf == 0.5
+
+
+def test_authoritative_signals_keep_high_confidence():
+    from app.services.scraper.extractors.study_mode import classify_study_mode
+    for txt, expected in (
+        ("Mode of study: On Campus", "On Campus"),  # label path
+        ("Fully online course delivery", "Online"),  # explicit-keyword path
+        ("on-campus delivery", "On Campus"),  # explicit-keyword path
+    ):
+        out, _, conf = classify_study_mode(txt)
+        assert out == expected, f"text={txt!r} expected={expected!r} got={out!r}"
+        assert conf == 0.7, (
+            f"text={txt!r} should be authoritative (0.7) but got conf={conf!r}"
+        )
+
+
+def test_extract_propagates_low_confidence_for_bare_online():
+    out = asyncio.run(
+        study_mode.extract(
+            "<p>Visit our online portal for more info.</p>", "https://e/x"
+        )
+    )
+    assert len(out) == 1
+    assert out[0].value == "Online"
+    assert out[0].confidence == 0.5

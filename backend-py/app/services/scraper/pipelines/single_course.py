@@ -44,6 +44,57 @@ log = logging.getLogger(__name__)
 _AI_FALLBACK_TIMEOUT_SEC = 120
 
 
+# PR-5 Bug 1: when the per-course extractors and AI fallback BOTH fail to
+# fill the english slots and we drop into the uni-level PDF backfill,
+# the PDF publishes a single english tier (typically the bachelor floor).
+# Stamping that tier on every course gives masters identical IELTS/PTE/
+# TOEFL to bachelors — wrong on virtually every Australian provider
+# (prod sweep job_8af4a..., 9/9 ASA courses staged with IELTS=6.0
+# regardless of degree level). Bump the value when the recipient is a
+# postgrad course.
+_POSTGRAD_TOKENS = (
+    "master",
+    "postgraduate",
+    "doctor",
+    "phd",
+    "graduate certificate",
+    "graduate diploma",
+)
+
+
+def _is_postgraduate(payload: dict[str, Any]) -> bool:
+    """Return True when the payload describes a postgrad course.
+
+    Checks ``degree_level`` first (set by the degree_level extractor),
+    falling back to course-name pattern-match for cases where the
+    extractor failed. Mirrors :func:`sibling_cache._bucket_for` semantics
+    intentionally so the two stages bucket consistently.
+    """
+    lvl = (payload.get("degree_level") or "").lower()
+    if any(t in lvl for t in _POSTGRAD_TOKENS):
+        return True
+    name = (payload.get("course_name") or "").lower()
+    return any(t in name for t in ("master of", "doctor of", "phd ", "graduate diploma", "graduate certificate"))
+
+
+def _postgrad_english_bump(slot: str, value: Any) -> Any:
+    """Return the postgrad-adjusted english value for a uni-PDF backfill.
+
+    +0.5 IELTS / +5 TOEFL / +5 PTE is the typical delta most Australian
+    providers publish between bachelor and masters minimums. Cambridge
+    Advanced English overall is left untouched (most providers don't
+    move it across degree levels). Returns the input unchanged when the
+    value isn't numeric or the slot isn't one we know how to bump.
+    """
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return value
+    if slot == "ielts_overall":
+        return round(float(value) + 0.5, 1)
+    if slot in ("toefl_overall", "pte_overall"):
+        return value + 5
+    return value
+
+
 def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any]) -> None:
     """Translate AI's `duration_value` / `duration_unit` keys into the
     canonical `duration` / `duration_term` keys used by the staged-course
@@ -424,16 +475,21 @@ async def extract_course(
                         "snippet": fees_pdf_url,
                     }
                 )
+        # PR-5 Bug 1: bump uni-PDF english values for postgrad courses so
+        # masters don't inherit the bachelor english floor verbatim.
+        is_pg = _is_postgraduate(payload)
         for k, v in english_block.items():
             if v is None or k in payload:
                 continue
-            payload[k] = v
+            stored = _postgrad_english_bump(k, v) if is_pg else v
+            payload[k] = stored
             evidence.append(
                 {
                     "field_key": k,
-                    "value": v,
+                    "value": stored,
                     "confidence": 0.7,
-                    "method": "uni_pdf:requirements",
+                    "method": "uni_pdf:requirements"
+                    + (":postgrad_bumped" if is_pg and stored != v else ""),
                     "snippet": reqs_pdf_url,
                 }
             )

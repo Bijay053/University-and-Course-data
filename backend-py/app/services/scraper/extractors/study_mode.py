@@ -158,8 +158,10 @@ def _classify_label_value(value: str) -> str | None:
     return None
 
 
-def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
-    """Return (study_mode, snippet).
+def classify_study_mode(
+    page_text: str,
+) -> tuple[str | None, str | None, float | None]:
+    """Return ``(study_mode, snippet, confidence)``.
 
     Order of operations:
 
@@ -178,6 +180,15 @@ def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
        tell them apart from purely in-person courses.
     3. Fall through to the labelled pattern set (Blended → Online →
        On Campus → bare "Online").
+
+    The third return is the confidence the extractor should attach to
+    the result. Authoritative paths (label, percent-online + on-campus,
+    explicit multi-keyword pattern) return 0.7. The bare-``\\bonline\\b``
+    fallback (last entry of :data:`_MODE_PATTERNS`) returns 0.5 because
+    it routinely fires on footer / marketing copy that mentions
+    "online" in passing — keeping it low lets a more confident location
+    or PDF signal override downstream. Returns
+    ``(None, None, None)`` when no pattern matches.
     """
     plain = _strip_tags(page_text)
 
@@ -188,23 +199,28 @@ def classify_study_mode(page_text: str) -> tuple[str | None, str | None]:
         if canonical:
             start = max(0, label_match.start() - 20)
             end = min(len(plain), label_match.end() + 20)
-            return canonical, plain[start:end].strip()
+            return canonical, plain[start:end].strip(), 0.7
 
     pct = _PERCENT_ONLINE_RE.search(plain)
     if pct and _ON_CAMPUS_RE.search(plain):
         start = max(0, pct.start() - 60)
-        return "Blended", plain[start : pct.end() + 60].strip()
+        return "Blended", plain[start : pct.end() + 60].strip(), 0.7
 
-    for pattern, label in _MODE_PATTERNS:
+    last_idx = len(_MODE_PATTERNS) - 1
+    for i, (pattern, label) in enumerate(_MODE_PATTERNS):
         m = pattern.search(plain)
         if m:
             start = max(0, m.start() - 30)
-            return label, plain[start : m.end() + 30].strip()
-    return None, None
+            # PR-5 Bug 2: bare-`\bonline\b` is the last pattern and is
+            # the noisy one — drop confidence so location/PDF signals
+            # outrank it during downstream merges.
+            confidence = 0.5 if i == last_idx else 0.7
+            return label, plain[start : m.end() + 30].strip(), confidence
+    return None, None, None
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
-    mode, snippet = classify_study_mode(html)
+    mode, snippet, confidence = classify_study_mode(html)
     if not mode:
         return []
     return [
@@ -212,7 +228,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             field_key=field_key,
             value=mode,
             normalized={"study_mode": mode},
-            confidence=0.7,
+            confidence=confidence if confidence is not None else 0.7,
             method="study_mode:rule",
             snippet=snippet,
         )

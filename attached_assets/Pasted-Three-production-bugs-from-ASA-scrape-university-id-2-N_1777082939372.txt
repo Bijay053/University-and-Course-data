@@ -1,0 +1,49 @@
+Three production bugs from ASA scrape (university_id=2). Need fixes before continuing T007.
+
+**Core principle the scraper is violating: course page is the source of truth. Always.** If the course page has data, that data wins. PDFs and other uni-level fallbacks should only fill gaps the course page didn't have.
+
+---
+
+**Bug 1: PDF / sibling-cache is overriding course-page English scores**
+
+All 9 ASA courses show identical IELTS=6, TOEFL=60, CAE=169, PTE=null. Masters and bachelors all got the same numbers, which is wrong — masters require higher IELTS than bachelors.
+
+Logs show the source:
+```
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+```
+
+The scraper loads a uni-level PDF, then stamps the same English values on every course via the sibling cache. Even the "undergraduate" and "postgraduate" cache buckets got identical numbers. The course pages themselves have the right data — the PDF/cache is overriding it.
+
+**Required behaviour:**
+1. Course page extraction runs first.
+2. If course page returns IELTS/PTE/TOEFL/CAE values, USE THEM. Don't overwrite from PDF or sibling cache.
+3. PDF/cache is fallback ONLY for fields the course page didn't have.
+
+Find where the sibling cache or PDF data merges into the per-course payload and reverse the precedence — course page values must not be overwritten.
+
+---
+
+**Bug 2: study_mode classified as Online on courses that should be On Campus**
+
+7 of 9 ASA courses staged as Online, 1 Blended, 1 On Campus. ASA lists Sydney as the campus location for all. Likely most or all should be On Campus.
+
+Probably PR-1.5 study_mode noise-stripping (`_NOISE_BLOCK_RE`) was tightened for VIT and now misclassifies ASA. Need to check what each ASA course page actually says about delivery mode and make the extractor honour it.
+
+Again: the course page wins. If ASA's course page says "On Campus", the extractor should not output Online.
+
+---
+
+**Bug 3: per-course browser timing out 100% on ASA (9/9)**
+
+Every ASA URL hits `timeout: per-course browser exceeded 60s — moving on`. The networkidle wait from PR-1.5 hot-fix #1 (added for VIT SPA) is hanging on ASA pages that never reach networkidle.
+
+This is why fields are missing: browser fallback never extracts anything, AI then fills only `duration_value, duration_unit`. Need per-host wait_until config (some sites need networkidle, some need just domcontentloaded), or a faster fallback when networkidle doesn't fire within e.g. 15s.
+
+---
+
+**Don't push more code until these three are addressed.** I haven't tested USQ/torrens/CSU/UTAS yet because Bug 3 likely affects them all.
+
+PR-4 itself is verified clean on VIT. These three bugs are separate — they're about ASA never being a primary test target during PR-1.5 or PR-4.
