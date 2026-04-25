@@ -1,0 +1,86 @@
+**Stop. Your code didn't reach GitHub.**
+
+Pulled origin/main on prod. The only commit since `1980385` (yesterday's batch) is `b222dca`. Here's what's in it:
+
+```
+b222dca (origin/main) Update website to improve stability and error handling
+
+ attached_assets/Pasted-Pulled-your-latest-fixes-...txt | 103 +++++++++++++++++
+ 1 file changed, 103 insertions(+)
+```
+
+That's a paste of my own previous message into your `attached_assets/` folder. Nothing else.
+
+**Missing from GitHub (you said you implemented these):**
+
+- `backend-py/app/services/scraper/central_pages.py` — HTTP-first fetch, Subject/Course fee column parsing, auto-discovery with tiebreaker
+- `backend-py/app/services/scraper/orchestrator.py` — auto-discovery wiring
+- `backend-py/app/services/scraper/pipelines/single_course.py` — `has_central_fee_page` flag
+- `backend-py/app/services/scraper/guards.py` — staging gate bypass when central fee page is configured
+- KBS DB row scrape_config update (you said this was done in the DB — but I can verify that on prod independently)
+
+None of those .py files were modified in `b222dca`. The PR you said shipped doesn't exist on GitHub.
+
+---
+
+**Before pushing again, please run these in your Replit workspace and paste the output:**
+
+```bash
+git status
+git log --oneline -10
+git diff HEAD~5 HEAD --stat
+```
+
+What I want to know:
+
+1. Are the 4 file changes actually committed locally? (`git log` should show a commit message about Bug 2 / central pages / Track A B C)
+2. If they're committed, is HEAD ahead of origin/main? (would show "ahead by N commits")
+3. If they're not committed, are they at least staged/unstaged? (would show in `git status`)
+4. Did the push actually succeed last time, or did you get "Everything up-to-date" / a rejection / a stale lock?
+
+---
+
+**Pattern flag (third time today):**
+
+This is the third state-mismatch we've hit today between what you said happened and what's actually on prod/GitHub:
+
+1. Earlier: "Everything up-to-date" when scrape_url fix was unpushed (you fixed by re-pushing)
+2. Earlier: `central_pages.py` shipped in commits e32e946/87eefb5 BEFORE the design doc — you never explained the relationship between the shipped shell and the proposed design (still unanswered, but probably moot now since neither matters if today's PR doesn't exist)
+3. Now: 3-track implementation marked complete, validated locally with "22 records parsed, 4 courses matched", but no code on GitHub
+
+Not blaming — these things happen, especially when working through Replit's deploy pipeline. But three in one day suggests a workflow issue. Some possibilities:
+
+- Stale Git lock on origin tracking ref (you mentioned this earlier and dismissed it as cosmetic — maybe it's not)
+- Replit's checkpoint/deploy pipeline diverging from `git push`
+- Push happening to a branch other than main without merge
+- Auth token issue on the remote
+
+Can you also paste the output of:
+
+```bash
+git remote -v
+git branch -vv
+cat .git/config | grep -A 2 'remote\|branch'
+```
+
+Want to see if there's anything weird about your remote setup that would make pushes silently land on a non-main branch or get rejected without you noticing.
+
+---
+
+**Once we figure out where the code actually is:**
+
+If the code is committed locally but didn't push: just push it. Force push if needed (you're the only writer, no risk of clobbering).
+
+If the code is uncommitted: commit it with a clear message ("Bug 2 Tracks A/B/C: central fee page handling") and push.
+
+If the code doesn't exist locally either (i.e., your changes never persisted): then we have a bigger problem and you need to redo the work. I'll wait.
+
+---
+
+**My state on prod:**
+
+- KBS still in DB at id=8 with scrape_url populated (manual SQL fix from earlier)
+- All 5 previously-deployed PRs verified working
+- Holding on KBS rerun until your actual Bug 2 code lands on GitHub
+
+Waiting on your diagnosis.

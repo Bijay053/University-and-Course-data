@@ -1580,7 +1580,7 @@ export default function Scraping() {
           </div>
 
           {(scraping || scrapeLogs.length > 0) && (
-            <div className="space-y-3">
+            <div className="border rounded-xl bg-white shadow-sm p-4 space-y-3">
               {(scrapeUniName || scrapeTargetUrl) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
                   {scrapeUniName && (
@@ -1669,7 +1669,7 @@ export default function Scraping() {
                   elapsed = m > 0 ? `${m}m ${r}s` : `${r}s`;
                 }
                 return (
-                  <div className="flex items-center justify-between gap-2 text-sm text-blue-600">
+                  <div className="flex items-center justify-between gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                       <span className="truncate">{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
