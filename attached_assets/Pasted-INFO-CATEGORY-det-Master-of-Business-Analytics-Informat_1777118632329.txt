@@ -1,0 +1,800 @@
+INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/44: Master of Information Technology
+[ 5/44] Fetching 5/44: Master of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4129
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1364: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 6/44: Master of Information Technology (Extension)
+[ 6/44] Fetching 6/44: Master of Information Technology (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4135
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1315: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 7/44: Master of Professional Accounting
+[ 7/44] Fetching 7/44: Master of Professional Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1346
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4129 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4129 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4135 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4135 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1346 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1346 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics - Kaplan Bu — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 8/44: Master of Accounting
+[ 8/44] Fetching 8/44: Master of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1352
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4129: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology - Kapla — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology - Kapla → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/44: Graduate Diploma of Business Administration
+[ 9/44] Fetching 9/44: Graduate Diploma of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1355
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4135: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 10/44: Graduate Diploma of Business Analytics
+[ 10/44] Fetching 10/44: Graduate Diploma of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1360
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1346: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting - Kapl — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Professional Accounting - Kapl → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 11/44: Graduate Diploma of Information Technology
+[ 11/44] Fetching 11/44: Graduate Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4134
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1352 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1352 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1352: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting - Kaplan Business S — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Accounting - Kaplan Business S → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 12/44: Graduate Certificate in Business Administration
+[ 12/44] Fetching 12/44: Graduate Certificate in Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1354
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1355 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1355 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1360 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1360 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1360: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics - — fee from 'Graduate Diploma of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 13/44: Graduate Certificate in Business Analytics
+[ 13/44] Fetching 13/44: Graduate Certificate in Business Analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4134 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4134 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1359
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4134: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — fee from 'Graduate Diploma of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 14/44: Graduate Certificate in Accounting
+[ 14/44] Fetching 14/44: Graduate Certificate in Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1344
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1354 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1354 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1355: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 15/44: Graduate Certificate in Information Technology
+[ 15/44] Fetching 15/44: Graduate Certificate in Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4133
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1354: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 16/44: MBA – (Project Management)
+[ 16/44] Fetching 16/44: MBA – (Project Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1369
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1359 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1359 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1344 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1344 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1344: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting - Kap — fee from 'Graduate Certificate of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Graduate Certificate in Accounting - Kap → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 17/44: MBA – (Health Services Management)
+[ 17/44] Fetching 17/44: MBA – (Health Services Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1367
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4133 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4133 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1359: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — fee from 'Graduate Certificate in Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 18/44: MBA – (Tourism and Hospitality Leadership)
+[ 18/44] Fetching 18/44: MBA – (Tourism and Hospitality Leadership)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1369 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1369 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1370
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4133: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — fee from 'Graduate Certificate in Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 19/44: MBA – (Digital Management)
+[ 19/44] Fetching 19/44: MBA – (Digital Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1365
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1367 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1367 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1370 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1370 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1367: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management - Kapla — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Health Services Management - Kapla → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 20/44: MBA – (Entrepreneurship)
+[ 20/44] Fetching 20/44: MBA – (Entrepreneurship)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1366
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1365 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1365 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1369: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Project Management - Kaplan Busine — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Project Management - Kaplan Busine → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 21/44: MBA – (Data-driven Leadership)
+[ 21/44] Fetching 21/44: MBA – (Data-driven Leadership)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/3908
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1366 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1366 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1366: duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1370: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Entrepreneurship - Kaplan Business — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Entrepreneurship - Kaplan Business → Business & Management / MBA
+[INFO ] [CATEGORY det] MBA – Tourism and Hospitality Leadership → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 22/44: MBA – (Women In Leadership)
+[EXTRACT ] [EXTRACT] 23/44: MBA – (International Leadership)
+[ 22/44] Fetching 22/44: MBA – (Women In Leadership)
+[ 23/44] Fetching 23/44: MBA – (International Leadership)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1371
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1368
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/3908 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/3908 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/3908: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership - Kaplan Bu — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Data-driven Leadership - Kaplan Bu → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 24/44: MBA – (Two Specialisations)
+[ 24/44] Fetching 24/44: MBA – (Two Specialisations)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1365: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management - Kaplan Busine — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Digital Management - Kaplan Busine → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 25/44: Diploma of Business
+[ 25/44] Fetching 25/44: Diploma of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4167
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1331
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1368 — moving on
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1371 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1368 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1371 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1371: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) - Kaplan Bus — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – (Women in Leadership) - Kaplan Bus → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 26/44: Bachelor of Business
+[ 26/44] Fetching 26/44: Bachelor of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1332
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1368: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership - Kaplan — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – International Leadership - Kaplan → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 27/44: Bachelor of Business (Accounting)
+[ 27/44] Fetching 27/44: Bachelor of Business (Accounting)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1336
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4167 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4167 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1331 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1331 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1331: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Business - Kaplan Business Sc — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 28/44: Bachelor of Business (Hospitality & Tourism Management)
+[ 28/44] Fetching 28/44: Bachelor of Business (Hospitality & Tourism Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1341
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1332 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1332 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Two Specialisations → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 29/44: Bachelor of Business (Management)
+[ 29/44] Fetching 29/44: Bachelor of Business (Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1342
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1336 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1336 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1332: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business - Kaplan Business S — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 30/44: Bachelor of Business (Marketing)
+[ 30/44] Fetching 30/44: Bachelor of Business (Marketing)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1343
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1336: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) - Kapl — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Accounting) - Kapl → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 31/44: Diploma of Information Technology
+[ 31/44] Fetching 31/44: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4102
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1341 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1341 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1341: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 32/44: Bachelor of Information Technology
+[ 32/44] Fetching 32/44: Bachelor of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4101
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1342 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1342 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1343 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1343 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4102 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4102 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1343: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) - Kapla — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Marketing) - Kapla → Business & Management / Marketing
+[EXTRACT ] [EXTRACT] 33/44: MBA
+[ 33/44] Fetching 33/44: MBA
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1342: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) - Kapl — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 34/44: Bachelor of Business
+[ 34/44] Fetching 34/44: Bachelor of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4102: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology - Kapl — fee from 'Graduate Diploma of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Diploma of Information Technology - Kapl → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 35/44: Master of Accounting
+[ 35/44] Fetching 35/44: Master of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-accounting
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4101 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4101 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4101: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology - Kap — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Information Technology - Kap → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 36/44: Graduate Diploma of Business Analytics
+[ 36/44] Fetching 36/44: Graduate Diploma of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/ultimate-guide-doing-mba-australia (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/bachelor-of-business — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-accounting — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia: duration_value, duration_unit
+[INFO ] [CATEGORY det] The Ultimate Guide to Doing An MBA in Au → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 37/44: Master of Business Analytics
+[ 37/44] Fetching 37/44: Master of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business - Kaplan Business S — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 38/44: Master of Business Analytics (Extension)
+[ 38/44] Fetching 38/44: Master of Business Analytics (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting - Kaplan Business S — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Accounting - Kaplan Business S → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 39/44: Master of Business Analytics (Information Technology)
+[ 39/44] Fetching 39/44: Master of Business Analytics (Information Technology)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics - — fee from 'Graduate Diploma of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 40/44: Graduate Diploma of Business Administration
+[ 40/44] Fetching 40/44: Graduate Diploma of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics-extension — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 41/44: Master of Business Administration
+[ 41/44] Fetching 41/44: Master of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics - Kaplan Bu — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 42/44: Bachelor of Information Technology
+[ 42/44] Fetching 42/44: Bachelor of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 43/44: Master of Information Technology
+[ 43/44] Fetching 43/44: Master of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/mba-master-of-business-administration — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 44/44: Master of Information Technology (Extension)
+[ 44/44] Fetching 44/44: Master of Information Technology (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/bachelor-of-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology - Kap — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Information Technology - Kap → Computer Science & IT / Information Systems
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-information-technology-extension — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology - Kapla — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology - Kapla → Computer Science & IT / Information Systems
+[STAGE ] [STAGE] skipped MBA – Master of Business Administration: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Master of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics (Extension)
+[STAGE ] [STAGE] saved: Master of Business Analytics (Information Technology)
+[STAGE ] [STAGE] saved: Master of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology (Extension)
+[STAGE ] [STAGE] saved: Master of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Accounting
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE ] [STAGE] saved: Graduate Diploma of Information Technology
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Administration
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Analytics
+[STAGE ] [STAGE] saved: Graduate Certificate in Accounting
+[STAGE ] [STAGE] saved: Graduate Certificate in Information Technology
+[STAGE ] [STAGE] skipped MBA – (Project Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Health Services Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Tourism and Hospitality Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Digital Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Entrepreneurship): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Data-driven Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Women In Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (International Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Two Specialisations): rejected: category_landing_page
+[STAGE ] [STAGE] saved: Diploma of Business
+[STAGE ] [STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Business (Accounting)
+[STAGE ] [STAGE] saved: Bachelor of Business (Hospitality & Tourism Management)
+[STAGE ] [STAGE] saved: Bachelor of Business (Management)
+[STAGE ] [STAGE] saved: Bachelor of Business (Marketing)
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Bachelor of Information Technology
+[STAGE ] [STAGE] skipped MBA: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Master of Accounting
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics (Extension)
+[STAGE ] [STAGE] saved: Master of Business Analytics (Information Technology)
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Administration
+[STAGE ] [STAGE] skipped Master of Business Administration: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Bachelor of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology (Extension)
+[COMPLETE] [TIMING] Total: 6m 49s | Courses: 30 | Avg: 13.6s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:44 | Staged:30 | Skipped:14 | Errors:0
+[COMPLETE] Staged 30 courses, 14 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.kbs.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.kbs.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.kbs.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/courses: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +33 candidates (total 33) — https://www.kbs.edu.au/courses
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/admissions/course-delivery-options: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 33) — https://www.kbs.edu.au/admissions/course-delivery-options
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/student-life/study-in-australia: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 33) — https://www.kbs.edu.au/student-life/study-in-australia
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/student-life/academic-support: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 33) — https://www.kbs.edu.au/student-life/academic-support
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/student-life/academic-internships: listing (43 course links found)
+[DISCOVER] [DISCOVER] Page 5/25: +11 candidates (total 44) — https://www.kbs.edu.au/student-life/academic-internships
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/study-australia-complete-guide-international-students: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 44) — https://www.kbs.edu.au/study-australia-complete-guide-international-students
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/courses/non-award-single-subject-enrolment: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 44) — https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-in-australia: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-in-australia
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-10-reasons-to-live-and-study-adelaide: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-10-reasons-to-live-and-study-adelaide
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-11-reasons-live-and-study-brisbane: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-11-reasons-live-and-study-brisbane
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-8-reasons-live-and-study-gold-coast: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-8-reasons-live-and-study-gold-coast
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/8-great-reasons-study-in-melbourne: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 12/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/8-great-reasons-study-in-melbourne
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-10-reasons-live-and-study-perth: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 13/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-10-reasons-live-and-study-perth
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-9-reasons-live-and-study-sydney: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 14/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-9-reasons-live-and-study-sydney
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/documents/studying-australia-ebook: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/4-life-changing-reasons-study-abroad: listing (33 course links found)
+[DISCOVER] [DISCOVER] Page 16/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/4-life-changing-reasons-study-abroad
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/top-8-study-methods-help-you-remember-more-faster: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 17/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/top-8-study-methods-help-you-remember-more-faster
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/how-has-teaching-changed-in-the-last-10-years: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 18/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/how-has-teaching-changed-in-the-last-10-years
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/best-student-cities-australia-what-does-each-have-offer: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 19/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/best-student-cities-australia-what-does-each-have-offer
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/how-save-money-student-australia: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 20/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/how-save-money-student-australia
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/new-students-guide-australia-key-tasks-first-month: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 21/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/new-students-guide-australia-key-tasks-first-month
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/how-balance-study-and-work-australia: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 22/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/how-balance-study-and-work-australia
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/what-does-student-support-mean-international-students: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 23/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/what-does-student-support-mean-international-students
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/why-wellness-important-academic-success: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 24/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/why-wellness-important-academic-success
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/blog/study-australia/what-are-benefits-mentoring: listing (32 course links found)
+[DISCOVER] [DISCOVER] Page 25/25: +0 candidates (total 44) — https://www.kbs.edu.au/blog/study-australia/what-are-benefits-mentoring
+[DISCOVER] Discovered 44 candidate course links
+[DISCOVER] [CENTRAL] fee page parsed → 22 program record(s) from https://www.kbs.edu.au/admissions/fees/international-fees
+[EXTRACT ] Extracting course details (44 pages)...
+[EXTRACT ] [EXTRACT] 1/44: MBA – Master of Business Administration
+[EXTRACT ] [EXTRACT] 2/44: Master of Business Analytics
+[EXTRACT ] [EXTRACT] 3/44: Master of Business Analytics (Extension)
+[EXTRACT ] [EXTRACT] 4/44: Master of Business Analytics (Information Technology)
+[ 4/44] Fetching 4/44: Master of Business Analytics (Information Technology)
+[ 1/44] Fetching 1/44: MBA – Master of Business Administration
+[ 2/44] Fetching 2/44: Master of Business Analytics
+[ 3/44] Fetching 3/44: Master of Business Analytics (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1364
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1315
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/5037
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1361
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1364 — moving on
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/5037 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1364 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/5037 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1361 — moving on
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1315 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1361 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1315 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/5037: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 5/44: Master of Information Technology
+[ 5/44] Fetching 5/44: Master of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4129
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1364: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 6/44: Master of Information Technology (Extension)
+[ 6/44] Fetching 6/44: Master of Information Technology (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4135
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1315: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 7/44: Master of Professional Accounting
+[ 7/44] Fetching 7/44: Master of Professional Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1346
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4129 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4129 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4135 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4135 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1346 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1346 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics - Kaplan Bu — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 8/44: Master of Accounting
+[ 8/44] Fetching 8/44: Master of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1352
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4129: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology - Kapla — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology - Kapla → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 9/44: Graduate Diploma of Business Administration
+[ 9/44] Fetching 9/44: Graduate Diploma of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1355
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4135: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 10/44: Graduate Diploma of Business Analytics
+[ 10/44] Fetching 10/44: Graduate Diploma of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1360
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1346: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting - Kapl — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Professional Accounting - Kapl → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 11/44: Graduate Diploma of Information Technology
+[ 11/44] Fetching 11/44: Graduate Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4134
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1352 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1352 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1352: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting - Kaplan Business S — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Accounting - Kaplan Business S → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 12/44: Graduate Certificate in Business Administration
+[ 12/44] Fetching 12/44: Graduate Certificate in Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1354
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1355 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1355 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1360 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1360 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1360: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics - — fee from 'Graduate Diploma of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 13/44: Graduate Certificate in Business Analytics
+[ 13/44] Fetching 13/44: Graduate Certificate in Business Analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4134 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4134 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1359
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4134: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — fee from 'Graduate Diploma of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 14/44: Graduate Certificate in Accounting
+[ 14/44] Fetching 14/44: Graduate Certificate in Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1344
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1354 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1354 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1355: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 15/44: Graduate Certificate in Information Technology
+[ 15/44] Fetching 15/44: Graduate Certificate in Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4133
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1354: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 16/44: MBA – (Project Management)
+[ 16/44] Fetching 16/44: MBA – (Project Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1369
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1359 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1359 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1344 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1344 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1344: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting - Kap — fee from 'Graduate Certificate of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Graduate Certificate in Accounting - Kap → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 17/44: MBA – (Health Services Management)
+[ 17/44] Fetching 17/44: MBA – (Health Services Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1367
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4133 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4133 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1359: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — fee from 'Graduate Certificate in Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 18/44: MBA – (Tourism and Hospitality Leadership)
+[ 18/44] Fetching 18/44: MBA – (Tourism and Hospitality Leadership)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1369 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1369 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1370
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4133: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — fee from 'Graduate Certificate in Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 19/44: MBA – (Digital Management)
+[ 19/44] Fetching 19/44: MBA – (Digital Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1365
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1367 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1367 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1370 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1370 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1367: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management - Kapla — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Health Services Management - Kapla → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 20/44: MBA – (Entrepreneurship)
+[ 20/44] Fetching 20/44: MBA – (Entrepreneurship)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1366
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1365 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1365 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1369: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Project Management - Kaplan Busine — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Project Management - Kaplan Busine → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 21/44: MBA – (Data-driven Leadership)
+[ 21/44] Fetching 21/44: MBA – (Data-driven Leadership)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/3908
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1366 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1366 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1366: duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1370: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Entrepreneurship - Kaplan Business — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Entrepreneurship - Kaplan Business → Business & Management / MBA
+[INFO ] [CATEGORY det] MBA – Tourism and Hospitality Leadership → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 22/44: MBA – (Women In Leadership)
+[EXTRACT ] [EXTRACT] 23/44: MBA – (International Leadership)
+[ 22/44] Fetching 22/44: MBA – (Women In Leadership)
+[ 23/44] Fetching 23/44: MBA – (International Leadership)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1371
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1368
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/3908 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/3908 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/3908: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership - Kaplan Bu — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Data-driven Leadership - Kaplan Bu → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 24/44: MBA – (Two Specialisations)
+[ 24/44] Fetching 24/44: MBA – (Two Specialisations)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1365: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management - Kaplan Busine — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Digital Management - Kaplan Busine → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 25/44: Diploma of Business
+[ 25/44] Fetching 25/44: Diploma of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4167
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1331
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1368 — moving on
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1371 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1368 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1371 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1371: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) - Kaplan Bus — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – (Women in Leadership) - Kaplan Bus → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 26/44: Bachelor of Business
+[ 26/44] Fetching 26/44: Bachelor of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1332
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1368: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership - Kaplan — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – International Leadership - Kaplan → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 27/44: Bachelor of Business (Accounting)
+[ 27/44] Fetching 27/44: Bachelor of Business (Accounting)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1336
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4167 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4167 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1331 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1331 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1331: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Business - Kaplan Business Sc — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 28/44: Bachelor of Business (Hospitality & Tourism Management)
+[ 28/44] Fetching 28/44: Bachelor of Business (Hospitality & Tourism Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1341
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1332 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1332 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — fee from 'Graduate Certificate in Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA – Two Specialisations → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 29/44: Bachelor of Business (Management)
+[ 29/44] Fetching 29/44: Bachelor of Business (Management)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1342
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1336 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1336 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1332: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business - Kaplan Business S — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 30/44: Bachelor of Business (Marketing)
+[ 30/44] Fetching 30/44: Bachelor of Business (Marketing)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/1343
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1336: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) - Kapl — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Accounting) - Kapl → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 31/44: Diploma of Information Technology
+[ 31/44] Fetching 31/44: Diploma of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4102
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1341 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1341 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1341: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 32/44: Bachelor of Information Technology
+[ 32/44] Fetching 32/44: Bachelor of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/node/4101
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1342 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1342 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/1343 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/1343 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4102 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4102 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1343: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) - Kapla — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Business (Marketing) - Kapla → Business & Management / Marketing
+[EXTRACT ] [EXTRACT] 33/44: MBA
+[ 33/44] Fetching 33/44: MBA
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/ultimate-guide-doing-mba-australia
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/1342: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) - Kapl — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 34/44: Bachelor of Business
+[ 34/44] Fetching 34/44: Bachelor of Business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4102: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology - Kapl — fee from 'Graduate Diploma of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Diploma of Information Technology - Kapl → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 35/44: Master of Accounting
+[ 35/44] Fetching 35/44: Master of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-accounting
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/node/4101 — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/node/4101 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/node/4101: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology - Kap — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Information Technology - Kap → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 36/44: Graduate Diploma of Business Analytics
+[ 36/44] Fetching 36/44: Graduate Diploma of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/ultimate-guide-doing-mba-australia (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/bachelor-of-business — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-accounting — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/ultimate-guide-doing-mba-australia: duration_value, duration_unit
+[INFO ] [CATEGORY det] The Ultimate Guide to Doing An MBA in Au → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 37/44: Master of Business Analytics
+[ 37/44] Fetching 37/44: Master of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business - Kaplan Business S — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[EXTRACT ] [EXTRACT] 38/44: Master of Business Analytics (Extension)
+[ 38/44] Fetching 38/44: Master of Business Analytics (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting - Kaplan Business S — fee from 'Master of Accounting' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Accounting - Kaplan Business S → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 39/44: Master of Business Analytics (Information Technology)
+[ 39/44] Fetching 39/44: Master of Business Analytics (Information Technology)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics - — fee from 'Graduate Diploma of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 40/44: Graduate Diploma of Business Administration
+[ 40/44] Fetching 40/44: Graduate Diploma of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics-extension — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 41/44: Master of Business Administration
+[ 41/44] Fetching 41/44: Master of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics - Kaplan Bu — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[EXTRACT ] [EXTRACT] 42/44: Bachelor of Information Technology
+[ 42/44] Fetching 42/44: Bachelor of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — fee from 'Master of Business Analytics' row: intl=3400.0 per=None
+[INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 43/44: Master of Information Technology
+[ 43/44] Fetching 43/44: Master of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/mba-master-of-business-administration — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=4910.0 per=None
+[EXTRACT ] [EXTRACT] 44/44: Master of Information Technology (Extension)
+[ 44/44] Fetching 44/44: Master of Information Technology (Extension)
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/bachelor-of-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=4910.0 per=None
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-information-technology — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology - Kap — fee from 'Bachelor of Business' row: intl=2880.0 per=None
+[INFO ] [CATEGORY det] Bachelor of Information Technology - Kap → Computer Science & IT / Information Systems
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-information-technology-extension — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology - Kapla — fee from 'Master of Information Technology' row: intl=3640.0 per=None
+[INFO ] [CATEGORY det] Master of Information Technology - Kapla → Computer Science & IT / Information Systems
+[STAGE ] [STAGE] skipped MBA – Master of Business Administration: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Master of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics (Extension)
+[STAGE ] [STAGE] saved: Master of Business Analytics (Information Technology)
+[STAGE ] [STAGE] saved: Master of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology (Extension)
+[STAGE ] [STAGE] saved: Master of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Accounting
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Administration
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE ] [STAGE] saved: Graduate Diploma of Information Technology
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Administration
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Analytics
+[STAGE ] [STAGE] saved: Graduate Certificate in Accounting
+[STAGE ] [STAGE] saved: Graduate Certificate in Information Technology
+[STAGE ] [STAGE] skipped MBA – (Project Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Health Services Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Tourism and Hospitality Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Digital Management): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Entrepreneurship): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Data-driven Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Women In Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (International Leadership): rejected: category_landing_page
+[STAGE ] [STAGE] skipped MBA – (Two Specialisations): rejected: category_landing_page
+[STAGE ] [STAGE] saved: Diploma of Business
+[STAGE ] [STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Business (Accounting)
+[STAGE ] [STAGE] saved: Bachelor of Business (Hospitality & Tourism Management)
+[STAGE ] [STAGE] saved: Bachelor of Business (Management)
+[STAGE ] [STAGE] saved: Bachelor of Business (Marketing)
+[STAGE ] [STAGE] saved: Diploma of Information Technology
+[STAGE ] [STAGE] saved: Bachelor of Information Technology
+[STAGE ] [STAGE] skipped MBA: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Master of Accounting
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics
+[STAGE ] [STAGE] saved: Master of Business Analytics (Extension)
+[STAGE ] [STAGE] saved: Master of Business Analytics (Information Technology)
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Administration
+[STAGE ] [STAGE] skipped Master of Business Administration: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Bachelor of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology
+[STAGE ] [STAGE] saved: Master of Information Technology (Extension)
+[COMPLETE] [TIMING] Total: 6m 49s | Courses: 30 | Avg: 13.6s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:44 | Staged:30 | Skipped:14 | Errors:0
+[COMPLETE] Staged 30 courses, 14 skipped, 0 fetch errors

@@ -137,11 +137,23 @@ _CATEGORY_BASE_SEGMENTS: frozenset[str] = frozenset({
 })
 
 
+# Bug 2: Drupal CMS publishes every node at both a human-readable clean URL
+# (/courses/master-of-business) AND a numeric node alias (/node/12345).
+# Both URLs appear as hrefs in the course listing, causing the BFS to stage
+# the same course twice (different URL → not caught by the URL-keyed dedup).
+# Reject /node/<digits> URLs here so only the canonical clean URL is kept.
+_DRUPAL_NODE_RE = re.compile(r"/node/\d+(/|$)", re.I)
+
+
 def _is_known_non_course_url(url: str) -> bool:
     """True when the URL matches a hard-coded blocklist of nav/admin/
     news/marketing patterns. Source of truth for keeping site nav out
     of the staged-courses table."""
     lurl = url.lower()
+    # Drupal node aliases (e.g. /node/12345) are always duplicates of the
+    # corresponding clean URL — drop them at discovery time (Bug 2).
+    if _DRUPAL_NODE_RE.search(url):
+        return True
     if any(p in lurl for p in _NON_COURSE_URL_PATTERNS):
         return True
     try:

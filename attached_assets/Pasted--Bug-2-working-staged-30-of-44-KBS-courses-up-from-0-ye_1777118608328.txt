@@ -1,0 +1,165 @@
+**Bug 2 working — staged 30 of 44 KBS courses, up from 0 yesterday.** Real progress. Central fee page parsing fired correctly, 22 records pulled from `/admissions/fees/international-fees`, fees populated on courses. Thank you.
+
+But now that we have data flowing, I can see 6 distinct bugs in the result. Listing all so you have full context. Please ship them as separate focused PRs (don't bundle all 6) so I can verify each independently.
+
+---
+
+## Bug 1 (P0): UI URL overrides in Advanced section being ignored
+
+**Repro:** In the Scraping page UI I clicked "Show advanced options" and filled in three fields:
+
+- Fee Schedule Page URL: `https://www.kbs.edu.au/admissions/fees/international-fees`
+- English Requirements Page URL: `https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements`
+- Academic Requirements Page URL: `https://www.kbs.edu.au/admissions/entry-requirements/international-entry-requirements`
+
+Then clicked Start AI Scraping on KBS.
+
+The scraper used the URL from `scrape_config.uniPages.feePage` in the database (set via SQL earlier) instead of the URLs I just typed. The Advanced fields had no effect on the scrape.
+
+**Why this matters:** the whole point of the Advanced section is letting the user override DB defaults on a per-scrape basis. Right now those fields are decorative — typing in them does nothing. For unis where the configured fee page is wrong, or the user wants to test a different page without permanent DB changes, there's no way to do it. Verification of new unis becomes painful: instead of "type the URL and re-run," the workflow is "manually update DB row with SQL, restart, re-run."
+
+**Diagnostic needed:** is this frontend (form values not being sent in `POST /api/scrape/start` request body) or backend (sent but ignored by orchestrator)? Quick check: open browser dev tools, Network tab, fire a scrape with Advanced filled in, look at the request payload. If `feePage` etc. aren't in the JSON → frontend. If they are → backend precedence issue.
+
+**Precedence I want once fixed:**
+1. Request-body overrides (UI Advanced) — highest, transient, one-scrape-only, NOT persisted to DB
+2. `university.scrape_config.uniPages.*` — medium, persisted across runs
+3. Auto-discovery (Track B) — fallback
+4. None — fall through to staging gate behavior
+
+---
+
+## Bug 2 (P0): Duplicate courses staged — 9 dupes out of 30 staged
+
+Staged list contains the same course twice:
+
+```
+Master of Accounting                              — twice
+Master of Business Analytics                      — twice
+Master of Business Analytics (Extension)          — twice
+Master of Business Analytics (Information Tech)   — twice
+Master of Information Technology                  — twice
+Master of Information Technology (Extension)      — twice
+Graduate Diploma of Business Analytics            — twice
+Graduate Diploma of Business Administration       — twice
+Bachelor of Information Technology                — twice
+```
+
+Root cause from the worker log: KBS exposes the same course via two different URL patterns:
+- `https://www.kbs.edu.au/node/4129`  (Drupal node id)
+- `https://www.kbs.edu.au/courses/master-of-information-technology`  (slug)
+
+Discovery picks up BOTH, extraction runs on BOTH, both get staged as separate rows. Dedup is failing.
+
+**Fix:** dedup by canonical URL (follow redirects + normalize) or by extracted course name + uni_id. The 30 "staged" is really 21 unique courses + 9 duplicates. Inflates the success metric and pollutes the staging table.
+
+You'll see this on every Drupal-based uni site (and there are several in the AU sector).
+
+---
+
+## Bug 3 (P0): All MBA-related courses incorrectly rejected as category_landing_page — 11 missing courses
+
+Look at the rejected list:
+
+```
+MBA – Master of Business Administration       — category_landing_page
+MBA – (Project Management)                    — category_landing_page
+MBA – (Health Services Management)            — category_landing_page
+MBA – (Tourism and Hospitality Leadership)    — category_landing_page
+MBA – (Digital Management)                    — category_landing_page
+MBA – (Entrepreneurship)                      — category_landing_page
+MBA – (Data-driven Leadership)                — category_landing_page
+MBA – (Women In Leadership)                   — category_landing_page
+MBA – (International Leadership)              — category_landing_page
+MBA – (Two Specialisations)                   — category_landing_page
+MBA                                            — category_landing_page
+Master of Business Administration              — category_landing_page (also)
+```
+
+KBS legitimately offers all of these as real MBA specialisations. They're NOT category landing pages — each one is a distinct program with its own admission, fees, duration. The category_landing_page filter is matching them incorrectly because the MBA spec pages share structure with the parent MBA landing page.
+
+Maybe the filter is keying on "MBA" prefix? Or shared URL pattern like `/node/13xx`? Whatever's triggering, it's catching 11 legitimate programs. We're losing the entire MBA portfolio for KBS.
+
+The `MBA – Master of Business Administration` and standalone `MBA` entries ARE legitimate category landing pages — those should be rejected. But the 9 specialisations and `Master of Business Administration` are real programs.
+
+**Fix:** tighten the category_landing_page detector. Probably needs to look at whether the page has program-specific data (CRICOS code, intake dates, duration, fees) before classifying as landing page. If it has those → it's a real program even if URL/structure looks landing-y.
+
+---
+
+## Bug 4 (P0): Fee parser uses wrong column — Subject fee instead of Course fee
+
+The KBS fee table has TWO columns:
+- "Subject fee" (per-subject cost, e.g., $4,910 for MBA)
+- "Course fee" (total program cost, e.g., $58,920 for MBA)
+
+The parser is grabbing "Subject fee" and storing $4,910 as `international_fee` for the entire program. Result: `intl=4910.0 per=None` — the per field is NULL when it should be `subject` or `unit`.
+
+This means every fee in the staged courses is **wrong by ~12x** (a typical KBS MBA is 12 subjects = $58,920, not $4,910).
+
+**Fix options (pick one or do both):**
+- (a) Prefer the `Course fee` column when present — it's the actual program total, which is what users want to compare
+- (b) Record the per-unit context properly: when grabbing Subject fee, set `per=subject` and store subject count separately so total can be computed
+
+Ideal: do (a) AND (b). Show "$58,920 total" in the UI but expose subject breakdown if available.
+
+---
+
+## Bug 5 (P1): Bachelor of Business rejected twice as online_only — false positive
+
+```
+Bachelor of Business: rejected: online_only  (twice — dedup bug strikes again)
+```
+
+KBS Bachelor of Business is a real on-campus program offered in Sydney, Melbourne, Brisbane, and Adelaide. The online_only filter is incorrectly classifying it.
+
+Probably the Mode field defaulted to Online or got set to Online by AI fallback when the per-course page didn't have explicit on-campus signals. Then the online_only filter kicked it out.
+
+This is similar in spirit to the KBS Bug 1 (mode default) ticket from earlier today — mode should be derived from location, not defaulted to Online.
+
+**Fix:** when location_text contains a real city (Sydney, Melbourne, Brisbane, Adelaide), mode should be derived as on-campus or blended, not Online. Ideally check this BEFORE the online_only filter rejects.
+
+---
+
+## Bug 6 (P2): Fee page also has duration data we're not using
+
+KBS fee table has implicit duration via subject count (e.g., MBA = 12 subjects × ~12 weeks each = ~3.5 years part-time / 1.5-2 years full-time).
+
+We're calling AI to fill duration on every course (`AI filled 2 field(s): duration_value, duration_unit`) when the fee page already encodes it. Saves an AI call per course, gives us cleaner data.
+
+Not urgent. Just noting because we're already parsing that table.
+
+---
+
+## Summary of state
+
+**What worked tonight:**
+- Central fee page fetched + parsed: ✅ 22 records from KBS
+- Fees populated on staged courses: ✅ (but wrong column — see Bug 4)
+- `[CENTRAL ✓]` log lines appearing: ✅
+- Auto-discovery wiring active: ✅
+- Staging gate Track C bypass for central-page-no-match: ✅
+
+**Net result:** 30 staged of 44, but really ~21 unique courses, with all 11 MBA programs missing AND fees wrong by ~12x. Honest score: maybe 19-20 correct rows out of 44 expected. Still hugely better than 0 yesterday, but not yet usable for production data.
+
+---
+
+## Recommended ship order
+
+1. **Bug 1** (URL override) — unblocks me from doing further verification cleanly
+2. **Bug 4** (fee column) — every staged course has wrong fee right now, this is data quality P0
+3. **Bug 3** (MBA filter) — 11 missing courses, this is data completeness P0
+4. **Bug 2** (duplicates) — staging table pollution, will hit every Drupal uni
+5. **Bug 5** (Bachelor of Business false positive) — connected to the Mode default issue
+6. **Bug 6** (duration from fee page) — nice-to-have
+
+Don't bundle all 6. PRs should be: (1) alone, (2) alone, (3) alone, (4) alone, (5+earlier mode default) together if convenient, (6) deferred.
+
+---
+
+## State on prod
+
+- KBS staged 30 (with caveats above)
+- All earlier verifications still hold (P0 create, debounce, Torrens filters, observability, Bug 2 architecture)
+- Holding on CSU/VIT verification until Bug 1 lands (don't want to retest while UI override is broken)
+- Process question from earlier still unanswered: was central_pages.py shell shipped before the design doc, or after? Not blocking, just curious.
+
+Going offline. Will pull and verify in the morning. Take your time on these — quality > speed.

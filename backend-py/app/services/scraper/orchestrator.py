@@ -454,6 +454,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
 
             effective_config = dict(uni_scrape_config or {})
+
+            # ── Priority 1: request-body overrides (UI Advanced fields) ─────
+            # The router stores these in job.request_payload so the orchestrator
+            # can apply them without touching the persistent scrape_config.
+            # Precedence: UI override > DB scrape_config > auto-discovery.
+            rp = job.request_payload or {}
+            _ui_overrides: dict[str, str | None] = {
+                # feePage maps directly
+                "feePage": rp.get("feePage"),
+                # requirementsPage from UI → both entry-point keys in central_pages
+                "entryPage": rp.get("requirementsPage"),
+                "requirementsPage": rp.get("requirementsPage"),
+                "scholarshipPage": rp.get("scholarshipPage"),
+                "academicRequirementsPage": rp.get("academicRequirementsPage"),
+            }
+            _applied_overrides: list[str] = []
+            for _k, _v in _ui_overrides.items():
+                if _v:
+                    effective_config.setdefault("uniPages", {})[_k] = _v
+                    _applied_overrides.append(f"{_k}={_v}")
+            if _applied_overrides:
+                await emit(
+                    "status",
+                    f"[OVERRIDE] Applying {len(_applied_overrides)} UI advanced field(s): {', '.join(_applied_overrides[:2])}{'...' if len(_applied_overrides) > 2 else ''}",
+                    phase="discover",
+                    kind="config_override",
+                    overrides=_applied_overrides,
+                )
+
             has_fee_page = bool(
                 (effective_config.get("uniPages") or {}).get("feePage")
             )
@@ -624,7 +653,25 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     url=r.get("url"),
                 )
                 continue
-            payload = r.get("payload") or {}
+            payload = dict(r.get("payload") or {})
+
+            # ── Bug 5: defaultStudyMode config override ───────────────────
+            # When a university's scrape_config (or UI override) contains
+            # "defaultStudyMode", use it as the authoritative mode whenever
+            # the extractor returned None (no signal found) or produced a
+            # low-confidence "Online" value from the bare-keyword fallback.
+            # This lets admins fix false online_only rejections without code
+            # changes (e.g. KBS Bachelor of Business marketing copy contains
+            # "Apply Online" which fires the \bonline\b fallback).
+            _default_mode = (
+                effective_config.get("defaultStudyMode")
+                or rp.get("defaultStudyMode")
+            )
+            if _default_mode:
+                _cur_mode = (payload.get("study_mode") or "").strip()
+                if not _cur_mode or _cur_mode.lower() == "online":
+                    payload["study_mode"] = _default_mode
+
             try:
                 async with AsyncSessionLocal() as stage_db:
                     res = await stage_course(

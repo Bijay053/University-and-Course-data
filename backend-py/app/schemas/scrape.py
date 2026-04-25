@@ -15,6 +15,7 @@ class StartScrapeBody(BaseModel):
     requirements_page: str | None = Field(default=None, alias="requirementsPage")
     scholarship_page: str | None = Field(default=None, alias="scholarshipPage")
     academic_requirements_page: str | None = Field(default=None, alias="academicRequirementsPage")
+    default_study_mode: str | None = Field(default=None, alias="defaultStudyMode")
     fast_mode: bool = Field(default=False, alias="fastMode")
     bulk_mode: bool = Field(default=False, alias="bulkMode")
     model_config = ConfigDict(populate_by_name=True, extra="ignore")

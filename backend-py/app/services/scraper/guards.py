@@ -217,7 +217,34 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"associate\s+degree|"
     r"diploma(?:\s+of|\s+in)?(?!\s+of\s+(?:ceremonies|honor))|"
     r"certificate\s+(?:i{1,4}v?|iv|iv\+?|\d+)\b|"  # Certificate III/IV/I/II
-    r"certificate\s+(?:of|in)\b"                    # Certificate of ..., Certificate in ...
+    r"certificate\s+(?:of|in)\b|"                   # Certificate of ..., Certificate in ...
+    # ── Bug 3: well-known degree abbreviations ─────────────────────────────
+    # Abbreviation-named courses (e.g. "MBA") must NOT be rejected as category
+    # landing pages. Include common postgraduate (M*) and undergraduate (B*)
+    # abbreviations plus Ph.D variants.
+    r"mba\b|"           # Master of Business Administration
+    r"mbs\b|"           # Master of Business Science
+    r"mpa\b|"           # Master of Public Admin
+    r"mph\b|"           # Master of Public Health
+    r"med\b|"           # Master of Education
+    r"mit\b|"           # Master of Info Tech
+    r"msc\b|"           # Master of Science
+    r"mcom\b|"          # Master of Commerce
+    r"mres\b|"          # Master of Research
+    r"mfin\b|"          # Master of Finance
+    r"mba\s*\(|"        # MBA (Specialisation)
+    r"phd\b|"           # Doctor of Philosophy (abbrev.)
+    r"ph\.d\b|"
+    r"dba\b|"           # Doctor of Business Admin
+    r"bba\b|"           # Bachelor of Business Admin
+    r"bbs\b|"           # Bachelor of Business Science
+    r"bcom\b|"          # Bachelor of Commerce
+    r"bbus\b|"          # Bachelor of Business
+    r"bit\b|"           # Bachelor of IT
+    r"bsw\b|"           # Bachelor of Social Work
+    r"bsc\b|"           # Bachelor of Science
+    r"beng\b|"          # Bachelor of Engineering
+    r"ba\b(?:\s|$)"     # Bachelor of Arts (must be word-bounded)
     r")",
     re.IGNORECASE,
 )

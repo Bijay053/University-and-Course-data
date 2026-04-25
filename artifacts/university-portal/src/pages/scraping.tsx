@@ -367,6 +367,7 @@ export default function Scraping() {
   const [requirementsPageUrl, setRequirementsPageUrl] = useState("");
   const [scholarshipPageUrl, setScholarshipPageUrl] = useState("");
   const [academicRequirementsPageUrl, setAcademicRequirementsPageUrl] = useState("");
+  const [defaultStudyMode, setDefaultStudyMode] = useState("");
   const [fastMode, setFastMode] = useState(false);
 
   // ── Country auto-detection from URL TLD ──────────────────────────────────
@@ -1034,6 +1035,7 @@ export default function Scraping() {
     if (requirementsPageUrl.trim()) uniBody.requirementsPage = requirementsPageUrl.trim();
     if (scholarshipPageUrl.trim()) uniBody.scholarshipPage = scholarshipPageUrl.trim();
     if (academicRequirementsPageUrl.trim()) uniBody.academicRequirementsPage = academicRequirementsPageUrl.trim();
+    if (defaultStudyMode.trim()) uniBody.defaultStudyMode = defaultStudyMode.trim();
     if (fastMode) uniBody.fastMode = true;
     uniBodyRef.current = uniBody;
 
@@ -1058,7 +1060,7 @@ export default function Scraping() {
       setScrapeLogs([{ event: "error", message: (err as Error).message }].slice(-MAX_SCRAPE_LOG_LINES));
       setScraping(false);
     }
-  }, [scrapeUrls, feePageUrl, requirementsPageUrl, fastMode, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
+  }, [scrapeUrls, feePageUrl, requirementsPageUrl, scholarshipPageUrl, academicRequirementsPageUrl, defaultStudyMode, fastMode, selectedUni, newUniName, newUniCountry, newUniCity, startSingleJob, pollJobStatus, uniData]);
 
   useEffect(() => {
     if (!scraping && activeJobId) {
@@ -1415,6 +1417,23 @@ export default function Scraping() {
                     className="bg-white h-9 text-sm"
                     disabled={scraping}
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Default Study Mode
+                    <span className="ml-1 text-gray-400 font-normal">(override when extractor uncertain)</span>
+                  </label>
+                  <select
+                    value={defaultStudyMode}
+                    onChange={(e) => setDefaultStudyMode(e.target.value)}
+                    disabled={scraping}
+                    className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm disabled:opacity-50"
+                  >
+                    <option value="">— auto-detect —</option>
+                    <option value="On Campus">On Campus</option>
+                    <option value="Online">Online</option>
+                    <option value="Blended">Blended</option>
+                  </select>
                 </div>
               </div>
             )}

@@ -279,6 +279,14 @@ async def start_scrape(
             # snake_case duplicates kept so Python code can read either style.
             "university_id": uni.id,
             "fast_mode": body.fast_mode,
+            # ── Advanced UI overrides — stored so the orchestrator can apply
+            # them at highest priority without touching the DB scrape_config.
+            # Only non-empty values are meaningful; None means "not provided".
+            "feePage": body.fee_page or None,
+            "requirementsPage": body.requirements_page or None,
+            "scholarshipPage": body.scholarship_page or None,
+            "academicRequirementsPage": body.academic_requirements_page or None,
+            "defaultStudyMode": body.default_study_mode or None,
         },
     )
     db.add(job)

@@ -168,38 +168,61 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         if not header_cells:
             continue
 
+        # ── Multi-row header detection (e.g. KBS) ───────────────────────────
+        # Some tables use rows[0] as a title/colspan row ("International Student
+        # Tuition Fees") and rows[1] as the actual column header row ("Course",
+        # "Subject fee^", "Course fee"). If the first row doesn't contain any
+        # fee-signal keywords, check whether rows[1] does, and if so use it as
+        # the effective header for column detection. The first data row is then
+        # rows[2] instead of rows[1].
+        effective_header_cells = header_cells
+        data_start = 1
+        if len(rows) > 2:
+            row1_cells = [c.get_text(" ", strip=True).lower() for c in rows[1].find_all(["th", "td"])]
+            row1_text = " ".join(row1_cells)
+            row0_has_fee = any(k in " ".join(header_cells) for k in ("fee", "tuition", "international", "domestic"))
+            row1_has_fee_col = any(k in row1_text for k in ("subject fee", "course fee", "unit fee", "international", "total fee", "program fee"))
+            if row1_has_fee_col and not any(k in " ".join(header_cells) for k in ("subject fee", "course fee", "unit fee", "total fee", "program fee")):
+                # rows[0] is a title/label row; rows[1] contains real column headers
+                effective_header_cells = row1_cells
+                data_start = 2
+
         # Find relevant column indices.
         prog_col = next(
-            (i for i, h in enumerate(header_cells) if any(k in h for k in ("course", "program", "programme", "qualification"))),
+            (i for i, h in enumerate(effective_header_cells) if any(k in h for k in ("course", "program", "programme", "qualification"))),
             None,
         )
         if prog_col is None:
             prog_col = 0  # first col is usually program name
 
         intl_col = next(
-            (i for i, h in enumerate(header_cells) if any(k in h for k in ("international", "overseas", "intl"))),
+            (i for i, h in enumerate(effective_header_cells) if any(k in h for k in ("international", "overseas", "intl"))),
             None,
         )
         dom_col = next(
-            (i for i, h in enumerate(header_cells) if any(k in h for k in ("domestic", "local", "resident"))),
+            (i for i, h in enumerate(effective_header_cells) if any(k in h for k in ("domestic", "local", "resident"))),
             None,
         )
-        # KBS-style tables use "Subject fee" (per trimester) and "Course fee"
-        # (total program fee) instead of "International"/"Domestic" headers.
-        # Prefer the total-course-fee column as the primary fee value; fall
-        # back to per-unit if that's all that's available.
+        # KBS-style tables use "Subject fee" (per-subject/trimester) and "Course fee"
+        # (total program fee).  Prefer total_col because users compare program totals.
         total_col = next(
-            (i for i, h in enumerate(header_cells)
+            (i for i, h in enumerate(effective_header_cells)
              if any(k in h for k in ("course fee", "total fee", "program fee", "full fee", "total cost"))),
             None,
         )
         unit_col = next(
-            (i for i, h in enumerate(header_cells)
+            (i for i, h in enumerate(effective_header_cells)
              if any(k in h for k in ("subject fee", "unit fee", "per subject", "per unit"))),
             None,
         )
 
         # Column priority: explicit intl > total-course > per-unit > domestic > scan-all
+        # KBS: intl_col may match the *title* row "International..." and point to col 0
+        # (course name). Guard: if intl_col == prog_col, discard it so we fall through
+        # to the more specific total_col / unit_col detection.
+        if intl_col is not None and intl_col == prog_col:
+            intl_col = None
+
         primary_fee_col = intl_col if intl_col is not None else (
             total_col if total_col is not None else (
                 unit_col if unit_col is not None else None
@@ -207,13 +230,15 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         )
 
         # Sniff the per-term from the header row text.
-        header_text = " ".join(header_cells)
+        header_text = " ".join(effective_header_cells)
         per_term = _infer_per_term(header_text)
-        # KBS "Subject fee" implies trimester; "Course fee" implies total program
-        if unit_col is not None and intl_col is None and total_col is None:
-            per_term = per_term or "trimester"
+        # "Course fee" column = full program total; "Subject fee" = per-unit
+        if total_col is not None:
+            per_term = per_term or "total"
+        elif unit_col is not None and intl_col is None:
+            per_term = per_term or "subject"
 
-        for row in rows[1:]:
+        for row in rows[data_start:]:
             cells = row.find_all(["td", "th"])
             if not cells:
                 continue
