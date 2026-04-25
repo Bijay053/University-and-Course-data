@@ -23,6 +23,7 @@ from app.services.scraper.extractors import (
     ai_fallback,
     course_name,
     degree_level,
+    description,
     duration,
     eligibility,
     english_test,
@@ -89,6 +90,7 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
 # and auto_publish_status was permanently stuck on "pending_review".
 _EXTRACTORS = (
     (course_name, ()),
+    (description, ()),   # meta/p description — runs early on static HTML
     (location, ()),
     (eligibility, ()),
     (fee, ("country",)),

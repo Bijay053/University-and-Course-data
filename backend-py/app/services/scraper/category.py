@@ -199,11 +199,13 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Business & Management",     "International Business", ("international business",)),
     ("Business & Management",     "Supply Chain & Logistics", ("supply chain", "logistics")),
     ("Business & Management",     "Human Resources",        ("human resource", "hr management")),
+    ("Business & Management",     "Technology Management",  ("technology management",)),
     ("Business & Management",     "Entrepreneurship",       ("entrepreneurship",)),
+    ("Computer Science & IT",     "Networking",             ("networking", "network engineering", "computer networks")),
     ("Computer Science & IT",     "Data Science",           ("data science", "data analytics")),
     ("Computer Science & IT",     "Cyber Security",         ("cyber",)),
     ("Computer Science & IT",     "Artificial Intelligence", ("artificial intelligence", "machine learning")),
-    ("Computer Science & IT",     "Software Engineering",   ("software engineering", "software development")),
+    ("Computer Science & IT",     "Software Engineering",   ("software engineering", "software development", "software application development", "application development")),
     ("Computer Science & IT",     "Information Systems",    ("information systems", "information technology", "it management")),
     ("Engineering & Technology",  "Mechanical Engineering", ("mechanical engineering", "mechatronic")),
     ("Engineering & Technology",  "Civil Engineering",      ("civil engineering",)),
@@ -239,27 +241,46 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 )
 
 
+_PARENS_RE = re.compile(r"\(([^)]+)\)")
+
+
 def map_course_to_category(course_name: str) -> dict | None:
     """Return ``{"category": str, "sub_category": str}`` if a confident
     keyword pre-map fires, otherwise ``None``.
 
-    Runs BEFORE :func:`classify_category` so well-known compound titles
-    (e.g. "Master of Hospitality Management") are pinned to the correct
-    bucket without relying on the body-text heuristics that were tied 1-1
-    by bare-keyword matches. Matching is whole-word, case-insensitive,
-    first-hit-wins.
+    Two-pass strategy:
+    1. Try matching ONLY the parenthetical portion of the course name
+       (e.g. the "(Cyber Security)" in "Master of IT (Cyber Security)").
+       Parentheticals are specialisation labels — they are a stronger
+       sub-category signal than the prefix field name.
+    2. Fall through to a full-name scan if the parenthetical yields nothing.
+
+    Both passes use whole-word, case-insensitive, first-hit-wins matching
+    against ``_SUB_CATEGORY_MAP``.
     """
     if not course_name:
         return None
     n = course_name.lower()
-    for category, sub_label, keywords in _SUB_CATEGORY_MAP:
-        for kw in keywords:
-            kw_clean = kw.strip()
-            if not kw_clean:
-                continue
-            if re.search(r"\b" + re.escape(kw_clean) + r"\b", n):
-                return {"category": category, "sub_category": sub_label}
-    return None
+
+    def _match(text: str) -> dict | None:
+        for category, sub_label, keywords in _SUB_CATEGORY_MAP:
+            for kw in keywords:
+                kw_clean = kw.strip()
+                if not kw_clean:
+                    continue
+                if re.search(r"\b" + re.escape(kw_clean) + r"\b", text):
+                    return {"category": category, "sub_category": sub_label}
+        return None
+
+    # Pass 1 — parenthetical content only
+    parens = _PARENS_RE.findall(n)
+    for paren_text in parens:
+        hit = _match(paren_text)
+        if hit:
+            return hit
+
+    # Pass 2 — full name
+    return _match(n)
 
 
 def classify_category(course_name: str) -> str | None:

@@ -1,0 +1,68 @@
+Pulled the API + DB evidence. Your diagnosis was half right — deploy claim wrong, conclusion right.
+
+**Deploy DID happen.** Verified on prod:
+- HEAD = 6d64da5 (Bug L commit, dated 2026-04-25 07:17:39 UTC)
+- Files modified Apr 25 07:33 (english_test.py, per_course_vision.py)
+- Celery PID 540283 started 07:40
+- Today's ASA scrape job_40023dc70644 ran 07:41-07:42 — AFTER the restart, on new code
+
+**Data IS in the DB.** Bachelor of Business Technology Management (course_id 6666):
+```
+degree_level    : Bachelor's
+ielts_overall   : 6.0
+ielts_listening : 5.5
+ielts_reading   : 5.5
+ielts_writing   : 5.5
+ielts_speaking  : 5.5
+sub_category    : null     ← genuinely empty
+description     : null     ← genuinely empty (no extractor)
+completeness    : 69
+```
+
+**API endpoint returns it correctly.** GET /api/scrape/staged/6666 response includes:
+```json
+"degree_level": "Bachelor's",
+"ielts_listening": 5.5,
+"ielts_reading": 5.5,
+"ielts_writing": 5.5,
+"ielts_speaking": 5.5
+```
+
+**The bug is in the edit modal frontend.** It's displaying these fields as empty when the data is in the API response. Likely culprit: field-name mismatch (modal looks for `degreeLevel` while API returns `degree_level`), or the modal binding doesn't include IELTS sub-band fields at all.
+
+File to investigate: `artifacts/university-portal/src/` — wherever the "Edit Scraped Course" modal lives. Check:
+1. What field names the modal binds to vs what the API returns
+2. Whether the IELTS L/R/W/S input fields have a value prop pointing at the right slot
+3. Whether the Degree Level dropdown's `value` is bound to `degree_level` (snake_case) or `degreeLevel` (camelCase)
+
+**Don't touch the scraper for these two.** The data is there. Only the modal needs fixing.
+
+---
+
+**For the genuinely-empty fields, your diagnoses are correct:**
+
+**Bug 3 (sub_category null) — APPROVED.** Your parenthetical-priority fix in category.py is the right approach. Ship as a small targeted PR. Plus add "Technology Management" and "software application development" keywords. Test on:
+- "Bachelor of Business Technology Management" → sub_category="Technology Management" (or similar Business sub)
+- "Master of Information Technology (Software Application Development)" → sub_category="Software Engineering" (parenthetical wins over IT prefix)
+- "Master of Information Technology (Cyber Security)" → sub_category="Cyber Security" (regression check, currently works)
+
+**Bug 4 (description null) — APPROVED.** Build description.py extractor. Default order:
+1. `<meta name="description">` content (most reliable)
+2. First `<p>` under the course title heading (h1/h2)
+3. First non-empty paragraph in `<main>` or `<article>`
+Length cap ~500 chars. Skip if it looks like nav/footer text. Test on ASA + VIT pages.
+
+**academic_level/academic_score/other_requirement — DEFER.** Your read is right: ASA puts these in admission policy PDFs, not on course pages. Don't write a heuristic. File as future work, mark as "not extracted" in UI rather than scraping garbage.
+
+---
+
+**Order of work:**
+
+1. **Fix the edit modal** (highest priority — user-visible). API returns the data; modal needs to display it.
+2. **Ship Bug 3 (sub_category parenthetical-priority)** as a small PR.
+3. **Ship description.py extractor** as a small PR.
+4. **Defer academic fields** — file as future work.
+
+When those land, the same ASA scrape (job_40023dc70644 data) should display correctly in the modal AND show ~10/13 = 77% completeness once description fills.
+
+Don't run T007 on Torrens/USQ/CSU/UTAS yet — fix the modal first so we can actually see the data those scrapes produce.

@@ -467,17 +467,16 @@ NOT cover. All six fixes below land together.
     parsed slot→value dict. Cache hits emit
     `extraction_method='per_course_vision_cached'` so prod evidence
     rows make the win observable.
-- **Verification (job_b63dc17f0604)**: all 4 IT Masters now show
-  IELTS 6.5 / sub-bands 6.0 / PTE 58 / TOEFL 85 (matching
-  MaSTER.png); all 4 BB variants show 6 / 5.5 / 50 / 60 (matching
-  their shared screenshot); BPA shows its own image's values. Every
-  English evidence row reads `per_course_vision` or
+- **Verification (job_b63dc17f0604 / job_9c7246ff2042)**: all 4 IT
+  Masters show IELTS 6.5 / sub-bands 6.0 / PTE 58 / TOEFL 85
+  (matching MaSTER.png); all 4 BB variants show 6 / 5.5 / 50 / 60
+  (matching their shared screenshot); BPA shows its own image values.
+  Every English evidence row reads `per_course_vision` or
   `per_course_vision_cached` — no more `uni_pdf:requirements`
   contamination on these courses.
-- **Coverage**: 3 new tests in
-  `tests/test_english_test_table_layouts.py` pin the verbose Gemini
-  phrasing for IELTS, PTE, and TOEFL using the literal MaSTER.png
-  OCR text (18 passing total in that file).
+- **Coverage**: 8 tests in `tests/test_english_test_verbose_gemini.py`
+  (full MaSTER.png OCR simulation end-to-end) + 3 pinned in
+  `tests/test_english_test_table_layouts.py` (26 total pass).
 
 ### 8. PTE/TOEFL/CAE buried in equivalence table (commit f54ebf8)
 - **Symptom**: After hot-fix #2 deployed, prod job_24323bbb8715
@@ -846,6 +845,49 @@ The current ordering is now pinned by
 so any future change is intentional. Tracked as a follow-up: "decide
 whether sibling-cache should beat uni-PDF when same-bucket peer
 extractions exist".
+
+## Session Fixes: Edit-modal field binding, sub_category, description (Apr 2026)
+
+Three data-quality bugs found in the Apr 25 production ASA scrape
+(job_40023dc70644) and fixed in this session:
+
+### Fix 1 — Edit-modal fields showing empty (camelCase mismatch)
+- **Root cause**: `_staged_row_to_dict` in `scrape.py` only manually
+  aliased ~15 fields to camelCase. All sub-band fields
+  (`ieltsListening`, `ieltsReading`, `ieltsWriting`, `ieltsSpeaking`,
+  `pteListening`, etc.), `subCategory`, `durationTerm`,
+  `otherRequirement`, `academicLevel`, `academicScore` were never
+  emitted — React modal read `undefined`.
+- **Fix**: Replaced the manual-alias list with a loop over every ORM
+  column, calling `_camel()` on each key. The explicit overrides
+  remain for convenience aliases (`intakes`, `level`, etc.). `_camel`
+  was de-duplicated (was defined at line 33 AND line 930).
+- **degree_level**: Extractor writes `"Bachelor's"` / `"Master's"`;
+  modal Select has `"Bachelor"` / `"Master"` without apostrophe.
+  `_staged_row_to_dict` now strips `'s` when emitting `degreeLevel`
+  so the dropdown preselects correctly. DB value is unchanged.
+
+### Fix 2 — sub_category wrong or empty (parenthetical ordering)
+- **Root cause**: `map_course_to_category` scanned the full course
+  name with first-hit-wins, so `"Master of Information Technology
+  (Cyber Security)"` matched `"information technology"` → sub_category
+  `"Information Systems"` instead of `"Cyber Security"`. Similarly,
+  `"Bachelor of Business Technology Management"` had no keyword match.
+- **Fix**: Two-pass strategy — first try matching ONLY the parenthetical
+  content (e.g. `"cyber security"` in `(Cyber Security)`), then fall
+  through to full-name scan. Added keywords: `"technology management"`,
+  `"software application development"`, `"application development"`,
+  `"networking"` / `"network engineering"`. All 7 test cases pass.
+
+### Fix 3 — description field always NULL
+- **New extractor**: `extractors/description.py`. Priority: (1) meta
+  description / og:description (confidence 0.95), (2) first `<p>` after
+  the primary heading (0.80), (3) first substantive `<p>` in main/article
+  (0.65), (4) first substantive `<p>` anywhere (0.50). Truncates at 500
+  chars. Boilerplate rejected by regex (cookie/copyright/nav/breadcrumb).
+  Wired into `_EXTRACTORS` in `single_course.py`.
+- **Result (job_9c7246ff2042)**: all 9 ASA courses now have a description
+  populated from the meta tag.
 
 ### Tests
 

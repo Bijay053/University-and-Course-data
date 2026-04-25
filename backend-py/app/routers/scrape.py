@@ -28,18 +28,40 @@ from app.schemas.scrape import (
 router = APIRouter()
 
 
+# ── snake_case → camelCase helper (used by _staged_row_to_dict and below) ────
+_SNAKE_TO_CAMEL_RE = re.compile(r"_([a-z])")
+
+# Matches "Bachelor's", "Master's" and their typographic-apostrophe variants
+# so the edit-modal degree_level Select can match "Bachelor" / "Master".
+_DEGREE_POSSESSIVE_RE = re.compile(r"['\u2019]s$")
+
+
+def _camel(s: str) -> str:
+    """snake_case → camelCase."""
+    return _SNAKE_TO_CAMEL_RE.sub(lambda m: m.group(1).upper(), s)
 
 
 def _staged_row_to_dict(r) -> dict:
-    """Build complete UI-friendly dict from a ScrapedCourse row (snake + camel keys)."""
+    """Build complete UI-friendly dict from a ScrapedCourse row.
+
+    Emits BOTH snake_case (backward-compat) and camelCase keys for every
+    column so the React StagedCourse type is fully satisfied without
+    per-field aliasing.  Previously only a small subset of fields had
+    explicit camelCase aliases, which caused the edit modal to show empty
+    for ieltsListening, subCategory, durationTerm, otherRequirement, etc.
+    even when the data was present in the DB.
+    """
     d = {}
     for col in r.__table__.columns:
         v = getattr(r, col.name)
         if hasattr(v, "isoformat"):
             v = v.isoformat()
-        d[col.name] = v
-    # camelCase aliases UI expects
-    d["id"] = r.id
+        d[col.name] = v                  # snake_case (keep for compat)
+        cc = _camel(col.name)
+        if cc != col.name:
+            d[cc] = v                    # camelCase (React modal)
+
+    # ── Explicit overrides / extra convenience aliases ───────────────────
     d["courseName"] = r.course_name
     d["courseWebsite"] = r.course_website
     d["universityId"] = r.university_id
@@ -55,24 +77,25 @@ def _staged_row_to_dict(r) -> dict:
     d["intakes"] = r.intake_months or []
     d["courseLocation"] = r.course_location
     d["studyMode"] = r.study_mode
-    d["degreeLevel"] = r.degree_level
     d["feeTerm"] = r.fee_term
     d["feeYear"] = r.fee_year
     d["eligibilityStatus"] = r.eligibility_status
     d["autoPublishStatus"] = r.auto_publish_status
-    # T205: surface the publish-blocked reason so the Review modal can
-    # render the warning banner. Was previously dropped on the floor —
-    # the column existed but never made it onto the wire.
     d["eligibilityReason"] = r.eligibility_reason
     d["eligibility_reason"] = r.eligibility_reason
-    # UI uses these short names too
-    d["level"] = r.degree_level
+    # Normalise degree_level: the extractor writes "Bachelor's"/"Master's"
+    # but the edit modal's Select only has "Bachelor"/"Master" as options,
+    # so the dropdown showed empty.  Strip the possessive suffix here.
+    # Use a regex so both ASCII apostrophe (') and typographic apostrophe
+    # (\u2019) are handled, and only a literal "'s" ending is removed —
+    # not any random combination of the characters ' and s.
+    raw_level = r.degree_level or ""
+    d["degreeLevel"] = _DEGREE_POSSESSIVE_RE.sub("", raw_level) or None
+    d["level"] = d["degreeLevel"]
     d["intake"] = r.intake_months
     d["field"] = r.category
-    # fees as a number for the simple Intl. Fee column
     d["fees"] = r.international_fee
     # Default empty so UI's `course.evidence?.length` is a number, not undefined.
-    # Bulk-attached by `_attach_evidence_bulk` for list endpoints.
     d["evidence"] = []
     return d
 
@@ -922,15 +945,6 @@ async def staged_one(
     return {c.name: getattr(sc, c.name) for c in sc.__table__.columns} | {"ok": True}
 
 
-
-
-_SNAKE_TO_CAMEL_RE = re.compile(r"_([a-z])")
-
-
-def _camel(s: str) -> str:
-    """snake_case → camelCase. Pure helper so the response dict and the
-    React StagedCourse type stay in sync without per-field aliasing."""
-    return _SNAKE_TO_CAMEL_RE.sub(lambda m: m.group(1).upper(), s)
 
 
 def _row_to_camel(row: dict) -> dict:
