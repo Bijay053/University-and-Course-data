@@ -225,9 +225,35 @@ async def start_scrape(
         )
         uni = result.scalar_one_or_none()
     if not uni:
+        # Observability: record the failed lookup as a failed job row so the
+        # admin dashboard can surface it instead of losing it to stdout only.
+        fail_job_id = f"job_{uuid.uuid4().hex[:12]}"
+        err_msg = (
+            f"University not found "
+            f"(id={body.university_id}, url={body.url}, name={body.university_name})"
+        )
+        try:
+            fail_job = ScrapeRuntimeJob(
+                runtime_job_id=fail_job_id,
+                university_id=None,
+                university_name=body.university_name or body.url or "unknown",
+                url=body.url,
+                job_type="single",
+                status="failed",
+                error_message=err_msg,
+                request_payload={
+                    "url": body.url,
+                    "universityId": body.university_id,
+                    "universityName": body.university_name,
+                },
+            )
+            db.add(fail_job)
+            await db.commit()
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"University not found (id={body.university_id}, url={body.url}, name={body.university_name})"
+            detail=err_msg,
         )
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     # request_payload MUST be Node-StartRuntimePayload-compatible because the

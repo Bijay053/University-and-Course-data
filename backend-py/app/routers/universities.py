@@ -148,8 +148,34 @@ async def create_university(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"University '{existing.name}' already exists",
+            detail={
+                "id": existing.id,
+                "name": existing.name,
+                "website": existing.website,
+                "message": f"University '{existing.name}' already exists",
+            },
         )
+    # Bug #2: website URL uniqueness -- prevents duplicate universities that
+    # happen to be spelled differently but share the same domain.
+    if body.website:
+        website_str = str(body.website)
+        url_stmt = select(University).where(
+            or_(
+                University.website == website_str,
+                University.scrape_url == website_str,
+            )
+        )
+        existing_by_url = (await db.execute(url_stmt)).scalar_one_or_none()
+        if existing_by_url:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "id": existing_by_url.id,
+                    "name": existing_by_url.name,
+                    "website": existing_by_url.website,
+                    "message": f"A university with website '{website_str}' already exists",
+                },
+            )
     payload = body.model_dump(exclude_none=True)
     for url_key in (
         "website",

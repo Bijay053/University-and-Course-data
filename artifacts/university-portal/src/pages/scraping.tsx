@@ -177,6 +177,33 @@ type CourseReviewPayload = {
 
 const ALL = "__new__";
 
+/**
+ * Infer the likely country from a university URL's TLD/ccTLD.
+ * Returns the country name string, or "" when no pattern matches
+ * (so the field is never erroneously pre-filled for unknown TLDs).
+ */
+function detectCountryFromUrl(url: string): string {
+  try {
+    const hostname = new URL(url.startsWith("http") ? url : `https://${url}`).hostname.toLowerCase();
+    if (/\.(edu|ac)\.au$/.test(hostname) || /\.edu\.au$/.test(hostname) || /\.com\.au$/.test(hostname)) return "Australia";
+    if (/\.(ac|co|org|net|sch)\.uk$/.test(hostname) || /\.ac\.uk$/.test(hostname)) return "United Kingdom";
+    if (/\.(ac|co|org)\.nz$/.test(hostname)) return "New Zealand";
+    if (/\.(ac|co|org)\.sg$/.test(hostname)) return "Singapore";
+    if (/\.(ac|co)\.in$/.test(hostname)) return "India";
+    if (/\.(ac|ca)\.ca$/.test(hostname) || /\.ca$/.test(hostname)) return "Canada";
+    if (/\.edu\.my$/.test(hostname)) return "Malaysia";
+    if (/\.edu\.hk$/.test(hostname) || /\.ac\.hk$/.test(hostname)) return "Hong Kong";
+    if (/\.ac\.jp$/.test(hostname) || /\.ed\.jp$/.test(hostname)) return "Japan";
+    if (/\.edu\.cn$/.test(hostname) || /\.ac\.cn$/.test(hostname)) return "China";
+    if (/\.edu\.au$/.test(hostname)) return "Australia";
+    // Plain .edu is almost always US
+    if (/\.edu$/.test(hostname)) return "United States";
+  } catch {
+    // malformed URL — silently ignore
+  }
+  return "";
+}
+
 type UniLite = { id: number; name: string; scrapeUrl?: string | null };
 
 function UniversityCombobox({
@@ -339,6 +366,20 @@ export default function Scraping() {
   const [scholarshipPageUrl, setScholarshipPageUrl] = useState("");
   const [academicRequirementsPageUrl, setAcademicRequirementsPageUrl] = useState("");
   const [fastMode, setFastMode] = useState(false);
+
+  // ── Country auto-detection from URL TLD ──────────────────────────────────
+  // When the user is creating a new university and the country field is blank,
+  // auto-fill it based on the TLD/ccTLD of the first scrape URL.  The user
+  // can always override it manually.  We only fire when the first URL changes
+  // AND no university is selected (i.e. "Create New" mode is active).
+  useEffect(() => {
+    if (selectedUni && selectedUni !== ALL) return; // existing uni selected — don't touch
+    if (newUniCountry.trim()) return;               // user already filled in a country
+    const firstUrl = scrapeUrls[0]?.trim() ?? "";
+    if (!firstUrl) return;
+    const detected = detectCountryFromUrl(firstUrl);
+    if (detected) setNewUniCountry(detected);
+  }, [scrapeUrls, selectedUni, newUniCountry]);
 
   // ── Scrape History (persistent, browseable after a run completes) ────────
   type HistoryRun = {
@@ -896,16 +937,84 @@ export default function Scraping() {
     setAwaitingApproval(null);
 
     const uniBody: Record<string, unknown> = {};
+
     if (selectedUni && selectedUni !== ALL) {
+      // ── Existing university selected ──────────────────────────────────────
       uniBody.universityId = parseInt(selectedUni);
       const uni = uniData?.data?.find((u) => String(u.id) === selectedUni);
       if (uni) setScrapeUniName(uni.name);
     } else {
-      uniBody.universityName = newUniName;
-      uniBody.universityCountry = newUniCountry;
-      uniBody.universityCity = newUniCity;
-      setScrapeUniName(newUniName);
+      // ── Create New University ─────────────────────────────────────────────
+      // Validate all required fields before any network call.
+      if (!newUniName.trim()) {
+        setScrapeLogs([{ event: "error", message: "University Name is required to create a new university." }]);
+        setScraping(false);
+        return;
+      }
+      if (!newUniCountry.trim()) {
+        setScrapeLogs([{ event: "error", message: "Country is required to create a new university." }]);
+        setScraping(false);
+        return;
+      }
+      if (!newUniCity.trim()) {
+        setScrapeLogs([{ event: "error", message: "City is required to create a new university." }]);
+        setScraping(false);
+        return;
+      }
+
+      // Step 1: Create the university record, then use its id for the scrape.
+      setScrapeLogs([{ event: "status", message: `Creating university "${newUniName}"…` }]);
+      let createdId: number | null = null;
+      try {
+        const createResp = await fetch("/api/universities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newUniName.trim(),
+            website: validUrls[0],
+            country: newUniCountry.trim(),
+            city: newUniCity.trim(),
+          }),
+        });
+
+        if (createResp.status === 409) {
+          // University already exists — extract id from the 409 detail body.
+          const errData = await createResp.json() as { detail?: { id?: number; name?: string; message?: string } };
+          createdId = errData?.detail?.id ?? null;
+          const existingName = errData?.detail?.name ?? newUniName;
+          if (createdId) {
+            setScrapeLogs((prev) => [
+              ...prev,
+              { event: "status", message: `University already exists as "${existingName}" (id=${createdId}). Using existing record.` },
+            ]);
+          } else {
+            setScrapeLogs([{ event: "error", message: errData?.detail?.message ?? "University already exists but could not retrieve its ID." }]);
+            setScraping(false);
+            return;
+          }
+        } else if (!createResp.ok) {
+          const msg = await getFetchErrorMessage(createResp);
+          setScrapeLogs([{ event: "error", message: `Failed to create university: ${msg}` }]);
+          setScraping(false);
+          return;
+        } else {
+          const created = await createResp.json() as { id: number; name: string };
+          createdId = created.id;
+          setScrapeLogs((prev) => [
+            ...prev,
+            { event: "status", message: `University "${created.name}" created (id=${createdId}). Starting scrape…` },
+          ]);
+        }
+      } catch (err) {
+        setScrapeLogs([{ event: "error", message: `Network error creating university: ${(err as Error).message}` }]);
+        setScraping(false);
+        return;
+      }
+
+      uniBody.universityId = createdId;
+      setScrapeUniName(newUniName.trim());
     }
+
     if (feePageUrl.trim()) uniBody.feePage = feePageUrl.trim();
     if (requirementsPageUrl.trim()) uniBody.requirementsPage = requirementsPageUrl.trim();
     if (scholarshipPageUrl.trim()) uniBody.scholarshipPage = scholarshipPageUrl.trim();
@@ -922,7 +1031,7 @@ export default function Scraping() {
     }
 
     try {
-      setScrapeLogs([{ event: "status", message: "Scraping started in background..." }].slice(-MAX_SCRAPE_LOG_LINES));
+      setScrapeLogs((prev) => [...prev, { event: "status", message: "Scraping started in background…" }].slice(-MAX_SCRAPE_LOG_LINES));
       setScrapeStartTime(Date.now());
       const jobId = await startSingleJob(validUrls[0]);
       if (jobId) {
@@ -1344,7 +1453,13 @@ export default function Scraping() {
           <div className="flex gap-2 items-center flex-wrap">
             <Button
               onClick={startScraping}
-              disabled={scraping || scrapeUrls.every((u) => !u.trim()) || (!selectedUni && !newUniName)}
+              disabled={
+                scraping ||
+                scrapeUrls.every((u) => !u.trim()) ||
+                // Creating a new university: require name + country + city
+                ((!selectedUni || selectedUni === ALL) &&
+                  (!newUniName.trim() || !newUniCountry.trim() || !newUniCity.trim()))
+              }
               className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
               size="lg"
             >

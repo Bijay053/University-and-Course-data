@@ -1,0 +1,97 @@
+**P0 BLOCKER** — user can't add ANY new universities. Different scope from the 6 open scraper tickets, please prioritize this above them.
+
+**Symptom:** User opens scraping page, picks "+ Create New University" from dropdown, fills in URL + name + country + city, clicks Start AI Scraping. Worker output panel shows:
+```
+[INFO ] Scraping started in background...
+[ERROR] University not found (id=None, url=https://www.kbs.edu.au/, name=KBS)
+```
+Scrape never runs. No record in DB.
+
+**Diagnostic evidence (from prod):**
+
+1. KBS does not exist in the universities table:
+```
+SELECT id, name, website FROM universities WHERE name ILIKE '%kbs%' OR website LIKE '%kbs.edu.au%';
+→ 0 rows
+```
+
+2. No failed runtime job was recorded:
+```
+SELECT runtime_job_id, university_id, status, error_message FROM scrape_runtime_jobs WHERE university_id IS NULL OR error_message ILIKE '%not found%';
+→ 0 rows
+```
+
+The scrape failed BEFORE a runtime job row was inserted. The error went to stdout only. Invisible from the admin dashboard.
+
+**Root cause (from app/routers/scrape.py `start_scrape`):**
+```python
+async def start_scrape(body: StartScrapeBody, db: ...) -> ScrapeStartResponse:
+    uni = None
+    if body.university_id:
+        uni = await db.get(University, body.university_id)
+    if not uni and body.url:
+        result = await db.execute(
+            select(University).where(
+                or_(
+                    University.scrape_url == body.url,
+                    University.website == body.url,
+                    func.lower(University.name) == (body.university_name or "").lower(),
+                )
+            ).limit(1)
+        )
+        uni = result.scalar_one_or_none()
+    if not uni:
+        raise ...  # "University not found"
+```
+
+**This endpoint only LOOKS UP universities. It cannot CREATE them.** The frontend's `+ Create New University` dropdown is wired to nothing on the backend. The form data gets sent with the scrape-start request but there's no create call before it.
+
+**Why this is P0:**
+
+- Blocks ALL new university onboarding. Cannot add UNSW, USyd, Monash, ANU, or any of the 80+ unis from the Phase 1 scaling list. Onboarding is dead until this is fixed.
+- The `+ Create New University` dropdown option in the UI is misleading — it looks like it works, doesn't.
+- Silent failure: scrape failures with no university_id leave no DB trace. User has to read the small console panel in the UI to know anything went wrong. No retry path. No admin visibility. No metrics.
+
+**What I want from you:**
+
+**1. Diagnose first.** Look at the React component that renders the "+ Create New University" dropdown (probably `artifacts/university-portal/src/pages/scraping.tsx` or similar). What does the form actually POST? Does it call `/api/universities` create endpoint at all, or does it just dump the form fields into the scrape-start payload?
+
+**2. Decide the API contract.** Two options:
+
+- **Option A:** Frontend calls `POST /api/universities` first, gets back `id`, then calls `POST /api/scrape/start` with that id. Cleaner separation, two requests.
+- **Option B:** `/api/scrape/start` accepts an optional `create_university: {name, website, country, city}` block and creates+returns the id atomically before kicking off the scrape. One request, but the endpoint does two things.
+
+I lean Option A — cleaner, easier to test, easier to handle errors (e.g. duplicate website should return existing university not error). Your call, but please pick one and document.
+
+**3. Backend create endpoint.** If `POST /api/universities` doesn't exist, build it. Required fields: `name`, `website`, `country`, `city`. Optional: `scrape_url` (defaults to website). Return `{id, name, website, country, city}`. Handle duplicate website with 409 + existing id (so the frontend can surface "University already exists, use it?").
+
+**4. Frontend wiring.** When user picks `+ Create New University`, on Submit:
+- Validate all 4 fields present (name, website, country, city)
+- POST to `/api/universities`
+- On 200: take returned id, POST to `/api/scrape/start` with that id
+- On 409: show "University already exists, switching to existing" and use the returned id
+- On 4xx/5xx: show error in UI, don't fire scrape
+
+**5. Observability fix.** Whether you go Option A or B, when `start_scrape` fails to find a university, INSERT a `scrape_runtime_jobs` row with status=failed and error_message so it's visible in the admin dashboard. Currently the failure goes to stdout only. This is a separate small fix but worth doing while you're in this code path.
+
+**6. Country detection.** Side issue — the user filled in `country=United Kingdom` for `https://www.kbs.edu.au/`. KBS is Kaplan Business School, an Australian institution (.edu.au domain). Either the form auto-detected wrong, or the country dropdown defaulted to UK and user didn't notice. If there's auto-detection from TLD, fix it: `.edu.au → Australia`, `.ac.uk → United Kingdom`, `.ac.nz → New Zealand`, etc. If there's no auto-detect, add one — it'll prevent this kind of error.
+
+**7. Test fixtures.** When you ship: include integration test for the full create+scrape flow. Mock the scrape pipeline, just verify:
+- POST `/api/universities` with valid body → 200 + new row in DB
+- POST `/api/universities` with duplicate website → 409 + existing id
+- POST `/api/scrape/start` with newly-created university_id → 200 + scrape_runtime_jobs row inserted
+- POST `/api/scrape/start` with no university_id and no matching url → 4xx + scrape_runtime_jobs row inserted with status=failed
+
+**Don't bundle this with anything else.** This is a focused frontend+backend wiring fix. Should be fast — most of the work is the React form and the new POST endpoint.
+
+**Don't have user retry yet.** Will wait until you ship.
+
+---
+
+**For context, current state of open Replit tickets (in priority order):**
+1. **THIS ONE (P0)** — Create New University blocker
+2. **Torrens 3 filters** — category/domestic/online filters (also user-stated requirement)
+3. **CSU SPA adapter** — discovery broken on JS-rendered catalogs
+4. **VIT 5 follow-ups** — vocational timeouts, missing categories, name normalization, duration units, eligibility recompute
+
+The Create New University fix unblocks Phase 1 scaling. Until it ships, we can only re-scrape the 5 unis already in the system (USQ, ASA, Torrens, CSU, UTAS, VIT). Adding any new uni is impossible.

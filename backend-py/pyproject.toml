@@ -46,6 +46,13 @@ target-version = "py312"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Share a single asyncio event loop across all tests in the session.
+# Without this, pytest-asyncio creates a new event loop per test function,
+# but asyncpg's connection pool binds its connections to the first loop it
+# sees.  Subsequent tests get "Future attached to a different loop" errors
+# when the pool tries to recycle those connections.  session scope fixes it.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
