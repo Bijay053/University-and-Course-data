@@ -893,3 +893,117 @@ field-label tag — not ASA-specific.
   correctly.
 
 Full suite: 392 passed, 1 skipped (was 387+1 → +5 new tests).
+
+## PR-6 Bug C investigation — debunked at the browser layer
+
+### Hypothesis under test
+User-reported symptom: "the per-course browser fetch returns empty
+for ASA". Three priors offered: JS bundle 404 / wrong wait-condition
+/ http vs https URL.
+
+### Method
+Reproduced the EXACT scraper code path locally:
+* `pool.fetch_html(url, wait_until="domcontentloaded", settle_ms=1500,
+  timeout=15000, click_international=False)` — same args
+  `per_course_browser._browser_config_for("asahe.edu.au")` returns
+  for ASA (apex `asahe.edu.au` is NOT in `_NETWORKIDLE_HOSTS`).
+* Tested all three URL forms the user suggested as suspect:
+  `http://asahe.edu.au/...`, `https://asahe.edu.au/...`,
+  `https://www.asahe.edu.au/...`.
+* For each, captured: `resp.status`, redirect chain, `page.url`
+  after goto, content length, presence of `<strong>Delivery</strong>`
+  marker, `<img>` tags with english/language/requirement in src,
+  presence of `IELTS` substring.
+* Then ran `english_test.extract(html, url)` against the rendered
+  HTML to see what the downstream extractor finds.
+* Then ran the PUBLIC entry-point `maybe_browser_refetch(url, payload={})`
+  with empty payload to force the same code path the scraper uses
+  when the static fetcher returns no english values.
+
+Diagnostic script: `/tmp/diagnose_asa_browser_fetch.py`.
+
+### Findings — the browser fetch is NOT empty
+* All three URL forms resolve to a 200 OK at
+  `https://www.asahe.edu.au/courses/bachelor-of-business`
+  (apex 301→ www, http 301→ https).
+* Browser fetch returns **30329 bytes** of fully-rendered HTML
+  (vs 26523 from the static `httpx` fetcher — the 3806-byte delta
+  is just GA / GTM / WebFlow scripts injected at runtime, no new
+  course data).
+* Rendered HTML contains every course-page marker we care about:
+  `<strong>Delivery</strong>` ✓, `<strong>Location</strong>` ✓,
+  `Face to Face on campus` ✓, `Bachelor of Business` title ✓,
+  `data-wf-page` (Webflow-served, server-rendered) ✓.
+* `maybe_browser_refetch(url, payload={})` returned
+  `(filled={}, evidence=[], rendered=30329-byte HTML)` — the browser
+  did its job; the *extractor* just had nothing english-shaped to
+  pull out.
+* `english_test.extract` against the rendered HTML returned **0
+  results**. Same against the static HTML — also **0 results**.
+  Browser pass and static pass produce IDENTICAL extraction output.
+
+### Why the page has no english requirements text
+* Page has 10 `<img>` tags. None have `english`, `language`, or
+  `requirement` in the `src`.
+* `IELTS` and `Test of English Language` substrings are absent
+  from the rendered HTML entirely.
+* ASA renders the full English-requirements panel as a baked-in
+  PNG / JPEG asset somewhere in the design system (a marketing-design
+  decision, not a SPA hydration delay). Neither static nor browser
+  fetch can read those numbers — both see zero text to regex.
+
+### Verdict
+**Bug C as originally framed is debunked.** The browser fetch
+returns the full server-rendered HTML for ASA on every URL form
+tested, with no JS bundle 404, no wait-condition issue, no http /
+https mismatch, and no Akamai gate. The actual production
+"empty response" symptom (when seen) is the **`per_course_browser_empty`
+status emit** firing because:
+  1. The static fetcher correctly extracts `study_mode`, `location`,
+     `duration`, `intake` from the server-rendered HTML — so for
+     those fields the page IS the source of truth.
+  2. The english slots come back empty (image-only requirements →
+     0 hits from the regex extractor).
+  3. `_all_english_empty(payload)` fires → browser refetch is
+     attempted.
+  4. Browser refetch returns the SAME server-rendered HTML the
+     static fetcher already had → still 0 english hits → the
+     `[per-course browser ✓]` log line shows `IELTS=— PTE=— TOEFL=— CAE=—`
+     i.e. visually "empty" output despite a successful 30329-byte
+     HTML response.
+
+The fix is image-content-aware extraction (OCR / image-URL pattern
+recognition / sibling-cache lookup), not browser configuration.
+That work is already scoped as project task #22
+("Read English requirements from ASA's image-only course pages") —
+no new PR-6 Bug 3 task needed.
+
+### Recommended task scope refinement
+Project task #20 ("Make the live course-page browser fetch work
+for ASA so course data isn't pulled from PDFs") is misframed —
+the live browser fetch DOES work; the issue is that the
+**english-requirements field falls back to the PDF because the
+course page has no extractable english text**. Recommend
+either renaming #20 or merging it into #22.
+
+### Reproducer fixtures
+* `backend-py/tests/fixtures/asa_bachelor_of_business.html`
+  (26523 bytes — what the static `httpx` fetcher sees)
+* `backend-py/tests/fixtures/asa_bachelor_of_business_browser_rendered.html`
+  (30329 bytes — what `browser_pool.fetch_html` returns; identical
+  course data, +GA/GTM script injection)
+* `/tmp/diagnose_asa_browser_fetch.py` — re-runnable diagnostic.
+
+### Local-env note (does not affect production)
+This dev container did not have Playwright installed at investigation
+time. Resolved by `pip install playwright>=1.44.0`, then
+`python -m playwright install chromium`, then installing the Nix
+system libs Chromium needs at runtime: `nspr`, `nss`, `atk`,
+`at-spi2-atk`, `at-spi2-core`, `cups`, `dbus`, `expat`,
+`gdk-pixbuf`, `glib`, `gtk3`, `libdrm`, `libxkbcommon`, `mesa`,
+`alsa-lib`, `pango`, `fontconfig`, `freetype`, `cairo`,
+`xorg.libX11`, `xorg.libXcomposite`, `xorg.libXdamage`,
+`xorg.libXfixes`, `xorg.libXrandr`, `xorg.libXext`, `xorg.libxcb`,
+`libgbm`, `xorg.libXtst`, `xorg.libXi`, `xorg.libXcursor`. Future
+fresh containers may need the same setup if the chromium browser
+fallback is to be exercised locally.
