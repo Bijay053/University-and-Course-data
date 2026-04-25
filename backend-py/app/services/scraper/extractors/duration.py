@@ -77,6 +77,18 @@ _DURATION_ANTI_CONTEXT = re.compile(
     r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry)\b",
     re.I,
 )
+# Bug 3 (KBS / Torrens): compound durations like "1 year, 8 months" or
+# "1 year and 8 months".  The single-unit patterns above only capture the
+# first numeric token ("1 Year") and discard the month component.
+# This pattern captures both integers and converts to total months.
+# Order of checks: compound fires BEFORE the single-unit patterns so the
+# more precise value wins.  Two month representations are supported:
+#   "1 year, 8 months"  /  "1 year and 8 months"  /  "1 year 8 months"
+_COMPOUND_DURATION_RE = re.compile(
+    r"(\d+)\s+years?\s*,?\s*(?:and\s+)?(\d+)\s+months?",
+    re.IGNORECASE,
+)
+
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
 _DURATION_CAP = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}
@@ -140,12 +152,29 @@ def _convert_weeks(amount: float, unit: str) -> tuple[float, str]:
 
 
 def _classify_duration_value(value: str) -> tuple[float, str] | None:
-    """Parse ``<num> <unit>`` from a label-value cell. Returns
+    """Parse a duration expression from a label-value cell. Returns
     ``(amount, canonical_unit)`` or ``None`` when no plausible
     duration is recoverable. Applies the same per-unit caps as the
-    keyword fallback so junk values (e.g. "200 years") are rejected."""
+    keyword fallback so junk values (e.g. "200 years") are rejected.
+
+    Checks compound expressions first ("1 year, 8 months" → 20 months)
+    before falling back to single-unit parsing.
+    """
     if _ACCELERATED.search(value):
         return None
+
+    # Compound match first: "N year(s), M month(s)" → total months.
+    cm = _COMPOUND_DURATION_RE.search(value)
+    if cm:
+        try:
+            years = int(cm.group(1))
+            months = int(cm.group(2))
+            total_months = years * 12 + months
+            if 0 < total_months <= _DURATION_CAP["Month"]:
+                return float(total_months), "Month"
+        except (ValueError, IndexError):
+            pass
+
     m = _DURATION_VALUE_RE.search(value)
     if not m:
         return None
@@ -282,6 +311,29 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # don't need either gate.
         duration_context = bool(_DURATION_CONTEXT.search(s))
         anti_duration_context = bool(_DURATION_ANTI_CONTEXT.search(s))
+
+        # Bug 3: compound "N year(s), M month(s)" match — check before the
+        # single-unit patterns so "1 year, 8 months" → 20 months, not "1 Year".
+        # Compound matches always have duration context (both units present) so
+        # no additional gate is needed.
+        cm = _COMPOUND_DURATION_RE.search(s)
+        if cm and not credit_context:
+            try:
+                c_years = int(cm.group(1))
+                c_months = int(cm.group(2))
+                total_months = c_years * 12 + c_months
+                if 0 < total_months <= _DURATION_CAP["Month"]:
+                    weeks = total_months * _WEEKS["Month"]
+                    parsed.append((
+                        (weeks * 100 + _UNIT_RANK["Month"]) * 1.5,  # boost over single-unit
+                        float(total_months),
+                        "Month",
+                        s.strip()[:240],
+                    ))
+                    continue  # don't also try single-unit patterns on this sentence
+            except (ValueError, IndexError):
+                pass
+
         for pat_idx, pat in enumerate(_PATTERNS):
             m = pat.search(s)
             if not m:

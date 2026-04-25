@@ -1,0 +1,117 @@
+scrape itself produced broken results that point to a **previously-unseen architectural pattern** common to KBS-style university sites. Filing as a focused new ticket because it's not the same as the Torrens 3-filters work.
+
+---
+
+**Diagnostic: I fetched one KBS course page and read the actual HTML.**
+
+URL: `https://www.kbs.edu.au/courses/master-of-information-technology`
+
+What the page contains:
+- Course name, CRICOS code, AQF level, duration, intakes, locations — all on the page
+- "Locations: Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney" — literal physical campuses
+- "Duration: 1 year, 8 months / 12 subjects / 5 trimesters"
+- "Start date: March, July, September + November"
+
+What the page does NOT contain:
+- No fees on the course page. Page links out to `/admissions/fees/international-fees` and `/admissions/fees/domestic-fees`
+- No entry requirements on the course page. Page links out to `/admissions/entry-requirements/international-entry-requirements` and `/admissions/entry-requirements/english-entry-requirements`
+- No "mode" indicator (no On Campus / Online / Blended label) anywhere on the page — mode is implicit (multi-city locations = on-campus)
+
+**This is the central-admissions-page pattern** common to many Australian unis (KBS, USyd handbook, UNSW handbook, ANU programsAndCourses). Per-course pages are thin; fee + entry data lives on shared admissions pages.
+
+---
+
+**Bug 1 (HIGH): Mode defaults to "Online" when extractor can't determine mode**
+
+All 44 KBS courses staged with `Mode: Online`. KBS courses are NOT online — they're on-campus across 6 cities (Adelaide/Brisbane/Gold Coast/Melbourne/Perth/Sydney) per the page content. The scraper has correctly extracted these locations as the `Course Location` field, then for some reason set `Mode: Online`.
+
+My guess: when the mode extractor can't find an explicit "On Campus" / "Online" / "Blended" string on the page, it defaults to `Online`. This is the wrong default. Two implications:
+
+1. KBS courses are misclassified — they're on-campus, not online
+2. **The Torrens online-only filter (when it ships) will incorrectly REJECT these KBS courses** because they're labeled Online when they're actually on-campus
+
+Proposed fix: when mode can't be determined explicitly, derive it from `course_location`:
+- If location contains 1+ city names (Adelaide, Brisbane, Sydney, Melbourne, Perth, etc.) → `On Campus`
+- If page mentions "online" in body but no city locations → `Online`
+- If both → `Blended`
+- If neither → `Unknown` (NOT `Online`)
+
+Note: if you ship the Torrens filter ticket BEFORE fixing this, KBS will look like 44 wrongly-rejected courses. Fix this first, OR ship them together.
+
+**Bug 2 (HIGH): No follow-link extraction for centralized fees / entry requirements**
+
+KBS course pages link to centralized admissions pages:
+- `https://www.kbs.edu.au/admissions/fees/international-fees`
+- `https://www.kbs.edu.au/admissions/fees/domestic-fees`
+- `https://www.kbs.edu.au/admissions/entry-requirements/international-entry-requirements`
+- `https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements`
+
+These pages presumably contain a fee table indexed by course code (CRICOS code is shown on the course page — 110274C for the Master of IT) and entry requirements that apply uni-wide (English requirements for international students are often the same across all programs).
+
+Current scraper architecture: "course page wins" with PDF / image cache as fallback. No mechanism for following central admissions links.
+
+Proposed feature: **central admissions cache per uni**. When discovery runs, identify candidate central pages (URL patterns: `/admissions/fees`, `/admissions/entry-requirements`, `/fees`, `/english-requirements`, etc.), fetch each one ONCE per scrape, parse into a cache keyed by `(course_code, level, intl/dom)`. Per-course extraction then consults the cache when on-page extraction fails for fees / IELTS.
+
+This is similar in spirit to the sibling cache for English requirements, but cross-cutting all courses in a uni. Worth designing carefully — KBS is the first instance but USyd / UNSW / ANU will hit the same pattern at much larger scale.
+
+**Bug 3 (MEDIUM): Duration extractor truncates compound durations**
+
+KBS page literally says: "Typical Duration / Standard Study Option **1** year, **8** months"
+
+Scraper extracted: `1 Year`. Lost the "8 months" part. Real value is 1.67 years or 20 months.
+
+This is a duration.py extractor bug — only catches first numeric+unit pair, doesn't compose. Fix: when input matches `<N> year(s)?,? <M> month(s)?` pattern, output `N years M months` or normalize to total months / total years with decimal.
+
+Note: this also overlaps with Bug D from Torrens (float precision `1.7000000476837158 Year`). When you fix that one, account for compound durations too.
+
+---
+
+**Sanity check on what DID work for KBS:**
+
+- Discovery: 44 candidates from `/courses` static catalog — fast, no SPA issues ✓
+- Course names: clean (no Title Case issues like Torrens, no AQF prefix issues like VIT) ✓
+- Intakes: "Mar, Jul, Sep, Nov" parsed correctly ✓
+- Locations: "Adelaide / Brisbane / ... / Sydney" extracted correctly ✓ (the only uni so far where multi-campus extraction works perfectly)
+- Categories: detected correctly (CS&IT/Information Systems, Business&Mgmt/MBA, etc.) ✓
+- Sibling cache fired for backfill ✓
+
+44 staged — catalog is real, worker is healthy, just the 3 bugs above need fixing.
+
+---
+
+**Side observation: worker re-ran the same scrape twice in this log**
+
+The full worker log shows TWO complete back-to-back runs of the KBS scrape (both 8m 28s, both ending with 44 staged, both with identical content). Either:
+- The `Worker claimed queued scrape job` line ran twice because the queue had two jobs (user double-clicked Submit?)
+- Or the previous job didn't mark itself complete before the worker re-claimed it (celery retry / heartbeat issue)
+
+Not critical to fix today — just flagging. Worth a `SELECT runtime_job_id, status, started_at, completed_at FROM scrape_runtime_jobs WHERE university_id=10 ORDER BY started_at DESC` check on your preview DB to see if both runs are recorded as separate jobs.
+
+---
+
+**What I want from you:**
+
+1. **Acknowledge the P0 fix verified working** — will close that ticket on my end.
+
+2. **Bug 1 (mode default) before Torrens filter PR ships** — otherwise the filter will incorrectly reject KBS courses as online-only. These two need to land together OR Bug 1 first.
+
+3. **Bug 2 (central admissions cache)** — this is the architecturally-significant one. Don't quick-fix. Design properly because USyd / UNSW / ANU will all need this. Send me a short design proposal before coding (URL patterns to discover, cache key shape, fallback behavior, where in the pipeline it slots in). I want to review before you build.
+
+4. **Bug 3 (compound duration)** — small fix in `duration.py`, can bundle with the existing float-precision fix from Torrens.
+
+5. **Check the double-run side observation** — worth knowing if it's a real bug or just the user double-clicking.
+
+---
+
+**State of all open tickets, updated:**
+
+1. ~~**P0** Create New University blocker~~ — VERIFIED FIXED
+2. **P1 (NEW)** KBS Bug 1 — Mode default = Online (must ship before/with Torrens filter PR)
+3. **P1** Torrens 3 filters — (category-landing / domestic-only / online-only)
+4. **P1 (NEW)** KBS Bug 2 — Central admissions cache architecture
+5. **P1** CSU SPA discovery adapter
+6. **P2** VIT 5 follow-ups
+7. **P3 (NEW)** KBS Bug 3 — Compound duration parsing (bundle with Torrens float-precision)
+8. **P3 (NEW)** Worker double-run check (diagnostic)
+
+I'll keep ASA + VIT as the verified-working baseline. Don't run any scrapes that might change them. KBS is now in your preview at id=10.

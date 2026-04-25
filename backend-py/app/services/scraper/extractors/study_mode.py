@@ -368,6 +368,26 @@ def classify_study_mode(
     return None, None, None
 
 
+def derive_mode_from_location(location_str: str | None) -> str | None:
+    """Derive a study-mode signal purely from the course_location field.
+
+    Called by the pipeline *after* all extractors have run as a fallback /
+    correction step.  The location extractor strips virtual/online keywords
+    from its output, so a non-empty ``course_location`` value means the
+    course has at least one physical campus.
+
+    Returns:
+        ``"On Campus"`` — location is non-empty (physical campus confirmed).
+        ``None``        — location is absent or blank; no derivation possible.
+    """
+    if not location_str:
+        return None
+    stripped = location_str.strip().strip("/").strip()
+    if stripped:
+        return "On Campus"
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     mode, snippet, confidence = classify_study_mode(html)
     if not mode:

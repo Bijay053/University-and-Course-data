@@ -163,6 +163,45 @@ async def extract_course(
                     # the extractor returned first) is preserved.
                     payload.setdefault(k, v)
 
+    # ── Bug 1 (KBS): location-based mode correction ──────────────────────────
+    # The bare `\bonline\b` fallback in study_mode.py fires on marketing copy
+    # like "Apply Online" / "Enquire Online" found in footers/navs of pages
+    # that have NO structural mode label.  It is assigned confidence=0.5
+    # (deliberately low) but still wins when there's no competing signal.
+    #
+    # If course_location has content (location extractor already strips
+    # virtual/online keywords), the course has a physical campus.  A bare
+    # `\bonline\b` hit at confidence ≤ 0.5 must NOT override that evidence.
+    # Similarly, if mode wasn't determined at all but we have a location,
+    # derive "On Campus" rather than leaving the field blank.
+    _study_mode_evidence = [e for e in evidence if e["field_key"] == "study_mode"]
+    _low_conf_online = (
+        payload.get("study_mode") == "Online"
+        and any(
+            e.get("confidence", 1.0) <= 0.5 and e.get("method") == "study_mode:rule"
+            for e in _study_mode_evidence
+        )
+    )
+    _mode_absent = not payload.get("study_mode")
+    if _mode_absent or _low_conf_online:
+        from app.services.scraper.extractors.study_mode import derive_mode_from_location
+
+        _derived_mode = derive_mode_from_location(payload.get("course_location"))
+        if _derived_mode:
+            payload["study_mode"] = _derived_mode
+            evidence.append(
+                {
+                    "field_key": "study_mode",
+                    "value": _derived_mode,
+                    "confidence": 0.6,
+                    "method": "study_mode:location_derived",
+                    "snippet": (
+                        f"Derived from course_location: "
+                        f"{(payload.get('course_location') or '')[:80]}"
+                    ),
+                }
+            )
+
     # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
     # the per-course browser pass because (a) it's pure-CPU (no Playwright
     # spin-up, no network), (b) the english_test extractor often misses
