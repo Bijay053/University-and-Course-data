@@ -1,0 +1,91 @@
+Pulled the 6 PRs to prod (c970083 → aeca3d4), restarted services, verified P0 backend works at API level. Then deployed the frontend (had to manually `npm run build` + rsync — separate ticket on that infra issue coming next). Tested Create New University end-to-end through the UI: ✅ KBS row created as id=8.
+
+Then fired a scrape on KBS via UI → immediate failure:
+```
+[INFO] Scraping started in background...
+[INFO] Worker claimed queued scrape job
+[INFO] Cleared 0 stale ... for university 8
+```
+Worker died in 0.4 seconds. Checked `scrape_runtime_jobs` and found:
+
+```
+  runtime_job_id  | status |          started_at           |         error_message
+------------------+--------+-------------------------------+-------------------------------
+ job_311a8b2ee6e6 | failed | 2026-04-25 10:47:28.906129+00 | University missing scrape_url
+ job_cfee41b27398 | failed | 2026-04-25 10:47:27.682631+00 | University missing scrape_url
+ job_6ef861144da0 | failed | 2026-04-25 10:47:24.376242+00 | University missing scrape_url
+ job_732824890b4c | failed | 2026-04-25 10:44:42.944297+00 | University missing scrape_url
+ job_a36b0712003f | failed | 2026-04-25 10:44:40.843457+00 | University missing scrape_url
+```
+
+**Two bugs here — main + side. Plus one positive observation.**
+
+---
+
+**MAIN BUG: `POST /api/universities` doesn't set `scrape_url`. Scraper requires it. New unis can't be scraped.**
+
+Compare row state across all unis on prod:
+
+```
+ id |       name       |          website          |                scrape_url                 
+----+------------------+---------------------------+-------------------------------------------
+  1 | USQ              |                           | https://www.unisq.edu.au/
+  2 | asa              | https://www.asahe.edu.au/ | https://www.asahe.edu.au/
+  3 | torrens          |                           | https://www.torrens.edu.au/
+  4 | CSU              |                           | https://study.csu.edu.au/
+  5 | UTAS             |                           | https://www.utas.edu.au/courses-and-units
+  6 | vit              |                           | https://vit.edu.au/
+  8 | KBS  (new)       | https://www.kbs.edu.au/   |                                <- EMPTY
+```
+
+Every uni created the OLD way has `scrape_url` populated (often with `website` blank). The new POST endpoint sets `website` but not `scrape_url`. Scraper looks at `scrape_url` → fails immediately.
+
+**This blocks every single new university.** UNSW, USyd, Monash, ANU — anyone added via the new flow will hit this. The P0 ticket fix is half-shipped: users can CREATE universities but can't SCRAPE them.
+
+**Fix:** In `POST /api/universities`, default `scrape_url = website` if `scrape_url` not provided in request body. One-line fix in `app/routers/universities.py`. Also ideally add a not-null constraint to `scrape_url` column so this can't happen again silently.
+
+**Workaround on prod (already applied for KBS):**
+```sql
+UPDATE universities SET scrape_url = website WHERE id = 8;
+```
+After this, KBS scrape ran successfully (44 candidates discovered, currently extracting). So the fix unblocks scraping. Your one-line endpoint change will make it not-needed for future unis.
+
+**Test fixture to add:** In `test_create_university_flow.py`, after creating a uni, assert `created.scrape_url == created.website` when scrape_url not provided. Then attempt a `/api/scrape/start` with the new id and assert it doesn't return "missing scrape_url".
+
+---
+
+**SIDE BUG (also affects new users): UI fires multiple jobs back-to-back, no debounce.**
+
+Look at the timestamps above:
+- 10:44:40, 10:44:42 — 2 seconds apart
+- 10:47:24, 10:47:27, 10:47:28 — 3 jobs in 4 seconds
+
+User only clicked Submit twice (once at ~10:44, once at ~10:47), but 5 jobs fired. Either:
+- (a) Frontend doesn't disable the button after click, user clicked multiple times by accident
+- (b) Frontend has retry logic on the request and is re-firing on errors
+- (c) Some race condition between the create-university POST and the scrape-start POST
+
+Fix the Submit button to disable + show "Starting..." state after click, only re-enable after worker output starts streaming OR after a clear error response. This is also useful UX — current behavior is "click button, nothing visible happens for 2-3 seconds, click again because it didn't react".
+
+---
+
+**POSITIVE OBSERVATION (verifying P0 observability fix worked):**
+
+The `scrape_runtime_jobs` table now records failed jobs WITH error messages. Earlier today this query returned `0 rows` because the silent-fail pattern hid everything. Now we get the error message, timestamps, can grep, can build dashboards. Thank you — this is a real win that'll save diagnostic time on every future bug.
+
+Worth using this newfound observability: a metric/alert on `SELECT count(*) FROM scrape_runtime_jobs WHERE status='failed' AND started_at > now() - interval '1 hour'` would catch P0-class issues in seconds instead of waiting for users to report them.
+
+---
+
+**State of P0 verification on prod:**
+
+- ✅ `POST /api/universities` works (KBS created as id=8)
+- ✅ Frontend wiring works (UI calls create endpoint then scrape endpoint)
+- ✅ Country auto-detect works (`.edu.au` → Australia, no longer United Kingdom)
+- ✅ Failed jobs recorded in DB with error messages (observability)
+- ❌ **Scrape itself fails on the newly-created uni (this ticket)**
+- ⚠️ Submit button doesn't debounce (side bug)
+
+P0 is half-shipped. This ticket closes the gap.
+
+**Don't bundle with anything else.** Single one-line fix to `app/routers/universities.py` + the test fixture. Should be a 10-minute PR.

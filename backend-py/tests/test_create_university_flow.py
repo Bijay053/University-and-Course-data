@@ -138,6 +138,107 @@ async def test_create_university_valid_body_returns_200_and_inserts_row() -> Non
 
 
 # ---------------------------------------------------------------------------
+# Test 1b: POST /api/universities — scrape_url defaults to website
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_university_sets_scrape_url_from_website() -> None:
+    """POST /api/universities without scrape_url → scrape_url defaults to website.
+
+    This prevents the 'University missing scrape_url' failure that blocked
+    all newly-created universities from being scraped.
+    """
+    name = _unique_name()
+    website = _unique_website("-scrapeurldefault")
+    created_id: int | None = None
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        resp = await ac.post(
+            "/api/universities",
+            json={"name": name, "website": website, "country": "Australia", "city": "Sydney"},
+        )
+
+    try:
+        assert resp.status_code in (200, 201), f"Expected 200/201, got {resp.status_code}: {resp.text}"
+        body = resp.json()
+        created_id = body["id"]
+
+        # The endpoint must set scrape_url = website when scrape_url is not provided.
+        async with AsyncSessionLocal() as db:
+            row = (
+                await db.execute(
+                    text("SELECT scrape_url FROM universities WHERE id = :i"),
+                    {"i": created_id},
+                )
+            ).one_or_none()
+        assert row is not None, f"No DB row for id={created_id}"
+        assert row.scrape_url == website, (
+            f"scrape_url should default to website ('{website}'), got '{row.scrape_url}'"
+        )
+    finally:
+        if created_id:
+            await _delete_uni(created_id)
+
+
+@pytest.mark.asyncio
+async def test_create_university_then_scrape_start_does_not_fail_missing_scrape_url() -> None:
+    """End-to-end: create uni via API → POST /api/scrape/start → 202, no 'missing scrape_url'.
+
+    Regression test for the bug where newly-created universities had scrape_url=NULL
+    causing every scrape to fail immediately with 'University missing scrape_url'.
+    """
+    name = _unique_name()
+    website = _unique_website("-scrapeflow")
+    created_id: int | None = None
+    job_id: str | None = None
+
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        create_resp = await ac.post(
+            "/api/universities",
+            json={"name": name, "website": website, "country": "Australia", "city": "Melbourne"},
+        )
+    assert create_resp.status_code in (200, 201), f"Create failed: {create_resp.text}"
+    created_id = create_resp.json()["id"]
+
+    try:
+        with patch("app.tasks.scrape_tasks.scrape_university.delay"):
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac2:
+                scrape_resp = await ac2.post(
+                    "/api/scrape/start",
+                    json={"universityId": created_id, "url": website},
+                )
+        job_id = (scrape_resp.json() or {}).get("jobId") or (scrape_resp.json() or {}).get("job_id")
+
+        # Must not fail; should queue the job.
+        assert scrape_resp.status_code == 202, (
+            f"scrape/start returned {scrape_resp.status_code} — "
+            f"possible 'missing scrape_url' error: {scrape_resp.text}"
+        )
+
+        # Verify the queued job did not immediately fail with the scrape_url error.
+        if job_id:
+            async with AsyncSessionLocal() as db:
+                row = (
+                    await db.execute(
+                        text("SELECT status, error_message FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+                        {"j": job_id},
+                    )
+                ).one_or_none()
+            if row:
+                assert "missing scrape_url" not in (row.error_message or "").lower(), (
+                    f"Job failed with scrape_url error: {row.error_message}"
+                )
+    finally:
+        if job_id:
+            await _delete_runtime_job(job_id)
+        if created_id:
+            await _delete_uni(created_id)
+
+
+# ---------------------------------------------------------------------------
 # Test 2: POST /api/universities — duplicate website returns 409 + existing id
 # ---------------------------------------------------------------------------
 

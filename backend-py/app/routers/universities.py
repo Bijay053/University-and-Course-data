@@ -182,6 +182,9 @@ async def create_university(
     ):
         if url_key in payload and payload[url_key] is not None:
             payload[url_key] = str(payload[url_key])
+    # Default scrape_url to website so the scraper can find newly-created unis.
+    if not payload.get("scrape_url") and payload.get("website"):
+        payload["scrape_url"] = payload["website"]
     u = University(**payload)
     db.add(u)
     await db.commit()

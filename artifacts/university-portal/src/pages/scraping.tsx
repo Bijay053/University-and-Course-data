@@ -342,6 +342,7 @@ export default function Scraping() {
   const pollWarningShownRef = useRef(false);
   const pollLastSuccessAtRef = useRef(Date.now());
   const pollRequestTimeoutRef = useRef<number | null>(null);
+  const submittingRef = useRef(false);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
@@ -925,10 +926,19 @@ export default function Scraping() {
   }, [awaitingApproval, activeJobId, handleApproval]);
 
   const startScraping = useCallback(async () => {
+    // Synchronous guard: prevents double-submit in the render window before
+    // scraping=true propagates to the DOM and disables the button.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     const validUrls = scrapeUrls.map((u) => u.trim()).filter(Boolean);
-    if (validUrls.length === 0) return;
+    if (validUrls.length === 0) {
+      submittingRef.current = false;
+      return;
+    }
 
     setScraping(true);
+    submittingRef.current = false; // React state now owns the disabled guard
     setScrapeLogs([]);
     setScrapeResult(null);
     setShowReview(false);
