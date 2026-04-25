@@ -1,0 +1,29 @@
+#19 - PR-6 Bug 2 — diagnose study_mode reporting "online" for ASA on-campus courses
+What & Why
+ASA's Bachelor of Business course page literally says <strong>Delivery</strong> Face to Face on campus in adjacent course-header-text divs. The current extractors/study_mode.py returns "online" instead, almost certainly because it picks up the word "Online" from the Location field (which reads "Sydney, Online"). This is a real production bug — every ASA course is being mis-classified. The user explicitly said "diagnose before patching"; do not jump to a fix until the actual extractor input → output mapping is captured on paper.
+
+Done looks like
+A reproducible script or notebook entry that loads the saved /tmp/asa_bbus.html (26566 bytes), runs the current extractors/study_mode.py against it, and prints (a) every input substring the extractor considered, (b) the score/decision path, (c) the final returned value.
+A side-by-side written comparison: what the page says (the literal "Face to Face on campus" string in its course-header-text parent), versus what the extractor reads (the "Online" token from the Location field).
+A proposed fix design (one paragraph, no code yet) that uses the <strong>Delivery</strong> label-value sibling-div pair as the authoritative signal and ignores Location-field text entirely. Spell out which other Australian university course pages use the same label-value sibling-div idiom, so the fix is generalised, not ASA-only.
+A test case (failing today) that locks in the correct behaviour for ASA Bachelor of Business: study_mode == "on_campus" / "face_to_face" (whichever the schema uses).
+Then — and only then — implement the fix, make the test pass, and re-run the full PR-5 suite at 385+/0/1.
+Out of scope
+Changing study_mode enum values or schema. Whatever the current study_mode field accepts ("on_campus", "face_to_face", "online", "blended", "mixed", …), use the existing values.
+Any speculative regex tweak to the existing extractor without first capturing what it actually reads. The goal is "extractor sees the literal label, then the literal value" — not a more aggressive "online" exclusion.
+Bug 1 (sibling-cache precedence) — separate PR-6 task.
+Steps
+Reproduce on saved HTML: write a one-shot script that loads /tmp/asa_bbus.html, runs the current extractor, and dumps the decision trace.
+Pull a fresh live ASA course page (any Bachelor) and a fresh live ASA master page; save both alongside the bbus snapshot. Confirms the structure isn't a one-off.
+Search for the same <strong>Label</strong> / sibling-div idiom on at least two other AU universities the project already scrapes (CSU, UTAS, USQ, Torrens, VIT). Document which ones use it. This decides whether the fix is a general label-value-sibling-div parser or ASA-specific.
+Add a failing test (saved HTML in tests/fixtures/) before changing extractor code.
+Implement the parser change. Make the new test pass. Re-run the PR-5 suite — must stay at ≥385/0/1.
+Critical constraints
+No "hide 'online'" hack. The Location field legitimately says "Sydney, Online" — the bug is the extractor reading the wrong field, not that "online" is the wrong word.
+Diagnose-before-patch. The first commit on this task should be the saved fixture + failing test + diagnosis writeup. The fix commit is second.
+Relevant files
+backend-py/app/services/scraper/extractors/study_mode.py
+backend-py/app/services/scraper/sibling_cache.py
+backend-py/app/services/scraper/pipelines/single_course.py
+backend-py/tests/
+/tmp/asa_bbus.html
