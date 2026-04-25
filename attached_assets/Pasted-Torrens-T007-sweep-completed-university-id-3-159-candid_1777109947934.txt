@@ -1,0 +1,170 @@
+Torrens T007 sweep completed (university_id=3, 159 candidates, 157 staged, 17m 53s, 0 errors). Discovery jumped from the broken 22 we saw pre-PR-5 to 159 — the URL-shape filter from PR-5 is working. But the result is mixed: roughly 40 of 157 rows shouldn't be there. The user has now stated explicit business requirements that need to land as filters.
+
+**User's hard requirements (these are PRIORITY 1):**
+
+1. **Reject category landing pages.** Only ingest actual course pages.
+2. **Reject domestic-only courses.** Only courses available to international students.
+3. **Reject online-only courses.** Only on-campus or blended.
+
+All three are visible failures in the current Torrens result. Diagnose each, propose targeted detection, ship as ONE focused PR (not 3 — these filters all live in the same gate).
+
+---
+
+**Bug A: Category landing pages staged as courses**
+
+~25 of 157 rows are category landing pages. User-confirmed examples with URLs:
+```
+https://www.torrens.edu.au/courses/design/3d-design-animation
+https://www.torrens.edu.au/courses/design/ux-web-design
+https://www.torrens.edu.au/courses/design/graphic-communication-design
+```
+
+Full list staged from worker log:
+```
+Game Design Development     /courses/design/game-design-development
+Interior Design Decoration  /courses/design/interior-design-decoration
+Media Production            /courses/design/media-production
+Photography Film Video Design  /courses/design/photography-film-video-design
+Ux Web Design               /courses/design/ux-web-design
+Graphic Communication Design /courses/design/graphic-communication-design
+3d Design Animation         /courses/design/3d-design-animation
+Branded Fashion Design      /courses/design/branded-fashion-design
+Hotel Management            /courses/hospitality/hotel-management
+Hospitality Management Tourism /courses/hospitality/hospitality-management-tourism
+Cloud Computing             /courses/technology/cloud-computing
+Software Engineering        /courses/technology/software-engineering
+Information Technology      /courses/technology/information-technology
+Artificial Intelligence     /courses/technology/artificial-intelligence
+Technology School           /courses/technology/technology-school
+Faculty Of Health           /courses/health/faculty-of-health
+Faculty Of Education        /courses/education/faculty-of-education
+Business School             /courses/business/business-school
+Project Management          /courses/business/project-management
+Sports Management           /courses/business/sports-management
+Business Analytics          /courses/business/business-analytics
+Event Management            /courses/business/event-management
+Public Health, Mental Health, Health Science, Complementary Medicine, Beauty And Dermal Therapies
+```
+
+The PR-5 `_is_category_landing` URL filter can't catch these because the URLs look course-shaped (`/courses/<faculty>/<slug>`). The actual course pages live at the SAME URL pattern, just with longer slugs (`/courses/design/bachelor-of-3d-design-and-animation` is a real course, `/courses/design/3d-design-animation` is its category landing).
+
+Detection has to be content-based. Visit one of the user's examples like `https://www.torrens.edu.au/courses/design/3d-design-animation` and look at the HTML structure. Strong signals for category landing:
+- Page contains many outbound links to other `/courses/<faculty>/*` URLs (5+)
+- No single fee, duration, or intake (or contradictory "varies by program" copy)
+- H1/title doesn't start with degree-level word ("Bachelor", "Master", "Diploma", "Certificate", "Graduate", "Doctor", "Advanced Diploma", "Associate Degree")
+- Has "explore", "discover", "find", "choose your" text in main content
+
+Reject in `_is_category_landing` (or whatever the equivalent function is) BEFORE staging, not after. Don't stage them at 38-54% completeness with placeholder values — just skip.
+
+**Bug B: Domestic-only courses staged**
+
+Many staged rows have NO international fee (Intl. Fee column blank in UI):
+```
+Master Of Cybersecurity
+Master Of Cybersecurity Advanced
+Master Of Economics Of Sustainability
+Master Of Engineering Management
+Bachelor Of Counselling
+Bachelor Of Psychological Science
+Graduate Diploma Of Counselling
+Graduate Diploma Of Psychology
+Graduate Diploma Of Economics Of Sustainability
+Graduate Certificate Of Counselling
+Graduate Certificate Of Public Health
+Graduate Certificate Of Cybersecurity
+Graduate Certificate Of Information Technology
+Graduate Certificate Of Education
+Graduate Diploma Of Education
+Master Of Education Advanced
+Master Of Counselling, Master Of Counselling Advanced
+Diploma Of Marketing, Diploma Of Sport Development, Diploma Of Health And Wellbeing, Diploma Of Nutrition, Diploma Of Counselling Vet
+Master Of Research Studies, Doctor Of Philosophy By Prior Works, Graduate Certificate Of Research Studies, Professional Doctorate Research, Professional Doctorate Applied Research
+```
+
+~30 rows. The user does NOT want domestic-only courses. Rule: if `international_fee` is null AND we've completed extraction (not just pending AI fallback), reject the course.
+
+Might also be related to T005's "international toggle" pattern from VIT — does Torrens have an international/domestic toggle the scraper isn't clicking? Check `https://www.torrens.edu.au/courses/health/master-of-counselling` source for any toggle/tab/radio UI that swaps fee data between local and international views.
+
+**Bug C: Online-only courses staged**
+
+~15-20 rows have Mode: Online:
+```
+Diploma Of Marketing                          — Online
+Diploma Of Travel And Tourism                  — Online
+Bachelor Of Applied Business Marketing         — Online
+Bachelor Of Applied Business Management        — Online
+Bachelor Of Applied Entrepreneurship           — Online
+Bachelor Of Psychological Science              — Online
+Bachelor Of Nutrition                          — Online
+Master Of Education Advanced/Leadership/Inclusive Literacies — Online
+Graduate Diploma Of Education                  — Online
+Graduate Certificate Of Education              — Online
+Graduate Certificate Of Higher Education...    — Online
+Graduate Certificate Of Education, etc.
+Master Of Business Administration Innovation … Ducere — Online
+Master Of Business Administration On Demand    — Online
+Graduate Certificate Of Economics Of Sustainability — Online
+Graduate Diploma Of Economics Of Sustainability — Online
+Master Of Economics Of Sustainability          — Online
+Doctor Of Business Leadership                  — Online
+Graduate Diploma Of Business Administration On Demand — Online
+Graduate Certificate Of Business Administration On Demand — Online
+```
+
+The user does NOT want online-only courses. Rule: if `study_mode` IN ('Online') AND no on-campus alternative, reject. If `study_mode` is 'Blended' or 'On Campus', accept.
+
+**Implementation note for all 3:** these should be a single `_should_stage_course(course)` gate function that returns `(accept: bool, reject_reason: str)`. Reject reasons should be loggable: `"category_landing_page"`, `"international_only"` is wrong term — it should say `"no_international_fee"`, `"online_only"`. Then staged_count vs candidates_count tells us how many got filtered, AND we can grep prod logs by reason.
+
+Expected impact: 157 staged → ~95-110 staged after filters apply. That's the right number for Torrens — they have a known catalog of around 100-110 international on-campus/blended courses across all faculties.
+
+---
+
+**Lower priority bugs found (file separately, ship later, not this PR):**
+
+**Bug D: Float precision in duration**
+Multiple rows show `1.7000000476837158 Year`. That's a 32-bit float upcast to 64-bit. Round to 1 decimal in `duration.py` before serializing.
+
+**Bug E: Course name normalization, vol 2**
+VIT exposed prefix issues. Torrens exposes title-case issues:
+- "Of" / "And" / "In" capitalized (should be lowercase prepositions): `Diploma Of 3d Design And Animation` → `Diploma of 3D Design and Animation`
+- "3d" → "3D" (Roman/numeric+letter pattern)
+- "Mba" → "MBA", "Vet" → "VET", "Ux" → "UX" (acronyms)
+- Redundant suffixes like "Master of Business Administration Mba" (drop trailing acronym already in title)
+
+This is the SAME `course_name.py` extractor that surfaced VIT issues. Worth one comprehensive PR fixing all the title-case rules in one go: prepositions lowercase, acronyms uppercase, alphanumeric mixes uppercase, dedupe acronym in title.
+
+**Bug F: Course Location empty for all Torrens courses**
+Every row shows `-` for Course Location. Torrens has Sydney/Melbourne/Adelaide/Brisbane campuses listed on their pages but extractor isn't catching them. Add Torrens-specific location extraction OR generalize T003 VIT static fallback to also fire on `torrens.edu.au`.
+
+**Bug G: AI fallback hallucinating durations**
+Category landing pages are getting impossible durations from AI fallback:
+- `Bachelor Of Health Science Naturopathy: 8 Year` (real value: 4 years)
+- `Bachelor Of Interior Design Residential: 6 Year` (real value: 3 years)
+- `Faculty Of Health: 10 Year` (it's a faculty, not a course)
+- `Health Science: 10 Year` (category)
+
+If Bug A lands first, this mostly self-resolves (these rows won't be staged). But duration AI fallback should also have a sanity gate: reject duration values > 5 years for non-Doctorate level.
+
+**Bug H: Browser timeouts on torrens.edu.au, same pattern as VIT vocational and CSU**
+~30+ timeouts at 20s on torrens. Each costs 30s wall time. Static fallback catches them but doubles the runtime. Same broader fix needed as VIT vocational — per-host config or path-specific browser strategy.
+
+---
+
+**What I want from you:**
+
+1. **Ship one focused PR** for Bugs A + B + C — the 3 filters — since they're all about the same staging-gate decision. **Don't bundle anything else.**
+2. **Diagnose first.** For Bug A specifically, fetch one of the category landing pages (`https://www.torrens.edu.au/courses/design/3d-design-animation` is the user's example) and tell me the structural signal. Don't propose a heuristic without showing me what the page actually looks like.
+3. **Test fixtures.** When you ship, include test fixtures for: one Torrens category landing page (rejected), one Torrens real course page (accepted), one Torrens domestic-only course (rejected), one Torrens online-only course (rejected), one Torrens international on-campus course (accepted).
+4. **Don't run the existing scrapes again.** The current 157 staged Torrens rows can stay as garbage in the staging table — user will reject/clear them after the new filters land. Don't re-scrape Torrens until your PR is merged.
+5. **File Bugs D-H as separate tickets** in your follow-up list. Not this PR.
+
+---
+
+**State of T007 sweep (for context):**
+- ASA — 9 courses, clean ✓
+- VIT — 38 courses, clean (5 follow-up issues filed)
+- CSU — broken at discovery, separate ticket filed (SPA adapter needed)
+- Torrens — this ticket
+- USQ, UTAS — not yet run
+
+**Pausing T007 here.** Won't run USQ/UTAS until Torrens filters land. They might have similar SPA + category-landing issues and we'd just generate more garbage.
