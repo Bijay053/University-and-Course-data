@@ -11,7 +11,7 @@ A centralized admin portal for managing university course data including courses
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui + TanStack React Query + wouter
-- **API framework**: Express 5
+- **API framework**: FastAPI in Replit dev (Python, port 8080); Express 5 in production (Node, PM2 + Nginx). See "Local Dev API" and "Production Deployment".
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
@@ -20,7 +20,12 @@ A centralized admin portal for managing university course data including courses
 ## Key Artifacts
 
 - **`artifacts/university-portal`** — React + Vite frontend at `/`
-- **`artifacts/api-server`** — Express 5 API server at `/api`
+- **`artifacts/api-server`** — Express 5 API server at `/api`. **Production-only.** Built and run by PM2 on the DigitalOcean droplet via `deploy.sh`. The local dev workflow is intentionally inert (it prints a status line and exits cleanly, so the workflow lands in the `finished` state — never `failed`); FastAPI owns `/api` in the Replit dev container — see "Local Dev API" below.
+- **`backend-py/`** — FastAPI + SQLAlchemy async + Celery + Playwright rewrite. **Authoritative in local dev only** (workflows `backend-py: FastAPI` on `:8080` and `backend-py: Celery worker`). Not yet on production. See "Python Backend (Parallel Deployment)" further down.
+
+### Local Dev API
+
+In the Replit container, **only the Python FastAPI service binds `:8080`** and serves `/api/*`. The Node `artifacts/api-server` workflow is still registered (because its `[[services]] paths = ["/api"], localPort = 8080` block is what tells the Replit preview proxy to route `/api/*` requests to `localhost:8080` — where FastAPI is listening), but its dev `run` command is a no-op that exits cleanly. The workflow therefore reads as `finished` in the workflow list rather than `failed`, and never races FastAPI for the port. The Node source is still built and shipped to production unchanged. To actually run the Node API locally for debugging, run `pnpm --filter @workspace/api-server run dev` in a shell after stopping `backend-py: FastAPI`. To edit the artifact's `run` command, use the `verifyAndReplaceArtifactToml` callback — do not edit `artifact.toml` in place.
 
 ## Pages
 
@@ -85,7 +90,7 @@ pm2 env 0 | grep -E "DATABASE_URL|GEMINI|UV_THREADPOOL"            # confirm pm2
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm --filter @workspace/api-server run dev` — run the legacy Node API server locally (only needed for debugging the production Node code; FastAPI serves `/api` in dev by default)
 - `pnpm --filter @workspace/university-portal run dev` — run frontend locally
 
 ## API Routes
