@@ -20,6 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.models import ScrapeRuntimeJob, University
 from app.services.scraper.discovery import discover_course_links
+from app.services.scraper.per_course_vision import (
+    VisionImageCache,
+    new_vision_image_cache,
+)
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
@@ -192,7 +196,7 @@ async def _extract_only(
     country: str | None,
     uni_pdf_data: dict | None = None,
     emit=None,
-    vision_image_cache: dict | None = None,
+    vision_image_cache: VisionImageCache | None = None,
 ) -> dict:
     """Network-bound work — safe to parallelise across coroutines.
 
@@ -444,10 +448,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # one shared screenshot covers all 4 Bachelor of Business pages.
         # Without a shared cache we (a) pay Gemini per course and (b)
         # get non-deterministic per-call OCR results that leave sibling
-        # courses inconsistent. One dict per gather() run is the right
+        # courses inconsistent. One per gather() run is the right
         # scope: not so wide it leaks across universities, not so narrow
-        # it misses the cross-course wins.
-        vision_image_cache: dict[str, dict[str, Any]] = {}
+        # it misses the cross-course wins. The cache stores asyncio
+        # Futures (see ``VisionImageCache``) so concurrent siblings on
+        # the same image URL coalesce to a single Gemini call instead
+        # of racing past the cache check.
+        vision_image_cache: VisionImageCache = new_vision_image_cache()
 
         async def _bounded(link: dict) -> dict:
             async with sem:

@@ -161,27 +161,54 @@ async def _download(url: str) -> bytes | None:
         return None
 
 
+VisionImageCache = dict[str, "asyncio.Future[dict[str, Any]]"]
+"""Type alias for the per-scrape-run cache used by
+:func:`maybe_vision_refetch`.
+
+Stores ``asyncio.Future`` values (not raw parsed dicts) so that
+concurrent coroutines processing the same image URL coalesce into a
+single Gemini call — the leader resolves the future, waiters await it.
+The orchestrator creates a fresh empty dict per scrape run; callers
+should never read from the cache themselves, only pass it through.
+Use the :func:`new_vision_image_cache` factory below to construct one
+without depending on the internal value type.
+"""
+
+
+def new_vision_image_cache() -> VisionImageCache:
+    """Construct a fresh empty per-scrape-run image cache.
+
+    Provided so callers can stay decoupled from the internal Future-based
+    representation: see :data:`VisionImageCache` for why we store futures
+    instead of plain dicts.
+    """
+    return {}
+
+
 async def maybe_vision_refetch(
     url: str,
     rendered_html: str | None,
     payload: dict[str, Any],
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
-    image_cache: dict[str, dict[str, Any]] | None = None,
+    image_cache: VisionImageCache | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """If at least one english slot is still missing AND vision is
     available, scan ``<img>`` tags on the rendered HTML and ask Gemini
     Vision to read the score table.
 
-    ``image_cache`` is an optional caller-owned dict (one per scrape run)
-    that maps absolute image URL → parsed slot dict from a previous
-    Gemini OCR pass. When the same image appears on multiple course
-    pages (ASA's ``MaSTER.png`` lives on every Master page; the
+    ``image_cache`` is an optional caller-owned mapping (one per scrape
+    run, created via :func:`new_vision_image_cache`) keyed by absolute
+    image URL. When the same image appears on multiple course pages
+    (ASA's ``MaSTER.png`` lives on every Master page; the
     ``Screenshot 2026-01-19 104316.png`` lives on every Bachelor of
     Business variant) we OCR it exactly once and reuse the parsed
     values — saving Gemini cost AND eliminating the per-course vision
     non-determinism that left 3/4 IT Masters with IELTS=— while one
-    sibling came back with IELTS=6.5 from the same image.
+    sibling came back with IELTS=6.5 from the same image. The cache
+    stores ``asyncio.Future`` values so concurrent coroutines for the
+    same URL coalesce: the first ("leader") performs the work, others
+    ("waiters") await its result.
 
     Returns ``(filled_values, evidence_rows)`` — both empty when the
     fallback no-ops (slots already filled, no API key, no rendered HTML,
@@ -243,20 +270,20 @@ async def maybe_vision_refetch(
         cached_method = "per_course_vision"
         leader_future: asyncio.Future[dict[str, Any]] | None = None
         if image_cache is not None:
-            existing = image_cache.get(img_url)
+            existing: asyncio.Future[dict[str, Any]] | None = image_cache.get(img_url)
             if existing is None:
                 # Be the leader for this URL. Install our Future
                 # synchronously (no await between get and set) so any
                 # subsequent coroutine in the same event-loop iteration
                 # sees it and becomes a waiter.
                 leader_future = asyncio.get_running_loop().create_future()
-                image_cache[img_url] = leader_future  # type: ignore[assignment]
+                image_cache[img_url] = leader_future
             else:
                 # Waiter path: someone is already (or has already) OCR'd
                 # this image. Await the Future (resolves instantly if
                 # already set) and treat the result as a cache hit.
                 try:
-                    normalized = await existing  # type: ignore[misc]
+                    normalized = await existing
                 except Exception:  # noqa: BLE001 — leader's error already logged
                     normalized = {}
                 cache_hits += 1

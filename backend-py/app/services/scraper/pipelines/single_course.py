@@ -8,7 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    # Type-checking-only import to avoid pulling per_course_vision (and
+    # its heavy gemini_client transitive imports) at module load time.
+    # The real runtime import happens lazily inside ``extract_course``
+    # alongside the other per_course_* fallbacks.
+    from app.services.scraper.per_course_vision import VisionImageCache  # noqa: F401
 
 from app.services.scraper.category import classify_category, map_course_to_category
 from app.services.scraper.guards import should_trust_generic_university_fee_fallback
@@ -101,7 +108,7 @@ async def extract_course(
     use_ai_fallback: bool = True,
     uni_pdf_data: dict[str, Any] | None = None,
     emit=None,
-    vision_image_cache: dict[str, dict[str, Any]] | None = None,
+    vision_image_cache: "VisionImageCache | None" = None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
