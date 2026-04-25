@@ -111,6 +111,7 @@ async def extract_course(
     uni_pdf_data: dict[str, Any] | None = None,
     emit=None,
     vision_image_cache: "VisionImageCache | None" = None,
+    central_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -118,6 +119,11 @@ async def extract_course(
     :func:`app.services.scraper.pipelines.university_pdfs.load_university_pdf_data`,
     used as a *last-resort* fallback for fee/IELTS fields that the per-page
     extractors and AI fallback could not fill.
+
+    ``central_data`` is the (optional) result of
+    :func:`app.services.scraper.central_pages.prefetch_central_pages`, used as
+    the *absolute last-resort* fallback (lower confidence than ``uni_pdf_data``)
+    for universities that publish fees/IELTS only on central pages (Bug 2).
     """
     if html is None:
         html = await fetch_html(url)
@@ -579,6 +585,103 @@ async def extract_course(
                     "snippet": reqs_pdf_url,
                 }
             )
+
+    # Bug 2: central-pages fallback — applies fees and English requirements
+    # pre-fetched from a university's central fee/admissions page when
+    # per-course extractors, AI, and PDF backfill all left these slots empty.
+    # This is the absolute last-resort path: confidence ceiling is 0.45 for
+    # fees (lower than every earlier stage) and 0.50 for English requirements
+    # (central admissions pages are authoritative for English policy, but we
+    # still want course-page data and sibling cache to win when present).
+    if central_data:
+        try:
+            from app.services.scraper.central_pages import match_central_fee
+
+            _central_fees: list = central_data.get("fees") or []
+            _central_english: dict = central_data.get("english") or {}
+            _central_fee_url: str | None = central_data.get("fee_page_url")
+            _central_eng_url: str | None = central_data.get("english_page_url")
+
+            # ── Fee fallback ─────────────────────────────────────────────
+            _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
+            _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
+            if _fee_missing and _central_fees:
+                matched = match_central_fee(
+                    payload.get("course_name") or "",
+                    _central_fees,
+                    degree_level=payload.get("degree_level"),
+                )
+                if matched:
+                    _filled_fee_keys: list[str] = []
+                    for _k, _src_k in (
+                        ("international_fee", "international_fee"),
+                        ("domestic_fee", "domestic_fee"),
+                        ("currency", "currency"),
+                        ("fee_term", "per"),
+                    ):
+                        _v = matched.get(_src_k)
+                        if _v in (None, "", 0):
+                            continue
+                        if payload.get(_k) not in (None, "", 0):
+                            continue
+                        payload[_k] = _v
+                        evidence.append({
+                            "field_key": _k,
+                            "value": _v,
+                            "confidence": 0.45,
+                            "method": "central_page:fees",
+                            "snippet": _central_fee_url,
+                        })
+                        _filled_fee_keys.append(_k)
+                    if emit and _filled_fee_keys:
+                        _prog = matched.get("program_pattern", "?")
+                        await emit(
+                            "status",
+                            f"[CENTRAL ✓] {payload.get('course_name', url)[:40]} — "
+                            f"fee from '{_prog}' row: "
+                            f"intl={matched.get('international_fee')} "
+                            f"per={matched.get('per')}",
+                            phase="fallback",
+                            kind="central_fee_applied",
+                            url=url,
+                            matched_program=_prog,
+                            filled=_filled_fee_keys,
+                        )
+
+            # ── English-requirements fallback ────────────────────────────
+            if _central_english:
+                _eng_filled: list[str] = []
+                for _k, _v in _central_english.items():
+                    if _v in (None, "", 0):
+                        continue
+                    if payload.get(_k) not in (None, "", 0):
+                        continue
+                    payload[_k] = _v
+                    evidence.append({
+                        "field_key": _k,
+                        "value": _v,
+                        "confidence": 0.50,
+                        "method": "central_page:english",
+                        "snippet": _central_eng_url,
+                    })
+                    _eng_filled.append(_k)
+                if emit and _eng_filled:
+                    _scores = " ".join(
+                        f"{k.replace('_overall', '')}={payload.get(k)}"
+                        for k in _eng_filled
+                    )
+                    await emit(
+                        "status",
+                        f"[CENTRAL ✓] {payload.get('course_name', url)[:40]} — "
+                        f"english from central page: {_scores}",
+                        phase="fallback",
+                        kind="central_english_applied",
+                        url=url,
+                        filled=_eng_filled,
+                    )
+
+        except Exception as exc:  # noqa: BLE001 — never abort extraction
+            log.warning("central_pages fallback errored on %s: %s", url, exc)
 
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The

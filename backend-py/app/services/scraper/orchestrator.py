@@ -197,6 +197,7 @@ async def _extract_only(
     uni_pdf_data: dict | None = None,
     emit=None,
     vision_image_cache: VisionImageCache | None = None,
+    central_data: dict | None = None,
 ) -> dict:
     """Network-bound work — safe to parallelise across coroutines.
 
@@ -208,6 +209,10 @@ async def _extract_only(
     why this matters (eliminates the per-course non-determinism that
     left 3/4 ASA Master pages with IELTS=— while one sibling came back
     with IELTS=6.5 from the same MaSTER.png).
+
+    ``central_data`` is the pre-fetched central-pages payload (Bug 2).
+    Passed through to ``extract_course`` where it is applied as a
+    last-resort fallback after all per-course and PDF extractors.
     """
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
@@ -218,6 +223,7 @@ async def _extract_only(
             uni_pdf_data=uni_pdf_data,
             emit=emit,
             vision_image_cache=vision_image_cache,
+            central_data=central_data,
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
@@ -431,6 +437,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 pdf_english=bool(uni_pdf_data.get("english")),
             )
 
+        # Bug 2: central-pages pre-fetch — scrape_config['uniPages']['feePage'] /
+        # ['entryPage'] ONCE before the course loop, cache results in memory for
+        # the duration of this job.  Universities like KBS publish fees and IELTS
+        # requirements on a single central page rather than per course.
+        central_data: dict | None = None
+        try:
+            from app.services.scraper.central_pages import prefetch_central_pages
+            central_data = await prefetch_central_pages(uni_scrape_config, emit=emit)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("central_pages prefetch failed: %s", exc)
+            central_data = None
+
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
         # 1) Extraction phase — parallel network calls, no DB shared state.
@@ -496,12 +514,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
                 # Pass the emit hook into extract_course so AI fallback can
                 # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
+                # central_data is the pre-fetched central-pages payload (Bug 2).
                 return await _extract_only(
                     link,
                     uni_country,
                     uni_pdf_data or None,
                     emit=emit,
                     vision_image_cache=vision_image_cache,
+                    central_data=central_data,
                 )
 
         results = await asyncio.gather(
