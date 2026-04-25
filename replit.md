@@ -467,16 +467,19 @@ NOT cover. All six fixes below land together.
     parsed slot→value dict. Cache hits emit
     `extraction_method='per_course_vision_cached'` so prod evidence
     rows make the win observable.
-- **Verification (job_b63dc17f0604 / job_9c7246ff2042)**: all 4 IT
-  Masters show IELTS 6.5 / sub-bands 6.0 / PTE 58 / TOEFL 85
-  (matching MaSTER.png); all 4 BB variants show 6 / 5.5 / 50 / 60
-  (matching their shared screenshot); BPA shows its own image values.
-  Every English evidence row reads `per_course_vision` or
-  `per_course_vision_cached` — no more `uni_pdf:requirements`
-  contamination on these courses.
+- **Verification (job_b63dc17f0604 / job_9c7246ff2042 / job_9b80c5514a0d
+  Apr 25 2026)**: all 4 IT Masters show IELTS 6.5 / sub-bands 6.0 /
+  PTE 58 / TOEFL 85 (matching MaSTER.png); all 4 BB variants show
+  6 / 5.5 / 50 / 60 (matching their shared screenshot); BPA shows
+  its own image values. Every English evidence row reads
+  `per_course_vision` or `per_course_vision_cached` — no more
+  `uni_pdf:requirements` contamination on these courses. Full-suite
+  464 passed, 1 skipped.
 - **Coverage**: 8 tests in `tests/test_english_test_verbose_gemini.py`
-  (full MaSTER.png OCR simulation end-to-end) + 3 pinned in
-  `tests/test_english_test_table_layouts.py` (26 total pass).
+  (full MaSTER.png OCR simulation end-to-end) + 2 in
+  `tests/test_per_course_vision_cache.py` (in-flight coalescing +
+  negative-result skip) + 3 pinned in
+  `tests/test_english_test_table_layouts.py` → 464 total suite.
 
 ### 8. PTE/TOEFL/CAE buried in equivalence table (commit f54ebf8)
 - **Symptom**: After hot-fix #2 deployed, prod job_24323bbb8715
