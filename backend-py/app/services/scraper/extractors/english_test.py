@@ -592,6 +592,20 @@ def _parse_program_level_table(soup: BeautifulSoup) -> dict[str, float]:
                         ov = float(m.group(1))
                         if 4 <= ov <= 9:
                             result["ielts_overall"] = ov
+                            # Also parse subscores: "6.0 for Speaking and Writing and 5.5 for Listening and Reading"
+                            # Each "SCORE for SKILL [and SKILL]" group — stop before next number.
+                            for sc_str, skills_str in re.findall(
+                                r"([0-9]+(?:\.[0-9]+)?)\s+for\s+"
+                                r"((?:(?:speaking|listening|reading|writing)"
+                                r"(?:\s+and\s+(?![0-9])(?:speaking|listening|reading|writing))*)+)",
+                                val, re.I,
+                            ):
+                                sc = float(sc_str)
+                                if 4 <= sc <= 9:
+                                    for skill_m in re.finditer(
+                                        r"speaking|listening|reading|writing", skills_str, re.I
+                                    ):
+                                        result[f"ielts_{skill_m.group().lower()}"] = sc
                 elif "pte" in label:
                     m = re.search(r"(?:score\s+of\s+)?([1-9][0-9])\b", val)
                     if m:
@@ -707,17 +721,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         soup = BeautifulSoup(html, "html.parser")
         level_data = _parse_program_level_table(soup)
         if level_data:
-            # Replace existing results for the fields found in the level table.
+            # Group level_data by test prefix (ielts, pte, toefl, cambridge).
+            # Each test gets ONE ExtractionResult with all its band scores in
+            # normalized — matching the convention established by _emit().
+            test_groups: dict[str, dict[str, float]] = {}
+            for field_key, val in level_data.items():
+                prefix = field_key.split("_")[0]  # "ielts", "pte", …
+                test_groups.setdefault(prefix, {})[field_key] = val
+
+            # Drop existing results for any field now covered by the table.
             dominated = set(level_data.keys())
             results = [r for r in results if r.field_key not in dominated]
-            for field_key, val in level_data.items():
+
+            for prefix, fields in test_groups.items():
+                overall_key = f"{prefix}_overall"
                 results.append(
                     ExtractionResult(
-                        field_key=field_key,
-                        value=val,
-                        normalized={field_key: val},
+                        field_key=overall_key,
+                        value=fields.get(overall_key),
+                        normalized=fields,        # includes subscores
                         confidence=0.9,
-                        snippet=f"program-level table → {field_key}={val}",
+                        snippet=f"program-level table → {fields}",
                         method="program_level_table",
                     )
                 )
