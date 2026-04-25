@@ -367,6 +367,96 @@ def test_strong_label_value_blended_when_value_lists_both_modes():
     assert out == "Blended"
 
 
+# ──────────────────────────────────────────────────────────────────
+# Definition-list and table-row label/value coverage.
+#
+# Same flattened-text boundary-collision bug class as the original
+# ASA <strong>Delivery</strong> case, but on:
+#   * <dt>Mode of study</dt><dd>On Campus</dd>   (no colon in label)
+#   * <th>Delivery</th><td>Face to Face</td>     (table key/value)
+#
+# These idioms used to classify correctly only by accident — the
+# keyword-pattern ordering happened to favour the right answer. The
+# structural pre-pass now reads the value cell directly out of the
+# DOM so a future university template that adopts one of these
+# idioms with value-then-label adjacency can't ship the same wrong
+# study_mode.
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_dt_dd_without_colon_classifies_via_structural_pass():
+    """Bare ``<dt>Mode of study</dt><dd>On Campus</dd>`` (no colon in
+    the dt) was previously only classified correctly by the
+    keyword-fallback path — the label-first regex required a delimiter.
+    The structural pre-pass must now read the dd value directly so
+    unrelated copy that follows the `<dd>` cannot steer the result."""
+    html = (
+        "<dl>"
+        "<dt>Mode of study</dt><dd>On Campus</dd>"
+        "</dl>"
+        "<p>Study online and on-campus options are available for "
+        "select intakes.</p>"
+    )
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"<dt>/<dd> structural pre-pass must return On Campus. "
+        f"Pre-fix this would have bled the trailing 'online and on-campus' "
+        f"prose into the value capture and mis-classified as Blended. "
+        f"Got {out!r}."
+    )
+    assert conf == 0.7
+
+
+def test_th_td_table_row_classifies_via_structural_pass():
+    """Course summary tables sometimes publish delivery as a table row:
+    ``<th>Delivery</th><td>Face to Face</td>``. The structural pre-pass
+    must read the matching `<td>` directly and not walk forward across
+    later rows (which often list the next field's value adjacent to
+    'Online'/'Blended' tokens that would otherwise hijack the result)."""
+    html = (
+        "<table>"
+        "<tr><th>Delivery</th><td>Face to Face</td></tr>"
+        "<tr><th>Location</th><td>Sydney, Online</td></tr>"
+        "<tr><th>Duration</th><td>3 years</td></tr>"
+        "</table>"
+    )
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"<th>/<td> structural pre-pass must return On Campus. "
+        f"Without it, walking forward from the Delivery label across the "
+        f"next row's 'Sydney, Online' value would mis-classify the course. "
+        f"Got {out!r}."
+    )
+    assert conf == 0.7
+
+
+def test_dt_dd_value_lists_both_modes_is_blended():
+    """Value-side authority still applies inside a definition list:
+    a `<dd>` that names both modes (`On Campus and Online`) is the
+    canonical Blended signal, even with no colon in the `<dt>`."""
+    html = (
+        "<dl><dt>Study mode</dt><dd>On Campus and Online</dd></dl>"
+    )
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Blended"
+
+
+def test_th_td_value_online_classifies_as_online():
+    """Symmetric to the on-campus case: a `<td>Online</td>` value in a
+    table row whose `<th>` is a recognised delivery label classifies
+    as Online via the structural pre-pass (not via the noisy bare-
+    keyword fallback), so the result keeps full confidence."""
+    html = (
+        "<table>"
+        "<tr><th>Delivery mode</th><td>Online</td></tr>"
+        "</table>"
+        "<p>Visit our campus on open day to learn more.</p>"
+    )
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "Online"
+    assert conf == 0.7
+
+
 def test_asa_full_bachelor_fixture_classifies_as_on_campus():
     """End-to-end against the saved /courses/bachelor-of-business HTML.
     Pre-fix: returned 'Online' (production-confirmed).

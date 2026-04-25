@@ -188,27 +188,33 @@ def _classify_label_value(value: str) -> str | None:
 
 
 def _extract_strong_label_value(html: str) -> tuple[str | None, str | None]:
-    """Structural pre-pass for `<strong>Delivery</strong>` / sibling-div
-    label/value idioms (ASA, VIT, …). Returns
+    """Structural pre-pass for label/value idioms in the DOM. Returns
     ``(canonical_study_mode, snippet)`` or ``(None, None)``.
 
-    Walks each `<strong>` (or `<b>`) tag whose text matches the
-    delivery-label whitelist (:data:`_STRONG_LABEL_RE`), then collects
-    text in document order from the strong tag forward — across sibling
-    divs, list items, anything — until it hits the next `<strong>`,
-    `<b>`, heading (`h1`-`h6`) or `<dt>`. The collected text is fed to
-    :func:`_classify_label_value`. The first canonical hit wins.
+    Recognised idioms (all read the value from the DOM rather than from a
+    flattened tag-stripped token run):
 
-    Why this exists: the previous tag-stripped fallback flattened
+    * ``<strong>Delivery</strong>`` / ``<b>Delivery:</b>`` — value either
+      inline after the bold tag (VIT) or in the next sibling element
+      (ASA's adjacent-div layout). Walks forward in document order until
+      the next labelled boundary.
+    * ``<dt>Mode of study</dt><dd>On Campus</dd>`` — definition lists,
+      with or without a colon in the label. Reads the value from the
+      matching ``<dd>`` sibling.
+    * ``<th>Delivery</th><td>Face to Face</td>`` — table key/value rows.
+      Reads the value from the matching ``<td>`` sibling.
+
+    Why this exists: the original tag-stripped fallback flattened
     ASA's `<div><strong>Location</strong></div><div>Sydney, Online
     </div><div><strong>Delivery</strong></div><div>Face to Face on
     campus</div>` into a single token run that contained the substring
     ``Online Delivery`` at the boundary between the Location value
     and the next label. ``_MODE_PATTERNS[1]`` then matched
     ``online\\s+delivery`` and returned "Online" — the wrong answer
-    for an on-campus course. The structural pre-pass reads the value
-    from the DOM, never from a flattened token run, so the boundary
-    collision can't fire.
+    for an on-campus course. The same boundary-collision bug class
+    applies to any flattened label/value layout (definition lists,
+    table rows, list items), so the structural pre-pass covers all of
+    them by reading the value cell directly out of the DOM.
     """
     if not html:
         return None, None
@@ -223,40 +229,67 @@ def _extract_strong_label_value(html: str) -> tuple[str | None, str | None]:
     except Exception:  # pragma: no cover - defensive
         return None, None
 
-    for strong in soup.find_all(("strong", "b")):
-        label_raw = strong.get_text(" ", strip=True).rstrip(":").strip()
+    # `<dt>` / `<th>` are added so definition-list and table-row
+    # idioms get the same DOM-aware treatment as the original
+    # `<strong>` / `<b>` cases. For dt/th the value lives in the
+    # paired `<dd>` / `<td>` sibling, so we read it directly via
+    # `find_next_sibling` rather than walking forward across
+    # arbitrary descendants — that way unrelated paragraphs after
+    # the `<dd>` (e.g. marketing copy) can't pollute the value.
+    for label_tag in soup.find_all(("strong", "b", "dt", "th")):
+        label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
         if not label_raw or not _STRONG_LABEL_RE.fullmatch(label_raw):
             continue
-        parts: list[str] = []
-        char_count = 0
-        for node in strong.next_elements:
-            if isinstance(node, Tag):
-                # Stop at the next labelled value or a major section
-                # break — beyond these the text belongs to a different
-                # field entirely.
-                if node is strong:
+
+        value_text: str | None = None
+        if label_tag.name == "dt":
+            sibling = label_tag.find_next_sibling("dd")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        elif label_tag.name == "th":
+            sibling = label_tag.find_next_sibling("td")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        else:
+            parts: list[str] = []
+            char_count = 0
+            for node in label_tag.next_elements:
+                if isinstance(node, Tag):
+                    # Stop at the next labelled value or a major
+                    # section break — beyond these the text belongs
+                    # to a different field entirely. `dt`/`th`/`tr`
+                    # are included so a `<strong>` sitting inside a
+                    # definition list or table row doesn't bleed
+                    # into the next pair / row.
+                    if node is label_tag:
+                        continue
+                    if node.name in ("strong", "b", "h1", "h2", "h3",
+                                     "h4", "h5", "h6", "dt", "th",
+                                     "tr"):
+                        break
                     continue
-                if node.name in ("strong", "b", "h1", "h2", "h3",
-                                 "h4", "h5", "h6", "dt"):
-                    break
-                continue
-            if isinstance(node, NavigableString):
-                text = str(node).strip()
-                if not text:
-                    continue
-                parts.append(text)
-                char_count += len(text) + 1
-                if char_count >= _STRONG_VALUE_CHAR_CAP:
-                    break
-        # Strip leading delimiters carried in from a colon outside the
-        # strong tag (e.g. `<strong>Delivery</strong>: Face to face`).
-        value_text = " ".join(parts).lstrip(":-– ").strip()
+                if isinstance(node, NavigableString):
+                    text = str(node).strip()
+                    if not text:
+                        continue
+                    parts.append(text)
+                    char_count += len(text) + 1
+                    if char_count >= _STRONG_VALUE_CHAR_CAP:
+                        break
+            value_text = " ".join(parts)
+
+        if not value_text:
+            continue
+        # Strip leading delimiters carried in from a colon outside
+        # the label tag (e.g. `<strong>Delivery</strong>: Face to
+        # face`).
+        value_text = value_text.lstrip(":-– ").strip()
         if not value_text:
             continue
         canonical = _classify_label_value(value_text)
         if canonical:
             snippet = (
-                f"<strong>{label_raw}</strong> -> "
+                f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "
                 f"{value_text[:80]}"
             )
             return canonical, snippet
