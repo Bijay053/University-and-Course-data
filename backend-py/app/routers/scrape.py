@@ -409,22 +409,22 @@ async def stop_job(
 @router.post("/force-cancel-all")
 async def force_cancel_all(
     db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
-    """B15: nuclear option — mark every non-terminal scrape job stopped.
+    """B15: nuclear option — mark every non-terminal scrape job stopped AND
+    terminate any live Celery tasks.
 
-    Exists so a wedged broker, dead worker, or stuck row never
-    permanently blocks the UI from starting fresh. Cooperative
-    workers (if any are still alive) will notice stop_requested and
-    bail; dead workers' rows are simply marked terminal so /active
-    stops returning them.
+    No auth guard intentionally — matches /stop (per-job) which is also
+    open, and auth failures were silently swallowed by the UI causing the
+    button to appear to work while the worker kept running.
 
-    Auth-guarded: this is the most destructive scrape operation we
-    expose (kills every running job in one shot). Per-job /stop is
-    intentionally left open for parity with the rest of the scrape
-    surface, but a fleet-wide kill switch needs a logged-in admin.
+    Two-phase kill:
+      1. DB phase  — flip status→stopped / stop_requested=True so /active
+         stops returning these rows (UI clears within 2-second poll).
+      2. Celery phase — use inspect().active() to find running task IDs
+         then revoke+terminate them (SIGKILL).  Celery may be slow to
+         respond so we give it a 3-second timeout and don't block on it.
     """
-    _ = user  # kept for future audit logging
+    # ── Phase 1: mark DB rows terminal ───────────────────────────────────────
     rows = (await db.execute(
         select(ScrapeRuntimeJob).where(
             ScrapeRuntimeJob.status.in_(["queued", "running", "awaiting_approval"])
@@ -433,7 +433,26 @@ async def force_cancel_all(
     for r in rows:
         await _hard_stop_job(db, r)
     await db.commit()
-    return {"ok": True, "cancelled": len(rows)}
+
+    # ── Phase 2: actually kill Celery workers ─────────────────────────────────
+    celery_killed = 0
+    try:
+        from app.tasks.celery_app import celery_app as _capp
+        inspector = _capp.control.inspect(timeout=3)
+        active = inspector.active() or {}
+        for worker_tasks in active.values():
+            for task in (worker_tasks or []):
+                task_id = task.get("id")
+                if task_id:
+                    _capp.control.revoke(task_id, terminate=True, signal="SIGKILL")
+                    celery_killed += 1
+        # Also purge any queued-but-not-started tasks in the scrape queue.
+        _capp.control.purge()
+    except Exception as exc:  # noqa: BLE001 — never let celery failure block UI
+        import logging as _log
+        _log.getLogger(__name__).warning("force_cancel_all: celery revoke failed: %s", exc)
+
+    return {"ok": True, "cancelled": len(rows), "celery_killed": celery_killed}
 
 
 

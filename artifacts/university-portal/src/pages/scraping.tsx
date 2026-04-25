@@ -891,15 +891,34 @@ export default function Scraping() {
   const executeForceCancelAll = useCallback(async () => {
     setShowForceCancelDialog(false);
     try {
-      await fetch("/api/scrape/force-cancel-all", { method: "POST" });
-    } catch {}
+      const res = await fetch("/api/scrape/force-cancel-all", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({
+          title: "All scrapes cancelled",
+          description: `Stopped ${data.cancelled ?? 0} job(s)${data.celery_killed ? `, terminated ${data.celery_killed} worker(s)` : ""}.`,
+        });
+      } else {
+        toast({
+          title: "Force cancel failed",
+          description: `Server returned ${res.status}. Try refreshing the page.`,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Force cancel failed",
+        description: "Could not reach the server. Try refreshing the page.",
+        variant: "destructive",
+      });
+    }
     setScraping(false);
     setStopping(false);
     setActiveJobId(null);
     sessionStorage.removeItem("activeScrapeJob");
     setScrapeLogs([]);
     setAwaitingApproval(null);
-  }, []);
+  }, [toast]);
 
   const handleApproval = useCallback(async (proceed: boolean) => {
     if (!activeJobId) return;
