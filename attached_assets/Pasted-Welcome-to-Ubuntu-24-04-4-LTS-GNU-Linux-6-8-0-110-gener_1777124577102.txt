@@ -1,0 +1,122 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat Apr 25 13:37:53 UTC 2026
+
+  System load:           1.16
+  Usage of /:            3.0% of 231.44GB
+  Memory usage:          14%
+  Swap usage:            0%
+  Processes:             191
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Sat Apr 25 12:30:18 2026 from 162.243.188.66
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git pull origin main
+git log --oneline -4
+# top should be: 01f12e36 fix(kbs): extract IELTS band subscores...
+
+# ── Kill the specific Two Specialisations row + all old KBS courses ───────────
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+DELETE FROM scraped_courses 
+WHERE university_id = 8 
+   AND (course_website ILIKE '%specialisations%' 
+    OR course_website ILIKE '%two-specialisations%');
+SELECT COUNT(*) AS specialisations_remaining FROM scraped_courses 
+WHERE university_id = 8 AND course_website ILIKE '%specialisations%';
+"
+
+# ── Restart services ──────────────────────────────────────────────────────────
+systemctl restart uni-api-py uni-celery
+sleep 6
+systemctl status uni-api-py uni-celery --no-pager | grep "Active:"
+
+echo "=== Now re-scrape KBS from the UI ==="
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+01f12e3 (HEAD -> main, origin/main) fix(kbs): extract IELTS band subscores from program-level table
+dabcbe5 fix(kbs): add program-level table parser for IELTS/PTE extraction
+fce2487 fix(kbs): filter two-specialisations URL, fix MBA specialisation name via title tag, fix IELTS/PTE broad patterns
+a20047e Use user-provided URL for course discovery when available
+DELETE 0
+ specialisations_remaining 
+---------------------------
+                         0
+(1 row)
+
+     Active: active (running) since Sat 2026-04-25 13:40:35 UTC; 1min 20s ago
+     Active: active (running) since Sat 2026-04-25 13:41:50 UTC; 6s ago
+=== Now re-scrape KBS from the UI ===
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git pull origin main
+git log --oneline -2
+# top: 95874a8f fix(scraper): fix Force Cancel All
+
+# ── Rebuild frontend ──────────────────────────────────────────────────────────
+cd artifacts/university-portal
+pnpm build
+cd /root/University-and-Course-data
+
+# ── Restart all services ──────────────────────────────────────────────────────
+systemctl restart uni-api-py uni-celery uni-frontend
+sleep 6
+systemctl status uni-api-py uni-celery uni-frontend --no-pager | grep "Active:"
+remote: Enumerating objects: 21, done.
+remote: Counting objects: 100% (21/21), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 11 (delta 10), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (11/11), 2.49 KiB | 364.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   01f12e3..95874a8  main       -> origin/main
+Updating 01f12e3..95874a8
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx | 25 ++++++++++++++++++++++---
+ backend-py/app/routers/scrape.py                   | 49 ++++++++++++++++++++++++++++++++++---------------
+ 2 files changed, 56 insertions(+), 18 deletions(-)
+95874a8 (HEAD -> main, origin/main) fix(scraper): fix Force Cancel All — remove auth, add Celery revoke, add UI feedback
+01f12e3 fix(kbs): extract IELTS band subscores from program-level table
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1876 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-BHCIQPH_.css                131.43 kB │ gzip:  21.65 kB
+dist/public/assets/index-C9v6cyKQ.js                 855.63 kB │ gzip: 241.10 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.29s
+Failed to restart uni-frontend.service: Unit uni-frontend.service not found.
+Unit uni-frontend.service could not be found.
+     Active: active (running) since Sat 2026-04-25 13:42:46 UTC; 6s ago
+     Active: active (running) since Sat 2026-04-25 13:42:46 UTC; 6s ago
+root@university-and-course-data:~/University-and-Course-data# 
