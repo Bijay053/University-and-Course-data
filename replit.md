@@ -195,6 +195,21 @@ no unrouted 404), (3) JSON-shape contracts the UI actually destructures
 (`{courses: [...]}`, `{results, summary}`, `appliedFields[]`,
 top-level 409 `{error, conflicts}`). 3/3 green.
 
+## VIT Parity Port (T001–T005, commit `a20b728`)
+
+Five VIT-specific scraper features ported Node→Python so the Python pipeline
+matches Node on `vit.edu.au` (24 → 30 discovered courses; per-course
+IELTS/PTE/TOEFL/CAE values match across BBus/MBA/Diploma rows; duration +
+intake + location recovered after the international toggle strips them).
+
+- **T001** Home-page → `/course-list` redirect (`scraper/home_page_redirect.py::detect_course_listing_page`). HEAD-probes `/course-list`, `/courses`, `/study/degrees-and-courses` etc.; falls back to weighted link-scan, then a broad HEAD probe. Wired into `discovery.py::discover_course_links` so `https://vit.edu.au/` is auto-redirected to `https://vit.edu.au/course-list` before BFS.
+- **T002** Per-course Bootstrap-modal English-test extractor (`scraper/per_course_modal.py::extract_modal_english`). Finds `.modal/[role=dialog]` containers with IELTS+PTE+TOEFL, parses tables, classifies numbers into ielts/pte/toefl/cae buckets, picks the row whose IELTS is closest to the degree-level target (5.5/6.0/6.5). Also extracts IELTS sub-bands via three patterns ("no individual band below X.X" / explicit L/R/W/S / short-form `L X.X R X.X`). Wired into `pipelines/single_course.py::extract_course` BEFORE the per-course browser pass.
+- **T003** VIT static fallback for duration / intake / location (`scraper/vit_static_extract.py::apply_vit_summary_extraction`). Label-walks `<strong>/<b>` for `intake|location|duration`, harvests values from sibling `<ul>/<ol>` lists, normalises via existing extractors. Wired AFTER the per-course browser pass when the toggle stripped the static narrative paragraph.
+- **T004** Category-filtered listing expansion (`home_page_redirect.py::expand_course_list_with_categories`). HEAD-probes `?course_categories[0]=bbus`, `?category=master`, `?type=diploma`, `/{slug}` variants on the listing path; merges new course links found on each variant page. Raises VIT discovery from 24 → 30.
+- **T005** Browser "International" toggle action (`scraper/browser_pool.py::fetch_html(click_international=True)`). JS-evaluates the page, finds radios/checkboxes/elements whose value/text matches "international", clicks the first that fires a renderedSinceBaseline change. `per_course_browser.maybe_browser_refetch` passes `click_international=True` for hosts in `_INTERNATIONAL_TOGGLE_HOSTS = ("vit.edu.au",)`.
+
+**Regression tests** (`backend-py/tests/`): `test_home_page_redirect.py` (9), `test_per_course_modal.py` (9), `test_vit_static_extract.py` (7), `test_category_expand.py` (10), `test_browser_international_toggle.py` (6), plus `test_data_parity_priorities.py` (9) — 50/50 green.
+
 ## Repair Scrape (PR-1.5 B18)
 
 `POST /api/scrape/repair/start` runs a "back-fill only" pass for courses
