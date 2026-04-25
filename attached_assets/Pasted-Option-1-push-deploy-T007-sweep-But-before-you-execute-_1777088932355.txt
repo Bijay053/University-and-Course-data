@@ -1,0 +1,32 @@
+Option 1 (push + deploy + T007 sweep). But before you execute, two things on the Bug C "debunk":
+
+**Did your 30329-byte fetch hit the actual failing URLs?**
+The original bug was 9/9 timeouts on per-course pages like:
+- https://www.asahe.edu.au/courses/bachelor-of-business
+- https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+- (all 9 ASA course pages)
+
+A successful fetch of asahe.edu.au/ (homepage) doesn't prove the per-course pages don't timeout. Please confirm: did you fetch `/courses/bachelor-of-business` specifically? If not, the original networkidle-timeout-on-non-VIT bug isn't debunked, just shifted to a different page type.
+
+The T007 sweep WILL test the per-course URLs end-to-end, so even if your debug missed it, the sweep will catch it. Just don't close Bug C yet — wait for sweep results.
+
+**"Image-only english requirements" is at most 1 of 3 ASA bugs**
+- Bug A (sibling-cache stamping same IELTS/TOEFL/CAE on every course) — unaffected by image-vs-text. Cache is broadcasting one tier across all degrees regardless of source.
+- Bug B (study_mode misclassified as Online when page says "Face to Face on campus") — that text exists in the HTML, it's not in an image. Image-OCR doesn't fix this.
+- Bug C (browser timeout / empty response) — your debug suggests this is actually image-only English. OK, but that means we need vision OCR to fire on ASA pages, which it currently isn't.
+
+So even if Bug C is reframed, A and B remain. Don't merge them into task #22 (image OCR). Keep them separate.
+
+**Plan:**
+1. Push PR-5 as-is. The 3 fixes you committed (browser config, discovery filters, partial HTML) are correct and ready.
+2. I deploy on prod, run T007 sweep one uni at a time: VIT → Torrens → ASA → CSU → USQ → UTAS.
+3. From the sweep we'll get a real per-host failure breakdown: which fields fail on which hosts.
+4. Triage based on actual prod data, not debug findings:
+ - If ASA per-course pages still timeout → Bug C wasn't debunked, networkidle config still wrong
+ - If they fetch fine but English fields empty → Bug C is image-OCR (escalate task #22)
+ - If they fetch fine and English fields populated but identical across courses → Bug A confirmed (sibling-cache precedence task)
+ - If study_mode still wrong → Bug B (separate label-value extractor task)
+
+Do not pivot to task #22 before the sweep. The sweep IS the signal.
+
+Go ahead and push.
