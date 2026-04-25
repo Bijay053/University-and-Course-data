@@ -140,7 +140,6 @@ async def get_university_courses(
 async def create_university(
     body: UniversityCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
 ) -> UniversityRead:
     # Bug #1: case-insensitive name match -- prevents "Monash" / "monash" duplicates.
     existing_stmt = select(University).where(func.lower(University.name) == body.name.lower())
