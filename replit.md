@@ -1059,3 +1059,86 @@ system libs Chromium needs at runtime: `nspr`, `nss`, `atk`,
 `libgbm`, `xorg.libXtst`, `xorg.libXi`, `xorg.libXcursor`. Future
 fresh containers may need the same setup if the chromium browser
 fallback is to be exercised locally.
+
+## PR-7 — Per-course PDF fee-table extraction (Apr 2026)
+
+### Problem
+ASA's 9 courses on the dashboard all stamped the same A$58,080
+international fee — the bachelor row from the Fees Schedule PDF —
+even though the PDF clearly listed masters at A$52,800. Same shape
+as Torrens v1: one uni-wide value cloned onto every sibling.
+
+### Root cause
+`load_university_pdf_data` only surfaced the *highest* numeric fee
+it saw in the PDF (`_pick_amounts_from_pdf_text`), so the merge step
+in `single_course.py` had nothing per-course to prefer over that
+single uni-wide stamp.
+
+### Fix (`scraper/pipelines/university_pdfs.py`)
+1. New `_pick_per_course_amounts(text)` parses the schedule table:
+   `\d{6}[A-Z]` CRICOS regex (no line-start anchor — handles inline
+   rows like "Diploma of Business 108861B 2026 …"), then
+   `_extract_primary_name` walks forward to lock onto a degree-lead
+   line (`Bachelor of …`, `Master of …`, NOT `Undergraduate` /
+   `Postgraduate` which are dividers), folds continuations
+   (`(Cyber Security)`), and splits any `Including Majors:` sub-list
+   into `_extras` for matcher token enrichment only.
+2. Loader output gains a top-level `fee_by_course` dict keyed by
+   normalized PDF name (carries `international_fee`, `currency`,
+   `fee_term`, `fee_year`, plus private `_*` matcher fields).
+3. New `match_course_in_pdf_table(course_name, by_course)` matches
+   the live course name to a PDF row. Symmetric token overlap
+   (`max(overlap/len(db), overlap/len(pdf))`, threshold 0.5) plus
+   THREE guards added in code review (see "Review-round fixes" below):
+   - hard award-level filter via `_degree_level()` — Master/Bachelor/
+     GraduateCertificate/etc. on both sides must agree;
+   - `>=2` shared-token floor with a precise escape hatch (DB tokens
+     must equal the PDF row's *primary*-only tokens, not primary +
+     extras union) so parent rows like "Bachelor of Business" still
+     match without admitting "Bachelor of Game Design" → "Master of
+     Design" cross-pollution;
+   - tie-break by primary-token-set size proximity to the DB course.
+   Strips private `_*` keys before returning.
+4. `single_course.py` merge prefers the matched per-course row,
+   replaces `fee_block`, tags provenance `uni_pdf:fees:per_course`,
+   and bypasses the generic-fallback guard for that case (per-course
+   row IS the course-specific evidence).
+
+### Review-round fixes (post-merge)
+First architect pass found two high-severity bugs:
+- **Token-set keying collapsed siblings** — Cert + Master of the
+  same stem (e.g. Public Health) tokenised to identical sets after
+  stopword stripping, so the parser's output dict silently dropped
+  one row's fee. Fixed by keying `_pick_per_course_amounts` output
+  by CRICOS code (unique per row).
+- **Single-token false positives** — "Master of Design" (tokens =
+  `{design}`) scored 1.0 against any DB course containing "design",
+  reintroducing the cross-course contamination this PR was meant
+  to prevent. Fixed by the matcher guards listed in step 3 above.
+Five regression tests added (Public-Health Cert/Master collision,
+matcher level-mismatch skip, single-token rejection, exact-set
+escape hatch, `_degree_level` canonicalisation table).
+
+### Verification
+- Live ASA rescrape (`job_b0e6e75775a8`, post-fix) yielded 9 staged
+  courses: 5 bachelors @ $58,080, 4 masters @ $52,800 — matches the
+  PDF.
+- Celery worker logs show one `[FEE] per-course PDF row matched`
+  line per course.
+- 18 unit tests pass in `tests/test_university_pdfs.py` (13 prior
+  + 5 review-round regressions).
+
+### Generalization
+Any university with a multi-row fee schedule PDF wired through
+`scrape_config.uniPages.feesPdf` benefits with no extra config —
+the per-course path activates automatically when ≥2 CRICOS rows
+parse. Falls back cleanly to the old uni-wide value when the PDF
+is single-page / web-style.
+
+### Operational note
+Celery workers do **not** auto-reload on source changes (unlike
+FastAPI's `--reload`). After editing pipeline code, restart the
+`backend-py: Celery worker` workflow before re-triggering scrapes,
+or queued jobs will run against stale code (caught this during
+PR-7 verification — first rescrape stamped uniform fees because
+the worker was still on pre-edit code).

@@ -1,0 +1,375 @@
+status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 22
+[status] [fetch] Fetching https://www.torrens.edu.au/...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Home page detected → course listing at https://www.torrens.edu.au/courses/course-guides (high-priority probe)
+[status] [discover] [DISCOVER] Crawling from https://www.torrens.edu.au/courses/course-guides (max 25 pages, max 60 candidates)
+[status] [discover] [DISCOVER] classified https://www.torrens.edu.au/courses/course-guides: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.torrens.edu.au/courses/course-guides
+[status] [discover] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[status] [discover] [DISCOVER] sitemap: probing 4 URL(s) at https://www.torrens.edu.au
+[status] [discover] [DISCOVER] sitemap index https://www.torrens.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[status] [discover] [DISCOVER] sitemap https://www.torrens.edu.au/sitemap.xml: +159 candidates (total 159)
+[status] [discover] [DISCOVER] sitemap: done — 159 unique candidates
+[status] [discover] Discovered 60 candidate course links
+[status] [discover] Loaded uni-level PDF data: fee=yes english=no
+[status] [extract] Extracting course details (60 pages)...
+[status] [extract] [EXTRACT] 1/60: Higher Degrees By Research
+[status] [extract] [EXTRACT] 2/60: Bachelor Of Architectural Technology
+[status] [extract] [EXTRACT] 3/60: Bachelor Of 3d Design And Animation
+[status] [extract] [EXTRACT] 4/60: Bachelor Of Game Design And Development
+[progress] [extract] Fetching 1/60: Higher Degrees By Research
+[progress] [extract] Fetching 3/60: Bachelor Of 3d Design And Animation
+[progress] [extract] Fetching 2/60: Bachelor Of Architectural Technology
+[progress] [extract] Fetching 4/60: Bachelor Of Game Design And Development
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/higher-degrees-by-research
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-3d-design-and-animation (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-game-design-and-development (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-architectural-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-architectural-technology: duration_value, duration_unit
+[status] [extract] [EXTRACT] 5/60: Bachelor Of Game Programming
+[progress] [extract] Fetching 5/60: Bachelor Of Game Programming
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-game-programming (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-3d-design-and-animation: duration_value, duration_unit
+[status] [extract] [EXTRACT] 6/60: Bachelor Of Branded Fashion Design
+[progress] [extract] Fetching 6/60: Bachelor Of Branded Fashion Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-branded-fashion-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/higher-degrees-by-research — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-game-design-and-development: duration_value, duration_unit
+[status] [extract] [EXTRACT] 7/60: Bachelor Of Communication Design
+[progress] [extract] Fetching 7/60: Bachelor Of Communication Design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-game-programming: duration_value, duration_unit
+[status] [extract] [EXTRACT] 8/60: Bachelor Of Media Production And Communication
+[progress] [extract] Fetching 8/60: Bachelor Of Media Production And Communication
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-communication-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication
+[status] [extract] [EXTRACT] 9/60: Diploma Of Media Production
+[progress] [extract] Fetching 9/60: Diploma Of Media Production
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/diploma-of-media-production
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-branded-fashion-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 10/60: Bachelor Of Fashion Marketing And Enterprise
+[progress] [extract] Fetching 10/60: Bachelor Of Fashion Marketing And Enterprise
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-communication-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 11/60: Bachelor Of Interior Design Commercial
+[progress] [extract] Fetching 11/60: Bachelor Of Interior Design Commercial
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-fashion-marketing-and-enterprise (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-commercial (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-commercial: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Interior Design (Commercial) → Architecture, Building & Design / Interior Design
+[status] [extract] [EXTRACT] 12/60: Bachelor Of Interior Design Residential
+[progress] [extract] Fetching 12/60: Bachelor Of Interior Design Residential
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/diploma-of-media-production — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-media-production (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-residential (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-fashion-marketing-and-enterprise: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Fashion Marketing and Enterp → Business & Management / Marketing
+[status] [extract] [EXTRACT] 13/60: Bachelor Of Ux And Web Design
+[progress] [extract] Fetching 13/60: Bachelor Of Ux And Web Design
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-residential: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Interior Design (Residential → Architecture, Building & Design / Interior Design
+[status] [extract] [EXTRACT] 14/60: Diploma Of 3d Design And Animation
+[progress] [extract] Fetching 14/60: Diploma Of 3d Design And Animation
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-3d-design-and-animation (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication: duration_value, duration_unit
+[status] [extract] [EXTRACT] 15/60: Diploma Of Branded Fashion Design
+[progress] [extract] Fetching 15/60: Diploma Of Branded Fashion Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-branded-fashion-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-media-production: duration_value, duration_unit
+[status] [extract] [EXTRACT] 16/60: Advanced Diploma Of Game Design And Development
+[progress] [extract] Fetching 16/60: Advanced Diploma Of Game Design And Development
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-design-and-development (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-3d-design-and-animation: duration_value, duration_unit
+[status] [extract] [EXTRACT] 17/60: Advanced Diploma Of Game Programming
+[progress] [extract] Fetching 17/60: Advanced Diploma Of Game Programming
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-programming (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-programming: duration_value, duration_unit
+[status] [extract] [EXTRACT] 18/60: Diploma Of Design
+[progress] [extract] Fetching 18/60: Diploma Of Design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-branded-fashion-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 19/60: Diploma Of Fashion Marketing And Enterprise
+[progress] [extract] Fetching 19/60: Diploma Of Fashion Marketing And Enterprise
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-fashion-marketing-and-enterprise (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-design-and-development: duration_value, duration_unit
+[status] [extract] [EXTRACT] 20/60: Diploma Of Graphic Design
+[progress] [extract] Fetching 20/60: Diploma Of Graphic Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-graphic-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 21/60: Advanced Diploma Of Interior Design And Decoration
+[progress] [extract] Fetching 21/60: Advanced Diploma Of Interior Design And Decoration
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-interior-design-and-decoration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-fashion-marketing-and-enterprise: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Diploma of Fashion Marketing and Enterpr → Business & Management / Marketing
+[status] [extract] [EXTRACT] 22/60: Diploma Of Interior Design And Decoration
+[progress] [extract] Fetching 22/60: Diploma Of Interior Design And Decoration
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 23/60: Diploma Of Photography And Photo Imaging
+[progress] [extract] Fetching 23/60: Diploma Of Photography And Photo Imaging
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-interior-design-and-decoration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-photography-and-photo-imaging (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-graphic-design: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Diploma of Graphic Design → Architecture, Building & Design / Graphic Design
+[status] [extract] [EXTRACT] 24/60: Diploma Of Ux And Web Design
+[progress] [extract] Fetching 24/60: Diploma Of Ux And Web Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-ux-and-web-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/advanced-diploma-of-interior-design-and-decoration: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Advanced Diploma of Interior Design and  → Architecture, Building & Design / Interior Design
+[status] [extract] [EXTRACT] 25/60: Graduate Certificate Of Design
+[progress] [extract] Fetching 25/60: Graduate Certificate Of Design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-photography-and-photo-imaging: duration_value, duration_unit
+[status] [extract] [EXTRACT] 26/60: Graduate Certificate Of Ux Design
+[progress] [extract] Fetching 26/60: Graduate Certificate Of Ux Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graduate-certificate-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/graduate-certificate-of-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 27/60: Master Of Design
+[progress] [extract] Fetching 27/60: Master Of Design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-ux-and-web-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 28/60: Branded Fashion Design
+[progress] [extract] Fetching 28/60: Branded Fashion Design
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/master-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/branded-fashion-design
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/diploma-of-interior-design-and-decoration: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Diploma of Interior Design and Decoratio → Architecture, Building & Design / Interior Design
+[status] [extract] [EXTRACT] 29/60: 3d Design Animation
+[progress] [extract] Fetching 29/60: 3d Design Animation
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/3d-design-animation
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/master-of-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 30/60: Photography Film Video Design
+[progress] [extract] Fetching 30/60: Photography Film Video Design
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/photography-film-video-design
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/branded-fashion-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/branded-fashion-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/3d-design-animation — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/3d-design-animation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 31/60: Ux Web Design
+[progress] [extract] Fetching 31/60: Ux Web Design
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/ux-web-design
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/photography-film-video-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/photography-film-video-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [classify] [CATEGORY det] Fashion Marketing and Design Courses → Business & Management / Marketing
+[status] [extract] [EXTRACT] 32/60: Graphic Communication Design
+[progress] [extract] Fetching 32/60: Graphic Communication Design
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/graphic-communication-design
+[status] [extract] [EXTRACT] 33/60: Media Production
+[progress] [extract] Fetching 33/60: Media Production
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/media-production
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/ux-web-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/ux-web-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 34/60: Interior Design Decoration
+[progress] [extract] Fetching 34/60: Interior Design Decoration
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/interior-design-decoration
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/graphic-communication-design — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graphic-communication-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 35/60: Game Design Development
+[progress] [extract] Fetching 35/60: Game Design Development
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/design/game-design-development
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/media-production — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/media-production (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/design/graphic-communication-design: duration_value, duration_unit
+[status] [extract] [EXTRACT] 36/60: Bachelor Of Community Services
+[progress] [extract] Fetching 36/60: Bachelor Of Community Services
+[status] [extract] [EXTRACT] 37/60: Bachelor Of Counselling
+[progress] [extract] Fetching 37/60: Bachelor Of Counselling
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/interior-design-decoration — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/interior-design-decoration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-community-services (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/bachelor-of-counselling
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/design/game-design-development — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/game-design-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-community-services: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 38/60: Bachelor Of Health Science Chinese Medicine
+[progress] [extract] Fetching 38/60: Bachelor Of Health Science Chinese Medicine
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-chinese-medicine (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/bachelor-of-counselling — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [classify] [CATEGORY det] Interior Design Courses → Architecture, Building & Design / Interior Design
+[status] [extract] [EXTRACT] 39/60: Bachelor Of Health Science Clinical Nutrition
+[progress] [extract] Fetching 39/60: Bachelor Of Health Science Clinical Nutrition
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 40/60: Bachelor Of Health Science Dermal Therapies
+[progress] [extract] Fetching 40/60: Bachelor Of Health Science Dermal Therapies
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-dermal-therapies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-health-science-chinese-medicine: duration_value, duration_unit
+[status] [extract] [EXTRACT] 41/60: Bachelor Of Health Science Naturopathy
+[progress] [extract] Fetching 41/60: Bachelor Of Health Science Naturopathy
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-naturopathy (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-health-science-dermal-therapies: duration_value, duration_unit
+[status] [extract] [EXTRACT] 42/60: Bachelor Of Health Science Western Herbal Medicine
+[progress] [extract] Fetching 42/60: Bachelor Of Health Science Western Herbal Medicine
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-western-herbal-medicine (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-counselling: duration_value, duration_unit
+[status] [extract] [EXTRACT] 43/60: Bachelor Of Nursing
+[progress] [extract] Fetching 43/60: Bachelor Of Nursing
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-nursing (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition: duration_value, duration_unit
+[status] [extract] [EXTRACT] 44/60: Bachelor Of Nutrition
+[progress] [extract] Fetching 44/60: Bachelor Of Nutrition
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-nutrition (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-health-science-western-herbal-medicine: duration_value, duration_unit
+[status] [extract] [EXTRACT] 45/60: Bachelor Of Psychological Science
+[progress] [extract] Fetching 45/60: Bachelor Of Psychological Science
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-health-science-naturopathy: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 46/60: Diploma Of Beauty And Spa Practice
+[progress] [extract] Fetching 46/60: Diploma Of Beauty And Spa Practice
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-beauty-and-spa-practice (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-nursing: fee_currency, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[status] [extract] [EXTRACT] 47/60: Diploma Of Counselling Vet
+[progress] [extract] Fetching 47/60: Diploma Of Counselling Vet
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-nutrition: duration_value, duration_unit
+[status] [extract] [EXTRACT] 48/60: Diploma Of Health And Wellbeing
+[progress] [extract] Fetching 48/60: Diploma Of Health And Wellbeing
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/diploma-of-beauty-and-spa-practice: duration_value, duration_unit
+[status] [extract] [EXTRACT] 49/60: Diploma Of Health Science
+[progress] [extract] Fetching 49/60: Diploma Of Health Science
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-health-science (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science: duration_value, duration_unit
+[status] [extract] [EXTRACT] 50/60: Diploma Of Nutrition
+[progress] [extract] Fetching 50/60: Diploma Of Nutrition
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/diploma-of-health-science: duration_value, duration_unit
+[status] [extract] [EXTRACT] 51/60: Diploma Of Sport Development
+[progress] [extract] Fetching 51/60: Diploma Of Sport Development
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-nutrition
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-sport-development
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet: duration_value, duration_unit
+[status] [extract] [EXTRACT] 52/60: Graduate Certificate Of Counselling
+[progress] [extract] Fetching 52/60: Graduate Certificate Of Counselling
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling
+[status] [extract] [EXTRACT] 53/60: Graduate Certificate Of Public Health
+[progress] [extract] Fetching 53/60: Graduate Certificate Of Public Health
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-certificate-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/diploma-of-nutrition — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-nutrition (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/diploma-of-sport-development — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-sport-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/diploma-of-sport-development: duration_value, duration_unit
+[status] [extract] [EXTRACT] 54/60: Graduate Diploma Of Counselling
+[progress] [extract] Fetching 54/60: Graduate Diploma Of Counselling
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/diploma-of-nutrition: duration_value, duration_unit
+[status] [extract] [EXTRACT] 55/60: Graduate Diploma Of Psychology
+[progress] [extract] Fetching 55/60: Graduate Diploma Of Psychology
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-psychology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/graduate-certificate-of-public-health: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Graduate Certificate of Public Health → Medicine & Health / Public Health
+[status] [extract] [EXTRACT] 56/60: Graduate Diploma Of Public Health
+[progress] [extract] Fetching 56/60: Graduate Diploma Of Public Health
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling: duration_value, duration_unit
+[status] [extract] [EXTRACT] 57/60: Master Of Counselling
+[progress] [extract] Fetching 57/60: Master Of Counselling
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/master-of-counselling
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling: duration_value, duration_unit
+[status] [extract] [EXTRACT] 58/60: Master Of Counselling Advanced
+[progress] [extract] Fetching 58/60: Master Of Counselling Advanced
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/graduate-diploma-of-public-health: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Graduate Diploma of Public Health → Medicine & Health / Public Health
+[status] [extract] [EXTRACT] 59/60: Master Of Public Health
+[progress] [extract] Fetching 59/60: Master Of Public Health
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/graduate-diploma-of-psychology: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Graduate Diploma of Psychology → Medicine & Health / Psychology
+[status] [extract] [EXTRACT] 60/60: Master Of Public Health Advanced
+[progress] [extract] Fetching 60/60: Master Of Public Health Advanced
+[status] [fallback] [per-course browser ↻] https://www.torrens.edu.au/courses/health/master-of-counselling-advanced
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-public-health-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/master-of-counselling — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/master-of-public-health: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Master of Public Health → Medicine & Health / Public Health
+[status] [fallback] timeout: per-course browser exceeded 20s on https://www.torrens.edu.au/courses/health/master-of-counselling-advanced — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-counselling-advanced (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/master-of-public-health-advanced: duration_value, duration_unit
+[status] [classify] [CATEGORY det] Master of Public Health (Advanced) → Medicine & Health / Public Health
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/master-of-counselling: duration_value, duration_unit
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.torrens.edu.au/courses/health/master-of-counselling-advanced: duration_value, duration_unit
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 toefl_overall=94.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill undergraduate] 47 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill postgraduate] 5 slot(s) filled across siblings
+[status] [stage] [STAGE] skipped Higher Degrees By Research: rejected: generic category page
+[status] [stage] [STAGE] saved: Bachelor Of Architectural Technology
+[status] [stage] [STAGE] saved: Bachelor Of 3d Design And Animation
+[status] [stage] [STAGE] saved: Bachelor Of Game Design And Development
+[status] [stage] [STAGE] saved: Bachelor Of Game Programming
+[status] [stage] [STAGE] saved: Bachelor Of Branded Fashion Design
+[status] [stage] [STAGE] saved: Bachelor Of Communication Design
+[status] [stage] [STAGE] saved: Bachelor Of Media Production And Communication
+[status] [stage] [STAGE] saved: Diploma Of Media Production
+[status] [stage] [STAGE] saved: Bachelor Of Fashion Marketing And Enterprise
+[status] [stage] [STAGE] saved: Bachelor Of Interior Design Commercial
+[status] [stage] [STAGE] saved: Bachelor Of Interior Design Residential
+[status] [stage] [STAGE] saved: Bachelor Of Ux And Web Design
+[status] [stage] [STAGE] saved: Diploma Of 3d Design And Animation
+[status] [stage] [STAGE] saved: Diploma Of Branded Fashion Design
+[status] [stage] [STAGE] saved: Advanced Diploma Of Game Design And Development
+[status] [stage] [STAGE] saved: Advanced Diploma Of Game Programming
+[status] [stage] [STAGE] saved: Diploma Of Design
+[status] [stage] [STAGE] saved: Diploma Of Fashion Marketing And Enterprise
+[status] [stage] [STAGE] saved: Diploma Of Graphic Design
+[status] [stage] [STAGE] saved: Advanced Diploma Of Interior Design And Decoration
+[status] [stage] [STAGE] saved: Diploma Of Interior Design And Decoration
+[status] [stage] [STAGE] saved: Diploma Of Photography And Photo Imaging
+[status] [stage] [STAGE] saved: Diploma Of Ux And Web Design
+[status] [stage] [STAGE] saved: Graduate Certificate Of Design
+[status] [stage] [STAGE] saved: Graduate Certificate Of Ux Design
+[status] [stage] [STAGE] saved: Master Of Design
+[status] [stage] [STAGE] saved: Branded Fashion Design
+[status] [stage] [STAGE] saved: 3d Design Animation
+[status] [stage] [STAGE] saved: Photography Film Video Design
+[status] [stage] [STAGE] saved: Ux Web Design
+[status] [stage] [STAGE] saved: Graphic Communication Design
+[status] [stage] [STAGE] saved: Media Production
+[status] [stage] [STAGE] saved: Interior Design Decoration
+[status] [stage] [STAGE] saved: Game Design Development
+[status] [stage] [STAGE] saved: Bachelor Of Community Services
+[status] [stage] [STAGE] saved: Bachelor Of Counselling
+[status] [stage] [STAGE] saved: Bachelor Of Health Science Chinese Medicine
+[status] [stage] [STAGE] saved: Bachelor Of Health Science Clinical Nutrition
+[status] [stage] [STAGE] saved: Bachelor Of Health Science Dermal Therapies
+[status] [stage] [STAGE] saved: Bachelor Of Health Science Naturopathy
+[status] [stage] [STAGE] saved: Bachelor Of Health Science Western Herbal Medicine
+[status] [stage] [STAGE] saved: Bachelor Of Nursing
+[status] [stage] [STAGE] saved: Bachelor Of Nutrition
+[status] [stage] [STAGE] saved: Bachelor Of Psychological Science
+[status] [stage] [STAGE] saved: Diploma Of Beauty And Spa Practice
+[status] [stage] [STAGE] saved: Diploma Of Counselling Vet
+[status] [stage] [STAGE] saved: Diploma Of Health And Wellbeing
+[status] [stage] [STAGE] saved: Diploma Of Health Science
+[status] [stage] [STAGE] saved: Diploma Of Nutrition
+[status] [stage] [STAGE] saved: Diploma Of Sport Development
+[status] [stage] [STAGE] saved: Graduate Certificate Of Counselling
+[status] [stage] [STAGE] saved: Graduate Certificate Of Public Health
+[status] [stage] [STAGE] saved: Graduate Diploma Of Counselling
+[status] [stage] [STAGE] saved: Graduate Diploma Of Psychology
+[status] [stage] [STAGE] saved: Graduate Diploma Of Public Health
+[status] [stage] [STAGE] saved: Master Of Counselling
+[status] [stage] [STAGE] saved: Master Of Counselling Advanced
+[status] [stage] [STAGE] saved: Master Of Public Health
+[status] [stage] [STAGE] saved: Master Of Public Health Advanced
+[status] [complete] [TIMING] Total: 6m 30s | Courses: 59 | Avg: 6.6s/course | Concurrency: HTTP=4 Browser=3
+[done] [complete] ══ DONE ══ Found:60 | Staged:59 | Skipped:1 | Errors:0
+[status] [complete] Staged 59 courses, 1 skipped, 0 fetch errors

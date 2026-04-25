@@ -1,0 +1,178 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode
+	
+Master Of Public Health Advanced
+-	-	-			-	-	-	-		-	-
+	
+Master Of Public Health
+-	-	-			-	-	-	-		-	-
+	
+Master Of Counselling Advanced
+-	-	-			-	-	-	-		-	-
+	
+Master Of Counselling
+-	-	-			-	-	-	-		-	-
+	
+Graduate Diploma Of Public Health
+-	-	-			-	-	-	-		-	-
+	
+Graduate Diploma Of Psychology
+-	-	-			-	-	-	-		-	-
+	
+Graduate Diploma Of Counselling
+-	-	-			-	-	-	-		-	-
+	
+Graduate Certificate Of Public Health
+-	-	-			-	-	-	-		-	-
+	
+Graduate Certificate Of Counselling
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Sport Development
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Nutrition
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Health Science
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Health And Wellbeing
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Counselling Vet
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Beauty And Spa Practice
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Psychological Science
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Nutrition
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Nursing
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Health Science Western Herbal Medicine
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Health Science Naturopathy
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Health Science Dermal Therapies
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Health Science Clinical Nutrition
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Health Science Chinese Medicine
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Counselling
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Community Services
+-	-	-			-	-	-	-		-	-
+	
+Game Design Development
+-	-	-			-	-	-	-		-	-
+	
+Interior Design Decoration
+-	-	-			-	-	-	-		-	-
+	
+Media Production
+-	-	-			-	-	-	-		-	-
+	
+Graphic Communication Design
+-	-	-			-	-	-	-		-	-
+	
+Ux Web Design
+-	-	-			-	-	-	-		-	-
+	
+Photography Film Video Design
+-	-	-			-	-	-	-		-	-
+	
+3d Design Animation
+-	-	-			-	-	-	-		-	-
+	
+Branded Fashion Design
+-	-	-			-	-	-	-		-	-
+	
+Master Of Design
+-	-	-			-	-	-	-		-	-
+	
+Graduate Certificate Of Ux Design
+-	-	-			-	-	-	-		-	-
+	
+Graduate Certificate Of Design
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Ux And Web Design
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Photography And Photo Imaging
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Interior Design And Decoration
+-	-	-			-	-	-	-		-	-
+	
+Advanced Diploma Of Interior Design And Decoration
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Graphic Design
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Fashion Marketing And Enterprise
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Design
+-	-	-			-	-	-	-		-	-
+	
+Advanced Diploma Of Game Programming
+-	-	-			-	-	-	-		-	-
+	
+Advanced Diploma Of Game Design And Development
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Branded Fashion Design
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of 3d Design And Animation
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Ux And Web Design
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Interior Design Residential
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Interior Design Commercial
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Fashion Marketing And Enterprise
+-	-	-			-	-	-	-		-	-
+	
+Diploma Of Media Production
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Media Production And Communication
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Communication Design
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Branded Fashion Design
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Game Programming
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Game Design And Development
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of 3d Design And Animation
+-	-	-			-	-	-	-		-	-
+	
+Bachelor Of Architectural Technology
+-	-	-			-	-	-	-		-	-

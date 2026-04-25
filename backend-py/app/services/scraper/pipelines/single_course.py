@@ -386,6 +386,34 @@ async def extract_course(
         fees_pdf_url = uni_pdf_data.get("fees_pdf_url")
         reqs_pdf_url = uni_pdf_data.get("requirements_pdf_url")
 
+        # NEW: prefer the per-course row from the fee schedule PDF over
+        # the uni-wide value. ``fee_by_course`` is populated when the
+        # PDF was a multi-row schedule (ASA, Torrens, …). Matching is
+        # done by distinctive course-name tokens — see
+        # :func:`match_course_in_pdf_table`. When a row matches, it
+        # *replaces* ``fee_block`` for this course and is tagged with a
+        # different provenance method so reviewers can tell per-course
+        # rows apart from the old uni-wide stamp.
+        fee_by_course = uni_pdf_data.get("fee_by_course") or {}
+        fee_method = "uni_pdf:fees"
+        if fee_by_course:
+            from app.services.scraper.pipelines.university_pdfs import (
+                match_course_in_pdf_table,
+            )
+
+            matched_row = match_course_in_pdf_table(
+                payload.get("course_name") or "", fee_by_course
+            )
+            if matched_row:
+                log.info(
+                    "[FEE] per-course PDF row matched for %r: $%s (%s)",
+                    payload.get("course_name"),
+                    matched_row.get("international_fee"),
+                    matched_row.get("fee_term"),
+                )
+                fee_block = matched_row
+                fee_method = "uni_pdf:fees:per_course"
+
         # Diff item H (MIGRATION_AUDIT.md §6): gate the uni-wide fee PDF
         # fallback on course-specific evidence. Without this, every
         # Bachelor on the catalogue inherits the same single dollar
@@ -401,13 +429,22 @@ async def extract_course(
         # caller has supplied text we can actually evaluate against.
         # (Code-review feedback on PR-1: avoid silently dropping every
         # uni-PDF fallback now that we lack the text channel.)
+        # The guard is intentionally bypassed when we have a per-course
+        # row — that row IS the course-specific evidence the guard is
+        # asking for, so applying the guard a second time would be
+        # double-jeopardy.
         fee_search_text = uni_pdf_data.get("fee_text") or ""
         fee_amount = fee_block.get("international_fee")
         unique_amounts = (
             [int(fee_amount)] if isinstance(fee_amount, (int, float)) else []
         )
         trust_fee_fallback = True
-        if fee_block and fees_pdf_url and fee_search_text:
+        if (
+            fee_block
+            and fees_pdf_url
+            and fee_search_text
+            and fee_method == "uni_pdf:fees"  # only guard the uni-wide stamp
+        ):
             try:
                 trust_fee_fallback = should_trust_generic_university_fee_fallback(
                     fees_pdf_url,
@@ -443,7 +480,7 @@ async def extract_course(
                         "field_key": k,
                         "value": v,
                         "confidence": 0.7,
-                        "method": "uni_pdf:fees",
+                        "method": fee_method,
                         "snippet": fees_pdf_url,
                     }
                 )
