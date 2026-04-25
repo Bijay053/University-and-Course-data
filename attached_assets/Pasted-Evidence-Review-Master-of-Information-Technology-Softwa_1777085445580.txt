@@ -1,0 +1,155 @@
+Evidence Review
+Master of Information Technology (Software Application Development)
+Eligibility: review - Missing: description, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+cambridge_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+169.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+category
+needs_review
+/ category:det
+confidence 70%
+Computer Science & IT
+Master of Information Technology (Software Application Development)
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+course_location
+needs_review
+/ location.text_block
+confidence 50%
+Sydney
+Sydney
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+course_name
+needs_review
+/ course_name.h1
+confidence 90%
+Master of Information Technology (Software Application Development)
+Master of Information Technology (Software Application Development)
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+currency
+needs_review
+/ uni_pdf:fees
+confidence 70%
+AUD
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+degree_level
+needs_review
+/ degree_level:name
+confidence 90%
+Master's
+Master of Information Technology (Software Application Development)
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+duolingo_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+100.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+duration
+needs_review
+/ regex
+confidence 75%
+2.0
+Master of Information Technology (Software Application Development) STUDENT HUB Apply Now → About US About usGovernanceEducation Agents Courses Students New StudentsCurrent StudentsStudent SupportKey DatesPolicies and FormsPricing Informati
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+duration_unit
+needs_review
+/ ai_fallback
+confidence 50%
+years
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+duration_value
+needs_review
+/ ai_fallback
+confidence 50%
+2.0
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+fee_term
+needs_review
+/ uni_pdf:fees
+confidence 70%
+Full Course
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+fee_year
+needs_review
+/ uni_pdf:fees
+confidence 70%
+2026
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+ielts_listening
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+ielts_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+ielts_reading
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+ielts_speaking
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+ielts_writing
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+intake_months
+needs_review
+/ regex
+confidence 70%
+["January", "April", "July", "October"]
+ation 2 years Full Time Intake Options‍ January, April, July, October See Key Dates AQF Level AQF Level 9 delivered by ASA Institute of Higher Education Download course brochure Course Overview Entry Requirements Fees and Scholarships Cours
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+international_fee
+needs_review
+/ uni_pdf:fees
+confidence 70%
+58080
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+study_mode
+needs_review
+/ study_mode:rule
+confidence 70%
+On Campus
+on Sydney, Australia Delivery Face to Face on campus Course Duration 2 y
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+sub_category
+needs_review
+/ category:det
+confidence 70%
+Information Systems
+Master of Information Technology (Software Application Development)
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+toefl_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+60.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+http://asahe.edu.au/courses/master-of-information-technology-software-application-development

@@ -154,6 +154,35 @@ All routes served at `/api/...`:
 Node scraper. As of commit `203226a`, the Python pipeline is at data-parity with
 the Node implementation across these features:
 
+**Required workflows for scraping to actually run** (all three must be up,
+otherwise jobs sit in `queued` and the UI hangs polling status forever —
+the symptom that surfaced as "scraping is freezed" on 2026-04-25):
+
+1. `Redis` — `redis-server --bind 127.0.0.1 --port 6379 --save "" --appendonly no --loglevel notice`
+   (Celery broker + result backend; `redis` system pkg from Nix; no
+   persistence, no waitForPort because 6379 isn't in Replit's allow-list).
+2. `backend-py: Celery worker` —
+   `cd backend-py && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=2 --loglevel=info -Q scrape`
+   (consumes the `scrape` queue; jobs are Celery-dispatched from
+   `routers/scrape.py` via `scrape_university.delay(job_id)`, the call
+   is wrapped in try/except so the API still returns 202 even with no
+   broker — that's why a missing worker presents as silent freeze, not
+   a 5xx).
+3. `backend-py: FastAPI` —
+   `cd backend-py && PYTHONPATH=. python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload`.
+
+The `scrape_runtime_jobs.status='queued'` rows are auto-reaped inline by
+the `GET /active` endpoint (`routers/scrape.py:list_active`, lines
+~457–575) if they sit unclaimed for >10 min — the row moves to
+`stopped` with `error_message='Auto-reaped (never claimed by a
+worker)'` (lines 528 and 544 cover the heartbeat-lost and
+never-claimed cases). The `/status/{job_id}` endpoint does NOT reap;
+it just reports current state. The reaper is a self-heal for
+dead-broker scenarios, not a substitute for actually running the
+worker — and it only fires on `/active` polls, so a UI screen that
+only polls `/status` won't trigger reaping.
+
+
 - **T201** course-name slug detection + title-casing (`extractors/course_name.py`)
 - **T202** duration term suffix (Year/Month) + Masters credit-points fix (`extractors/duration.py`)
 - **T203** Per-Unit → Full-Course fee multiplier (`extractors/fee.py`)
