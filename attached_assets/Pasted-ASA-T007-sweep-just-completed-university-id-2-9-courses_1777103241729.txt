@@ -1,0 +1,53 @@
+ASA T007 sweep just completed (university_id=2, 9 courses, 1m 40s — 2x faster than before, good). Per-course English scores now differentiate by image (bachelors 6/50/60, masters 6.5/58/85) — Bug L's per-image vision OCR is working. But three production-visible fields are still empty across all 9 rows:
+
+**Bug 1: IELTS sub-bands (L/R/W/S) empty for every course**
+
+Your Bug L commit message said "All 4 BB variants show 6 / 5.5 / 50 / 60" and "All 4 IT Masters now show IELTS 6.5 / sub 6.0 / PTE 58 / TOEFL 85". Production screenshot of Bachelor of Business Technology Management edit modal shows:
+- IELTS Overall: 6
+- IELTS L: empty
+- IELTS R: empty
+- IELTS W: empty
+- IELTS S: empty
+
+This matches the symptom you said was fixed. Either the fix didn't deploy correctly, or the verification job (job_31738449d953) wasn't representative of what prod produces. Please check the staged rows from this morning's prod scrape against the same image they came from. Look at any course matching `https://www.asahe.edu.au/courses/bachelor-of-business-technology-management` and report:
+- What `extraction_method` is recorded in the evidence row for ielts_listening?
+- Did `per_course_vision` or `per_course_vision_cached` actually fire for this course?
+- If yes, what did the Gemini response actually contain for the sub-bands?
+- If the image OCR returned sub-bands, where did they get dropped before reaching the DB?
+
+**Bug 2: degree_level field empty for every course**
+
+The Level column in the table shows "Bachelor's" / "Master's" — that's classified correctly. But the underlying `degree_level` column in `scraped_courses` (used by the edit modal's Degree Level dropdown) is empty. Either:
+- (a) The Level chip uses a derived value not stored in degree_level
+- (b) degree_level is computed but the modal binds to the wrong field
+- (c) The classifier writes to a different column entirely
+
+For Bachelor of Business Technology Management the degree level is literally in the course name ("Bachelor"). Filling this should be trivial — name-prefix detection.
+
+**Bug 3: sub_category field empty for every course**
+
+The Category column shows "Business & Management" or "Computer Science & IT" but `sub_category` is null. ASA's IT masters have specializations in the course name itself: "(Software Application Development)", "(Cyber Security)", "(Artificial Intelligence)". The parenthetical is the sub-category. For business courses, "Hospitality Management", "International Business", "Project Management", "Professional Accounting" are all sub-category candidates derivable from the course name.
+
+Why this matters: the user runs a course advisory product. Sub-category drives filtering in the user-facing search. Empty sub_category means courses don't appear in subject-specific searches.
+
+**Bug 4 (consequence): completeness stuck at 69%**
+
+Avg completeness across all 9 ASA courses is 69% — identical to pre-PR-5. The new extractors (intake.py, location.py, fee.py, duration.py) shipped today should have improved this. They didn't. The remaining missing fields per row are: description, academic_level, academic_score, other_requirement, IELTS sub-bands, degree_level, sub_category.
+
+**What I want from you:**
+
+1. Pull the most recent ASA scrape job from prod (today's run, ~07:41 UTC). Look at the actual DB rows for Bachelor of Business Technology Management and dump:
+   - `degree_level`, `sub_category`, `ielts_listening/reading/writing/speaking` values
+   - All evidence rows for that course's English fields
+   - All evidence rows for that course's category/sub_category
+   - The completeness breakdown: which fields are counted, which are missing
+2. Diagnose-before-patch: figure out WHY each of the 4 fields is empty. Don't ship a heuristic.
+3. Then propose a fix per field with: (a) the precedence rule, (b) the test fixture proving it works on ASA, (c) regression test confirming it doesn't break VIT.
+
+**What did work this round:**
+- Per-course IELTS overall now differs by image (6 vs 6.5) — Bug L confirmed working at the overall level
+- Discovery filters held — only 9 ASA courses staged, no junk URLs
+- Per-host browser config working — runtime cut from 3m 43s to 1m 40s, no 60s timeouts
+- Sibling-cache no longer broadcasting same English to all (PDF stamping fixed)
+
+**Don't push more code yet.** Diagnose the 4 empty-field bugs first. I'm pausing T007 here — won't run Torrens/USQ/CSU/UTAS until we understand why ASA degree_level is empty when the course name literally starts with "Bachelor". That bug existing means there's a fundamental wiring issue, not a heuristic edge case.
