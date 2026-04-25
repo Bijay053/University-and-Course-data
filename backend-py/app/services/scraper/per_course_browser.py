@@ -40,46 +40,58 @@ def _needs_international_toggle(url: str) -> bool:
 
 log = logging.getLogger(__name__)
 
-# Hard ceiling on the entire browser-fallback round-trip for ONE course.
-# browser_pool.fetch_html already passes a 30s timeout to page.goto, but
-# page.content(), context teardown, and the per-call semaphore acquire
-# can each block past that — and a single hung page can wedge the whole
-# Celery worker (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min,
-# zero log output). asyncio.wait_for is unconditional: if the wrapped
-# coroutine doesn't return within the budget, it gets cancelled and we
-# move on.
-_BROWSER_FETCH_TIMEOUT_SEC = 60
-
-# PR-5 Bug 3: per-host wait_until config. PR-1.5 made `networkidle` the
+# PR-5 Bug 3: per-host browser config (wait_until, settle, outer ceiling,
+# inner goto timeout). PR-1.5 made `networkidle` + 60s budget the
 # universal default to fix VIT's SPA hydration (the english <table>
 # rendered via XHR after DCL fired, so the cheap path saw an empty
 # skeleton). But ASA / Torrens / similar marketing sites embed
 # long-poll widgets (Intercom, Hotjar, GA stream) that prevent the
 # network from EVER going idle, so every per-course browser hit on
-# those hosts ate the full 60s budget and timed out (prod sweep
-# job_8af4a..., 9/9 ASA URLs hit `timeout: per-course browser
-# exceeded 60s`). Allow-list networkidle behavior to the SPA hosts that
-# actually need it; default everyone else to fast `domcontentloaded`.
-# Add new hosts here when a regression sweep proves they need it.
+# those hosts ate the full 60s budget and timed out (prod sweeps
+# job_8af4a... ASA 9/9 timeouts, Torrens 22/22 timeouts). Allow-list
+# networkidle to SPAs that need it; default everyone else to fast
+# `domcontentloaded` with a tight 20s outer ceiling. Add new hosts
+# here when a regression sweep proves they need the slow path.
 _NETWORKIDLE_HOSTS: tuple[str, ...] = ("vit.edu.au",)
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
+# Outer ceilings keep a single hung page from wedging the Celery worker
+# (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min, zero log
+# output). VIT's networkidle path needs ~25s headroom; everyone else
+# gets the requested 20s ceiling.
+_NETWORKIDLE_OUTER_TIMEOUT_SEC = 30
+_DEFAULT_OUTER_TIMEOUT_SEC = 20
+_NETWORKIDLE_GOTO_TIMEOUT_MS = 25_000
+_DEFAULT_GOTO_TIMEOUT_MS = 15_000
 
 
-def _browser_config_for(url: str) -> tuple[str, int]:
-    """Return (wait_until, settle_ms) for the given URL.
+def _browser_config_for(url: str) -> tuple[str, int, int, int]:
+    """Return (wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)
+    for the given URL.
 
-    Hosts in :data:`_NETWORKIDLE_HOSTS` get the slow-but-thorough
-    `networkidle` + 3s settle. Everyone else gets `domcontentloaded` +
-    1.5s settle so a hung XHR widget can't wedge the whole 60s budget.
+    * Hosts in :data:`_NETWORKIDLE_HOSTS` get the slow-but-thorough
+      `networkidle` + 3s settle, 30s outer ceiling, 25s goto timeout.
+    * Everyone else gets fast `domcontentloaded` + 1.5s settle, 20s
+      outer ceiling, 15s goto timeout — so a hung XHR widget can't
+      wedge the whole budget.
     """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         host = ""
     if any(host == h or host.endswith("." + h) for h in _NETWORKIDLE_HOSTS):
-        return "networkidle", _NETWORKIDLE_SETTLE_MS
-    return "domcontentloaded", _DEFAULT_SETTLE_MS
+        return (
+            "networkidle",
+            _NETWORKIDLE_SETTLE_MS,
+            _NETWORKIDLE_OUTER_TIMEOUT_SEC,
+            _NETWORKIDLE_GOTO_TIMEOUT_MS,
+        )
+    return (
+        "domcontentloaded",
+        _DEFAULT_SETTLE_MS,
+        _DEFAULT_OUTER_TIMEOUT_SEC,
+        _DEFAULT_GOTO_TIMEOUT_MS,
+    )
 
 
 # The four slot keys we care about — IELTS overall, PTE overall, TOEFL
@@ -132,16 +144,17 @@ async def maybe_browser_refetch(
             kind="per_course_browser_start",
             url=url,
         )
-    wait_until, settle_ms = _browser_config_for(url)
+    wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(url)
     try:
         rendered = await asyncio.wait_for(
             browser_pool.fetch_html(
                 url,
                 wait_until=wait_until,
                 settle_ms=settle_ms,
+                timeout=goto_ms,
                 click_international=_needs_international_toggle(url),
             ),
-            timeout=_BROWSER_FETCH_TIMEOUT_SEC,
+            timeout=outer_sec,
         )
     except asyncio.TimeoutError:
         # Hard ceiling hit. Log a warning BEFORE the abort so the celery
@@ -149,18 +162,18 @@ async def maybe_browser_refetch(
         # during the 32min hang — even an error would have helped).
         log.warning(
             "browser fallback exceeded %ss on URL %s — aborting this course",
-            _BROWSER_FETCH_TIMEOUT_SEC,
+            outer_sec,
             url,
         )
         if emit:
             await emit(
                 "status",
                 f"timeout: per-course browser exceeded "
-                f"{_BROWSER_FETCH_TIMEOUT_SEC}s on {url} — moving on",
+                f"{outer_sec}s on {url} — moving on",
                 phase="fallback",
                 kind="per_course_browser_timeout",
                 url=url,
-                timeout_seconds=_BROWSER_FETCH_TIMEOUT_SEC,
+                timeout_seconds=outer_sec,
                 level="warn",
             )
         return {}, [], None

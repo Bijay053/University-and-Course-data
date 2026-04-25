@@ -9,9 +9,15 @@ freeze the entire pipeline. The fix wraps the entire fetch in
 asyncio.wait_for with a hard cap and logs a warning before aborting.
 
 These tests pin that contract: a hung browser_pool.fetch_html must NOT
-block maybe_browser_refetch past _BROWSER_FETCH_TIMEOUT_SEC, and the
-abort must emit a warning + a typed status event so the UI shows the
-timeout instead of silently dropping the run.
+block maybe_browser_refetch past the per-host outer ceiling returned
+by `_browser_config_for`, and the abort must emit a warning + a typed
+status event so the UI shows the timeout instead of silently dropping
+the run.
+
+PR-5 Bug 3 changed the timeout knob from a module-level constant to
+the per-host 4-tuple (`wait_until, settle_ms, outer_sec, goto_ms`)
+returned by `_browser_config_for`. We monkeypatch that helper to drop
+the ceiling to 0.5s for fast test runs.
 """
 from __future__ import annotations
 
@@ -31,9 +37,14 @@ async def test_browser_fallback_aborts_on_timeout(monkeypatch, caplog):
         await asyncio.sleep(3600)
 
     monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _hang_forever)
-    # Bring the ceiling down to 0.5s so the test runs fast. The product
-    # value (45s) is the same code path — just longer.
-    monkeypatch.setattr(per_course_browser, "_BROWSER_FETCH_TIMEOUT_SEC", 0.5)
+    # Bring the outer ceiling down to 0.5s so the test runs fast. The
+    # product value (20s default / 30s VIT) is the same code path —
+    # just longer.
+    monkeypatch.setattr(
+        per_course_browser,
+        "_browser_config_for",
+        lambda url: ("domcontentloaded", 0, 0.5, 200),
+    )
 
     emitted: list[dict] = []
 

@@ -9,6 +9,18 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 
+# Resolve playwright TimeoutError once at import time so the hot path
+# in `fetch_html` doesn't pay an import on every call. In the test
+# environment playwright isn't installed (the unit tests stub the
+# browser entirely), so we fall back to a private sentinel that real
+# code paths will never raise — preserving the narrowed `except`
+# semantics introduced by PR-5 Bug 3.
+try:  # pragma: no cover - exercised only when playwright is installed
+    from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+except Exception:  # noqa: BLE001
+    class PlaywrightTimeoutError(Exception):  # type: ignore[no-redef]
+        """Stand-in used when playwright is not importable (test env)."""
+
 # Real Chrome 124 on macOS — matches UA we set
 _REAL_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -208,7 +220,50 @@ class BrowserPool:
             async with self.page() as page:
                 # Set referer to look like coming from Google
                 await page.set_extra_http_headers({"Referer": "https://www.google.com/"})
-                resp = await page.goto(url, wait_until=wait_until, timeout=timeout)
+                # PR-5 Bug 3: catch the SPECIFIC navigation-timeout case
+                # and STILL try to grab whatever DOM is rendered.
+                # Marketing sites embed long-poll widgets that prevent
+                # `networkidle` from firing, but the english-test
+                # table is usually present in the partial HTML —
+                # bailing entirely (returning None) was throwing away
+                # usable data and forcing a retry loop that never
+                # converged. We deliberately narrow this to playwright
+                # TimeoutError only: DNS/cert/protocol failures must
+                # still propagate as None, and we sniff for Chromium
+                # error pages so we don't silently return junk.
+                try:
+                    resp = await page.goto(url, wait_until=wait_until, timeout=timeout)
+                except PlaywrightTimeoutError as goto_exc:
+                    log.warning(
+                        "browser fetch %s: goto timed out (%s) — trying partial HTML",
+                        url, goto_exc,
+                    )
+                    try:
+                        partial = await asyncio.wait_for(
+                            page.content(), timeout=3.0
+                        )
+                    except Exception:
+                        return None
+                    if not partial or len(partial) < 1024:
+                        return None
+                    # Cheap Chromium error-page sniff. The interstitials
+                    # have a tiny <body class="neterror"> + <title>like
+                    # "example.com" or the error code. If we accept these
+                    # as success the staged record gets garbage extracted.
+                    lowered = partial[:4096].lower()
+                    if (
+                        "neterror" in lowered
+                        or "chrome-error://" in lowered
+                        or "err_name_not_resolved" in lowered
+                        or "err_connection_" in lowered
+                        or "err_cert_" in lowered
+                    ):
+                        log.warning(
+                            "browser fetch %s: partial HTML looks like a Chromium error page — discarding",
+                            url,
+                        )
+                        return None
+                    return partial
                 if resp is None:
                     log.warning("browser fetch %s: no response", url)
                     return None

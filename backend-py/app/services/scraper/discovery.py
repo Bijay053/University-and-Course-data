@@ -58,6 +58,90 @@ _JUNK_TEXT = re.compile(
     re.I,
 )
 
+# PR-5 Bug 4: nav/admin/news/marketing URL substrings that are NEVER
+# course detail pages. Ported from Node `excludePatterns` (routes/
+# scrape.ts:6553-6566) plus the explicit Torrens regression patterns:
+# /stories/, /studying-with-us/, /student-support/, /student-showcase/,
+# /success-coaches/, /why-study-with-us/. Without this filter, the
+# discovery BFS staged 22 "courses" for Torrens of which most were nav
+# or news (job_..., university_id=3).
+_NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
+    "/accommodation", "/student-life", "/campus-life", "/campus-map",
+    "/campus-tour", "/apply/", "/application/", "/contact",
+    "/about-us", "/about/", "/news/", "/newsroom/", "/events/",
+    "/event/", "/stories/", "/story/", "/search", "/category/", "/tag/",
+    "/blog/", "/blogs/", "/staff/", "/faculty-profile", "/research/",
+    "/library/", "/scholarships", "/support/", "/services/",
+    "/student-support", "/student-showcase", "/success-coaches",
+    "/why-study-with-us", "/why-choose", "/info-night", "/open-day",
+    "/virtual-info", "/keydates", "/key-dates", "/career-finder",
+    "/testimonials", "/study/why-", "/studying-with-us/",
+    "/all-courses", "/browse-courses", "/explore-courses",
+)
+
+# Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
+# under a "course-y" parent path, segments ending in these words are
+# always info pages, not real courses (e.g. /courses/scholarships,
+# /degrees/open-day, /programs/info-night).
+_JUNK_LAST_SEG_RE = re.compile(
+    r"(scholarships?|jobs?|internships?|employment|career|life|"
+    r"accommodation|sport|news|events?|blogs?|faq|help|support|overview|"
+    r"guide|information|handbook|tips|process|pathway|pathways?|"
+    r"class(?:es)?|fair|expo|hub|community|connect|network|info-night|"
+    r"open-day|keydates?|key-dates?|story|stories|testimonials?)$",
+    re.I,
+)
+
+# Top-level catalogue path segments. A URL of shape
+# /<one of these>/<single-segment-without-degree-qualifier> is a
+# category landing page (e.g. /courses/design, /programs/business),
+# not a real course detail page.
+_CATEGORY_BASE_SEGMENTS: frozenset[str] = frozenset({
+    "courses", "course", "programs", "programmes", "programme", "program",
+    "degrees", "degree", "study",
+})
+
+
+def _is_known_non_course_url(url: str) -> bool:
+    """True when the URL matches a hard-coded blocklist of nav/admin/
+    news/marketing patterns. Source of truth for keeping site nav out
+    of the staged-courses table."""
+    lurl = url.lower()
+    if any(p in lurl for p in _NON_COURSE_URL_PATTERNS):
+        return True
+    try:
+        path = urlparse(url).path.lower()
+    except Exception:
+        return False
+    last = path.rstrip("/").rsplit("/", 1)[-1]
+    if last and _JUNK_LAST_SEG_RE.search(last):
+        return True
+    return False
+
+
+def _is_category_landing(url: str) -> bool:
+    """True for `/<catalogue>/<single-segment>` URLs whose final segment
+    has no degree qualifier — i.e. category index pages like
+    /courses/design, /programs/business, /degrees/health.
+
+    These match the `/courses/` URL hint and would otherwise be treated
+    as real courses by :func:`_looks_like_course`. The BFS uses this to
+    (a) reject them from the candidate set and (b) enqueue them for
+    drill-in so their listed courses are harvested. Mirrors Node's
+    ``isShallowCatalogPath`` (routes/scrape.ts:5535-5544).
+    """
+    try:
+        path = urlparse(url).path.lower().rstrip("/")
+    except Exception:
+        return False
+    parts = [p for p in path.split("/") if p]
+    if len(parts) != 2:
+        return False
+    if parts[0] not in _CATEGORY_BASE_SEGMENTS:
+        return False
+    last = parts[1].replace("-", " ").replace("_", " ")
+    return not _COURSE_TEXT.search(last)
+
 
 class _LinkExtractor(HTMLParser):
     def __init__(self) -> None:
@@ -95,6 +179,17 @@ def _resolve(href: str, base: str, origin: str) -> str | None:
 
 
 def _looks_like_course(url: str, text: str) -> bool:
+    # PR-5 Bug 4 + Bug 5: hard reject nav/news/admin URLs and shallow
+    # category landings (e.g. /courses/design) BEFORE the URL-hint
+    # check would otherwise accept them. Without these filters the
+    # Torrens scrape staged 22 candidates of which most were nav,
+    # news, or category indexes — and missed the real 152 courses
+    # because the category landings were leaves instead of being
+    # drilled.
+    if _is_known_non_course_url(url):
+        return False
+    if _is_category_landing(url):
+        return False
     lurl = url.lower()
     if any(h in lurl for h in _COURSE_URL_HINTS):
         return True
@@ -266,7 +361,16 @@ async def discover_course_links(
                         found[full] = text or full.rsplit("/", 1)[-1]
                     if len(found) >= max_courses:
                         break
-                elif depth < 1 and _is_nav(full) and full not in visited:
+                # PR-5 Bug 5: enqueue category landings (e.g. /courses/
+                # design) for drill-in alongside generic nav. depth<2
+                # allows the BFS to walk: catalogue root → category →
+                # course-detail-list, which is how Torrens hides 152
+                # courses behind 11 single-word category pages.
+                elif (
+                    depth < 2
+                    and full not in visited
+                    and (_is_nav(full) or _is_category_landing(full))
+                ):
                     queue.append((full, depth + 1))
 
         added = len(found) - before

@@ -595,3 +595,35 @@ parity, completeness). Total: 75 passing.
   (`scrape.ts:10367`). Python uses `[DISCOVER]` BFS path.
 - `detect_course_listing_page` Step-3 GET-content fallback
   (`scrape.ts:7071-7077`) for hosts that reject HEAD but serve GET.
+
+**PR-5 ASA/Torrens regression sweep (in flight, NOT pushed):**
+- Bug 1 (postgrad IELTS bump): `pipelines/single_course.py` bumps
+  IELTS/PTE/TOEFL by 0.5 / 5 / 5 for postgrad payloads (Cambridge
+  unchanged). 9 unit tests in `test_postgrad_english_bump.py`.
+- Bug 2 (study_mode 3-tuple): `extractors/study_mode.py` returns
+  `ExtractionResult(value, confidence, evidence)`; 22 tests cover
+  label-priority, blended-vs-online, low-confidence bare "online".
+- Bug 3 (per-host browser config): `per_course_browser._browser_config_for`
+  returns `(wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)`.
+  Default 20s/15s ceiling (was 60s); VIT keeps 30s/25s for SPA hydration.
+  `browser_pool.fetch_html` catches Playwright `TimeoutError` ONLY and
+  falls back to `page.content()` with 1024-byte floor + Chromium
+  error-page sniff (`neterror`, `chrome-error://`, `ERR_*`). 9+4 tests.
+- Bug 4 (nav/news URL filter): `discovery._is_known_non_course_url` +
+  `_JUNK_LAST_SEG_RE` reject `/stories/`, `/news/`, `/blog/`,
+  `/studying-with-us/`, `/about/`, `/research/`, plus last-segment
+  suffixes (`-events`, `-scholarships`, `-jobs`, …). Wired into
+  `_looks_like_course`. 16 unit tests in `test_discovery_filters.py`.
+- Bug 5 (category-landing drill-in): `discovery._is_category_landing`
+  detects `/courses/{single-segment-without-degree-qualifier}` shapes
+  on `courses/programs/programmes/degrees/study` bases. BFS legacy
+  sweep enqueues these at `depth<2` so the 11 Torrens category pages
+  expand into 152 real courses instead of 22.
+- Evidence Review API fix (LANDED in `routers/scrape.py`):
+  `_attach_evidence_bulk` loads evidence with a single
+  `WHERE scraped_course_id = ANY(:ids)` query and attaches camelCase
+  aliases (`fieldKey`, `candidateValue`, `normalizedValue`,
+  `sourceUrl`, `pageType`, `extractionMethod`, `decisionScore`,
+  `validationStatus`, `decisionStatus`, `selected`). Wired into
+  `/staged` and `/staged/{job_id}`. 4 tests in
+  `test_staged_list_evidence.py`.
