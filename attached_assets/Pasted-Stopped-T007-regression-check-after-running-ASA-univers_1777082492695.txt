@@ -1,0 +1,23 @@
+Stopped T007 regression check after running ASA (university_id=2). Found 3 prod bugs. Need fixes before continuing to other unis.
+
+**Bug 1: Sibling cache stamping identical English scores on every course**
+All 9 ASA courses show IELTS=6, TOEFL=60, CAE=169 (PTE=null). Masters and bachelors got the same numbers. Logs show:
+```
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+```
+Undergraduate and postgraduate cache rows have identical values — the cache is supposed to differentiate by degree level but isn't. It's loading from the uni-level PDF (`Loaded uni-level PDF data: fee=yes english=yes`) and broadcasting one tier to all courses.
+
+Expected: masters typically need higher IELTS (6.5) than bachelors (6.0). User confirms.
+
+**Bug 2: study_mode classified as Online on courses that should be On Campus**
+7 of 9 ASA courses show study_mode=Online, 1 Blended, 1 On Campus. User states most/all should be On Campus (Sydney is listed as the location for all). Likely PR-1.5 study_mode noise-stripping was tightened for VIT and is now mis-classifying ASA. Please check `_NOISE_BLOCK_RE` and the Online/On Campus precedence in study_mode.py.
+
+**Bug 3: per-course browser timing out 100% on ASA**
+Every ASA URL hits `timeout: per-course browser exceeded 60s on — moving on`. 9/9 timeouts. Likely the networkidle change from PR-1.5 hot-fix #1 (added for VIT SPA) is hanging on ASA pages that never reach networkidle. Need either: (a) per-host wait_until config, or (b) shorter networkidle timeout with `domcontentloaded` fallback.
+
+**Job ID for diagnosis:** check the most recent ASA scrape (university_id=2) on prod for full logs.
+
+**Don't push more code until these three are addressed.** I haven't run T007 on USQ/torrens/CSU/UTAS yet because if Bug 3 is networkidle-related, it'll affect them too.
+
+Note: PR-4 itself is verified clean on VIT. These three bugs predate PR-4 — ASA was just never tested with PR-1.5 noise-stripping or per-course browser changes. They surfaced now because we're doing the regression sweep.
