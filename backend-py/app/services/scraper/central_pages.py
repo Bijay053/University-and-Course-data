@@ -434,16 +434,28 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
         html = None
 
     # ── 2. Playwright fallback ───────────────────────────────────────────────
-    try:
-        from app.services.scraper.browser_pool import pool as browser_pool
+    # Hard 60-second wall-clock timeout on the entire browser block —
+    # browser_pool.page() acquisition can itself block indefinitely if the
+    # pool is exhausted, which caused 1h+ hangs on the Celery worker.
+    import asyncio as _asyncio
 
+    async def _browser_fetch() -> str | None:
+        from app.services.scraper.browser_pool import pool as browser_pool
         async with browser_pool.page() as page:
             await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
             await page.wait_for_timeout(3_000)
             rendered = await page.content()
             if rendered and len(rendered) > 1000:
-                log.info("central_pages: browser fetch OK for %s (%d bytes)", url, len(rendered))
                 return rendered
+        return None
+
+    try:
+        rendered = await _asyncio.wait_for(_browser_fetch(), timeout=60)
+        if rendered:
+            log.info("central_pages: browser fetch OK for %s (%d bytes)", url, len(rendered))
+            return rendered
+    except _asyncio.TimeoutError:
+        log.warning("central_pages: browser fetch timed out (60s) for %s — using HTTP html", url)
     except Exception as exc:
         log.warning("central_pages: browser fetch failed for %s: %s", url, exc)
 
@@ -531,9 +543,15 @@ async def prefetch_central_pages(
                 )
 
     # ── Fetch English-requirements page ────────────────────────────────────
+    # IMPORTANT: use plain HTTP only — no Playwright fallback.
+    # The entryPage/requirementsPage never needs browser rendering because
+    # English requirement tables are always in static HTML.  Passing it
+    # through _fetch_with_browser_fallback() would check for "fee signals",
+    # find none (it's not a fee page), and launch Playwright — which can
+    # hang for hours blocking the entire Celery worker.
     if english_url and not english_url.endswith(".pdf"):
         try:
-            eng_html = await _fetch_with_browser_fallback(english_url)
+            eng_html = await fetch_html(english_url)
             if eng_html:
                 english_vals = await _parse_english_page_html_async(eng_html, english_url)
                 result["english"] = english_vals

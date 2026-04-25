@@ -1,0 +1,801 @@
+
+[FALLBACK] [per-course vision img 3/5 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 5/5] https://www.kbs.edu.au/courses/diploma-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=58920.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 5/35: Bachelor Of Business Hospitality And Tourism Management
+[ 5/35] Fetching 5/35: Bachelor Of Business Hospitality And Tourism Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Accounting) → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 6/35: Bachelor Of Business Management
+[ 6/35] Fetching 6/35: Bachelor Of Business Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 7/35: Bachelor Of Business Marketing
+[ 7/35] Fetching 7/35: Bachelor Of Business Marketing
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-marketing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 8/35: Graduate Certificate In Accounting
+[ 8/35] Fetching 8/35: Graduate Certificate In Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Business — fee from 'Graduate Diploma of Business Administration' row: intl=39280.0 per=total
+[FALLBACK] [CENTRAL ✓] Diploma of Business — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 9/35: Master Of Professional Accounting
+[ 9/35] Fetching 9/35: Master Of Professional Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-professional-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-professional-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-marketing: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Marketing) → Business & Management / Marketing
+[EXTRACT ] [EXTRACT] 10/35: Master Of Accounting
+[ 10/35] Fetching 10/35: Master Of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 11/35: Graduate Certificate In Business Administration
+[ 11/35] Fetching 11/35: Graduate Certificate In Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+[FALLBACK] [per-course vision img 3/5 (cache hits 2)] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 1/4 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting — fee from 'Graduate Certificate of Accounting' row: intl=13600.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Certificate in Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 12/35: Graduate Diploma Of Business Administration
+[ 12/35] Fetching 12/35: Graduate Diploma Of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] [per-course vision img 2/4 (cache hits 2)] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-professional-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting — fee from 'Master of Accounting' row: intl=54400.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 13/35: Graduate Certificate In Business Analytics
+[ 13/35] Fetching 13/35: Graduate Certificate In Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting — fee from 'Master of Accounting' row: intl=54400.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 14/35: Graduate Diploma Of Business Analytics
+[ 14/35] Fetching 14/35: Graduate Diploma Of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 15/35: Master Of Business Analytics
+[ 15/35] Fetching 15/35: Master Of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/master-of-business-analytics
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=39280.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 16/35: Master Of Business Analytics Extension
+[ 16/35] Fetching 16/35: Master Of Business Analytics Extension
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics — fee from 'Graduate Diploma of Business Analytics' row: intl=27200.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 17/35: Digital Management
+[ 17/35] Fetching 17/35: Digital Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — fee from 'Graduate Certificate in Business Analytics' row: intl=13600.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 18/35: Health Services Management
+[ 18/35] Fetching 18/35: Health Services Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 19/35: International Leadership
+[ 19/35] Fetching 19/35: International Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 20/35: Project Management
+[ 20/35] Fetching 20/35: Project Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[FALLBACK] [per-course vision img 0/4 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Digital Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 21/35: Tourism And Hospitality Leadership
+[ 21/35] Fetching 21/35: Tourism And Hospitality Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[FALLBACK] [per-course vision img 0/4 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Tourism and Hospitality Leadership → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 22/35: Women In Leadership
+[ 22/35] Fetching 22/35: Women In Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management: duration_value, duration_unit
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[FALLBACK] [CENTRAL ✓] MBA – Project Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Project Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Project Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 23/35: Data Driven Leadership
+[ 23/35] Fetching 23/35: Data Driven Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – International Leadership → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 24/35: Bachelor Of Information Technology
+[ 24/35] Fetching 24/35: Bachelor Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Data-driven Leadership → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 25/35: Diploma Of Information Technology
+[ 25/35] Fetching 25/35: Diploma Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Health Services Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 26/35: Master Of Information Technology
+[ 26/35] Fetching 26/35: Master Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – (Women in Leadership) → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 27/35: Graduate Certificate In Information Technology
+[ 27/35] Fetching 27/35: Graduate Certificate In Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[FALLBACK] [per-course vision img 4/6 (cache hits 2)] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology — fee from 'Bachelor of Information Technology' row: intl=74880.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 28/35: Graduate Diploma Information Technology
+[ 28/35] Fetching 28/35: Graduate Diploma Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/6 (cache hits 4)] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — fee from 'Graduate Certificate in Information Technology' row: intl=14560.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 29/35: Master Of Information Technology Extension
+[ 29/35] Fetching 29/35: Master Of Information Technology Extension
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology — fee from 'Master of Information Technology' row: intl=43680.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 30/35: Master Of Business Analytics Information Technology
+[ 30/35] Fetching 30/35: Master Of Business Analytics Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology — fee from 'Graduate Diploma of Information Technology' row: intl=29120.0 per=total
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 31/35: English For Academic Purposes
+[ 31/35] Fetching 31/35: English For Academic Purposes
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/english-for-academic-purposes
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/english-for-academic-purposes
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — fee from 'Graduate Diploma of Information Technology' row: intl=29120.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 32/35: Non Award Single Subject Enrolment
+[ 32/35] Fetching 32/35: Non Award Single Subject Enrolment
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/3] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[FALLBACK] [per-course vision img 2/6 (cache hits 4)] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/4 (cache hits 2)] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 33/35: It Specialisations System Requirements
+[ 33/35] Fetching 33/35: It Specialisations System Requirements
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=43680.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 34/35: Two Specialisations
+[ 34/35] Fetching 34/35: Two Specialisations
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations
+[FALLBACK] [CENTRAL ✓] IT Specialisations and System Requiremen — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 35/35: Study Abroad Program
+[ 35/35] Fetching 35/35: Study Abroad Program
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/study-abroad-program (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/1] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations
+[FALLBACK] [per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/non-award-single-subject-enrolment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 4/6 (cache hits 2)] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/english-for-academic-purposes (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/study-abroad-program: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Study Abroad Program — english from central page: duolingo=90.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/english-for-academic-purposes: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Business Administration — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] Business Administration — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[FALLBACK] [per-course vision img 1/1] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Two Specialisations → Business & Management / MBA
+[FALLBACK] [CENTRAL ✓] Non-award Single Subject Enrolment — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build unknown] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[STAGE ] [STAGE] saved: Mba Master Of Business Administration
+[STAGE ] [STAGE] saved: Diploma Of Business
+[STAGE ] [STAGE] skipped Bachelor Of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor Of Business Accounting
+[STAGE ] [STAGE] saved: Bachelor Of Business Hospitality And Tourism Management
+[STAGE ] [STAGE] saved: Bachelor Of Business Management
+[STAGE ] [STAGE] saved: Bachelor Of Business Marketing
+[STAGE ] [STAGE] saved: Graduate Certificate In Accounting
+[STAGE ] [STAGE] saved: Master Of Professional Accounting
+[STAGE ] [STAGE] saved: Master Of Accounting
+[STAGE ] [STAGE] saved: Graduate Certificate In Business Administration
+[STAGE ] [STAGE] saved: Graduate Diploma Of Business Administration
+[STAGE ] [STAGE] saved: Graduate Certificate In Business Analytics
+[STAGE ] [STAGE] saved: Graduate Diploma Of Business Analytics
+[STAGE ] [STAGE] saved: Master Of Business Analytics
+[STAGE ] [STAGE] saved: Master Of Business Analytics Extension
+[STAGE ] [STAGE] saved: Digital Management
+[STAGE ] [STAGE] saved: Health Services Management
+[STAGE ] [STAGE] saved: International Leadership
+[STAGE ] [STAGE] saved: Project Management
+[STAGE ] [STAGE] saved: Tourism And Hospitality Leadership
+[STAGE ] [STAGE] saved: Women In Leadership
+[STAGE ] [STAGE] saved: Data Driven Leadership
+[STAGE ] [STAGE] saved: Bachelor Of Information Technology
+[STAGE ] [STAGE] saved: Diploma Of Information Technology
+[STAGE ] [STAGE] saved: Master Of Information Technology
+[STAGE ] [STAGE] saved: Graduate Certificate In Information Technology
+[STAGE ] [STAGE] saved: Graduate Diploma Information Technology
+[STAGE ] [STAGE] saved: Master Of Information Technology Extension
+[STAGE ] [STAGE] saved: Master Of Business Analytics Information Technology
+[STAGE ] [STAGE] skipped English For Academic Purposes: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Non Award Single Subject Enrolment: rejected: category_landing_page
+[STAGE ] [STAGE] skipped It Specialisations System Requirements: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Two Specialisations
+[STAGE ] [STAGE] skipped Study Abroad Program: rejected: category_landing_page
+[COMPLETE] [TIMING] Total: 6m 44s | Courses: 30 | Avg: 13.5s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:35 | Staged:30 | Skipped:5 | Errors:0
+[COMPLETE] Staged 30 courses, 5 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.kbs.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.kbs.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.kbs.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.kbs.edu.au/courses: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.kbs.edu.au/courses
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.kbs.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://www.kbs.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://www.kbs.edu.au/sitemap.xml: +35 candidates (total 35)
+[DISCOVER] [DISCOVER] sitemap: done — 35 unique candidates
+[DISCOVER] Discovered 35 candidate course links
+[DISCOVER] [CENTRAL] auto-discovered fee page: https://www.kbs.edu.au/admissions/fees/international-fees
+[DISCOVER] [CENTRAL] fee page parsed → 22 program record(s) from https://www.kbs.edu.au/admissions/fees/international-fees
+[DISCOVER] [CENTRAL] english page parsed → cambridge_overall=169.0, duolingo_overall=90.0, ielts_listening=5.5, ielts_overall=6.0, ielts_reading=5.5, ielts_speaking=6.0, ielts_writing=6.0, pte_overall=50.0, toefl_overall=72.0 from https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements
+[EXTRACT ] Extracting course details (35 pages)...
+[EXTRACT ] [EXTRACT] 1/35: Mba Master Of Business Administration
+[EXTRACT ] [EXTRACT] 2/35: Diploma Of Business
+[EXTRACT ] [EXTRACT] 3/35: Bachelor Of Business
+[EXTRACT ] [EXTRACT] 4/35: Bachelor Of Business Accounting
+[ 2/35] Fetching 2/35: Diploma Of Business
+[ 3/35] Fetching 3/35: Bachelor Of Business
+[ 1/35] Fetching 1/35: Mba Master Of Business Administration
+[ 4/35] Fetching 4/35: Bachelor Of Business Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/diploma-of-business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/diploma-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/diploma-of-business
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business-accounting
+[FALLBACK] [per-course vision img 3/5 (cache hits 2)] https://www.kbs.edu.au/courses/mba-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 5/5] https://www.kbs.edu.au/courses/diploma-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — fee from 'Master of Business Administration' row: intl=58920.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA - Master of Business Administration — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA - Master of Business Administration → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 5/35: Bachelor Of Business Hospitality And Tourism Management
+[ 5/35] Fetching 5/35: Bachelor Of Business Hospitality And Tourism Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Accounting) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Accounting) → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 6/35: Bachelor Of Business Management
+[ 6/35] Fetching 6/35: Bachelor Of Business Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 7/35: Bachelor Of Business Marketing
+[ 7/35] Fetching 7/35: Bachelor Of Business Marketing
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/bachelor-of-business-marketing
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-marketing — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-marketing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Management) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 8/35: Graduate Certificate In Accounting
+[ 8/35] Fetching 8/35: Graduate Certificate In Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-business: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Business — fee from 'Graduate Diploma of Business Administration' row: intl=39280.0 per=total
+[FALLBACK] [CENTRAL ✓] Diploma of Business — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 9/35: Master Of Professional Accounting
+[ 9/35] Fetching 9/35: Master Of Professional Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-professional-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-professional-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-marketing: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Marketing) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Marketing) → Business & Management / Marketing
+[EXTRACT ] [EXTRACT] 10/35: Master Of Accounting
+[ 10/35] Fetching 10/35: Master Of Accounting
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-business-hospitality-and-tourism-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — fee from 'Bachelor of Business' row: intl=69120.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Business (Hospitality and To — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 11/35: Graduate Certificate In Business Administration
+[ 11/35] Fetching 11/35: Graduate Certificate In Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+[FALLBACK] [per-course vision img 3/5 (cache hits 2)] https://www.kbs.edu.au/courses/graduate-certificate-in-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 1/4 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-accounting
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting — fee from 'Graduate Certificate of Accounting' row: intl=13600.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Certificate in Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 12/35: Graduate Diploma Of Business Administration
+[ 12/35] Fetching 12/35: Graduate Diploma Of Business Administration
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] [per-course vision img 2/4 (cache hits 2)] https://www.kbs.edu.au/courses/master-of-accounting — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-professional-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting — fee from 'Master of Accounting' row: intl=54400.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Professional Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 13/35: Graduate Certificate In Business Analytics
+[ 13/35] Fetching 13/35: Graduate Certificate In Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-accounting: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Accounting — fee from 'Master of Accounting' row: intl=54400.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Accounting — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 14/35: Graduate Diploma Of Business Analytics
+[ 14/35] Fetching 14/35: Graduate Diploma Of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Adminis — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 15/35: Master Of Business Analytics
+[ 15/35] Fetching 15/35: Master Of Business Analytics
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/master-of-business-analytics
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-administration: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=39280.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Administrat — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 16/35: Master Of Business Analytics Extension
+[ 16/35] Fetching 16/35: Master Of Business Analytics Extension
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/master-of-business-analytics-extension
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics — fee from 'Graduate Diploma of Business Analytics' row: intl=27200.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Business Analytics — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 17/35: Digital Management
+[ 17/35] Fetching 17/35: Digital Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-business-analytics-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — fee from 'Graduate Certificate in Business Analytics' row: intl=13600.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Business Analyti — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 18/35: Health Services Management
+[ 18/35] Fetching 18/35: Health Services Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Extension) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 19/35: International Leadership
+[ 19/35] Fetching 19/35: International Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 20/35: Project Management
+[ 20/35] Fetching 20/35: Project Management
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management
+[FALLBACK] [per-course vision img 0/4 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/digital-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Digital Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Digital Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 21/35: Tourism And Hospitality Leadership
+[ 21/35] Fetching 21/35: Tourism And Hospitality Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership
+[FALLBACK] [per-course vision img 0/4 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/tourism-and-hospitality-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Tourism and Hospitality Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Tourism and Hospitality Leadership → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT ] [EXTRACT] 22/35: Women In Leadership
+[ 22/35] Fetching 22/35: Women In Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/project-management: duration_value, duration_unit
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership
+[FALLBACK] [CENTRAL ✓] MBA – Project Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Project Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Project Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 23/35: Data Driven Leadership
+[ 23/35] Fetching 23/35: Data Driven Leadership
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/international-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – International Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – International Leadership → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 24/35: Bachelor Of Information Technology
+[ 24/35] Fetching 24/35: Bachelor Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/data-driven-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Data-driven Leadership — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Data-driven Leadership → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 25/35: Diploma Of Information Technology
+[ 25/35] Fetching 25/35: Diploma Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/diploma-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/bachelor-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/5] https://www.kbs.edu.au/courses/diploma-of-information-technology
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/health-services-management: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Health Services Management — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Health Services Management → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 26/35: Master Of Information Technology
+[ 26/35] Fetching 26/35: Master Of Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/master-of-information-technology
+[FALLBACK] [per-course vision img 1/5 (cache hits 4)] https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/mba-master-of-business-administration/women-in-leadership: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – (Women in Leadership) — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – (Women in Leadership) → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 27/35: Graduate Certificate In Information Technology
+[ 27/35] Fetching 27/35: Graduate Certificate In Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology
+[FALLBACK] [per-course vision img 4/6 (cache hits 2)] https://www.kbs.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/bachelor-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology — fee from 'Bachelor of Information Technology' row: intl=74880.0 per=total
+[FALLBACK] [CENTRAL ✓] Bachelor of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 28/35: Graduate Diploma Information Technology
+[ 28/35] Fetching 28/35: Graduate Diploma Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/graduate-diploma-information-technology
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 3/6 (cache hits 3)] https://www.kbs.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/5 (cache hits 3)] https://www.kbs.edu.au/courses/diploma-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/diploma-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/6 (cache hits 4)] https://www.kbs.edu.au/courses/graduate-diploma-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/graduate-diploma-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-certificate-in-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — fee from 'Graduate Certificate in Information Technology' row: intl=14560.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Certificate in Information Tech — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 29/35: Master Of Information Technology Extension
+[ 29/35] Fetching 29/35: Master Of Information Technology Extension
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology — fee from 'Master of Information Technology' row: intl=43680.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 30/35: Master Of Business Analytics Information Technology
+[ 30/35] Fetching 30/35: Master Of Business Analytics Information Technology
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/master-of-information-technology-extension
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/diploma-of-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology — fee from 'Graduate Diploma of Information Technology' row: intl=29120.0 per=total
+[FALLBACK] [CENTRAL ✓] Diploma of Information Technology — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 31/35: English For Academic Purposes
+[ 31/35] Fetching 31/35: English For Academic Purposes
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/english-for-academic-purposes
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/4] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/6] https://www.kbs.edu.au/courses/english-for-academic-purposes
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/graduate-diploma-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — fee from 'Graduate Diploma of Information Technology' row: intl=29120.0 per=total
+[FALLBACK] [CENTRAL ✓] Graduate Diploma of Information Technolo — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 32/35: Non Award Single Subject Enrolment
+[ 32/35] Fetching 32/35: Non Award Single Subject Enrolment
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/3] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment
+[FALLBACK] [per-course vision img 2/6 (cache hits 4)] https://www.kbs.edu.au/courses/master-of-information-technology-extension — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology-extension (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 2/4 (cache hits 2)] https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-business-analytics-information-technology: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — fee from 'Master of Business Analytics' row: intl=40800.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Business Analytics (Informatio — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Business Analytics (Informatio → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 33/35: It Specialisations System Requirements
+[ 33/35] Fetching 33/35: It Specialisations System Requirements
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/master-of-information-technology/it-specialisations-system-requirements (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/master-of-information-technology-extension: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — fee from 'Master of Information Technology' row: intl=43680.0 per=total
+[FALLBACK] [CENTRAL ✓] Master of Information Technology (Extens — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] Master of Information Technology (Extens → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 34/35: Two Specialisations
+[ 34/35] Fetching 34/35: Two Specialisations
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations
+[FALLBACK] [CENTRAL ✓] IT Specialisations and System Requiremen — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] 35/35: Study Abroad Program
+[ 35/35] Fetching 35/35: Study Abroad Program
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/study-abroad-program (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course vision img 0/1] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations
+[FALLBACK] [per-course vision img 2/3 (cache hits 1)] https://www.kbs.edu.au/courses/non-award-single-subject-enrolment — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/non-award-single-subject-enrolment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course vision img 4/6 (cache hits 2)] https://www.kbs.edu.au/courses/english-for-academic-purposes — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/english-for-academic-purposes (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/study-abroad-program: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Study Abroad Program — english from central page: duolingo=90.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.kbs.edu.au/courses/english-for-academic-purposes: duration_value, duration_unit
+[FALLBACK] [CENTRAL ✓] Business Administration — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] Business Administration — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[FALLBACK] [per-course vision img 1/1] https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [FALLBACK] AI enriching https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — fee from 'Graduate Certificate in Business Administration' row: intl=19640.0 per=total
+[FALLBACK] [CENTRAL ✓] MBA – Two Specialisations — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[INFO ] [CATEGORY det] MBA – Two Specialisations → Business & Management / MBA
+[FALLBACK] [CENTRAL ✓] Non-award Single Subject Enrolment — english from central page: duolingo=90.0 ielts=6.0 ielts_speaking=6.0 ielts_writing=6.0 ielts_listening=5.5 ielts_reading=5.5 pte=50.0 toefl=72.0 cambridge=169.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build unknown] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=72.0
+[STAGE ] [STAGE] saved: Mba Master Of Business Administration
+[STAGE ] [STAGE] saved: Diploma Of Business
+[STAGE ] [STAGE] skipped Bachelor Of Business: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor Of Business Accounting
+[STAGE ] [STAGE] saved: Bachelor Of Business Hospitality And Tourism Management
+[STAGE ] [STAGE] saved: Bachelor Of Business Management
+[STAGE ] [STAGE] saved: Bachelor Of Business Marketing
+[STAGE ] [STAGE] saved: Graduate Certificate In Accounting
+[STAGE ] [STAGE] saved: Master Of Professional Accounting
+[STAGE ] [STAGE] saved: Master Of Accounting
+[STAGE ] [STAGE] saved: Graduate Certificate In Business Administration
+[STAGE ] [STAGE] saved: Graduate Diploma Of Business Administration
+[STAGE ] [STAGE] saved: Graduate Certificate In Business Analytics
+[STAGE ] [STAGE] saved: Graduate Diploma Of Business Analytics
+[STAGE ] [STAGE] saved: Master Of Business Analytics
+[STAGE ] [STAGE] saved: Master Of Business Analytics Extension
+[STAGE ] [STAGE] saved: Digital Management
+[STAGE ] [STAGE] saved: Health Services Management
+[STAGE ] [STAGE] saved: International Leadership
+[STAGE ] [STAGE] saved: Project Management
+[STAGE ] [STAGE] saved: Tourism And Hospitality Leadership
+[STAGE ] [STAGE] saved: Women In Leadership
+[STAGE ] [STAGE] saved: Data Driven Leadership
+[STAGE ] [STAGE] saved: Bachelor Of Information Technology
+[STAGE ] [STAGE] saved: Diploma Of Information Technology
+[STAGE ] [STAGE] saved: Master Of Information Technology
+[STAGE ] [STAGE] saved: Graduate Certificate In Information Technology
+[STAGE ] [STAGE] saved: Graduate Diploma Information Technology
+[STAGE ] [STAGE] saved: Master Of Information Technology Extension
+[STAGE ] [STAGE] saved: Master Of Business Analytics Information Technology
+[STAGE ] [STAGE] skipped English For Academic Purposes: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Non Award Single Subject Enrolment: rejected: category_landing_page
+[STAGE ] [STAGE] skipped It Specialisations System Requirements: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Two Specialisations
+[STAGE ] [STAGE] skipped Study Abroad Program: rejected: category_landing_page
+[COMPLETE] [TIMING] Total: 6m 44s | Courses: 30 | Avg: 13.5s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:35 | Staged:30 | Skipped:5 | Errors:0
+[COMPLETE] Staged 30 courses, 5 skipped, 0 fetch errors

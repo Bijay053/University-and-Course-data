@@ -1,0 +1,268 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Two Specialisations
+Business & Management
+Publish: review
+Eligibility: review
+54%	Master	-	A$19,640/total	6	50	72	169	90		-	On Campus	
+
+
+
+	
+Master Of Business Analytics Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$40,800/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Master Of Information Technology Extension
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$43,680/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Diploma Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$29,120/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Certificate In Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$14,560/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Master Of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	20 Month	A$43,680/total	6	50	72	169	90	Mar, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Diploma Of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Diploma	1 Year	A$29,120/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Bachelor Of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$74,880/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Data Driven Leadership
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Women In Leadership
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Tourism And Hospitality Leadership
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Project Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+International Leadership
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Health Services Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Digital Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$19,640/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus	
+
+
+
+	
+Master Of Business Analytics Extension
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$40,800/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Master Of Business Analytics
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	20 Month	A$40,800/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Diploma Of Business Analytics
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$27,200/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Certificate In Business Analytics
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$13,600/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Diploma Of Business Administration
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	16 Month	A$39,280/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Graduate Certificate In Business Administration
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$19,640/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney	On Campus	
+
+
+
+	
+Master Of Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$54,400/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Master Of Professional Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	20 Month	A$54,400/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Graduate Certificate In Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$13,600/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Bachelor Of Business Marketing
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$69,120/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Melbourne / Sydney	On Campus	
+
+
+
+	
+Bachelor Of Business Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$69,120/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Melbourne / Sydney	On Campus	
+
+
+
+	
+Bachelor Of Business Hospitality And Tourism Management
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$69,120/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Bachelor Of Business Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$69,120/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Diploma Of Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Diploma	1 Year	A$39,280/total	6	50	72	169	90	Mar, Jul, Nov	Adelaide / Brisbane / Melbourne / Sydney / Perth	On Campus	
+
+
+
+	
+Mba Master Of Business Administration
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 Year	A$58,920/total	6	50	72	169	90	Mar, May, Jul, Sep, Nov	Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /	On Campus
