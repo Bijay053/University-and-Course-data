@@ -1,0 +1,103 @@
+Pulled your latest fixes (P0 follow-up: scrape_url default + frontend debounce), redeployed (backend + frontend rebuild + nginx sync), re-ran KBS. **All four of today's fixes verified working on prod.** But the KBS result exposes that Bug 2 is now the single ticket blocking Phase 1.
+
+---
+
+**✅ Verified working tonight:**
+
+1. **scrape_url default** — created KBS via UI, scrape_url was auto-set to website value, scrape ran end-to-end without manual SQL. Future new unis won't need the workaround.
+
+2. **Frontend debounce** — clicked Submit, scrape fired ONCE. No more 5-jobs-in-3-seconds. The useRef guard works.
+
+3. **Torrens 3 filters** — fired correctly with proper reject reasons logged to staging:
+   - 9 courses rejected as `category_landing_page` (MBA generic, ultimate-guide page, MBA specialisation overview pages)
+   - 35 courses rejected as `no_international_fee`
+
+4. **Failed-job observability** — every reject reason now appears in the staging table with course name. Earlier today this was invisible.
+
+Clean execution on a 4-PR batch. Thank you.
+
+---
+
+**⚠️ But: KBS staged 0 of 44 courses, and that's because Bug 2 hasn't shipped yet.**
+
+KBS is a real, accredited Australian university (Kaplan Business School, CRICOS 02426B) that does accept international students. Every course offering is open to international students. But on every KBS course page, the international fee link points to a centralized admissions page:
+
+```
+https://www.kbs.edu.au/admissions/fees/international-fees
+```
+
+The scraper doesn't follow that link, so `international_fee` stays NULL. The Torrens filter then correctly says "no_international_fee → reject". Result: 44 rejections that look right by the filter logic but are functionally wrong for KBS.
+
+**This is exactly the scenario I flagged in the original KBS Bug 2 ticket.** It's no longer hypothetical — we now have prod evidence that without Bug 2, the new filter is over-aggressive on every centralized-admissions uni.
+
+**Why this matters for Phase 1:**
+
+The Phase 1 scaling target (~80 AU/NZ unis) heavily includes handbook-architecture institutions. From my partial research:
+
+- USyd: `handbook.sydney.edu.au` per-program pages link out to central fee/eligibility
+- UNSW: `handbook.unsw.edu.au` same pattern
+- ANU: `programsAndCourses.anu.edu.au` same pattern
+- Monash, RMIT, UQ, Melbourne, Adelaide — all G8/major uni handbooks follow this design pattern
+- KBS, Top Education, Holmes, ICMS, Le Cordon Bleu, ECU — private/specialist providers follow it too
+
+A conservative estimate is **30-50% of the Phase 1 list will hit this exact failure mode**. Without Bug 2, every one of them will produce 0 staged courses through the new filter.
+
+The 5 unis already in the system (USQ/ASA/Torrens/CSU/UTAS/VIT) don't have this architecture. They got us this far. Phase 1 can't proceed past them on the current code path.
+
+---
+
+**Asking for: Bug 2 design proposal first, then code.**
+
+From the original ticket I asked for a design doc before coding. That's still the right approach — Bug 2 isn't a quick patch. Specifically I want to see your thinking on:
+
+1. **Discovery rules.** How does the scraper identify which links on a course page are central admissions pages vs. just outbound nav? URL patterns (`/admissions/fees`, `/fees`, `/entry-requirements`, `/english-requirements`)? Anchor text matching? Both?
+
+2. **Cache key shape.** A central fees page might list every program's fee in one table indexed by course code (KBS uses CRICOS code 110274C etc.). Or a single "international students pay $X" generic statement. Or a fee table per faculty. The cache lookup needs to handle all three. What's the data model?
+
+3. **Per-uni vs. global cache.** Cache lives for one scrape run? One uni forever? Refresh how often? My instinct: per-uni, refreshed per scrape run, lives in memory only.
+
+4. **Pipeline insertion point.** Where does the lookup slot in? My instinct: between the per-course fetch and the staging gate — same place the sibling cache backfill already runs.
+
+5. **Fallback behavior.** If central page exists but doesn't have this specific course's fee, what happens? Reject as no-fee, or stage with central "international students pay X" generic value, or surface for human review?
+
+6. **Scope estimate.** How many days of work is this? If it's >3 days I want to scope it down. If <1 day I want it shipped this week.
+
+Send the design proposal as a markdown doc in your repo or paste it as a Replit message. I'll review and we can converge before you write code. **Don't start coding until we agree on the design.**
+
+---
+
+**Workaround for KBS specifically (not blocking, just FYI):**
+
+If I want KBS data in the system before Bug 2 lands, I have two options:
+
+- (a) Manually scrape `https://www.kbs.edu.au/admissions/fees/international-fees`, build a SQL update script, apply per-course fee values, re-run KBS, filter passes
+- (b) Wait for Bug 2
+
+Not doing (a) — it doesn't generalize. Just waiting.
+
+---
+
+**Other tickets I haven't verified yet (not urgent, will do tomorrow):**
+
+- CSU SPA discovery fix — need to re-run CSU scrape to confirm it now finds real courses, not nav pages
+- VIT 5 follow-ups — need to re-run VIT to confirm vocational courses categorize, no Iv/Iii casing, no week-units
+- KBS Bug 1 (mode default) and KBS Bug 3 (compound duration) — staged 0 courses on KBS so couldn't confirm in DB. Will check after Bug 2 lands and KBS actually stages something.
+
+No rush on those. Bug 2 is the unblocker.
+
+---
+
+**Updated ticket state:**
+
+1. ~~P0 Create New University~~ — SHIPPED + verified (with deploy infra fix on my side)
+2. ~~P0 follow-up: scrape_url default + debounce~~ — SHIPPED + verified  
+3. ~~Torrens 3 filters~~ — SHIPPED + verified (rejections fire with proper reasons)
+4. ~~CSU SPA discovery~~ — SHIPPED, not yet verified (low risk)
+5. ~~VIT 5 follow-ups~~ — SHIPPED, not yet verified (low risk)
+6. ~~KBS Bug 1 (mode default)~~ — SHIPPED, can't verify until KBS stages something
+7. ~~KBS Bug 3 (compound duration)~~ — SHIPPED, can't verify until KBS stages something
+8. **→ KBS Bug 2 (central admissions cache)** — P1 NOW BLOCKING. Awaiting design proposal from you.
+9. **Deploy infrastructure** — separate ticket, will write tomorrow. Frontend served from `/opt/app/` not `/root/.../dist/`. Manual rebuild + rsync was needed tonight to pick up your frontend changes.
+10. Worker double-run diagnostic — P3, can wait
+
+Great day on your side. 4 PRs landed clean. Let's design Bug 2 together so it's the right shape before you build it.
