@@ -224,6 +224,13 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Business & Management",     "Human Resources",        ("human resource", "hr management")),
     ("Business & Management",     "Technology Management",  ("technology management",)),
     ("Business & Management",     "Entrepreneurship",       ("entrepreneurship",)),
+    # Business Analytics must come before bare "Management" to avoid
+    # "Business Analytics" being swallowed by the "management" keyword.
+    ("Business & Management",     "Business Analytics",     ("business analytics",)),
+    # General management — catches "Bachelor of Business Management",
+    # "Master of Management", "Graduate Diploma of Business Management" etc.
+    # Listed after more-specific sub-categories so specific terms win first.
+    ("Business & Management",     "Management",             ("business management", "management studies", "master of management", "graduate diploma of management", "graduate certificate of management")),
     ("Computer Science & IT",     "Networking",             ("networking", "network engineering", "computer networks")),
     ("Computer Science & IT",     "Data Science",           ("data science", "data analytics")),
     ("Computer Science & IT",     "Cyber Security",         ("cyber",)),

@@ -114,12 +114,20 @@ def _parse_fee_amount(text: str) -> float | None:
 
 
 def _infer_per_term(text: str) -> str | None:
+    """Return a normalised fee_term enum value or None.
+
+    The returned strings are the same controlled vocabulary used by the
+    fee extractor (fee.py _normalize_fee_term) and the UI dropdown:
+      "Annual" | "Semester" | "Trimester" | "Full Course" | "Per Unit"
+
+    Returning None means the caller should apply a column-type default.
+    """
     if _PER_TRIMESTER_RE.search(text):
-        return "trimester"
+        return "Trimester"
     if _PER_SEMESTER_RE.search(text):
-        return "semester"
+        return "Semester"
     if _PER_YEAR_RE.search(text):
-        return "year"
+        return "Annual"
     return None
 
 
@@ -232,11 +240,13 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         # Sniff the per-term from the header row text.
         header_text = " ".join(effective_header_cells)
         per_term = _infer_per_term(header_text)
-        # "Course fee" column = full program total; "Subject fee" = per-unit
+        # "Course fee" column = full program total → "Full Course";
+        # "Subject fee" column = per-unit enrolment → "Per Unit".
+        # These match the controlled enum used by fee.py and the UI dropdown.
         if total_col is not None:
-            per_term = per_term or "total"
+            per_term = per_term or "Full Course"
         elif unit_col is not None and intl_col is None:
-            per_term = per_term or "subject"
+            per_term = per_term or "Per Unit"
 
         for row in rows[data_start:]:
             cells = row.find_all(["td", "th"])
