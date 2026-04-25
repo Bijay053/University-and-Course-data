@@ -688,3 +688,128 @@ catalogue discovery + cross-page nav dedup) before they can land.
   `validationStatus`, `decisionStatus`, `selected`). Wired into
   `/staged` and `/staged/{job_id}`. 4 tests in
   `test_staged_list_evidence.py`.
+
+## PR-6 Bug 1 — uni-PDF / sibling-cache precedence audit (Apr 2026)
+
+User report: ASA postgrad courses staged with `ielts_overall=6.0` —
+the bachelor-tier number from the requirements PDF — even though the
+two cohorts have different policies. Investigation conclusion: the
+**precedence rule is correct everywhere**; the leak is a missing-data
+problem, not a merge bug.
+
+### Audit of every per-course payload merge site (`pipelines/single_course.py`)
+
+Order of operations in `extract_course`, with the conflict-resolution
+rule at each step:
+
+1. **Per-course extractors** (course_name, location, fee, english_test,
+   intake, duration, degree_level, study_mode) — `if v is None: continue`
+   then `payload.setdefault(k, v)`. Nones filtered → setdefault pins
+   highest-confidence first-write. ✓
+2. **Per-course modal (T002)** — explicit empty-aware:
+   `if k in payload and payload.get(k) not in (None, "", 0): continue`. ✓
+3. **Per-course browser (T207)** — `payload.setdefault(k, v)`. ✓ in
+   practice (`per_course_browser` strips empties before returning).
+4. **Per-course vision (T208)** — `payload.setdefault(k, v)`. ✓ in
+   practice (vision returns no key when empty).
+5. **VIT static fallback (T003)** — explicit empty-aware:
+   `if v in (None, "", 0): continue; if payload.get(k) not in (None, "", 0):
+   continue`. ✓
+6. **AI fallback** — `payload.setdefault(k, v)`. ✓ (`ai_fallback.fill_missing`
+   only returns coerced-non-None values, line 163).
+7. **uni-PDF backfill (fee + english blocks)** — was `if v is None or
+   k in payload: continue` (key-exists). Hardened in this PR to
+   empty-aware `if payload.get(k) not in (None, "", 0): continue` so
+   it matches sibling-cache / VIT static / per-course modal. Defensive
+   change — eliminated a latent fragility where any future upstream
+   merge site emitting a `None` placeholder would have silently
+   blocked the PDF fill.
+8. **Sibling cache (orchestrator, after `extract_course` returns)** —
+   `existing = payload.get(k); if existing not in (None, "", 0): continue`. ✓
+
+Course-page wins at every site. The PR-1.5 hot-fix #6 design decision
+("sibling cache only ever fills missing slots, never overwrites real
+extractions") is now uniformly enforced by the same `(None, "", 0)`
+predicate everywhere.
+
+### ASA bachelor-vs-master diagnosis (live evidence)
+
+Per-course extractor run directly against the live HTML of one ASA
+bachelor (`/courses/bachelor-of-business`) and one ASA master
+(`/courses/master-of-information-technology-software-application-development`):
+
+- Both pages: `english_test.extract` returns **0 results**.
+- Both pages' raw HTML contains **zero matches** for
+  `ielts|toefl|pte|cambridge|english|language` (the policy lives only
+  inside a PNG screenshot the rule extractors cannot read).
+
+So the bleed is NOT a precedence bug. It is two compounding facts:
+
+1. The per-course extractor is genuinely empty for both bachelor and
+   master ASA URLs (image-only requirements section).
+2. The university-level requirements PDF only publishes one tier of
+   English requirements, so uni-PDF backfill applies the same
+   `ielts_overall=6.0` to both bachelor courses (correct) and master
+   courses (incorrect — masters need 6.5 per ASA's own policy).
+
+### What this means for the fix
+
+- **No code-level precedence fix is warranted** — every merge site
+  already honours course-page-wins.
+- **A heuristic postgrad-IELTS bump remains out of scope** (was
+  reverted last session and stays reverted — see `replit.md` PR-1.5
+  hot-fix #6).
+- **The real fix is upstream** and falls into one of two future tasks:
+  (a) discover and parse a master-tier requirements PDF if ASA
+  publishes one (research required — may not exist as a separate
+  document), or (b) add a per-course PNG OCR pass to read the
+  embedded English-requirements screenshot. Either is a separate task,
+  not part of PR-6 Bug 1.
+
+### Latent precedence-policy gap (DOCUMENTED, NOT FIXED)
+
+Code-review (architect) flagged a real but ASA-unrelated ordering
+issue: `extract_course` runs uni-PDF backfill BEFORE returning, and
+`backfill_english_from_siblings` runs AFTER in the orchestrator. So
+when one sibling in a bucket has a real per-page extraction (e.g.
+postgrad sibling X extracted IELTS=6.5 from its own page) and another
+sibling (Y) only has the generic uni-PDF value (6.0), sibling-cache
+sees Y as "already filled" and does NOT supply the better per-cohort
+peer value to Y. Y stays at 6.0.
+
+Why not fix here:
+
+- The actual ASA bug is unaffected — both ASA tiers are image-only,
+  so NO sibling has a real extraction to promote.
+- The project's "fill gaps only" principle in `replit.md` puts uni-PDF
+  and sibling-cache in the same low-confidence tier. Reordering them
+  is a deliberate product choice, not an obvious correctness fix.
+- A safe restructure (move uni-PDF backfill out of `extract_course`
+  into the orchestrator, run after sibling-cache) needs care because
+  `extract_course` is also called directly by `repair_scrape` and
+  several unit tests.
+
+The current ordering is now pinned by
+`tests/test_university_pdfs.py::test_uni_pdf_backfill_is_applied_before_sibling_cache`
+so any future change is intentional. Tracked as a follow-up: "decide
+whether sibling-cache should beat uni-PDF when same-bucket peer
+extractions exist".
+
+### Tests
+
+- `tests/test_university_pdfs.py::test_extract_course_backfills_from_uni_pdf`
+  (already existed) — empty page → uni-PDF fills.
+- `tests/test_university_pdfs.py::test_extract_course_pdf_does_not_overwrite_existing`
+  (already existed) — page has fee+IELTS → uni-PDF dropped, page wins.
+- `tests/test_university_pdfs.py::test_extract_course_pdf_fills_through_empty_string_placeholder`
+  **(new)** — pins down the empty-aware merge after the harden:
+  monkeypatches extractors to write `""`/`0` placeholders into payload
+  via step-1 setdefault, then asserts uni-PDF overwrites both. Under
+  the OLD `k in payload` gate the placeholders would have survived
+  (test would FAIL); under the NEW empty-aware gate the PDF fills
+  them. Verified mathematically and by execution.
+- `tests/test_university_pdfs.py::test_uni_pdf_backfill_is_applied_before_sibling_cache`
+  **(new)** — pins the current ordering so the sibling-vs-uni-PDF
+  policy is explicit, not accidental.
+
+Full suite: 387 passed, 1 skipped (was 385+1 → +2 new tests).

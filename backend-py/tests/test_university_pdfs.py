@@ -196,6 +196,177 @@ async def test_extract_course_pdf_does_not_overwrite_existing(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_extract_course_pdf_fills_through_empty_string_placeholder(
+    monkeypatch,
+):
+    """Empty-aware precedence: if an upstream extractor writes a
+    ``""``/``0`` placeholder into ``payload`` (key exists but holds an
+    empty value), the uni-PDF backfill MUST still fill it.
+
+    Pins down the harden in ``pipelines/single_course.py`` — the
+    uni-PDF blocks now use the same
+    ``payload.get(k) not in (None, "", 0)`` check that every other
+    merge site uses (per-course modal, VIT static fallback, sibling
+    cache). The previous ``k in payload`` check would have silently
+    skipped this fill, leaving the placeholder in place.
+
+    The test injects a placeholder by monkeypatching ``english_test``
+    + ``fee`` extractors so step-1 of ``extract_course`` writes
+    ``payload["ielts_overall"] = ""`` and
+    ``payload["international_fee"] = 0`` via ``setdefault`` (step-1
+    only filters ``None``, not empties — see single_course.py:148-154).
+    Under the OLD ``k in payload`` check both keys would survive as
+    placeholders; under the NEW empty-aware check the uni-PDF values
+    take over.
+    """
+    from app.services.scraper.extractors import english_test, fee
+    from app.services.scraper.extractors.base import ExtractionResult
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    async def fake_english_extract(html, url):
+        return [
+            ExtractionResult(
+                field_key="ielts_overall",
+                value="",
+                normalized={"ielts_overall": ""},
+                confidence=0.1,
+                method="test_placeholder",
+                snippet="placeholder",
+            )
+        ]
+
+    async def fake_fee_extract(html, url, country=None):
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=0,
+                normalized={"international_fee": 0},
+                confidence=0.1,
+                method="test_placeholder",
+                snippet="placeholder",
+            )
+        ]
+
+    monkeypatch.setattr(english_test, "extract", fake_english_extract)
+    monkeypatch.setattr(fee, "extract", fake_fee_extract)
+
+    page_html = """
+    <html><body>
+      <h1>Master of Cybersecurity</h1>
+      <p>Apply for the next intake.</p>
+    </body></html>
+    """
+    uni_pdf_data = {
+        "fee": {"international_fee": 30000, "currency": "AUD", "fee_term": "Annual"},
+        "english": {"ielts_overall": 6.5, "ielts_listening": 6.0},
+        "fees_pdf_url": "https://example.com/fees.pdf",
+        "requirements_pdf_url": "https://example.com/policy.pdf",
+    }
+
+    out = await extract_course(
+        url="https://uni.example.com/cyber-master",
+        country="Australia",
+        html=page_html,
+        use_ai_fallback=False,
+        uni_pdf_data=uni_pdf_data,
+    )
+    payload = out["payload"]
+    # The placeholders ("" and 0) MUST have been overwritten by the
+    # uni-PDF values — NOT preserved as empties.
+    assert payload.get("ielts_overall") == 6.5, (
+        f"empty-aware english-block fill failed; "
+        f"got {payload.get('ielts_overall')!r} (placeholder survived)"
+    )
+    assert payload.get("international_fee") == 30000, (
+        f"empty-aware fee-block fill failed; "
+        f"got {payload.get('international_fee')!r} (placeholder survived)"
+    )
+    # Sub-band slot was never placeholdered → fills as before.
+    assert payload.get("ielts_listening") == 6.0
+
+    # Provenance must credit the PDFs for the fields that were
+    # placeholder-overwritten — proves the uni-PDF block actually
+    # ran for these keys (not just that the payload happened to
+    # contain the right values for some other reason).
+    methods = {(e.get("field_key"), e.get("method")) for e in out["evidence"]}
+    assert ("ielts_overall", "uni_pdf:requirements") in methods
+    assert ("international_fee", "uni_pdf:fees") in methods
+
+
+@pytest.mark.asyncio
+async def test_uni_pdf_backfill_is_applied_before_sibling_cache():
+    """Pin down the current backfill ORDERING between uni-PDF and
+    sibling-cache.
+
+    Today's pipeline sequence (orchestrator.run_scrape → _extract_only →
+    extract_course → backfill_english_from_siblings):
+
+    1. ``extract_course`` runs all per-page extractors AND the uni-PDF
+       backfill before returning. Empty slots are populated by uni-PDF
+       at this point.
+    2. After all per-URL extractions complete, the orchestrator calls
+       ``backfill_english_from_siblings`` over the full result set.
+       Sibling-cache only fills slots that are still empty
+       (``payload.get(k) not in (None, "", 0)``).
+
+    Consequence (architect-flagged): when one sibling course in a
+    bucket has a real extracted English value (e.g. 6.5) and another
+    sibling has only the generic uni-PDF value (e.g. 6.0), the
+    second sibling KEEPS the uni-PDF value — sibling-cache cannot
+    supply the per-cohort peer extraction because the slot is
+    already non-empty.
+
+    This test pins the current behaviour. It is intentionally a
+    "current state" lock — any future change to make sibling-cache
+    beat uni-PDF should be a deliberate, documented product decision
+    that flips this assertion (see follow-up task on uni-PDF vs
+    sibling precedence policy).
+    """
+    from app.services.scraper.sibling_cache import (
+        backfill_english_from_siblings,
+    )
+
+    # Two postgrad sibling courses:
+    # - course_x: per-page extractor genuinely succeeded (ielts_overall=6.5)
+    # - course_y: per-page extractor empty, uni-PDF then filled 6.0
+    results = [
+        {
+            "url": "https://uni.example.com/master-x",
+            "payload": {
+                "course_name": "Master of X",
+                "degree_level": "Master",
+                "ielts_overall": 6.5,  # real per-page extraction
+            },
+            "evidence": [],
+        },
+        {
+            "url": "https://uni.example.com/master-y",
+            "payload": {
+                "course_name": "Master of Y",
+                "degree_level": "Master",
+                "ielts_overall": 6.0,  # uni-PDF backfill (generic value)
+            },
+            "evidence": [],
+        },
+    ]
+    fills = await backfill_english_from_siblings(results)
+
+    # Sibling-cache observes both buckets as already-filled and does
+    # NOT override. Master Y keeps the uni-PDF generic value.
+    assert fills == 0, (
+        f"sibling-cache should NOT override an existing (uni-PDF) value "
+        f"under the current ordering; got {fills} fills"
+    )
+    assert results[0]["payload"]["ielts_overall"] == 6.5
+    assert results[1]["payload"]["ielts_overall"] == 6.0, (
+        "PINNING: under current ordering, course Y keeps the uni-PDF "
+        "value 6.0 even though sibling X extracted 6.5 from its page. "
+        "Flipping this assertion requires a deliberate product decision "
+        "to reorder uni-PDF after sibling-cache (see replit.md)."
+    )
+
+
+@pytest.mark.asyncio
 async def test_vision_not_invoked_when_text_extraction_succeeds(monkeypatch):
     """Regression: vision OCR is the LAST resort. If text extraction
     yields a usable fee/IELTS payload, ``extract_via_vision`` must NOT

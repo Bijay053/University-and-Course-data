@@ -426,7 +426,16 @@ async def extract_course(
 
         if trust_fee_fallback:
             for k, v in fee_block.items():
-                if v is None or k in payload:
+                if v is None:
+                    continue
+                # Empty-aware: only skip when the page already extracted
+                # a *real* value (matches per-course modal / VIT static /
+                # sibling cache). Treats None / "" / 0 as "still empty"
+                # so a stray placeholder from any upstream merge site
+                # never blocks the PDF backfill. Course-page-wins still
+                # holds — see step-1 extractors which strip Nones before
+                # setdefault, so a real extraction is always truthy.
+                if payload.get(k) not in (None, "", 0):
                     continue
                 payload[k] = v
                 evidence.append(
@@ -445,7 +454,10 @@ async def extract_course(
         # gap to be solved upstream (per-degree-level PDF parsing or
         # OCR of course-page screenshots), NOT by guessing here.
         for k, v in english_block.items():
-            if v is None or k in payload:
+            if v is None:
+                continue
+            # Empty-aware: see fee-block comment above.
+            if payload.get(k) not in (None, "", 0):
                 continue
             payload[k] = v
             evidence.append(
