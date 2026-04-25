@@ -432,6 +432,53 @@ NOT cover. All six fixes below land together.
   `overall band score 6.5` or `overall IELTS score of 6.5` are still
   unsupported by pattern 1; they have not been observed in the wild.
 
+#### Bug L: ASA per-course IELTS sub-bands stuck on uni-PDF stamp + non-deterministic Master pages
+- **Symptom (Apr 2026)**: every ASA Master/Bachelor course showed
+  `ielts_overall=6.5/6.0` (correct) but `ielts_listening=5.5` etc.
+  (wrong — uni-PDF stamp). 4 IT Master pages all link the *same*
+  `MaSTER.png` (overall 6.5, sub-bands 6.0, PTE 58, TOEFL 85) yet
+  three of them came back with IELTS=— and only one had IELTS=6.5
+  while none had sub-bands=6.0 from vision.
+- **Root causes (three-in-one)**:
+  1. `english_test._ielts` Pattern 4/4.5 + `_pte` Pattern 2.5 didn't
+     allow a `(band )?score` bridge between "overall" and the digit,
+     so Gemini's verbose `IELTS Academic Overall Band Score: 6.5`
+     phrasing for MaSTER.png never matched. Sub-band regexes used
+     `\s*` so `IELTS Academic listening: 6` (with a colon) didn't
+     parse either.
+  2. `per_course_vision._ENGLISH_SLOTS` only listed the four
+     `*_overall` keys — the output filter dropped any sub-band the
+     extractor produced, leaving uni-PDF requirements (5.5) to win.
+  3. No per-image cache. The same MaSTER.png URL was OCR'd four
+     times in one scrape with non-deterministic results across the
+     siblings.
+- **Fix**:
+  - Pattern 4 + 4.5 IELTS / Pattern 2.5 PTE: insert
+    `(?:\s+band)?(?:\s+score)?` after `overall`. Sub-band regexes:
+    `\s*` → `[\s:.\-]+` plus `\b` boundaries and a 4-9 sanity gate.
+    See `extractors/english_test.py`.
+  - Split `_ENGLISH_SLOTS` into `_ENGLISH_OVERALL_SLOTS` (gate /
+    early-stop) and `_ENGLISH_OUTPUT_SLOTS` (filter — superset that
+    INCLUDES sub-bands so they reach `filled` + evidence).
+  - New `image_cache: dict[str, dict[str, Any]] | None` param on
+    `maybe_vision_refetch`, plumbed orchestrator → `_extract_only`
+    → `extract_course` → `maybe_vision_refetch`. One fresh dict per
+    `gather()` run. Cache key = absolute image URL; value =
+    parsed slot→value dict. Cache hits emit
+    `extraction_method='per_course_vision_cached'` so prod evidence
+    rows make the win observable.
+- **Verification (job_b63dc17f0604)**: all 4 IT Masters now show
+  IELTS 6.5 / sub-bands 6.0 / PTE 58 / TOEFL 85 (matching
+  MaSTER.png); all 4 BB variants show 6 / 5.5 / 50 / 60 (matching
+  their shared screenshot); BPA shows its own image's values. Every
+  English evidence row reads `per_course_vision` or
+  `per_course_vision_cached` — no more `uni_pdf:requirements`
+  contamination on these courses.
+- **Coverage**: 3 new tests in
+  `tests/test_english_test_table_layouts.py` pin the verbose Gemini
+  phrasing for IELTS, PTE, and TOEFL using the literal MaSTER.png
+  OCR text (18 passing total in that file).
+
 ### 8. PTE/TOEFL/CAE buried in equivalence table (commit f54ebf8)
 - **Symptom**: After hot-fix #2 deployed, prod job_24323bbb8715
   reported `has_pte=11/24, has_toefl=11/24, has_cae=11/24,

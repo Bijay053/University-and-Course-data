@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,14 +188,32 @@ async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
 
 
 async def _extract_only(
-    link: dict, country: str | None, uni_pdf_data: dict | None = None, emit=None
+    link: dict,
+    country: str | None,
+    uni_pdf_data: dict | None = None,
+    emit=None,
+    vision_image_cache: dict | None = None,
 ) -> dict:
-    """Network-bound work — safe to parallelise across coroutines."""
+    """Network-bound work — safe to parallelise across coroutines.
+
+    ``vision_image_cache`` is a per-scrape-run dict (created by the
+    caller before the ``asyncio.gather`` over courses) that lets the
+    per-course vision fallback OCR each unique image at most once and
+    reuse the parsed values across sibling courses that link the same
+    screenshot. See :func:`per_course_vision.maybe_vision_refetch` for
+    why this matters (eliminates the per-course non-determinism that
+    left 3/4 ASA Master pages with IELTS=— while one sibling came back
+    with IELTS=6.5 from the same MaSTER.png).
+    """
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
     try:
         out = await extract_course(
-            url, country=country, uni_pdf_data=uni_pdf_data, emit=emit
+            url,
+            country=country,
+            uni_pdf_data=uni_pdf_data,
+            emit=emit,
+            vision_image_cache=vision_image_cache,
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
@@ -418,6 +437,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         sem = asyncio.Semaphore(_MAX_PARALLEL_FETCH)
         total = len(links)
         progress = [0]
+        # Per-scrape-run vision OCR cache, keyed by absolute image URL.
+        # Many universities (ASA being the canonical example) embed the
+        # exact same English-requirements screenshot on every variant of
+        # a course family — MaSTER.png lives on all 4 IT Master pages,
+        # one shared screenshot covers all 4 Bachelor of Business pages.
+        # Without a shared cache we (a) pay Gemini per course and (b)
+        # get non-deterministic per-call OCR results that leave sibling
+        # courses inconsistent. One dict per gather() run is the right
+        # scope: not so wide it leaks across universities, not so narrow
+        # it misses the cross-course wins.
+        vision_image_cache: dict[str, dict[str, Any]] = {}
 
         async def _bounded(link: dict) -> dict:
             async with sem:
@@ -460,7 +490,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # Pass the emit hook into extract_course so AI fallback can
                 # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
                 return await _extract_only(
-                    link, uni_country, uni_pdf_data or None, emit=emit
+                    link,
+                    uni_country,
+                    uni_pdf_data or None,
+                    emit=emit,
+                    vision_image_cache=vision_image_cache,
                 )
 
         results = await asyncio.gather(

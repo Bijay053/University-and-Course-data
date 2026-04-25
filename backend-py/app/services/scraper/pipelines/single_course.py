@@ -101,6 +101,7 @@ async def extract_course(
     use_ai_fallback: bool = True,
     uni_pdf_data: dict[str, Any] | None = None,
     emit=None,
+    vision_image_cache: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -230,7 +231,8 @@ async def extract_course(
         evidence.extend(browser_evidence)
 
         vision_filled, vision_evidence = await maybe_vision_refetch(
-            url, rendered_html, payload, emit=emit
+            url, rendered_html, payload, emit=emit,
+            image_cache=vision_image_cache,
         )
         for k, v in vision_filled.items():
             payload.setdefault(k, v)

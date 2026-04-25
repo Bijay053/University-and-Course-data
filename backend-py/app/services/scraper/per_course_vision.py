@@ -37,12 +37,37 @@ from app.services.scraper.extractors.base import ExtractionResult
 
 log = logging.getLogger(__name__)
 
-_ENGLISH_SLOTS: Final = (
+# Overall-only slots — used for the "is anything still missing?" gate
+# (we won't pay for vision when every overall is filled) and for the
+# early-stop loop check inside the candidate-image walk. Sub-bands are
+# excluded from this set on purpose: a course page that only fills
+# `*_overall` should still trigger vision so we can recover sub-bands
+# from the image, and conversely we shouldn't keep OCR'ing extra images
+# just to backfill sub-bands once every overall is known.
+_ENGLISH_OVERALL_SLOTS: Final = (
     "ielts_overall",
     "pte_overall",
     "toefl_overall",
     "cambridge_overall",
 )
+
+# Output-filter slots — superset of overall + sub-bands. Vision results
+# matching any of these keys are persisted into the merged payload and
+# evidence rows. Without sub-bands here we used to silently drop
+# `ielts_listening`, etc. even when the english_test extractor parsed
+# them out of the Gemini response, leaving sub-bands stuck on the
+# uni-wide PDF fallback (ASA: every course showed sub-bands = 5.5 even
+# when the course-page MaSTER.png clearly says 6.0 across the board).
+_ENGLISH_OUTPUT_SLOTS: Final = (
+    *_ENGLISH_OVERALL_SLOTS,
+    "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking",
+    "pte_listening", "pte_reading", "pte_writing", "pte_speaking",
+    "toefl_listening", "toefl_reading", "toefl_writing", "toefl_speaking",
+)
+
+# Backwards-compat alias for any external import / test that referenced
+# the old name. New code should use one of the two pairs above.
+_ENGLISH_SLOTS: Final = _ENGLISH_OVERALL_SLOTS
 
 # Pages that wrap the requirements table in an image often have it as
 # the *only* substantial graphic — we cap at 6 to avoid burning the
@@ -142,10 +167,21 @@ async def maybe_vision_refetch(
     payload: dict[str, Any],
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
+    image_cache: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """If at least one english slot is still missing AND vision is
     available, scan ``<img>`` tags on the rendered HTML and ask Gemini
     Vision to read the score table.
+
+    ``image_cache`` is an optional caller-owned dict (one per scrape run)
+    that maps absolute image URL → parsed slot dict from a previous
+    Gemini OCR pass. When the same image appears on multiple course
+    pages (ASA's ``MaSTER.png`` lives on every Master page; the
+    ``Screenshot 2026-01-19 104316.png`` lives on every Bachelor of
+    Business variant) we OCR it exactly once and reuse the parsed
+    values — saving Gemini cost AND eliminating the per-course vision
+    non-determinism that left 3/4 IT Masters with IELTS=— while one
+    sibling came back with IELTS=6.5 from the same image.
 
     Returns ``(filled_values, evidence_rows)`` — both empty when the
     fallback no-ops (slots already filled, no API key, no rendered HTML,
@@ -155,7 +191,7 @@ async def maybe_vision_refetch(
         return {}, []
     if not getattr(settings, "gemini_api_key", None):
         return {}, []
-    if not any(payload.get(k) in (None, "", 0) for k in _ENGLISH_SLOTS):
+    if not any(payload.get(k) in (None, "", 0) for k in _ENGLISH_OVERALL_SLOTS):
         return {}, []
 
     candidates = _extract_img_candidates(rendered_html, url)
@@ -175,72 +211,155 @@ async def maybe_vision_refetch(
     filled: dict[str, Any] = {}
     evidence: list[dict[str, Any]] = []
     images_consumed = 0
+    cache_hits = 0
     for img_url, alt in candidates:
-        # Stop early once every slot is filled — saves Gemini calls and
-        # keeps the live log tidy on pages where the first image was the
-        # one we needed.
-        if all(payload.get(k) not in (None, "", 0) or k in filled for k in _ENGLISH_SLOTS):
+        # Stop early once every overall slot is filled — saves Gemini
+        # calls and keeps the live log tidy on pages where the first
+        # image was the one we needed. Sub-bands intentionally don't
+        # gate this loop: getting all four overalls is the win condition;
+        # we don't want to keep paying for OCR just to backfill sub-bands.
+        if all(
+            payload.get(k) not in (None, "", 0) or k in filled
+            for k in _ENGLISH_OVERALL_SLOTS
+        ):
             break
-        img_bytes = await _download(img_url)
-        if not img_bytes:
+
+        # ── Per-image cache lookup with in-flight coalescing ─────────
+        # Same image URL seen on a sibling course in this scrape? Reuse
+        # whatever english_test parsed out of it last time. This is
+        # what makes the 4 ASA Masters internally consistent (all see
+        # the same MaSTER.png) without re-paying Gemini for each one.
+        #
+        # The cache value is an asyncio.Future, NOT the parsed dict
+        # directly, so that when N coroutines (e.g. all 4 ASA IT
+        # Masters running under _MAX_PARALLEL_FETCH=4) reach this point
+        # for the same img_url, only the first one ("leader") performs
+        # the download + Gemini call + parse, and the others ("waiters")
+        # await the leader's result. Without the Future, all 4 would
+        # see "url not in cache", all 4 would race to fire Gemini, and
+        # the cache would only help cross-WAVE (later courses) — not
+        # the very ASA-Masters scenario the cache was built for.
+        normalized: dict[str, Any] | None = None
+        cached_method = "per_course_vision"
+        leader_future: asyncio.Future[dict[str, Any]] | None = None
+        if image_cache is not None:
+            existing = image_cache.get(img_url)
+            if existing is None:
+                # Be the leader for this URL. Install our Future
+                # synchronously (no await between get and set) so any
+                # subsequent coroutine in the same event-loop iteration
+                # sees it and becomes a waiter.
+                leader_future = asyncio.get_running_loop().create_future()
+                image_cache[img_url] = leader_future  # type: ignore[assignment]
+            else:
+                # Waiter path: someone is already (or has already) OCR'd
+                # this image. Await the Future (resolves instantly if
+                # already set) and treat the result as a cache hit.
+                try:
+                    normalized = await existing  # type: ignore[misc]
+                except Exception:  # noqa: BLE001 — leader's error already logged
+                    normalized = {}
+                cache_hits += 1
+                cached_method = "per_course_vision_cached"
+
+        if leader_future is not None or image_cache is None:
+            # Leader (or no cache at all) actually does the work.
+            try:
+                img_bytes = await _download(img_url)
+                if not img_bytes:
+                    # Negative-cache: a 404 / oversized image must not
+                    # be re-downloaded per sibling course. Resolve the
+                    # Future with {} so waiters short-circuit too.
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    continue
+                images_consumed += 1
+                try:
+                    resp = await gemini_client.generate_with_images(
+                        _VISION_PROMPT, [img_bytes]
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "per_course_vision Gemini failed for %s: %s", img_url, exc
+                    )
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    continue
+                if resp.skipped or not resp.text:
+                    if resp.skipped:
+                        log.info(
+                            "per_course_vision: Gemini skipped (%s) for %s",
+                            resp.skip_reason,
+                            img_url,
+                        )
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    continue
+                # Wrap the plain-text dump back in a tiny HTML shell so the
+                # existing english_test extractor can re-parse it. The
+                # extractor walks <p>/<li>-like text — pre-tags work too
+                # because the underlying _text helper strips tags.
+                text_html = "<pre>" + resp.text + "</pre>"
+                try:
+                    results: list[ExtractionResult] = await english_test.extract(
+                        text_html, url
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("english_test parse-of-vision failed: %s", exc)
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    continue
+                normalized = {}
+                for r in results:
+                    if not r.normalized:
+                        continue
+                    for k, v in r.normalized.items():
+                        if v in (None, "", 0):
+                            continue
+                        if k not in _ENGLISH_OUTPUT_SLOTS:
+                            continue
+                        normalized.setdefault(k, v)
+                if leader_future is not None:
+                    leader_future.set_result(dict(normalized))
+            except BaseException as exc:
+                # Propagate the leader failure to any waiters so they
+                # don't await forever. Re-raise so existing exception
+                # handling (the outer try/except in extract_course)
+                # behaves identically to before.
+                if leader_future is not None and not leader_future.done():
+                    leader_future.set_exception(exc)
+                raise
+
+        if not normalized:
             continue
-        images_consumed += 1
-        try:
-            resp = await gemini_client.generate_with_images(
-                _VISION_PROMPT, [img_bytes]
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning("per_course_vision Gemini failed for %s: %s", img_url, exc)
-            continue
-        if resp.skipped or not resp.text:
-            if resp.skipped:
-                log.info(
-                    "per_course_vision: Gemini skipped (%s) for %s",
-                    resp.skip_reason,
-                    img_url,
-                )
-            continue
-        # Wrap the plain-text dump back in a tiny HTML shell so the
-        # existing english_test extractor can re-parse it. The extractor
-        # walks <p>/<li>-like text — pre-tags work too because the
-        # underlying _text helper strips tags.
-        text_html = "<pre>" + resp.text + "</pre>"
-        try:
-            results: list[ExtractionResult] = await english_test.extract(
-                text_html, url
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.debug("english_test parse-of-vision failed: %s", exc)
-            continue
-        for r in results:
-            if not r.normalized:
+
+        for k, v in normalized.items():
+            if k not in _ENGLISH_OUTPUT_SLOTS:
                 continue
-            for k, v in r.normalized.items():
-                if k not in _ENGLISH_SLOTS:
-                    continue
-                if v in (None, "", 0):
-                    continue
-                if k in filled or payload.get(k) not in (None, "", 0):
-                    continue
-                filled[k] = v
-                evidence.append(
-                    {
-                        "field_key": k,
-                        "value": v,
-                        "confidence": min(1.0, (r.confidence or 0.4) + 0.05),
-                        "method": "per_course_vision",
-                        "snippet": (alt or img_url)[:240],
-                    }
-                )
+            if v in (None, "", 0):
+                continue
+            if k in filled or payload.get(k) not in (None, "", 0):
+                continue
+            filled[k] = v
+            evidence.append(
+                {
+                    "field_key": k,
+                    "value": v,
+                    "confidence": 0.85,
+                    "method": cached_method,
+                    "snippet": (alt or img_url)[:240],
+                }
+            )
 
     if emit:
         def _fmt(k: str) -> str:
             v = filled.get(k)
             return str(v) if v not in (None, "", 0) else "—"
 
+        cache_note = f" (cache hits {cache_hits})" if cache_hits else ""
         await emit(
             "status",
-            f"[per-course vision img {images_consumed}/{len(candidates)}] "
+            f"[per-course vision img {images_consumed}/{len(candidates)}{cache_note}] "
             f"{url} — IELTS={_fmt('ielts_overall')} "
             f"PTE={_fmt('pte_overall')} TOEFL={_fmt('toefl_overall')} "
             f"CAE={_fmt('cambridge_overall')}",
@@ -248,6 +367,7 @@ async def maybe_vision_refetch(
             kind="per_course_vision_done",
             url=url,
             consumed=images_consumed,
+            cache_hits=cache_hits,
             filled=list(filled.keys()),
         )
 

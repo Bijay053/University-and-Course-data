@@ -177,3 +177,60 @@ def test_rich_pattern_still_wins_over_bare_overall():
     assert res["overall"] == 6.5
     # Pattern 1 fills all subscores; Pattern 4.5 leaves them None.
     assert res.get("listening") == 6.0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Bug L: Gemini Vision occasionally returns the verbose phrasing
+# "IELTS Academic Overall Band Score: 6.5" / "PTE Academic Overall
+# score: 58" instead of the terse "IELTS overall: 6.5" the prompt asks
+# for. Captured below is the literal text Gemini returned for ASA's
+# MaSTER.png (the English-requirements screenshot embedded on every
+# IT Master page). Before the english_test fix the extractor only
+# caught TOEFL via the table-layout pattern and silently dropped IELTS
+# + PTE entirely, leaving IELTS=— on every staged ASA Master.
+# ─────────────────────────────────────────────────────────────────────
+
+
+_MASTER_PNG_GEMINI_OUTPUT = (
+    "IELTS Academic Overall Band Score: 6.5\n"
+    "IELTS Academic listening: 6\n"
+    "IELTS Academic reading: 6\n"
+    "IELTS Academic writing: 6\n"
+    "IELTS Academic speaking: 6\n"
+    "PTE Academic Overall score: 58\n"
+    "PTE Academic minimum in each skill: 60\n"
+    "TOEFL iBT Overall score: 85\n"
+    "TOEFL iBT minimum in each skill: 20\n"
+)
+
+
+def test_ielts_verbose_overall_band_score_phrasing():
+    """`IELTS Academic Overall Band Score: 6.5` plus per-skill `: 6` lines
+    must yield overall=6.5 AND each sub-band=6.0."""
+    res = et._ielts(_MASTER_PNG_GEMINI_OUTPUT)
+    assert res is not None, "verbose IELTS phrasing must parse"
+    assert res["overall"] == 6.5
+    assert res["listening"] == 6.0
+    assert res["reading"] == 6.0
+    assert res["writing"] == 6.0
+    assert res["speaking"] == 6.0
+
+
+def test_pte_verbose_overall_score_phrasing():
+    """`PTE Academic Overall score: 58` must yield overall=58. The
+    nonsensical `minimum in each skill: 60` (60 > 58) must NOT be
+    accepted as a sub-band requirement."""
+    res = et._pte(_MASTER_PNG_GEMINI_OUTPUT)
+    assert res is not None
+    assert res["overall"] == 58
+    # min > overall is a logical impossibility, so Pattern 2 must drop
+    # the sub-band; Pattern 2.5 then fires and returns sub=None.
+    assert res.get("listening") in (None, 0)
+
+
+def test_toefl_verbose_extraction_unchanged():
+    """The existing TOEFL table-layout pattern already handles this
+    shape; pin it so a future english_test refactor doesn't regress it."""
+    res = et._toefl(_MASTER_PNG_GEMINI_OUTPUT)
+    assert res is not None
+    assert res["overall"] == 85

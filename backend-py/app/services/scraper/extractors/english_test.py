@@ -85,23 +85,41 @@ def _ielts(text: str) -> dict[str, float] | None:
             "speaking": float(m.group(5)),
         }
 
-    # Pattern 4: overall near "ielts" + standalone subscores
+    # Pattern 4: overall near "ielts" + standalone subscores.
+    # The optional `(?:\s+(?:band\s+)?score)?` bridge after "overall"
+    # lets us also catch Gemini Vision's verbose phrasing — e.g.
+    # "IELTS Academic Overall Band Score: 6.5" — which is what ASA's
+    # MaSTER.png OCR returns. The sub-score regexes use `[\s:.\-]+` (not
+    # `\s*`) so "IELTS Academic listening: 6" parses; the leading `\b`
+    # plus a 12-char window (with no other digit and no other test name)
+    # keeps us from picking up unrelated numbers from elsewhere on the page.
     overall_m = re.search(
-        r"ielts(?:\s+academic)?.{0,120}?overall\s*([0-9]+(?:\.[0-9]+)?)", text, re.I | re.S
+        r"ielts(?:\s+academic)?.{0,120}?overall(?:\s+band)?(?:\s+score)?"
+        r"[\s:.\-]+([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I | re.S,
     )
-    listen_m = re.search(r"listening\s*([0-9]+(?:\.[0-9]+)?)", text, re.I)
-    read_m = re.search(r"reading\s*([0-9]+(?:\.[0-9]+)?)", text, re.I)
-    write_m = re.search(r"writing\s*([0-9]+(?:\.[0-9]+)?)", text, re.I)
-    speak_m = re.search(r"speaking\s*([0-9]+(?:\.[0-9]+)?)", text, re.I)
+    listen_m = re.search(r"\blistening[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    read_m = re.search(r"\breading[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    write_m = re.search(r"\bwriting[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
+    speak_m = re.search(r"\bspeaking[\s:.\-]+([0-9]+(?:\.[0-9]+)?)\b", text, re.I)
     if overall_m and (listen_m or read_m or write_m or speak_m):
         ov = float(overall_m.group(1))
         if 4 <= ov <= 9:
+            def _sub(m: re.Match | None) -> float | None:
+                if not m:
+                    return None
+                v = float(m.group(1))
+                # IELTS sub-bands live in the same 4-9 range as overall;
+                # anything outside is a false positive from neighbouring
+                # text (e.g. "writing 60" caught from a PTE skill row).
+                return v if 4 <= v <= 9 else None
             return {
                 "overall": ov,
-                "listening": float(listen_m.group(1)) if listen_m else None,
-                "reading": float(read_m.group(1)) if read_m else None,
-                "writing": float(write_m.group(1)) if write_m else None,
-                "speaking": float(speak_m.group(1)) if speak_m else None,
+                "listening": _sub(listen_m),
+                "reading": _sub(read_m),
+                "writing": _sub(write_m),
+                "speaking": _sub(speak_m),
             }
 
     # Pattern 4.5 (vision-friendly bare overall): "IELTS overall: 6.5"
@@ -113,8 +131,12 @@ def _ielts(text: str) -> dict[str, float] | None:
     # `IELTS overall: 6.0`. Placed AFTER patterns 1-4 so a richer match
     # (with "no band below" / per-skill subscores) wins, but BEFORE
     # Pattern 5 so this exact-shape match wins over ambiguous broad hits.
+    # Optional "(band )?score" bridge mirrors Pattern 4 — handles Gemini's
+    # "IELTS Academic Overall Band Score: 6.5" output that previously left
+    # IELTS=— even when overall was clearly stated.
     m = re.search(
-        r"\bielts(?:\s+academic)?\s+overall[\s:.\-]{0,5}([4-9](?:\.[0-9])?)\b",
+        r"\bielts(?:\s+academic)?\s+overall(?:\s+band)?(?:\s+score)?"
+        r"[\s:.\-]{0,8}([4-9](?:\.[0-9])?)\b",
         text,
         re.I,
     )
@@ -193,8 +215,13 @@ def _pte(text: str) -> dict[str, float] | None:
     # this pattern, prod ASA scrape showed PTE=— for every staged
     # course even when vision OCR printed `PTE overall: 50`. Placed
     # before Pattern 3 so the explicit "overall" shape wins.
+    # Optional "(band )?score" bridge handles Gemini's verbose phrasing
+    # — e.g. "PTE Academic Overall score: 58" from ASA's MaSTER.png
+    # OCR — that previously left PTE=— even when the value was clearly
+    # stated. Mirrors the same fix to IELTS Pattern 4.5.
     m = re.search(
-        r"\bpte(?:\s+academic)?\s+overall[\s:.\-]{0,5}([1-9][0-9])\b",
+        r"\bpte(?:\s+academic)?\s+overall(?:\s+band)?(?:\s+score)?"
+        r"[\s:.\-]{0,8}([1-9][0-9])\b",
         text,
         re.I,
     )
