@@ -1382,6 +1382,60 @@ sitemap fallback), so it never tried the sitemap.
 fires automatically → discovers all 260 CSU sitemap entries. No custom
 CSU adapter needed.
 
+## PR-10 — Torrens T007 staging-gate filters: Bugs A + B + C (Apr 2026)
+
+### Problem
+Torrens (`torrens.edu.au`, university_id=3) staged three classes of junk:
+
+**Bug A — Category landing pages**: Torrens's course navigation links point
+to category landing pages (e.g. `/courses/design/3d-design-animation`) whose
+H1 is "3D Design and Animation courses" — a topic heading, not a degree name.
+The real Bachelor page lives at `/courses/design/bachelor-of-3d-design-and-animation`.
+The scraper was staging both.
+
+**Bug B — Domestic-only courses**: Several Torrens courses (Master of
+Counselling, Graduate Certificate of Education, etc.) are offered to domestic
+students only. The fee extractor returns `international_fee = None` for these.
+Previously they were staged with null pricing; they should be filtered out.
+
+**Bug C — Online-only courses**: Torrens lists courses in "Online" delivery
+mode (e.g. Bachelor of Applied Business Marketing). The operator's business
+rule: on-campus and blended only. Online-only courses should never be staged.
+
+### Solution
+
+Single `should_stage_course(course_name, payload, source_url)` function added
+to `backend-py/app/services/scraper/guards.py`. Returns `(accept: bool,
+reject_reason: str)` with three sequential checks:
+
+1. **Bug A** — `payload["course_name"]` (H1-extracted) doesn't start with a
+   recognised degree-level qualifier (Bachelor, Master, Doctor, Graduate
+   Certificate/Diploma, Diploma, Certificate, Advanced Diploma, Associate
+   Degree). Falls back to the discovery-link name if H1 extraction missed.
+   Reject reason: `"category_landing_page"`.
+
+2. **Bug B** — `payload["international_fee"] is None` after all extractors and
+   AI fallback have run. Reject reason: `"no_international_fee"`.
+
+3. **Bug C** — `payload["study_mode"].lower() == "online"`. Reject reason:
+   `"online_only"`.
+
+Called from `stage_course.py` immediately after the existing
+`is_generic_course_category_name` check (cheaper guard runs first), but
+BEFORE any DB work (no point querying the rejection-block table for rows we
+will always refuse).
+
+### Files changed
+
+- `backend-py/app/services/scraper/guards.py` — added `_DEGREE_QUALIFIER_RE`,
+  `_name_has_degree_qualifier`, `should_stage_course`
+- `backend-py/app/services/scraper/stage_course.py` — import +
+  `should_stage_course` call with `log.info` on reject
+- `backend-py/tests/test_stage_filters.py` — NEW: 74 tests covering all five
+  required fixtures (category landing, real course × 2, domestic-only, online-only),
+  full parametrised reject-lists for Bugs A/B/C, and edge-case regressions
+  (blended mode, case-insensitivity, empty name, payload preferred over link name)
+
 **PR(b) — Sitemap already correct**: `sitemap.py::_is_course_loc`
 handles all 260 CSU entries correctly. `/courses/access-charles-sturt-entry`
 (4 words, no degree qualifier) passes the `len(name.split()) ≥ 2` gate.

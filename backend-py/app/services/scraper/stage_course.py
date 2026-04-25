@@ -29,7 +29,7 @@ from app.models import ScrapedCourse, ScrapedFieldEvidence
 from app.services.auto_publish import should_auto_publish
 from app.services.scraper.category import map_course_to_category
 from app.services.scraper.completeness import compute_completeness, decide_eligibility
-from app.services.scraper.guards import is_generic_course_category_name
+from app.services.scraper.guards import is_generic_course_category_name, should_stage_course
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +128,15 @@ async def stage_course(
     # in the review modal.
     if is_generic_course_category_name(name):
         return StageResult(False, "rejected: generic category page")
+
+    # Bugs A / B / C (Torrens T007 sweep): staging gate that rejects category
+    # landing pages, domestic-only courses, and online-only courses.  Runs
+    # AFTER the generic-name guard (cheaper) but BEFORE any DB work (no point
+    # hitting the rejection-block query for a page we'll always reject).
+    accept, gate_reason = should_stage_course(name, payload, source_url=source_url)
+    if not accept:
+        log.info("staging_gate rejected %r: %s", name, gate_reason)
+        return StageResult(False, f"rejected: {gate_reason}")
 
     # Diff item R (MIGRATION_AUDIT.md §6): category safety net. The
     # single_course pipeline runs map_course_to_category before staging,

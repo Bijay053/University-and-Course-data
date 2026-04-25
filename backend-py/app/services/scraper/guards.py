@@ -1,6 +1,6 @@
 """Pure guard functions ported from artifacts/api-server/src/lib/scrape-guards.ts.
 
-Three responsibilities:
+Four responsibilities:
 
 1. ``is_generic_course_category_name`` — reject "courses" whose name is just a
    catalogue header ("Business", "Master's Degrees", "Single Subjects"). These
@@ -17,6 +17,22 @@ Three responsibilities:
    FEE-HELP heuristic (loan-limit text without an explicit course-fee phrase
    is almost always a HELP cap, not a course price).
 
+4. ``should_stage_course`` — three Torrens-T007 staging filters that run
+   BEFORE any DB write.  Returns ``(accept: bool, reject_reason: str)`` so
+   the caller can log the reason and count skipped vs staged.
+
+   Bug A — category landing pages: the extracted course name (H1-based, from
+   ``payload["course_name"]``) does not start with a recognised degree-level
+   qualifier.  Torrens example: H1 "3D Design and Animation courses" vs
+   "Bachelor of 3D Design and Animation" — the latter passes, the former fails.
+
+   Bug B — domestic-only courses: ``international_fee`` is still None after all
+   extractors + AI fallback have run.  No international pricing data means the
+   course should not be surfaced to international-student audiences.
+
+   Bug C — online-only courses: ``study_mode`` is exactly "Online".  Business
+   rule: only on-campus or blended courses are ingested.
+
 Implementation mirrors the Node regexes byte-for-byte so the two pipelines
 agree on every edge case while both still write to the shared production
 ``scraped_courses`` table.
@@ -24,6 +40,7 @@ agree on every edge case while both still write to the shared production
 from __future__ import annotations
 
 import re
+from typing import Any
 from urllib.parse import urlparse
 
 # Pre-compiled regexes — these run on every staged row in the orchestrator
@@ -177,3 +194,74 @@ def should_trust_generic_university_fee_fallback(
         return False
 
     return has_course_specific_fee_evidence(course_name, search_text)
+
+
+# ---------------------------------------------------------------------------
+# Bug A: degree-qualifier check for category-landing-page rejection
+# ---------------------------------------------------------------------------
+# Matches the START of a course name. Any course title that begins with one of
+# these qualifiers is a real degree-level page; anything else (e.g. "Hotel
+# Management", "3D Design and Animation courses", "Faculty of Health") is a
+# category-landing page whose H1 just names the subject area.
+#
+# Note: "Graduate" alone is intentionally NOT in the list — "Graduate" appears
+# as a standalone word on Torrens category pages ("Graduate courses"). We
+# require it to be followed by "Certificate" or "Diploma" to count.
+_DEGREE_QUALIFIER_RE = re.compile(
+    r"^(?:"
+    r"bachelor|"
+    r"master(?:s|'s)?(?!\s+of\s+ceremonies)|"  # reject "Master of Ceremonies"
+    r"doctor(?:ate)?|"
+    r"graduate\s+(?:certificate|diploma)|"
+    r"advanced\s+diploma|"
+    r"associate\s+degree|"
+    r"diploma(?:\s+of|\s+in)?(?!\s+of\s+(?:ceremonies|honor))|"
+    r"certificate\s+(?:i{1,4}v?|iv|iv\+?|\d+)\b|"  # Certificate III/IV/I/II
+    r"certificate\s+(?:of|in)\b"                    # Certificate of ..., Certificate in ...
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _name_has_degree_qualifier(name: str) -> bool:
+    """True when *name* starts with a recognised degree-level prefix."""
+    return bool(_DEGREE_QUALIFIER_RE.match((name or "").strip()))
+
+
+def should_stage_course(
+    course_name: str,
+    payload: dict[str, Any],
+    source_url: str | None = None,  # kept for future URL-based heuristics
+) -> tuple[bool, str]:
+    """Three-filter staging gate (Bugs A, B, C from the Torrens T007 sweep).
+
+    Returns ``(True, "accepted")`` when the course passes all filters, or
+    ``(False, reject_reason)`` on the first failing check.  Reject reasons
+    are designed to be grep-able in production logs:
+
+    * ``"category_landing_page"`` — H1/course-name lacks a degree qualifier
+    * ``"no_international_fee"`` — international_fee is None after full extraction
+    * ``"online_only"`` — study_mode is exactly "Online"
+
+    Callers must invoke this AFTER all extractors + AI fallback have run (i.e.
+    just before the DB write in ``stage_course``) so Bug B has a settled
+    payload to inspect.
+    """
+    # Bug A: reject pages whose extracted title has no degree-level qualifier.
+    # Prefer payload["course_name"] (from H1 via course_name extractor) over
+    # the discovery-link name (passed as course_name param) — the H1 is the
+    # canonical page title and the most reliable signal.
+    effective_name = (payload.get("course_name") or course_name or "").strip()
+    if effective_name and not _name_has_degree_qualifier(effective_name):
+        return (False, "category_landing_page")
+
+    # Bug B: no international fee after all extraction is done.
+    if payload.get("international_fee") is None:
+        return (False, "no_international_fee")
+
+    # Bug C: online-only delivery.
+    mode = (payload.get("study_mode") or "").strip()
+    if mode.lower() == "online":
+        return (False, "online_only")
+
+    return (True, "accepted")
