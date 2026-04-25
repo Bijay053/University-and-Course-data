@@ -1,0 +1,291 @@
+[INFO ] Scraping started in background...
+[INFO ] Scraping http://asahe.edu.au/...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 9
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] [DISCOVER] Crawling from http://asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified http://asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +9 candidates (total 9) — http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 9 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (9 pages)...
+[EXTRACT ] [EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT ] [EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT ] [EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT ] [EXTRACT] 4/9: Bachelor of Business
+[ 2/9] Fetching 2/9: Bachelor of Business Hospitality Management
+[ 1/9] Fetching 1/9: Bachelor of Business International Business
+[ 3/9] Fetching 3/9: Bachelor of Business Technology Management
+[ 4/9] Fetching 4/9: Bachelor of Business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business: empty response
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-international-business: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-technology-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 9
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] [DISCOVER] Crawling from http://asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified http://asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +9 candidates (total 9) — http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 9 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (9 pages)...
+[EXTRACT ] [EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT ] [EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT ] [EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT ] [EXTRACT] 4/9: Bachelor of Business
+[ 2/9] Fetching 2/9: Bachelor of Business Hospitality Management
+[ 1/9] Fetching 1/9: Bachelor of Business International Business
+[ 3/9] Fetching 3/9: Bachelor of Business Technology Management
+[ 4/9] Fetching 4/9: Bachelor of Business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business: empty response
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-international-business: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-technology-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 5/9: Bachelor of Professional Accounting
+[ 5/9] Fetching 5/9: Bachelor of Professional Accounting
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-professional-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 6/9: Master of Project Management
+[ 6/9] Fetching 6/9: Master of Project Management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-professional-accounting: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-project-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+[ 7/9] Fetching 7/9: Master of Information Technology (Cyber Security)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-cyber-security: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+[ 8/9] Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+[ 9/9] Fetching 9/9: Master of Information Technology (Software Application Development)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-software-application-development: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE ] [STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[COMPLETE] [TIMING] Total: 0m 35s | Courses: 9 | Avg: 3.9s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+[COMPLETE] Staged 9 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 9
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] [DISCOVER] Crawling from http://asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified http://asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +9 candidates (total 9) — http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 9 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (9 pages)...
+[EXTRACT ] [EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT ] [EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT ] [EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT ] [EXTRACT] 4/9: Bachelor of Business
+[ 2/9] Fetching 2/9: Bachelor of Business Hospitality Management
+[ 1/9] Fetching 1/9: Bachelor of Business International Business
+[ 3/9] Fetching 3/9: Bachelor of Business Technology Management
+[ 4/9] Fetching 4/9: Bachelor of Business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business: empty response
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-international-business: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-technology-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 5/9: Bachelor of Professional Accounting
+[ 5/9] Fetching 5/9: Bachelor of Professional Accounting
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-professional-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 6/9: Master of Project Management
+[ 6/9] Fetching 6/9: Master of Project Management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-professional-accounting: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-project-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+[ 7/9] Fetching 7/9: Master of Information Technology (Cyber Security)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-cyber-security: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+[ 8/9] Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+[ 9/9] Fetching 9/9: Master of Information Technology (Software Application Development)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-software-application-development: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE ] [STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[COMPLETE] [TIMING] Total: 0m 35s | Courses: 9 | Avg: 3.9s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+[COMPLETE] Staged 9 courses, 0 skipped, 0 fetch errors
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 9
+[INFO ] Fetching http://asahe.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing found at http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] [DISCOVER] Crawling from http://asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 60 candidates)
+[DISCOVER] [DISCOVER] classified http://asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] [DISCOVER] Page 1/25: +9 candidates (total 9) — http://asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Discovered 9 candidate course links
+[DISCOVER] Loaded uni-level PDF data: fee=yes english=yes
+[EXTRACT ] Extracting course details (9 pages)...
+[EXTRACT ] [EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT ] [EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT ] [EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT ] [EXTRACT] 4/9: Bachelor of Business
+[ 2/9] Fetching 2/9: Bachelor of Business Hospitality Management
+[ 1/9] Fetching 1/9: Bachelor of Business International Business
+[ 3/9] Fetching 3/9: Bachelor of Business Technology Management
+[ 4/9] Fetching 4/9: Bachelor of Business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business: empty response
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-business-international-business
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-international-business: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-business-technology-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT ] [EXTRACT] 5/9: Bachelor of Professional Accounting
+[ 5/9] Fetching 5/9: Bachelor of Professional Accounting
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/bachelor-of-professional-accounting
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 6/9: Master of Project Management
+[ 6/9] Fetching 6/9: Master of Project Management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/bachelor-of-professional-accounting: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-project-management
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-project-management: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+[ 7/9] Fetching 7/9: Master of Information Technology (Cyber Security)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-cyber-security: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+[ 8/9] Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/bachelor-of-business-hospitality-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT ] [EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+[ 9/9] Fetching 9/9: Master of Information Technology (Software Application Development)
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser ↻] http://asahe.edu.au/courses/master-of-information-technology-software-application-development
+[FALLBACK] [per-course browser ✗] http://asahe.edu.au/courses/master-of-information-technology-software-application-development: empty response
+[EXTRACT ] [FALLBACK] AI enriching http://asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Information Systems
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on http://asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[INFO ] [CATEGORY det] Master of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=169.0 ielts_overall=6.0 toefl_overall=60.0
+[STAGE ] [STAGE] saved: Bachelor of Business International Business
+[STAGE ] [STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE ] [STAGE] saved: Bachelor of Business Technology Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Bachelor of Professional Accounting
+[STAGE ] [STAGE] saved: Master of Project Management
+[STAGE ] [STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE ] [STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE ] [STAGE] saved: Master of Information Technology (Software Application Development)
+[COMPLETE] [TIMING] Total: 0m 35s | Courses: 9 | Avg: 3.9s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+[COMPLETE] Staged 9 courses, 0 skipped, 0 fetch errors

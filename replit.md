@@ -986,6 +986,53 @@ the live browser fetch DOES work; the issue is that the
 course page has no extractable english text**. Recommend
 either renaming #20 or merging it into #22.
 
+### CORRECTION (2026-04-25) — partially wrong verdict
+
+The above "debunked" verdict was issued from a diagnostic shell that
+HAD the chromium runtime libs installed. The Celery worker process
+that actually runs scrape jobs DID NOT have those libs and was
+silently returning empty responses for every per-course browser
+fetch — symptom logs show
+`[per-course browser ✗] {url}: empty response` for all 9 ASA URLs
+on a real sweep.
+
+What's still correct from the analysis above:
+* When the browser layer DOES work, the rendered HTML IS 30329 bytes,
+  and that HTML genuinely has no `IELTS` / `PTE` / `TOEFL` / `CAE`
+  text strings (image-only English requirements). Task #22 is still
+  the right home for the OCR fix.
+
+What's wrong:
+* The verdict that the browser fetch always succeeds. It only succeeds
+  if chromium can actually launch. If the worker's environment is
+  missing `libnspr4.so` (or any other chromium runtime lib), the
+  browser layer returns empty for EVERY URL — including non-ASA ones
+  — and the symptom looks identical to a real "no extractable english
+  text" empty.
+* The recommendation to merge / rename task #20. Task #20 is the
+  legitimate home for "make sure the browser layer can actually run
+  on the deployed worker" — independent of the OCR work in #22.
+
+### Required environment for the per-course browser fetch
+Both the local Celery worker and the production worker must have
+the chromium runtime libs installed BEFORE the worker process
+starts. If chromium libs are installed AFTER the worker starts, the
+worker will keep failing until restarted (subprocess env is
+inherited at fork time). Symptoms of a misconfigured worker:
+* `[per-course browser ✗] {url}: empty response` on every URL
+* Worker stderr: `error while loading shared libraries: libnspr4.so:
+  cannot open shared object file`
+* All courses get identical fees (uni-PDF stamping the gap left by
+  the empty per-course response)
+* AI fallback fires for every course missing
+  `international_fee, ielts_overall, duration_text, intake_text,
+  location_text` — i.e. all the fields that should have come from
+  the per-course HTML.
+
+Smoke test: `cd backend-py && PYTHONPATH=. python -c "import asyncio;
+from playwright.async_api import async_playwright; ..."` — should
+return 30329 bytes for a known-good ASA URL.
+
 ### Reproducer fixtures
 * `backend-py/tests/fixtures/asa_bachelor_of_business.html`
   (26523 bytes — what the static `httpx` fetcher sees)
