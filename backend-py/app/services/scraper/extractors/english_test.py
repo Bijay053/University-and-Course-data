@@ -521,6 +521,103 @@ def _parse_equivalence_table(table) -> dict[float, dict[str, float]]:
         return {}
 
 
+# Program-level column priority: higher number = prefer this column.
+# "Bachelor and all Postgraduate programs" → priority 5 (wins over Diploma etc.)
+_PROG_LEVEL_PRIORITY: list[tuple[re.Pattern[str], int]] = [
+    (re.compile(r"\bpostgraduate\b|\bmaster\b|\bmba\b", re.I), 5),
+    (re.compile(r"\bbachelor\b", re.I), 4),
+    (re.compile(r"\bdiploma\b", re.I), 3),
+    (re.compile(r"\bassociate\b|\beap\s*2\b|\bfoundation\s*2\b", re.I), 2),
+    (re.compile(r"\bfoundation\b|\beap\b|\benglish\s+for\s+academic\b", re.I), 1),
+]
+_TEST_ROW_LABELS = re.compile(r"\b(ielts|pte|toefl|cambridge|cae|duolingo|det)\b", re.I)
+
+
+def _parse_program_level_table(soup: BeautifulSoup) -> dict[str, float]:
+    """Parse tables where COLUMN HEADERS are program levels and ROW LABELS are
+    test names (e.g. KBS English Entry Requirements page):
+
+        |                  | EAP 1 | Diploma | Bachelor & Postgrad |
+        | IELTS            | 5.0   | 5.5     | 6.0                 |
+        | PTE Academic     | 41    | 46      | 50                  |
+
+    Returns scores for the HIGHEST-priority program level column found.
+    Overrides prose-based extraction on multi-level pages (fixes picking 5.0
+    instead of 6.0 when Foundation rows appear before Bachelor rows).
+    """
+    for table in soup.find_all("table"):
+        try:
+            rows = table.find_all("tr")
+            if len(rows) < 2:
+                continue
+            # ── Identify column headers (first row) ──────────────────────────
+            header_cells = rows[0].find_all(["th", "td"])
+            if len(header_cells) < 3:
+                continue
+            col_texts = [c.get_text(" ", strip=True) for c in header_cells]
+
+            # ── Require at least one data row whose first cell is a test name ─
+            first_data_cells = rows[1].find_all(["td", "th"])
+            if not first_data_cells:
+                continue
+            if not _TEST_ROW_LABELS.search(first_data_cells[0].get_text(" ", strip=True)):
+                continue
+
+            # ── Score each column by program-level priority ───────────────────
+            best_col = -1
+            best_priority = 0
+            for ci, col_text in enumerate(col_texts[1:], 1):
+                for pattern, priority in _PROG_LEVEL_PRIORITY:
+                    if pattern.search(col_text):
+                        if priority > best_priority:
+                            best_priority = priority
+                            best_col = ci
+                        break
+
+            if best_col < 0 or best_priority < 3:
+                continue
+
+            # ── Extract test scores from the winning column ───────────────────
+            result: dict[str, float] = {}
+            for row in rows[1:]:
+                cells = row.find_all(["td", "th"])
+                if len(cells) <= best_col:
+                    continue
+                label = cells[0].get_text(" ", strip=True).lower()
+                val = cells[best_col].get_text(" ", strip=True)
+
+                if "ielts" in label:
+                    m = re.search(r"([4-9](?:\.[05])?)", val)
+                    if m:
+                        ov = float(m.group(1))
+                        if 4 <= ov <= 9:
+                            result["ielts_overall"] = ov
+                elif "pte" in label:
+                    m = re.search(r"(?:score\s+of\s+)?([1-9][0-9])\b", val)
+                    if m:
+                        ov = float(m.group(1))
+                        if 10 <= ov <= 90:
+                            result["pte_overall"] = ov
+                elif "toefl" in label:
+                    m = re.search(r"(?:band\s+score\s+of\s+|total\s+)?(\d{2,3})\b", val)
+                    if m:
+                        ov = float(m.group(1))
+                        if 0 <= ov <= 120:
+                            result["toefl_overall"] = ov
+                elif "cambridge" in label or re.search(r"\bcae\b", label):
+                    m = re.search(r"(\d{3})\b", val)
+                    if m:
+                        ov = float(m.group(1))
+                        if 140 <= ov <= 230:
+                            result["cambridge_overall"] = ov
+
+            if len(result) >= 2:
+                return result
+        except Exception as exc:  # noqa: BLE001
+            log.debug("_parse_program_level_table row error: %s", exc)
+    return {}
+
+
 def _equivalence_fallback(
     html: str, results: list[ExtractionResult]
 ) -> list[ExtractionResult]:
@@ -600,6 +697,37 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),
     ]
+    # ── Program-level table: override prose results when the page has a table
+    # with program-level column headers (Foundation | Diploma | Bachelor |
+    # Postgraduate).  Prose extraction on such pages picks the first/lowest
+    # row value (e.g. IELTS 5.0 for Foundation) instead of the target level
+    # (6.0 for Bachelor+Postgraduate).  The table parser selects the
+    # highest-priority column and overrides any already-extracted values.
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        level_data = _parse_program_level_table(soup)
+        if level_data:
+            # Replace existing results for the fields found in the level table.
+            dominated = set(level_data.keys())
+            results = [r for r in results if r.field_key not in dominated]
+            for field_key, val in level_data.items():
+                results.append(
+                    ExtractionResult(
+                        field_key=field_key,
+                        value=val,
+                        normalized={field_key: val},
+                        confidence=0.9,
+                        snippet=f"program-level table → {field_key}={val}",
+                        method="program_level_table",
+                    )
+                )
+            log.debug(
+                "english_test: program_level_table overrode %s → %s",
+                dominated, level_data,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.debug("program_level_table failed: %s", exc)
+
     # Last-resort: equivalence-table lookup for tests not captured by prose.
     results.extend(_equivalence_fallback(html, results))
     return results
