@@ -21,7 +21,20 @@ from app.services.scraper import home_page_redirect
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    # Use a fresh event loop per invocation so this helper survives being
+    # called after pytest-asyncio (mode=auto) has already created and
+    # closed its own loop earlier in the suite. The deprecated
+    # ``asyncio.get_event_loop()`` form would either emit a
+    # DeprecationWarning ("There is no current event loop") or — worse —
+    # return a closed loop, causing all 7 tests in this file to fail
+    # whenever an async pytest-asyncio test ran first (e.g.
+    # tests/test_route_parity.py). Symptom: the suite reported 7 failures
+    # in isolation it didn't have.
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 # ── _is_home_page ───────────────────────────────────────────────────────────

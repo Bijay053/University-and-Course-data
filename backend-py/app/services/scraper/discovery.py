@@ -52,6 +52,17 @@ _COURSE_TEXT = re.compile(
     r"undergrad(?:uate)?|postgrad(?:uate)?|MBA|MSc|MA|BA|BSc|BEng|MEng)\b",
     re.I,
 )
+# Host-specific *brand* acronyms that name a degree program rather than a
+# discipline — VIT uses BITS (Bachelor of IT & Systems), MITS (Master of
+# IT & Systems), and BBus (Bachelor of Business). These are degree-
+# qualifier-equivalent for the universities that use them, so a link
+# whose anchor text contains one is a real course detail page even when
+# its URL slug looks superficially category-shaped (e.g.
+# /courses/bits-cybersecurity is a real course, not a discipline index).
+# Word-boundary anchored to avoid matching incidental substrings ("8-bit
+# ADC", "bits and pieces"). Mirrors the host-slug list in
+# `home_page_redirect._HOST_CATEGORY_SLUGS` — keep the two in sync.
+_COURSE_BRAND_TEXT = re.compile(r"\b(BITS|MITS|BBus)\b", re.I)
 _JUNK_TEXT = re.compile(
     r"^(home|about|contact|news|events?|search|menu|login|sign\s*in|"
     r"apply\s*now|read\s*more|learn\s*more|view\s*all|see\s*all)$",
@@ -189,11 +200,28 @@ def _looks_like_course(url: str, text: str) -> bool:
     if _is_known_non_course_url(url):
         return False
     if _is_category_landing(url):
-        return False
+        # Anchor-text override: when the URL slug looks category-shaped
+        # but the link text contains a degree qualifier (Bachelor, MBA,
+        # …) or a host-specific brand acronym (BITS, MITS, BBus), the
+        # link is actually a real course detail page and the URL-shape
+        # heuristic is a false positive. Without this override, VIT's
+        # /courses/bits-cybersecurity (anchor "BITS - Cybersecurity")
+        # was silently rejected by the category-landing filter even
+        # though the BITS expansion explicitly fetched the page to
+        # harvest it — the regression that surfaced as the
+        # `test_expand_merges_new_candidates` failure.
+        if text and (
+            _COURSE_TEXT.search(text) or _COURSE_BRAND_TEXT.search(text)
+        ):
+            pass  # fall through to the URL-hint / text-match acceptance
+        else:
+            return False
     lurl = url.lower()
     if any(h in lurl for h in _COURSE_URL_HINTS):
         return True
-    if text and not _JUNK_TEXT.match(text) and _COURSE_TEXT.search(text):
+    if text and not _JUNK_TEXT.match(text) and (
+        _COURSE_TEXT.search(text) or _COURSE_BRAND_TEXT.search(text)
+    ):
         return True
     return False
 

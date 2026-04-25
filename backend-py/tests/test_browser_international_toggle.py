@@ -17,7 +17,14 @@ from app.services.scraper import browser_pool
 
 
 def _run(coro):  # noqa: ANN001
-    return asyncio.get_event_loop().run_until_complete(coro)
+    # Fresh event loop per call — see the matching note in
+    # tests/test_home_page_redirect.py::_run. Without this, every test
+    # in this file fails when an async pytest-asyncio test ran first.
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 class _FakeResponse:
