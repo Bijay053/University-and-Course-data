@@ -1,0 +1,666 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat Apr 25 11:19:50 UTC 2026
+
+  System load:           0.04
+  Usage of /:            3.0% of 231.44GB
+  Memory usage:          12%
+  Swap usage:            0%
+  Processes:             180
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Sat Apr 25 10:42:45 2026 from 198.211.111.194
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git fetch origin main
+git log origin/main --oneline -5
+echo "---"
+# What changed since our last pull (1980385)?
+git log 1980385..origin/main --oneline
+echo "---"
+# How big is the diff?
+git diff 1980385..origin/main --stat
+remote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2), pack-reused 0 (from 0)
+Unpacking objects: 100% (4/4), 3.79 KiB | 1.26 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   1980385..b222dca  main       -> origin/main
+b222dca (origin/main) Update website to improve stability and error handling
+1980385 (HEAD -> main) Fix university scraping and prevent duplicate job submissions
+87eefb5 Add fallback for university fee and course information
+e32e946 Add a central cache for admissions data to improve course information consistency
+cfd80a5 Add server information and system diagnostic details to file
+---
+b222dca (origin/main) Update website to improve stability and error handling
+---
+ attached_assets/Pasted-Pulled-your-latest-fixes-P0-follow-up-scrape-url-defaul_1777115015296.txt | 103 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git fetch origin main
+git log origin/main --oneline -5
+echo "---"
+# What changed?
+git log b222dca..origin/main --oneline
+echo "---"
+# Confirm the actual files we expected are in the diff
+git diff b222dca..origin/main --stat | grep -E "central_pages|orchestrator|single_course|guards|universities"
+remote: Enumerating objects: 37, done.
+remote: Counting objects: 100% (37/37), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 21 (delta 16), reused 21 (delta 16), pack-reused 0 (from 0)
+Unpacking objects: 100% (21/21), 819.39 KiB | 5.94 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   b222dca..42cb425  main       -> origin/main
+42cb425 (origin/main) Add a proper card to the scraping status display
+0d66242 feat(central_pages): Bug 2 — full implementation: discovery, parsing, staging gate
+b222dca Update website to improve stability and error handling
+1980385 (HEAD -> main) Fix university scraping and prevent duplicate job submissions
+87eefb5 Add fallback for university fee and course information
+---
+42cb425 (origin/main) Add a proper card to the scraping status display
+0d66242 feat(central_pages): Bug 2 — full implementation: discovery, parsing, staging gate
+---
+ backend-py/app/services/scraper/central_pages.py   | 231 +++++++++++++++++++--
+ backend-py/app/services/scraper/guards.py          |   6 +
+ backend-py/app/services/scraper/orchestrator.py    |  33 ++-
+ .../services/scraper/pipelines/single_course.py    |   7 +
+root@university-and-course-data:~/University-and-Course-data# # 1. Pull and deploy
+cd /root/University-and-Course-data
+git pull origin main
+systemctl restart uni-api-py uni-celery
+echo "---"
+
+# 2. Frontend rebuild (in case 42cb425 needs it)
+cd /root/University-and-Course-data/artifacts/university-portal
+npm run build 2>&1 | tail -5
+rsync -av --delete dist/public/ /opt/app/artifacts/university-portal/dist/public/
+echo "---"
+
+# 3. Verify services healthy
+sleep 5
+systemctl status uni-api-py uni-celery --no-pager | head -10
+echo "---"
+
+# 4. Check KBS scrape_config (Replit said they updated it directly in DB)
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT id, name, scrape_config FROM universities WHERE id = 8;
+"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 1980385..42cb425
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx                                               |   4 +-
+ attached_assets/Pasted--Stop-Your-code-didn-t-reach-GitHub-Pulled-origin-main-_1777116228702.txt |  86 +++++++++++++++++++++++
+ attached_assets/Pasted-Pulled-your-latest-fixes-P0-follow-up-scrape-url-defaul_1777115015296.txt | 103 +++++++++++++++++++++++++++
+ attached_assets/Screenshot_2026-04-25_at_8.51.04_pm_1777116125891.png                            | Bin 0 -> 900137 bytes
+ backend-py/app/services/scraper/central_pages.py                                                 | 231 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ backend-py/app/services/scraper/guards.py                                                        |   6 ++
+ backend-py/app/services/scraper/orchestrator.py                                                  |  33 ++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py                                       |   7 ++
+ 8 files changed, 448 insertions(+), 22 deletions(-)
+ create mode 100644 attached_assets/Pasted--Stop-Your-code-didn-t-reach-GitHub-Pulled-origin-main-_1777116228702.txt
+ create mode 100644 attached_assets/Pasted-Pulled-your-latest-fixes-P0-follow-up-scrape-url-defaul_1777115015296.txt
+ create mode 100644 attached_assets/Screenshot_2026-04-25_at_8.51.04_pm_1777116125891.png
+
+
+
+---
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.52s
+sending incremental file list
+./
+favicon.svg
+index.html
+opengraph.jpg
+deleting assets/index-BVq3kR1K.js
+assets/
+assets/image_1776917782083-Beo3ixZx.png
+assets/index-BHCIQPH_.css
+assets/index-CwFGofnd.js
+
+sent 1,029,997 bytes  received 173 bytes  2,060,340.00 bytes/sec
+total size is 1,029,225  speedup is 1.00
+---
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-04-25 11:29:20 UTC; 1min 40s ago
+   Main PID: 546228 (python)
+      Tasks: 16 (limit: 9483)
+     Memory: 168.8M (peak: 169.3M)
+        CPU: 3.304s
+     CGroup: /system.slice/uni-api-py.service
+             ├─546228 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info
+             ├─546231 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+---
+ id | name | scrape_config 
+----+------+---------------
+  8 | KBS  | 
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# 
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# 
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# 
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# cd /root/University-and-Course-data
+git pull origin main
+systemctl restart uni-api-py uni-celery
+echo "---"
+cd /root/University-and-Course-data/artifacts/university-portal
+npm run build 2>&1 | tail -5
+rsync -av --delete dist/public/ /opt/app/artifacts/university-portal/dist/public/
+echo "---"
+sleep 5
+systemctl status uni-api-py --no-pager | head -10
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+---
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.33s
+sending incremental file list
+./
+favicon.svg
+index.html
+opengraph.jpg
+assets/
+assets/image_1776917782083-Beo3ixZx.png
+assets/index-BHCIQPH_.css
+assets/index-CwFGofnd.js
+
+sent 1,030,009 bytes  received 145 bytes  2,060,308.00 bytes/sec
+total size is 1,029,225  speedup is 1.00
+---
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-04-25 11:31:24 UTC; 40s ago
+   Main PID: 546354 (python)
+      Tasks: 16 (limit: 9483)
+     Memory: 196.2M (peak: 196.9M)
+        CPU: 3.744s
+     CGroup: /system.slice/uni-api-py.service
+             ├─546354 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info
+             ├─546356 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# source /root/.env.backup
+
+# 1. What's the most recent KBS scrape job?
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, status, started_at, completed_at, error_message
+FROM scrape_runtime_jobs 
+WHERE university_id = 8 
+ORDER BY started_at DESC LIMIT 5;
+"
+
+echo "---"
+
+# 2. Is celery worker actually busy?
+journalctl -u uni-celery --since "5 min ago" --no-pager | tail -20
+
+echo "---"
+
+# 3. Did the new code actually deploy? Check that the new Bug 2 code file exists and is recent
+ls -la /root/University-and-Course-data/backend-py/app/services/scraper/central_pages.py
+echo "---"
+# And the api was restarted with it
+systemctl status uni-api-py --no-pager | head -5
+  runtime_job_id  |  status   |          started_at           |         completed_at          |         error_message         
+------------------+-----------+-------------------------------+-------------------------------+-------------------------------
+ job_921b8555d9bf | queued    | 2026-04-25 11:32:30.2227+00   |                               | 
+ job_1cf181bef0db | queued    | 2026-04-25 11:31:44.328011+00 |                               | 
+ job_e421076a83ba | running   | 2026-04-25 11:23:23.853142+00 |                               | 
+ job_d5ba4b115945 | completed | 2026-04-25 10:50:54.928719+00 | 2026-04-25 10:58:50.411492+00 | 
+ job_311a8b2ee6e6 | failed    | 2026-04-25 10:47:28.906129+00 | 2026-04-25 10:47:29.297991+00 | University missing scrape_url
+(5 rows)
+
+---
+Apr 25 11:29:20 university-and-course-data systemd[1]: Stopping uni-celery.service - University Portal Celery Worker (background scraping)...
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: State 'stop-sigterm' timed out. Killing.
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Killing process 545351 (celery) with signal SIGKILL.
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Killing process 545470 (MainThread) with signal SIGKILL.
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Failed to kill control group /system.slice/uni-celery.service, ignoring: Invalid argument
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Main process exited, code=killed, status=9/KILL
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Failed with result 'timeout'.
+Apr 25 11:30:50 university-and-course-data systemd[1]: Stopped uni-celery.service - University Portal Celery Worker (background scraping).
+Apr 25 11:30:50 university-and-course-data systemd[1]: uni-celery.service: Consumed 23.567s CPU time.
+Apr 25 11:30:50 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+Apr 25 11:31:24 university-and-course-data systemd[1]: Stopping uni-celery.service - University Portal Celery Worker (background scraping)...
+Apr 25 11:31:55 university-and-course-data systemd[1]: uni-celery.service: Deactivated successfully.
+Apr 25 11:31:55 university-and-course-data systemd[1]: Stopped uni-celery.service - University Portal Celery Worker (background scraping).
+Apr 25 11:31:55 university-and-course-data systemd[1]: uni-celery.service: Consumed 7.856s CPU time, 86.8M memory peak, 0B memory swap peak.
+Apr 25 11:31:55 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+---
+-rw-r--r-- 1 root root 30075 Apr 25 11:29 /root/University-and-Course-data/backend-py/app/services/scraper/central_pages.py
+---
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-04-25 11:31:24 UTC; 1min 21s ago
+   Main PID: 546354 (python)
+      Tasks: 16 (limit: 9483)
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+UPDATE scrape_runtime_jobs 
+SET status = 'cancelled', 
+    completed_at = NOW(),
+    error_message = 'Cancelled: orphaned by celery restart during deploy'
+WHERE university_id = 8 
+  AND status IN ('running', 'queued');
+
+SELECT runtime_job_id, status, started_at FROM scrape_runtime_jobs 
+WHERE university_id = 8 ORDER BY started_at DESC LIMIT 5;
+"
+UPDATE 3
+  runtime_job_id  |  status   |          started_at           
+------------------+-----------+-------------------------------
+ job_b3ccc5fb1d21 | cancelled | 2026-04-25 11:33:30.768246+00
+ job_921b8555d9bf | stopped   | 2026-04-25 11:32:30.2227+00
+ job_1cf181bef0db | cancelled | 2026-04-25 11:31:44.328011+00
+ job_e421076a83ba | cancelled | 2026-04-25 11:23:23.853142+00
+ job_d5ba4b115945 | completed | 2026-04-25 10:50:54.928719+00
+(5 rows)
+
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# psql "$DATABASE_URL" -c "
+UPDATE universities 
+SET scrape_config = '{
+  \"uniPages\": {
+    \"feePage\": \"https://www.kbs.edu.au/admissions/fees/international-fees\"
+  }
+}'::jsonb
+WHERE id = 8;
+
+SELECT id, name, scrape_config FROM universities WHERE id = 8;
+"
+UPDATE 1
+ id | name |                                     scrape_config                                      
+----+------+----------------------------------------------------------------------------------------
+  8 | KBS  | {"uniPages": {"feePage": "https://www.kbs.edu.au/admissions/fees/international-fees"}}
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# journalctl -u uni-celery --since "30 sec ago" --no-pager | tail -10
+-- No entries --
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# source /root/.env.backup
+
+# 1. Are there any active jobs RIGHT NOW?
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, status, started_at, completed_at
+FROM scrape_runtime_jobs 
+WHERE university_id = 8 
+ORDER BY started_at DESC LIMIT 5;
+"
+
+echo "---"
+
+# 2. Is celery worker actually doing anything in the last 2 minutes?
+journalctl -u uni-celery --since "2 min ago" --no-pager | tail -30
+
+echo "---"
+
+# 3. Is the worker process even alive?
+ps -ef | grep -E "celery|playwright" | grep -v grep | head -10
+  runtime_job_id  |  status   |          started_at           |         completed_at          
+------------------+-----------+-------------------------------+-------------------------------
+ job_0ffce7a6720c | queued    | 2026-04-25 11:34:30.728607+00 | 
+ job_b3ccc5fb1d21 | cancelled | 2026-04-25 11:33:30.768246+00 | 2026-04-25 11:33:55.224309+00
+ job_921b8555d9bf | stopped   | 2026-04-25 11:32:30.2227+00   | 2026-04-25 11:33:28.126699+00
+ job_1cf181bef0db | cancelled | 2026-04-25 11:31:44.328011+00 | 2026-04-25 11:33:55.224309+00
+ job_e421076a83ba | cancelled | 2026-04-25 11:23:23.853142+00 | 2026-04-25 11:33:55.224309+00
+(5 rows)
+
+---
+-- No entries --
+---
+root      546478       1  9 11:31 ?        00:00:23 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+root      546590  546478  1 11:32 ?        00:00:04 /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/node /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/package/cli.js run-driver
+root      546601  546590  3 11:32 ?        00:00:06 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --enable-automation --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --disable-blink-features=AutomationControlled --no-sandbox --disable-dev-shm-usage --disable-web-security --disable-features=IsolateOrigins,site-per-process --user-data-dir=/tmp/playwright_chromiumdev_profile-dcJJOj --remote-debugging-pipe --no-startup-window
+root      546603  546601  0 11:32 ?        00:00:00 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-zygote-sandbox --no-sandbox --headless
+root      546604  546601  0 11:32 ?        00:00:00 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-sandbox --headless
+root      546619  546603  0 11:32 ?        00:00:01 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=gpu-process --no-sandbox --disable-dev-shm-usage --disable-breakpad --headless --ozone-platform=headless --use-angle=swiftshader-webgl --enable-unsafe-swiftshader --gpu-preferences=UAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAAAQAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAA --use-gl=angle --shared-files --field-trial-handle=3,i,15082681374521953816,14284459961990034056,262144 --enable-features=CDPScreenshotNewSurface --disable-features=IsolateOrigins,PaintHolding,site-per-process --variations-seed-version --trace-process-track-uuid=3190708988185955192
+root      546621  546601  3 11:32 ?        00:00:07 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader-webgl --use-gl=angle --mute-audio --headless=old --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,15082681374521953816,14284459961990034056,262144 --enable-features=CDPScreenshotNewSurface --disable-features=IsolateOrigins,PaintHolding,site-per-process --variations-seed-version --trace-process-track-uuid=3190708989122997041
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# # 1. Stop celery cleanly
+systemctl stop uni-celery
+sleep 5
+
+# 2. Make sure no celery processes are lingering
+ps -ef | grep -E "celery|chromium|chrome-headless" | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null
+sleep 2
+ps -ef | grep -E "celery|chromium" | grep -v grep | head -5
+echo "--- Should be empty above ---"
+
+# 3. Cancel any new queued jobs that came in
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+UPDATE scrape_runtime_jobs 
+SET status = 'cancelled', completed_at = NOW(), error_message = 'Cancelled before celery restart'
+WHERE university_id = 8 AND status IN ('running', 'queued');
+
+SELECT runtime_job_id, status FROM scrape_runtime_jobs 
+WHERE university_id = 8 ORDER BY started_at DESC LIMIT 5;
+"
+
+# 4. Optional but recommended: flush Redis queue to remove any stale messages
+redis-cli FLUSHALL
+echo "--- Redis flushed ---"
+
+# 5. Start celery fresh
+systemctl start uni-celery
+sleep 8
+
+# 6. Verify it's healthy
+journalctl -u uni-celery --since "10 sec ago" --no-pager | tail -20
+echo "---"
+# Should see celery startup messages: "celery@... ready" or similar
+
+--- Should be empty above ---
+UPDATE 1
+  runtime_job_id  |  status   
+------------------+-----------
+ job_0ffce7a6720c | cancelled
+ job_b3ccc5fb1d21 | cancelled
+ job_921b8555d9bf | stopped
+ job_1cf181bef0db | cancelled
+ job_e421076a83ba | cancelled
+(5 rows)
+
+OK
+--- Redis flushed ---
+Apr 25 11:38:14 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+---
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# 
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# # Wait 30 seconds
+sleep 30
+
+# Check job status
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, status, started_at FROM scrape_runtime_jobs 
+WHERE university_id = 8 ORDER BY started_at DESC LIMIT 1;
+"
+
+# Check celery is actually doing work
+journalctl -u uni-celery --since "1 min ago" --no-pager | tail -30
+  runtime_job_id  | status  |          started_at           
+------------------+---------+-------------------------------
+ job_b6a16cdf5bd3 | running | 2026-04-25 11:39:34.230665+00
+(1 row)
+
+-- No entries --
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# sleep 30
+echo "=== Job status now ==="
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, status, started_at, completed_at, error_message
+FROM scrape_runtime_jobs WHERE university_id = 8 ORDER BY started_at DESC LIMIT 2;
+"
+
+echo ""
+echo "=== Any celery logs at all ==="
+journalctl -u uni-celery --since "2 min ago" --no-pager | tail -50
+
+echo ""
+echo "=== Worker process state - is it actually CPU-active or stuck? ==="
+top -b -n 1 -p $(pgrep -f "celery.*worker") 2>/dev/null | tail -5
+
+echo ""
+echo "=== Strace the worker briefly to see what it's actually doing ==="
+WORKER_PID=$(pgrep -f "celery.*worker" | head -1)
+if [ -n "$WORKER_PID" ]; then
+  echo "Worker PID: $WORKER_PID"
+  timeout 3 strace -p $WORKER_PID 2>&1 | head -30 || echo "strace failed or not available"
+fi
+=== Job status now ===
+  runtime_job_id  |  status   |          started_at           |         completed_at          |          error_message          
+------------------+-----------+-------------------------------+-------------------------------+---------------------------------
+ job_b6a16cdf5bd3 | running   | 2026-04-25 11:39:34.230665+00 |                               | 
+ job_0ffce7a6720c | cancelled | 2026-04-25 11:34:30.728607+00 | 2026-04-25 11:38:14.726403+00 | Cancelled before celery restart
+(2 rows)
+
+
+=== Any celery logs at all ===
+-- No entries --
+
+=== Worker process state - is it actually CPU-active or stuck? ===
+MiB Mem :   7941.2 total,   3454.7 free,   1253.9 used,   3603.9 buff/cache     
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   6687.4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+ 547272 root      20   0  970804 201672  43332 S   0.0   2.5   0:41.61 celery
+
+=== Strace the worker briefly to see what it's actually doing ===
+Worker PID: 547272
+strace: Process 547272 attached
+epoll_wait(19, [{events=EPOLLIN, data={u32=32, u64=131503308668960}}], 10, 2870) = 1
+recvfrom(32, "1", 1, 0, NULL, NULL)     = 1
+epoll_wait(19, [], 10, 0)               = 0
+epoll_wait(19, [], 10, 0)               = 0
+getpid()                                = 547272
+getpid()                                = 547272
+getpid()                                = 547272
+newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=526, ...}, 0) = 0
+newfstatat(AT_FDCWD, "/etc/resolv.conf", {st_mode=S_IFREG|0644, st_size=920, ...}, 0) = 0
+openat(AT_FDCWD, "/etc/hosts", O_RDONLY|O_CLOEXEC) = 41
+fstat(41, {st_mode=S_IFREG|0644, st_size=579, ...}) = 0
+lseek(41, 0, SEEK_SET)                  = 0
+read(41, "# Your system has configured 'ma"..., 4096) = 579
+read(41, "", 4096)                      = 0
+close(41)                               = 0
+socket(AF_NETLINK, SOCK_RAW|SOCK_CLOEXEC, NETLINK_ROUTE) = 41
+bind(41, {sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, 12) = 0
+getsockname(41, {sa_family=AF_NETLINK, nl_pid=547272, nl_groups=00000000}, [12]) = 0
+sendto(41, [{nlmsg_len=20, nlmsg_type=RTM_GETADDR, nlmsg_flags=NLM_F_REQUEST|NLM_F_DUMP, nlmsg_seq=1777117512, nlmsg_pid=0}, {ifa_family=AF_UNSPEC, ...}], 20, 0, {sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, 12) = 20
+recvmsg(41, {msg_name={sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, msg_namelen=12, msg_iov=[{iov_base=[[{nlmsg_len=76, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET, ifa_prefixlen=8, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_HOST, ifa_index=if_nametoindex("lo")}, [[{nla_len=8, nla_type=IFA_ADDRESS}, inet_addr("127.0.0.1")], [{nla_len=8, nla_type=IFA_LOCAL}, inet_addr("127.0.0.1")], [{nla_len=7, nla_type=IFA_LABEL}, "lo"], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=165, tstamp=165}]]], [{nlmsg_len=88, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET, ifa_prefixlen=20, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_UNIVERSE, ifa_index=if_nametoindex("eth0")}, [[{nla_len=8, nla_type=IFA_ADDRESS}, inet_addr("159.65.152.72")], [{nla_len=8, nla_type=IFA_LOCAL}, inet_addr("159.65.152.72")], [{nla_len=8, nla_type=IFA_BROADCAST}, inet_addr("159.65.159.255")], [{nla_len=9, nla_type=IFA_LABEL}, "eth0"], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=356, tstamp=16655943}]]], [{nlmsg_len=88, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET, ifa_prefixlen=16, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_UNIVERSE, ifa_index=if_nametoindex("eth0")}, [[{nla_len=8, nla_type=IFA_ADDRESS}, inet_addr("10.47.0.13")], [{nla_len=8, nla_type=IFA_LOCAL}, inet_addr("10.47.0.13")], [{nla_len=8, nla_type=IFA_BROADCAST}, inet_addr("10.47.255.255")], [{nla_len=9, nla_type=IFA_LABEL}, "eth0"], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=356, tstamp=16655943}]]], [{nlmsg_len=88, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET, ifa_prefixlen=20, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_UNIVERSE, ifa_index=if_nametoindex("eth1")}, [[{nla_len=8, nla_type=IFA_ADDRESS}, inet_addr("10.122.0.10")], [{nla_len=8, nla_type=IFA_LOCAL}, inet_addr("10.122.0.10")], [{nla_len=8, nla_type=IFA_BROADCAST}, inet_addr("10.122.15.255")], [{nla_len=9, nla_type=IFA_LABEL}, "eth1"], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=357, tstamp=16655943}]]]], iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 340
+recvmsg(41, {msg_name={sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, msg_namelen=12, msg_iov=[{iov_base=[[{nlmsg_len=72, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET6, ifa_prefixlen=128, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_HOST, ifa_index=if_nametoindex("lo")}, [[{nla_len=20, nla_type=IFA_ADDRESS}, inet_pton(AF_INET6, "::1")], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=165, tstamp=165}], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT|IFA_F_NOPREFIXROUTE]]], [{nlmsg_len=72, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET6, ifa_prefixlen=64, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_UNIVERSE, ifa_index=if_nametoindex("eth0")}, [[{nla_len=20, nla_type=IFA_ADDRESS}, inet_pton(AF_INET6, "2400:6180:100:d0:0:1:3615:5001")], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=356, tstamp=16655943}], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT]]], [{nlmsg_len=80, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET6, ifa_prefixlen=64, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_LINK, ifa_index=if_nametoindex("eth0")}, [[{nla_len=20, nla_type=IFA_ADDRESS}, inet_pton(AF_INET6, "fe80::2c38:60ff:feed:291c")], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=355, tstamp=355}], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=5, nla_type=IFA_PROTO}, "\x03"]]], [{nlmsg_len=80, nlmsg_type=RTM_NEWADDR, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, {ifa_family=AF_INET6, ifa_prefixlen=64, ifa_flags=IFA_F_PERMANENT, ifa_scope=RT_SCOPE_LINK, ifa_index=if_nametoindex("eth1")}, [[{nla_len=20, nla_type=IFA_ADDRESS}, inet_pton(AF_INET6, "fe80::909a:27ff:fee3:89cd")], [{nla_len=20, nla_type=IFA_CACHEINFO}, {ifa_prefered=4294967295, ifa_valid=4294967295, cstamp=355, tstamp=355}], [{nla_len=8, nla_type=IFA_FLAGS}, IFA_F_PERMANENT], [{nla_len=5, nla_type=IFA_PROTO}, "\x03"]]]], iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 304
+recvmsg(41, {msg_name={sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, msg_namelen=12, msg_iov=[{iov_base=[{nlmsg_len=20, nlmsg_type=NLMSG_DONE, nlmsg_flags=NLM_F_MULTI, nlmsg_seq=1777117512, nlmsg_pid=547272}, 0], iov_len=4096}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, 0) = 20
+close(41)                               = 0
+socket(AF_INET, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_IP) = 41
+connect(41, {sa_family=AF_INET, sin_port=htons(6379), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+getsockname(41, {sa_family=AF_INET, sin_port=htons(35554), sin_addr=inet_addr("127.0.0.1")}, [28 => 16]) = 0
+close(41)                               = 0
+socket(AF_INET6, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_IP) = 41
+connect(41, {sa_family=AF_INET6, sin6_port=htons(6379), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, "::1", &sin6_addr), sin6_scope_id=0}, 28) = 0
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# # 1. Is the scraped_courses table getting rows? (proves scrape is doing work)
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT COUNT(*), MAX(created_at) as latest_row
+FROM scraped_courses 
+WHERE university_id = 8 AND created_at > NOW() - INTERVAL '5 minutes';
+"
+
+# 2. Worker CPU time should be growing — sample twice
+echo "=== CPU time sample 1 ==="
+ps -o pid,etime,time,cmd -p $(pgrep -f "celery.*worker") | head -3
+sleep 10
+echo "=== CPU time sample 2 (after 10s wait) ==="
+ps -o pid,etime,time,cmd -p $(pgrep -f "celery.*worker") | head -3
+
+# 3. Check logs from BOTH stdout AND any python log files
+ls -la /var/log/uniportal* 2>/dev/null
+ls -la /tmp/celery*.log 2>/dev/null
+find / -name "*.log" -newer /tmp -type f 2>/dev/null | head -10
+ count | latest_row 
+-------+------------
+     0 | 
+(1 row)
+
+=== CPU time sample 1 ===
+    PID     ELAPSED     TIME CMD
+ 547272       08:16 00:00:52 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+=== CPU time sample 2 (after 10s wait) ===
+    PID     ELAPSED     TIME CMD
+ 547272       08:26 00:00:55 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+-rw-r--r-- 1 root root 68663 Apr 23 11:52 /tmp/celery_debug.log
+root@university-and-course-data:~/University-and-Course-data/artifacts/university-portal# cd /root/University-and-Course-data
+git fetch origin main
+git log origin/main --oneline -10
+echo "---"
+echo "=== Commits since 42cb425 (last known good)? ==="
+git log 42cb425..origin/main --oneline
+echo "---"
+echo "=== Diff size ==="
+git diff 42cb425..origin/main --stat | grep -E "central_pages|orchestrator|guards|discovery|scrape\.py|scraping\.tsx" | head -20
+remote: Enumerating objects: 58, done.
+remote: Counting objects: 100% (58/58), done.
+remote: Compressing objects: 100% (14/14), done.
+remote: Total 39 (delta 33), reused 31 (delta 25), pack-reused 0 (from 0)
+Unpacking objects: 100% (39/39), 1.51 MiB | 7.35 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   42cb425..a20047e  main       -> origin/main
+a20047e (origin/main) Use user-provided URL for course discovery when available
+5fa3188 fix(scraper): KBS Bugs 1-5 — URL overrides, Drupal dedup, MBA qualifier, Course fee column, defaultStudyMode
+7058a68 fix(scraper): Bugs 1,2,3,4,5 — URL overrides, Drupal dedup, MBA qualifier, Course fee column, defaultStudyMode
+3e18ba7 Improve scraping interface by replacing native confirmation dialogs
+42cb425 (HEAD -> main) Add a proper card to the scraping status display
+0d66242 feat(central_pages): Bug 2 — full implementation: discovery, parsing, staging gate
+b222dca Update website to improve stability and error handling
+1980385 Fix university scraping and prevent duplicate job submissions
+87eefb5 Add fallback for university fee and course information
+e32e946 Add a central cache for admissions data to improve course information consistency
+---
+=== Commits since 42cb425 (last known good)? ===
+a20047e (origin/main) Use user-provided URL for course discovery when available
+5fa3188 fix(scraper): KBS Bugs 1-5 — URL overrides, Drupal dedup, MBA qualifier, Course fee column, defaultStudyMode
+7058a68 fix(scraper): Bugs 1,2,3,4,5 — URL overrides, Drupal dedup, MBA qualifier, Course fee column, defaultStudyMode
+3e18ba7 Improve scraping interface by replacing native confirmation dialogs
+---
+=== Diff size ===
+ artifacts/university-portal/src/pages/scraping.tsx |  59 +-
+ backend-py/app/routers/scrape.py                   |  17 +-
+ backend-py/app/schemas/scrape.py                   |   1 +
+ backend-py/app/services/scraper/central_pages.py   |  53 +-
+ backend-py/app/services/scraper/discovery.py       |  12 +
+ backend-py/app/services/scraper/guards.py          |  29 +-
+ backend-py/app/services/scraper/orchestrator.py    |  49 +-
+root@university-and-course-data:~/University-and-Course-data# git fetch origin main
+git log --oneline 5fa3188..7058a68  
+echo "---"
+git diff 5fa3188 7058a68 --stat
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+---
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 42cb425..a20047e
+Fast-forward
+ artifacts/university-portal/src/pages/scraping.tsx                                               |  59 ++++-
+ attached_assets/Pasted--Bug-2-working-staged-30-of-44-KBS-courses-up-from-0-ye_1777118608328.txt | 165 +++++++++++++
+ attached_assets/Pasted-INFO-CATEGORY-det-Master-of-Business-Analytics-Informat_1777118632329.txt | 800 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Screenshot_2026-04-25_at_9.43.45_pm_1777118621238.png                            | Bin 0 -> 879482 bytes
+ attached_assets/image_1777117437277.png                                                          | Bin 0 -> 851286 bytes
+ backend-py/app/routers/scrape.py                                                                 |  17 +-
+ backend-py/app/schemas/scrape.py                                                                 |   1 +
+ backend-py/app/services/scraper/central_pages.py                                                 |  53 ++--
+ backend-py/app/services/scraper/discovery.py                                                     |  12 +
+ backend-py/app/services/scraper/guards.py                                                        |  29 ++-
+ backend-py/app/services/scraper/orchestrator.py                                                  |  49 +++-
+ 11 files changed, 1164 insertions(+), 21 deletions(-)
+ create mode 100644 attached_assets/Pasted--Bug-2-working-staged-30-of-44-KBS-courses-up-from-0-ye_1777118608328.txt
+ create mode 100644 attached_assets/Pasted-INFO-CATEGORY-det-Master-of-Business-Analytics-Informat_1777118632329.txt
+ create mode 100644 attached_assets/Screenshot_2026-04-25_at_9.43.45_pm_1777118621238.png
+ create mode 100644 attached_assets/image_1777117437277.png
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+cd backend-py
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+error: externally-managed-environment
+
+× This environment is externally managed
+╰─> To install Python packages system-wide, try apt install
+    python3-xyz, where xyz is the package you are trying to
+    install.
+    
+    If you wish to install a non-Debian-packaged Python package,
+    create a virtual environment using python3 -m venv path/to/venv.
+    Then use path/to/venv/bin/python and path/to/venv/bin/pip. Make
+    sure you have python3-full installed.
+    
+    If you wish to install a non-Debian packaged Python application,
+    it may be easiest to use pipx install xyz, which will manage a
+    virtual environment for you. Make sure you have pipx installed.
+    
+    See /usr/share/doc/python3.12/README.venv for more information.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+Command 'uvicorn' not found, but can be installed with:
+apt install uvicorn
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd backend-py
+PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=2 --loglevel=info -Q scrape
+-bash: cd: backend-py: No such file or directory
+Command 'celery' not found, but can be installed with:
+apt install celery
+root@university-and-course-data:~/University-and-Course-data/backend-py# pnpm --filter @workspace/university-portal run dev
+
+> @workspace/university-portal@0.0.0 dev /root/University-and-Course-data/artifacts/university-portal
+> vite --config vite.config.ts --host 0.0.0.0
+
+
+  VITE v7.3.1  ready in 256 ms
+
+  ➜  Local:   http://localhost:8080/
+  ➜  Network: http://159.65.152.72:8080/
+  ➜  Network: http://10.47.0.13:8080/
+  ➜  Network: http://10.122.0.10:8080/
+  ➜  press h + enter to show help
+^C/root/University-and-Course-data/artifacts/university-portal:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/university-portal@0.0.0 dev: `vite --config vite.config.ts --host 0.0.0.0`
+Command failed with signal "SIGINT"
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cc
+cc: fatal error: no input files
+compilation terminated.
+root@university-and-course-data:~/University-and-Course-data/backend-py# h
+h: command not found
+root@university-and-course-data:~/University-and-Course-data/backend-py# h
+h: command not found
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# h
+h: command not found
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
