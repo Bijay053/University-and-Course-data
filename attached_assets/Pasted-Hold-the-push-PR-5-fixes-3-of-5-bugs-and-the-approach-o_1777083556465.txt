@@ -1,0 +1,40 @@
+Hold the push. PR-5 fixes 3 of 5 bugs and the approach on 2 of those 3 is wrong. Specifics:
+
+**Bug 3 fix (per-host browser config) — APPROVED.** networkidle allow-list is the right approach. Ship that part.
+
+**Bug 1 fix (postgrad English bump) — REJECTED. The fix philosophy is wrong.**
+
+The bug we reported was: course page is the source of truth, sibling cache / PDF should never overwrite course-page values. Your fix bumps the PDF values for postgrad, which doesn't address the bug — it just makes the PDF data slightly less wrong for masters while still discarding what the actual course page says.
+
+Also: "masters need IELTS +0.5" is a heuristic. Real masters courses range from 6.0 to 7.0 IELTS depending on field, and the course page knows the right answer. We shouldn't be guessing when the truth is one HTTP request away.
+
+What we actually need: find where sibling_cache merges into the per-course payload and reverse the precedence so course-page values are not overwritten. Empty fields get filled from cache/PDF. Populated fields stay.
+
+Do NOT ship the postgrad bump. It will hide bugs by making numbers look plausible while still being wrong.
+
+**Bug 2 fix (bare-online confidence 0.5) — INSUFFICIENT.**
+
+Lowering confidence doesn't change what's stored. ASA still ends up labeled "Online" on courses that should be "On Campus". Lower confidence isn't useful unless something downstream consumes it (does anything?).
+
+What we actually need: look at ASA's course page HTML and figure out what signal we're missing. Are they saying "On Campus" somewhere we're not parsing? Is the noise-strip eating it? Without that diagnosis, lowering confidence is just hiding the wrong answer behind a confidence number.
+
+Action: please pull one ASA course page (e.g. https://www.asahe.edu.au/courses/bachelor-of-business), grep for online/campus/blended/delivery, and tell me what the page actually says vs what we're extracting. Then we can write the right fix.
+
+**Bugs 4 and 5 (Torrens discovery) — NOT FIXED. THIS IS THE BIGGEST ISSUE.**
+
+Torrens has 152 courses. We discovered 22, of which most are nav/category/news pages. Until this is fixed, no extraction improvement matters because the URLs being scraped are wrong.
+
+From my earlier message:
+- Strip URLs matching /stories/ (news), /studying-with-us/ (nav)
+- Strip /courses/{single-word} (category landings like /courses/design)
+- Find the actual Torrens course directory — there must be a per-course URL pattern that's currently being missed
+- Detect when a "listing page" is actually the site nav by deduping links across pages: if we see the same 11 links on 25 different crawled pages, those are the nav, not the courses
+
+Until bugs 4+5 ship, T007 will keep finding garbage data on every non-VIT uni.
+
+**What to do now:**
+
+1. Ship Bug 3 fix as a standalone PR-5 (per-host browser config). That one's correct and we need it to even unblock testing.
+2. Investigate sibling_cache precedence (Bug 1) and ASA HTML (Bug 2) before writing fixes. No more guesses.
+3. Tackle bugs 4+5 next — these block everything.
+4. Do not push the postgrad bump. Revert that change locally before committing.

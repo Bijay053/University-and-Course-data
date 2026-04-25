@@ -71,7 +71,64 @@ def _staged_row_to_dict(r) -> dict:
     d["field"] = r.category
     # fees as a number for the simple Intl. Fee column
     d["fees"] = r.international_fee
+    # Default empty so UI's `course.evidence?.length` is a number, not undefined.
+    # Bulk-attached by `_attach_evidence_bulk` for list endpoints.
+    d["evidence"] = []
     return d
+
+
+async def _attach_evidence_bulk(
+    db: AsyncSession, course_dicts: list[dict]
+) -> None:
+    """Bulk-load `scraped_field_evidence` for a list of course dicts and
+    attach each row's evidence under ``course["evidence"]`` (camelCase
+    aliases mirror the per-course /review endpoint shape).
+
+    Was missing entirely from the Python rewrite — the staged-list
+    endpoints returned rows with no evidence, so the React EvidencePanel
+    saw `evidence?.length === 0` and the "Sources" button stayed
+    disabled. Single bulk query (one round-trip, not N+1) keyed on
+    scraped_course_id.
+    """
+    if not course_dicts:
+        return
+    ids = [d["id"] for d in course_dicts if d.get("id") is not None]
+    if not ids:
+        return
+    from sqlalchemy import text as _t
+    rows = (await db.execute(
+        _t(
+            "SELECT id, scraped_course_id, field_key, candidate_value, "
+            "normalized_value, source_url, page_type, extraction_method, "
+            "snippet, confidence, decision_score, validation_status, "
+            "decision_status, selected, created_at "
+            "FROM scraped_field_evidence "
+            "WHERE scraped_course_id = ANY(:ids) "
+            "ORDER BY scraped_course_id, field_key, "
+            "confidence DESC NULLS LAST, id"
+        ),
+        {"ids": ids},
+    )).mappings().all()
+
+    grouped: dict[int, list[dict]] = {}
+    for ev in rows:
+        ev_dict = dict(ev)
+        ts = ev_dict.get("created_at")
+        if hasattr(ts, "isoformat"):
+            ev_dict["created_at"] = ts.isoformat()
+        ev_dict["fieldKey"] = ev_dict["field_key"]
+        ev_dict["candidateValue"] = ev_dict["candidate_value"]
+        ev_dict["normalizedValue"] = ev_dict["normalized_value"]
+        ev_dict["sourceUrl"] = ev_dict["source_url"]
+        ev_dict["pageType"] = ev_dict["page_type"]
+        ev_dict["extractionMethod"] = ev_dict["extraction_method"]
+        ev_dict["decisionScore"] = ev_dict["decision_score"]
+        ev_dict["validationStatus"] = ev_dict["validation_status"]
+        ev_dict["decisionStatus"] = ev_dict["decision_status"]
+        grouped.setdefault(ev_dict["scraped_course_id"], []).append(ev_dict)
+
+    for d in course_dicts:
+        d["evidence"] = grouped.get(d["id"], [])
 
 
 @router.get("/jobs")
@@ -808,7 +865,9 @@ async def staged_list(
     stmt = stmt.order_by(desc(ScrapedCourse.created_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     # UI expects a bare array (Array.isArray check)
-    return [_staged_row_to_dict(r) for r in rows]
+    dicts = [_staged_row_to_dict(r) for r in rows]
+    await _attach_evidence_bulk(db, dicts)
+    return dicts
 
 
 @router.get("/staged/{sc_id_or_job}")
@@ -831,6 +890,7 @@ async def staged_one(
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
         courses = [_staged_row_to_dict(s) for s in rows]
+        await _attach_evidence_bulk(db, courses)
         job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
         last_scrape = None
         if job:
