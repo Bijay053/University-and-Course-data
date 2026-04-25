@@ -262,16 +262,21 @@ async def start_scrape(
     # `requestPayload.universityId`; if those are missing it raises
     # "URL is empty" before the job even starts. Keep both camelCase (Node) and
     # snake_case (Python convenience) keys so either worker is happy.
+    # Use the caller-supplied URL as the discovery start point when present.
+    # The UI always sends body.url (the value the user typed in the "Course
+    # listing URL" field). Only fall back to uni.scrape_url when the field
+    # was blank — never silently override what the user explicitly provided.
+    discovery_url = (body.url or "").strip() or (uni.scrape_url or "")
     job = ScrapeRuntimeJob(
         runtime_job_id=job_id,
         university_id=uni.id,
         university_name=uni.name,
-        url=uni.scrape_url,
+        url=discovery_url,
         job_type="single",
         status="queued",
         fast_mode=body.fast_mode,
         request_payload={
-            "url": uni.scrape_url,
+            "url": discovery_url,
             "universityId": uni.id,
             "universityName": uni.name,
             "universityCountry": uni.country,
