@@ -9,10 +9,17 @@ campus suffixes ("- USQ", "| Charles Sturt University").
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
 from app.services.scraper.extractors.base import ExtractionResult
+
+# Catalogue path segments used by university websites (mirrors discovery.py).
+_CATALOGUE_SEGS: frozenset[str] = frozenset({
+    "courses", "course", "programs", "programme", "programmes",
+    "program", "degrees", "degree", "study",
+})
 
 _PREPOSITIONS = {"of", "in", "and", "for", "the", "with", "to", "on", "by"}
 _ACRONYMS = {
@@ -46,6 +53,33 @@ _AQF_PREFIX_RE = re.compile(r"^[A-Za-z]{3}\d{5}\s*[-–—]\s*")
 
 
 _SLUG_LIKE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+){2,}$")
+
+
+def _url_mba_spec_name(url: str) -> str | None:
+    """Return 'MBA – Spec Name' when the URL is an MBA specialisation sub-page.
+
+    Detects the pattern  /<catalogue>/<mba-parent>/<specialisation>
+    e.g. /courses/mba-master-of-business-administration/women-in-leadership
+    → 'MBA – Women in Leadership'
+
+    Returns None when the URL does not match the pattern.
+    """
+    try:
+        segs = [s for s in urlparse(url).path.lower().split("/") if s]
+    except Exception:
+        return None
+    # Need at least  <catalogue> / <mba-parent> / <spec>
+    if len(segs) < 3:
+        return None
+    catalogue, parent, spec = segs[-3], segs[-2], segs[-1]
+    if catalogue not in _CATALOGUE_SEGS:
+        return None
+    if not parent.startswith("mba"):
+        return None
+    if spec.startswith("mba"):
+        return None  # the spec slug itself begins with mba → it IS the main MBA page
+    spec_name = _smart_case(_unslug(spec))
+    return f"MBA \u2013 {spec_name}"
 
 
 def _looks_like_slug(text: str) -> bool:
@@ -135,9 +169,19 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         ):
             candidates = [("title", title_raw, 0.85), ("h1", h1_raw, 0.6)]
 
+    # Pre-compute whether this URL is an MBA specialisation sub-page.
+    # If yes, any candidate name that lacks the "MBA" prefix will be
+    # upgraded to "MBA – <name>" (Playwright rewrites <title> dynamically
+    # and drops the "MBA –" prefix, so we cannot rely on page content alone).
+    mba_prefix_name = _url_mba_spec_name(url)
+
     for method, raw, conf in candidates:
         cleaned = _clean(raw)
         if cleaned:
+            # If this is an MBA specialisation sub-page and the extracted
+            # name is missing the degree prefix, add it now.
+            if mba_prefix_name and not cleaned.upper().startswith("MBA"):
+                cleaned = f"MBA \u2013 {cleaned}"
             return [
                 ExtractionResult(
                     field_key="course_name",
@@ -148,4 +192,18 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
                     snippet=raw[:160],
                 )
             ]
+
+    # Last-resort: derive name purely from the URL slug (e.g. for JS-heavy
+    # pages where both H1 and title are missing or empty after rendering).
+    if mba_prefix_name:
+        return [
+            ExtractionResult(
+                field_key="course_name",
+                value=mba_prefix_name,
+                normalized={"course_name": mba_prefix_name},
+                confidence=0.5,
+                method="course_name.url_mba_spec",
+                snippet=url,
+            )
+        ]
     return []

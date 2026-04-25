@@ -112,6 +112,9 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # prevents matching "elearning/anywhere" (no "why-" substring) while
     # still catching /why-charles-sturt/…, /why-choose-csu/…, etc.
     "/why-",
+    # KBS MBA specialisations overview page — not a real course, just a list
+    # of MBA specialisation tracks.  Both British and American spellings kept.
+    "/two-specialisations", "/two-specializations",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
