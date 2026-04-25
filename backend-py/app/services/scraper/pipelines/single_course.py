@@ -396,6 +396,16 @@ async def extract_course(
         # rows apart from the old uni-wide stamp.
         fee_by_course = uni_pdf_data.get("fee_by_course") or {}
         fee_method = "uni_pdf:fees"
+        # When the schedule PDF parses to a real per-course table (≥2
+        # rows — same threshold ``_pick_per_course_amounts`` uses to
+        # consider a table "real"), the per-course path becomes the
+        # source of truth for this university's fees. Falling back to
+        # the uni-wide stamp for unmatched courses re-creates the
+        # original failure mode this PR was built to fix (every course
+        # gets the same number) — Torrens v1 symptom. We instead leave
+        # the fee NULL so the dashboard surfaces it as missing rather
+        # than silently wrong.
+        per_course_table_active = len(fee_by_course) >= 2
         if fee_by_course:
             from app.services.scraper.pipelines.university_pdfs import (
                 match_course_in_pdf_table,
@@ -413,6 +423,19 @@ async def extract_course(
                 )
                 fee_block = matched_row
                 fee_method = "uni_pdf:fees:per_course"
+            elif per_course_table_active:
+                # No per-course row matched, but the schedule itself
+                # parses cleanly. Suppress the uni-wide stamp so we
+                # don't pollute every unmatched course with the same
+                # (likely-wrong) number. Leave the rest of the PDF
+                # block (english requirements, etc.) intact.
+                log.info(
+                    "[FEE] no per-course PDF row for %r — leaving fee NULL "
+                    "(schedule has %d rows; uni-wide stamp suppressed)",
+                    payload.get("course_name"),
+                    len(fee_by_course),
+                )
+                fee_block = {}
 
         # Diff item H (MIGRATION_AUDIT.md §6): gate the uni-wide fee PDF
         # fallback on course-specific evidence. Without this, every

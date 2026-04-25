@@ -805,3 +805,239 @@ def test_degree_level_helper():
         assert got == expected, (
             f"_degree_level({name!r}) = {got!r}, expected {expected!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Torrens regressions (uni id=22)
+# ---------------------------------------------------------------------------
+#
+# Symptoms reported by the user: Torrens dashboard showed ~60 courses with
+# every fee stamped at $121,955 (the highest number found anywhere in the
+# fee schedule PDF). Root causes:
+#
+#   1. ``_strip_campus_tail`` was missing — Torrens' fee schedule appends a
+#      campus list ("Sydney, Melbourne, Online") to course names, which
+#      drowned out the discriminative tokens during matching.
+#   2. The data-row regex required INTEGER durations and CANONICAL 6+letter
+#      CRICOS codes. Torrens postgrad uses half-year increments (0.5, 1.5,
+#      1.7) and at least one 7-digit CRICOS (0101388). Rows that didn't
+#      match the regex were silently swallowed as continuation text into
+#      the previous row's primary name, producing massive polluted
+#      primaries like "Master of … (Advanced) Adelaide, Brisbane, … 0101388
+#      2 16 $5,156 $41,250 $82,500 4 2026 International Student …".
+#   3. The matcher unioned primary tokens with extras (`_pdf_match_text`)
+#      with no upper bound. When extras was a 130-token blob of footer
+#      text, short generic queries like "Higher Degrees By Research" got
+#      false-positive matches via coincidental {higher, by} overlap.
+#   4. The merge step fell back to the uni-wide stamp ($121,955 for
+#      Torrens) whenever the per-course matcher returned None, recreating
+#      the original "every course gets the same fee" failure mode this
+#      whole project exists to fix.
+#
+# Fixes are tested below.
+
+
+def test_strip_campus_tail_handles_torrens_layout():
+    """Torrens fee schedule appends a comma-separated campus list to the
+    primary course name (e.g. "Bachelor of Business (Accounting) Sydney,
+    Melbourne, Online"). _strip_campus_tail must remove that tail
+    without touching legitimate words elsewhere in the name.
+    """
+    cases = {
+        "Bachelor of Business (Accounting) Sydney, Melbourne, Online":
+            "Bachelor of Business (Accounting)",
+        "Master of Public Health Sydney":
+            "Master of Public Health",
+        "Bachelor of Information Technology Adelaide, Brisbane, Melbourne, Sydney, Online":
+            "Bachelor of Information Technology",
+        # Unchanged when no campus tail is present:
+        "Bachelor of Professional Accounting":
+            "Bachelor of Professional Accounting",
+        # Doesn't strip mid-name capitalised tokens — only the trailing run:
+        "Master of Sydney Studies":
+            "Master of Sydney Studies",
+        "":
+            "",
+    }
+    for raw, expected in cases.items():
+        got = university_pdfs._strip_campus_tail(raw)
+        assert got == expected, (
+            f"_strip_campus_tail({raw!r}) = {got!r}, expected {expected!r}"
+        )
+
+
+def test_pick_per_course_amounts_matches_decimal_duration_rows():
+    """REGRESSION: Torrens postgrad rows use half-year durations
+    (0.5, 1.5, 1.7). The old data-row regex required ``\\d+`` so these
+    rows were silently dropped and got swallowed as continuation text
+    into the previous row's primary name, polluting the matcher and
+    leaving real per-course fees invisible.
+    """
+    pdf = (
+        "Postgraduate\n"
+        "Master of Business Administration Sydney, Melbourne, Online "
+        "095353M 1.5 12 $4,500 $36,000 $54,000\n"
+        "Graduate Certificate of Cybersecurity Adelaide, Brisbane "
+        "110794A 0.5 4 $4,975 $19,900 $19,900\n"
+        "Master of Cybersecurity Adelaide "
+        "110792C 1.7 11 $4,975 $39,800 $59,700\n"
+    )
+    rows = university_pdfs._pick_per_course_amounts(pdf)
+    assert "095353M" in rows, (
+        f"1.5-year MBA row not parsed (decimal duration regression): "
+        f"{list(rows)}"
+    )
+    assert "110794A" in rows, (
+        f"0.5-year cert row not parsed: {list(rows)}"
+    )
+    assert "110792C" in rows, (
+        f"1.7-year master row not parsed: {list(rows)}"
+    )
+    # And the campus tail must be stripped from each primary:
+    assert (
+        rows["095353M"]["_pdf_primary_name"]
+        == "Master of Business Administration"
+    ), rows["095353M"]["_pdf_primary_name"]
+
+
+def test_pick_per_course_amounts_matches_seven_digit_cricos():
+    """REGRESSION: Torrens 2026 schedule has at least one 7-digit CRICOS
+    (``0101388``). The old regex only accepted ``\\d{6}[A-Z]`` so this
+    row was dropped, and its content got swallowed into the previous
+    row's primary name as a giant pollution source.
+    """
+    # Anchor with one canonical 6+letter row so the parser has at least
+    # two qualifying rows to walk between (matches the production PDF
+    # shape where data rows always appear in groups).
+    pdf = (
+        "Postgraduate\n"
+        "Bachelor of Business Sydney, Online 094008C 3 24 $3,950 $31,600 $94,800\n"
+        "Master of Business Administration (Sport Management) (Advanced) "
+        "Sydney, Online 0101388 2 16 $5,156 $41,250 $82,500\n"
+        "Master of Public Health Sydney 097404M 1 12 $3,975 $31,800 $47,700\n"
+    )
+    rows = university_pdfs._pick_per_course_amounts(pdf)
+    assert "0101388" in rows, (
+        f"7-digit CRICOS row not parsed: {list(rows)}"
+    )
+    row = rows["0101388"]
+    assert row["international_fee"] == 82500, row
+    assert (
+        row["_pdf_primary_name"]
+        == "Master of Business Administration (Sport Management) (Advanced)"
+    ), row["_pdf_primary_name"]
+
+
+def test_match_rejects_polluted_extras_blob():
+    """REGRESSION: when the parser swallows footer text into a row's
+    extras blob, the matcher's primary∪extras union balloons to >100
+    tokens. Short generic queries then false-positive match on
+    coincidental token overlap (e.g. "Higher Degrees By Research"
+    matching "Master of Sport Management" via {higher, by}).
+
+    The fix bounds extras at 25 tokens; anything larger is treated as
+    parser pollution and the matcher falls back to primary-only.
+    """
+    polluted_blob = " ".join(
+        f"noiseword{i}" for i in range(50)
+    ) + " higher by"
+    by_course = {
+        "999999A": {
+            "international_fee": 99999,
+            "fee_term": "Full Course",
+            "fee_year": 2026,
+            "currency": "AUD",
+            "_pdf_primary_name": "Master of Sport Management",
+            "_pdf_match_text": (
+                "Master of Sport Management " + polluted_blob
+            ),
+            "_cricos": "999999A",
+        }
+    }
+    matched = university_pdfs.match_course_in_pdf_table(
+        "Higher Degrees By Research", by_course
+    )
+    assert matched is None, (
+        f"polluted-extras false positive returned: {matched}"
+    )
+
+    # Sanity: the legitimate match for the actual primary still works.
+    matched_real = university_pdfs.match_course_in_pdf_table(
+        "Master of Sport Management", by_course
+    )
+    assert matched_real is not None, (
+        "primary-only match must still fire after extras-cap defense"
+    )
+    assert matched_real["international_fee"] == 99999
+
+
+@pytest.mark.asyncio
+async def test_per_course_path_suppresses_uni_wide_stamp_with_two_row_table(
+    monkeypatch,
+):
+    """REGRESSION: when the schedule PDF parses to ≥2 per-course rows
+    (the same threshold ``_pick_per_course_amounts`` uses to consider
+    the table "real"), an unmatched course must NOT inherit the
+    uni-wide stamp — that re-creates the original Torrens v1 failure
+    mode (every course gets the same number).
+
+    The single_course merge gates this on ``len(fee_by_course) >= 2``.
+    Earlier the threshold was 3, which silently mis-stamped tiny
+    schedules (architect review caught this).
+    """
+    uni_pdf_data = {
+        "fee": {
+            "international_fee": 121955,
+            "currency": "AUD",
+            "fee_term": "Annual",
+        },
+        # Exactly 2 per-course rows — the smallest "real" table.
+        "fee_by_course": {
+            "111111A": {
+                "international_fee": 30000,
+                "currency": "AUD",
+                "fee_term": "Full Course",
+                "fee_year": 2026,
+                "_pdf_match_text": "Bachelor of Business",
+                "_pdf_primary_name": "Bachelor of Business",
+                "_cricos": "111111A",
+            },
+            "222222B": {
+                "international_fee": 40000,
+                "currency": "AUD",
+                "fee_term": "Full Course",
+                "fee_year": 2026,
+                "_pdf_match_text": "Master of Business Administration",
+                "_pdf_primary_name": "Master of Business Administration",
+                "_cricos": "222222B",
+            },
+        },
+        "fees_pdf_url": "https://example.com/fees.pdf",
+    }
+    # Course is genuinely not in the schedule — must NOT inherit the
+    # $121,955 uni-wide stamp; should land NULL instead.
+    page_html = """
+    <html><body>
+      <h1>Doctor of Philosophy in Astrophysics</h1>
+      <p>Research degree.</p>
+    </body></html>
+    """
+    out = await single_course.extract_course(
+        url="https://uni.example.com/phd-astro",
+        country="Australia",
+        html=page_html,
+        use_ai_fallback=False,
+        uni_pdf_data=uni_pdf_data,
+    )
+    payload = out["payload"]
+    assert payload.get("international_fee") in (None, 0, "", "null"), (
+        f"unmatched course must not inherit uni-wide stamp when per-course "
+        f"path is active (≥2 rows); got ${payload.get('international_fee')}"
+    )
+    # And the uni-wide-stamp evidence row must NOT be emitted either —
+    # otherwise downstream merges could resurrect the wrong number.
+    methods = {(e.get("field_key"), e.get("method")) for e in out["evidence"]}
+    assert ("international_fee", "uni_pdf:fees") not in methods, (
+        f"uni-wide fee evidence leaked despite per-course path active; "
+        f"methods={methods}"
+    )

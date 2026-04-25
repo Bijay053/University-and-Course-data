@@ -95,7 +95,7 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
 
 
 
-_MAX_COURSES_PER_JOB = 60
+_MAX_COURSES_PER_JOB = 200
 _MAX_PARALLEL_FETCH = 4
 # How long a pending/rejected scraped_courses row may sit before the next
 # scrape is allowed to wipe it. Anything older than this is considered
@@ -110,6 +110,49 @@ _STALE_DEDUP_MINUTES = 10
 # the UI polls /status with, so a stop click typically takes 3–6s to
 # observably halt new work.
 _STOP_POLL_INTERVAL_SEC = 3
+
+
+# How often the dedicated heartbeat pulser writes ``heartbeat_at`` for the
+# running job. The /active endpoint reaps any job whose heartbeat is older
+# than 5 minutes (see ``routers/scrape.py``); 30s gives a 10x safety margin
+# against transient DB / event-loop hiccups while keeping the write rate
+# trivial. This pulser runs on its OWN AsyncSession spanning BOTH the
+# extraction phase (asyncio.gather over per-course fetches) and the
+# staging phase, because either phase alone can exceed 5 minutes on
+# Torrens-scale unis (~152 courses). Without this, the in-memory mutations
+# of ``job.heartbeat_at`` inside the orchestrator's main session are
+# invisible to the reaper until they're committed — which during a long
+# extract phase never happens, so the reaper kills the job mid-flight.
+_HEARTBEAT_PULSE_INTERVAL_SEC = 30
+
+
+async def _heartbeat_pulser(runtime_job_id: str, stop_flag: list[bool]) -> None:
+    """Background task: keep ``heartbeat_at`` fresh for the whole scrape.
+
+    Uses its own AsyncSession so it never contends with the orchestrator's
+    main session or the per-course staging sessions. Exits cleanly when
+    the scrape signals stop or when the task is cancelled at scrape end.
+    """
+    from sqlalchemy import text as _text
+    while not stop_flag[0]:
+        try:
+            async with AsyncSessionLocal() as pulse_db:
+                await pulse_db.execute(
+                    _text(
+                        "UPDATE scrape_runtime_jobs "
+                        "SET heartbeat_at = NOW() "
+                        "WHERE runtime_job_id = :j "
+                        "  AND status = 'running'"
+                    ),
+                    {"j": runtime_job_id},
+                )
+                await pulse_db.commit()
+        except Exception as exc:  # noqa: BLE001 — never crash the pulser
+            log.warning("heartbeat pulser write failed for %s: %s", runtime_job_id, exc)
+        try:
+            await asyncio.sleep(_HEARTBEAT_PULSE_INTERVAL_SEC)
+        except asyncio.CancelledError:
+            return
 
 
 async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
@@ -278,6 +321,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # silently did nothing past flipping a DB flag.
     stop_flag: list[bool] = [False]
     stop_poll_task = asyncio.create_task(_stop_poller(runtime_job_id, stop_flag))
+    # Dedicated heartbeat pulser — see ``_heartbeat_pulser`` docstring.
+    # Spans extract + stage phases so /active never reaps a still-working
+    # job just because the orchestrator's main session hasn't committed.
+    heartbeat_task = asyncio.create_task(_heartbeat_pulser(runtime_job_id, stop_flag))
 
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
@@ -450,6 +497,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
 
         # 2) Staging phase — serial writes through one fresh session per course.
+        # Heartbeat is now handled by the dedicated ``_heartbeat_pulser``
+        # background task (see top of file) — it spans BOTH this loop
+        # and the preceding extraction phase, on its own session, so the
+        # /active reaper sees a fresh ``heartbeat_at`` regardless of what
+        # the main session is doing. We keep the in-memory mutation
+        # below for parity with the historical UI / log consumers, but
+        # the DB write is no longer this loop's responsibility.
         for r in results:
             # Stop check between rows: lets the user interrupt mid-batch.
             # Anything left in ``results`` at this point came back from the
@@ -526,7 +580,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     url=r.get("url"),
                 )
 
-            # Heartbeat between batches so the admin UI sees progress.
+            # ``heartbeat_at`` is kept fresh by the dedicated
+            # ``_heartbeat_pulser`` background task on its own session
+            # (see top of file). The in-memory assignment below is
+            # purely cosmetic for any future code path that reads the
+            # local ``job`` instance before the next commit.
             job.heartbeat_at = datetime.now(timezone.utc)
 
         # T209: emit a single human-readable TIMING line + a typed DONE
@@ -670,14 +728,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await db.commit()
         return {"ok": False, "reason": str(exc), **summary}
     finally:
-        # Always tear the poller down — it holds its own AsyncSession and
-        # would keep ticking past the worker process otherwise. Setting
-        # the flag first lets the `await asyncio.sleep` exit cleanly on
-        # the next tick; cancel() is the safety net for the in-flight DB
-        # roundtrip case.
+        # Always tear the background tasks down — each holds its own
+        # AsyncSession and would keep ticking past the worker process
+        # otherwise. Setting the flag first lets each `await
+        # asyncio.sleep` exit cleanly on the next tick; cancel() is the
+        # safety net for the in-flight DB roundtrip case. We cancel
+        # both tasks first so they tear down concurrently, then await
+        # each in turn — sequential await would mean waiting up to
+        # two full sleep intervals end-to-end.
         stop_flag[0] = True
         stop_poll_task.cancel()
-        try:
-            await stop_poll_task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
-            pass
+        heartbeat_task.cancel()
+        for _bg_task in (stop_poll_task, heartbeat_task):
+            try:
+                await _bg_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass

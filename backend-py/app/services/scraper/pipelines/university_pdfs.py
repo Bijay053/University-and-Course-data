@@ -240,14 +240,27 @@ def _pick_amounts_from_pdf_text(text: str) -> dict[str, Any]:
 # matched row IN PREFERENCE TO the uni-wide value.
 
 _PDF_DATA_ROW_RE = re.compile(
-    # CRICOS course codes are 6 digits + 1 trailing letter (e.g. 102219K,
-    # 117606J). Anchoring with \b on both sides avoids matching unit
-    # counts ("15*") or fee-amount digits ("19,360"). NOT line-anchored
+    # CRICOS course codes are *normally* 6 digits + 1 trailing letter
+    # (e.g. 102219K, 117606J). Some publishers print 7-digit codes
+    # without a trailing letter (Torrens 2026 schedule has rows like
+    # ``0101388 2 16 $5,156 …``), and pypdf occasionally concatenates
+    # the trailing letter into the next number. We accept either shape
+    # and let the rest of the row (duration + units + three $-amounts)
+    # discriminate true data rows from coincidental digit runs.
+    #
+    # Anchoring with \b on both sides avoids matching unit counts
+    # ("15*") or fee-amount digits ("19,360"). NOT line-anchored
     # because pypdf often concatenates a course name and its data row
     # onto a single line ("Diploma of Business  108861B 1 8 …"), so
     # requiring ^\s* would silently skip those rows.
-    r"\b(?P<cricos>\d{6}[A-Z])\b\s+"
-    r"(?P<duration>\d+(?:\s*Months?)?)\s+"
+    #
+    # Duration accepts decimals (Torrens postgrad uses 0.5 / 1.5 / 1.7
+    # year increments) and an optional ``Months`` qualifier — earlier
+    # versions only matched integer years and silently dropped every
+    # half-year row, which then got swallowed as continuation text
+    # into the previous row's primary name and polluted the matcher.
+    r"\b(?P<cricos>\d{6}[A-Z]|\d{7,8})\b\s+"
+    r"(?P<duration>\d+(?:\.\d+)?(?:\s*Months?)?)\s+"
     r"(?P<units>\d+\*?)\s+"
     r"\$(?P<per_unit>[\d,]+)\s+"
     r"\$(?P<annual>[\d,]+)\s+"
@@ -352,6 +365,50 @@ def _degree_level(name: str) -> str:
     return ""
 
 
+# Australian campus tokens that PDF schedules sometimes append to the
+# primary course-name column (e.g. Torrens: "Bachelor of Business
+# (Accounting) Sydney, Melbourne, Online"). We strip these from the
+# tail of an extracted primary so token-based matching against the DB
+# course name (which has no campus info) doesn't get drowned out.
+_CAMPUS_TAIL_TOKENS = {
+    "sydney", "melbourne", "adelaide", "brisbane", "perth",
+    "darwin", "canberra", "hobart", "auckland", "wellington",
+    "online", "australia", "campus", "domestic", "international",
+    "fortitude", "valley",  # Brisbane suburb sometimes spelled out
+}
+
+
+def _strip_campus_tail(primary: str) -> str:
+    """Remove a trailing comma-separated campus list from a primary name.
+
+    Examples::
+
+        "Bachelor of Business (Accounting) Sydney, Melbourne, Online"
+            -> "Bachelor of Business (Accounting)"
+        "Master of Public Health Sydney"
+            -> "Master of Public Health"
+        "Bachelor of Professional Accounting"
+            -> "Bachelor of Professional Accounting"  # unchanged
+
+    Stops as soon as a non-campus token is reached, so legitimate
+    continuation words ("Accounting", "Design", etc.) at the tail are
+    preserved. Also tolerates trailing commas left over from comma
+    splitting.
+    """
+    if not primary:
+        return primary
+    parts = primary.split()
+    while parts:
+        # Allow either a bare campus token or a campus token followed
+        # by a comma (e.g. "Sydney,").
+        bare = parts[-1].rstrip(",").lower()
+        if bare in _CAMPUS_TAIL_TOKENS:
+            parts.pop()
+        else:
+            break
+    return " ".join(parts).rstrip(",").strip()
+
+
 def _extract_primary_name(name_block: str) -> tuple[str, str]:
     """Pull the actual course title out of the text preceding a data row.
 
@@ -416,6 +473,18 @@ def _extract_primary_name(name_block: str) -> tuple[str, str]:
 
     primary = " ".join(primary_parts).strip()
     extras = " ".join(extras_parts).strip()
+    # Strip trailing campus suffixes from the primary so token-based
+    # matching against the DB course name (which never carries campus
+    # info) doesn't get drowned out. The dropped tokens are folded
+    # back into ``extras`` so they're still available to the matcher
+    # as low-priority enrichment context (and so the data isn't lost
+    # for downstream consumers that want it).
+    cleaned = _strip_campus_tail(primary)
+    if cleaned != primary:
+        dropped = primary[len(cleaned):].strip()
+        if dropped:
+            extras = (extras + " " + dropped).strip() if extras else dropped
+        primary = cleaned
     return primary, extras
 
 
@@ -540,9 +609,19 @@ def match_course_in_pdf_table(
         # "Bachelor of Business" even though "international" only
         # appears in the sub-list. The *primary*-only set is kept
         # separately for the exact-match escape hatch below.
-        pdf_tokens = pdf_primary_tokens | _name_tokens(
-            row.get("_pdf_match_text") or ""
-        )
+        #
+        # Defense-in-depth: a real "Including Majors:" sub-list rarely
+        # exceeds a dozen distinctive tokens. If the extras blob has
+        # more than ~25 tokens it almost certainly means the parser
+        # swallowed unrelated text (footer paragraphs, the next row's
+        # data, etc.). Trusting it would inflate the union and let
+        # short generic queries (e.g. "Higher Degrees By Research")
+        # match unrelated rows on coincidental token overlap. In that
+        # case fall back to primary-only matching.
+        extras_tokens = _name_tokens(row.get("_pdf_match_text") or "")
+        if len(extras_tokens) > 25:
+            extras_tokens = set()
+        pdf_tokens = pdf_primary_tokens | extras_tokens
         if not pdf_tokens:
             continue
 

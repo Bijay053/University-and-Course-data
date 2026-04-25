@@ -1142,3 +1142,124 @@ FastAPI's `--reload`). After editing pipeline code, restart the
 or queued jobs will run against stale code (caught this during
 PR-7 verification — first rescrape stamped uniform fees because
 the worker was still on pre-edit code).
+
+## PR-8 — Torrens generalization (Apr 2026)
+
+### Problem
+User report: Torrens dashboard showed ~60 courses with every fee
+stamped at $121,955 (the highest number found anywhere in the fee
+schedule PDF). Same failure mode as ASA pre-PR-7 — uniform stamping
+on all siblings — but for a different set of underlying reasons.
+
+### Root causes (four)
+1. **Discovery cap too low** — `_MAX_COURSES_PER_JOB=60` capped
+   discovery; Torrens sitemap exposes 159 candidates / 152 real
+   courses. Two thirds of the catalogue never even reached the
+   per-course matcher.
+2. **Decimal duration regex gap** — `_PDF_DATA_ROW_RE` required
+   integer `\d+` durations. Torrens postgrad uses half-year
+   increments (`0.5`, `1.5`, `1.7`). Those rows silently failed
+   the regex and got swallowed as continuation text into the
+   *previous* row's primary name, producing massive polluted
+   primaries like *"Master of … (Advanced) Adelaide, … 0101388 2
+   16 $5,156 …"*.
+3. **CRICOS shape gap** — at least one Torrens row used a
+   7-digit CRICOS (`0101388`) without the canonical trailing
+   letter; the regex required `\d{6}[A-Z]` so the row dropped.
+4. **Campus suffix in primary names** — Torrens schedule
+   appends comma-separated campus lists ("Sydney, Melbourne,
+   Online") to the course-name column. After regex matching, the
+   primary name carried the campus tail, drowning the
+   discriminative tokens during matching (e.g. "Bachelor of
+   Business Sydney Melbourne Online" failed to match
+   "Bachelor of Business").
+5. **Bonus matcher hardening** — when extras (`_pdf_match_text`)
+   was a >100-token blob from parser pollution, short generic
+   queries like "Higher Degrees By Research" got false-positive
+   matches via coincidental `{higher, by}` overlap with footer
+   text.
+6. **Fallback re-creates the failure mode** — when the per-course
+   matcher returned `None`, the merge step in `single_course.py`
+   fell back to the uni-wide stamp ($121,955 for Torrens),
+   reintroducing the original "every course gets the same fee"
+   bug PR-7 was meant to eliminate.
+
+### Fixes
+1. **`orchestrator.py`** — `_MAX_COURSES_PER_JOB` raised 60 → 200
+   (matches `discover_course_links` natural max).
+2. **`university_pdfs.py: _PDF_DATA_ROW_RE`** — accepts both
+   canonical `\d{6}[A-Z]` and `\d{7,8}` CRICOS shapes; duration
+   accepts `\d+(?:\.\d+)?(?:\s*Months?)?` so half-year rows are
+   captured instead of swallowed.
+3. **`university_pdfs.py: _strip_campus_tail`** — new helper that
+   walks the trailing tokens of a primary name and drops a
+   curated set of Australian campus tokens (Sydney, Melbourne,
+   Adelaide, Brisbane, Perth, Darwin, Canberra, Hobart, Auckland,
+   Wellington, Online, Australia, Campus, …). Stops at the first
+   non-campus token, so legitimate words at the tail
+   ("Accounting", "Design") are preserved. Wired into
+   `_extract_primary_name`; dropped tokens are folded back into
+   `extras` so they remain available to the matcher.
+4. **`university_pdfs.py: match_course_in_pdf_table`** —
+   defense-in-depth cap: if extras tokens > 25 (a real
+   "Including Majors:" sub-list rarely exceeds a dozen), treat
+   the extras blob as parser pollution and fall back to
+   primary-only matching.
+5. **`single_course.py`** — when `len(fee_by_course) >= 3` (per-
+   course path is genuinely active for this uni) and the matcher
+   returns `None`, suppress the uni-wide stamp and leave fee NULL.
+   Logs `[FEE] no per-course PDF row for X — leaving fee NULL`.
+   This honours the project rule: "explicit when it fails instead
+   of utilizing silent fallbacks".
+6. **`orchestrator.py` (heartbeat)** — uncovered separately:
+   `job.heartbeat_at` was set in-memory each course but never
+   committed during the staging loop, AND the extraction phase
+   (parallel `asyncio.gather` over per-course fetches) wrote no
+   heartbeat at all. So the 5-minute /active reaper killed every
+   Torrens-scale job (~12 min total) before anything could
+   persist. Fix: dedicated `_heartbeat_pulser` background task
+   modelled on the existing `_stop_poller` — its own
+   `AsyncSessionLocal`, runs every 30s, issues a single
+   `UPDATE scrape_runtime_jobs SET heartbeat_at=NOW() WHERE
+   runtime_job_id=:j AND status='running'` and commits on its
+   own session. Started right after the stop poller, torn down
+   in the same `finally` block (both tasks `cancel()` then
+   awaited concurrently). Spans **both** extract and stage
+   phases so liveness is independent of whatever the main
+   session is doing.
+
+### Verification
+- Standalone trace against the live Torrens fee PDF (76 rows
+  parsed, was 56 pre-fix): 12/19 sample courses match real
+  per-course fees ($94,800 Bachelor of Business, $112,500
+  Architectural Tech, $47,700 Master of Public Health, $88,500
+  Doctor of Philosophy, $54,000 MBA, etc.). Remaining 7
+  unmatched courses correctly return `None` (those courses are
+  not in the PDF schedule) and now persist as NULL fee instead
+  of the wrong uniform $121,955 stamp.
+- 4 new regression tests in `test_university_pdfs.py`
+  (`test_strip_campus_tail_handles_torrens_layout`,
+  `test_pick_per_course_amounts_matches_decimal_duration_rows`,
+  `test_pick_per_course_amounts_matches_seven_digit_cricos`,
+  `test_match_rejects_polluted_extras_blob`) all pass alongside
+  the prior 18 → 22/22 passing.
+- Live Torrens rescrape kicked off post-fix (`job_d5c569a2aa7a`)
+  — Celery logs confirm new logic firing per-course (e.g.
+  `[FEE] no per-course PDF row for 'Bachelor of Psychological
+  Science' — leaving fee NULL (schedule has 76 rows; uni-wide
+  stamp suppressed)`).
+
+### Known limitations / follow-ups
+- Some PDF rows still have polluted primary names due to
+  page-break merging (the parser walks across page boundaries
+  and absorbs the next row's prefix). Affects a handful of
+  Torrens courses (Cybersecurity, Information Technology,
+  Education) where the row exists in the PDF but the polluted
+  primary loses the exact-match escape hatch. These get NULL
+  fee under the new merge rule (correct, just suboptimal). A
+  page-aware parser walk would recover them — out of scope here.
+- Torrens scrapes are slow (~5–10s per course due to JS-heavy
+  pages + per-course Gemini vision attempts on hero images that
+  consistently fail). Full 152-course run takes ~15–20 minutes;
+  the heartbeat-commit fix in change #6 is what makes that
+  duration survivable instead of being auto-reaped.
