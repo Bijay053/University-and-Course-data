@@ -95,6 +95,29 @@ def test_empty_url_falls_back_to_safe_default():
     assert outer_sec == 20
 
 
+def test_csu_study_subdomain_uses_networkidle():
+    # study.csu.edu.au is a Vue.js SPA — static HTML is a 39-byte shell.
+    # domcontentloaded fires before any content renders, so networkidle
+    # is required to get extractable fee / english-requirements sections.
+    wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(
+        "https://study.csu.edu.au/courses/bachelor-accounting"
+    )
+    assert wait_until == "networkidle"
+    assert settle_ms == 3000
+    assert outer_sec == 30
+    assert goto_ms == 25_000
+
+
+def test_csu_www_subdomain_uses_domcontentloaded():
+    # www.csu.edu.au is a conventional server-rendered site — only the
+    # study subdomain is a SPA. The two must not be conflated.
+    wait_until, settle_ms, _, _ = _browser_config_for(
+        "https://www.csu.edu.au/courses/baz"
+    )
+    assert wait_until == "domcontentloaded"
+    assert settle_ms == 1500
+
+
 def test_substring_match_does_not_match_unrelated_host():
     # `vit.edu.au` should not match `evit.edu.au` or `vit.edu.au.example.com`.
     # The match logic uses exact-host or `.<host>` suffix to prevent

@@ -80,7 +80,21 @@ def _skip_browser_for_url(url: str) -> bool:
     return False
 
 
-_NETWORKIDLE_HOSTS: tuple[str, ...] = ("vit.edu.au",)
+_NETWORKIDLE_HOSTS: tuple[str, ...] = (
+    # VIT: SPA that requires JS rendering + 3s settle to surface the
+    # International tab's fee and english-requirements sections.
+    "vit.edu.au",
+    # CSU (study.csu.edu.au): every per-course page is a pure SPA —
+    # the static HTML is a 39-byte shell. domcontentloaded fires
+    # immediately on the empty shell, before any English/fee content
+    # has rendered. networkidle + 30s outer ceiling keeps per-course
+    # scrapes accurate without burning extra time on the discovery phase
+    # (which now correctly uses the sitemap path for CSU).
+    # Scoped to `study.csu.edu.au` rather than the whole `csu.edu.au`
+    # TLD because only the study sub-domain uses the SPA framework;
+    # www.csu.edu.au is a conventional server-rendered site.
+    "study.csu.edu.au",
+)
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
 # Outer ceilings keep a single hung page from wedging the Celery worker

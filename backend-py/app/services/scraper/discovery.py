@@ -65,7 +65,13 @@ _COURSE_TEXT = re.compile(
 _COURSE_BRAND_TEXT = re.compile(r"\b(BITS|MITS|BBus)\b", re.I)
 _JUNK_TEXT = re.compile(
     r"^(home|about|contact|news|events?|search|menu|login|sign\s*in|"
-    r"apply\s*now|read\s*more|learn\s*more|view\s*all|see\s*all)$",
+    r"apply\s*now|read\s*more|learn\s*more|view\s*all|see\s*all|"
+    # CSU (and other SPA sites) produce bare section-header link text
+    # like "Undergraduate" / "Postgraduate" as nav anchors — these are
+    # never course names and must be blocked here so the BFS candidate
+    # count stays accurate and the sitemap-fallback threshold fires.
+    r"undergraduate|postgraduate|"
+    r"courses?|programs?|degrees?|study|explore)$",
     re.I,
 )
 
@@ -88,6 +94,24 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/virtual-info", "/keydates", "/key-dates", "/career-finder",
     "/testimonials", "/study/why-", "/studying-with-us/",
     "/all-courses", "/browse-courses", "/explore-courses",
+    # CSU regression (T007): these path prefixes generated 6 of the 7
+    # garbage staged rows (nav sections, career-browsing pages, and a
+    # short-course finder that hides behind a JS filter UI).
+    # "/information-for/" — /information-for/undergraduate-students etc.
+    # "/why-"            — /why-charles-sturt/our-rankings etc. (catches
+    #                      any /why-<brand>/ marketing section, not just
+    #                      the already-listed /why-study-with-us exact).
+    # "/career-area/"    — CSU by-career course-browsing sidebar pages.
+    # "/find-courses/"   — CSU JS-rendered short-course filter UI.
+    "/information-for/", "/career-area/", "/find-courses/",
+    # "/why-" matches any URL that contains the substring "/why-" —
+    # i.e. any path segment that starts with "why-".  Real university
+    # course pages never use a slug beginning with "why-" (they use
+    # degree-qualifier prefixes: bachelor-*, master-*, graduate-*, etc.),
+    # so the false-positive risk is effectively zero.  The leading slash
+    # prevents matching "elearning/anywhere" (no "why-" substring) while
+    # still catching /why-charles-sturt/…, /why-choose-csu/…, etc.
+    "/why-",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even

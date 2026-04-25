@@ -1352,3 +1352,53 @@ on all siblings — but for a different set of underlying reasons.
   consistently fail). Full 152-course run takes ~15–20 minutes;
   the heartbeat-commit fix in change #6 is what makes that
   duration survivable instead of being auto-reaped.
+
+## PR-9 — CSU T007 discovery fix (Apr 2026)
+
+### Problem
+CSU (`study.csu.edu.au`, university_id=4) returned only 7 staged courses
+after the T007 sweep — 2 real, 5 junk. The 260-course sitemap was
+ignored because the BFS found ≥ 5 "candidates" (threshold that triggers
+sitemap fallback), so it never tried the sitemap.
+
+### Root causes (three)
+
+**PR(a) — Filter regression** (`scraper/discovery.py`):
+- Six CSU nav/marketing URLs reached the BFS candidate counter because
+  four path prefixes were missing from `_NON_COURSE_URL_PATTERNS`:
+  `/information-for/`, `/career-area/`, `/find-courses/`, `/why-`.
+  Once these 6 junk entries were counted (total=7 ≥ threshold=5),
+  the sitemap fallback was suppressed.
+- `_JUNK_TEXT` didn't block bare SPA section-header labels
+  ("Undergraduate", "Postgraduate", "Courses", "Programs", "Study",
+  "Explore") — these are nav anchors, never course names. Added to
+  the `^(...)$` regex so they can't pad the BFS candidate count.
+
+**Cascade fix**: after PR(a), BFS finds exactly 1 real course URL
+(`/courses/bachelor-education-primary`). 1 < 5 → sitemap fallback
+fires automatically → discovers all 260 CSU sitemap entries. No custom
+CSU adapter needed.
+
+**PR(b) — Sitemap already correct**: `sitemap.py::_is_course_loc`
+handles all 260 CSU entries correctly. `/courses/access-charles-sturt-entry`
+(4 words, no degree qualifier) passes the `len(name.split()) ≥ 2` gate.
+`/courses/executive-masters-...` passes via `_COURSE_TEXT` match on
+"masters". No code changes needed.
+
+**PR(c) — SPA browser timeout** (`scraper/per_course_browser.py`):
+`study.csu.edu.au` added to `_NETWORKIDLE_HOSTS`. Per-course pages are
+pure Vue.js SPAs — the static HTML is a 39-byte shell. Without
+`networkidle`, `domcontentloaded` fires immediately before any
+English/fee content renders. Scoped to `study.csu.edu.au` (not the
+whole `csu.edu.au` TLD) because `www.csu.edu.au` is server-rendered.
+
+### Tests
+- `tests/test_discovery_filters.py::TestCSUNavBlocked` (6 new tests):
+  `/information-for/`, `/why-`, `/career-area/`, `/find-courses/`
+  blocked; real CSU course URLs pass; bare nav labels blocked via
+  `_looks_like_course`.
+- `tests/test_per_course_browser_per_host_config.py`:
+  `test_csu_study_subdomain_uses_networkidle` + 
+  `test_csu_www_subdomain_uses_domcontentloaded` (2 new tests) — pins
+  the exact-subdomain scoping so `www.csu.edu.au` doesn't accidentally
+  inherit SPA config.

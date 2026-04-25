@@ -200,3 +200,89 @@ class TestLooksLikeCourseRejectsNoiseAndLandings:
             assert _looks_like_course(url, text), (
                 f"{url} ({text!r}) is a real course — must pass the filter"
             )
+
+
+# ── CSU T007 regression: nav sections that slipped past the blocklist ──────
+
+
+class TestCSUNavBlocked:
+    """CSU (study.csu.edu.au) produced 7 staged rows after the SPA
+    discovery pass. 6 of the 7 were junk URLs that shouldn't have made
+    it past ``_is_known_non_course_url``. These tests pin the patterns
+    added to fix the regression.
+
+    Root cause: ``/information-for/``, ``/why-<brand>/``,
+    ``/career-area/``, and ``/find-courses/`` were absent from
+    ``_NON_COURSE_URL_PATTERNS``, so 6 nav/career-browsing anchors
+    were counted toward the BFS candidate tally (raising it above the
+    sitemap-fallback threshold of 5) AND got staged as fake courses.
+    """
+
+    def test_csu_information_for_blocked(self):
+        for url in (
+            "https://study.csu.edu.au/information-for/undergraduate-students",
+            "https://study.csu.edu.au/information-for/postgraduate-students",
+            "https://study.csu.edu.au/information-for/international-students",
+        ):
+            assert _is_known_non_course_url(url), (
+                f"{url} is CSU nav — must be blocked"
+            )
+
+    def test_csu_why_blocked(self):
+        # /why-<brand>/ marketing sections must be blocked.
+        for url in (
+            "https://study.csu.edu.au/why-charles-sturt/our-rankings",
+            "https://study.csu.edu.au/why-choose-csu/campus-life",
+            "https://www.example.edu.au/why-study-here/facilities",
+        ):
+            assert _is_known_non_course_url(url), (
+                f"{url} starts with /why- — must be blocked"
+            )
+
+    def test_csu_career_area_blocked(self):
+        for url in (
+            "https://study.csu.edu.au/career-area/arts-communication/ba-communication",
+            "https://study.csu.edu.au/career-area/education-teaching/bachelor-of-education-secondary",
+        ):
+            assert _is_known_non_course_url(url), (
+                f"{url} is a /career-area/ browsing page — must be blocked"
+            )
+
+    def test_csu_find_courses_blocked(self):
+        for url in (
+            "https://study.csu.edu.au/find-courses/short-courses/undergraduate-certificates",
+            "https://study.csu.edu.au/find-courses/postgraduate-courses",
+        ):
+            assert _is_known_non_course_url(url), (
+                f"{url} is a /find-courses/ filter UI — must be blocked"
+            )
+
+    def test_csu_real_courses_not_blocked(self):
+        # The one real URL the BFS found (and the sitemap's 260 entries)
+        # must survive the filter unchanged.
+        for url in (
+            "https://study.csu.edu.au/courses/bachelor-education-primary",
+            "https://study.csu.edu.au/courses/master-business-administration",
+            "https://study.csu.edu.au/courses/bachelor-accounting",
+            "https://study.csu.edu.au/courses/undergraduate-certificate-information-technology",
+        ):
+            assert not _is_known_non_course_url(url), (
+                f"{url} is a real CSU course — must NOT be blocked"
+            )
+
+    def test_junk_text_blocks_bare_nav_labels(self):
+        """Bare "Undergraduate" / "Postgraduate" anchor text (CSU SPA nav
+        section headers) must be blocked by ``_JUNK_TEXT`` so they never
+        reach the BFS candidate counter.  Checks the helper indirectly
+        via ``_looks_like_course``."""
+        from app.services.scraper.discovery import _looks_like_course
+
+        for url, text in (
+            ("https://study.csu.edu.au/information-for/undergraduate-students", "Undergraduate"),
+            ("https://study.csu.edu.au/information-for/postgraduate-students", "Postgraduate"),
+            ("https://study.csu.edu.au/courses", "Courses"),
+            ("https://study.csu.edu.au/find-courses/all", "Explore"),
+        ):
+            assert not _looks_like_course(url, text), (
+                f"({url!r}, {text!r}) is a nav label — must NOT be treated as a course"
+            )
