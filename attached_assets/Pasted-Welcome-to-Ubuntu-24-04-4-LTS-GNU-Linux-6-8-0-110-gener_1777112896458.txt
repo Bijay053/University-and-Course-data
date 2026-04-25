@@ -1,0 +1,159 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sat Apr 25 09:17:45 UTC 2026
+
+  System load:           0.32
+  Usage of /:            3.0% of 231.44GB
+  Memory usage:          13%
+  Swap usage:            0%
+  Processes:             178
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Sat Apr 25 07:30:14 2026 from 198.211.111.194
+root@university-and-course-data:~# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT id, name, website, country, city, created_at
+FROM universities 
+WHERE name ILIKE '%kbs%' OR website LIKE '%kbs.edu.au%'
+ORDER BY created_at DESC LIMIT 5;
+"
+ id | name | website | country | city | created_at 
+----+------+---------+---------+------+------------
+(0 rows)
+
+root@university-and-course-data:~# psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, university_id, status, error_message, started_at
+FROM scrape_runtime_jobs 
+WHERE university_id IS NULL OR error_message ILIKE '%not found%'
+ORDER BY started_at DESC LIMIT 5;
+"
+ runtime_job_id | university_id | status | error_message | started_at 
+----------------+---------------+--------+---------------+------------
+(0 rows)
+
+root@university-and-course-data:~# cd /root/University-and-Course-data/backend-py
+grep -A 20 "def start_scrape\|@.*scrape/start\|/scrape/start" app/routers/scrape.py | head -50
+async def start_scrape(
+    body: StartScrapeBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScrapeStartResponse:
+    # Lookup by university_id first, fall back to URL match (UI compatibility)
+    uni = None
+    if body.university_id:
+        uni = await db.get(University, body.university_id)
+    if not uni and body.url:
+        from sqlalchemy import select, or_, func
+        result = await db.execute(
+            select(University).where(
+                or_(
+                    University.scrape_url == body.url,
+                    University.website == body.url,
+                    func.lower(University.name) == (body.university_name or "").lower(),
+                )
+            ).limit(1)
+        )
+        uni = result.scalar_one_or_none()
+    if not uni:
+--
+    # silent-fail pattern used by ``/scrape/start`` above (no module
+    # logger is defined in this router).
+    try:
+        from app.tasks.scrape_tasks import repair_university
+
+        repair_university.delay(job_id)
+    except Exception:
+        pass
+
+    return {
+        "jobId": job_id,
+        "count": len(targets),
+        "rejectedForeignIds": rejected,
+        "message": f"Repair scrape queued for {len(targets)} course(s).",
+    }
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -10
+echo "---"
+git log origin/main --oneline -10
+remote: Enumerating objects: 124, done.
+remote: Counting objects: 100% (124/124), done.
+remote: Compressing objects: 100% (30/30), done.
+remote: Total 91 (delta 73), reused 79 (delta 61), pack-reused 0 (from 0)
+Unpacking objects: 100% (91/91), 562.85 KiB | 4.43 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   c970083..aeca3d4  main       -> origin/main
+c970083 (HEAD -> main) fix: ASA scrape data quality — sub-bands, sub_category, description extractor
+e0577f5 Add detailed diagnostic report on course data extraction issues
+664eba9 Add server setup instructions and confirm repository update
+6d64da5 Bug L: ASA per-course IELTS sub-bands now match each course's image
+64936d9 Bug L: ASA per-course IELTS sub-bands now match each course's image
+939dcc5 Update English test score extraction for accuracy and consistency
+189cf46 Improve PDF scraping by fixing course matching and fee assignment
+f1df3b9 Improve course fee extraction by parsing per-course tables
+6a6e345 Cancel task #26 (drop Node-era backup tables) — premise was wrong; document findings instead
+f8edf73 Update documentation to reflect API server workflow status
+---
+aeca3d4 (origin/main) Allow creating universities without needing to log in
+cdc77bb Improve duration extraction and refine study mode determination
+380b3cc Fix 2 failing integration tests in test_create_university_flow.py
+9eeccb6 Update website preview image to improve visual appeal
+f611b17 feat(scraper): Torrens T007 staging-gate filters — Bugs A + B + C
+07fa420 ASA IELTS sub-band fix verified + CSU T007 rescrape initiated
+0dbbc7d docs: verify ASA Bug L sub-band fix + update job IDs
+3f1b41d Fix CSU T007 discovery failures + confirm ASA IELTS sub-band fixes complete
+bf66c9d fix(VIT-T007): fix all 5 vocational scrape issues
+c970083 (HEAD -> main) fix: ASA scrape data quality — sub-bands, sub_category, description extractor
+root@university-and-course-data:~/University-and-Course-data# systemctl status uni-api-py uni-celery --no-pager | head -30
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-04-25 08:22:32 UTC; 2h 5min ago
+   Main PID: 541166 (python)
+      Tasks: 16 (limit: 9483)
+     Memory: 239.0M (peak: 246.5M)
+        CPU: 46.592s
+     CGroup: /system.slice/uni-api-py.service
+             ├─541166 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info
+             ├─541168 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─541169 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=9)" --multiprocessing-fork
+             └─541170 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=13)" --multiprocessing-fork
+
+Apr 25 08:22:32 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-04-25 08:22:34 UTC; 2h 5min ago
+   Main PID: 541175 (celery)
+      Tasks: 67 (limit: 9483)
+     Memory: 311.8M (peak: 680.5M)
+        CPU: 6min 53.238s
+     CGroup: /system.slice/uni-celery.service
+             ├─541175 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+             ├─541237 /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/node /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/package/cli.js run-driver
+             ├─541248 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --enable-automation --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --disable-blink-features=AutomationControlled --no-sandbox --disable-dev-shm-usage --disable-web-security --disable-features=IsolateOrigins,site-per-process --user-data-dir=/tmp/playwright_chromiumdev_profile-WO5w2F --remote-debugging-pipe --no-startup-window
+             ├─541250 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-zygote-sandbox --no-sandbox --headless"
+             ├─541251 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-sandbox --headless"
+             ├─541267 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=gpu-process --no-sandbox --disable-dev-shm-usage --disable-breakpad --headless --ozone-platform=headless --use-angle=swiftshader-webgl --enable-unsafe-swiftshader --gpu-preferences=UAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAAAQAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAA --use-gl=angle --shared-files --field-trial-handle=3,i,10248890229187134593,11177113880572994542,262144 --enable-features=CDPScreenshotNewSurface --disable-features=IsolateOrigins,PaintHolding,site-per-process --variations-seed-version --trace-process-track-uuid=3190708988185955192"
+             └─541269 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader-webgl --use-gl=angle --mute-audio --headless=old --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,10248890229187134593,11177113880572994542,262144 --enable-features=CDPScreenshotNewSurface --disable-features=IsolateOrigins,PaintHolding,site-per-process --variations-seed-version --trace-process-track-uuid=3190708989122997041"
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git log --since="3 hours ago" --oneline
+c970083 (HEAD -> main) fix: ASA scrape data quality — sub-bands, sub_category, description extractor
+e0577f5 Add detailed diagnostic report on course data extraction issues
+664eba9 Add server setup instructions and confirm repository update
+root@university-and-course-data:~/University-and-Course-data# 
