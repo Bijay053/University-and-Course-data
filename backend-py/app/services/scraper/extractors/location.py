@@ -96,6 +96,93 @@ def _sanitise_for_display(raw: str | None) -> str | None:
     return cleaned or None
 
 
+# Mirrors `study_mode._extract_strong_label_value`: a structural
+# pre-pass that walks the DOM looking for `<strong>Location</strong>`
+# style labels and reads the value out of the next text nodes /
+# sibling cells. The existing `_from_dl` and `_from_tables` already
+# cover `<dt>/<dd>` and `<th>/<td>`; this catches the ASA-style
+# adjacent-div idiom (`<div><strong>Location</strong></div><div>
+# Sydney</div>`) where the value lives in the parent's next sibling
+# rather than the strong tag's own next sibling — `_from_headings`
+# misses that because it walks `find_next_sibling()` on the strong
+# tag only and never bubbles up to the parent.
+_LOCATION_LABEL_TAG_RE = re.compile(
+    r"(?:campus(?:\s+locations?)?|locations?|"
+    r"where\s+(?:can\s+)?(?:i|you)\s+study|"
+    r"delivery\s+location)",
+    re.IGNORECASE,
+)
+_STRONG_VALUE_CHAR_CAP = 300
+
+
+def _classify_location_value(value: str) -> str | None:
+    """Run the value text through the existing normalise/sanitise
+    pipeline so the structural pre-pass returns the same shape as
+    the rest of the cascade. Returns ``None`` when the value is
+    rejected (marketing copy, junk, virtual-only)."""
+    normalised = _normalise(value)
+    if not normalised:
+        return None
+    display = _sanitise_for_display(normalised)
+    if not display:
+        return None
+    return display
+
+
+def _from_strong_dom_walk(soup: BeautifulSoup) -> str | None:
+    """Structural pre-pass for `<strong>Location</strong>` /
+    `<b>Campus</b>` idioms whose value lives in the parent's next
+    sibling element. Walks forward from the strong/b tag in document
+    order until the next labelled boundary, mirroring
+    `study_mode._extract_strong_label_value`."""
+    try:
+        from bs4.element import NavigableString, Tag
+    except ImportError:  # pragma: no cover - bs4 is a hard dep
+        return None
+    for label_tag in soup.find_all(("strong", "b")):
+        label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+        if not label_raw or not _LOCATION_LABEL_TAG_RE.fullmatch(label_raw):
+            continue
+        # Skip the label tag's own descendants (its own text would
+        # otherwise be appended in front of the value, e.g.
+        # `Location Sydney` for `<strong>Location</strong>` followed
+        # by `<div>Sydney</div>`). The other extractors' classifiers
+        # ignore unknown leading words by design, so they're fine
+        # without this guard — for location the label word can look
+        # exactly like a city name to the normaliser.
+        descendant_ids = {id(d) for d in label_tag.descendants}
+        parts: list[str] = []
+        char_count = 0
+        for node in label_tag.next_elements:
+            if isinstance(node, Tag):
+                if node is label_tag or id(node) in descendant_ids:
+                    continue
+                if node.name in ("strong", "b", "h1", "h2", "h3",
+                                 "h4", "h5", "h6", "dt", "th",
+                                 "tr"):
+                    break
+                continue
+            if isinstance(node, NavigableString):
+                if id(node) in descendant_ids:
+                    continue
+                text = str(node).strip()
+                if not text:
+                    continue
+                parts.append(text)
+                char_count += len(text) + 1
+                if char_count >= _STRONG_VALUE_CHAR_CAP:
+                    break
+        if not parts:
+            continue
+        value_text = " ".join(parts).lstrip(":-– ").strip()
+        if not value_text:
+            continue
+        v = _classify_location_value(value_text)
+        if v:
+            return v
+    return None
+
+
 def _from_dl(soup: BeautifulSoup) -> str | None:
     for dt in soup.find_all("dt"):
         if not LOCATION_LABEL.match(dt.get_text(strip=True)):
@@ -166,6 +253,11 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         return []
     soup = BeautifulSoup(html, "html.parser")
     cascade = (
+        # Structural pre-pass FIRST — see _from_strong_dom_walk for the
+        # rationale. Reads `<strong>Location</strong>` style values out
+        # of the DOM directly, including the ASA-style adjacent-div
+        # idiom that the heading walker misses.
+        ("strong", _from_strong_dom_walk(soup), 0.9),
         ("dl", _from_dl(soup), 0.9),
         ("table", _from_tables(soup), 0.85),
         ("heading", _from_headings(soup), 0.7),

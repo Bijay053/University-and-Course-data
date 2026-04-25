@@ -51,6 +51,26 @@ _FULL_DATE = re.compile(
 )
 _MONTH_RE = re.compile(rf"\b({_MONTH_ANY})\b", re.I)
 
+# Mirrors `study_mode._extract_strong_label_value`: a structural pre-pass
+# that reads the value cell directly out of the DOM so the same
+# flattened-text boundary-collision bug class can't bleed an adjacent
+# field's value into the intake capture (e.g. ASA-style
+# `<div><strong>Location</strong></div><div>Sydney, March</div>
+# <div><strong>Intake</strong></div><div>February, July</div>` —
+# tag-stripping concatenates "March" and "Intake" and the keyword
+# window would then walk forward from the wrong offset).
+_INTAKE_LABEL_RE = re.compile(
+    r"(?:intakes?|intake\s+(?:dates?|months?|periods?)|"
+    r"next\s+(?:available\s+)?intakes?|available\s+intakes?|"
+    r"start\s+dates?|commencement(?:\s+dates?)?|"
+    r"course\s+(?:start\s+dates?|commencement|starts?)|"
+    r"study\s+(?:periods?|start)|class\s+starts?|"
+    r"applications?\s+(?:open|close|closing|opening\s+date)|"
+    r"entry\s+points?)",
+    re.IGNORECASE,
+)
+_STRONG_VALUE_CHAR_CAP = 300
+
 
 def _normalise_month(raw: str) -> str | None:
     """'Jan' / 'jan.' / 'JANUARY' → 'January'."""
@@ -59,6 +79,114 @@ def _normalise_month(raw: str) -> str | None:
         if full.lower().startswith(m):
             return full
     return None
+
+
+def _classify_intake_value(value: str) -> tuple[list[str], int | None] | None:
+    """Parse months (and a leading day-of-month, if present) from a raw
+    label-value string. Returns ``(months, day)`` or ``None`` when no
+    month name is recoverable. Mirrors the two-pass strategy in
+    :func:`extract` (full ``day Month`` dates first, bare month names
+    as a fallback) but constrained to a single value cell so we never
+    bleed adjacent paragraphs into the result."""
+    months: list[str] = []
+    day: int | None = None
+    for m in _FULL_DATE.finditer(value):
+        d = int(m.group(1))
+        if 1 <= d <= 31:
+            mo = _normalise_month(m.group(2))
+            if mo:
+                if day is None:
+                    day = d
+                if mo not in months:
+                    months.append(mo)
+    if not months:
+        for raw in _MONTH_RE.findall(value):
+            mo = _normalise_month(raw)
+            if mo and mo not in months:
+                months.append(mo)
+    if not months:
+        return None
+    return months, day
+
+
+def _extract_strong_label_value(
+    html: str,
+) -> tuple[tuple[list[str], int | None] | None, str | None]:
+    """Structural pre-pass for label/value idioms in the DOM. See
+    :func:`study_mode._extract_strong_label_value` for the full
+    rationale — this is the same idea, restricted to intake labels.
+
+    Recognised idioms (all read the value from the DOM rather than
+    from a flattened tag-stripped token run):
+
+    * ``<strong>Intake</strong>`` / ``<b>Start dates:</b>`` — value
+      either inline after the bold tag or in a sibling element. Walks
+      forward in document order until the next labelled boundary.
+    * ``<dt>Intake</dt><dd>February, July</dd>`` — definition lists.
+    * ``<th>Intake</th><td>February, July</td>`` — table key/value rows.
+    """
+    if not html:
+        return None, None
+    try:
+        from bs4 import BeautifulSoup
+        from bs4.element import NavigableString, Tag
+    except ImportError:  # pragma: no cover - bs4 is a hard dep
+        return None, None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None, None
+
+    for label_tag in soup.find_all(("strong", "b", "dt", "th")):
+        label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+        if not label_raw or not _INTAKE_LABEL_RE.fullmatch(label_raw):
+            continue
+
+        value_text: str | None = None
+        if label_tag.name == "dt":
+            sibling = label_tag.find_next_sibling("dd")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        elif label_tag.name == "th":
+            sibling = label_tag.find_next_sibling("td")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        else:
+            parts: list[str] = []
+            char_count = 0
+            for node in label_tag.next_elements:
+                if isinstance(node, Tag):
+                    if node is label_tag:
+                        continue
+                    if node.name in ("strong", "b", "h1", "h2", "h3",
+                                     "h4", "h5", "h6", "dt", "th",
+                                     "tr"):
+                        break
+                    continue
+                if isinstance(node, NavigableString):
+                    text = str(node).strip()
+                    if not text:
+                        continue
+                    parts.append(text)
+                    char_count += len(text) + 1
+                    if char_count >= _STRONG_VALUE_CHAR_CAP:
+                        break
+            value_text = " ".join(parts)
+
+        if not value_text:
+            continue
+        value_text = value_text.lstrip(":-– ").strip()
+        if not value_text:
+            continue
+        parsed = _classify_intake_value(value_text)
+        if parsed is not None:
+            snippet = (
+                f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "
+                f"{value_text[:80]}"
+            )
+            return parsed, snippet
+    return None, None
 
 
 def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
@@ -75,6 +203,29 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    # Structural pre-pass FIRST — see _extract_strong_label_value for
+    # the rationale. When the page publishes intake months as a
+    # `<strong>Intake</strong>` / `<dt>/<dd>` / `<th>/<td>` pair, read
+    # the value cell out of the DOM directly so a flattened-text
+    # boundary collision with the previous field's value can't pollute
+    # the result.
+    structural, snippet = _extract_strong_label_value(html)
+    if structural is not None:
+        months, day = structural
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=months,
+                normalized={
+                    "intake_months": months,
+                    "intake_days": day,
+                },
+                confidence=0.8,
+                snippet=snippet,
+                method="intake.structural",
+            )
+        ]
+
     text = compact(html_to_text(html))
     if not text:
         return []

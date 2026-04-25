@@ -79,6 +79,27 @@ _DURATION_ANTI_CONTEXT = re.compile(
 )
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
+_DURATION_CAP = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}
+
+# Mirrors `study_mode._extract_strong_label_value`: a structural pre-pass
+# that reads the value cell directly out of the DOM so the same
+# flattened-text boundary-collision bug class can't bleed an adjacent
+# field's value into the duration capture (e.g. an ASA-style
+# `<div><strong>Location</strong></div><div>Sydney, 3 days a week</div>
+# <div><strong>Duration</strong></div><div>3 years</div>` template
+# where stripping tags yields a token run that the loose `<num> <unit>`
+# fallback could match in the wrong cell).
+_DURATION_LABEL_RE = re.compile(
+    r"(?:course\s+duration|duration|course\s+length|"
+    r"program(?:me)?\s+length|study\s+duration|"
+    r"length\s+of\s+(?:course|program(?:me)?|study)|"
+    r"full[-\s]?time\s+duration|standard\s+duration)",
+    re.IGNORECASE,
+)
+_DURATION_VALUE_RE = re.compile(
+    rf"\b(\d+(?:\.\d+)?)\s*({_UNIT})\b", re.IGNORECASE
+)
+_STRONG_VALUE_CHAR_CAP = 300
 
 
 def _normalise_unit(raw: str) -> str | None:
@@ -96,7 +117,129 @@ def _normalise_unit(raw: str) -> str | None:
     return None
 
 
+def _classify_duration_value(value: str) -> tuple[float, str] | None:
+    """Parse ``<num> <unit>`` from a label-value cell. Returns
+    ``(amount, canonical_unit)`` or ``None`` when no plausible
+    duration is recoverable. Applies the same per-unit caps as the
+    keyword fallback so junk values (e.g. "200 years") are rejected."""
+    if _ACCELERATED.search(value):
+        return None
+    m = _DURATION_VALUE_RE.search(value)
+    if not m:
+        return None
+    try:
+        amount = float(m.group(1))
+    except ValueError:
+        return None
+    unit = _normalise_unit(m.group(2))
+    if not unit:
+        return None
+    cap = _DURATION_CAP[unit]
+    if not (0 < amount <= cap):
+        return None
+    return amount, unit
+
+
+def _extract_strong_label_value(
+    html: str,
+) -> tuple[tuple[float, str] | None, str | None]:
+    """Structural pre-pass for label/value duration idioms in the DOM.
+    See :func:`study_mode._extract_strong_label_value` for the full
+    rationale — this is the same idea, restricted to duration labels.
+
+    Recognised idioms:
+
+    * ``<strong>Duration</strong>`` / ``<b>Course duration:</b>`` —
+      value either inline after the bold tag or in a sibling element.
+      Walks forward in document order until the next labelled boundary.
+    * ``<dt>Duration</dt><dd>3 years</dd>`` — definition lists.
+    * ``<th>Course length</th><td>2 years</td>`` — table key/value rows.
+    """
+    if not html:
+        return None, None
+    try:
+        from bs4 import BeautifulSoup
+        from bs4.element import NavigableString, Tag
+    except ImportError:  # pragma: no cover - bs4 is a hard dep
+        return None, None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None, None
+
+    for label_tag in soup.find_all(("strong", "b", "dt", "th")):
+        label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+        if not label_raw or not _DURATION_LABEL_RE.fullmatch(label_raw):
+            continue
+
+        value_text: str | None = None
+        if label_tag.name == "dt":
+            sibling = label_tag.find_next_sibling("dd")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        elif label_tag.name == "th":
+            sibling = label_tag.find_next_sibling("td")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        else:
+            parts: list[str] = []
+            char_count = 0
+            for node in label_tag.next_elements:
+                if isinstance(node, Tag):
+                    if node is label_tag:
+                        continue
+                    if node.name in ("strong", "b", "h1", "h2", "h3",
+                                     "h4", "h5", "h6", "dt", "th",
+                                     "tr"):
+                        break
+                    continue
+                if isinstance(node, NavigableString):
+                    text = str(node).strip()
+                    if not text:
+                        continue
+                    parts.append(text)
+                    char_count += len(text) + 1
+                    if char_count >= _STRONG_VALUE_CHAR_CAP:
+                        break
+            value_text = " ".join(parts)
+
+        if not value_text:
+            continue
+        value_text = value_text.lstrip(":-– ").strip()
+        if not value_text:
+            continue
+        parsed = _classify_duration_value(value_text)
+        if parsed is not None:
+            snippet = (
+                f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "
+                f"{value_text[:80]}"
+            )
+            return parsed, snippet
+    return None, None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    # Structural pre-pass FIRST — see _extract_strong_label_value for
+    # the rationale. When the page publishes duration as a
+    # `<strong>Duration</strong>` / `<dt>/<dd>` / `<th>/<td>` pair,
+    # read the value cell out of the DOM directly so a flattened-text
+    # boundary collision with the previous field's value can't bleed
+    # an unrelated `<num> <unit>` token run into the duration capture.
+    structural, snippet = _extract_strong_label_value(html)
+    if structural is not None:
+        amount, unit = structural
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.85,
+                snippet=snippet,
+                method="duration.structural",
+            )
+        ]
+
     text = compact(html_to_text(html))
     if not text:
         return []

@@ -182,6 +182,132 @@ _PER_UNIT_HINT_RE = re.compile(
     r"per\s*(?:credit\s*)?(?:unit|point|credit|subject|module)", re.IGNORECASE
 )
 
+# Mirrors `study_mode._extract_strong_label_value`: a structural pre-pass
+# that reads the value cell directly out of the DOM so a flattened-text
+# boundary collision can't bleed an adjacent paragraph's currency
+# figure (scholarship, deposit, building cost) into the fee capture.
+# Only "international"-flavoured labels are whitelisted here so the
+# pre-pass never claims a domestic-only fee as the international tuition;
+# the keyword fallback (with its salary/intl-context scoring) still
+# handles the ambiguous cases below.
+_FEE_LABEL_RE = re.compile(
+    r"(?:international\s+(?:tuition\s+)?(?:fees?|cost|tuition)|"
+    r"international\s+student\s+(?:tuition\s+)?fees?|"
+    r"international\s+tuition|"
+    r"tuition\s+fees?\s*\(international\)|"
+    r"fees?\s*\(international\)|"
+    r"international\s+annual\s+fees?)",
+    re.IGNORECASE,
+)
+_STRONG_VALUE_CHAR_CAP = 300
+
+
+def _classify_fee_value(value: str) -> tuple[int, str] | None:
+    """Parse the first plausible currency amount from a label-value
+    cell. Returns ``(amount, surrounding_value_text)`` so the caller
+    can run the existing currency / fee-term / year detectors over
+    the same context. Bounds match the keyword extractor's sanity
+    range (5_000 - 200_000)."""
+    m = _AMOUNT_RE.search(value)
+    if not m:
+        return None
+    raw = m.group(2) or m.group(3) or ""
+    try:
+        amount = int(float(raw.replace(",", "")))
+    except ValueError:
+        return None
+    if amount < 5_000 or amount > 200_000:
+        return None
+    return amount, value
+
+
+def _extract_strong_label_value(
+    html: str,
+) -> tuple[tuple[int, str] | None, str | None]:
+    """Structural pre-pass for `<strong>International tuition fees</strong>`
+    style label/value idioms. See
+    :func:`study_mode._extract_strong_label_value` for the full
+    rationale.
+
+    Recognised idioms:
+
+    * ``<strong>International tuition fees</strong>`` — value either
+      inline after the bold tag or in a sibling element. Walks forward
+      until the next labelled boundary.
+    * ``<dt>International tuition</dt><dd>$42,000 per year</dd>``
+      — definition lists.
+    * ``<th>International fees</th><td>A$45,000</td>`` — table rows.
+    """
+    if not html:
+        return None, None
+    try:
+        from bs4 import BeautifulSoup
+        from bs4.element import NavigableString, Tag
+    except ImportError:  # pragma: no cover - bs4 is a hard dep
+        return None, None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None, None
+
+    for label_tag in soup.find_all(("strong", "b", "dt", "th")):
+        label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+        if not label_raw or not _FEE_LABEL_RE.fullmatch(label_raw):
+            continue
+
+        value_text: str | None = None
+        if label_tag.name == "dt":
+            sibling = label_tag.find_next_sibling("dd")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        elif label_tag.name == "th":
+            sibling = label_tag.find_next_sibling("td")
+            if sibling is not None:
+                value_text = sibling.get_text(" ", strip=True)
+        else:
+            parts: list[str] = []
+            char_count = 0
+            for node in label_tag.next_elements:
+                if isinstance(node, Tag):
+                    if node is label_tag:
+                        continue
+                    if node.name in ("strong", "b", "h1", "h2", "h3",
+                                     "h4", "h5", "h6", "dt", "th",
+                                     "tr"):
+                        break
+                    continue
+                if isinstance(node, NavigableString):
+                    text = str(node).strip()
+                    if not text:
+                        continue
+                    parts.append(text)
+                    char_count += len(text) + 1
+                    if char_count >= _STRONG_VALUE_CHAR_CAP:
+                        break
+            value_text = " ".join(parts)
+
+        if not value_text:
+            continue
+        value_text = value_text.lstrip(":-– ").strip()
+        if not value_text:
+            continue
+        # Salary-context guard: the label says "international tuition"
+        # but if the value cell explicitly mentions salary/wages/income
+        # we're looking at marketing copy ("graduate salary outcomes
+        # for international students"), not a fee figure.
+        if _SALARY_CTX.search(value_text):
+            continue
+        parsed = _classify_fee_value(value_text)
+        if parsed is not None:
+            amount, _ = parsed
+            snippet = (
+                f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "
+                f"{value_text[:80]}"
+            )
+            return (amount, value_text), snippet
+    return None, None
+
 
 def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
     """Yield (amount, currency_token_in_match, surrounding_context)."""
@@ -242,6 +368,41 @@ def _score(amount: int, ctx: str) -> int:
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    # Structural pre-pass FIRST — see _extract_strong_label_value for
+    # the rationale. When the page publishes the international tuition
+    # fee as an unambiguous `<strong>International tuition fees</strong>`
+    # / `<dt>/<dd>` / `<th>/<td>` pair, read the value cell out of the
+    # DOM directly so a flattened-text boundary collision can't bleed
+    # an adjacent paragraph's currency figure (scholarship, deposit,
+    # building cost) into the fee capture.
+    structural, snippet = _extract_strong_label_value(html)
+    if structural is not None:
+        amount, value_ctx = structural
+        currency = _detect_currency(value_ctx, country)
+        fee_term = _normalize_fee_term(value_ctx)
+        method = "fee.structural"
+        rollup = _maybe_compute_full_course(
+            amount, fee_term, compact(html_to_text(html))
+        )
+        if rollup is not None:
+            amount, fee_term = rollup
+            method = "fee.structural+per_unit_rollup"
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": currency,
+                    "fee_term": fee_term,
+                    "fee_year": _extract_year(value_ctx),
+                },
+                confidence=0.85,
+                snippet=snippet,
+                method=method,
+            )
+        ]
+
     text = compact(html_to_text(html))
     if not text:
         return []
