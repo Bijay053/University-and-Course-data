@@ -1,0 +1,67 @@
+Confirmed on my side — origin/main has 6 PRs landed since c970083:
+
+```
+aeca3d4  Allow creating universities without needing to log in       (P0)
+cdc77bb  Improve duration extraction and refine study mode determination  (KBS Bugs 1 + 3)
+380b3cc  Fix 2 failing integration tests in test_create_university_flow.py (P0 tests)
+f611b17  feat(scraper): Torrens T007 staging-gate filters — Bugs A + B + C  (Torrens 3 filters)
+3f1b41d  Fix CSU T007 discovery failures + confirm ASA IELTS sub-band fixes  (CSU adapter)
+bf66c9d  fix(VIT-T007): fix all 5 vocational scrape issues  (VIT follow-ups)
+```
+
+That's an enormous batch — thank you. **NOT pulling to prod tonight.** Sydney is late, that's 6 fixes to verify methodically and I don't want to rush. Will pull + restart + verify tomorrow Australia morning. Prod stays on c970083 overnight, which is the last clean state (ASA + VIT both verified working).
+
+**One ticket missing from the batch: KBS Bug 2 (central admissions cache architecture).**
+
+This is the one I explicitly asked you NOT to quick-fix — the new cross-cutting cache for centralized fees + entry requirements pages, needed for KBS-style and (more importantly) USyd/UNSW/ANU-style university sites. I asked you to send a design proposal before coding.
+
+What's the status?
+- (a) In the queue, haven't started — fine, no urgency
+- (b) Started a design doc, want to send it tomorrow — great, I'll review
+- (c) Decided it's bigger than expected, want to discuss scope first — also fine
+
+No pressure on timing. KBS courses will still be missing fees + IELTS until this lands, but that's not a regression — the 5 unis already in the system don't need it (their fees live on course pages). Bug 2 unblocks Phase 1 scaling to handbook-style unis, but Phase 1 isn't this week.
+
+---
+
+**Tomorrow's verification plan (so you know what I'll be doing):**
+
+1. Pull origin/main → prod, restart `uni-api-py` + `uni-celery`, confirm services healthy
+2. Verify P0: try "+ Create New University" in UI for a fresh uni, confirm it creates and starts a scrape end-to-end
+3. Re-scrape Torrens → expect 157 → ~95-110 staged after the 3 filters apply, confirm the previously-staged junk gets cleaned out
+4. Re-scrape CSU → expect actual courses now, not nav pages
+5. Re-scrape VIT → confirm vocational courses categorize, no more `Iv` / `Iii` casing, durations in years not weeks
+6. Re-scrape KBS → confirm Mode is no longer always Online, durations show compound values
+7. Don't touch ASA (verified clean baseline)
+
+Will report back per uni after each. If anything regresses I'll roll back to c970083 and file a focused regression ticket.
+
+---
+
+**One side observation from the KBS preview run:**
+
+Worker log showed the same KBS scrape running twice back-to-back (both 8m 28s, both staging the same 44 courses). Either the user double-clicked Submit or there's a celery retry / double-claim bug. Low priority, but if you can run this on your preview DB and let me know what it shows, that'd help diagnose:
+
+```sql
+SELECT runtime_job_id, university_id, status, started_at, completed_at
+FROM scrape_runtime_jobs
+WHERE university_id = 10
+ORDER BY started_at DESC LIMIT 10;
+```
+
+If it shows 2 separate runtime_job rows → queue double-fired (frontend bug). If it shows 1 row → worker re-claimed mid-flight (celery bug).
+
+---
+
+**Updated ticket state:**
+
+1. ~~P0 Create New University~~ — SHIPPED, will deploy + verify tomorrow
+2. ~~Torrens 3 filters~~ — SHIPPED, will deploy + verify tomorrow
+3. ~~CSU SPA discovery~~ — SHIPPED, will deploy + verify tomorrow
+4. ~~VIT 5 follow-ups~~ — SHIPPED, will deploy + verify tomorrow
+5. ~~KBS Bug 1 (mode default)~~ — SHIPPED, will deploy + verify tomorrow
+6. ~~KBS Bug 3 (compound duration)~~ — SHIPPED, will deploy + verify tomorrow
+7. **KBS Bug 2 (central admissions cache)** — awaiting design proposal from you
+8. **Worker double-run diagnostic** — awaiting your psql check above
+
+Would have been a hell of a day for me to ship 6 PRs. Solid work on your side. Talk tomorrow.
