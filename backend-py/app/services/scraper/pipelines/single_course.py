@@ -237,6 +237,11 @@ async def extract_course(
                             if v not in (None, "", 0, [])
                         ],
                     )
+            # CSU pages embed all data in JS variables — the visible page
+            # text the AI sees says "This course has no domestic offering"
+            # for every course.  Gemini always returns null for all fields,
+            # so every AI call is pure waste.  Skip the fallback entirely.
+            use_ai_fallback = False
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
 

@@ -1,0 +1,801 @@
+
+[EXTRACT ] [GP-DEBUG] static=1062449B rendered=0B using=static text_len=23025
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - HSIE I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Thi"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6535 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-secondary-hsie (missing: international_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 29/200: Bachelor Education Secondary Mathematics
+[ 29/200] Fetching 29/200: Bachelor Education Secondary Mathematics
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-mathematics — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [EXTRACT] 30/200: Bachelor Education Secondary Pdhpe
+[ 30/200] Fetching 30/200: Bachelor Education Secondary Pdhpe
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-pdhpe — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [EXTRACT] 31/200: Bachelor Education Secondary Science
+[ 31/200] Fetching 31/200: Bachelor Education Secondary Science
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-science — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [EXTRACT] 32/200: Bachelor Education Secondary Industry Entry Program
+[ 32/200] Fetching 32/200: Bachelor Education Secondary Industry Entry Program
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-industry-en — dom=6316.0, dur=2.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-education-secondary-industry-entry-program — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1029889B rendered=0B using=static text_len=23027
+[EXTRACT ] [GP-DEBUG] static=1013888B rendered=0B using=static text_len=23039
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - PDHPE I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Mathematics I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offeri"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000493, in=6535 out=10)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6540 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-secondary-pdhpe (missing: international_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-secondary-mathematics (missing: international_fee, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Education (Secondary) - Math → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 33/200: Bachelor Education Technology Applied Studies
+[ 33/200] Fetching 33/200: Bachelor Education Technology Applied Studies
+[EXTRACT ] [CSU ✓] bachelor-education-technology-applied-st — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [GP-DEBUG] static=1045545B rendered=0B using=static text_len=23031
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000495, in=6537 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-secondary-science (missing: international_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1101485B rendered=0B using=static text_len=23053
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Technology and Applied Studies) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-technolo → 0 field(s) (cost=$0.000495, in=6545 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-technology-applied-studies (missing: international_fee, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1360434B rendered=0B using=static text_len=23057
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) Industry Entry Program I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internation"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000495, in=6547 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-education-secondary-industry-entry-program (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 34/200: Bachelor Educational Studies
+[ 34/200] Fetching 34/200: Bachelor Educational Studies
+[EXTRACT ] [CSU ✓] bachelor-educational-studies — dom=12600.0, int=27920.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-educational-studies — vocational static fallback
+[EXTRACT ] [EXTRACT] 35/200: Bachelor Emergency Management
+[ 35/200] Fetching 35/200: Bachelor Emergency Management
+[EXTRACT ] [CSU ✓] bachelor-emergency-management — dom=10516.0, int=29760.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-emergency-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1818156B rendered=0B using=static text_len=23007
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Educational Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-educational-studie → 0 field(s) (cost=$0.000494, in=6529 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-educational-studies (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 36/200: Bachelor Engineering Honours
+[ 36/200] Fetching 36/200: Bachelor Engineering Honours
+[EXTRACT ] [CSU ✓] bachelor-engineering-honours — dom=9536.0, int=38000.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-engineering-honours — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1036365B rendered=0B using=static text_len=23011
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Engineering (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This cours"
+[EXTRACT ] [GP-DEBUG] raw_response='Found: "1 year full-time equivalent fee". This describes how the fee is calculated.'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-engineering-honour → 0 field(s) (cost=$0.000496, in=6530 out=20)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-engineering-honours (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=966165B rendered=0B using=static text_len=23009
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Emergency Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-emergency-manageme → 0 field(s) (cost=$0.000493, in=6530 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-emergency-management (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 37/200: Bachelor Environmental Science Management
+[ 37/200] Fetching 37/200: Bachelor Environmental Science Management
+[EXTRACT ] [CSU ✓] bachelor-environmental-science-managemen — dom=9536.0, int=35840.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-environmental-science-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1080708B rendered=0B using=static text_len=23041
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Environmental Science and Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offer"
+[EXTRACT ] [GP-DEBUG] raw_response='Result: `duration_value: null`, `duration_unit: null`,'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-environmental-scie → 0 field(s) (cost=$0.000494, in=6541 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-environmental-science-management (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 38/200: Bachelor Equine Science
+[ 38/200] Fetching 38/200: Bachelor Equine Science
+[EXTRACT ] [CSU ✓] bachelor-equine-science — dom=7516.0, int=37600.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-equine-science — vocational static fallback
+[EXTRACT ] [EXTRACT] 39/200: Bachelor Exercise Sport Science
+[ 39/200] Fetching 39/200: Bachelor Exercise Sport Science
+[EXTRACT ] [CSU ✓] bachelor-exercise-sport-science — dom=11284.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-exercise-sport-science — vocational static fallback
+[EXTRACT ] [EXTRACT] 40/200: Bachelor Food Science Nutrition
+[ 40/200] Fetching 40/200: Bachelor Food Science Nutrition
+[EXTRACT ] [CSU ✓] bachelor-food-science-nutrition — dom=11496.0, int=36880.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-food-science-nutrition — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=987138B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Food Science and Nutrition I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-food-science-nutri → 0 field(s) (cost=$0.000494, in=6533 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-food-science-nutrition (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1007822B rendered=0B using=static text_len=23382
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Equine Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-equine-science → 0 field(s) (cost=$0.000500, in=6621 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-equine-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 41/200: Bachelor Geospatial Science
+[ 41/200] Fetching 41/200: Bachelor Geospatial Science
+[EXTRACT ] [CSU ✓] bachelor-geospatial-science — dom=8136.0, int=35600.0, dur=3.0years, intakes=March,July, loc=Albury-Wodonga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-geospatial-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1075341B rendered=0B using=static text_len=23005
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Geospatial Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course i"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-geospatial-science → 0 field(s) (cost=$0.000493, in=6528 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-geospatial-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=995649B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Exercise and Sport Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-exercise-sport-sci → 0 field(s) (cost=$0.000494, in=6533 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-exercise-sport-science (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 42/200: Bachelor Health Science Mental Health
+[ 42/200] Fetching 42/200: Bachelor Health Science Mental Health
+[EXTRACT ] [CSU ✓] bachelor-health-science-mental-health — dom=9536.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-health-science-mental-health — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=940906B rendered=0B using=static text_len=23029
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Health Science (Mental Health) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. T"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-health-science-men → 0 field(s) (cost=$0.000494, in=6537 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-health-science-mental-health (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 43/200: Bachelor Health Medical Science
+[ 43/200] Fetching 43/200: Bachelor Health Medical Science
+[EXTRACT ] [CSU ✓] bachelor-health-medical-science — dom=13456.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-health-medical-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1063436B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Health and Medical Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-health-medical-sci → 0 field(s) (cost=$0.000494, in=6533 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-health-medical-science (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 44/200: Bachelor Horticulture
+[ 44/200] Fetching 44/200: Bachelor Horticulture
+[EXTRACT ] [CSU ✓] bachelor-horticulture — dom=7920.0, int=36320.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-horticulture — vocational static fallback
+[EXTRACT ] [EXTRACT] 45/200: Bachelor Human Services
+[ 45/200] Fetching 45/200: Bachelor Human Services
+[EXTRACT ] [CSU ✓] bachelor-human-services — dom=11496.0, int=27920.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-human-services — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1115145B rendered=0B using=static text_len=22997
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Human Services I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='Entry score" - the value after Duration is missing in the provided snippet ("Duration Entry score View entry requirements'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-human-services → 0 field(s) (cost=$0.000498, in=6525 out=30)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-human-services (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 46/200: Bachelor Information Studies
+[ 46/200] Fetching 46/200: Bachelor Information Studies
+[EXTRACT ] [CSU ✓] bachelor-information-studies — dom=15416.0, int=27040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-information-studies — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-horticulture → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-horticulture (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1066620B rendered=0B using=static text_len=23053
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Information Studies (with specialisations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international"
+[EXTRACT ] [GP-DEBUG] raw_response='time study load at Charles Sturt University is 64 points over two sessions. The points'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-information-studie → 0 field(s) (cost=$0.000497, in=6540 out=21)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-information-studies (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 47/200: Bachelor Information Technology
+[ 47/200] Fetching 47/200: Bachelor Information Technology
+[EXTRACT ] [CSU ✓] bachelor-information-technology — dom=10516.0, int=33600.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-information-technology — vocational static fallback
+[EXTRACT ] [EXTRACT] 48/200: Bachelor Islamic Studies
+[ 48/200] Fetching 48/200: Bachelor Islamic Studies
+[EXTRACT ] [CSU ✓] bachelor-islamic-studies — dom=17376.0, int=24560.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-islamic-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1038786B rendered=0B using=static text_len=23013
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Information Technology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This cour"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-information-techno → 0 field(s) (cost=$0.000494, in=6531 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-information-technology (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Horticulture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 49/200: Bachelor Islamic Studies Honours
+[ 49/200] Fetching 49/200: Bachelor Islamic Studies Honours
+[EXTRACT ] [CSU ✓] bachelor-islamic-studies-honours — dom=17376.0, int=24560.0, dur=1.5years, intakes=March,July, loc=United Theological College
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-islamic-studies-honours — vocational static fallback
+[EXTRACT ] [EXTRACT] 50/200: Bachelor Laws
+[ 50/200] Fetching 50/200: Bachelor Laws
+[EXTRACT ] [CSU ✓] bachelor-laws — dom=17376.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-laws — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=997107B rendered=0B using=static text_len=22999
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Islamic Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is p"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-islamic-studies → 0 field(s) (cost=$0.000493, in=6526 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-islamic-studies (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=945321B rendered=0B using=static text_len=23019
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Islamic Studies (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This c"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-islamic-studies-ho → 0 field(s) (cost=$0.000494, in=6533 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-islamic-studies-honours (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 51/200: Bachelor Laws Bachelor Criminal Justice
+[ 51/200] Fetching 51/200: Bachelor Laws Bachelor Criminal Justice
+[EXTRACT ] [CSU ✓] bachelor-laws-bachelor-criminal-justice — dom=16992.0, dur=5.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-laws-bachelor-criminal-justice — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=982654B rendered=0B using=static text_len=22977
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Laws I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of an a"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-laws → 0 field(s) (cost=$0.000493, in=6518 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-laws (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-islamic-studies: fee_currency
+[EXTRACT ] [EXTRACT] 52/200: Bachelor Medical Laboratory Science Pathology
+[ 52/200] Fetching 52/200: Bachelor Medical Laboratory Science Pathology
+[EXTRACT ] [CSU ✓] bachelor-medical-laboratory-science-path — dom=11410.0, int=37120.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-medical-laboratory-science-pathology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-islamic-studies-honours: fee_currency
+[EXTRACT ] [EXTRACT] 53/200: Bachelor Medical Radiation Science
+[ 53/200] Fetching 53/200: Bachelor Medical Radiation Science
+[EXTRACT ] [CSU ✓] bachelor-medical-radiation-science — dom=11496.0, int=38000.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-medical-radiation-science — vocational static fallback
+[EXTRACT ] [EXTRACT] 54/200: Bachelor Nuclear Science Safety
+[ 54/200] Fetching 54/200: Bachelor Nuclear Science Safety
+[EXTRACT ] [CSU ✓] bachelor-nuclear-science-safety — dom=11496.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-nuclear-science-safety — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1028382B rendered=0B using=static text_len=23039
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Laws / Bachelor of Criminal Justice I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offeri"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-laws-bachelor-crim → 0 field(s) (cost=$0.000495, in=6540 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-laws-bachelor-criminal-justice (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=986576B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Nuclear Science and Safety I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-nuclear-science-sa → 0 field(s) (cost=$0.000494, in=6533 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-nuclear-science-safety (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1013482B rendered=0B using=static text_len=23452
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Medical Laboratory Science (Pathology) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international off"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-medical-laboratory → 0 field(s) (cost=$0.000503, in=6644 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-medical-laboratory-science-pathology (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1002001B rendered=0B using=static text_len=23487
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Medical Radiation Science (with specialisations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no interna"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-medical-radiation- → 0 field(s) (cost=$0.000503, in=6650 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-medical-radiation-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Laws / Bachelor of Criminal → Law & Legal Studies / Criminal Justice
+[EXTRACT ] [EXTRACT] 55/200: Bachelor Nursing
+[ 55/200] Fetching 55/200: Bachelor Nursing
+[EXTRACT ] [CSU ✓] bachelor-nursing — dom=6316.0, int=34640.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-nursing — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1062739B rendered=0B using=static text_len=23361
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Nursing I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of a"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-nursing → 0 field(s) (cost=$0.000500, in=6614 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-nursing (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 56/200: Bachelor Occupational Therapy
+[ 56/200] Fetching 56/200: Bachelor Occupational Therapy
+[EXTRACT ] [CSU ✓] bachelor-occupational-therapy — dom=10516.0, int=36480.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-occupational-therapy — vocational static fallback
+[INFO ] [CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 57/200: Bachelor Oral Health Therapy Hygiene
+[ 57/200] Fetching 57/200: Bachelor Oral Health Therapy Hygiene
+[EXTRACT ] [CSU ✓] bachelor-oral-health-therapy-hygiene — dom=14496.0, int=44560.0, dur=3.0years, intakes=March,July,November, loc=Holmesglen, Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-oral-health-therapy-hygiene — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1022864B rendered=0B using=static text_len=23400
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Occupational Therapy I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[EXTRACT ] [GP-DEBUG] raw_response='A". This refers to the fee calculation basis, not the course length.\n * Snippet'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-occupational-thera → 0 field(s) (cost=$0.000504, in=6627 out=22)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-occupational-therapy (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 58/200: Bachelor Paramedicine
+[ 58/200] Fetching 58/200: Bachelor Paramedicine
+[EXTRACT ] [CSU ✓] bachelor-paramedicine — dom=9536.0, int=37120.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-paramedicine — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=986784B rendered=0B using=static text_len=23433
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Oral Health (Therapy and Hygiene) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-oral-health-therap → 0 field(s) (cost=$0.000502, in=6637 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-oral-health-therapy-hygiene (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 59/200: Bachelor Pharmacy Honours
+[ 59/200] Fetching 59/200: Bachelor Pharmacy Honours
+[EXTRACT ] [CSU ✓] bachelor-pharmacy-honours — dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-pharmacy-honours — vocational static fallback
+[EXTRACT ] [EXTRACT] 60/200: Bachelor Physiotherapy
+[ 60/200] Fetching 60/200: Bachelor Physiotherapy
+[EXTRACT ] [CSU ✓] bachelor-physiotherapy — dom=10516.0, int=40400.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-physiotherapy — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-paramedicine → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-paramedicine (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1016623B rendered=0B using=static text_len=23379
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Physiotherapy I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is par"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-physiotherapy → 0 field(s) (cost=$0.000500, in=6620 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-physiotherapy (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-pharmacy-honours → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-pharmacy-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-paramedicine: fee_currency
+[EXTRACT ] [EXTRACT] 61/200: Bachelor Podiatric Medicine
+[ 61/200] Fetching 61/200: Bachelor Podiatric Medicine
+[EXTRACT ] [CSU ✓] bachelor-podiatric-medicine — dom=10516.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-podiatric-medicine — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1009013B rendered=0B using=static text_len=23802
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Podiatric Medicine I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course i"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-podiatric-medicine → 0 field(s) (cost=$0.000508, in=6727 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-podiatric-medicine (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Physiotherapy → Medicine & Health / Physiotherapy
+[EXTRACT ] [EXTRACT] 62/200: Bachelor Policing
+[ 62/200] Fetching 62/200: Bachelor Policing
+[EXTRACT ] [CSU ✓] bachelor-policing — dom=17376.0, int=25600.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-policing — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-occupational-therapy: fee_currency
+[EXTRACT ] [EXTRACT] 63/200: Bachelor Policing Investigations
+[ 63/200] Fetching 63/200: Bachelor Policing Investigations
+[EXTRACT ] [CSU ✓] bachelor-policing-investigations — dom=17376.0, int=25600.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-policing-investigations — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=952077B rendered=0B using=static text_len=23019
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Policing (Investigations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This c"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-investiga → 0 field(s) (cost=$0.000494, in=6533 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-policing-investigations (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/bachelor-podiatric-medicine: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 64/200: Bachelor Policing Public Safety
+[ 64/200] Fetching 64/200: Bachelor Policing Public Safety
+[EXTRACT ] [CSU ✓] bachelor-policing-public-safety — dom=16396.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-policing-public-safety — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=976238B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Policing and Public Safety I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-public-sa → 0 field(s) (cost=$0.000494, in=6533 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-policing-public-safety (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-policing (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 65/200: Bachelor Psychology
+[ 65/200] Fetching 65/200: Bachelor Psychology
+[EXTRACT ] [CSU ✓] bachelor-psychology — dom=10516.0, int=30400.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-psychology — vocational static fallback
+[EXTRACT ] [EXTRACT] 66/200: Bachelor Science
+[ 66/200] Fetching 66/200: Bachelor Science
+[EXTRACT ] [CSU ✓] bachelor-science — dom=9916.0, int=36480.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1043110B rendered=0B using=static text_len=22989
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Psychology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part o"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-psychology → 0 field(s) (cost=$0.000493, in=6522 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-psychology (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=984988B rendered=0B using=static text_len=22983
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of a"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science → 0 field(s) (cost=$0.000493, in=6520 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 67/200: Bachelor Science Honours
+[ 67/200] Fetching 67/200: Bachelor Science Honours
+[EXTRACT ] [CSU ✓] bachelor-science-honours — dom=9536.0, int=36480.0, dur=1.0years, intakes=March, loc=Albury-Wodonga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-science-honours — vocational static fallback
+[EXTRACT ] [EXTRACT] 68/200: Bachelor Social Science Psychology
+[ 68/200] Fetching 68/200: Bachelor Social Science Psychology
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology — dom=13456.0, int=31040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-science-psychology — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1012433B rendered=0B using=static text_len=23023
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Social Science (Psychology) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → 0 field(s) (cost=$0.000495, in=6534 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-science-psychology (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=945963B rendered=0B using=static text_len=23003
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Science (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science-honours → 0 field(s) (cost=$0.000493, in=6527 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-science-honours (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 69/200: Bachelor Social Science Psychology Honours
+[ 69/200] Fetching 69/200: Bachelor Social Science Psychology Honours
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology-honou — dom=9536.0, int=30400.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-science-psychology-honours — vocational static fallback
+[INFO ] [CATEGORY det] Bachelor of Pharmacy (Honours) → Medicine & Health / Pharmacy
+[EXTRACT ] [EXTRACT] 70/200: Bachelor Social Work
+[ 70/200] Fetching 70/200: Bachelor Social Work
+[EXTRACT ] [GP-DEBUG] static=937915B rendered=0B using=static text_len=23395
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Social Science (Psychology) (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offe"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → 0 field(s) (cost=$0.000501, in=6629 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-science-psychology-honours (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [CSU ✓] bachelor-social-work — dom=11496.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-work — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1088173B rendered=0B using=static text_len=22991
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Social Work I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-work → 0 field(s) (cost=$0.000493, in=6523 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-work (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 71/200: Bachelor Theology
+[ 71/200] Fetching 71/200: Bachelor Theology
+[EXTRACT ] [CSU ✓] bachelor-theology — dom=17376.0, int=24560.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-theology — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1079074B rendered=0B using=static text_len=22985
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Theology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology → 0 field(s) (cost=$0.000493, in=6521 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-theology (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-science-honours: fee_currency
+[EXTRACT ] [EXTRACT] 72/200: Bachelor Theology Honours
+[ 72/200] Fetching 72/200: Bachelor Theology Honours
+[EXTRACT ] [CSU ✓] bachelor-theology-honours — dom=17376.0, int=24560.0, dur=1.0years, intakes=March,July, loc=United Theological College, Ca
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-theology-honours — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/bachelor-social-science-psychology-honours: duration_value, duration_unit
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[ 73/200] Fetching 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[EXTRACT ] [CSU ✓] bachelor-veterinary-biology-bachelor-vet — dom=11316.0, int=72080.0, dur=6.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-veterinary-biology-bachelor-veterinary-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-theology: fee_currency
+[EXTRACT ] [EXTRACT] 74/200: Bachelor Veterinary Technology
+[ 74/200] Fetching 74/200: Bachelor Veterinary Technology
+[EXTRACT ] [CSU ✓] bachelor-veterinary-technology — dom=9724.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-veterinary-technology — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1058502B rendered=0B using=static text_len=24220
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Veterinary Biology/ Bachelor of Veterinary Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no inter"
+[EXTRACT ] [GP-DEBUG] raw_response='Indicative fees View costs". The snippet mentions "Check the course duration... to determine your study'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-biology → 0 field(s) (cost=$0.000520, in=6839 out=25)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-veterinary-biology-bachelor-veterinary-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology-honours → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-theology-honours (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 75/200: Bachelor Viticulture
+[ 75/200] Fetching 75/200: Bachelor Viticulture
+[EXTRACT ] [CSU ✓] bachelor-viticulture — dom=7136.0, int=37600.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-viticulture — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1030536B rendered=0B using=static text_len=23403
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Veterinary Technology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This cours"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-technol → 0 field(s) (cost=$0.000500, in=6628 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-veterinary-technology (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 76/200: Bachelor Wine Science
+[ 76/200] Fetching 76/200: Bachelor Wine Science
+[EXTRACT ] [CSU ✓] bachelor-wine-science — dom=9308.0, int=37600.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-wine-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 3 field(s) on https://study.csu.edu.au/courses/bachelor-theology-honours: fee_currency, duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 77/200: Diploma Agricultural Studies
+[ 77/200] Fetching 77/200: Diploma Agricultural Studies
+[EXTRACT ] [CSU ✓] diploma-agricultural-studies — dom=10076.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-agricultural-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=988829B rendered=0B using=static text_len=22993
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Wine Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-wine-science → 0 field(s) (cost=$0.000493, in=6524 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-wine-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/bachelor-wine-science: fee_currency
+[EXTRACT ] [EXTRACT] 78/200: Diploma Environmental Studies
+[ 78/200] Fetching 78/200: Diploma Environmental Studies
+[EXTRACT ] [CSU ✓] diploma-environmental-studies — dom=10516.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-environmental-studies — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-viticulture → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-viticulture (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 79/200: Diploma Exercise Studies
+[ 79/200] Fetching 79/200: Diploma Exercise Studies
+[EXTRACT ] [GP-DEBUG] static=928758B rendered=0B using=static text_len=23009
+[EXTRACT ] [GP-DEBUG] text[:500]="Diploma of Environmental Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-environmental-studi → 0 field(s) (cost=$0.000493, in=6530 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-environmental-studies (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [CSU ✓] diploma-exercise-studies — dom=9536.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-exercise-studies — vocational static fallback
+[EXTRACT ] [EXTRACT] 80/200: Diploma Health Science Mental Health
+[ 80/200] Fetching 80/200: Diploma Health Science Mental Health
+[EXTRACT ] [CSU ✓] diploma-health-science-mental-health — dom=9536.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-health-science-mental-health — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=963937B rendered=0B using=static text_len=23007
+[EXTRACT ] [GP-DEBUG] text[:500]="Diploma of Agricultural Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-agricultural-studie → 0 field(s) (cost=$0.000494, in=6529 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-agricultural-studies (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=961839B rendered=0B using=static text_len=22999
+[EXTRACT ] [GP-DEBUG] text[:500]="Diploma of Exercise Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is p"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-exercise-studies → 0 field(s) (cost=$0.000492, in=6526 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-exercise-studies (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=922242B rendered=0B using=static text_len=23027
+[EXTRACT ] [GP-DEBUG] text[:500]="Diploma of Health Science (Mental Health) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-health-science-ment → 0 field(s) (cost=$0.000494, in=6536 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-health-science-mental-health (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 81/200: Diploma Psychological Studies
+[ 81/200] Fetching 81/200: Diploma Psychological Studies
+[EXTRACT ] [CSU ✓] diploma-psychological-studies — dom=17376.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-psychological-studies — vocational static fallback
+[EXTRACT ] [EXTRACT] 82/200: Doctor Business Administration
+[ 82/200] Fetching 82/200: Doctor Business Administration
+[EXTRACT ] [CSU ✓] doctor-business-administration — dom=33680.0, int=34640.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-business-administration — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=936124B rendered=0B using=static text_len=23009
+[EXTRACT ] [EXTRACT] 83/200: Doctor Philosophy Arts Education
+[EXTRACT ] [GP-DEBUG] text[:500]="Diploma of Psychological Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[ 83/200] Fetching 83/200: Doctor Philosophy Arts Education
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-psychological-studi → 0 field(s) (cost=$0.000494, in=6530 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-psychological-studies (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [CSU ✓] doctor-philosophy-arts-education — dom=29120.0, int=33120.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-arts-education — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=999207B rendered=0B using=static text_len=23027
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Philosophy (Arts and Education) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-arts-educ → 0 field(s) (cost=$0.000494, in=6535 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-arts-education (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=937827B rendered=0B using=static text_len=23011
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Business Administration I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This cours"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-business-administrat → 0 field(s) (cost=$0.000493, in=6530 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-business-administration (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/diploma-psychological-studies: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[ 84/200] Fetching 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[EXTRACT ] [CSU ✓] doctor-philosophy-business-justice-behav — dom=35920.0, int=40320.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-business-justice-behavioural-sciences — vocational static fallback
+[EXTRACT ] [EXTRACT] 85/200: Doctor Philosophy Science Agriculture
+[ 85/200] Fetching 85/200: Doctor Philosophy Science Agriculture
+[EXTRACT ] [CSU ✓] doctor-philosophy-science-agriculture — dom=36880.0, int=39840.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-science-agriculture — vocational static fallback
+[EXTRACT ] [EXTRACT] 86/200: Doctor Public Safety
+[ 86/200] Fetching 86/200: Doctor Public Safety
+[EXTRACT ] [CSU ✓] doctor-public-safety — dom=33680.0, int=33680.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-public-safety — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=999456B rendered=0B using=static text_len=23037
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Philosophy (Science and Agriculture) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offerin"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-science-a → 0 field(s) (cost=$0.000494, in=6539 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-science-agriculture (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1041049B rendered=0B using=static text_len=23075
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Philosophy (Business, Justice and Behavioural Sciences) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no in"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-business- → 0 field(s) (cost=$0.000496, in=6553 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-business-justice-behavioural-sciences (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=938352B rendered=0B using=static text_len=22991
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Public Safety I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-public-safety → 0 field(s) (cost=$0.000494, in=6523 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-public-safety (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Doctor of Philosophy (Science and Agricu → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 87/200: Doctor Social Work
+[ 87/200] Fetching 87/200: Doctor Social Work
+[EXTRACT ] [CSU ✓] doctor-social-work — dom=29120.0, int=33120.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-social-work — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=938502B rendered=0B using=static text_len=22987
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Social Work I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-social-work → 0 field(s) (cost=$0.000493, in=6521 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-social-work (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 88/200: Doctor Veterinary Studies
+[ 88/200] Fetching 88/200: Doctor Veterinary Studies
+[EXTRACT ] [CSU ✓] doctor-veterinary-studies — dom=12800.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-veterinary-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=940732B rendered=0B using=static text_len=23192
+[EXTRACT ] [GP-DEBUG] text[:500]="Doctor of Veterinary Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-veterinary-studies → 0 field(s) (cost=$0.000497, in=6574 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-veterinary-studies (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI fallback exceeded 120s on https://study.csu.edu.au/courses/diploma-agricultural-studies — moving on without AI fill
+[EXTRACT ] [EXTRACT] 89/200: Executive Masters International Police Leadership
+[ 89/200] Fetching 89/200: Executive Masters International Police Leadership
+[EXTRACT ] [CSU ✓] executive-masters-international-police-l — dur=0.75years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/executive-masters-international-police-leadership — vocational static fallback
+[INFO ] [CATEGORY det] Doctor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 90/200: Graduate Certificate Adult Vocational Education
+[ 90/200] Fetching 90/200: Graduate Certificate Adult Vocational Education
+[EXTRACT ] [CSU ✓] graduate-certificate-adult-vocational-ed — dom=2368.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-adult-vocational-education — vocational static fallback
+[EXTRACT ] [EXTRACT] 91/200: Graduate Certificate Ageing Health
+[ 91/200] Fetching 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [CSU ✓] graduate-certificate-ageing-health — dom=12920.0, int=13960.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ageing-health — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=946865B rendered=0B using=static text_len=23053
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Adult and Vocational Education I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-adult- → 0 field(s) (cost=$0.000495, in=6545 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-adult-vocational-education (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=928578B rendered=0B using=static text_len=23049
+[EXTRACT ] [GP-DEBUG] text[:500]="Executive Masters in International Police Leadership I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international o"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/executive-masters-internati → 0 field(s) (cost=$0.000495, in=6545 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/executive-masters-international-police-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 92/200: Graduate Certificate Agricultural Business Management
+[ 92/200] Fetching 92/200: Graduate Certificate Agricultural Business Management
+[EXTRACT ] [CSU ✓] graduate-certificate-agricultural-busine — dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agricultural-business-management — vocational static fallback
+[EXTRACT ] [EXTRACT] 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [GP-DEBUG] static=934709B rendered=0B using=static text_len=23027
+[ 93/200] Fetching 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Ageing and Health I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ageing → 0 field(s) (cost=$0.000494, in=6535 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-ageing-health (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [CSU ✓] graduate-certificate-agriculture — dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agriculture — vocational static fallback
+[EXTRACT ] [EXTRACT] 94/200: Graduate Certificate Applied Artificial Intelligence
+[ 94/200] Fetching 94/200: Graduate Certificate Applied Artificial Intelligence
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-artificial- — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-artificial-intelligence — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=967005B rendered=0B using=static text_len=23057
+[EXTRACT ] [GP-DEBUG] static=954898B rendered=0B using=static text_len=23015
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Agricultural Business Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internation"
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Agriculture I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This cou"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → 0 field(s) (cost=$0.000495, in=6548 out=12)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → 0 field(s) (cost=$0.000494, in=6532 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-agricultural-business-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 95/200: Graduate Certificate Applied Business
+[ 95/200] Fetching 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-business — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-business — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 96/200: Graduate Certificate Applied Data Science
+[ 96/200] Fetching 96/200: Graduate Certificate Applied Data Science
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-data-scienc — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-data-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=937705B rendered=0B using=static text_len=23055
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Applied Artificial Intelligence I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internationa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → 0 field(s) (cost=$0.000496, in=6547 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-artificial-intelligence (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Agricultural Bus → Business & Management / Management
+[EXTRACT ] [EXTRACT] 97/200: Graduate Certificate Audiovisual Archiving
+[ 97/200] Fetching 97/200: Graduate Certificate Audiovisual Archiving
+[EXTRACT ] [CSU ✓] graduate-certificate-audiovisual-archivi — dom=12920.0, int=13520.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-audiovisual-archiving — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=939453B rendered=0B using=static text_len=23033
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Applied Data Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering."
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → 0 field(s) (cost=$0.000494, in=6539 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-data-science (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=927337B rendered=0B using=static text_len=23035
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Audiovisual Archiving I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-audiov → 0 field(s) (cost=$0.000494, in=6539 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-audiovisual-archiving (missing: ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Artifici → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 98/200: Graduate Certificate Business Administration
+[ 98/200] Fetching 98/200: Graduate Certificate Business Administration
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-business (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=936767B rendered=0B using=static text_len=23039
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Business Administration I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offeri"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → 0 field(s) (cost=$0.000495, in=6541 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-administration (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/graduate-certificate-applied-data-science: fee_currency
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Data Sci → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 99/200: Graduate Certificate Business Administration Computing
+[ 99/200] Fetching 99/200: Graduate Certificate Business Administration Computing
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration-computing — vocational static fallback
+[EXTRACT ] [EXTRACT] 100/200: Graduate Certificate Business Data Analytics
+[ 100/200] Fetching 100/200: Graduate Certificate Business Data Analytics
+[EXTRACT ] [CSU ✓] graduate-certificate-business-data-analy — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-data-analytics — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=929060B rendered=0B using=static text_len=23039
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Business Data Analytics I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offeri"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → 0 field(s) (cost=$0.000495, in=6541 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-data-analytics (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=1001614B rendered=0B using=static text_len=23063
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Business Administration (Computing) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internat"
+[EXTRACT ] [GP-DEBUG] raw_response='fee". This is not the duration.\n * Checking: "Duration Entry score View entry requirements'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → 0 field(s) (cost=$0.000498, in=6549 out=24)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-administration-computing (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/graduate-certificate-applied-business: fee_currency
+[EXTRACT ] [EXTRACT] 101/200: Graduate Certificate Case Management Coordinated Care
+[ 101/200] Fetching 101/200: Graduate Certificate Case Management Coordinated Care
+[EXTRACT ] [CSU ✓] graduate-certificate-case-management-coo — dom=7708.0, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-case-management-coordinated-care — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=937651B rendered=0B using=static text_len=23065
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Case Management and Coordinated Care I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no interna"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-case-m → 0 field(s) (cost=$0.000496, in=6550 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-case-management-coordinated-care (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 102/200: Graduate Certificate Classical Arabic
+[ 102/200] Fetching 102/200: Graduate Certificate Classical Arabic
+[EXTRACT ] [CSU ✓] graduate-certificate-classical-arabic — dom=9680.0, int=12280.0, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-classical-arabic — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Business Data An → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 103/200: Graduate Certificate Cloud Computing Virtualisation
+[ 103/200] Fetching 103/200: Graduate Certificate Cloud Computing Virtualisation
+[EXTRACT ] [CSU ✓] graduate-certificate-cloud-computing-vir — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cloud-computing-virtualisation — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=935335B rendered=0B using=static text_len=23025
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Classical Arabic I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Thi"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-classi → 0 field(s) (cost=$0.000494, in=6536 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-classical-arabic (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=963350B rendered=0B using=static text_len=23061
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Cloud Computing and Virtualisation I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internati"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cloud- → 0 field(s) (cost=$0.000495, in=6548 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-cloud-computing-virtualisation (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 104/200: Graduate Certificate Communication
+[ 104/200] Fetching 104/200: Graduate Certificate Communication
+[EXTRACT ] [CSU ✓] graduate-certificate-communication — dom=8688.0, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-communication — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/graduate-certificate-business-administration: fee_currency
+[EXTRACT ] [EXTRACT] 105/200: Graduate Certificate Computing Career Transition
+[ 105/200] Fetching 105/200: Graduate Certificate Computing Career Transition
+[EXTRACT ] [CSU ✓] graduate-certificate-computing-career-tr — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-computing-career-transition — vocational static fallback
+[EXTRACT ] [EXTRACT] 106/200: Graduate Certificate Paramedicine
+[ 106/200] Fetching 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [CSU ✓] graduate-certificate-paramedicine — dom=14960.0, int=19240.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-paramedicine — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=942669B rendered=0B using=static text_len=23019
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Communication I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This c"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-commun → 0 field(s) (cost=$0.000494, in=6533 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-communication (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=931062B rendered=0B using=static text_len=23045
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Critical Care Paramedicine I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international off"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-parame → 0 field(s) (cost=$0.000494, in=6540 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-paramedicine (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 107/200: Graduate Certificate Customs Administration
+[ 107/200] Fetching 107/200: Graduate Certificate Customs Administration
+[EXTRACT ] [CSU ✓] graduate-certificate-customs-administrat — dom=10280.0, int=11760.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-customs-administration — vocational static fallback
+[EXTRACT ] [EXTRACT] 108/200: Graduate Certificate Cyber Security
+[ 108/200] Fetching 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [CSU ✓] graduate-certificate-cyber-security — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cyber-security — vocational static fallback
+[EXTRACT ] [EXTRACT] 109/200: Graduate Certificate Data Management
+[ 109/200] Fetching 109/200: Graduate Certificate Data Management
+[EXTRACT ] [CSU ✓] graduate-certificate-data-management — dur=0.5years, intakes=March, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-data-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=931200B rendered=0B using=static text_len=23023
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Data Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-data-m → 0 field(s) (cost=$0.000495, in=6535 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-data-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-comput → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-computing-career-transition (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=929232B rendered=0B using=static text_len=23037
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Customs Administration I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offerin"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-custom → 0 field(s) (cost=$0.000495, in=6540 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-customs-administration (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=967148B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Cyber Security I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cyber- → 0 field(s) (cost=$0.000494, in=6534 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-cyber-security (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 110/200: Graduate Certificate Digital Archiving
+[ 110/200] Fetching 110/200: Graduate Certificate Digital Archiving
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-archiving — dom=12920.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-archiving — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/graduate-certificate-customs-administration: fee_currency
+[EXTRACT ] [EXTRACT] 111/200: Graduate Certificate Digital Communication
+[ 111/200] Fetching 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-communicati — dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-communication — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 112/200: Graduate Certificate Digital Health
+[ 112/200] Fetching 112/200: Graduate Certificate Digital Health
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-health — dom=13960.0, int=14520.0, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-health — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=942459B rendered=0B using=static text_len=23027
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Digital Archiving I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → 0 field(s) (cost=$0.000494, in=6536 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-archiving (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 113/200: Graduate Certificate Education
+[ 113/200] Fetching 113/200: Graduate Certificate Education
+[EXTRACT ] [CSU ✓] graduate-certificate-education — dom=3948.0, int=13960.0, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-education — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=941216B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Digital Health I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → 0 field(s) (cost=$0.000494, in=6534 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-health (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=943376B rendered=0B using=static text_len=23035
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Digital Communication I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → 0 field(s) (cost=$0.000495, in=6539 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 114/200: Graduate Certificate Environmental Management
+[ 114/200] Fetching 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [CSU ✓] graduate-certificate-environmental-manag — dom=18160.0, int=18440.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-environmental-management — vocational static fallback
+[EXTRACT ] [EXTRACT] 115/200: Graduate Certificate In Fish Conservation And Management
+[ 115/200] Fetching 115/200: Graduate Certificate In Fish Conservation And Management
+[EXTRACT ] [CSU ✓] graduate-certificate-in-fish-conservatio — int=17920.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-in-fish-conservation-and-management — vocational static fallback
+[EXTRACT ] [EXTRACT] 116/200: Graduate Certificate Financial Crime
+[ 116/200] Fetching 116/200: Graduate Certificate Financial Crime
+[EXTRACT ] [CSU ✓] graduate-certificate-financial-crime — dom=13200.0, int=14000.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-financial-crime — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-educat → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-education (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 117/200: Graduate Certificate Gis Remote Sensing
+[ 117/200] Fetching 117/200: Graduate Certificate Gis Remote Sensing
+[EXTRACT ] [CSU ✓] graduate-certificate-gis-remote-sensing — dom=17440.0, int=18440.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-gis-remote-sensing — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=935028B rendered=0B using=static text_len=23023
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Financial Crime I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-financ → 0 field(s) (cost=$0.000495, in=6535 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-financial-crime (missing: ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=962273B rendered=0B using=static text_len=23041
+[EXTRACT ] [GP-DEBUG] text[:500]="Graduate Certificate in Environmental Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offer"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-enviro → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[EXTRACT ] 
