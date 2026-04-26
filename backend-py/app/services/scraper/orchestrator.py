@@ -640,7 +640,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # the main session is doing. We keep the in-memory mutation
         # below for parity with the historical UI / log consumers, but
         # the DB write is no longer this loop's responsibility.
+        _total_gemini_cost_usd: float = 0.0
+        _total_gemini_in_tokens: int = 0
+        _total_gemini_out_tokens: int = 0
+
         for r in results:
+            # Accumulate Gemini PRIMARY cost (zero when Gemini was skipped/unavailable)
+            if isinstance(r, dict):
+                _total_gemini_cost_usd += r.get("gemini_primary_cost_usd", 0.0)
+
             # Stop check between rows: lets the user interrupt mid-batch.
             # Anything left in ``results`` at this point came back from the
             # gather phase BEFORE the stop click — we drop it on the floor
@@ -755,6 +763,31 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         course_count = summary.get("staged", 0) or summary.get("discovered", 0) or 1
         avg_per_course = elapsed_sec / max(1, course_count)
         mins, secs = divmod(elapsed_sec, 60)
+        # Gemini cost summary — emitted before TIMING so it's visible in the
+        # live log right above the timing row.
+        if _total_gemini_cost_usd > 0:
+            await emit(
+                "status",
+                f"[GEMINI] Total cost: ${_total_gemini_cost_usd:.4f} USD "
+                f"across {course_count} course(s) "
+                f"(~${_total_gemini_cost_usd / max(1, course_count):.5f}/course)",
+                phase="complete",
+                kind="gemini_cost_summary",
+                total_cost_usd=_total_gemini_cost_usd,
+                course_count=course_count,
+                level="info",
+            )
+        else:
+            await emit(
+                "status",
+                "[GEMINI] No Gemini PRIMARY calls billed this scrape "
+                "(key unavailable or budget exhausted)",
+                phase="complete",
+                kind="gemini_cost_summary",
+                total_cost_usd=0.0,
+                level="info",
+            )
+
         await emit(
             "status",
             # B9 / parity with B13 fix: do NOT prefix the message with

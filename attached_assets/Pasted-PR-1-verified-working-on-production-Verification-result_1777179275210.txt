@@ -1,0 +1,93 @@
+PR 1 verified working on production. ✅
+
+## Verification results
+
+**First KBS scrape (cache MISS):**
+- Fetched + parsed both central pages
+- Cached for 30 days (expires 2026-05-26)
+- 2 rows written to `central_page_cache` for KBS (id=8)
+
+**Second KBS scrape (cache HIT):**
+```
+[CACHE] fee_schedule hit → 22 record(s) (cached, skipping fetch of https://www.kbs.edu.au/admissions/fees/international-fees)
+[CACHE] english_requirements hit → cambridge_overall=169.0, duolingo_overall=90.0, ielts=6.0, pte=50, toefl=72 (cached, skipping fetch of https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements)
+```
+
+**Data integrity preserved:**
+- KBS by-level English: Bachelor's/Diploma/Grad Cert all `{6}/{50}/{72}`, Master's `{6, 6.5}/{50, 58}/{72, 79}`
+- Two Specialisations: 0 rows staged (still rejected)
+- MBA prefixes preserved
+- Scrape time: 5m 16s (down from 5m 52s pre-cache)
+
+**Cache table state:**
+```
+university_id | page_type            | expires_at                    
+            8 | english_requirements | 2026-05-26 04:41:28+00
+            8 | fee_schedule         | 2026-05-26 04:41:27+00
+```
+
+No regressions. Ship it.
+
+## Request: proceed with PR 2 — Gemini primary for hard fields
+
+As scoped in the original Ticket 2:
+
+**Replace existing AI-fallback with Gemini-first extraction. Build per-field prompts. Keep existing regex/CSS as fallback if Gemini errors.**
+
+**Hard fields to migrate to Gemini Flash as PRIMARY:**
+- `international_fee`, `domestic_fee`, `fee_term`
+- `duration_value`, `duration_unit`, `duration_text`
+- `ielts_overall`, `pte_overall`, `toefl_overall`, `cambridge_overall`, `duolingo_overall`
+- `sub_category`, `category`
+- `mode`
+- `intake_text`
+
+**Easy fields stay regex/CSS:**
+- `course_name`, `URL`, `location`, `discovery`, `degree_level`
+
+## Validation criteria for PR 2
+
+After PR 2 merges, an ASA + KBS scrape should produce:
+
+**KBS (uses cache from PR 1):**
+- Bachelor's: IELTS 6.0, PTE 50, TOEFL 72, CAE 169
+- Master's: IELTS 6.0 (or 6.5 from vision OCR), PTE 50/58, TOEFL 72/79
+- All MBA prefixes preserved
+- Two Specialisations rejected
+- Fees populated for all 29 staged courses
+
+**ASA (uses cache from PR 1):**
+- Bachelor's: IELTS 6.0, PTE 50, TOEFL 60, CAE 169
+- Master's: IELTS 6.5, PTE 58, TOEFL 85, CAE 169 (level-keyed from cached central page)
+- Fees populated for all 9 courses
+
+**New requirements for PR 2:**
+- Per-scrape cost log line at end of `[COMPLETE]`: total Gemini tokens + estimated USD
+- Per-scrape cost <$0.10 for KBS or ASA
+- If Gemini fails on a field, fall back to regex/CSS (don't crash)
+- Add `extraction_method` jsonb column on scraped_courses showing which method extracted each field (e.g., `{"international_fee": "gemini", "course_name": "regex"}`) — useful for debugging which fields are Gemini-driven vs regex
+
+## Out of scope for PR 2
+
+- Validation rules (that's PR 3)
+- Frontend changes (Review modal stays as-is until PR 3)
+- Touching the cache layer from PR 1 (works, leave it)
+- Changing the per-uni `scrape_config` structure
+- Vision OCR replacement
+
+## Constraints
+
+- Single PR, focused on Gemini integration only
+- No bundling — if you want to add a related improvement, ask first
+- Test on KBS + ASA before pushing
+- Paste the cost log line from a test scrape in your reply
+
+## State on prod
+
+- Code: `6531320` (PR 1 deployed and verified)
+- KBS + ASA both producing correct data
+- `central_page_cache` table populated for KBS (2 rows)
+- ASA `scrape_config.central_english_pg_skip = true` (will become no-op once central pages return level-keyed data; leave it)
+- Worker idle
+
+Ready when you are.

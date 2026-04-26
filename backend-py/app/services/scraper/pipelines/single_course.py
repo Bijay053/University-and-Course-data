@@ -156,6 +156,53 @@ async def extract_course(
 
     payload: dict[str, Any] = {"course_website": url}
     evidence: list[dict[str, Any]] = []
+    _gemini_primary_cost: float = 0.0
+
+    # ── Gemini Flash PRIMARY — hard-field extraction ──────────────────────────
+    # Runs BEFORE the regex extractors so that Gemini-filled values take
+    # priority.  The regex extractors use ``setdefault`` semantics (skip fields
+    # already in payload), so they serve as silent fallbacks for any field that
+    # Gemini left null.  On any failure the block is a no-op and the regex
+    # path handles everything as before.
+    try:
+        from app.services.scraper.extractors import gemini_primary as _gp
+
+        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok = await asyncio.wait_for(
+            _gp.extract_primary(html, url),
+            timeout=_AI_FALLBACK_TIMEOUT_SEC,
+        )
+        _gemini_primary_cost = _gp_cost
+        if _gp_filled:
+            # Translate duration_value/duration_unit → duration/duration_term
+            # (same mapping as the legacy ai_fallback path — see _apply_ai_duration_mapping).
+            _apply_ai_duration_mapping(payload, _gp_filled)
+            for _gp_k, _gp_v in _gp_filled.items():
+                if payload.get(_gp_k) in (None, "", 0):
+                    payload[_gp_k] = _gp_v
+                    evidence.append({
+                        "field_key": _gp_k,
+                        "value": _gp_v,
+                        "confidence": 0.75,
+                        "method": "gemini_primary",
+                        "snippet": None,
+                    })
+            if emit:
+                await emit(
+                    "status",
+                    f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
+                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
+                    phase="extract",
+                    kind="gemini_primary_done",
+                    filled=list(_gp_filled.keys()),
+                    cost_usd=_gp_cost,
+                    input_tokens=_gp_in_tok,
+                    output_tokens=_gp_out_tok,
+                    url=url,
+                )
+    except asyncio.TimeoutError:
+        log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
+    except Exception as _gp_exc:
+        log.warning("gemini_primary: failed on %s — %s", url, _gp_exc)
 
     for module, extra_keys in _EXTRACTORS:
         kwargs: dict[str, Any] = {}
@@ -902,9 +949,26 @@ async def extract_course(
             )
 
     footer = build_course_page_provenance_footer(payload)
+
+    # Build extraction_method: for each filled payload field, record the
+    # method of the first evidence entry that matches (first-write-wins mirrors
+    # the setdefault semantics used throughout the pipeline).
+    _extraction_method: dict[str, str] = {}
+    _seen_em: set[str] = set()
+    for _ev in evidence:
+        _fk = _ev.get("field_key", "")
+        if _fk and _fk not in _seen_em and payload.get(_fk) not in (None, "", 0, []):
+            _extraction_method[_fk] = _ev.get("method") or "unknown"
+            _seen_em.add(_fk)
+    # Persist in payload so stage_course can store it without schema changes to
+    # extract_course's callers (it is stripped in stage_course before DB write).
+    if _extraction_method:
+        payload["extraction_method"] = _extraction_method
+
     return {
         "url": url,
         "payload": payload,
         "evidence": evidence,
         "provenance_footer": footer,
+        "gemini_primary_cost_usd": _gemini_primary_cost,
     }
