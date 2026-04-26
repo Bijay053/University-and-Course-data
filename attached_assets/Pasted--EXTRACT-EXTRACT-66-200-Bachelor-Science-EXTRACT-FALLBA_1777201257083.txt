@@ -1,0 +1,800 @@
+[EXTRACT ] [EXTRACT] 66/200: Bachelor Science
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 66/200] Fetching 66/200: Bachelor Science
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-policing-investigations — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-policing-investigations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 67/200: Bachelor Science Honours
+[ 67/200] Fetching 67/200: Bachelor Science Honours
+[EXTRACT ] [EXTRACT] 68/200: Bachelor Social Science Psychology
+[ 68/200] Fetching 68/200: Bachelor Social Science Psychology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-science-psychology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-science-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 69/200: Bachelor Social Science Psychology Honours
+[ 69/200] Fetching 69/200: Bachelor Social Science Psychology Honours
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-science-honours — vocational static fallback
+[EXTRACT ] [EXTRACT] 70/200: Bachelor Social Work
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-science-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 70/200] Fetching 70/200: Bachelor Social Work
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-work — vocational static fallback
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-work (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 71/200: Bachelor Theology
+[ 71/200] Fetching 71/200: Bachelor Theology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-social-science-psychology-honours — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-social-science-psychology-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-theology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-theology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 72/200: Bachelor Theology Honours
+[ 72/200] Fetching 72/200: Bachelor Theology Honours
+[EXTRACT ] [EXTRACT] 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[ 73/200] Fetching 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 74/200: Bachelor Veterinary Technology
+[ 74/200] Fetching 74/200: Bachelor Veterinary Technology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-veterinary-biology-bachelor-veterinary-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-veterinary-biology-bachelor-veterinary-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 75/200: Bachelor Viticulture
+[ 75/200] Fetching 75/200: Bachelor Viticulture
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-theology-honours — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-theology-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-veterinary-technology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-veterinary-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 76/200: Bachelor Wine Science
+[ 76/200] Fetching 76/200: Bachelor Wine Science
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/bachelor-theology-honours: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 77/200: Diploma Agricultural Studies
+[ 77/200] Fetching 77/200: Diploma Agricultural Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-viticulture — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-viticulture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-agricultural-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-agricultural-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 78/200: Diploma Environmental Studies
+[ 78/200] Fetching 78/200: Diploma Environmental Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-wine-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/bachelor-wine-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-environmental-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-environmental-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 79/200: Diploma Exercise Studies
+[ 79/200] Fetching 79/200: Diploma Exercise Studies
+[EXTRACT ] [EXTRACT] 80/200: Diploma Health Science Mental Health
+[ 80/200] Fetching 80/200: Diploma Health Science Mental Health
+[EXTRACT ] [EXTRACT] 81/200: Diploma Psychological Studies
+[ 81/200] Fetching 81/200: Diploma Psychological Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-health-science-mental-health — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-health-science-mental-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-psychological-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-psychological-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/diploma-exercise-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/diploma-exercise-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 82/200: Doctor Business Administration
+[ 82/200] Fetching 82/200: Doctor Business Administration
+[EXTRACT ] [EXTRACT] 83/200: Doctor Philosophy Arts Education
+[ 83/200] Fetching 83/200: Doctor Philosophy Arts Education
+[EXTRACT ] [EXTRACT] 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[ 84/200] Fetching 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-business-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-arts-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-arts-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-business-justice-behavioural-sciences — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-business-justice-behavioural-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 85/200: Doctor Philosophy Science Agriculture
+[ 85/200] Fetching 85/200: Doctor Philosophy Science Agriculture
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-philosophy-science-agriculture — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-philosophy-science-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/diploma-exercise-studies: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 86/200: Doctor Public Safety
+[ 86/200] Fetching 86/200: Doctor Public Safety
+[EXTRACT ] [EXTRACT] 87/200: Doctor Social Work
+[ 87/200] Fetching 87/200: Doctor Social Work
+[EXTRACT ] [EXTRACT] 88/200: Doctor Veterinary Studies
+[ 88/200] Fetching 88/200: Doctor Veterinary Studies
+[INFO ] [CATEGORY det] Doctor of Philosophy (Science and Agricu → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 89/200: Executive Masters International Police Leadership
+[ 89/200] Fetching 89/200: Executive Masters International Police Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-public-safety — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-public-safety (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-social-work — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-social-work (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/doctor-veterinary-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/doctor-veterinary-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Doctor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 90/200: Graduate Certificate Adult Vocational Education
+[ 90/200] Fetching 90/200: Graduate Certificate Adult Vocational Education
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/executive-masters-international-police-leadership — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/executive-masters-international-police-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-adult-vocational-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-adult-vocational-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 91/200: Graduate Certificate Ageing Health
+[ 91/200] Fetching 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [EXTRACT] 92/200: Graduate Certificate Agricultural Business Management
+[ 92/200] Fetching 92/200: Graduate Certificate Agricultural Business Management
+[EXTRACT ] [EXTRACT] 93/200: Graduate Certificate Agriculture
+[ 93/200] Fetching 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [EXTRACT] 94/200: Graduate Certificate Applied Artificial Intelligence
+[ 94/200] Fetching 94/200: Graduate Certificate Applied Artificial Intelligence
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-artificial-intelligence — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agricultural-business-management — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ageing-health — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-agricultural-business-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-ageing-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agriculture — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Artifici → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 95/200: Graduate Certificate Applied Business
+[ 95/200] Fetching 95/200: Graduate Certificate Applied Business
+[INFO ] [CATEGORY det] Graduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 96/200: Graduate Certificate Applied Data Science
+[ 96/200] Fetching 96/200: Graduate Certificate Applied Data Science
+[INFO ] [CATEGORY det] Graduate Certificate in Agricultural Bus → Business & Management / Management
+[EXTRACT ] [EXTRACT] 97/200: Graduate Certificate Audiovisual Archiving
+[ 97/200] Fetching 97/200: Graduate Certificate Audiovisual Archiving
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-audiovisual-archiving — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-audiovisual-archiving (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-data-science — vocational static fallback
+[EXTRACT ] [EXTRACT] 98/200: Graduate Certificate Business Administration
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-data-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 98/200] Fetching 98/200: Graduate Certificate Business Administration
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-business — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-applied-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Data Sci → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 99/200: Graduate Certificate Business Administration Computing
+[ 99/200] Fetching 99/200: Graduate Certificate Business Administration Computing
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 100/200: Graduate Certificate Business Data Analytics
+[ 100/200] Fetching 100/200: Graduate Certificate Business Data Analytics
+[EXTRACT ] [EXTRACT] 101/200: Graduate Certificate Case Management Coordinated Care
+[ 101/200] Fetching 101/200: Graduate Certificate Case Management Coordinated Care
+[EXTRACT ] [EXTRACT] 102/200: Graduate Certificate Classical Arabic
+[ 102/200] Fetching 102/200: Graduate Certificate Classical Arabic
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-data-analytics — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration-computing — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-business-administration-computing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-classical-arabic — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-classical-arabic (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Business Data An → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 103/200: Graduate Certificate Cloud Computing Virtualisation
+[ 103/200] Fetching 103/200: Graduate Certificate Cloud Computing Virtualisation
+[EXTRACT ] [EXTRACT] 104/200: Graduate Certificate Communication
+[ 104/200] Fetching 104/200: Graduate Certificate Communication
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-case-management-coordinated-care — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-case-management-coordinated-care (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 105/200: Graduate Certificate Computing Career Transition
+[ 105/200] Fetching 105/200: Graduate Certificate Computing Career Transition
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cloud-computing-virtualisation — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-cloud-computing-virtualisation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-communication — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 106/200: Graduate Certificate Paramedicine
+[ 106/200] Fetching 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [EXTRACT] 107/200: Graduate Certificate Customs Administration
+[ 107/200] Fetching 107/200: Graduate Certificate Customs Administration
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-paramedicine — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-paramedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-computing-career-transition — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-computing-career-transition (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-customs-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-customs-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 108/200: Graduate Certificate Cyber Security
+[ 108/200] Fetching 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [EXTRACT] 109/200: Graduate Certificate Data Management
+[ 109/200] Fetching 109/200: Graduate Certificate Data Management
+[EXTRACT ] [EXTRACT] 110/200: Graduate Certificate Digital Archiving
+[ 110/200] Fetching 110/200: Graduate Certificate Digital Archiving
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-data-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-data-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 111/200: Graduate Certificate Digital Communication
+[ 111/200] Fetching 111/200: Graduate Certificate Digital Communication
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cyber-security — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-archiving — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-archiving (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 112/200: Graduate Certificate Digital Health
+[ 112/200] Fetching 112/200: Graduate Certificate Digital Health
+[EXTRACT ] [EXTRACT] 113/200: Graduate Certificate Education
+[ 113/200] Fetching 113/200: Graduate Certificate Education
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-communication — vocational static fallback
+[EXTRACT ] [EXTRACT] 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 114/200] Fetching 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [EXTRACT] 115/200: Graduate Certificate In Fish Conservation And Management
+[ 115/200] Fetching 115/200: Graduate Certificate In Fish Conservation And Management
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-health — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-digital-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 116/200: Graduate Certificate Financial Crime
+[ 116/200] Fetching 116/200: Graduate Certificate Financial Crime
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-environmental-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-environmental-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 117/200: Graduate Certificate Gis Remote Sensing
+[ 117/200] Fetching 117/200: Graduate Certificate Gis Remote Sensing
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-in-fish-conservation-and-management — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-financial-crime — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-in-fish-conservation-and-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-financial-crime (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-gis-remote-sensing — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-gis-remote-sensing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[ 118/200] Fetching 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[EXTRACT ] [EXTRACT] 119/200: Graduate Certificate Health Management Leadership
+[ 119/200] Fetching 119/200: Graduate Certificate Health Management Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-health-management-leadership — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-health-management-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 120/200: Graduate Certificate Human Resource Management
+[ 120/200] Fetching 120/200: Graduate Certificate Human Resource Management
+[EXTRACT ] [EXTRACT] 121/200: Graduate Certificate Human Services
+[ 121/200] Fetching 121/200: Graduate Certificate Human Services
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-geostatistics-spatial-modelling — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-geostatistics-spatial-modelling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-human-services — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-human-services (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-human-resource-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-human-resource-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 122/200: Graduate Certificate Industrial Relations
+[ 122/200] Fetching 122/200: Graduate Certificate Industrial Relations
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-industrial-relations — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-industrial-relations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 123/200: Graduate Certificate Information Studies
+[ 123/200] Fetching 123/200: Graduate Certificate Information Studies
+[INFO ] [CATEGORY det] Graduate Certificate in Human Resource M → Business & Management / Human Resources
+[EXTRACT ] [EXTRACT] 124/200: Graduate Certificate Information Technology
+[ 124/200] Fetching 124/200: Graduate Certificate Information Technology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-information-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-information-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 125/200: Graduate Certificate Intelligence Analysis
+[ 125/200] Fetching 125/200: Graduate Certificate Intelligence Analysis
+[EXTRACT ] [EXTRACT] 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[ 126/200] Fetching 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-intelligence-analysis — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-intelligence-analysis (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-information-technology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-intersectionality-diversity-inclusion — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-intersectionality-diversity-inclusion (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 127/200: Graduate Certificate Islamic Psychology
+[ 127/200] Fetching 127/200: Graduate Certificate Islamic Psychology
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 128/200: Graduate Certificate Islamic Studies
+[ 128/200] Fetching 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [EXTRACT] 129/200: Graduate Certificate Leadership Management Policing Security
+[ 129/200] Fetching 129/200: Graduate Certificate Leadership Management Policing Security
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-islamic-psychology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-islamic-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 130/200: Graduate Certificate Leadership Human Services
+[ 130/200] Fetching 130/200: Graduate Certificate Leadership Human Services
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-leadership-management-policing-security — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-leadership-management-policing-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-islamic-studies — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Islamic Psycholo → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 131/200: Graduate Certificate Learning Teaching Higher Education
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-islamic-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 131/200] Fetching 131/200: Graduate Certificate Learning Teaching Higher Education
+[EXTRACT ] [EXTRACT] 132/200: Graduate Certificate Mathematics
+[ 132/200] Fetching 132/200: Graduate Certificate Mathematics
+[EXTRACT ] [EXTRACT] 133/200: Graduate Certificate Ministry
+[ 133/200] Fetching 133/200: Graduate Certificate Ministry
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-leadership-human-services — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-leadership-human-services (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ministry — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-ministry (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-mathematics — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-mathematics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-learning-teaching-higher-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-learning-teaching-higher-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Mathematics → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 134/200: Graduate Certificate Networking Systems Administration
+[ 134/200] Fetching 134/200: Graduate Certificate Networking Systems Administration
+[EXTRACT ] [EXTRACT] 135/200: Graduate Certificate Nuclear Safeguards Security
+[ 135/200] Fetching 135/200: Graduate Certificate Nuclear Safeguards Security
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-networking-systems-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-networking-systems-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 136/200: Graduate Certificate Nursing Aged Care
+[ 136/200] Fetching 136/200: Graduate Certificate Nursing Aged Care
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nuclear-safeguards-security — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-nuclear-safeguards-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-aged-care — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-nursing-aged-care (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Networking and S → Computer Science & IT / Networking
+[EXTRACT ] [EXTRACT] 137/200: Graduate Certificate Nursing Clinical Education
+[ 137/200] Fetching 137/200: Graduate Certificate Nursing Clinical Education
+[EXTRACT ] [EXTRACT] 138/200: Graduate Certificate Nursing Leadership Management
+[ 138/200] Fetching 138/200: Graduate Certificate Nursing Leadership Management
+[INFO ] [CATEGORY det] Graduate Certificate in Learning and Tea → Education & Social Work / Teaching
+[EXTRACT ] [EXTRACT] 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[ 139/200] Fetching 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Aged Ca → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 140/200: Graduate Certificate Organisational Change
+[ 140/200] Fetching 140/200: Graduate Certificate Organisational Change
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-clinical-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-nursing-clinical-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-leadership-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-nursing-leadership-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-rural-remote-nursing — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-nursing-rural-remote-nursing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Clinica → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 141/200: Graduate Certificate Organisational Coaching Leadership
+[ 141/200] Fetching 141/200: Graduate Certificate Organisational Coaching Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-organisational-coaching-leadership — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-organisational-coaching-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Rural a → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 142/200: Graduate Certificate Ornithology
+[ 142/200] Fetching 142/200: Graduate Certificate Ornithology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-organisational-change — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-organisational-change (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Leaders → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 143/200: Graduate Certificate Professional Accounting
+[ 143/200] Fetching 143/200: Graduate Certificate Professional Accounting
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ornithology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-ornithology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 144/200: Graduate Certificate Professional Supervision Pastoral
+[ 144/200] Fetching 144/200: Graduate Certificate Professional Supervision Pastoral
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-professional-supervision-pastoral — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-professional-supervision-pastoral (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 145/200: Graduate Certificate Project Management
+[ 145/200] Fetching 145/200: Graduate Certificate Project Management
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-project-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-professional-accounting — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 146/200: Graduate Certificate Research
+[ 146/200] Fetching 146/200: Graduate Certificate Research
+[INFO ] [CATEGORY det] Graduate Certificate in Project Manageme → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 147/200: Graduate Certificate Social Organisational Leadership
+[ 147/200] Fetching 147/200: Graduate Certificate Social Organisational Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-research — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 148/200: Graduate Certificate Sustainable Agriculture
+[ 148/200] Fetching 148/200: Graduate Certificate Sustainable Agriculture
+[INFO ] [CATEGORY det] Graduate Certificate in Professional Acc → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 149/200: Graduate Certificate Terrorism Security Studies
+[ 149/200] Fetching 149/200: Graduate Certificate Terrorism Security Studies
+[EXTRACT ] [EXTRACT] 150/200: Graduate Certificate Theological Studies
+[ 150/200] Fetching 150/200: Graduate Certificate Theological Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-social-organisational-leadership — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-social-organisational-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-theological-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-terrorism-security-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-theological-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-terrorism-security-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-sustainable-agriculture — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-sustainable-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 151/200: Graduate Certificate Wiradyuri Language
+[ 151/200] Fetching 151/200: Graduate Certificate Wiradyuri Language
+[INFO ] [CATEGORY det] Graduate Certificate in Sustainable Agri → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 152/200: Graduate Diploma Accounting
+[ 152/200] Fetching 152/200: Graduate Diploma Accounting
+[EXTRACT ] [EXTRACT] 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[ 153/200] Fetching 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[EXTRACT ] [EXTRACT] 154/200: Graduate Diploma Adult Vocational Education
+[ 154/200] Fetching 154/200: Graduate Diploma Adult Vocational Education
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-adult-language-literacy-numeracy — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-wiradyuri-language — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-certificate-wiradyuri-language (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-adult-language-literacy-numeracy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-adult-vocational-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-adult-vocational-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-accounting — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 155/200: Graduate Diploma Ageing Pastoral Studies
+[ 155/200] Fetching 155/200: Graduate Diploma Ageing Pastoral Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-ageing-pastoral-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-ageing-pastoral-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 156/200: Graduate Diploma Applied Business
+[ 156/200] Fetching 156/200: Graduate Diploma Applied Business
+[EXTRACT ] [EXTRACT] 157/200: Graduate Diploma Of Business Data Analytics
+[ 157/200] Fetching 157/200: Graduate Diploma Of Business Data Analytics
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-of-business-data-analytics — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-of-business-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-applied-business — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-applied-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Diploma of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 158/200: Graduate Diploma Classical Arabic
+[ 158/200] Fetching 158/200: Graduate Diploma Classical Arabic
+[EXTRACT ] [EXTRACT] 159/200: Graduate Diploma Clinical Practice Paramedicine
+[ 159/200] Fetching 159/200: Graduate Diploma Clinical Practice Paramedicine
+[INFO ] [CATEGORY det] Graduate Diploma of Business Data Analyt → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 160/200: Graduate Diploma Paramedicine
+[ 160/200] Fetching 160/200: Graduate Diploma Paramedicine
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-classical-arabic — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-classical-arabic (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-ageing-pastoral-studies: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 161/200: Graduate Diploma Customs Administration
+[ 161/200] Fetching 161/200: Graduate Diploma Customs Administration
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-clinical-practice-paramedicine — vocational static fallback
+[EXTRACT ] [EXTRACT] 162/200: Graduate Diploma Dental Implantology
+[ 162/200] Fetching 162/200: Graduate Diploma Dental Implantology
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-clinical-practice-paramedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-dental-implantology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-dental-implantology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-paramedicine — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-paramedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-customs-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-customs-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-paramedicine: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 163/200: Graduate Diploma Financial Crime
+[ 163/200] Fetching 163/200: Graduate Diploma Financial Crime
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-financial-crime — vocational static fallback
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-clinical-practice-paramedicine: duration_value, duration_unit
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-financial-crime (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 164/200: Graduate Diploma Information Technology
+[ 164/200] Fetching 164/200: Graduate Diploma Information Technology
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-information-technology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 165/200: Graduate Diploma Intelligence Analysis
+[ 165/200] Fetching 165/200: Graduate Diploma Intelligence Analysis
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-intelligence-analysis — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-intelligence-analysis (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 1 field(s) on https://study.csu.edu.au/courses/graduate-diploma-information-technology: fee_currency
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 166/200: Graduate Diploma Investigations
+[ 166/200] Fetching 166/200: Graduate Diploma Investigations
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-dental-implantology: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Dental Implantology → Medicine & Health / Dentistry
+[EXTRACT ] [EXTRACT] 167/200: Graduate Diploma Islamic Studies
+[ 167/200] Fetching 167/200: Graduate Diploma Islamic Studies
+[EXTRACT ] [EXTRACT] 168/200: Graduate Diploma Leadership Management Policing Security
+[ 168/200] Fetching 168/200: Graduate Diploma Leadership Management Policing Security
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-islamic-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-islamic-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-investigations — vocational static fallback
+[EXTRACT ] [EXTRACT] 169/200: Graduate Diploma Mammography
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-investigations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 169/200] Fetching 169/200: Graduate Diploma Mammography
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-leadership-management-policing-security — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-leadership-management-policing-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-mammography — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-mammography (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 170/200: Graduate Diploma Mathematics
+[ 170/200] Fetching 170/200: Graduate Diploma Mathematics
+[EXTRACT ] [EXTRACT] 171/200: Graduate Diploma Midwifery
+[ 171/200] Fetching 171/200: Graduate Diploma Midwifery
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-mathematics — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-mathematics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 172/200: Graduate Diploma Organisational Coaching Leadership
+[ 172/200] Fetching 172/200: Graduate Diploma Organisational Coaching Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-organisational-coaching-leadership — vocational static fallback
+[EXTRACT ] [EXTRACT] 173/200: Graduate Diploma Pastoral Counselling
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-organisational-coaching-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 173/200] Fetching 173/200: Graduate Diploma Pastoral Counselling
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-mathematics: duration_value, duration_unit
+[INFO ] [CATEGORY det] Graduate Diploma of Mathematics → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 174/200: Graduate Diploma Project Management
+[ 174/200] Fetching 174/200: Graduate Diploma Project Management
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-pastoral-counselling — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-pastoral-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-project-management — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-midwifery — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-midwifery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 175/200: Graduate Diploma Of Project Management And Leadership
+[ 175/200] Fetching 175/200: Graduate Diploma Of Project Management And Leadership
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-of-project-management-and-leadership — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-of-project-management-and-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 176/200: Graduate Diploma Psychology
+[ 176/200] Fetching 176/200: Graduate Diploma Psychology
+[EXTRACT ] [EXTRACT] 177/200: Graduate Diploma Terrorism Security Studies
+[ 177/200] Fetching 177/200: Graduate Diploma Terrorism Security Studies
+[INFO ] [CATEGORY det] Graduate Diploma of Midwifery → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 178/200: Graduate Diploma Theological Studies
+[ 178/200] Fetching 178/200: Graduate Diploma Theological Studies
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management a → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 179/200: Graduate Diploma Cyber Security
+[ 179/200] Fetching 179/200: Graduate Diploma Cyber Security
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-theological-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-theological-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-psychology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-cyber-security — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-terrorism-security-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/graduate-diploma-terrorism-security-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://study.csu.edu.au/courses/graduate-diploma-theological-studies: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 180/200: Master Adult Vocational Education
+[ 180/200] Fetching 180/200: Master Adult Vocational Education
+[INFO ] [CATEGORY det] Graduate Diploma of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 181/200: Master Advanced Social Work Practice
+[ 181/200] Fetching 181/200: Master Advanced Social Work Practice
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-adult-vocational-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-advanced-social-work-practice — vocational static fallback
+[EXTRACT ] [EXTRACT] 182/200: Master Ageing Health
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-adult-vocational-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-advanced-social-work-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[ 182/200] Fetching 182/200: Master Ageing Health
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-ageing-health — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-ageing-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 183/200: Master Ageing Pastoral Studies
+[ 183/200] Fetching 183/200: Master Ageing Pastoral Studies
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-ageing-pastoral-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-ageing-pastoral-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Master of Advanced Social Work Practice → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 184/200: Master Agricultural Science
+[ 184/200] Fetching 184/200: Master Agricultural Science
+[EXTRACT ] [EXTRACT] 185/200: Master Agriculture
+[ 185/200] Fetching 185/200: Master Agriculture
+[INFO ] [CATEGORY det] Graduate Diploma of Psychology → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 186/200: Master Applied Business
+[ 186/200] Fetching 186/200: Master Applied Business
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-agriculture — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-agricultural-science — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-agricultural-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-applied-business — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-applied-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Master of Agriculture (with Specialisati → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 187/200: Master Arts Theological Studies
+[ 187/200] Fetching 187/200: Master Arts Theological Studies
+[EXTRACT ] [EXTRACT] 188/200: Master Business Administration Computing
+[ 188/200] Fetching 188/200: Master Business Administration Computing
+[EXTRACT ] [EXTRACT] 189/200: Master Business Administration
+[ 189/200] Fetching 189/200: Master Business Administration
+[EXTRACT ] [EXTRACT] 190/200: Master Of Business Data Analytics
+[ 190/200] Fetching 190/200: Master Of Business Data Analytics
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-business-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-of-business-data-analytics — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-of-business-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-arts-theological-studies — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-arts-theological-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Master of Business Administration (with → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 191/200: Master Classical Arabic
+[ 191/200] Fetching 191/200: Master Classical Arabic
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-business-administration-computing — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-business-administration-computing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-classical-arabic — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-classical-arabic (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Master of Business Data Analytics → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 192/200: Master Clinical Exercise Physiology
+[ 192/200] Fetching 192/200: Master Clinical Exercise Physiology
+[EXTRACT ] [EXTRACT] 193/200: Master Clinical Psychology
+[ 193/200] Fetching 193/200: Master Clinical Psychology
+[EXTRACT ] [EXTRACT] 194/200: Master Cloud Computing Virtualisation
+[ 194/200] Fetching 194/200: Master Cloud Computing Virtualisation
+[INFO ] [CATEGORY det] Master of Business Administration (Compu → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 195/200: Master Communication
+[ 195/200] Fetching 195/200: Master Communication
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-clinical-exercise-physiology — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-clinical-psychology — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-clinical-exercise-physiology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-clinical-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-communication — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-cloud-computing-virtualisation — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-cloud-computing-virtualisation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 196/200: Master Paramedicine
+[ 196/200] Fetching 196/200: Master Paramedicine
+[EXTRACT ] [EXTRACT] 197/200: Master Customs Administration
+[ 197/200] Fetching 197/200: Master Customs Administration
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-paramedicine — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-paramedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-customs-administration — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-customs-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 198/200: Master Cyber Security
+[ 198/200] Fetching 198/200: Master Cyber Security
+[INFO ] [CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 199/200: Master Education Teacher Librarianship
+[ 199/200] Fetching 199/200: Master Education Teacher Librarianship
+[EXTRACT ] [EXTRACT] 200/200: Master Education
+[ 200/200] Fetching 200/200: Master Education
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-education — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-cyber-security — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-education-teacher-librarianship — vocational static fallback
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-education-teacher-librarianship (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI enriching https://study.csu.edu.au/courses/master-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[INFO ] [CATEGORY det] Master of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] pte_overall=31.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill postgraduate] 119 slot(s) filled across siblings
+[STAGE ] [STAGE] skipped Bachelor of Education (Primary): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Access Charles Sturt Entry: rejected: category_landing_page
+[STAGE ] [STAGE] skipped University Certificate in Workforce Essentials: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Associate Degree in Adult and Vocational Education: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Associate Degree in Policing Practice: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Accounting: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Adult and Vocational Education (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Agricultural Business Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Agricultural Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Agriculture: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Animal Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Applied Research (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Arts: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Arts and Social Science (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Border Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Business: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Business Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Clinical Science (Medicine) / Doctor of Medicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Communication: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Computer Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Criminology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Dental Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Birth to Five Years): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Early Childhood and Primary): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (K - 12): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Creative Arts: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - English: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Hsie: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Mathematics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Pdhpe: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) Industry Entry Program: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Education (Technology and Applied Studies): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Educational Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Emergency Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Engineering (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Environmental Science and Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Equine Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Exercise and Sport Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Food Science and Nutrition: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Geospatial Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Health Science (Mental Health): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Health and Medical Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Horticulture: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Human Services: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Information Studies (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Information Technology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Islamic Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Islamic Studies (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Laws: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Laws / Bachelor of Criminal Justice: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Medical Laboratory Science (Pathology): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Medical Radiation Science (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Nuclear Science and Safety: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Nursing: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Occupational Therapy: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Oral Health (Therapy and Hygiene): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Paramedicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Pharmacy (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Physiotherapy: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Podiatric Medicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Policing: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Policing (Investigations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Policing and Public Safety: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Psychology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Science (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Social Science (Psychology): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Social Science (Psychology) (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Social Work: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Theology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Theology (Honours): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Veterinary Biology/ Bachelor of Veterinary Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Veterinary Technology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Viticulture: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Bachelor of Wine Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Diploma of Agricultural Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Diploma of Environmental Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Diploma of Exercise Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Diploma of Health Science (Mental Health): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Diploma of Psychological Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Business Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Arts and Education): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Business, Justice and Behavioural Sciences): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Science and Agriculture): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Public Safety: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Social Work: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Doctor of Veterinary Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Executive Masters in International Police Leadership: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Graduate Certificate in Adult and Vocational Education: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Ageing and Health: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Agricultural Business Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Agriculture: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Artificial Intelligence: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Business: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Data Science: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Audiovisual Archiving: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Administration (Computing): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Data Analytics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Case Management and Coordinated Care: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Classical Arabic: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Cloud Computing and Virtualisation: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Communication: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Computing (Career Transition): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Critical Care Paramedicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Customs Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Cyber Security: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Data Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Archiving: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Communication: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Health: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Education (Generic and with Specialistions): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Environmental Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Fish Conservation and Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Financial Crime: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Gis and Remote Sensing: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Geostatistics and Spatial Modelling: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Health Management and Leadership: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Human Resource Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Human Services: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Industrial Relations: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Information Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Information Technology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Intelligence Analysis: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Intersectionality, Diversity and Inclusion: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Islamic Psychology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Islamic Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Leadership and Management (Policing and Security): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Leadership in Human Services: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Learning and Teaching in Higher Education: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Mathematics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Ministry: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Networking and Systems Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Nuclear Safeguards and Security: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Aged Care): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Clinical Education): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Leadership and Management): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Rural and Remote Nursing): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Organisational Change: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Organisational Coaching and Leadership: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Ornithology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Professional Accounting: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Professional Supervision (Pastoral): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Project Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Research: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Social and Organisational Leadership: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Sustainable Agriculture: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Terrorism and Security Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Theological Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Certificate in Wiradyuri Language: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Accounting: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Adult Language, Literacy and Numeracy: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Adult and Vocational Education: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Ageing and Pastoral Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Applied Business: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Business Data Analytics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Classical Arabic: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Clinical Practice (Paramedicine): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Critical Care Paramedicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Customs Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Dental Implantology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Financial Crime: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Information Technology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Intelligence Analysis: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Investigations: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Islamic Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Leadership and Management (Policing and Security): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Mammography: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Mathematics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Midwifery: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Organisational Coaching and Leadership: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Pastoral Counselling: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Project Management: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Project Management and Leadership: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Psychology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Terrorism and Security Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Theological Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Graduate Diploma of Cyber Security: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Adult and Vocational Education: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Advanced Social Work Practice: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Ageing and Health: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Ageing and Pastoral Studies: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Agricultural Science (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Agriculture (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Applied Business (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Arts (Theological Studies): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Business Administration (Computing): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Business Administration (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Business Data Analytics: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Classical Arabic: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Clinical Exercise Physiology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Clinical Psychology: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Cloud Computing and Virtualisation: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Communication (with Specialisations): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Critical Care Paramedicine: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Customs Administration: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Cyber Security: rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Education (Teacher Librarianship): rejected: no_international_fee
+[STAGE ] [STAGE] skipped Master of Education (with Specialisations): rejected: no_international_fee
+[COMPLETE] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[COMPLETE] [TIMING] Total: 34m 59s | Courses: 200 | Avg: 10.5s/course | Concurrency: HTTP=4 Browser=3
+══ DONE ══ Found:200 | Staged:0 | Skipped:200 | Errors:0
+[COMPLETE] Staged 0 courses, 200 skipped, 0 fetch errors
