@@ -1,0 +1,94 @@
+Reorder fix from `862d5d6` deployed. Gemini IS being called on every course now — the wiring is correct. But Gemini returns **0 fields on every single course**, ASA and KBS both. Architecture works structurally, but Gemini contributes zero data.
+
+## Hard evidence
+
+**ASA (9 courses staged):**
+```
+total_courses | had_gemini | no_gemini 
+            9 |          0 |         9
+```
+
+**KBS (29 courses staged):**
+```
+total_courses | had_gemini | no_gemini 
+           29 |          0 |        29
+```
+
+Worker log shows Gemini fires on every course but always returns 0 fields. Sample lines from the KBS scrape:
+
+```
+[GEMINI] .../bachelor-of-business → 0 field(s) (cost=$0.000212, in=2776 out=14)
+[GEMINI] .../bachelor-of-business-accounting → 0 field(s) (cost=$0.000213, in=2779 out=15)
+[GEMINI] .../diploma-of-business → 0 field(s) (cost=$0.000211, in=2776 out=10)
+[GEMINI] .../mba-master-of-business-administration → 0 field(s) (cost=$0.000211, in=2780 out=10)
+[GEMINI] .../bachelor-of-business-hospitality → 0 field(s) (cost=$0.000212, in=2785 out=12)
+[GEMINI] .../bachelor-of-business-marketing → 0 field(s) (cost=$0.000212, in=2778 out=13)
+[GEMINI] .../graduate-certificate-in-accounting → 0 field(s) (cost=$0.000211, in=2779 out=10)
+[GEMINI] .../bachelor-of-business-management → 0 field(s) (cost=$0.000213, in=2779 out=15)
+[GEMINI] .../master-of-professional-accounting → 0 field(s) (cost=$0.000212, in=2779 out=12)
+[GEMINI] .../graduate-diploma-of-business → 0 field(s) (cost=$0.000212, in=2782 out=10)
+[GEMINI] .../graduate-certificate-in-business-administration → 0 field(s) (cost=$0.000213, in=2783 out=15)
+[GEMINI] .../master-of-accounting → 0 field(s) (cost=$0.000212, in=2776 out=14)
+[GEMINI] .../graduate-certificate-in-business-analytics → 0 field(s) (cost=$0.000213, in=2781 out=15)
+[GEMINI] .../graduate-diploma-of-business-analytics → 0 field(s) (cost=$0.000213, in=2780 out=15)
+[GEMINI] .../master-of-business-analytics-extension → 0 field(s) (cost=$0.000213, in=2780 out=15)
+... etc, every course returns 0 fields
+```
+
+The ONLY non-zero call across both unis was:
+```
+[GEMINI] .../study-abroad-program → 1 field(s) (cost=$0.000211, in=2776 out=10)
+```
+And that course was rejected as a category landing page anyway.
+
+## Two suspicious patterns
+
+**1. `out=10-15` tokens consistently.** Across 30+ calls, the model output is always 10-15 tokens. That's just enough to return `{}` or `{"international_fee": null, "ielts_overall": null, ...}`. The model is responding *consistently* with empty/null structure — not a transient failure or rate limit.
+
+**2. `in=~2780` tokens consistently.** Input size is uniform across all KBS courses, which suggests `html_to_text` is producing roughly the same processed text for every course. KBS course pages render different content per program (fees, durations, IELTS), but Gemini is seeing roughly the same input size every time.
+
+This points to one of two things:
+- `html_to_text` is stripping the actual course content and feeding Gemini boilerplate (header/footer/nav repeated across all pages)
+- The prompt instructs the model to extract fields that don't match what's actually present in the input
+
+## What I want you to investigate
+
+**Add a debug log on ONE course to capture:**
+
+1. The raw `rendered_html` length (vs the static `html` length) — confirms browser render produced content
+2. The processed text length AFTER `html_to_text` — confirms preprocessing didn't strip everything
+3. The first 500 chars of the text being sent to Gemini — confirms it's actual course content, not boilerplate
+4. The exact prompt template Gemini receives
+5. The raw Gemini response (before parsing) — see what the model is actually returning
+
+Pick one course where we KNOW the data exists — KBS Master of Information Technology should have:
+- international_fee = 43680
+- duration_value = 20, duration_unit = "Month"
+- ielts_overall = 6.0, pte_overall = 50, toefl_overall = 72
+- Course is at https://www.kbs.edu.au/courses/master-of-information-technology
+
+The fee schedule and IELTS values are confirmed present on this page (regex/PDF extractors find them). If Gemini returns 0 fields for THIS course, we'll see exactly which step breaks.
+
+## Don't make code changes yet
+
+First pass: add the debug logging, fire one KBS scrape, paste the captured prompt input + raw Gemini response in your reply.
+
+Once we see what's happening, the fix is clear. Without that data, we're guessing.
+
+## State on prod
+
+- Code: `862d5d6`
+- ASA + KBS both still produce correct data via existing extractors (no regression)
+- Gemini wired correctly (post-browser-render, true PRIMARY position) but contributes 0 fields
+- Cost: $0.0070 KBS / $0.0017 ASA — cheap but currently wasted
+- `extraction_method` column populated but `gemini_primary` never appears in any row
+
+## Out of scope
+
+- Don't change the call ordering (it's correct now)
+- Don't change config/budgets
+- Don't change the regex/CSS extractors
+- Don't change vision OCR
+- Just instrument the Gemini call path to show us what it's seeing and producing
+
+Ready when you have the debug output.

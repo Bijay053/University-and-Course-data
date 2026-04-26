@@ -275,6 +275,17 @@ async def extract_primary(
     text = _trim_text(html)
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
+    # ── DEBUG instrumentation (remove after diagnosis) ───────────────────────
+    log.warning(
+        "[GP-DEBUG] %s | html_len=%d text_len=%d prompt_len=%d",
+        url,
+        len(html) if html else 0,
+        len(text),
+        len(prompt),
+    )
+    log.warning("[GP-DEBUG] text[:500] = %r", text[:500])
+    # ─────────────────────────────────────────────────────────────────────────
+
     try:
         resp = await _asyncio.wait_for(
             gemini_client.generate(prompt, max_output_tokens=512),
@@ -288,8 +299,12 @@ async def extract_primary(
         return {}, 0.0, 0, 0
 
     if resp.skipped:
-        log.info("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
+        log.warning("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
         return {}, 0.0, resp.input_tokens, 0
+
+    # ── DEBUG: raw model output ──────────────────────────────────────────────
+    log.warning("[GP-DEBUG] raw_response = %r", resp.text[:400] if resp.text else "(empty)")
+    # ─────────────────────────────────────────────────────────────────────────
 
     raw_data = _parse_json(resp.text)
     filled: dict[str, Any] = {}

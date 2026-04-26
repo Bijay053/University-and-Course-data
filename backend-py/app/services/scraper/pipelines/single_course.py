@@ -328,6 +328,15 @@ async def extract_course(
         from app.services.scraper.extractors import gemini_primary as _gp
 
         _gp_html = rendered_html or html
+        # ── DEBUG (remove after diagnosis) ──────────────────────────────────
+        log.warning(
+            "[GP-DEBUG] %s | static_html_len=%d rendered_html_len=%d using=%s",
+            url,
+            len(html) if html else 0,
+            len(rendered_html) if rendered_html else 0,
+            "rendered" if rendered_html else "static",
+        )
+        # ────────────────────────────────────────────────────────────────────
         _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok = await asyncio.wait_for(
             _gp.extract_primary(_gp_html, url),
             timeout=_AI_FALLBACK_TIMEOUT_SEC,
