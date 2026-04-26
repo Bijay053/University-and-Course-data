@@ -1,0 +1,103 @@
+GP-DEBUG output captured cleanly on KBS. Root cause is now definitively identified, and there are two related bugs in the input preprocessing.
+
+## The smoking gun (2 things)
+
+**Bug 1: Hard 8005 char truncation on every single course**
+
+From the GP-DEBUG output, every single course shows:
+```
+text_len=8005
+text_len=8005
+text_len=8005
+text_len=8005
+... (29 courses, all exactly 8005)
+```
+
+The ONE exception is `non-award-single-subject-enrolment` which has `text_len=6815` (because the source page is shorter). Every other course gets truncated at exactly 8005 characters.
+
+**Bug 2: text[:500] is 100% nav/footer boilerplate, not course content**
+
+Sample from KBS Master of Information Technology:
+```
+text[:500]="Master of Information Technology - Kaplan Business School Skip to main content 
+Current Students Agent Resources Find An Agent News Alumni Contact Us Main navigation 
+Courses Admissions Student Life Blog About Us Apply My saved courses (0) search 
+Courses Master's Degrees MBA – Master of Business Administration Master of Business 
+Analytics Master of Business Analytics (Extension) Master of Business Analytics 
+(Information Technology) Master of Information Technology Master of Information 
+Technology..."
+```
+
+Every course's first 500 chars is just the global nav menu listing every other course. The course title appears in position 0-50, then it's pure navigation/menu/footer text for the rest. The actual fee/IELTS/duration content presumably sits AFTER position 8005 — which gets truncated away.
+
+## Combined effect
+
+- `html_to_text` is walking DOM order naively (header → nav → main → footer)
+- Output is truncated at exactly 8005 chars
+- The 8005 chars hit before the main content area starts
+- Gemini receives ~2780 tokens of pure navigation menu
+- Gemini correctly returns nulls because the data isn't there
+
+## Gemini's own reasoning confirms this
+
+Look at these GP-DEBUG raw_response samples:
+```
+raw_response='" is mentioned. The prompt says "Default to \'On Campus\' when a physical location is mentioned."'
+raw_response='Campus Locations" and "Online Study" are mentioned in the header/footer links.\n *'
+raw_response='`fee`: null (not in text).\n * `domestic_fee`: null (not'
+```
+
+Gemini is literally telling us "these are mentioned in the header/footer links" and "not in text". The model is performing correctly — it just doesn't have the data because we never sent it the data.
+
+## What to fix
+
+**Two changes needed in the Gemini-primary input preprocessing:**
+
+1. **Strip nav/header/footer BEFORE running `html_to_text`**
+   - Use a content extraction approach that targets `<main>`, `<article>`, or the primary content div
+   - For KBS specifically: course content sits inside specific Drupal content blocks (look at the rendered HTML structure)
+   - At minimum: filter out elements with class names containing "nav", "header", "footer", "menu", "breadcrumb"
+
+2. **Remove or dramatically raise the 8005 char truncation**
+   - Why 8005? That's a suspiciously specific number — grep the code for `8000` or `8005`
+   - With Gemini Flash Lite's context window (1M tokens), there's no need to truncate at 8K chars
+   - Increase to at least 50,000 chars (still well within budget at ~12,500 tokens input)
+   - OR remove the truncation entirely
+
+## Validation criteria for the fix
+
+After the fix, the GP-DEBUG output for KBS Master of Information Technology should show:
+- `text_len` significantly larger than 8005 (10,000+ chars)
+- `text[:500]` containing actual course content (fees, durations, IELTS scores) — NOT just nav menu
+- `raw_response` containing populated values like `{"international_fee": 43680, "duration_value": 20, "duration_unit": "Month", "ielts_overall": 6.0, ...}`
+
+Then the database should show:
+```
+total_courses | had_gemini | no_gemini
+           29 |        20+ |       <9
+```
+
+## State on prod
+
+- Code: `7aaa6b3`
+- ASA + KBS data still correct via existing extractors (no regression)
+- 29 KBS courses in pending state
+- Gemini wired correctly, fires on every course, returns 0 fields due to nav-only input
+- Cost: $0.0072 KBS — cheap but wasted (sending nav menu instead of course content)
+
+## Constraints
+
+- Single targeted PR for these two fixes
+- Don't change call ordering
+- Don't change prompt text
+- Don't touch caching, central pages, regex extractors, vision OCR
+- Just fix the input preprocessing pipeline
+- Keep the GP-DEBUG instrumentation in place for verification
+- Test on KBS Master of IT first (known good values: fee=43680, duration=20 Month, ielts=6.0, pte=50, toefl=72)
+- Paste the new GP-DEBUG output showing improved text[:500] and raw_response
+
+## Why this matters
+
+This is THE bug that's been preventing Gemini from contributing. Once fixed, Gemini should populate `international_fee`, `ielts_overall`, `pte_overall`, `toefl_overall`, `duration_value` for the majority of KBS courses. That's the architectural promise of Ticket 2 finally working.
+
+Ready when fixed.

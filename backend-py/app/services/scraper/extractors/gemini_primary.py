@@ -126,14 +126,89 @@ Course page text (may be truncated):
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Boilerplate element tags and class-name fragments that reliably contain
+# navigation, menus, and footers rather than course-specific content.
+# Removed BEFORE html_to_text so the content Gemini receives is course data.
+_BOILERPLATE_TAGS = {"nav", "header", "footer", "aside"}
+_BOILERPLATE_CLASS_FRAGS = (
+    "nav", "navigation", "menu", "breadcrumb",
+    "header", "footer", "sidebar", "widget",
+    "cookie", "banner", "alert", "announcement",
+    "social", "share", "search-bar",
+)
 
-def _trim_text(html: str, *, max_chars: int = 8_000) -> str:
-    """Convert HTML → plain text then trim to max_chars with head+tail strategy."""
-    text = html_to_text(html)
+
+def _extract_content_html(html: str) -> str:
+    """Return the HTML fragment most likely to contain course-specific content.
+
+    Strategy (in order of preference):
+    1. Prefer the ``<main>`` element — the semantic landmark for page content.
+    2. Fall back to the first ``<article>`` element.
+    3. Fall back to a ``<div>`` / ``<section>`` whose id/class suggests
+       "content" (e.g. id="content", class="page-content").
+    4. Last resort: strip the known boilerplate tags from the full document and
+       use whatever remains.
+
+    Falls back gracefully at each step; never raises.
+    """
+    try:
+        from bs4 import BeautifulSoup, Tag
+
+        soup = BeautifulSoup(html, "lxml")
+
+        # Remove script / style first (always noise)
+        for tag in soup.find_all(["script", "style", "noscript", "template"]):
+            tag.decompose()
+
+        # Remove explicit boilerplate structural tags
+        for tag in soup.find_all(_BOILERPLATE_TAGS):
+            tag.decompose()
+
+        # Remove divs/sections whose id or class indicates nav/menu/footer
+        for tag in soup.find_all(True):
+            tag_id = (tag.get("id") or "").lower()
+            tag_cls = " ".join(tag.get("class") or []).lower()
+            combined = f"{tag_id} {tag_cls}"
+            if any(frag in combined for frag in _BOILERPLATE_CLASS_FRAGS):
+                tag.decompose()
+
+        # Now look for the primary content area
+        main = soup.find("main")
+        if main and isinstance(main, Tag):
+            return str(main)
+
+        article = soup.find("article")
+        if article and isinstance(article, Tag):
+            return str(article)
+
+        # Heuristic: a div/section whose id or class contains "content"
+        for tag in soup.find_all(["div", "section"]):
+            tag_id = (tag.get("id") or "").lower()
+            tag_cls = " ".join(tag.get("class") or []).lower()
+            if "content" in tag_id or "content" in tag_cls or "main" in tag_id:
+                return str(tag)
+
+        # Fall back to the cleaned full document
+        return str(soup)
+    except Exception:
+        return html  # never break on parse failure
+
+
+def _trim_text(html: str, *, max_chars: int = 50_000) -> str:
+    """Extract main content, convert to plain text, trim to max_chars.
+
+    Uses ``_extract_content_html`` to strip nav/header/footer before running
+    ``html_to_text``, so Gemini receives course-specific content rather than
+    navigation boilerplate.  Limit raised from 8 K to 50 K chars — Gemini
+    Flash's context window is 1 M tokens and the extra input costs < $0.001.
+    """
+    content_html = _extract_content_html(html)
+    text = html_to_text(content_html)
     if len(text) <= max_chars:
         return text
-    half = max_chars // 2
-    return f"{text[:half]}\n...\n{text[-half:]}"
+    # For very long pages: prefer the first 40 K (intro + fees section) and
+    # last 10 K (admission requirements often sit at the bottom of the page).
+    return f"{text[:40_000]}\n...\n{text[-10_000:]}"
 
 
 def _parse_json(raw: str) -> dict[str, Any]:
