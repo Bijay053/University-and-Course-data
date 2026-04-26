@@ -1,0 +1,92 @@
+ASA Masters are showing empty IELTS/PTE/TOEFL/CAE on every scrape. Root cause: per-course browser is timing out at 20s on EVERY ASA page, which means vision OCR can't sample the images that contain English requirements.
+
+## Critical context you need
+
+**ASA does NOT publish English requirements as text — they're images on each individual course page.** The original system handles this via:
+
+1. Per-course browser opens the course page (e.g. https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security)
+2. Browser captures images on the page
+3. Vision OCR reads IELTS/PTE/TOEFL values from those images
+4. Sibling cache propagates per-level (undergraduate/postgraduate)
+
+This worked correctly in earlier scrapes (Masters showed IELTS=6.5 PTE=58 TOEFL=85 — these are on the course page images).
+
+## Current failure
+
+Every single ASA page now times out:
+```
+[FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — moving on
+```
+
+9 of 9 ASA courses time out at exactly 20s. No browser HTML, no images sampled, no vision OCR.
+
+## Cascading consequences
+
+1. No browser data → `using=static` everywhere (rendered=0B)
+2. No per-course images → vision OCR never runs
+3. No level-keyed English from per-course pages
+4. PG-SKIP guard fires on Masters: `[PG-SKIP ✗] ... nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall (no level-keyed data from browser)`
+5. Masters get all English fields nulled
+6. Bachelors only survive because the sibling cache from a prior good scrape provides undergraduate values: `[sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=60.0`
+
+The central English page also returns nothing because ASA's policies/forms PDF doesn't contain values: `[CENTRAL] english page parsed → no values from http://asahe.edu.au/policies-and-forms`. So we DEPEND on per-course vision OCR for ASA.
+
+## What to do
+
+**1. Raise per-course browser timeout for ASA from 20s to 60s.**
+
+Find the timeout config. Possibly hardcoded in the per-course fetch or in a per-uni config. Make it 60s for ASA specifically, or raise the global default. ASA's site is just slow — might be JavaScript-heavy or rate-limited.
+
+**2. Investigate WHY ASA browser takes >20s.** Some possibilities:
+- ASA added bot protection (Cloudflare challenge)
+- Site genuinely slow with images
+- DNS or TCP-level slowness from our DigitalOcean IP
+
+Manually try fetching one course page with curl/Playwright from prod to see what happens:
+```bash
+time curl -sI https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+```
+
+If the response is normal but slow, raising timeout fixes it. If it returns a Cloudflare challenge page, we need to handle that.
+
+**3. Cache poisoning bug (separate but related).** `central_page_cache` is storing empty results as successful cache entries. ASA's row contained:
+```
+fees: []
+english: {}
+html_bytes: NULL
+```
+
+Next lookup hits this empty cache and reports `[CACHE] hit → no values`, never re-fetches. **Fix**: don't cache rows where parsed_data is empty AND raw_html is null. Either skip caching, or set short TTL (1 hour) so we retry.
+
+**4. Validation criteria after fix:**
+
+For ASA Masters, expected values from prior good scrapes:
+- IELTS=6.5, PTE=58, TOEFL=85, CAE=176
+
+For Bachelors:
+- IELTS=6, PTE=50, TOEFL=60, CAE=169
+
+After fix, fire ASA scrape from UI. Expected log signals:
+```
+[FALLBACK] [per-course browser ✓] ...edu.au/courses/master-of-information-technology-cyber-security — IELTS=6.5 PTE=58 TOEFL=85 CAE=176
+[FALLBACK] [per-course vision img X/Y]...IELTS=6.5 PTE=58 TOEFL=85
+[sibling cache ↻ build postgraduate] ielts_overall=6.5 pte_overall=58.0 toefl_overall=85.0
+```
+
+No `[PG-SKIP ✗]` lines. All 9 ASA courses populated. Bachelors stay at 6/50/60/169, Masters get 6.5/58/85/176.
+
+## Constraints
+
+- DO NOT touch the PG-SKIP guard — it's working correctly. The fix is to make per-course vision data available so the guard doesn't fire.
+- Single PR for both fixes (timeout + cache poisoning).
+- No changes to Gemini-primary code (PR 2 work).
+
+## State on prod
+
+- Code: `a7f17d76`
+- ASA central cache: just wiped, empty
+- Last good ASA Masters data: lost when re-scrape ran without browser values
+- Bachelors still correct via stale sibling cache (will break on next prod restart)
+
+Ready when fixed.

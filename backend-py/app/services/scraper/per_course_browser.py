@@ -95,12 +95,25 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # www.csu.edu.au is a conventional server-rendered site.
     "study.csu.edu.au",
 )
+
+# Hosts that need extra-long timeouts beyond the networkidle tier.
+# ASA (asahe.edu.au): English requirements are image-only per-course;
+# the browser must fully load each page so vision OCR can sample those
+# images.  The site is slow from our DigitalOcean IP — every page takes
+# >20s, causing guaranteed timeouts under the default ceiling.
+# 60s outer / 50s goto gives it the headroom it needs.
+_SLOW_HOSTS: tuple[str, ...] = (
+    "asahe.edu.au",
+)
+
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
 # Outer ceilings keep a single hung page from wedging the Celery worker
 # (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min, zero log
 # output). VIT's networkidle path needs ~25s headroom; everyone else
-# gets the requested 20s ceiling.
+# gets the requested 20s ceiling. Slow hosts (ASA) need 60s.
+_SLOW_OUTER_TIMEOUT_SEC = 60
+_SLOW_GOTO_TIMEOUT_MS = 50_000
 _NETWORKIDLE_OUTER_TIMEOUT_SEC = 30
 _DEFAULT_OUTER_TIMEOUT_SEC = 20
 _NETWORKIDLE_GOTO_TIMEOUT_MS = 25_000
@@ -111,16 +124,26 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
     """Return (wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)
     for the given URL.
 
-    * Hosts in :data:`_NETWORKIDLE_HOSTS` get the slow-but-thorough
-      `networkidle` + 3s settle, 30s outer ceiling, 25s goto timeout.
-    * Everyone else gets fast `domcontentloaded` + 1.5s settle, 20s
-      outer ceiling, 15s goto timeout — so a hung XHR widget can't
-      wedge the whole budget.
+    * Hosts in :data:`_SLOW_HOSTS` get ``networkidle`` + 3s settle,
+      60s outer ceiling, 50s goto — for sites that are genuinely slow
+      but must be browser-rendered (e.g. ASA image-only English pages).
+    * Hosts in :data:`_NETWORKIDLE_HOSTS` get ``networkidle`` + 3s
+      settle, 30s outer ceiling, 25s goto.
+    * Everyone else gets fast ``domcontentloaded`` + 1.5s settle, 20s
+      outer ceiling, 15s goto — so a hung XHR widget can't wedge the
+      whole budget.
     """
     try:
         host = (urlparse(url).hostname or "").lower()
     except Exception:
         host = ""
+    if any(host == h or host.endswith("." + h) for h in _SLOW_HOSTS):
+        return (
+            "networkidle",
+            _NETWORKIDLE_SETTLE_MS,
+            _SLOW_OUTER_TIMEOUT_SEC,
+            _SLOW_GOTO_TIMEOUT_MS,
+        )
     if any(host == h or host.endswith("." + h) for h in _NETWORKIDLE_HOSTS):
         return (
             "networkidle",

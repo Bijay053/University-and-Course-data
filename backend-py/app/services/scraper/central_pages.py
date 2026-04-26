@@ -652,6 +652,32 @@ async def _cache_get(university_id: int, page_type: str) -> dict[str, Any] | Non
         return None
 
 
+def _is_empty_central_result(page_type: str, parsed_data: dict[str, Any]) -> bool:
+    """Return True when ``parsed_data`` contains no useful extracted values.
+
+    Prevents cache poisoning: if a central-page fetch succeeds at the HTTP
+    level but the parser extracts nothing (e.g. ASA's policies PDF has no
+    English values), we must NOT store an empty entry.  A future scrape
+    hitting that empty cache row would report ``[CACHE] hit → no values``
+    and skip the re-fetch for the full TTL period, permanently suppressing
+    any values that could have been obtained by other means.
+
+    Rules per page_type:
+    * ``fee_schedule`` — must have at least one fee record in ``fees``.
+    * ``english_requirements`` — must have at least one English slot in
+      ``english`` OR at least one level bucket in ``english_by_level``.
+    * All other page types — always considered non-empty (safe to cache).
+    """
+    if page_type == "fee_schedule":
+        return not bool(parsed_data.get("fees"))
+    if page_type == "english_requirements":
+        _has_flat = bool(parsed_data.get("english"))
+        _by_level = parsed_data.get("english_by_level") or {}
+        _has_level = any(bool(v) for v in _by_level.values())
+        return not (_has_flat or _has_level)
+    return False
+
+
 async def _cache_set(
     university_id: int,
     page_type: str,
@@ -660,6 +686,15 @@ async def _cache_set(
     ttl_days: int = _CACHE_TTL_DAYS,
 ) -> None:
     """Upsert a cache entry.  Silently swallows errors so failures never abort scrapes."""
+    # Guard: don't poison the cache with empty parse results.
+    if _is_empty_central_result(page_type, parsed_data):
+        log.info(
+            "central_page_cache: skipping empty result for %s/%s — "
+            "no useful data extracted, will re-fetch on next scrape",
+            university_id,
+            page_type,
+        )
+        return
     try:
         from datetime import datetime, timedelta, timezone
 
