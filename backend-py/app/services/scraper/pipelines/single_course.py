@@ -158,52 +158,6 @@ async def extract_course(
     evidence: list[dict[str, Any]] = []
     _gemini_primary_cost: float = 0.0
 
-    # ── Gemini Flash PRIMARY — hard-field extraction ──────────────────────────
-    # Runs BEFORE the regex extractors so that Gemini-filled values take
-    # priority.  The regex extractors use ``setdefault`` semantics (skip fields
-    # already in payload), so they serve as silent fallbacks for any field that
-    # Gemini left null.  On any failure the block is a no-op and the regex
-    # path handles everything as before.
-    try:
-        from app.services.scraper.extractors import gemini_primary as _gp
-
-        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok = await asyncio.wait_for(
-            _gp.extract_primary(html, url),
-            timeout=_AI_FALLBACK_TIMEOUT_SEC,
-        )
-        _gemini_primary_cost = _gp_cost
-        if _gp_filled:
-            # Translate duration_value/duration_unit → duration/duration_term
-            # (same mapping as the legacy ai_fallback path — see _apply_ai_duration_mapping).
-            _apply_ai_duration_mapping(payload, _gp_filled)
-            for _gp_k, _gp_v in _gp_filled.items():
-                if payload.get(_gp_k) in (None, "", 0):
-                    payload[_gp_k] = _gp_v
-                    evidence.append({
-                        "field_key": _gp_k,
-                        "value": _gp_v,
-                        "confidence": 0.75,
-                        "method": "gemini_primary",
-                        "snippet": None,
-                    })
-            if emit:
-                await emit(
-                    "status",
-                    f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
-                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
-                    phase="extract",
-                    kind="gemini_primary_done",
-                    filled=list(_gp_filled.keys()),
-                    cost_usd=_gp_cost,
-                    input_tokens=_gp_in_tok,
-                    output_tokens=_gp_out_tok,
-                    url=url,
-                )
-    except asyncio.TimeoutError:
-        log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
-    except Exception as _gp_exc:
-        log.warning("gemini_primary: failed on %s — %s", url, _gp_exc)
-
     for module, extra_keys in _EXTRACTORS:
         kwargs: dict[str, Any] = {}
         for k in extra_keys:
@@ -337,16 +291,21 @@ async def extract_course(
                     url=url,
                 )
 
-    # T207/T208: per-course browser + vision fallback. Run BEFORE the AI
-    # fallback because (a) they're cheaper, (b) AI hallucinates plausible
-    # numbers when the page is image-only and the browser/vision pass
-    # provides ground truth that AI can use as additional context (when
-    # we then run AI). Both helpers are no-ops when the english slots
-    # are already populated.
+    # T207/T208: per-course browser fallback + Gemini PRIMARY + vision.
+    # Split into three separate try/except blocks so a failure in any one
+    # does not short-circuit the others.
+    #
+    # Order rationale:
+    #   1. Browser render first — gives Gemini real JS-rendered HTML (not just
+    #      the HTML shell that static fetch returns for SPA-based sites like KBS).
+    #   2. Gemini PRIMARY second — text-based extraction on the best available
+    #      HTML.  PRIMARY means Gemini wins over regex for the 16 hard fields;
+    #      regex/vision are fallbacks for anything Gemini leaves null.
+    #   3. Vision OCR last — screenshot-based extraction for image-heavy pages
+    #      where text extraction (regex+Gemini) still left gaps.
     rendered_html: str | None = None
     try:
         from app.services.scraper.per_course_browser import maybe_browser_refetch
-        from app.services.scraper.per_course_vision import maybe_vision_refetch
 
         browser_filled, browser_evidence, rendered_html = await maybe_browser_refetch(
             url, payload, emit=emit
@@ -354,6 +313,75 @@ async def extract_course(
         for k, v in browser_filled.items():
             payload.setdefault(k, v)
         evidence.extend(browser_evidence)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("per-course browser fallback errored on %s: %s", url, exc)
+
+    # ── Gemini Flash PRIMARY ─────────────────────────────────────────────────
+    # Uses rendered_html when available (JS-rendered SPA pages like KBS),
+    # falls back to raw static html for plain-HTML sites (ASA, Torrens, etc.).
+    # PRIMARY semantics: Gemini's value always wins over an earlier regex hit
+    # for the 16 hard fields.  Evidence entries for those fields are replaced
+    # so extraction_method correctly credits gemini_primary.
+    # Emit [GEMINI] unconditionally — even when 0 fields filled — so every
+    # course has a visible log entry for diagnostics.
+    try:
+        from app.services.scraper.extractors import gemini_primary as _gp
+
+        _gp_html = rendered_html or html
+        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok = await asyncio.wait_for(
+            _gp.extract_primary(_gp_html, url),
+            timeout=_AI_FALLBACK_TIMEOUT_SEC,
+        )
+        _gemini_primary_cost = _gp_cost
+
+        # Map duration_value/duration_unit → canonical duration/duration_term
+        # unconditionally (PRIMARY means Gemini beats any earlier regex hit).
+        if _gp_filled.get("duration_value") is not None:
+            try:
+                _gp_filled["duration"] = float(_gp_filled["duration_value"])
+            except (TypeError, ValueError):
+                pass
+        if _gp_filled.get("duration_unit"):
+            from app.services.scraper.extractors.duration import _normalise_unit as _nu
+            _gp_term = _nu(str(_gp_filled["duration_unit"]))
+            if _gp_term:
+                _gp_filled["duration_term"] = _gp_term
+
+        for _gp_k, _gp_v in _gp_filled.items():
+            if _gp_k in ("duration_value", "duration_unit"):
+                continue  # consumed by the mapped keys above
+            # PRIMARY: always overwrite — replace any prior evidence entry
+            payload[_gp_k] = _gp_v
+            evidence[:] = [e for e in evidence if e.get("field_key") != _gp_k]
+            evidence.append({
+                "field_key": _gp_k,
+                "value": _gp_v,
+                "confidence": 0.75,
+                "method": "gemini_primary",
+                "snippet": None,
+            })
+
+        # Always emit so every course has a [GEMINI] line in the live log
+        if emit:
+            await emit(
+                "status",
+                f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
+                f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
+                phase="extract",
+                kind="gemini_primary_done",
+                filled=list(_gp_filled.keys()),
+                cost_usd=_gp_cost,
+                input_tokens=_gp_in_tok,
+                output_tokens=_gp_out_tok,
+                url=url,
+            )
+    except asyncio.TimeoutError:
+        log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
+    except Exception as _gp_exc:
+        log.warning("gemini_primary: failed on %s — %s", url, _gp_exc)
+
+    try:
+        from app.services.scraper.per_course_vision import maybe_vision_refetch
 
         vision_filled, vision_evidence = await maybe_vision_refetch(
             url, rendered_html, payload, emit=emit,
@@ -362,8 +390,8 @@ async def extract_course(
         for k, v in vision_filled.items():
             payload.setdefault(k, v)
         evidence.extend(vision_evidence)
-    except Exception as exc:  # noqa: BLE001 — never break extraction here
-        log.warning("per-course browser/vision fallback errored on %s: %s", url, exc)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("per-course vision fallback errored on %s: %s", url, exc)
 
     # T003: VIT-specific static fallback for duration / intake / location.
     # The per-course browser pass clicks the "International students"

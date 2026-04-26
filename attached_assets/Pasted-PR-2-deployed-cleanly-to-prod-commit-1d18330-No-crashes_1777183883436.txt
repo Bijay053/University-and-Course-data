@@ -1,0 +1,113 @@
+PR 2 deployed cleanly to prod (commit `1d18330`). No crashes, cost telemetry works, `extraction_method` column populated. Both KBS + ASA scrapes successful with correct data.
+
+**But Gemini is barely firing.** Need a wiring adjustment.
+
+## Evidence
+
+**KBS scrape (29 courses staged):**
+```
+total_courses | had_gemini | no_gemini 
+           29 |          0 |        29
+```
+
+Only ONE Gemini call in the entire 35-course KBS log:
+```
+[GEMINI] https://www.kbs.edu.au/courses/study-abroad-program → 1 field(s) (cost=$0.000211, in=2776 out=9)
+```
+
+And that one course (Study Abroad) was rejected as a category landing page — didn't even stage. So `had_gemini = 0` for everything that actually staged.
+
+**ASA scrape (9 courses staged):**
+- Total cost: $0.0017
+- All 9 courses' `extraction_method` JSON shows: `regex`, `course_name.h1`, `per_course_vision_cached`, `uni_pdf:fees:per_course`, `ai_fallback`, `category:det` — **no `gemini_primary` anywhere**
+
+## Why it's firing too late
+
+Looking at the worker log flow on KBS:
+
+1. Browser fetch (often times out at 20s)
+2. Vision OCR runs on screenshots
+3. Central page cache hit → fee + English populated from cached data
+4. AI fallback runs for any STILL-missing fields
+5. (Gemini-primary apparently sits somewhere in here but rarely has anything to do)
+
+By the time the Gemini-primary check happens, the payload usually already has fee_schedule + english_requirements from cached central pages, fee from PDF, English from vision OCR. So Gemini sees "no missing fields, skip."
+
+This is **late fallback behavior**, not "primary" behavior.
+
+## What the original ticket asked for
+
+From Ticket 2:
+> "Hard fields — Gemini Flash as PRIMARY (not fallback): international_fee, domestic_fee, fee_term, duration_value/unit/text, ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall, sub_category, category, mode, intake_text"
+>
+> "Replace AI-fallback for fee/duration/IELTS/sub_category/mode with Gemini Flash as primary"
+
+The word "PRIMARY" was the whole point. PR 2 wired Gemini as another late fallback, which means:
+- It rarely fires (1/29 courses on KBS)
+- It contributes nothing when it does fire (Study Abroad was rejected)
+- The cost target was met but only because Gemini barely runs
+
+## What I want from this fix
+
+**Move the Gemini call earlier in the per-course pipeline:**
+
+1. After course HTML is fetched (browser or static)
+2. **BEFORE** the existing regex/CSS extractors run on hard fields
+3. **BEFORE** vision OCR
+4. **BEFORE** central page lookup pre-seeds the payload
+
+Flow should be:
+1. Fetch course HTML
+2. Call `gemini_primary.extract_primary(html, url)` for hard fields
+3. Pre-seed payload with Gemini's results
+4. Run regex/CSS only for fields Gemini left null (true fallback)
+5. Vision OCR runs only if both Gemini AND regex left fields null
+6. Central pages still pre-seed at the start (they're per-uni, not per-course)
+
+This way `extraction_method` should show `gemini_primary` for fees/IELTS/duration on most courses, with `regex`/`vision` only as fallback.
+
+## Validation criteria for the fix
+
+After the fix, an ASA + KBS scrape should produce:
+
+**ASA (9 courses):**
+- Bachelor's still 6/50/60/169 ✅
+- Master's still 6.5/58/85 ✅
+- Cost <$0.05
+- `extraction_method` shows `gemini_primary` on at least international_fee, ielts_overall, duration_value for >50% of courses
+
+**KBS (29 staged courses):**
+- All fields still correct (6/50/72/169/90 across levels, fees correct)
+- Cost <$0.10 for the full scrape
+- `had_gemini` count = at least 20 out of 29 (most courses use Gemini for hard fields)
+
+## Why this matters
+
+The original architectural promise was "hard fields handled by Gemini, easy fields by regex." That's what makes the system robust to per-uni HTML differences — the same Gemini prompt works across ASA, KBS, USQ, CSU, UTAS, VIT, Torrens because it reads natural language. Regex/CSS rules break per-uni and require ongoing maintenance.
+
+With current PR 2 wiring, we still rely on per-uni regex/CSS/vision rules for hard fields. The same brittle pattern that caused 9 commits this weekend will keep biting us when we expand to remaining unis.
+
+## State on prod
+
+- Code: `1d18330`
+- KBS + ASA both producing correct data (don't break these)
+- Worker idle
+- Gemini API key set, model `gemini-2.5-flash-lite`
+- `central_page_cache` table has 2 rows (KBS), ASA cache cleared earlier
+- `extraction_method` column populated on all rows
+
+## Constraints
+
+- Single PR, focused on reordering only — do NOT touch caching or central page logic
+- Test on KBS + ASA before pushing
+- Paste the cost log line + a sample `extraction_method` JSON showing `gemini_primary` populated for hard fields
+- No bundling — if you want to add a related improvement, ask first
+
+## Out of scope
+
+- Validation rules (still PR 3, gated on this fix)
+- Frontend changes
+- Touching regex/CSS extractors themselves (just changing call order)
+- Vision OCR replacement
+
+Ready when you are.
