@@ -272,6 +272,18 @@ async def _clear_stale_dedup(
     was built for).
     """
     from sqlalchemy import text as _text
+    # Clear pending rows from all non-running jobs (including completed jobs).
+    # This ensures that when a new scrape starts it replaces stale pending rows
+    # from previous runs so reviewers always see fresh data.
+    #
+    # Only currently RUNNING jobs are protected — their rows are mid-flight and
+    # must not be wiped from under the active scrape worker.
+    #
+    # Previous versions also excluded 'completed' jobs from deletion to avoid
+    # the PR-1.5 regression (history showing 0 rows after a subsequent scrape).
+    # That protection caused the opposite problem: new scrapes found all courses
+    # blocked by existing pending rows and staged 0 new courses. Users now
+    # prefer fresh replacement over stale history preservation.
     res = await db.execute(
         _text(
             """
@@ -282,7 +294,7 @@ async def _clear_stale_dedup(
               AND NOT EXISTS (
                   SELECT 1 FROM scrape_runtime_jobs j
                   WHERE j.runtime_job_id = sc.scrape_job_id
-                    AND j.status IN ('completed', 'running')
+                    AND j.status = 'running'
               )
             """
         ),

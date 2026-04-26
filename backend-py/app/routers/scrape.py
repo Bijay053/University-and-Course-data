@@ -778,7 +778,8 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     except Exception:
         pass
     
-    # Staged courses for this job
+    # Staged courses for this job — return full ReviewStagedCourse shape so
+    # ReviewScrapedCoursesTable renders correctly in the history "View Courses" panel.
     sc_rows = (await db.execute(
         select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
         .order_by(ScrapedCourse.created_at.desc())
@@ -786,9 +787,29 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     staged = [{
         "id": s.id,
         "courseName": s.course_name,
+        "category": s.category,
         "courseWebsite": s.course_website,
+        "courseLocation": s.course_location,
+        "duration": s.duration,
+        "durationTerm": s.duration_term,
+        "studyMode": s.study_mode,
+        "degreeLevel": s.degree_level,
+        "internationalFee": s.international_fee,
+        "feeTerm": s.fee_term,
+        "currency": s.currency,
+        "ieltsOverall": s.ielts_overall,
+        "pteOverall": s.pte_overall,
+        "toeflOverall": s.toefl_overall,
+        "cambridgeOverall": s.cambridge_overall,
+        "duolingoOverall": s.duolingo_overall,
+        "intakeMonths": s.intake_months,
+        "autoPublishStatus": s.auto_publish_status,
+        "eligibilityStatus": s.eligibility_status,
+        "notes": s.notes,
+        "completeness": s.completeness,
         "status": s.status,
         "createdAt": s.created_at.isoformat() if s.created_at else None,
+        "evidence": [],
     } for s in sc_rows]
     
     return {
@@ -1533,6 +1554,39 @@ async def staged_clear_rejected(
     )
     await db.commit()
     return {"ok": True, "deleted": result.rowcount or 0}
+
+
+class _BulkRejectBody(BaseModel):
+    reason: str = "bulk_reject"
+
+
+@router.post("/staged/bulk-reject/{university_id}")
+async def staged_bulk_reject(
+    university_id: int,
+    body: _BulkRejectBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Reject ALL pending staged courses for a university in one operation.
+
+    Uses the supplied ``reason`` (default ``"bulk_reject"``) — this is stored in
+    ``rejection_reason`` so reviewers can see why courses were mass-rejected.
+    Using a transient reason like ``"extractor_bug"`` or ``"bulk_reset"`` allows
+    the courses to be re-staged on the very next scrape without waiting for the
+    rejection-block window to expire.
+    """
+    from app.models import ScrapedCourse
+    from sqlalchemy import update
+
+    result = await db.execute(
+        update(ScrapedCourse)
+        .where(
+            ScrapedCourse.university_id == university_id,
+            ScrapedCourse.status == "pending",
+        )
+        .values(status="rejected", rejection_reason=body.reason)
+    )
+    await db.commit()
+    return {"ok": True, "rejected": result.rowcount or 0}
 
 
 @router.post("/staged/dedup/{university_id}")

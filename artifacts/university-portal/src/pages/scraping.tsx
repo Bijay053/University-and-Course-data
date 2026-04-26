@@ -1158,6 +1158,37 @@ export default function Scraping() {
   };
 
   const [clearingRejected, setClearingRejected] = useState(false);
+  const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
+
+  const handleBulkRejectAll = async () => {
+    if (!selectedUni || selectedUni === ALL) return;
+    const uniId = parseInt(selectedUni);
+    if (isNaN(uniId)) return;
+    setBulkRejecting(true);
+    try {
+      const res = await fetch(`/api/scrape/staged/bulk-reject/${uniId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "bulk_reset" }),
+      });
+      if (res.ok) {
+        const data = await readResponseJson<{ rejected: number }>(res);
+        toast({
+          title: `Bulk rejected ${data?.rejected ?? 0} courses`,
+          description: "All pending courses rejected. Run a new scrape to get fresh data.",
+        });
+        setShowBulkRejectDialog(false);
+        if (reviewJobId) await loadStagedCourses(reviewJobId);
+      } else {
+        toast({ title: "Bulk reject failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Bulk reject failed", description: "Network error", variant: "destructive" });
+    }
+    setBulkRejecting(false);
+  };
+
   const handleClearRejected = async () => {
     if (!selectedUni || selectedUni === ALL) return;
     const uniId = parseInt(selectedUni);
@@ -2019,6 +2050,19 @@ export default function Scraping() {
                     Clear rejected
                   </Button>
                 )}
+                {selectedUni && selectedUni !== ALL && stagedCourses.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => setShowBulkRejectDialog(true)}
+                    disabled={bulkRejecting}
+                    title="Reject all pending courses at once so a fresh scrape can replace them"
+                  >
+                    {bulkRejecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />}
+                    Reject all ({stagedCourses.length})
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -2270,6 +2314,35 @@ export default function Scraping() {
             >
               <StopCircle className="w-4 h-4 mr-2" />
               Cancel All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBulkRejectDialog} onOpenChange={(o) => { if (!o) setShowBulkRejectDialog(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <XCircle className="w-5 h-5 shrink-0" />
+              Reject All Pending Courses?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            This will reject all <strong>{stagedCourses.length}</strong> pending course(s).
+            They will be marked with reason <code className="bg-gray-100 px-1 rounded text-xs">bulk_reset</code>, which allows them to be re-staged immediately on the next scrape run.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowBulkRejectDialog(false)} disabled={bulkRejecting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleBulkRejectAll}
+              disabled={bulkRejecting}
+            >
+              {bulkRejecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Reject All
             </Button>
           </DialogFooter>
         </DialogContent>
