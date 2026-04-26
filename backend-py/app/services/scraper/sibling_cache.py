@@ -65,6 +65,27 @@ def _bucket_for(payload: dict[str, Any]) -> str:
     return "unknown"
 
 
+_CROSS_LEVEL_METHODS: Final = (
+    # central_page:english fills every course in the scrape with the same
+    # university-level requirement — it may reflect only one degree-level's
+    # numbers (e.g. plain HTTP fetch returns Bachelor's table only).  Using
+    # these values to build the bucket cache would seed every bucket with the
+    # same wrong value; they may still be useful as a last-resort fallback
+    # applied directly to courses that have NO other English data, but they
+    # must NOT be used to drive the sibling-cache vote.
+    "central_page:english",
+    # sibling_cache: values are themselves derived from previous bucket votes
+    # — including them would cause circular reinforcement of stale data.
+    # The prefix covers all variants: sibling_cache:undergraduate,
+    # sibling_cache:postgraduate, sibling_cache:unknown.
+    "sibling_cache:",
+)
+
+
+def _is_cross_level_method(method: str) -> bool:
+    return any(method.startswith(pfx) for pfx in _CROSS_LEVEL_METHODS)
+
+
 def _build_bucket_cache(
     results: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
@@ -74,6 +95,13 @@ def _build_bucket_cache(
     sibling has a value (so back-fill never invents data). Ties on
     frequency are broken by Counter's insertion order, which matches
     the per-course gather() return order — deterministic across runs.
+
+    Values that came from ``central_page:english`` or a previous
+    ``sibling_cache:*`` round are excluded from the vote: the former may
+    reflect only one degree-level's requirements (causing cross-level
+    contamination), and the latter would create circular reinforcement.
+    Only values extracted directly from per-course pages (HTML, PDF,
+    browser, AI, vision) are eligible to seed the cache.
     """
     buckets: dict[str, dict[str, Counter]] = {}
     for r in results:
@@ -84,9 +112,21 @@ def _build_bucket_cache(
         slot_counters = buckets.setdefault(
             bucket, {k: Counter() for k in _ENGLISH_SLOTS}
         )
+        # Build a quick lookup: field_key → method that actually SET the value.
+        # first-write-wins in the pipeline means the earliest evidence entry
+        # for a key is the one that set the payload value.
+        evidence_method: dict[str, str] = {}
+        for ev in r.get("evidence") or []:
+            fk = ev.get("field_key", "")
+            if fk and fk not in evidence_method:
+                evidence_method[fk] = ev.get("method", "")
+
         for k in _ENGLISH_SLOTS:
             v = payload.get(k)
             if v in (None, "", 0):
+                continue
+            # Skip values that came from cross-level fallbacks.
+            if _is_cross_level_method(evidence_method.get(k, "")):
                 continue
             slot_counters[k][v] += 1
     cache: dict[str, dict[str, Any]] = {}

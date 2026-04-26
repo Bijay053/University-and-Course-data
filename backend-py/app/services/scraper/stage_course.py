@@ -177,6 +177,23 @@ async def stage_course(
             extra={"rejected_id": recent_rejection},
         )
 
+    # Canonicalize degree_level to the standard apostrophe-s forms used by
+    # the degree_level extractor and the sibling-cache bucket logic.
+    # Older scrapes / AI fallbacks sometimes returned bare "Master" or
+    # "Bachelor" (without the "'s") producing duplicate variants in the DB
+    # that break every level-based query and filter.
+    _DEGREE_LEVEL_CANONICAL: dict[str, str] = {
+        "bachelor":  "Bachelor's",
+        "master":    "Master's",
+        "doctorate": "Doctorate",
+        "doctor":    "Doctorate",
+    }
+    _raw_dl = (payload.get("degree_level") or "").strip()
+    _canon = _DEGREE_LEVEL_CANONICAL.get(_raw_dl.lower())
+    if _canon:
+        payload = dict(payload)
+        payload["degree_level"] = _canon
+
     sc = ScrapedCourse(
         scrape_job_id=scrape_job_id,
         university_id=university_id,

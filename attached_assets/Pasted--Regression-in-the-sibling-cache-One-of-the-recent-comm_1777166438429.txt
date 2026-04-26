@@ -1,0 +1,92 @@
+**Regression in the sibling cache.** One of the recent commits (likely `7f3d67b`, `4d72717`, or `ff46d04`) changed how the sibling cache propagates English test scores. Now Master's courses receive Bachelor's-level scores. Affects ASA AND KBS, probably every uni that has both UG + PG programs in one scrape.
+
+---
+
+## Repro / evidence
+
+The same ASA course (Master of Information Technology — Artificial Intelligence) has been scraped 5 times across recent jobs. Look at the data:
+
+```
+degree_level | ielts_overall | pte_overall | toefl_overall | cambridge_overall
+-------------+---------------+-------------+---------------+------------------
+Master's     | 6.5           | 58          | 85            | 169    ← OLD scrape (correct)
+Master       | 6.5           | 58          | 85            |        ← OLD scrape (correct)
+Master's     | 6.0           |             | 60            | 169    ← NEW scrape (WRONG)
+Master's     | 6.0           |             | 60            | 169    ← NEW scrape (WRONG)
+Master's     | 6.5           | 58          | 85            | 169    ← (correct)
+```
+
+ASA's published requirements: Master's = IELTS 6.5 / PTE 58 / TOEFL 85. The two new rows show IELTS 6.0 / TOEFL 60 — those are Bachelor's-level scores, applied to a Master's course.
+
+The worker log confirms what's happening:
+
+```
+[EXTRACT ] [sibling cache ↻ build undergraduate] cambridge=169 ielts=6.0 pte=50 toefl=60
+[EXTRACT ] [sibling cache ↻ build postgraduate]  cambridge=169 ielts=6.0 pte=50 toefl=60
+```
+
+Undergrad and postgrad cache entries are **identical**. The level-aware split is broken — postgrad is being filled with undergrad values.
+
+---
+
+## Same bug on KBS
+
+KBS data is even more uniform:
+
+```
+degree_level         | count | ielts_values
+---------------------+-------+--------------
+Bachelor's           |    16 | {6}
+Diploma              |     6 | {6}
+Graduate Certificate |    21 | {6, 6.5}
+Master's             |    47 | {6}     ← should be 6.5
+```
+
+All 47 KBS Master's courses show IELTS=6.0. KBS published policy is IELTS 6.5 for postgrad. We didn't catch this earlier because we were focused on fees.
+
+---
+
+## Where to look
+
+1. **The sibling cache code in central_pages.py / extractors.** Whatever logic decides which scores go into the `undergraduate` vs `postgraduate` slot is now mapping both buckets to the same source. Likely a fix from `7f3d67b` (entryPage no fee signals) or `ff46d04` (sub_category mappings) collapsed the level distinction.
+
+2. **Compare to git history** — find the commit where the sibling cache learned about levels. Check what changed in the last 3 KBS commits.
+
+3. **Verify by running ASA on a previous commit** (e.g., `95874a8`, before the 3 KBS commits). If ASA Masters get IELTS 6.5 there, the regression entered with one of those 3 commits.
+
+---
+
+## What I want fixed
+
+- Sibling cache must keep undergraduate / postgraduate buckets distinct
+- Level detection must look at `degree_level` field per course (Bachelor's → UG, Master's / Graduate Certificate / Graduate Diploma → PG, Diploma is ambiguous — needs explicit rule)
+- Score broadcast within a level group is fine; cross-level broadcast is the bug
+
+**Please do NOT also touch fees, sub_category, or anything else in this PR.** This is a focused English-scores regression. Bundling makes verification slow and is exactly what's been causing the whack-a-mole pattern (KBS fix → ASA broken → ASA fix → VIT broken → etc).
+
+---
+
+## Bonus issue while you're in there — degree_level normalization
+
+Current DB has FOUR variants of the same level value:
+```
+Bachelor      6 rows
+Bachelor's   40 rows
+Master        3 rows
+Master's     31 rows
+```
+
+Please canonicalize to one form (suggest `Bachelor's` and `Master's` since those are the majority). Apply at write time in the staging code. This is small but breaks every level-based query.
+
+---
+
+## State on prod
+
+- 0 active jobs, celery stopped, prod is idle and clean
+- KBS row state preserved (90 rows, fees correct from Bug 4 fix, sub_categories backfilled from your migration)
+- ASA row state preserved (80 rows, fees correct, English scores wrong on the 2 Master rows from the latest scrape)
+- Holding all other uni scrapes (CSU, USQ, UTAS, Torrens re-runs) until this regression lands
+
+**One more thing for context** — separate, bigger ticket coming after this one is verified: a regression-test framework so this stops happening. The pattern of "fix one uni, break another" has cost about 2 weeks across this project. Need a safety net before we keep adding unis. I'll write that ticket once Ticket 1 is shipped — don't start on it now, just FYI so the architecture's on your radar.
+
+Thanks. Will pull and verify when this lands.
