@@ -250,7 +250,7 @@ async def extract_primary(
     url: str,
     *,
     timeout: float = 30.0,
-) -> tuple[dict[str, Any], float, int, int]:
+) -> tuple[dict[str, Any], float, int, int, dict]:
     """Run one Gemini Flash call to extract all hard fields.
 
     Parameters
@@ -275,17 +275,6 @@ async def extract_primary(
     text = _trim_text(html)
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
-    # ── DEBUG instrumentation (remove after diagnosis) ───────────────────────
-    log.warning(
-        "[GP-DEBUG] %s | html_len=%d text_len=%d prompt_len=%d",
-        url,
-        len(html) if html else 0,
-        len(text),
-        len(prompt),
-    )
-    log.warning("[GP-DEBUG] text[:500] = %r", text[:500])
-    # ─────────────────────────────────────────────────────────────────────────
-
     try:
         resp = await _asyncio.wait_for(
             gemini_client.generate(prompt, max_output_tokens=512),
@@ -293,18 +282,14 @@ async def extract_primary(
         )
     except _asyncio.TimeoutError:
         log.warning("gemini_primary: timed out after %ss on %s", timeout, url)
-        return {}, 0.0, 0, 0
+        return {}, 0.0, 0, 0, {}
     except Exception as exc:
         log.warning("gemini_primary: generate failed on %s: %s", url, exc)
-        return {}, 0.0, 0, 0
+        return {}, 0.0, 0, 0, {}
 
     if resp.skipped:
         log.warning("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
-        return {}, 0.0, resp.input_tokens, 0
-
-    # ── DEBUG: raw model output ──────────────────────────────────────────────
-    log.warning("[GP-DEBUG] raw_response = %r", resp.text[:400] if resp.text else "(empty)")
-    # ─────────────────────────────────────────────────────────────────────────
+        return {}, 0.0, resp.input_tokens, 0, {}
 
     raw_data = _parse_json(resp.text)
     filled: dict[str, Any] = {}
@@ -320,4 +305,11 @@ async def extract_primary(
         len(filled),
         resp.cost_usd,
     )
-    return filled, resp.cost_usd, resp.input_tokens, resp.output_tokens
+    # Debug dict — returned to caller so it can emit via the SSE/Celery log path
+    _dbg: dict[str, Any] = {
+        "html_len": len(html) if html else 0,
+        "text_len": len(text),
+        "text_snippet": text[:500],
+        "raw_response": (resp.text or "")[:400],
+    }
+    return filled, resp.cost_usd, resp.input_tokens, resp.output_tokens, _dbg

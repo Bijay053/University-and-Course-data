@@ -1,0 +1,85 @@
+Pulled `0531400`, restarted uni-celery, fired KBS scrape end-to-end. Scrape completed cleanly (29 staged, $0.0070 cost). But the GP-DEBUG log lines you added are NOT appearing anywhere.
+
+## What I ran
+
+```bash
+git pull origin main
+# Updating 862d5d6..0531400
+# backend-py/app/services/scraper/extractors/gemini_primary.py | 17 ++++++++++++++++-
+# backend-py/app/services/scraper/pipelines/single_course.py   |  9 +++++++++
+# 2 files changed, 25 insertions(+), 1 deletion(-)
+
+systemctl restart uni-celery
+# Active: active (running) since Sun 2026-04-26 06:42:51 UTC
+
+# Fired KBS scrape from UI → ran for 8m 13s, completed normally
+
+journalctl -u uni-celery --since '15 min ago' | grep "GP-DEBUG" | grep "/master-of-information-technology" | grep -v "extension\|business-analytics"
+# [empty — no output]
+```
+
+I also ran without filters:
+```bash
+journalctl -u uni-celery --since '15 min ago' | grep "GP-DEBUG"
+# [empty — no output, no GP-DEBUG lines anywhere]
+```
+
+The code shows the file changes deployed correctly:
+```bash
+git log --oneline -1
+# 0531400 (HEAD -> main, origin/main) ...
+```
+
+But the GP-DEBUG instrumentation isn't producing any log output during the scrape.
+
+## Possible causes
+
+1. **Log level mismatch** — the GP-DEBUG lines are using `logger.debug()` but the worker is configured at INFO level, so DEBUG messages get filtered out. The `[GEMINI]` lines (which DO appear) are using a different log level (`info` or `print`).
+2. **Conditional guard** — the GP-DEBUG block is wrapped in an `if` that's evaluating False, so the lines never execute.
+3. **Wrong file location** — the GP-DEBUG calls were placed in a code path that isn't reached for KBS courses.
+4. **Print vs log** — if the lines use `print()` instead of the logger, they may be going to stdout which Celery captures differently.
+
+## What I want
+
+Fix the instrumentation so the GP-DEBUG output actually appears in `journalctl -u uni-celery`. The same logging mechanism that produces `[GEMINI] ... → N field(s)` should be used for GP-DEBUG — those `[GEMINI]` lines DO appear in journalctl. So whatever logger emits `[GEMINI]`, use the same one for GP-DEBUG.
+
+For reference, the `[GEMINI]` lines that work look like:
+```
+[EXTRACT ] [GEMINI] https://www.kbs.edu.au/courses/master-of-information-technol → 0 field(s) (cost=$0.000213, in=2779 out=14)
+```
+
+Make the GP-DEBUG lines emit the same way (with the `[EXTRACT]` prefix).
+
+## Additional finding from this run
+
+Looking at the per-course Gemini calls in this scrape:
+- `out=10`, `out=12`, `out=14`, `out=15`, `out=17` — **output token count varies slightly per course**
+- `in=2776`, `in=2779`, `in=2780`, `in=2783`, `in=2785`, `in=2789`, `in=2482` (non-award) — **input token count also varies**
+
+So `html_to_text` IS producing slightly different sized text per course, and Gemini IS responding with slightly different content. But still 0 fields extracted on every course.
+
+This tells us:
+- It's NOT pure boilerplate (input varies by ~300 tokens)
+- It's NOT identical responses (output varies by ~7 tokens)
+- Something more nuanced is happening — possibly the prompt structure or the JSON parsing
+
+**That's why we need GP-DEBUG output to actually appear.** Without seeing `text[:500]` and `raw_response`, we can't tell if:
+- The text has course content but in a format Gemini can't parse
+- Gemini is returning valid JSON but with all-null values
+- There's a JSON parsing error eating the response
+
+## State on prod
+
+- Code: `0531400`
+- KBS data still correct (no regression: 6/50/72, fees correct)
+- ASA data still correct
+- Worker idle
+- 29 KBS courses staged in pending state, ready for re-run with proper diagnostics
+
+## Constraints
+
+- Just fix the GP-DEBUG output so it appears in journalctl
+- Don't change anything else
+- Confirm by showing me a sample expected log line format
+
+Ready when GP-DEBUG actually produces output.

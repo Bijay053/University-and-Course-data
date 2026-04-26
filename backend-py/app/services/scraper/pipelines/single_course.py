@@ -328,20 +328,39 @@ async def extract_course(
         from app.services.scraper.extractors import gemini_primary as _gp
 
         _gp_html = rendered_html or html
-        # ── DEBUG (remove after diagnosis) ──────────────────────────────────
-        log.warning(
-            "[GP-DEBUG] %s | static_html_len=%d rendered_html_len=%d using=%s",
-            url,
-            len(html) if html else 0,
-            len(rendered_html) if rendered_html else 0,
-            "rendered" if rendered_html else "static",
-        )
-        # ────────────────────────────────────────────────────────────────────
-        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok = await asyncio.wait_for(
+        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
             _gp.extract_primary(_gp_html, url),
             timeout=_AI_FALLBACK_TIMEOUT_SEC,
         )
         _gemini_primary_cost = _gp_cost
+
+        # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
+        if emit and _gp_dbg:
+            await emit(
+                "status",
+                f"[GP-DEBUG] static={len(html) if html else 0}B "
+                f"rendered={len(rendered_html) if rendered_html else 0}B "
+                f"using={'rendered' if rendered_html else 'static'} "
+                f"text_len={_gp_dbg.get('text_len', '?')}",
+                phase="extract",
+                kind="gp_debug_html",
+                url=url,
+            )
+            await emit(
+                "status",
+                f"[GP-DEBUG] text[:500]={_gp_dbg.get('text_snippet', '')!r}",
+                phase="extract",
+                kind="gp_debug_text",
+                url=url,
+            )
+            await emit(
+                "status",
+                f"[GP-DEBUG] raw_response={_gp_dbg.get('raw_response', '')!r}",
+                phase="extract",
+                kind="gp_debug_raw",
+                url=url,
+            )
+        # ────────────────────────────────────────────────────────────────────
 
         # Map duration_value/duration_unit → canonical duration/duration_term
         # unconditionally (PRIMARY means Gemini beats any earlier regex hit).
