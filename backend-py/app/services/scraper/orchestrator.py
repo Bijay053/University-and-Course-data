@@ -517,7 +517,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                     effective_config.setdefault("uniPages", {})["feePage"] = discovered
 
-            central_data = await prefetch_central_pages(effective_config, emit=emit)
+            central_data = await prefetch_central_pages(
+                effective_config, emit=emit, university_id=uni.id
+            )
         except Exception as exc:  # noqa: BLE001
             log.warning("central_pages prefetch failed: %s", exc)
             central_data = None

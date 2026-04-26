@@ -1,0 +1,145 @@
+## Background
+
+This weekend (7 days of work) the scraper hit the same failure mode repeatedly: hard fields (fee, duration, IELTS, sub_category, mode) extracted via regex/CSS work for one uni's HTML structure, then break the moment another uni renders the same data differently. Every PR that fixed one uni regressed another. Examples from this weekend alone:
+
+- ASA Master IELTS regressed 3 times across 5 PRs (6.5 → 6.0 → NULL → 6.0 → NULL)
+- KBS PG English broken by ASA fix until per-uni `central_english_pg_skip` flag added
+- MBA name prefixes stripped by name-extractor change
+- `_asyncio` typo killed English fetch silently for 3+ days
+- Sibling cache contamination required cross-level method blocklist
+- Two Specialisations bypassed name-based filter, needed URL-based reject
+
+Root cause: hard fields are extracted via brittle per-site rules. Each uni needs custom regex/CSS adjustments. AI fallback is a last resort that runs late in the pipeline with stale/missing data, so it doesn't help.
+
+## Proposed architecture
+
+**Targeted Gemini extraction for hard fields, with caching and validation.**
+
+### Field classification
+
+**Easy fields — keep regex/CSS (no Gemini, no cost):**
+- course_name (HTML title tag, h1)
+- URL (already known)
+- location (regex on city names)
+- discovery (sitemap, listing page crawl)
+- degree_level (already extracted from name)
+
+**Hard fields — Gemini Flash as PRIMARY (not fallback):**
+- international_fee, domestic_fee, fee_term
+- duration_value, duration_unit, duration_text
+- ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall
+- sub_category, category
+- mode (On Campus / Online / Blended)
+- intake_text
+
+### Caching
+
+Central pages (fee schedule, English requirements) cached per-uni for 30 days. New table:
+
+```sql
+CREATE TABLE central_page_cache (
+  university_id INT NOT NULL,
+  page_type TEXT NOT NULL,  -- 'fee_schedule', 'english_requirements'
+  url TEXT NOT NULL,
+  raw_html TEXT,
+  parsed_data JSONB,
+  fetched_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (university_id, page_type)
+);
+```
+
+On scrape start: check cache. If hit and not expired, use cached `parsed_data`. If miss or expired, fetch + parse + cache. This eliminates ~80% of the per-scrape Gemini calls (one fetch per central page per 30 days, not per course).
+
+Manual cache invalidation via UI button "Refresh central pages" for when a uni updates their site mid-cycle.
+
+### Validation
+
+Two-tier validation runs after Gemini extraction, before staging:
+
+**Hard-fail (rejects staging, marks for manual review):**
+- `international_fee` is NULL or 0
+- `ielts_overall` outside 4.0-9.0
+- `pte_overall` outside 30-90
+- `toefl_overall` outside 30-120
+- `duration_value` is NULL or 0
+- `course_name` matches a known category-page pattern (already implemented)
+
+**Soft-flag (stages anyway, sets `needs_review=true`):**
+- `international_fee` outside $5,000-$120,000 (flag for sanity check)
+- `duration_value` outside 0.5-8 years
+- `ielts_overall` differs from sibling courses by ≥1.0 (e.g., one Master's at 5.5 when others are 6.5)
+- `sub_category` is NULL despite category being set
+- `mode` is NULL
+
+Validation results visible in the existing Review modal so the human reviewer sees WHY a row needs attention.
+
+### Cost target
+
+**< $30/month for weekly full scrapes across 7 unis.**
+
+Math:
+- 7 unis × ~50 courses avg = 350 courses/week
+- Per course: 1 Gemini call with ~5KB of page HTML → ~$0.001 with Flash
+- Plus central page calls: 7 unis × 2 central pages × (1 / 4 weeks) = 3.5 calls/week (cached)
+- Weekly: ~$0.35 + central = ~$0.50/week
+- Monthly: ~$2/month worst case
+
+Well under the $30 target. The cache makes this trivially cheap.
+
+## Phased rollout (3 PRs)
+
+**PR 1 — Caching layer.** Add `central_page_cache` table, refactor `prefetch_central_pages()` to use it. No behavior change yet, just caching. Verify: 2nd scrape of same uni within 30 days should show cache-hit log line and skip the central page fetch. Test on KBS + ASA. Time estimate: 1-2 hours.
+
+**PR 2 — Gemini as primary for hard fields.** Replace existing AI-fallback with Gemini-first extraction. Build per-field prompts. Keep existing regex/CSS as fallback if Gemini errors. Validate against KBS + ASA known-good values (we have these locked in from this weekend). Time estimate: 3-5 hours.
+
+**PR 3 — Validation rules + Review modal integration.** Hard-fail and soft-flag rules as specified above. Add `validation_warnings` jsonb column on `scraped_courses`. Surface in Review modal. Time estimate: 2-3 hours.
+
+Each PR ships independently with manual verification on KBS + ASA before merge.
+
+## Validation criteria for each PR
+
+**PR 1 (caching):**
+- First KBS scrape: central pages fetched and cached (log: `[CACHE] miss → fetched → cached for 30d`)
+- Second KBS scrape within 30 days: log shows `[CACHE] hit → using cached central pages` and skips fetch
+- ASA scrape: same behavior
+- Manual cache invalidation works via API/UI
+
+**PR 2 (Gemini primary):**
+- KBS scrape produces same English values as today (6.0/50/72/169 all levels)
+- ASA scrape produces correct level-keyed English (Bachelor's 6/50/60, Master's 6.5/58/85)
+- Fee column populated for all KBS + ASA courses
+- sub_category populated where category is set
+- Cost log line at end of scrape: total Gemini tokens + estimated USD
+- Per-scrape cost <$0.10 for KBS or ASA
+
+**PR 3 (validation):**
+- Force a hard-fail by manually corrupting test data (e.g., set ielts=15.0) — row not staged, marked `validation_failed`
+- Force a soft-flag (e.g., fee=$500) — row staged with `needs_review=true`
+- Review modal shows validation warnings prominently
+- Existing valid KBS + ASA data passes all validation
+
+## What I want from Replit on this ticket
+
+Three separate PRs, in the order above. Each PR includes:
+- Single-paragraph description of what the PR does + which files it touches
+- Validation results (run KBS and ASA scrapes, paste English/fee/duration outputs)
+- Estimated per-scrape cost from Gemini token count
+- No bundling. If Replit wants to add a related improvement, ask first.
+
+After all 3 PRs are merged and verified on KBS + ASA, we'll roll out to remaining unis (Torrens, USQ, CSU, UTAS, VIT) one at a time.
+
+## Out of scope for this ticket
+
+- Vision OCR replacement (separate ticket if needed)
+- Discovery / sitemap parsing (regex-based, working fine)
+- Frontend changes beyond Review modal validation badges
+- Changing existing per-uni `scrape_config` structure
+- Touching the sibling-cache mechanism (this ticket should make it largely obsolete)
+
+## State on prod
+
+- Code: `4b60d11` (Replit's commit on `main`, includes Option A browser-rendered central English page — deploy pending separate confirmation)
+- KBS + ASA both verified working today
+- Worker idle
+- Ready to start Ticket 2 work whenever Replit picks it up

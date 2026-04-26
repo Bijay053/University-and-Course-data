@@ -601,6 +601,135 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Central-page cache helpers
+# ---------------------------------------------------------------------------
+#
+# Stores per-university, per-page-type parsed data so scrapes that run
+# within 30 days of the last fetch skip the network round-trip entirely.
+# All functions are fault-tolerant: if the ``central_page_cache`` table
+# doesn't exist yet (e.g. DB migration pending) they log a warning and
+# return as if the cache were empty — no behaviour change for callers.
+#
+# page_type constants:
+#   "fee_schedule"          — parsed fee records + fee_page_url
+#   "english_requirements"  — english slots + english_page_url + english_by_level
+
+_CACHE_TTL_DAYS = 30
+
+
+async def _cache_get(university_id: int, page_type: str) -> dict[str, Any] | None:
+    """Return unexpired cached parsed_data for (university_id, page_type), or None."""
+    try:
+        from datetime import datetime, timezone
+
+        from sqlalchemy import select
+
+        from app.database import AsyncSessionLocal
+        from app.models.central_page_cache import CentralPageCache
+
+        async with AsyncSessionLocal() as session:
+            row = await session.scalar(
+                select(CentralPageCache).where(
+                    CentralPageCache.university_id == university_id,
+                    CentralPageCache.page_type == page_type,
+                )
+            )
+            if row is None:
+                return None
+            # Normalise to UTC-aware before comparison
+            expires = row.expires_at
+            if expires.tzinfo is None:
+                from datetime import timezone as _tz
+                expires = expires.replace(tzinfo=_tz.utc)
+            if expires > datetime.now(timezone.utc):
+                return row.parsed_data
+            # Expired — treat as miss (caller will re-fetch and overwrite)
+            return None
+    except Exception as exc:
+        log.warning(
+            "central_page_cache: get(%s, %s) failed — %s", university_id, page_type, exc
+        )
+        return None
+
+
+async def _cache_set(
+    university_id: int,
+    page_type: str,
+    url: str,
+    parsed_data: dict[str, Any],
+    ttl_days: int = _CACHE_TTL_DAYS,
+) -> None:
+    """Upsert a cache entry.  Silently swallows errors so failures never abort scrapes."""
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from app.database import AsyncSessionLocal
+        from app.models.central_page_cache import CentralPageCache
+
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(days=ttl_days)
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                pg_insert(CentralPageCache)
+                .values(
+                    university_id=university_id,
+                    page_type=page_type,
+                    url=url,
+                    parsed_data=parsed_data,
+                    fetched_at=now,
+                    expires_at=expires,
+                )
+                .on_conflict_do_update(
+                    index_elements=["university_id", "page_type"],
+                    set_={
+                        "url": url,
+                        "parsed_data": parsed_data,
+                        "fetched_at": now,
+                        "expires_at": expires,
+                    },
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+        log.info(
+            "[CACHE] cached %s/%s for %d days (expires %s)",
+            university_id,
+            page_type,
+            ttl_days,
+            expires.strftime("%Y-%m-%d"),
+        )
+    except Exception as exc:
+        log.warning(
+            "central_page_cache: set(%s, %s) failed — %s", university_id, page_type, exc
+        )
+
+
+async def invalidate_central_cache(university_id: int) -> int:
+    """Delete all cache entries for a university.  Returns number of rows deleted."""
+    try:
+        from sqlalchemy import delete
+
+        from app.database import AsyncSessionLocal
+        from app.models.central_page_cache import CentralPageCache
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                delete(CentralPageCache).where(
+                    CentralPageCache.university_id == university_id
+                )
+            )
+            await session.commit()
+            deleted = result.rowcount  # type: ignore[attr-defined]
+            log.info("central_page_cache: invalidated %d row(s) for uni %s", deleted, university_id)
+            return deleted
+    except Exception as exc:
+        log.warning("central_page_cache: invalidate(%s) failed — %s", university_id, exc)
+        return 0
+
+
+# ---------------------------------------------------------------------------
 # Public entry-point
 # ---------------------------------------------------------------------------
 
@@ -608,6 +737,7 @@ async def prefetch_central_pages(
     scrape_config: dict[str, Any] | None,
     *,
     emit=None,
+    university_id: int | None = None,
 ) -> CentralData:
     """Pre-fetch and parse central fee + English-requirements pages.
 
@@ -620,6 +750,12 @@ async def prefetch_central_pages(
     ``{"fees": [...], "english": {...}, "fee_page_url": str|None, "english_page_url": str|None}``
 
     Always returns a valid dict (empty fields, never raises).
+
+    When ``university_id`` is provided the results are cached in
+    ``central_page_cache`` for ``_CACHE_TTL_DAYS`` days.  Subsequent calls
+    within that window return the cached data immediately without any network
+    round-trip.  Cache misses and cache errors are transparent — behaviour is
+    identical to the pre-cache implementation.
     """
     empty: CentralData = {
         "fees": [],
@@ -639,61 +775,80 @@ async def prefetch_central_pages(
         or uni_pages.get("requirementsPdf")
     )
 
+    # Always preserve the pg_skip flag — single_course.py reads it to gate
+    # the PG clear-out pass regardless of whether any central pages exist.
+    _pg_skip = bool(scrape_config.get("central_english_pg_skip", False))
+
     if not fee_url and not english_url:
-        # Preserve the pg_skip flag even when there are no central pages to
-        # fetch — single_course.py reads it AFTER all extractors have run to
-        # perform the PG clear-out pass.  Returning `empty` verbatim would
-        # silently drop the flag, causing vision-OCR scores to survive for PG
-        # courses on universities where the flag should suppress them.
-        return {
-            **empty,
-            "central_english_pg_skip": bool(
-                scrape_config.get("central_english_pg_skip", False)
-            ),
-        }
+        return {**empty, "central_english_pg_skip": _pg_skip}
 
     result: CentralData = {
         "fees": [],
         "english": {},
         "fee_page_url": fee_url,
         "english_page_url": english_url,
-        # Per-university opt-in: when True, the central English page values are
-        # NOT applied to postgraduate courses (Master's, Graduate Certificate,
-        # Graduate Diploma, Doctorate).  Use when a university's central English
-        # page is fetched via plain HTTP and the PG row is JS-rendered (e.g. ASA).
-        # Default False — apply central English values to all degree levels.
-        "central_english_pg_skip": bool(scrape_config.get("central_english_pg_skip", False)),
+        "central_english_pg_skip": _pg_skip,
     }
 
     # ── Fetch fee page ──────────────────────────────────────────────────────
     if fee_url and not fee_url.endswith(".pdf"):
-        try:
-            fee_html = await _fetch_with_browser_fallback(fee_url)
-            if fee_html:
-                records = _parse_fee_page_html(fee_html, fee_url)
-                result["fees"] = records
+        # Check cache first when university_id is known
+        _fee_cached: dict[str, Any] | None = None
+        if university_id is not None:
+            _fee_cached = await _cache_get(university_id, "fee_schedule")
+            if _fee_cached is not None:
+                result["fees"] = _fee_cached.get("fees", [])
                 if emit:
                     await emit(
                         "status",
-                        f"[CENTRAL] fee page parsed → {len(records)} program record(s) from {fee_url}",
+                        f"[CACHE] fee_schedule hit → {len(result['fees'])} record(s) "
+                        f"(cached, skipping fetch of {fee_url})",
                         phase="discover",
-                        kind="central_fee_parsed",
-                        count=len(records),
+                        kind="central_fee_cache_hit",
+                        count=len(result["fees"]),
                         url=fee_url,
                     )
-                log.info("central_pages: %d fee records from %s", len(records), fee_url)
-        except Exception as exc:
-            log.warning("central_pages: fee page fetch/parse failed (%s): %s", fee_url, exc)
-            if emit:
-                await emit(
-                    "status",
-                    f"[CENTRAL] fee page fetch failed ({fee_url}): {exc}",
-                    phase="discover",
-                    kind="central_fee_error",
-                    level="warn",
-                    url=fee_url,
-                    error=str(exc)[:200],
+                log.info(
+                    "[CACHE] fee_schedule hit for uni %s (%d records)",
+                    university_id, len(result["fees"]),
                 )
+
+        if _fee_cached is None:
+            try:
+                fee_html = await _fetch_with_browser_fallback(fee_url)
+                if fee_html:
+                    records = _parse_fee_page_html(fee_html, fee_url)
+                    result["fees"] = records
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[CENTRAL] fee page parsed → {len(records)} program record(s) from {fee_url}",
+                            phase="discover",
+                            kind="central_fee_parsed",
+                            count=len(records),
+                            url=fee_url,
+                        )
+                    log.info("central_pages: %d fee records from %s", len(records), fee_url)
+                    # Store in cache
+                    if university_id is not None:
+                        await _cache_set(
+                            university_id,
+                            "fee_schedule",
+                            fee_url,
+                            {"fees": records, "fee_page_url": fee_url},
+                        )
+            except Exception as exc:
+                log.warning("central_pages: fee page fetch/parse failed (%s): %s", fee_url, exc)
+                if emit:
+                    await emit(
+                        "status",
+                        f"[CENTRAL] fee page fetch failed ({fee_url}): {exc}",
+                        phase="discover",
+                        kind="central_fee_error",
+                        level="warn",
+                        url=fee_url,
+                        error=str(exc)[:200],
+                    )
 
     # ── Fetch English-requirements page ────────────────────────────────────
     # Default: plain HTTP only, bounded at 45 s.  Some servers (ASA, etc.)
@@ -707,73 +862,122 @@ async def prefetch_central_pages(
     # The level-keyed dict is stored in ``result["english_by_level"]`` and
     # consumed by single_course.py to apply the correct values per degree
     # level instead of falling back to the "same for all" flat dict.
-    _use_browser_for_english = bool(scrape_config.get("central_english_pg_skip", False))
+    _use_browser_for_english = _pg_skip
 
     if english_url and not english_url.endswith(".pdf"):
-        try:
-            if _use_browser_for_english:
-                # Hard 75 s outer cap — the inner browser fetch has its own
-                # 60 s guard so the total wall time is bounded.
-                eng_html = await asyncio.wait_for(
-                    _fetch_english_with_browser(english_url),
-                    timeout=75,
-                )
-            else:
-                eng_html = await asyncio.wait_for(
-                    fetch_html(english_url),
-                    timeout=45,
-                )
-            if eng_html:
-                # Flat parse — first-seen value wins (typically UG for ASA).
-                english_vals = await _parse_english_page_html_async(eng_html, english_url)
-                result["english"] = english_vals
-
-                # Level-aware parse — only meaningful when the browser
-                # rendered a page with separate UG / PG sections.
-                if _use_browser_for_english:
-                    by_level = await _parse_english_by_level_async(eng_html, english_url)
-                    if by_level:
-                        result["english_by_level"] = by_level
-                        if emit:
-                            _level_summary = "; ".join(
-                                f"{lvl}: "
-                                + ", ".join(f"{k}={v}" for k, v in sorted(vals.items()))
-                                for lvl, vals in sorted(by_level.items())
-                            )
-                            await emit(
-                                "status",
-                                f"[CENTRAL] english by level → {_level_summary}",
-                                phase="discover",
-                                kind="central_english_by_level",
-                                values=by_level,
-                                url=english_url,
-                            )
-
+        # Check cache first when university_id is known
+        _eng_cached: dict[str, Any] | None = None
+        if university_id is not None:
+            _eng_cached = await _cache_get(university_id, "english_requirements")
+            if _eng_cached is not None:
+                result["english"] = _eng_cached.get("english", {})
+                if "english_by_level" in _eng_cached:
+                    result["english_by_level"] = _eng_cached["english_by_level"]
                 if emit:
-                    slots_found = ", ".join(
-                        f"{k}={v}" for k, v in sorted(english_vals.items())
+                    _cached_slots = ", ".join(
+                        f"{k}={v}"
+                        for k, v in sorted(result["english"].items())
+                    ) or "no values"
+                    _by_level_note = (
+                        f" + by_level keys: {list(_eng_cached.get('english_by_level', {}).keys())}"
+                        if _eng_cached.get("english_by_level")
+                        else ""
                     )
                     await emit(
                         "status",
-                        f"[CENTRAL] english page parsed → {slots_found or 'no values'} from {english_url}",
+                        f"[CACHE] english_requirements hit → {_cached_slots}"
+                        f"{_by_level_note} (cached, skipping fetch of {english_url})",
                         phase="discover",
-                        kind="central_english_parsed",
-                        values=english_vals,
+                        kind="central_english_cache_hit",
+                        values=result["english"],
                         url=english_url,
                     )
-                log.info("central_pages: english slots from %s: %s", english_url, english_vals)
-        except Exception as exc:
-            log.warning("central_pages: english page fetch/parse failed (%s): %s", english_url, exc)
-            if emit:
-                await emit(
-                    "status",
-                    f"[CENTRAL] english page fetch failed ({english_url}): {exc}",
-                    phase="discover",
-                    kind="central_english_error",
-                    level="warn",
-                    url=english_url,
-                    error=str(exc)[:200],
+                log.info(
+                    "[CACHE] english_requirements hit for uni %s (%s)",
+                    university_id, result["english"],
                 )
+
+        if _eng_cached is None:
+            try:
+                if _use_browser_for_english:
+                    # Hard 75 s outer cap — the inner browser fetch has its own
+                    # 60 s guard so the total wall time is bounded.
+                    eng_html = await asyncio.wait_for(
+                        _fetch_english_with_browser(english_url),
+                        timeout=75,
+                    )
+                else:
+                    eng_html = await asyncio.wait_for(
+                        fetch_html(english_url),
+                        timeout=45,
+                    )
+                if eng_html:
+                    # Flat parse — first-seen value wins (typically UG for ASA).
+                    english_vals = await _parse_english_page_html_async(eng_html, english_url)
+                    result["english"] = english_vals
+
+                    # Level-aware parse — only meaningful when the browser
+                    # rendered a page with separate UG / PG sections.
+                    by_level: dict[str, Any] = {}
+                    if _use_browser_for_english:
+                        by_level = await _parse_english_by_level_async(eng_html, english_url)
+                        if by_level:
+                            result["english_by_level"] = by_level
+                            if emit:
+                                _level_summary = "; ".join(
+                                    f"{lvl}: "
+                                    + ", ".join(f"{k}={v}" for k, v in sorted(vals.items()))
+                                    for lvl, vals in sorted(by_level.items())
+                                )
+                                await emit(
+                                    "status",
+                                    f"[CENTRAL] english by level → {_level_summary}",
+                                    phase="discover",
+                                    kind="central_english_by_level",
+                                    values=by_level,
+                                    url=english_url,
+                                )
+
+                    if emit:
+                        slots_found = ", ".join(
+                            f"{k}={v}" for k, v in sorted(english_vals.items())
+                        )
+                        await emit(
+                            "status",
+                            f"[CENTRAL] english page parsed → {slots_found or 'no values'} from {english_url}",
+                            phase="discover",
+                            kind="central_english_parsed",
+                            values=english_vals,
+                            url=english_url,
+                        )
+                    log.info("central_pages: english slots from %s: %s", english_url, english_vals)
+
+                    # Store in cache
+                    if university_id is not None:
+                        _to_cache: dict[str, Any] = {
+                            "english": english_vals,
+                            "english_page_url": english_url,
+                        }
+                        if by_level:
+                            _to_cache["english_by_level"] = by_level
+                        await _cache_set(
+                            university_id,
+                            "english_requirements",
+                            english_url,
+                            _to_cache,
+                        )
+            except Exception as exc:
+                log.warning("central_pages: english page fetch/parse failed (%s): %s", english_url, exc)
+                if emit:
+                    await emit(
+                        "status",
+                        f"[CENTRAL] english page fetch failed ({english_url}): {exc}",
+                        phase="discover",
+                        kind="central_english_error",
+                        level="warn",
+                        url=english_url,
+                        error=str(exc)[:200],
+                    )
 
     return result
 

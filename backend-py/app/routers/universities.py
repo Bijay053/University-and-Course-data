@@ -349,6 +349,27 @@ async def delete_university(
     await db.commit()
 
 
+@router.delete(
+    "/universities/{uni_id}/central-cache",
+    status_code=status.HTTP_200_OK,
+    summary="Invalidate central-page cache for a university",
+)
+async def invalidate_university_central_cache(
+    uni_id: int,
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Delete all central_page_cache rows for this university.
+
+    Forces the next scrape to re-fetch and re-parse the fee and English
+    requirements pages from source, then re-cache the fresh results.
+    Use after a university updates their fee schedule or English requirements.
+    """
+    from app.services.scraper.central_pages import invalidate_central_cache
+
+    deleted = await invalidate_central_cache(uni_id)
+    return {"university_id": uni_id, "rows_deleted": deleted, "status": "invalidated"}
+
+
 def _to_camel_uni(u) -> dict:
     """Add camelCase aliases UI expects: scrapeUrl, feePageUrl, etc."""
     if hasattr(u, '__table__'):
