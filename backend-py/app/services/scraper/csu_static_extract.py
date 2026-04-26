@@ -24,12 +24,16 @@ Fields produced  (DB-aligned key names)
 ``intake_months``     – list of intake month names (e.g. ["March", "July"])
                         Falls back to standard session calendar (is_session=Y) when
                         the course has no active offerings.
-``course_location``   – comma-separated campus names ("Bathurst Campus, Online")
-                        Always included in the result dict (None when no active
-                        offerings) to block the regex extractor's "test" garbage.
-``study_mode``        – comma-separated delivery modes ("On Campus, Online")
-                        Always included (None when no active offerings) to block the
-                        regex extractor's "Blended" mis-fire.
+``course_location``      – comma-separated campus names ("Bathurst Campus, Online")
+                          Always included in the result dict (None when no active
+                          offerings) to block the regex extractor's "test" garbage.
+``study_mode``           – comma-separated delivery modes ("On Campus, Online")
+                          Always included (None when no active offerings) to block
+                          the regex extractor's "Blended" mis-fire.
+``has_central_fee_page`` – always True.  Lets the staging gate pass CSU courses
+                          that have no extractable international_fee (e.g. research
+                          degrees, courses with no current INT intake) for human
+                          review instead of auto-rejecting with "no_international_fee".
 
 Design note
 -----------
@@ -339,6 +343,11 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
         "course_location": None,
         "intake_months": None,
         "study_mode": None,
+        # Staging gate: when international_fee cannot be extracted from the
+        # page JS (e.g. research degrees, courses with no current INT intake),
+        # this flag lets the course pass through for human review instead of
+        # being auto-rejected with "no_international_fee".
+        "has_central_fee_page": True,
     }
 
     if not html:

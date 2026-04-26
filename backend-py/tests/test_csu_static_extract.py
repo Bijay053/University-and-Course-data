@@ -104,12 +104,14 @@ def test_is_csu_url_rejects_other_hosts() -> None:
 
 
 # ---------------------------------------------------------------------------
-# always-present keys (course_location / intake_months / study_mode)
+# always-present keys (course_location / intake_months / study_mode /
+#                      has_central_fee_page)
 # ---------------------------------------------------------------------------
 
 def test_always_present_keys_even_when_empty_html() -> None:
-    """Empty HTML must still return the three always-present keys as None
-    so that standard regex extractors cannot poison the payload."""
+    """Empty HTML must still return the four always-present keys so that
+    standard regex extractors cannot poison the payload and the staging
+    gate does not auto-reject courses with no extractable fee."""
     result = apply_csu_static_extraction(_CSU_URL, "")
     assert "course_location" in result
     assert "intake_months" in result
@@ -117,6 +119,7 @@ def test_always_present_keys_even_when_empty_html() -> None:
     assert result["course_location"] is None
     assert result["intake_months"] is None
     assert result["study_mode"] is None
+    assert result["has_central_fee_page"] is True
 
 
 def test_always_present_keys_when_no_js_vars() -> None:
@@ -126,6 +129,22 @@ def test_always_present_keys_when_no_js_vars() -> None:
     assert "course_location" in result
     assert "intake_months" in result
     assert "study_mode" in result
+    assert result["has_central_fee_page"] is True
+
+
+def test_has_central_fee_page_true_even_when_int_fee_present() -> None:
+    """has_central_fee_page must always be True regardless of whether an
+    international fee was extracted, so the staging gate always defers
+    to human review rather than auto-rejecting CSU courses."""
+    html = _make_html(
+        fees_entries=[
+            {"student_type_code": "INT", "annual_indicative_fee_ft": "25416.0",
+             "session_year": "2026"},
+        ],
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result.get("international_fee") == 25416.0
+    assert result["has_central_fee_page"] is True
 
 
 def test_no_active_offerings_location_and_mode_are_none() -> None:

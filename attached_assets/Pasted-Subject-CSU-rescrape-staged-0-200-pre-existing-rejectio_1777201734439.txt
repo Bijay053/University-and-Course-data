@@ -1,0 +1,13 @@
+Subject: CSU rescrape staged 0/200 — pre-existing rejection guard blocks re-staging after extractor fix
+Field-mapping fix from bf0d990 works correctly — extraction is producing accurate data live (verified BEd Primary IELTS=7.5/4yr, BParamedic int=$37,120/3yr, MBA int=$35,712/1.5yr).
+But the rescrape staged 0 courses. All 200 were skipped with recently rejected (within 7d) or rejected: online_only / category_landing_page.
+Root cause: The 7-day rejection guard in the staging step blocks re-staging of any course recently marked rejected. When the bad batch from your previous extractor was rejected (to clear staging), it poisoned the next run — even though the new extractor produces correct data, the guard doesn't know the rejection reason was "bad extractor" not "bad course."
+I worked around it on prod by deleting the 200 rejected rows entirely (DELETE FROM scraped_courses WHERE university_id=4 AND status='rejected' AND auto_publish_status='review'), then re-firing the scrape. That should work this time since there are no rejected rows for the guard to match against.
+Two things to fix in code:
+
+Rejection guard needs a rejection-reason field. Right now it's a blunt time-based block. There needs to be a way to mark rejections as "extractor-bug" vs "genuinely bad course" so a code-side fix doesn't get permanently locked out by historical rejections. Suggest adding a rejection_reason text column to scraped_courses, and have the staging guard only block on certain reason categories (e.g., online_only, category_landing_page, manual_reject) — not on bulk SQL rejections from extractor bug recoveries.
+Operational runbook gap: When an extractor bug is identified and code is fixed, there's no documented procedure to clear the cooldown. Right now the only options are wait 7 days or delete rows. Add a SQL snippet or admin endpoint to "expire rejection cooldown for university X" so future bug fixes don't require manual DB surgery.
+
+Lower priority but related: the log line [STAGE] skipped X: recently rejected (within 7d) should also include the rejection date so it's clearer how long the cooldown has left.
+Logs from the failed-staging run are in journalctl on prod (10:24 UTC start, 30 min run, "Staged 0 courses, 200 skipped, 0 fetch errors"). Final line confirmed [COMPLETE] Total cost: $0.0938 USD across 200 course(s) — extraction worked, only staging blocked.
+Currently re-running scrape on prod with the 200 rejected rows deleted. Will confirm staging count once it completes.
