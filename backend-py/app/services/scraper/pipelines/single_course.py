@@ -169,6 +169,7 @@ async def extract_course(
     payload: dict[str, Any] = {"course_website": url}
     evidence: list[dict[str, Any]] = []
     _gemini_primary_cost: float = 0.0
+    _is_csu_page: bool = False  # set True by the CSU pre-seed; gates Gemini Primary
 
     # ── CSU pre-seed: runs BEFORE _EXTRACTORS ────────────────────────────────
     # CSU pages embed all course data as inline JS (fees, ocb_metadata,
@@ -240,8 +241,9 @@ async def extract_course(
             # CSU pages embed all data in JS variables — the visible page
             # text the AI sees says "This course has no domestic offering"
             # for every course.  Gemini always returns null for all fields,
-            # so every AI call is pure waste.  Skip the fallback entirely.
+            # so every AI call is pure waste.  Skip all Gemini calls.
             use_ai_fallback = False
+            _is_csu_page = True
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
 
@@ -411,85 +413,103 @@ async def extract_course(
     # so extraction_method correctly credits gemini_primary.
     # Emit [GEMINI] unconditionally — even when 0 fields filled — so every
     # course has a visible log entry for diagnostics.
+    #
+    # CSU EXCEPTION: all data is in inline JS; the visible page text the AI
+    # sees is "This course has no domestic offering" for every course.
+    # Skip the Gemini call and emit a $0 line to keep the log uniform.
     try:
-        from app.services.scraper.extractors import gemini_primary as _gp
+        if _is_csu_page:
+            if emit:
+                await emit(
+                    "status",
+                    f"[GEMINI] {url[:60]} → skipped (CSU pre-seed) (cost=$0.000000)",
+                    phase="extract",
+                    kind="gemini_primary_done",
+                    filled=[],
+                    cost_usd=0.0,
+                    input_tokens=0,
+                    output_tokens=0,
+                    url=url,
+                )
+        else:
+            from app.services.scraper.extractors import gemini_primary as _gp
 
-        _gp_html = rendered_html or html
-        _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
-            _gp.extract_primary(_gp_html, url),
-            timeout=_AI_FALLBACK_TIMEOUT_SEC,
-        )
-        _gemini_primary_cost = _gp_cost
-
-        # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
-        if emit and _gp_dbg:
-            await emit(
-                "status",
-                f"[GP-DEBUG] static={len(html) if html else 0}B "
-                f"rendered={len(rendered_html) if rendered_html else 0}B "
-                f"using={'rendered' if rendered_html else 'static'} "
-                f"text_len={_gp_dbg.get('text_len', '?')}",
-                phase="extract",
-                kind="gp_debug_html",
-                url=url,
+            _gp_html = rendered_html or html
+            _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
+                _gp.extract_primary(_gp_html, url),
+                timeout=_AI_FALLBACK_TIMEOUT_SEC,
             )
-            await emit(
-                "status",
-                f"[GP-DEBUG] text[:500]={_gp_dbg.get('text_snippet', '')!r}",
-                phase="extract",
-                kind="gp_debug_text",
-                url=url,
-            )
-            await emit(
-                "status",
-                f"[GP-DEBUG] raw_response={_gp_dbg.get('raw_response', '')!r}",
-                phase="extract",
-                kind="gp_debug_raw",
-                url=url,
-            )
-        # ────────────────────────────────────────────────────────────────────
+            _gemini_primary_cost = _gp_cost
 
-        # Map duration_value/duration_unit → canonical duration/duration_term
-        # unconditionally (PRIMARY means Gemini beats any earlier regex hit).
-        if _gp_filled.get("duration_value") is not None:
-            try:
-                _gp_filled["duration"] = float(_gp_filled["duration_value"])
-            except (TypeError, ValueError):
-                pass
-        if _gp_filled.get("duration_unit"):
-            from app.services.scraper.extractors.duration import _normalise_unit as _nu
-            _gp_term = _nu(str(_gp_filled["duration_unit"]))
-            if _gp_term:
-                _gp_filled["duration_term"] = _gp_term
+            # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
+            if emit and _gp_dbg:
+                await emit(
+                    "status",
+                    f"[GP-DEBUG] static={len(html) if html else 0}B "
+                    f"rendered={len(rendered_html) if rendered_html else 0}B "
+                    f"using={'rendered' if rendered_html else 'static'} "
+                    f"text_len={_gp_dbg.get('text_len', '?')}",
+                    phase="extract",
+                    kind="gp_debug_html",
+                    url=url,
+                )
+                await emit(
+                    "status",
+                    f"[GP-DEBUG] text[:500]={_gp_dbg.get('text_snippet', '')!r}",
+                    phase="extract",
+                    kind="gp_debug_text",
+                    url=url,
+                )
+                await emit(
+                    "status",
+                    f"[GP-DEBUG] raw_response={_gp_dbg.get('raw_response', '')!r}",
+                    phase="extract",
+                    kind="gp_debug_raw",
+                    url=url,
+                )
+            # ────────────────────────────────────────────────────────────────────
 
-        for _gp_k, _gp_v in _gp_filled.items():
-            if _gp_k in ("duration_value", "duration_unit"):
-                continue  # consumed by the mapped keys above
-            # PRIMARY: always overwrite — replace any prior evidence entry
-            payload[_gp_k] = _gp_v
-            evidence[:] = [e for e in evidence if e.get("field_key") != _gp_k]
-            evidence.append({
-                "field_key": _gp_k,
-                "value": _gp_v,
-                "confidence": 0.75,
-                "method": "gemini_primary",
-                "snippet": None,
-            })
+            # Map duration_value/duration_unit → canonical duration/duration_term
+            # unconditionally (PRIMARY means Gemini beats any earlier regex hit).
+            if _gp_filled.get("duration_value") is not None:
+                try:
+                    _gp_filled["duration"] = float(_gp_filled["duration_value"])
+                except (TypeError, ValueError):
+                    pass
+            if _gp_filled.get("duration_unit"):
+                from app.services.scraper.extractors.duration import _normalise_unit as _nu
+                _gp_term = _nu(str(_gp_filled["duration_unit"]))
+                if _gp_term:
+                    _gp_filled["duration_term"] = _gp_term
 
-        # Always emit so every course has a [GEMINI] line in the live log
-        if emit:
-            await emit(
-                "status",
-                f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
-                f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
-                phase="extract",
-                kind="gemini_primary_done",
-                filled=list(_gp_filled.keys()),
-                cost_usd=_gp_cost,
-                input_tokens=_gp_in_tok,
-                output_tokens=_gp_out_tok,
-                url=url,
-            )
+            for _gp_k, _gp_v in _gp_filled.items():
+                if _gp_k in ("duration_value", "duration_unit"):
+                    continue  # consumed by the mapped keys above
+                # PRIMARY: always overwrite — replace any prior evidence entry
+                payload[_gp_k] = _gp_v
+                evidence[:] = [e for e in evidence if e.get("field_key") != _gp_k]
+                evidence.append({
+                    "field_key": _gp_k,
+                    "value": _gp_v,
+                    "confidence": 0.75,
+                    "method": "gemini_primary",
+                    "snippet": None,
+                })
+
+            # Always emit so every course has a [GEMINI] line in the live log
+            if emit:
+                await emit(
+                    "status",
+                    f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
+                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
+                    phase="extract",
+                    kind="gemini_primary_done",
+                    filled=list(_gp_filled.keys()),
+                    cost_usd=_gp_cost,
+                    input_tokens=_gp_in_tok,
+                    output_tokens=_gp_out_tok,
+                    url=url,
+                )
     except asyncio.TimeoutError:
         log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
     except Exception as _gp_exc:

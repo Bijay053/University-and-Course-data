@@ -1,0 +1,789 @@
+[INFO ] Scraping started in background…
+[INFO ] Scraping https://study.csu.edu.au/...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[INFO ] Fetching https://study.csu.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://study.csu.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://study.csu.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://study.csu.edu.au/courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply/start-your-application: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 0) — https://study.csu.edu.au/apply/start-your-application
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/home: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 0) — https://study.csu.edu.au/home
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/information-for: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 0) — https://study.csu.edu.au/information-for
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/online: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 0) — https://study.csu.edu.au/online
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/why-charles-sturt: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 0) — https://study.csu.edu.au/why-charles-sturt
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 0) — https://study.csu.edu.au/apply
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/contact-us: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 0) — https://study.csu.edu.au/contact-us
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/search-microcredentials: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 0) — https://study.csu.edu.au/search-microcredentials
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/microcredential-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 12/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/microcredential-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/single-subject: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 13/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/single-subject
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/compare-degrees: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 14/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/compare-degrees
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 15/25: +0 candidates (total 0) — https://study.csu.edu.au
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/agriculture-environment: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 16/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/agriculture-environment
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/animal-vet-sciences: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 17/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/animal-vet-sciences
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/arts-communication: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 18/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/arts-communication
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/business: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 19/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/business
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/education-teaching: listing (1 course links found)
+[DISCOVER] [DISCOVER] Page 20/25: +1 candidates (total 1) — https://study.csu.edu.au/career-area/education-teaching
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/information-library: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 21/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/information-library
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/it-computing: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 22/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/it-computing
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/medicine-health: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 23/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/medicine-health
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/policing-law-security: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 24/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/policing-law-security
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/psychology-social-work: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 25/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/psychology-social-work
+[DISCOVER] [DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 8 URL(s) at https://study.csu.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://study.csu.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://study.csu.edu.au/sitemap-old-v2: +262 candidates (total 262)
+[DISCOVER] [DISCOVER] sitemap: done — 262 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Bachelor of Education (Primary)
+[EXTRACT ] [EXTRACT] 2/200: Access Charles Sturt Entry
+[EXTRACT ] [EXTRACT] 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [EXTRACT] 4/200: Associate Degree Adult Vocational Education
+[ 1/200] Fetching 1/200: Bachelor of Education (Primary)
+[ 4/200] Fetching 4/200: Associate Degree Adult Vocational Education
+[ 2/200] Fetching 2/200: Access Charles Sturt Entry
+[ 3/200] Fetching 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [CSU ✓] university-certificate-workforce-essenti — dom=700.0, dur=0.13years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/university-certificate-workforce-essentials — vocational static fallback
+[EXTRACT ] [CSU ✓] access-charles-sturt-entry — dur=0.5years, intakes=March,July,November, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [CSU ✓] associate-degree-adult-vocational-educat — dom=5132.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-education-primary — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July, loc=Port Macquarie Campus, Bathurs
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[INFO ] Fetching https://study.csu.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://study.csu.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://study.csu.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://study.csu.edu.au/courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply/start-your-application: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 0) — https://study.csu.edu.au/apply/start-your-application
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/home: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 0) — https://study.csu.edu.au/home
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/information-for: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 0) — https://study.csu.edu.au/information-for
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/online: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 0) — https://study.csu.edu.au/online
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/why-charles-sturt: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 0) — https://study.csu.edu.au/why-charles-sturt
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 0) — https://study.csu.edu.au/apply
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/contact-us: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 0) — https://study.csu.edu.au/contact-us
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/search-microcredentials: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 0) — https://study.csu.edu.au/search-microcredentials
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/microcredential-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 12/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/microcredential-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/single-subject: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 13/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/single-subject
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/compare-degrees: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 14/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/compare-degrees
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 15/25: +0 candidates (total 0) — https://study.csu.edu.au
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/agriculture-environment: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 16/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/agriculture-environment
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/animal-vet-sciences: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 17/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/animal-vet-sciences
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/arts-communication: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 18/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/arts-communication
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/business: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 19/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/business
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/education-teaching: listing (1 course links found)
+[DISCOVER] [DISCOVER] Page 20/25: +1 candidates (total 1) — https://study.csu.edu.au/career-area/education-teaching
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/information-library: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 21/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/information-library
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/it-computing: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 22/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/it-computing
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/medicine-health: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 23/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/medicine-health
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/policing-law-security: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 24/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/policing-law-security
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/psychology-social-work: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 25/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/psychology-social-work
+[DISCOVER] [DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 8 URL(s) at https://study.csu.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://study.csu.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://study.csu.edu.au/sitemap-old-v2: +262 candidates (total 262)
+[DISCOVER] [DISCOVER] sitemap: done — 262 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Bachelor of Education (Primary)
+[EXTRACT ] [EXTRACT] 2/200: Access Charles Sturt Entry
+[EXTRACT ] [EXTRACT] 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [EXTRACT] 4/200: Associate Degree Adult Vocational Education
+[ 1/200] Fetching 1/200: Bachelor of Education (Primary)
+[ 4/200] Fetching 4/200: Associate Degree Adult Vocational Education
+[ 2/200] Fetching 2/200: Access Charles Sturt Entry
+[ 3/200] Fetching 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [CSU ✓] university-certificate-workforce-essenti — dom=700.0, dur=0.13years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/university-certificate-workforce-essentials — vocational static fallback
+[EXTRACT ] [CSU ✓] access-charles-sturt-entry — dur=0.5years, intakes=March,July,November, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [CSU ✓] associate-degree-adult-vocational-educat — dom=5132.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-education-primary — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July, loc=Port Macquarie Campus, Bathurs
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-adult-vocational-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/access-charles-sturt-entry — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=980027B rendered=0B using=static text_len=23045
+[EXTRACT ] [GP-DEBUG] text[:500]="Associate Degree in Adult and Vocational Education I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international off"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-adult-voca → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[EXTRACT ] [EXTRACT] 5/200: Associate Degree Policing Practice
+[ 5/200] Fetching 5/200: Associate Degree Policing Practice
+[EXTRACT ] [CSU ✓] associate-degree-policing-practice — dur=2.0years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-policing-practice — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=831271B rendered=0B using=static text_len=432
+[EXTRACT ] [GP-DEBUG] text[:500]='University Certificate in Workforce Essentials All intakes for the University Certificate in Workforce Essentials (UCWE) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/university-certificate-work → 0 field(s) (cost=$0.000070, in=889 out=12)
+[EXTRACT ] [EXTRACT] 6/200: Bachelor Accounting
+[ 6/200] Fetching 6/200: Bachelor Accounting
+[EXTRACT ] [CSU ✓] bachelor-accounting — dom=15796.0, int=32000.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-accounting — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=887157B rendered=0B using=static text_len=414
+[EXTRACT ] [GP-DEBUG] text[:500]='Associate Degree in Policing Practice All intakes for the Associate Degree in Policing Practice (ADPP) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-policing-p → 0 field(s) (cost=$0.000070, in=882 out=13)
+[EXTRACT ] [EXTRACT] 7/200: Bachelor Adult Vocational Education
+[ 7/200] Fetching 7/200: Bachelor Adult Vocational Education
+[EXTRACT ] [CSU ✓] bachelor-adult-vocational-education — dom=5132.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-adult-vocational-education — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1312166B rendered=0B using=static text_len=23007
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-primary → 0 field(s) (cost=$0.000493, in=6528 out=12)
+[EXTRACT ] [EXTRACT] 8/200: Bachelor Agricultural Business Management
+[ 8/200] Fetching 8/200: Bachelor Agricultural Business Management
+[EXTRACT ] [GP-DEBUG] static=1066610B rendered=0B using=static text_len=22989
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Accounting I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part o"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-accounting → 0 field(s) (cost=$0.000493, in=6522 out=13)
+[INFO ] [CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 9/200: Bachelor Agricultural Science
+[ 9/200] Fetching 9/200: Bachelor Agricultural Science
+[EXTRACT ] [CSU ✓] bachelor-agricultural-science — dom=7516.0, int=37040.0, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-agricultural-business-managemen — dom=7896.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-science — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-business-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1065796B rendered=0B using=static text_len=23075
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Adult and Vocational Education (with specialisations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no in"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-adult-vocational-e → 0 field(s) (cost=$0.000495, in=6548 out=14)
+[EXTRACT ] [EXTRACT] 10/200: Bachelor Agriculture
+[ 10/200] Fetching 10/200: Bachelor Agriculture
+[EXTRACT ] [CSU ✓] bachelor-agriculture — dom=7516.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[INFO ] Fetching https://study.csu.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://study.csu.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://study.csu.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://study.csu.edu.au/courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply/start-your-application: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 0) — https://study.csu.edu.au/apply/start-your-application
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/home: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 0) — https://study.csu.edu.au/home
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/information-for: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 0) — https://study.csu.edu.au/information-for
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/online: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 0) — https://study.csu.edu.au/online
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/why-charles-sturt: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 0) — https://study.csu.edu.au/why-charles-sturt
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 0) — https://study.csu.edu.au/apply
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/contact-us: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 0) — https://study.csu.edu.au/contact-us
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/search-microcredentials: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 0) — https://study.csu.edu.au/search-microcredentials
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/microcredential-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 12/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/microcredential-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/single-subject: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 13/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/single-subject
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/compare-degrees: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 14/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/compare-degrees
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 15/25: +0 candidates (total 0) — https://study.csu.edu.au
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/agriculture-environment: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 16/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/agriculture-environment
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/animal-vet-sciences: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 17/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/animal-vet-sciences
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/arts-communication: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 18/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/arts-communication
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/business: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 19/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/business
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/education-teaching: listing (1 course links found)
+[DISCOVER] [DISCOVER] Page 20/25: +1 candidates (total 1) — https://study.csu.edu.au/career-area/education-teaching
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/information-library: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 21/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/information-library
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/it-computing: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 22/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/it-computing
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/medicine-health: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 23/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/medicine-health
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/policing-law-security: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 24/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/policing-law-security
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/psychology-social-work: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 25/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/psychology-social-work
+[DISCOVER] [DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 8 URL(s) at https://study.csu.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://study.csu.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://study.csu.edu.au/sitemap-old-v2: +262 candidates (total 262)
+[DISCOVER] [DISCOVER] sitemap: done — 262 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Bachelor of Education (Primary)
+[EXTRACT ] [EXTRACT] 2/200: Access Charles Sturt Entry
+[EXTRACT ] [EXTRACT] 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [EXTRACT] 4/200: Associate Degree Adult Vocational Education
+[ 1/200] Fetching 1/200: Bachelor of Education (Primary)
+[ 4/200] Fetching 4/200: Associate Degree Adult Vocational Education
+[ 2/200] Fetching 2/200: Access Charles Sturt Entry
+[ 3/200] Fetching 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [CSU ✓] university-certificate-workforce-essenti — dom=700.0, dur=0.13years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/university-certificate-workforce-essentials — vocational static fallback
+[EXTRACT ] [CSU ✓] access-charles-sturt-entry — dur=0.5years, intakes=March,July,November, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [CSU ✓] associate-degree-adult-vocational-educat — dom=5132.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-education-primary — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July, loc=Port Macquarie Campus, Bathurs
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-adult-vocational-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/access-charles-sturt-entry — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=980027B rendered=0B using=static text_len=23045
+[EXTRACT ] [GP-DEBUG] text[:500]="Associate Degree in Adult and Vocational Education I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international off"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-adult-voca → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[EXTRACT ] [EXTRACT] 5/200: Associate Degree Policing Practice
+[ 5/200] Fetching 5/200: Associate Degree Policing Practice
+[EXTRACT ] [CSU ✓] associate-degree-policing-practice — dur=2.0years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-policing-practice — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=831271B rendered=0B using=static text_len=432
+[EXTRACT ] [GP-DEBUG] text[:500]='University Certificate in Workforce Essentials All intakes for the University Certificate in Workforce Essentials (UCWE) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/university-certificate-work → 0 field(s) (cost=$0.000070, in=889 out=12)
+[EXTRACT ] [EXTRACT] 6/200: Bachelor Accounting
+[ 6/200] Fetching 6/200: Bachelor Accounting
+[EXTRACT ] [CSU ✓] bachelor-accounting — dom=15796.0, int=32000.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-accounting — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=887157B rendered=0B using=static text_len=414
+[EXTRACT ] [GP-DEBUG] text[:500]='Associate Degree in Policing Practice All intakes for the Associate Degree in Policing Practice (ADPP) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-policing-p → 0 field(s) (cost=$0.000070, in=882 out=13)
+[EXTRACT ] [EXTRACT] 7/200: Bachelor Adult Vocational Education
+[ 7/200] Fetching 7/200: Bachelor Adult Vocational Education
+[EXTRACT ] [CSU ✓] bachelor-adult-vocational-education — dom=5132.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-adult-vocational-education — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1312166B rendered=0B using=static text_len=23007
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-primary → 0 field(s) (cost=$0.000493, in=6528 out=12)
+[EXTRACT ] [EXTRACT] 8/200: Bachelor Agricultural Business Management
+[ 8/200] Fetching 8/200: Bachelor Agricultural Business Management
+[EXTRACT ] [GP-DEBUG] static=1066610B rendered=0B using=static text_len=22989
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Accounting I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part o"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-accounting → 0 field(s) (cost=$0.000493, in=6522 out=13)
+[INFO ] [CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 9/200: Bachelor Agricultural Science
+[ 9/200] Fetching 9/200: Bachelor Agricultural Science
+[EXTRACT ] [CSU ✓] bachelor-agricultural-science — dom=7516.0, int=37040.0, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-agricultural-business-managemen — dom=7896.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-science — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-business-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1065796B rendered=0B using=static text_len=23075
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Adult and Vocational Education (with specialisations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no in"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-adult-vocational-e → 0 field(s) (cost=$0.000495, in=6548 out=14)
+[EXTRACT ] [EXTRACT] 10/200: Bachelor Agriculture
+[ 10/200] Fetching 10/200: Bachelor Agriculture
+[EXTRACT ] [CSU ✓] bachelor-agriculture — dom=7516.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agriculture — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1009814B rendered=0B using=static text_len=23009
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Agricultural Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-scien → 0 field(s) (cost=$0.000493, in=6530 out=12)
+[EXTRACT ] [EXTRACT] 11/200: Bachelor Animal Science
+[ 11/200] Fetching 11/200: Bachelor Animal Science
+[EXTRACT ] [CSU ✓] bachelor-animal-science — dom=8716.0, int=37600.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-animal-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=938453B rendered=0B using=static text_len=22619
+[EXTRACT ] [GP-DEBUG] text[:500]="Access Charles Sturt Entry I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/access-charles-sturt-entry → 0 field(s) (cost=$0.000486, in=6431 out=12)
+[EXTRACT ] [EXTRACT] 12/200: Bachelor Applied Research Honours
+[ 12/200] Fetching 12/200: Bachelor Applied Research Honours
+[EXTRACT ] [CSU ✓] bachelor-applied-research-honours — dom=14216.0, int=29760.0, dur=1.0years, intakes=March, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-applied-research-honours — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=949380B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Applied Research (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-applied-research-h → 0 field(s) (cost=$0.000494, in=6534 out=13)
+[EXTRACT ] [EXTRACT] 13/200: Bachelor Arts
+[ 13/200] Fetching 13/200: Bachelor Arts
+[EXTRACT ] [CSU ✓] bachelor-arts — dom=14900.0, int=24560.0, dur=3.0years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-arts — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1054332B rendered=0B using=static text_len=22977
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Arts I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of an a"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts → 0 field(s) (cost=$0.000493, in=6518 out=14)
+[EXTRACT ] [EXTRACT] 14/200: Bachelor Arts Social Science Honours
+[ 14/200] Fetching 14/200: Bachelor Arts Social Science Honours
+[EXTRACT ] [CSU ✓] bachelor-arts-social-science-honours — dom=4736.0, int=27920.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-arts-social-science-honours — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-busin → 0 field(s) (cost=$0.000000, in=0 out=0)
+[INFO ] [CATEGORY det] Bachelor of Agricultural Business Manage → Business & Management / Management
+[EXTRACT ] [EXTRACT] 15/200: Bachelor Border Management
+[ 15/200] Fetching 15/200: Bachelor Border Management
+[EXTRACT ] [CSU ✓] bachelor-border-management — dom=17376.0, int=23200.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-border-management — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agriculture → 0 field(s) (cost=$0.000000, in=0 out=0)
+[INFO ] [CATEGORY det] Bachelor of Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 16/200: Bachelor Business
+[ 16/200] Fetching 16/200: Bachelor Business
+[EXTRACT ] [CSU ✓] bachelor-business — dom=17376.0, int=33120.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-business — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1087643B rendered=0B using=static text_len=22985
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Business I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business → 0 field(s) (cost=$0.000493, in=6521 out=13)
+[EXTRACT ] [EXTRACT] 17/200: Bachelor Business Studies
+[ 17/200] Fetching 17/200: Bachelor Business Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-animal-science → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 18/200: Bachelor Clinical Science Medicine Doctor Medicine
+[ 18/200] Fetching 18/200: Bachelor Clinical Science Medicine Doctor Medicine
+[EXTRACT ] [CSU ✓] bachelor-business-studies — dom=17376.0, int=33120.0, dur=3.0years, intakes=March,July,November, loc=Bathurst Campus, Yunnan Uni-Fi
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-business-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=971607B rendered=0B using=static text_len=23003
+[EXTRACT ] [CSU ✓] bachelor-clinical-science-medicine-docto — dur=5.0years, intakes=March,July,November
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Border Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-border-management → 0 field(s) (cost=$0.000493, in=6527 out=10)
+[EXTRACT ] [EXTRACT] 19/200: Bachelor Communication
+[ 19/200] Fetching 19/200: Bachelor Communication
+[EXTRACT ] [CSU ✓] bachelor-communication — dom=17376.0, int=27920.0, dur=3.0years, intakes=March,July, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-communication — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1354682B rendered=0B using=static text_len=23001
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Business Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business-studies → 0 field(s) (cost=$0.000493, in=6527 out=13)
+[EXTRACT ] [EXTRACT] 20/200: Bachelor Computer Science
+[ 20/200] Fetching 20/200: Bachelor Computer Science
+[EXTRACT ] [CSU ✓] bachelor-computer-science — dom=9100.0, int=28640.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-computer-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=982964B rendered=0B using=static text_len=26320
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Clinical Science (Medicine) / Doctor of Medicine I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no interna"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-clinical-science-m → 0 field(s) (cost=$0.000555, in=7363 out=10)
+[EXTRACT ] [EXTRACT] 21/200: Bachelor Criminology
+[ 21/200] Fetching 21/200: Bachelor Criminology
+[EXTRACT ] [CSU ✓] bachelor-criminology — dom=17376.0, int=28320.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-criminology — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=996091B rendered=0B using=static text_len=22995
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Communication I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is par"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-communication → 0 field(s) (cost=$0.000492, in=6524 out=10)
+[EXTRACT ] [EXTRACT] 22/200: Bachelor Dental Science
+[ 22/200] Fetching 22/200: Bachelor Dental Science
+[EXTRACT ] [CSU ✓] bachelor-dental-science — dom=12516.0, int=72240.0, dur=5.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-dental-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1003665B rendered=0B using=static text_len=22991
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Criminology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-criminology → 0 field(s) (cost=$0.000493, in=6523 out=13)
+[INFO ] [CATEGORY det] Bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[EXTRACT ] [EXTRACT] 23/200: Bachelor Education Birth To Five Years
+[ 23/200] Fetching 23/200: Bachelor Education Birth To Five Years
+[EXTRACT ] [CSU ✓] bachelor-education-birth-to-five-years — dom=6316.0, int=27920.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-education-birth-to-five-years — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=989489B rendered=0B using=static text_len=23597
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Dental Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-dental-science → 0 field(s) (cost=$0.000505, in=6675 out=14)
+[INFO ] [CATEGORY det] Bachelor of Dental Science → Medicine & Health / Dentistry
+[EXTRACT ] [EXTRACT] 24/200: Bachelor Education Early Childhood Primary
+[ 24/200] Fetching 24/200: Bachelor Education Early Childhood Primary
+[EXTRACT ] [CSU ✓] bachelor-education-early-childhood-prima — dom=6170.0, int=27280.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus, Albury-Wodong
+[EXTRACT ] [GP-DEBUG] static=1049412B rendered=0B using=static text_len=23047
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Early Childhood and Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international of"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-early-ch → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[INFO ] [CATEGORY det] Bachelor of Education (Early Childhood a → Education & Social Work / Early Childhood
+[EXTRACT ] [EXTRACT] 25/200: Bachelor Education K 12
+[ 25/200] Fetching 25/200: Bachelor Education K 12
+[EXTRACT ] [CSU ✓] bachelor-education-k-12 — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts-social-scienc → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 26/200: Bachelor Education Secondary Creative Arts
+[ 26/200] Fetching 26/200: Bachelor Education Secondary Creative Arts
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-creative-ar — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1009973B rendered=0B using=static text_len=23001
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Computer Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-computer-science → 0 field(s) (cost=$0.000494, in=6527 out=15)
+[EXTRACT ] [EXTRACT] 27/200: Bachelor Education Secondary English
+[ 27/200] Fetching 27/200: Bachelor Education Secondary English
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-english — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1033612B rendered=0B using=static text_len=23043
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Creative Arts I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offe"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6541 out=13)
+[EXTRACT ] [EXTRACT] 28/200: Bachelor Education Secondary Hsie
+[ 28/200] Fetching 28/200: Bachelor Education Secondary Hsie
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-hsie — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1013748B rendered=0B using=static text_len=23031
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - English I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6537 out=13)
+[EXTRACT ] [EXTRACT] 29/200: Bachelor Education Secondary Mathematics
+[ 29/200] Fetching 29/200: Bachelor Education Secondary Mathematics
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-mathematics — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1062449B rendered=0B using=static text_len=23025
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - HSIE I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Thi"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000493, in=6535 out=10)
+[EXTRACT ] [EXTRACT] 30/200: Bachelor Education Secondary Pdhpe
+[ 30/200] Fetching 30/200: Bachelor Education Secondary Pdhpe
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-pdhpe — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Wagga Wagga Campus, Bathurst C
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[INFO ] Fetching https://study.csu.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://study.csu.edu.au/courses (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://study.csu.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://study.csu.edu.au/courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply/start-your-application: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 2/25: +0 candidates (total 0) — https://study.csu.edu.au/apply/start-your-application
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/home: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 3/25: +0 candidates (total 0) — https://study.csu.edu.au/home
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 4/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 5/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/information-for: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 6/25: +0 candidates (total 0) — https://study.csu.edu.au/information-for
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/online: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 7/25: +0 candidates (total 0) — https://study.csu.edu.au/online
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/why-charles-sturt: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 8/25: +0 candidates (total 0) — https://study.csu.edu.au/why-charles-sturt
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/apply: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 9/25: +0 candidates (total 0) — https://study.csu.edu.au/apply
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/contact-us: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 10/25: +0 candidates (total 0) — https://study.csu.edu.au/contact-us
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/search-microcredentials: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 11/25: +0 candidates (total 0) — https://study.csu.edu.au/search-microcredentials
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/microcredential-courses: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 12/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/microcredential-courses
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/short-courses/single-subject: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 13/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/short-courses/single-subject
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/find-courses/compare-degrees: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 14/25: +0 candidates (total 0) — https://study.csu.edu.au/find-courses/compare-degrees
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 15/25: +0 candidates (total 0) — https://study.csu.edu.au
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/agriculture-environment: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 16/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/agriculture-environment
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/animal-vet-sciences: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 17/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/animal-vet-sciences
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/arts-communication: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 18/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/arts-communication
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/business: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 19/25: +0 candidates (total 0) — https://study.csu.edu.au/career-area/business
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/education-teaching: listing (1 course links found)
+[DISCOVER] [DISCOVER] Page 20/25: +1 candidates (total 1) — https://study.csu.edu.au/career-area/education-teaching
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/information-library: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 21/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/information-library
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/it-computing: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 22/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/it-computing
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/medicine-health: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 23/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/medicine-health
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/policing-law-security: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 24/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/policing-law-security
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/career-area/psychology-social-work: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 25/25: +0 candidates (total 1) — https://study.csu.edu.au/career-area/psychology-social-work
+[DISCOVER] [DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 8 URL(s) at https://study.csu.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://study.csu.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://study.csu.edu.au/sitemap-old-v2: +262 candidates (total 262)
+[DISCOVER] [DISCOVER] sitemap: done — 262 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Bachelor of Education (Primary)
+[EXTRACT ] [EXTRACT] 2/200: Access Charles Sturt Entry
+[EXTRACT ] [EXTRACT] 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [EXTRACT] 4/200: Associate Degree Adult Vocational Education
+[ 1/200] Fetching 1/200: Bachelor of Education (Primary)
+[ 4/200] Fetching 4/200: Associate Degree Adult Vocational Education
+[ 2/200] Fetching 2/200: Access Charles Sturt Entry
+[ 3/200] Fetching 3/200: University Certificate Workforce Essentials
+[EXTRACT ] [CSU ✓] university-certificate-workforce-essenti — dom=700.0, dur=0.13years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/university-certificate-workforce-essentials — vocational static fallback
+[EXTRACT ] [CSU ✓] access-charles-sturt-entry — dur=0.5years, intakes=March,July,November, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [CSU ✓] associate-degree-adult-vocational-educat — dom=5132.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-education-primary — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July, loc=Port Macquarie Campus, Bathurs
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-adult-vocational-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/access-charles-sturt-entry — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=980027B rendered=0B using=static text_len=23045
+[EXTRACT ] [GP-DEBUG] text[:500]="Associate Degree in Adult and Vocational Education I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international off"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-adult-voca → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[EXTRACT ] [EXTRACT] 5/200: Associate Degree Policing Practice
+[ 5/200] Fetching 5/200: Associate Degree Policing Practice
+[EXTRACT ] [CSU ✓] associate-degree-policing-practice — dur=2.0years, loc=Goulburn Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/associate-degree-policing-practice — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=831271B rendered=0B using=static text_len=432
+[EXTRACT ] [GP-DEBUG] text[:500]='University Certificate in Workforce Essentials All intakes for the University Certificate in Workforce Essentials (UCWE) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/university-certificate-work → 0 field(s) (cost=$0.000070, in=889 out=12)
+[EXTRACT ] [EXTRACT] 6/200: Bachelor Accounting
+[ 6/200] Fetching 6/200: Bachelor Accounting
+[EXTRACT ] [CSU ✓] bachelor-accounting — dom=15796.0, int=32000.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-accounting — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=887157B rendered=0B using=static text_len=414
+[EXTRACT ] [GP-DEBUG] text[:500]='Associate Degree in Policing Practice All intakes for the Associate Degree in Policing Practice (ADPP) are now closed. For information about future intakes into the Constable Education Program, please visit the NSW Police Force Recruitment page. Related courses Related courses Check out some of our other courses. You can use these as a stepping stone to get into this course, or complete them after you graduate.'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-policing-p → 0 field(s) (cost=$0.000070, in=882 out=13)
+[EXTRACT ] [EXTRACT] 7/200: Bachelor Adult Vocational Education
+[ 7/200] Fetching 7/200: Bachelor Adult Vocational Education
+[EXTRACT ] [CSU ✓] bachelor-adult-vocational-education — dom=5132.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-adult-vocational-education — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1312166B rendered=0B using=static text_len=23007
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-primary → 0 field(s) (cost=$0.000493, in=6528 out=12)
+[EXTRACT ] [EXTRACT] 8/200: Bachelor Agricultural Business Management
+[ 8/200] Fetching 8/200: Bachelor Agricultural Business Management
+[EXTRACT ] [GP-DEBUG] static=1066610B rendered=0B using=static text_len=22989
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Accounting I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part o"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-accounting → 0 field(s) (cost=$0.000493, in=6522 out=13)
+[INFO ] [CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 9/200: Bachelor Agricultural Science
+[ 9/200] Fetching 9/200: Bachelor Agricultural Science
+[EXTRACT ] [CSU ✓] bachelor-agricultural-science — dom=7516.0, int=37040.0, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] bachelor-agricultural-business-managemen — dom=7896.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-science — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agricultural-business-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1065796B rendered=0B using=static text_len=23075
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Adult and Vocational Education (with specialisations) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no in"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-adult-vocational-e → 0 field(s) (cost=$0.000495, in=6548 out=14)
+[EXTRACT ] [EXTRACT] 10/200: Bachelor Agriculture
+[ 10/200] Fetching 10/200: Bachelor Agriculture
+[EXTRACT ] [CSU ✓] bachelor-agriculture — dom=7516.0, int=37040.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-agriculture — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1009814B rendered=0B using=static text_len=23009
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Agricultural Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-scien → 0 field(s) (cost=$0.000493, in=6530 out=12)
+[EXTRACT ] [EXTRACT] 11/200: Bachelor Animal Science
+[ 11/200] Fetching 11/200: Bachelor Animal Science
+[EXTRACT ] [CSU ✓] bachelor-animal-science — dom=8716.0, int=37600.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-animal-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=938453B rendered=0B using=static text_len=22619
+[EXTRACT ] [GP-DEBUG] text[:500]="Access Charles Sturt Entry I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/access-charles-sturt-entry → 0 field(s) (cost=$0.000486, in=6431 out=12)
+[EXTRACT ] [EXTRACT] 12/200: Bachelor Applied Research Honours
+[ 12/200] Fetching 12/200: Bachelor Applied Research Honours
+[EXTRACT ] [CSU ✓] bachelor-applied-research-honours — dom=14216.0, int=29760.0, dur=1.0years, intakes=March, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-applied-research-honours — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=949380B rendered=0B using=static text_len=23021
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Applied Research (Honours) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-applied-research-h → 0 field(s) (cost=$0.000494, in=6534 out=13)
+[EXTRACT ] [EXTRACT] 13/200: Bachelor Arts
+[ 13/200] Fetching 13/200: Bachelor Arts
+[EXTRACT ] [CSU ✓] bachelor-arts — dom=14900.0, int=24560.0, dur=3.0years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-arts — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1054332B rendered=0B using=static text_len=22977
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Arts I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of an a"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts → 0 field(s) (cost=$0.000493, in=6518 out=14)
+[EXTRACT ] [EXTRACT] 14/200: Bachelor Arts Social Science Honours
+[ 14/200] Fetching 14/200: Bachelor Arts Social Science Honours
+[EXTRACT ] [CSU ✓] bachelor-arts-social-science-honours — dom=4736.0, int=27920.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-arts-social-science-honours — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-busin → 0 field(s) (cost=$0.000000, in=0 out=0)
+[INFO ] [CATEGORY det] Bachelor of Agricultural Business Manage → Business & Management / Management
+[EXTRACT ] [EXTRACT] 15/200: Bachelor Border Management
+[ 15/200] Fetching 15/200: Bachelor Border Management
+[EXTRACT ] [CSU ✓] bachelor-border-management — dom=17376.0, int=23200.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-border-management — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agriculture → 0 field(s) (cost=$0.000000, in=0 out=0)
+[INFO ] [CATEGORY det] Bachelor of Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 16/200: Bachelor Business
+[ 16/200] Fetching 16/200: Bachelor Business
+[EXTRACT ] [CSU ✓] bachelor-business — dom=17376.0, int=33120.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-business — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1087643B rendered=0B using=static text_len=22985
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Business I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part of "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business → 0 field(s) (cost=$0.000493, in=6521 out=13)
+[EXTRACT ] [EXTRACT] 17/200: Bachelor Business Studies
+[ 17/200] Fetching 17/200: Bachelor Business Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-animal-science → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 18/200: Bachelor Clinical Science Medicine Doctor Medicine
+[ 18/200] Fetching 18/200: Bachelor Clinical Science Medicine Doctor Medicine
+[EXTRACT ] [CSU ✓] bachelor-business-studies — dom=17376.0, int=33120.0, dur=3.0years, intakes=March,July,November, loc=Bathurst Campus, Yunnan Uni-Fi
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-business-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=971607B rendered=0B using=static text_len=23003
+[EXTRACT ] [CSU ✓] bachelor-clinical-science-medicine-docto — dur=5.0years, intakes=March,July,November
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Border Management I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-border-management → 0 field(s) (cost=$0.000493, in=6527 out=10)
+[EXTRACT ] [EXTRACT] 19/200: Bachelor Communication
+[ 19/200] Fetching 19/200: Bachelor Communication
+[EXTRACT ] [CSU ✓] bachelor-communication — dom=17376.0, int=27920.0, dur=3.0years, intakes=March,July, loc=Bathurst Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-communication — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1354682B rendered=0B using=static text_len=23001
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Business Studies I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business-studies → 0 field(s) (cost=$0.000493, in=6527 out=13)
+[EXTRACT ] [EXTRACT] 20/200: Bachelor Computer Science
+[ 20/200] Fetching 20/200: Bachelor Computer Science
+[EXTRACT ] [CSU ✓] bachelor-computer-science — dom=9100.0, int=28640.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-computer-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=982964B rendered=0B using=static text_len=26320
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Clinical Science (Medicine) / Doctor of Medicine I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no interna"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-clinical-science-m → 0 field(s) (cost=$0.000555, in=7363 out=10)
+[EXTRACT ] [EXTRACT] 21/200: Bachelor Criminology
+[ 21/200] Fetching 21/200: Bachelor Criminology
+[EXTRACT ] [CSU ✓] bachelor-criminology — dom=17376.0, int=28320.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-criminology — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=996091B rendered=0B using=static text_len=22995
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Communication I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is par"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-communication → 0 field(s) (cost=$0.000492, in=6524 out=10)
+[EXTRACT ] [EXTRACT] 22/200: Bachelor Dental Science
+[ 22/200] Fetching 22/200: Bachelor Dental Science
+[EXTRACT ] [CSU ✓] bachelor-dental-science — dom=12516.0, int=72240.0, dur=5.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-dental-science — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1003665B rendered=0B using=static text_len=22991
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Criminology I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is part "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-criminology → 0 field(s) (cost=$0.000493, in=6523 out=13)
+[INFO ] [CATEGORY det] Bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[EXTRACT ] [EXTRACT] 23/200: Bachelor Education Birth To Five Years
+[ 23/200] Fetching 23/200: Bachelor Education Birth To Five Years
+[EXTRACT ] [CSU ✓] bachelor-education-birth-to-five-years — dom=6316.0, int=27920.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-education-birth-to-five-years — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=989489B rendered=0B using=static text_len=23597
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Dental Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is pa"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-dental-science → 0 field(s) (cost=$0.000505, in=6675 out=14)
+[INFO ] [CATEGORY det] Bachelor of Dental Science → Medicine & Health / Dentistry
+[EXTRACT ] [EXTRACT] 24/200: Bachelor Education Early Childhood Primary
+[ 24/200] Fetching 24/200: Bachelor Education Early Childhood Primary
+[EXTRACT ] [CSU ✓] bachelor-education-early-childhood-prima — dom=6170.0, int=27280.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus, Albury-Wodong
+[EXTRACT ] [GP-DEBUG] static=1049412B rendered=0B using=static text_len=23047
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Early Childhood and Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international of"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-early-ch → 0 field(s) (cost=$0.000494, in=6542 out=12)
+[INFO ] [CATEGORY det] Bachelor of Education (Early Childhood a → Education & Social Work / Early Childhood
+[EXTRACT ] [EXTRACT] 25/200: Bachelor Education K 12
+[ 25/200] Fetching 25/200: Bachelor Education K 12
+[EXTRACT ] [CSU ✓] bachelor-education-k-12 — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts-social-scienc → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 26/200: Bachelor Education Secondary Creative Arts
+[ 26/200] Fetching 26/200: Bachelor Education Secondary Creative Arts
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-creative-ar — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1009973B rendered=0B using=static text_len=23001
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Computer Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. This course is "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-computer-science → 0 field(s) (cost=$0.000494, in=6527 out=15)
+[EXTRACT ] [EXTRACT] 27/200: Bachelor Education Secondary English
+[ 27/200] Fetching 27/200: Bachelor Education Secondary English
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-english — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1033612B rendered=0B using=static text_len=23043
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Creative Arts I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offe"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6541 out=13)
+[EXTRACT ] [EXTRACT] 28/200: Bachelor Education Secondary Hsie
+[ 28/200] Fetching 28/200: Bachelor Education Secondary Hsie
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-hsie — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1013748B rendered=0B using=static text_len=23031
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - English I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6537 out=13)
+[EXTRACT ] [EXTRACT] 29/200: Bachelor Education Secondary Mathematics
+[ 29/200] Fetching 29/200: Bachelor Education Secondary Mathematics
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-mathematics — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1062449B rendered=0B using=static text_len=23025
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - HSIE I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Thi"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000493, in=6535 out=10)
+[EXTRACT ] [EXTRACT] 30/200: Bachelor Education Secondary Pdhpe
+[ 30/200] Fetching 30/200: Bachelor Education Secondary Pdhpe
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-pdhpe — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [GP-DEBUG] static=1029889B rendered=0B using=static text_len=23027
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - PDHPE I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. Th"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6535 out=13)
+[EXTRACT ] [EXTRACT] 31/200: Bachelor Education Secondary Science
+[ 31/200] Fetching 31/200: Bachelor Education Secondary Science
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-science — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GP-DEBUG] static=1045545B rendered=0B using=static text_len=23031
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Science I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offering. "
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6537 out=13)
+[EXTRACT ] [EXTRACT] 32/200: Bachelor Education Secondary Industry Entry Program
+[ 32/200] Fetching 32/200: Bachelor Education Secondary Industry Entry Program
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-industry-en — dom=6316.0, dur=2.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-education-secondary-industry-entry-program — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-birth-to → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 33/200: Bachelor Education Technology Applied Studies
+[ 33/200] Fetching 33/200: Bachelor Education Technology Applied Studies
+[EXTRACT ] [CSU ✓] bachelor-education-technology-applied-st — dom=6316.0, ielts=7.5, dur=4.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-k-12 → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [EXTRACT] 34/200: Bachelor Educational Studies
+[ 34/200] Fetching 34/200: Bachelor Educational Studies
+[EXTRACT ] [CSU ✓] bachelor-educational-studies — dom=12600.0, int=27920.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-educational-studies — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1013888B rendered=0B using=static text_len=23039
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) - Mathematics I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no international offeri"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6540 out=13)
+[INFO ] [CATEGORY det] Bachelor of Education (Secondary) - Math → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 35/200: Bachelor Emergency Management
+[ 35/200] Fetching 35/200: Bachelor Emergency Management
+[EXTRACT ] [CSU ✓] bachelor-emergency-management — dom=10516.0, int=29760.0, dur=3.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-emergency-management — vocational static fallback
+[EXTRACT ] [GP-DEBUG] static=1360434B rendered=0B using=static text_len=23057
+[EXTRACT ] [GP-DEBUG] text[:500]="Bachelor of Education (Secondary) Industry Entry Program I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year . This course has no domestic offering. This course has no internation"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → 0 field(s) (cost=$0.000494, in=6547 out=10)
+[EXTRACT ] [EXTRACT] 36/200: Bachelor Engineering Honours
+[ 36/200] Fetching 36/200: Bachelor Engineering Honours
+[EXTRACT ] [CSU ✓] bachelor-engineering-honours — dom=9536.0, int=38000.0, dur=4.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/bachelor-engineering-honours — vocational static fallback
