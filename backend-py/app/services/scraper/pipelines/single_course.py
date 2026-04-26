@@ -53,6 +53,15 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
     "Doctorate",
 })
 
+# Evidence methods produced by per-course vision OCR.  These represent a
+# direct read of the course's own page screenshots and are per-course
+# reliable — they must NOT be wiped by the PG clear-out even when
+# ``central_english_pg_skip`` is True and level-keyed data is unavailable.
+_PER_COURSE_VISION_METHODS: frozenset[str] = frozenset({
+    "per_course_vision",
+    "per_course_vision_cached",
+})
+
 
 # Hard ceiling on the AI fallback Gemini call. Same bug class as the
 # Playwright hang that started this hot-fix chain — if Gemini stalls
@@ -775,10 +784,16 @@ async def extract_course(
         # ── PG English clear-out (safety net) ────────────────────────────────
         # When ``central_english_pg_skip`` is True AND the browser fetch did
         # not return reliable level-keyed PG data (``english_by_level``
-        # missing or has no "postgraduate" entry), any English scores that
-        # landed in the payload are unreliable.  NULL is honest and
-        # recoverable; a silently-wrong 6.0 for a Master's that requires
-        # 6.5 is neither.
+        # missing or has no "postgraduate" entry), English scores that came
+        # from the central page or sibling-cache (UG-only values) must be
+        # cleared.  NULL is honest and recoverable; a silently-wrong 6.0 for
+        # a Master's that requires 6.5 is neither.
+        #
+        # EXCEPTION: if a slot was filled by per-course vision OCR
+        # (``per_course_vision`` / ``per_course_vision_cached``), it was
+        # read directly from the course's own page and is per-course
+        # reliable.  Those values must survive the clear-out even when the
+        # browser-rendered central page had no level headings.
         #
         # When the browser DID return level-keyed data and Path 1 applied
         # the correct PG values above, this block is skipped — the values
@@ -796,9 +811,20 @@ async def extract_course(
             and not _pg_has_level_data
             and _pg_dl_final in _CENTRAL_ENGLISH_PG_LEVELS
         ):
+            # Build a quick index: slot → set of methods that filled it
+            _slot_methods: dict[str, set[str]] = {}
+            for _ev in evidence:
+                _fk = _ev.get("field_key", "")
+                _meth = _ev.get("method", "")
+                if _fk and _meth:
+                    _slot_methods.setdefault(_fk, set()).add(_meth)
+
             _cleared: list[str] = []
             for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall"):
                 if payload.get(_slot) not in (None, "", 0):
+                    # Keep vision-OCR-sourced values — they are per-course reliable
+                    if _slot_methods.get(_slot, set()) & _PER_COURSE_VISION_METHODS:
+                        continue
                     payload[_slot] = None
                     _cleared.append(_slot)
             if _cleared and emit:
