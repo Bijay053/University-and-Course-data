@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
@@ -797,6 +798,8 @@ export default function UniversityDetail() {
   const [bulkApproveRunning, setBulkApproveRunning] = useState(false);
   const [bulkRejectRunning, setBulkRejectRunning] = useState(false);
   const [showBulkRejectConfirm, setShowBulkRejectConfirm] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
+  const [bulkRejectFieldKey, setBulkRejectFieldKey] = useState("general");
 
   const toggleRawSelect = (id: number) =>
     setRawSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -858,7 +861,7 @@ export default function UniversityDetail() {
   };
 
   const handleBulkRejectSelected = async () => {
-    if (rawSelectedIds.size === 0) return;
+    if (rawSelectedIds.size === 0 || !bulkRejectReason.trim()) return;
     setBulkRejectRunning(true);
     setShowBulkRejectConfirm(false);
     let rejected = 0; let failed = 0;
@@ -867,7 +870,10 @@ export default function UniversityDetail() {
         const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/reject`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: "bulk_reset", fieldKey: "general" }),
+          body: JSON.stringify({
+            reason: bulkRejectReason.trim(),
+            fieldKey: bulkRejectFieldKey === "general" ? null : bulkRejectFieldKey,
+          }),
         });
         if (res.ok) rejected++; else failed++;
       } catch { failed++; }
@@ -876,6 +882,8 @@ export default function UniversityDetail() {
       title: "Bulk reject complete",
       description: `${rejected} rejected${failed > 0 ? `, ${failed} failed` : ""}. Run a new scrape to get fresh data.`,
     });
+    setBulkRejectReason("");
+    setBulkRejectFieldKey("general");
     setRawSelectedIds(new Set());
     await fetchRawData();
     setBulkRejectRunning(false);
@@ -2432,31 +2440,71 @@ export default function UniversityDetail() {
             </div>
           )}
 
-          {/* Bulk reject confirmation dialog */}
-          <Dialog open={showBulkRejectConfirm} onOpenChange={(o) => { if (!o) setShowBulkRejectConfirm(false); }}>
-            <DialogContent className="max-w-sm">
+          {/* Bulk reject with reason dialog */}
+          <Dialog open={showBulkRejectConfirm} onOpenChange={(o) => {
+            if (!o) {
+              setShowBulkRejectConfirm(false);
+              setBulkRejectReason("");
+              setBulkRejectFieldKey("general");
+            }
+          }}>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-red-700">
                   <XCircle className="w-5 h-5 shrink-0" />
-                  Reject {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""}?
+                  Reject {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""} With Reason
                 </DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-gray-600">
-                The selected courses will be rejected with reason <code className="bg-gray-100 px-1 rounded text-xs">bulk_reset</code>.
-                They can be re-staged immediately on the next scrape run.
-              </p>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setShowBulkRejectConfirm(false)} disabled={bulkRejectRunning}>
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Describe what was wrong on this university's website so the next rerun can use that guidance and produce more accurate data. This feedback is scoped to this university and its similar page layouts, not copied to other universities.
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Field</label>
+                  <Select value={bulkRejectFieldKey} onValueChange={setBulkRejectFieldKey}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General / whole course</SelectItem>
+                      <SelectItem value="internationalFee">International Fee</SelectItem>
+                      <SelectItem value="courseLocation">Course Location</SelectItem>
+                      <SelectItem value="ieltsOverall">English Requirement</SelectItem>
+                      <SelectItem value="courseName">Wrong Page / Course Match</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Reject reason</label>
+                  <Textarea
+                    rows={4}
+                    className="mt-1"
+                    value={bulkRejectReason}
+                    onChange={(e) => setBulkRejectReason(e.target.value)}
+                    placeholder="Example: On this university site, intake is shown under Start Date / Class start date, and location is under Campus Location. Use those labels for rerun. Do not copy this rule to other universities."
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowBulkRejectConfirm(false);
+                    setBulkRejectReason("");
+                    setBulkRejectFieldKey("general");
+                  }}
+                  disabled={bulkRejectRunning}
+                >
                   Cancel
                 </Button>
                 <Button
                   variant="destructive"
                   className="bg-red-600 hover:bg-red-700"
                   onClick={handleBulkRejectSelected}
-                  disabled={bulkRejectRunning}
+                  disabled={!bulkRejectReason.trim() || bulkRejectRunning}
                 >
                   {bulkRejectRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
-                  Reject All
+                  Reject And Save University Feedback
                 </Button>
               </DialogFooter>
             </DialogContent>
