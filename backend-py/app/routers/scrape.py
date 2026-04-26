@@ -12,6 +12,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import case, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1571,20 +1572,36 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
     return {"ok": True, "id": sc_id, "status": "approved"}
 
 
+class _RejectBody(BaseModel):
+    reason: str | None = None
+    fieldKey: str | None = None
+
+
 @router.post("/staged/{sc_id}/reject")
 async def staged_reject(
     sc_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    reason: Annotated[str | None, Body(embed=True)] = None,
+    body: _RejectBody = Body(default_factory=_RejectBody),
 ) -> dict:
-    from app.models import ScrapedCourse
+    from app.models import ScrapedCourse, ScrapeFeedback
     from datetime import datetime, timezone
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
     sc.status = "rejected"
-    sc.rejection_reason = reason or "manual_reject"
+    sc.rejection_reason = body.reason or "manual_reject"
     sc.reviewed_at = datetime.now(timezone.utc)
+    if body.reason and body.reason.strip():
+        fb = ScrapeFeedback(
+            university_id=sc.university_id,
+            scraped_course_id=sc.id,
+            course_name=sc.course_name,
+            field_key=body.fieldKey,
+            issue_type="manual_reject",
+            reason=body.reason.strip(),
+            status="active",
+        )
+        db.add(fb)
     await db.commit()
     return {"ok": True, "id": sc_id, "status": "rejected", "rejection_reason": sc.rejection_reason}
 

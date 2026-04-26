@@ -353,6 +353,7 @@ export default function Scraping() {
   const [rejectingIds, setRejectingIds] = useState<number[] | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectFieldKey, setRejectFieldKey] = useState("general");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -1206,8 +1207,9 @@ export default function Scraping() {
 
   const submitReject = async () => {
     if (!rejectingIds || rejectingIds.length === 0 || !rejectReason.trim()) return;
-    const succeededIds = new Set<number>();
+    setRejectSubmitting(true);
     try {
+      const errors: string[] = [];
       for (const id of rejectingIds) {
         const res = await fetch(`/api/scrape/staged/${id}/reject`, {
           method: "POST",
@@ -1218,21 +1220,23 @@ export default function Scraping() {
           }),
         });
         if (!res.ok) {
-          toast({ title: "Reject failed", description: await getFetchErrorMessage(res), variant: "destructive" });
-          return;
+          errors.push(`Course ${id}: ${await getFetchErrorMessage(res)}`);
         }
-        succeededIds.add(id);
       }
-      setStagedCourses((prev) => prev.filter((c) => !succeededIds.has(c.id)));
-      setSelectedIds((prev) => {
-        const n = new Set(prev);
-        for (const id of succeededIds) n.delete(id);
-        return n;
-      });
+      if (errors.length > 0) {
+        toast({ title: `${errors.length} reject(s) failed`, description: errors[0], variant: "destructive" });
+      } else {
+        toast({ title: `${rejectingIds.length} course(s) rejected`, description: "Feedback saved." });
+      }
       setRejectingIds(null);
       setRejectReason("");
       setRejectFieldKey("general");
-    } catch {}
+      if (reviewJobId) await loadStagedCourses(reviewJobId);
+    } catch (err) {
+      toast({ title: "Unexpected error", description: String(err), variant: "destructive" });
+    } finally {
+      setRejectSubmitting(false);
+    }
   };
 
   const handleOpenReview = async (id: number) => {
@@ -2323,8 +2327,8 @@ export default function Scraping() {
             >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={submitReject} disabled={!rejectReason.trim()}>
-              Reject And Save University Feedback
+            <Button variant="destructive" onClick={submitReject} disabled={!rejectReason.trim() || rejectSubmitting}>
+              {rejectSubmitting ? "Rejecting…" : "Reject And Save University Feedback"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,0 +1,800 @@
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-adult-vocational-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/executive-masters-international-police-leadership — vocational static fallback
+[INFO ] [CATEGORY det] Doctor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-adult- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-veterinary-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/executive-masters-internati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 92/200: Graduate Certificate Agricultural Business Management
+[ 91/200] Fetching 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [EXTRACT] 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [EXTRACT] 94/200: Graduate Certificate Applied Artificial Intelligence
+[ 92/200] Fetching 92/200: Graduate Certificate Agricultural Business Management
+[ 93/200] Fetching 93/200: Graduate Certificate Agriculture
+[ 94/200] Fetching 94/200: Graduate Certificate Applied Artificial Intelligence
+[EXTRACT ] [CSU ✓] graduate-certificate-agricultural-busine — dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agricultural-business-management — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-ageing-health — dom=12920.0, int=13960.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-agriculture — dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-artificial- — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ageing-health — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-artificial-intelligence — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-agriculture — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Agricultural Bus → Business & Management / Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ageing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Graduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Artifici → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [EXTRACT] 96/200: Graduate Certificate Applied Data Science
+[ 95/200] Fetching 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [EXTRACT] 97/200: Graduate Certificate Audiovisual Archiving
+[EXTRACT ] [EXTRACT] 98/200: Graduate Certificate Business Administration
+[ 96/200] Fetching 96/200: Graduate Certificate Applied Data Science
+[ 97/200] Fetching 97/200: Graduate Certificate Audiovisual Archiving
+[ 98/200] Fetching 98/200: Graduate Certificate Business Administration
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-audiovisual-archivi — dom=12920.0, int=13520.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-business — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-data-scienc — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-audiovisual-archiving — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-business — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-applied-data-science — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-audiov → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 99/200: Graduate Certificate Business Administration Computing
+[EXTRACT ] [EXTRACT] 100/200: Graduate Certificate Business Data Analytics
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 101/200: Graduate Certificate Case Management Coordinated Care
+[ 99/200] Fetching 99/200: Graduate Certificate Business Administration Computing
+[ 100/200] Fetching 100/200: Graduate Certificate Business Data Analytics
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Data Sci → Computer Science & IT / Data Science
+[ 101/200] Fetching 101/200: Graduate Certificate Case Management Coordinated Care
+[EXTRACT ] [EXTRACT] 102/200: Graduate Certificate Classical Arabic
+[ 102/200] Fetching 102/200: Graduate Certificate Classical Arabic
+[EXTRACT ] [CSU ✓] graduate-certificate-classical-arabic — dom=9680.0, int=12280.0, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] graduate-certificate-case-management-coo — dom=7708.0, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-classical-arabic — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-business-data-analy — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-case-management-coordinated-care — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-classi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-case-m → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-administration-computing — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-business-data-analytics — vocational static fallback
+[EXTRACT ] [EXTRACT] 103/200: Graduate Certificate Cloud Computing Virtualisation
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 104/200: Graduate Certificate Communication
+[ 103/200] Fetching 103/200: Graduate Certificate Cloud Computing Virtualisation
+[EXTRACT ] [EXTRACT] 105/200: Graduate Certificate Computing Career Transition
+[ 104/200] Fetching 104/200: Graduate Certificate Communication
+[ 105/200] Fetching 105/200: Graduate Certificate Computing Career Transition
+[INFO ] [CATEGORY det] Graduate Certificate in Business Data An → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 106/200: Graduate Certificate Paramedicine
+[ 106/200] Fetching 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [CSU ✓] graduate-certificate-computing-career-tr — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-computing-career-transition — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-communication — dom=8688.0, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-paramedicine — dom=14960.0, int=19240.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-cloud-computing-vir — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-comput → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-communication — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cloud-computing-virtualisation — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-paramedicine — vocational static fallback
+[EXTRACT ] [EXTRACT] 107/200: Graduate Certificate Customs Administration
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cloud- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-commun → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-parame → skipped (CSU pre-seed) (cost=$0.000000)
+[ 107/200] Fetching 107/200: Graduate Certificate Customs Administration
+[EXTRACT ] [EXTRACT] 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [EXTRACT] 109/200: Graduate Certificate Data Management
+[ 108/200] Fetching 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [EXTRACT] 110/200: Graduate Certificate Digital Archiving
+[ 109/200] Fetching 109/200: Graduate Certificate Data Management
+[ 110/200] Fetching 110/200: Graduate Certificate Digital Archiving
+[EXTRACT ] [CSU ✓] graduate-certificate-data-management — dur=0.5years, intakes=March, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-data-management — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-customs-administrat — dom=10280.0, int=11760.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-archiving — dom=12920.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-cyber-security — dom=16840.0, int=17856.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-data-m → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-cyber-security — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-archiving — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-customs-administration — vocational static fallback
+[EXTRACT ] [EXTRACT] 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-custom → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cyber- → skipped (CSU pre-seed) (cost=$0.000000)
+[ 111/200] Fetching 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [EXTRACT] 112/200: Graduate Certificate Digital Health
+[INFO ] [CATEGORY det] Graduate Certificate in Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 113/200: Graduate Certificate Education
+[ 112/200] Fetching 112/200: Graduate Certificate Digital Health
+[EXTRACT ] [EXTRACT] 114/200: Graduate Certificate Environmental Management
+[ 113/200] Fetching 113/200: Graduate Certificate Education
+[ 114/200] Fetching 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-health — dom=13960.0, int=14520.0, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-health — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-education — dom=3948.0, int=13960.0, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-communicati — dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-environmental-manag — dom=18160.0, int=18440.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-environmental-management — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-digital-communication — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-education — vocational static fallback
+[EXTRACT ] [EXTRACT] 115/200: Graduate Certificate In Fish Conservation And Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-enviro → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-educat → skipped (CSU pre-seed) (cost=$0.000000)
+[ 115/200] Fetching 115/200: Graduate Certificate In Fish Conservation And Management
+[EXTRACT ] [EXTRACT] 116/200: Graduate Certificate Financial Crime
+[EXTRACT ] [EXTRACT] 117/200: Graduate Certificate Gis Remote Sensing
+[EXTRACT ] [EXTRACT] 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[ 116/200] Fetching 116/200: Graduate Certificate Financial Crime
+[ 117/200] Fetching 117/200: Graduate Certificate Gis Remote Sensing
+[ 118/200] Fetching 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[EXTRACT ] [CSU ✓] graduate-certificate-gis-remote-sensing — dom=17440.0, int=18440.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-gis-remote-sensing — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-financial-crime — dom=13200.0, int=14000.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-in-fish-conservatio — int=17920.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-geostatistics-spati — dom=17440.0, int=18440.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-gis-re → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-in-fish-conservation-and-management — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-geostatistics-spatial-modelling — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-financial-crime — vocational static fallback
+[EXTRACT ] [EXTRACT] 119/200: Graduate Certificate Health Management Leadership
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-in-fis → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-geosta → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-financ → skipped (CSU pre-seed) (cost=$0.000000)
+[ 119/200] Fetching 119/200: Graduate Certificate Health Management Leadership
+[EXTRACT ] [EXTRACT] 120/200: Graduate Certificate Human Resource Management
+[EXTRACT ] [EXTRACT] 121/200: Graduate Certificate Human Services
+[ 120/200] Fetching 120/200: Graduate Certificate Human Resource Management
+[EXTRACT ] [EXTRACT] 122/200: Graduate Certificate Industrial Relations
+[ 121/200] Fetching 121/200: Graduate Certificate Human Services
+[ 122/200] Fetching 122/200: Graduate Certificate Industrial Relations
+[EXTRACT ] [CSU ✓] graduate-certificate-human-services — dom=12920.0, int=17248.0, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-human-services — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-health-management-l — dom=13960.0, int=14520.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-industrial-relation — dom=16840.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-human-resource-mana — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-industrial-relations — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-health-management-leadership — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-human-resource-management — vocational static fallback
+[EXTRACT ] [EXTRACT] 123/200: Graduate Certificate Information Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-indust → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-health → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[ 123/200] Fetching 123/200: Graduate Certificate Information Studies
+[INFO ] [CATEGORY det] Graduate Certificate in Human Resource M → Business & Management / Human Resources
+[EXTRACT ] [EXTRACT] 124/200: Graduate Certificate Information Technology
+[EXTRACT ] [EXTRACT] 125/200: Graduate Certificate Intelligence Analysis
+[EXTRACT ] [EXTRACT] 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[ 124/200] Fetching 124/200: Graduate Certificate Information Technology
+[ 125/200] Fetching 125/200: Graduate Certificate Intelligence Analysis
+[ 126/200] Fetching 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[EXTRACT ] [CSU ✓] graduate-certificate-information-technol — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-information-technology — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-information-studies — dom=12920.0, int=13520.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-intersectionality-d — dom=12920.0, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-intelligence-analys — dom=8688.0, int=12900.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-intelligence-analysis — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-information-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-intersectionality-diversity-inclusion — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-intell → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 127/200: Graduate Certificate Islamic Psychology
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inters → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [EXTRACT] 129/200: Graduate Certificate Leadership Management Policing Security
+[ 128/200] Fetching 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [EXTRACT] 130/200: Graduate Certificate Leadership Human Services
+[ 127/200] Fetching 127/200: Graduate Certificate Islamic Psychology
+[ 129/200] Fetching 129/200: Graduate Certificate Leadership Management Policing Security
+[ 130/200] Fetching 130/200: Graduate Certificate Leadership Human Services
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-psychology — dom=9680.0, int=12280.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-islamic-psychology — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-leadership-manageme — dom=8688.0, int=12900.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-studies — dom=9680.0, int=12280.0, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] graduate-certificate-leadership-human-se — dom=8688.0, int=27920.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-islami → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-islamic-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-leadership-human-services — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-leadership-management-policing-security — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Islamic Psycholo → Medicine & Health / Psychology
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-islami → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-leader → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 131/200: Graduate Certificate Learning Teaching Higher Education
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-leader → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 132/200: Graduate Certificate Mathematics
+[ 131/200] Fetching 131/200: Graduate Certificate Learning Teaching Higher Education
+[EXTRACT ] [EXTRACT] 133/200: Graduate Certificate Ministry
+[EXTRACT ] [EXTRACT] 134/200: Graduate Certificate Networking Systems Administration
+[ 132/200] Fetching 132/200: Graduate Certificate Mathematics
+[ 134/200] Fetching 134/200: Graduate Certificate Networking Systems Administration
+[ 133/200] Fetching 133/200: Graduate Certificate Ministry
+[EXTRACT ] [CSU ✓] graduate-certificate-learning-teaching-h — dur=0.5years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-ministry — dom=9680.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-mathematics — dom=16520.0, int=17240.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-networking-systems- — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-learning-teaching-higher-education — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ministry — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-mathematics — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-networking-systems-administration — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-learni → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-mathem → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-networ → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-minist → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Graduate Certificate in Learning and Tea → Education & Social Work / Teaching
+[INFO ] [CATEGORY det] Graduate Certificate in Mathematics → Science & Mathematics / Mathematics
+[INFO ] [CATEGORY det] Graduate Certificate in Networking and S → Computer Science & IT / Networking
+[EXTRACT ] [EXTRACT] 135/200: Graduate Certificate Nuclear Safeguards Security
+[EXTRACT ] [EXTRACT] 136/200: Graduate Certificate Nursing Aged Care
+[EXTRACT ] [EXTRACT] 137/200: Graduate Certificate Nursing Clinical Education
+[EXTRACT ] [EXTRACT] 138/200: Graduate Certificate Nursing Leadership Management
+[ 137/200] Fetching 137/200: Graduate Certificate Nursing Clinical Education
+[ 135/200] Fetching 135/200: Graduate Certificate Nuclear Safeguards Security
+[ 136/200] Fetching 136/200: Graduate Certificate Nursing Aged Care
+[ 138/200] Fetching 138/200: Graduate Certificate Nursing Leadership Management
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-clinical-ed — dom=14320.0, int=17560.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-clinical-education — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-nuclear-safeguards- — dom=17528.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-aged-care — dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-leadership- — dom=14320.0, int=17560.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nuclear-safeguards-security — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-aged-care — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-leadership-management — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Clinica → Medicine & Health / Nursing
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nuclea → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 140/200: Graduate Certificate Organisational Change
+[ 139/200] Fetching 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Aged Ca → Medicine & Health / Nursing
+[ 140/200] Fetching 140/200: Graduate Certificate Organisational Change
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Leaders → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 141/200: Graduate Certificate Organisational Coaching Leadership
+[EXTRACT ] [EXTRACT] 142/200: Graduate Certificate Ornithology
+[ 141/200] Fetching 141/200: Graduate Certificate Organisational Coaching Leadership
+[ 142/200] Fetching 142/200: Graduate Certificate Ornithology
+[EXTRACT ] [CSU ✓] graduate-certificate-organisational-chan — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-organisational-change — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-organisational-coac — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-rural-remot — dom=14320.0, int=17560.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-ornithology — dom=14680.0, int=18760.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-nursing-rural-remote-nursing — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-organisational-coaching-leadership — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-organi → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-ornithology — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-organi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ornith → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 143/200: Graduate Certificate Professional Accounting
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Rural a → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 144/200: Graduate Certificate Professional Supervision Pastoral
+[ 143/200] Fetching 143/200: Graduate Certificate Professional Accounting
+[EXTRACT ] [EXTRACT] 145/200: Graduate Certificate Project Management
+[EXTRACT ] [EXTRACT] 146/200: Graduate Certificate Research
+[ 144/200] Fetching 144/200: Graduate Certificate Professional Supervision Pastoral
+[ 146/200] Fetching 146/200: Graduate Certificate Research
+[ 145/200] Fetching 145/200: Graduate Certificate Project Management
+[EXTRACT ] [CSU ✓] graduate-certificate-professional-accoun — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-research — dom=8688.0, int=13960.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-professional-accounting — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-project-management — dom=16840.0, int=17860.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-professional-superv — dom=9680.0, dur=0.5years, intakes=March,July,November, loc=United Theological College, Ca
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-research — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-profes → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-resear → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-professional-supervision-pastoral — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-project-management — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Professional Acc → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 147/200: Graduate Certificate Social Organisational Leadership
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-projec → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-profes → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 148/200: Graduate Certificate Sustainable Agriculture
+[ 147/200] Fetching 147/200: Graduate Certificate Social Organisational Leadership
+[INFO ] [CATEGORY det] Graduate Certificate in Project Manageme → Business & Management / Project Management
+[ 148/200] Fetching 148/200: Graduate Certificate Sustainable Agriculture
+[EXTRACT ] [EXTRACT] 149/200: Graduate Certificate Terrorism Security Studies
+[EXTRACT ] [EXTRACT] 150/200: Graduate Certificate Theological Studies
+[ 149/200] Fetching 149/200: Graduate Certificate Terrorism Security Studies
+[ 150/200] Fetching 150/200: Graduate Certificate Theological Studies
+[EXTRACT ] [CSU ✓] graduate-certificate-sustainable-agricul — dom=2968.0, int=18520.0, dur=0.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-sustainable-agriculture — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-social-organisation — dom=16840.0, int=17320.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-certificate-theological-studies — dom=9680.0, int=12280.0, dur=0.5years, intakes=March,July, loc=United Theological College, Ca
+[EXTRACT ] [CSU ✓] graduate-certificate-terrorism-security- — dom=8688.0, int=12900.0, dur=0.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-sustai → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-theological-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-social-organisational-leadership — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-terrorism-security-studies — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Certificate in Sustainable Agri → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-theolo → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-terror → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-social → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 151/200: Graduate Certificate Wiradyuri Language
+[EXTRACT ] [EXTRACT] 152/200: Graduate Diploma Accounting
+[EXTRACT ] [EXTRACT] 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[ 151/200] Fetching 151/200: Graduate Certificate Wiradyuri Language
+[EXTRACT ] [EXTRACT] 154/200: Graduate Diploma Adult Vocational Education
+[ 152/200] Fetching 152/200: Graduate Diploma Accounting
+[ 153/200] Fetching 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[ 154/200] Fetching 154/200: Graduate Diploma Adult Vocational Education
+[EXTRACT ] [CSU ✓] graduate-diploma-adult-vocational-educat — dom=7896.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-accounting — dom=33680.0, int=34640.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-adult-vocational-education — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-certificate-wiradyuri-language — dom=2368.0, dur=2.0years, intakes=March, loc=Dubbo Campus
+[EXTRACT ] [CSU ✓] graduate-diploma-adult-language-literacy — dom=4736.0, int=27920.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-accounting — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-certificate-wiradyuri-language — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-adult-voca → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-adult-language-literacy-numeracy — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-accounting → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-wirady → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-adult-lang → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 155/200: Graduate Diploma Ageing Pastoral Studies
+[INFO ] [CATEGORY det] Graduate Diploma of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 156/200: Graduate Diploma Applied Business
+[ 155/200] Fetching 155/200: Graduate Diploma Ageing Pastoral Studies
+[EXTRACT ] [EXTRACT] 157/200: Graduate Diploma Of Business Data Analytics
+[EXTRACT ] [EXTRACT] 158/200: Graduate Diploma Classical Arabic
+[ 156/200] Fetching 156/200: Graduate Diploma Applied Business
+[ 157/200] Fetching 157/200: Graduate Diploma Of Business Data Analytics
+[ 158/200] Fetching 158/200: Graduate Diploma Classical Arabic
+[EXTRACT ] [CSU ✓] graduate-diploma-of-business-data-analyt — int=32640.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-of-business-data-analytics — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-applied-business — dom=33680.0, int=34640.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-ageing-pastoral-studies — dur=2.0years, intakes=March,July, loc=Canberra Campus
+[EXTRACT ] [CSU ✓] graduate-diploma-classical-arabic — dom=19360.0, int=24560.0, dur=1.0years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-of-busines → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-applied-business — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-classical-arabic — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-ageing-pastoral-studies — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Diploma of Business Data Analyt → Computer Science & IT / Data Science
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-applied-bu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-ageing-pas → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 159/200: Graduate Diploma Clinical Practice Paramedicine
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-classical- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 160/200: Graduate Diploma Paramedicine
+[EXTRACT ] [EXTRACT] 161/200: Graduate Diploma Customs Administration
+[ 160/200] Fetching 160/200: Graduate Diploma Paramedicine
+[ 159/200] Fetching 159/200: Graduate Diploma Clinical Practice Paramedicine
+[EXTRACT ] [EXTRACT] 162/200: Graduate Diploma Dental Implantology
+[ 161/200] Fetching 161/200: Graduate Diploma Customs Administration
+[ 162/200] Fetching 162/200: Graduate Diploma Dental Implantology
+[EXTRACT ] [CSU ✓] graduate-diploma-paramedicine — dom=29920.0, int=38480.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-paramedicine — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-dental-implantology — dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-clinical-practice-param — dom=9536.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-customs-administration — dom=20560.0, int=23520.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-paramedici → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-dental-implantology — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-clinical-practice-paramedicine — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-customs-administration — vocational static fallback
+[EXTRACT ] [EXTRACT] 163/200: Graduate Diploma Financial Crime
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-dental-imp → skipped (CSU pre-seed) (cost=$0.000000)
+[ 163/200] Fetching 163/200: Graduate Diploma Financial Crime
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-customs-ad → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-clinical-p → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Graduate Diploma of Dental Implantology → Medicine & Health / Dentistry
+[EXTRACT ] [EXTRACT] 164/200: Graduate Diploma Information Technology
+[EXTRACT ] [EXTRACT] 165/200: Graduate Diploma Intelligence Analysis
+[EXTRACT ] [EXTRACT] 166/200: Graduate Diploma Investigations
+[ 164/200] Fetching 164/200: Graduate Diploma Information Technology
+[ 165/200] Fetching 165/200: Graduate Diploma Intelligence Analysis
+[ 166/200] Fetching 166/200: Graduate Diploma Investigations
+[EXTRACT ] [CSU ✓] graduate-diploma-information-technology — dom=32400.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-information-technology — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-investigations — dom=17376.0, int=25800.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-financial-crime — dom=26400.0, int=28000.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-intelligence-analysis — dom=17376.0, int=25800.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-informatio → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-investigations — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-intelligence-analysis — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-financial-crime — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-intelligen → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-investigat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 167/200: Graduate Diploma Islamic Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-financial- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 168/200: Graduate Diploma Leadership Management Policing Security
+[EXTRACT ] [EXTRACT] 169/200: Graduate Diploma Mammography
+[ 167/200] Fetching 167/200: Graduate Diploma Islamic Studies
+[EXTRACT ] [EXTRACT] 170/200: Graduate Diploma Mathematics
+[ 169/200] Fetching 169/200: Graduate Diploma Mammography
+[ 168/200] Fetching 168/200: Graduate Diploma Leadership Management Policing Security
+[ 170/200] Fetching 170/200: Graduate Diploma Mathematics
+[EXTRACT ] [CSU ✓] graduate-diploma-mathematics — dom=4736.0, int=34480.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-mathematics — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-islamic-studies — dom=19360.0, int=24560.0, dur=1.0years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] graduate-diploma-leadership-management-p — dom=17376.0, int=25800.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-mammography — dom=36320.0, dur=1.0years, intakes=March, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-mathematic → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-islamic-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-leadership-management-policing-security — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-mammography — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Diploma of Mathematics → Science & Mathematics / Mathematics
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-leadership → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-islamic-st → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 171/200: Graduate Diploma Midwifery
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-mammograph → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 172/200: Graduate Diploma Organisational Coaching Leadership
+[EXTRACT ] [EXTRACT] 173/200: Graduate Diploma Pastoral Counselling
+[ 171/200] Fetching 171/200: Graduate Diploma Midwifery
+[EXTRACT ] [EXTRACT] 174/200: Graduate Diploma Project Management
+[ 172/200] Fetching 172/200: Graduate Diploma Organisational Coaching Leadership
+[ 173/200] Fetching 173/200: Graduate Diploma Pastoral Counselling
+[ 174/200] Fetching 174/200: Graduate Diploma Project Management
+[EXTRACT ] [CSU ✓] graduate-diploma-midwifery — dom=4736.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-midwifery — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-organisational-coaching — dom=33680.0, int=34640.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-pastoral-counselling — dom=19360.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-project-management — dom=33680.0, int=35720.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-midwifery → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-organisational-coaching-leadership — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-project-management — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-pastoral-counselling — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Diploma of Midwifery → Medicine & Health / Nursing
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-organisati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-project-ma → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-pastoral-c → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 175/200: Graduate Diploma Of Project Management And Leadership
+[EXTRACT ] [EXTRACT] 176/200: Graduate Diploma Psychology
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 177/200: Graduate Diploma Terrorism Security Studies
+[ 175/200] Fetching 175/200: Graduate Diploma Of Project Management And Leadership
+[EXTRACT ] [EXTRACT] 178/200: Graduate Diploma Theological Studies
+[ 176/200] Fetching 176/200: Graduate Diploma Psychology
+[ 177/200] Fetching 177/200: Graduate Diploma Terrorism Security Studies
+[ 178/200] Fetching 178/200: Graduate Diploma Theological Studies
+[EXTRACT ] [CSU ✓] graduate-diploma-terrorism-security-stud — dom=17376.0, int=25800.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-of-project-management-a — int=33920.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] graduate-diploma-psychology — dom=17376.0, int=35520.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-terrorism-security-studies — vocational static fallback
+[EXTRACT ] [CSU ✓] graduate-diploma-theological-studies — dom=19360.0, int=24560.0, dur=1.0years, intakes=March,July, loc=Canberra Campus, United Theolo
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-of-project-management-and-leadership — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-terrorism- → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-psychology — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-theological-studies — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-of-project → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-theologica → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 179/200: Graduate Diploma Cyber Security
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management a → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 180/200: Master Adult Vocational Education
+[INFO ] [CATEGORY det] Graduate Diploma of Psychology → Medicine & Health / Psychology
+[ 179/200] Fetching 179/200: Graduate Diploma Cyber Security
+[EXTRACT ] [EXTRACT] 181/200: Master Advanced Social Work Practice
+[ 180/200] Fetching 180/200: Master Adult Vocational Education
+[ 181/200] Fetching 181/200: Master Advanced Social Work Practice
+[EXTRACT ] [EXTRACT] 182/200: Master Ageing Health
+[ 182/200] Fetching 182/200: Master Ageing Health
+[EXTRACT ] [CSU ✓] graduate-diploma-cyber-security — dom=33680.0, int=35712.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/graduate-diploma-cyber-security — vocational static fallback
+[EXTRACT ] [CSU ✓] master-adult-vocational-education — dom=26720.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-ageing-health — dom=25840.0, int=27920.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-advanced-social-work-practice — dom=26720.0, int=31200.0, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-cyber-secu → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-ageing-health — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-advanced-social-work-practice — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-adult-vocational-education — vocational static fallback
+[INFO ] [CATEGORY det] Graduate Diploma of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-ageing-health → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-adult-vocational-edu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-advanced-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 183/200: Master Ageing Pastoral Studies
+[EXTRACT ] [EXTRACT] 184/200: Master Agricultural Science
+[INFO ] [CATEGORY det] Master of Advanced Social Work Practice → Education & Social Work / Social Work
+[ 183/200] Fetching 183/200: Master Ageing Pastoral Studies
+[EXTRACT ] [EXTRACT] 185/200: Master Agriculture
+[ 184/200] Fetching 184/200: Master Agricultural Science
+[ 185/200] Fetching 185/200: Master Agriculture
+[EXTRACT ] [EXTRACT] 186/200: Master Applied Business
+[ 186/200] Fetching 186/200: Master Applied Business
+[EXTRACT ] [CSU ✓] master-applied-business — dom=33680.0, int=34640.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-applied-business — vocational static fallback
+[EXTRACT ] [CSU ✓] master-agricultural-science — dom=36320.0, int=37040.0, dur=2.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-ageing-pastoral-studies — dur=3.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-agriculture — dom=11056.0, int=37040.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-applied-business → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-agricultural-science — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-agriculture — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-ageing-pastoral-studies — vocational static fallback
+[EXTRACT ] [EXTRACT] 187/200: Master Arts Theological Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-agricultural-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-agriculture → skipped (CSU pre-seed) (cost=$0.000000)
+[ 187/200] Fetching 187/200: Master Arts Theological Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-ageing-pastoral-stud → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 188/200: Master Business Administration Computing
+[INFO ] [CATEGORY det] Master of Agriculture (with Specialisati → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 189/200: Master Business Administration
+[ 188/200] Fetching 188/200: Master Business Administration Computing
+[EXTRACT ] [EXTRACT] 190/200: Master Of Business Data Analytics
+[ 189/200] Fetching 189/200: Master Business Administration
+[ 190/200] Fetching 190/200: Master Of Business Data Analytics
+[EXTRACT ] [CSU ✓] master-business-administration — dom=33680.0, int=35712.0, dur=1.5years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-business-administration — vocational static fallback
+[EXTRACT ] [CSU ✓] master-arts-theological-studies — dom=19360.0, int=24560.0, dur=1.5years, intakes=March,July, loc=United Theological College, Ca
+[EXTRACT ] [CSU ✓] master-business-administration-computing — dom=33680.0, int=35720.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-of-business-data-analytics — int=32640.0, dur=2.0years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-business-administration-computing — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-arts-theological-studies — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-of-business-data-analytics — vocational static fallback
+[INFO ] [CATEGORY det] Master of Business Administration (with → Business & Management / MBA
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-arts-theological-stu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-of-business-data-ana → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 191/200: Master Classical Arabic
+[INFO ] [CATEGORY det] Master of Business Administration (Compu → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 192/200: Master Clinical Exercise Physiology
+[ 191/200] Fetching 191/200: Master Classical Arabic
+[INFO ] [CATEGORY det] Master of Business Data Analytics → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 193/200: Master Clinical Psychology
+[ 192/200] Fetching 192/200: Master Clinical Exercise Physiology
+[ 193/200] Fetching 193/200: Master Clinical Psychology
+[EXTRACT ] [EXTRACT] 194/200: Master Cloud Computing Virtualisation
+[ 194/200] Fetching 194/200: Master Cloud Computing Virtualisation
+[EXTRACT ] [CSU ✓] master-classical-arabic — dom=19360.0, int=24560.0, dur=1.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] master-clinical-exercise-physiology — dom=9536.0, dur=1.0years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-cloud-computing-virtualisation — dom=33680.0, int=35712.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-clinical-psychology — dom=4736.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-classical-arabic — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-clinical-psychology — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-clinical-exercise-physiology — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-cloud-computing-virtualisation — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-classical-arabic → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-cloud-computing-virt → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-clinical-exercise-ph → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-clinical-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 195/200: Master Communication
+[EXTRACT ] [EXTRACT] 196/200: Master Paramedicine
+[INFO ] [CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 197/200: Master Customs Administration
+[ 195/200] Fetching 195/200: Master Communication
+[EXTRACT ] [EXTRACT] 198/200: Master Cyber Security
+[ 196/200] Fetching 196/200: Master Paramedicine
+[ 197/200] Fetching 197/200: Master Customs Administration
+[ 198/200] Fetching 198/200: Master Cyber Security
+[EXTRACT ] [CSU ✓] master-communication — dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-communication — vocational static fallback
+[EXTRACT ] [CSU ✓] master-cyber-security — dom=33680.0, int=35712.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-paramedicine — dom=29920.0, int=38480.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [CSU ✓] master-customs-administration — dom=20560.0, int=23520.0, dur=1.5years, intakes=March,July,November
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-communication → skipped (CSU pre-seed) (cost=$0.000000)
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-cyber-security — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-paramedicine — vocational static fallback
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-customs-administration — vocational static fallback
+[EXTRACT ] [EXTRACT] 199/200: Master Education Teacher Librarianship
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-cyber-security → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-paramedicine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-customs-administrati → skipped (CSU pre-seed) (cost=$0.000000)
+[ 199/200] Fetching 199/200: Master Education Teacher Librarianship
+[INFO ] [CATEGORY det] Master of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] 200/200: Master Education
+[ 200/200] Fetching 200/200: Master Education
+[EXTRACT ] [CSU ✓] master-education — dom=11656.0, int=27920.0, dur=1.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-education — vocational static fallback
+[EXTRACT ] [CSU ✓] master-education-teacher-librarianship — dom=7896.0, int=27920.0, dur=2.0years, intakes=March,July,November
+[FALLBACK] [per-course browser skipped] https://study.csu.edu.au/courses/master-education-teacher-librarianship — vocational static fallback
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-education → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-education-teacher-li → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=7.5
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] pte_overall=31.0
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill undergraduate] 69 slot(s) filled across siblings
+[EXTRACT ] [EXTRACT] [sibling cache ↻ backfill postgraduate] 119 slot(s) filled across siblings
+[STAGE ] [STAGE] saved: Bachelor of Education (Primary)
+[STAGE ] [STAGE] skipped Access Charles Sturt Entry: rejected: category_landing_page
+[STAGE ] [STAGE] skipped University Certificate in Workforce Essentials: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Associate Degree in Adult and Vocational Education
+[STAGE ] [STAGE] saved: Associate Degree in Policing Practice
+[STAGE ] [STAGE] saved: Bachelor of Accounting
+[STAGE ] [STAGE] saved: Bachelor of Adult and Vocational Education (with Specialisations)
+[STAGE ] [STAGE] saved: Bachelor of Agricultural Business Management
+[STAGE ] [STAGE] saved: Bachelor of Agricultural Science
+[STAGE ] [STAGE] saved: Bachelor of Agriculture
+[STAGE ] [STAGE] saved: Bachelor of Animal Science
+[STAGE ] [STAGE] skipped Bachelor of Applied Research (Honours): rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Arts: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Arts and Social Science (Honours)
+[STAGE ] [STAGE] saved: Bachelor of Border Management
+[STAGE ] [STAGE] saved: Bachelor of Business
+[STAGE ] [STAGE] saved: Bachelor of Business Studies
+[STAGE ] [STAGE] saved: Bachelor of Clinical Science (Medicine) / Doctor of Medicine
+[STAGE ] [STAGE] saved: Bachelor of Communication
+[STAGE ] [STAGE] saved: Bachelor of Computer Science
+[STAGE ] [STAGE] saved: Bachelor of Criminology
+[STAGE ] [STAGE] saved: Bachelor of Dental Science
+[STAGE ] [STAGE] saved: Bachelor of Education (Birth to Five Years)
+[STAGE ] [STAGE] saved: Bachelor of Education (Early Childhood and Primary)
+[STAGE ] [STAGE] saved: Bachelor of Education (K - 12)
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - Creative Arts
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - English
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - Hsie
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - Mathematics
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - Pdhpe
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) - Science
+[STAGE ] [STAGE] saved: Bachelor of Education (Secondary) Industry Entry Program
+[STAGE ] [STAGE] saved: Bachelor of Education (Technology and Applied Studies)
+[STAGE ] [STAGE] saved: Bachelor of Educational Studies
+[STAGE ] [STAGE] saved: Bachelor of Emergency Management
+[STAGE ] [STAGE] saved: Bachelor of Engineering (Honours)
+[STAGE ] [STAGE] saved: Bachelor of Environmental Science and Management
+[STAGE ] [STAGE] saved: Bachelor of Equine Science
+[STAGE ] [STAGE] saved: Bachelor of Exercise and Sport Science
+[STAGE ] [STAGE] saved: Bachelor of Food Science and Nutrition
+[STAGE ] [STAGE] skipped Bachelor of Geospatial Science: rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Health Science (Mental Health)
+[STAGE ] [STAGE] saved: Bachelor of Health and Medical Science
+[STAGE ] [STAGE] saved: Bachelor of Horticulture
+[STAGE ] [STAGE] saved: Bachelor of Human Services
+[STAGE ] [STAGE] saved: Bachelor of Information Studies (with Specialisations)
+[STAGE ] [STAGE] saved: Bachelor of Information Technology
+[STAGE ] [STAGE] saved: Bachelor of Islamic Studies
+[STAGE ] [STAGE] skipped Bachelor of Islamic Studies (Honours): rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Laws
+[STAGE ] [STAGE] saved: Bachelor of Laws / Bachelor of Criminal Justice
+[STAGE ] [STAGE] saved: Bachelor of Medical Laboratory Science (Pathology)
+[STAGE ] [STAGE] saved: Bachelor of Medical Radiation Science (with Specialisations)
+[STAGE ] [STAGE] saved: Bachelor of Nuclear Science and Safety
+[STAGE ] [STAGE] saved: Bachelor of Nursing
+[STAGE ] [STAGE] saved: Bachelor of Occupational Therapy
+[STAGE ] [STAGE] saved: Bachelor of Oral Health (Therapy and Hygiene)
+[STAGE ] [STAGE] saved: Bachelor of Paramedicine
+[STAGE ] [STAGE] saved: Bachelor of Pharmacy (Honours)
+[STAGE ] [STAGE] saved: Bachelor of Physiotherapy
+[STAGE ] [STAGE] saved: Bachelor of Podiatric Medicine
+[STAGE ] [STAGE] saved: Bachelor of Policing
+[STAGE ] [STAGE] saved: Bachelor of Policing (Investigations)
+[STAGE ] [STAGE] saved: Bachelor of Policing and Public Safety
+[STAGE ] [STAGE] saved: Bachelor of Psychology
+[STAGE ] [STAGE] saved: Bachelor of Science
+[STAGE ] [STAGE] skipped Bachelor of Science (Honours): rejected: online_only
+[STAGE ] [STAGE] saved: Bachelor of Social Science (Psychology)
+[STAGE ] [STAGE] saved: Bachelor of Social Science (Psychology) (Honours)
+[STAGE ] [STAGE] saved: Bachelor of Social Work
+[STAGE ] [STAGE] saved: Bachelor of Theology
+[STAGE ] [STAGE] saved: Bachelor of Theology (Honours)
+[STAGE ] [STAGE] saved: Bachelor of Veterinary Biology/ Bachelor of Veterinary Science
+[STAGE ] [STAGE] saved: Bachelor of Veterinary Technology
+[STAGE ] [STAGE] saved: Bachelor of Viticulture
+[STAGE ] [STAGE] saved: Bachelor of Wine Science
+[STAGE ] [STAGE] saved: Diploma of Agricultural Studies
+[STAGE ] [STAGE] saved: Diploma of Environmental Studies
+[STAGE ] [STAGE] saved: Diploma of Exercise Studies
+[STAGE ] [STAGE] saved: Diploma of Health Science (Mental Health)
+[STAGE ] [STAGE] saved: Diploma of Psychological Studies
+[STAGE ] [STAGE] saved: Doctor of Business Administration
+[STAGE ] [STAGE] saved: Doctor of Philosophy (Arts and Education)
+[STAGE ] [STAGE] saved: Doctor of Philosophy (Business, Justice and Behavioural Sciences)
+[STAGE ] [STAGE] saved: Doctor of Philosophy (Science and Agriculture)
+[STAGE ] [STAGE] saved: Doctor of Public Safety
+[STAGE ] [STAGE] saved: Doctor of Social Work
+[STAGE ] [STAGE] saved: Doctor of Veterinary Studies
+[STAGE ] [STAGE] skipped Executive Masters in International Police Leadership: rejected: category_landing_page
+[STAGE ] [STAGE] saved: Graduate Certificate in Adult and Vocational Education
+[STAGE ] [STAGE] saved: Graduate Certificate in Ageing and Health
+[STAGE ] [STAGE] saved: Graduate Certificate in Agricultural Business Management
+[STAGE ] [STAGE] saved: Graduate Certificate in Agriculture
+[STAGE ] [STAGE] saved: Graduate Certificate in Applied Artificial Intelligence
+[STAGE ] [STAGE] saved: Graduate Certificate in Applied Business
+[STAGE ] [STAGE] saved: Graduate Certificate in Applied Data Science
+[STAGE ] [STAGE] saved: Graduate Certificate in Audiovisual Archiving
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Administration
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Administration (Computing)
+[STAGE ] [STAGE] saved: Graduate Certificate in Business Data Analytics
+[STAGE ] [STAGE] saved: Graduate Certificate in Case Management and Coordinated Care
+[STAGE ] [STAGE] skipped Graduate Certificate in Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Certificate in Cloud Computing and Virtualisation
+[STAGE ] [STAGE] saved: Graduate Certificate in Communication
+[STAGE ] [STAGE] saved: Graduate Certificate in Computing (Career Transition)
+[STAGE ] [STAGE] saved: Graduate Certificate in Critical Care Paramedicine
+[STAGE ] [STAGE] saved: Graduate Certificate in Customs Administration
+[STAGE ] [STAGE] saved: Graduate Certificate in Cyber Security
+[STAGE ] [STAGE] saved: Graduate Certificate in Data Management
+[STAGE ] [STAGE] saved: Graduate Certificate in Digital Archiving
+[STAGE ] [STAGE] saved: Graduate Certificate in Digital Communication
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Health: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Education (Generic and with Specialistions): rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Certificate in Environmental Management
+[STAGE ] [STAGE] saved: Graduate Certificate in Fish Conservation and Management
+[STAGE ] [STAGE] saved: Graduate Certificate in Financial Crime
+[STAGE ] [STAGE] saved: Graduate Certificate in Gis and Remote Sensing
+[STAGE ] [STAGE] saved: Graduate Certificate in Geostatistics and Spatial Modelling
+[STAGE ] [STAGE] saved: Graduate Certificate in Health Management and Leadership
+[STAGE ] [STAGE] saved: Graduate Certificate in Human Resource Management
+[STAGE ] [STAGE] skipped Graduate Certificate in Human Services: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Certificate in Industrial Relations
+[STAGE ] [STAGE] saved: Graduate Certificate in Information Studies
+[STAGE ] [STAGE] saved: Graduate Certificate in Information Technology
+[STAGE ] [STAGE] saved: Graduate Certificate in Intelligence Analysis
+[STAGE ] [STAGE] saved: Graduate Certificate in Intersectionality, Diversity and Inclusion
+[STAGE ] [STAGE] saved: Graduate Certificate in Islamic Psychology
+[STAGE ] [STAGE] skipped Graduate Certificate in Islamic Studies: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Certificate in Leadership and Management (Policing and Security)
+[STAGE ] [STAGE] saved: Graduate Certificate in Leadership in Human Services
+[STAGE ] [STAGE] saved: Graduate Certificate in Learning and Teaching in Higher Education
+[STAGE ] [STAGE] saved: Graduate Certificate in Mathematics
+[STAGE ] [STAGE] saved: Graduate Certificate in Ministry
+[STAGE ] [STAGE] saved: Graduate Certificate in Networking and Systems Administration
+[STAGE ] [STAGE] saved: Graduate Certificate in Nuclear Safeguards and Security
+[STAGE ] [STAGE] saved: Graduate Certificate in Nursing (Aged Care)
+[STAGE ] [STAGE] saved: Graduate Certificate in Nursing (Clinical Education)
+[STAGE ] [STAGE] saved: Graduate Certificate in Nursing (Leadership and Management)
+[STAGE ] [STAGE] saved: Graduate Certificate in Nursing (Rural and Remote Nursing)
+[STAGE ] [STAGE] saved: Graduate Certificate in Organisational Change
+[STAGE ] [STAGE] saved: Graduate Certificate in Organisational Coaching and Leadership
+[STAGE ] [STAGE] saved: Graduate Certificate in Ornithology
+[STAGE ] [STAGE] saved: Graduate Certificate in Professional Accounting
+[STAGE ] [STAGE] saved: Graduate Certificate in Professional Supervision (Pastoral)
+[STAGE ] [STAGE] saved: Graduate Certificate in Project Management
+[STAGE ] [STAGE] skipped Graduate Certificate in Research: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Certificate in Social and Organisational Leadership
+[STAGE ] [STAGE] saved: Graduate Certificate in Sustainable Agriculture
+[STAGE ] [STAGE] saved: Graduate Certificate in Terrorism and Security Studies
+[STAGE ] [STAGE] saved: Graduate Certificate in Theological Studies
+[STAGE ] [STAGE] saved: Graduate Certificate in Wiradyuri Language
+[STAGE ] [STAGE] saved: Graduate Diploma of Accounting
+[STAGE ] [STAGE] saved: Graduate Diploma of Adult Language, Literacy and Numeracy
+[STAGE ] [STAGE] saved: Graduate Diploma of Adult and Vocational Education
+[STAGE ] [STAGE] saved: Graduate Diploma of Ageing and Pastoral Studies
+[STAGE ] [STAGE] saved: Graduate Diploma of Applied Business
+[STAGE ] [STAGE] saved: Graduate Diploma of Business Data Analytics
+[STAGE ] [STAGE] skipped Graduate Diploma of Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Diploma of Clinical Practice (Paramedicine)
+[STAGE ] [STAGE] saved: Graduate Diploma of Critical Care Paramedicine
+[STAGE ] [STAGE] saved: Graduate Diploma of Customs Administration
+[STAGE ] [STAGE] saved: Graduate Diploma of Dental Implantology
+[STAGE ] [STAGE] saved: Graduate Diploma of Financial Crime
+[STAGE ] [STAGE] saved: Graduate Diploma of Information Technology
+[STAGE ] [STAGE] saved: Graduate Diploma of Intelligence Analysis
+[STAGE ] [STAGE] saved: Graduate Diploma of Investigations
+[STAGE ] [STAGE] skipped Graduate Diploma of Islamic Studies: rejected: online_only
+[STAGE ] [STAGE] saved: Graduate Diploma of Leadership and Management (Policing and Security)
+[STAGE ] [STAGE] saved: Graduate Diploma of Mammography
+[STAGE ] [STAGE] saved: Graduate Diploma of Mathematics
+[STAGE ] [STAGE] saved: Graduate Diploma of Midwifery
+[STAGE ] [STAGE] saved: Graduate Diploma of Organisational Coaching and Leadership
+[STAGE ] [STAGE] saved: Graduate Diploma of Pastoral Counselling
+[STAGE ] [STAGE] saved: Graduate Diploma of Project Management
+[STAGE ] [STAGE] saved: Graduate Diploma of Project Management and Leadership
+[STAGE ] [STAGE] saved: Graduate Diploma of Psychology
+[STAGE ] [STAGE] saved: Graduate Diploma of Terrorism and Security Studies
+[STAGE ] [STAGE] saved: Graduate Diploma of Theological Studies
+[STAGE ] [STAGE] saved: Graduate Diploma of Cyber Security
+[STAGE ] [STAGE] saved: Master of Adult and Vocational Education
+[STAGE ] [STAGE] skipped Master of Advanced Social Work Practice: rejected: online_only
+[STAGE ] [STAGE] saved: Master of Ageing and Health
+[STAGE ] [STAGE] saved: Master of Ageing and Pastoral Studies
+[STAGE ] [STAGE] saved: Master of Agricultural Science (with Specialisations)
+[STAGE ] [STAGE] saved: Master of Agriculture (with Specialisations)
+[STAGE ] [STAGE] saved: Master of Applied Business (with Specialisations)
+[STAGE ] [STAGE] saved: Master of Arts (Theological Studies)
+[STAGE ] [STAGE] saved: Master of Business Administration (Computing)
+[STAGE ] [STAGE] saved: Master of Business Administration (with Specialisations)
+[STAGE ] [STAGE] saved: Master of Business Data Analytics
+[STAGE ] [STAGE] skipped Master of Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] saved: Master of Clinical Exercise Physiology
+[STAGE ] [STAGE] saved: Master of Clinical Psychology
+[STAGE ] [STAGE] saved: Master of Cloud Computing and Virtualisation
+[STAGE ] [STAGE] saved: Master of Communication (with Specialisations)
+[STAGE ] [STAGE] saved: Master of Critical Care Paramedicine
+[STAGE ] [STAGE] saved: Master of Customs Administration
+[STAGE ] [STAGE] saved: Master of Cyber Security
+[STAGE ] [STAGE] saved: Master of Education (Teacher Librarianship)
+[STAGE ] [STAGE] saved: Master of Education (with Specialisations)
+[COMPLETE] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[COMPLETE] [TIMING] Total: 3m 22s | Courses: 182 | Avg: 1.1s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:200 | Staged:182 | Skipped:18 | Errors:0
+[COMPLETE] Staged 182 courses, 18 skipped, 0 fetch errors
