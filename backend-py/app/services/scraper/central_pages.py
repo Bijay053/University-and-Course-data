@@ -521,6 +521,12 @@ async def prefetch_central_pages(
         "english": {},
         "fee_page_url": fee_url,
         "english_page_url": english_url,
+        # Per-university opt-in: when True, the central English page values are
+        # NOT applied to postgraduate courses (Master's, Graduate Certificate,
+        # Graduate Diploma, Doctorate).  Use when a university's central English
+        # page is fetched via plain HTTP and the PG row is JS-rendered (e.g. ASA).
+        # Default False — apply central English values to all degree levels.
+        "central_english_pg_skip": bool(scrape_config.get("central_english_pg_skip", False)),
     }
 
     # ── Fetch fee page ──────────────────────────────────────────────────────

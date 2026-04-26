@@ -1,0 +1,50 @@
+Adding to the ticket I just sent. **The same KBS PR (873838a) regressed ASA back to the original bug.**
+
+Fresh ASA scrape just completed (job after 02:47 UTC deploy). Master's English scores are 6.0 / 50 / 60 / 169 again — the exact bug we fixed in 43380d8 a few hours ago.
+
+```
+Master of IT (Artificial Intelligence)            | 6 | 50 | 60 | 169   ← should be 6.5/58/85/169
+Master of IT (Cyber Security)                     | 6 | 50 | 60 | 169   ← should be 6.5/58/85/169
+Master of IT (Software Application Development)   | 6 | 50 | 60 | 169   ← should be 6.5/58/85/169
+Master of Project Management                      | 6 | 50 | 60 | 169   ← should be 6.5/58/85/169
+```
+
+Worker log shows sibling cache buckets are identical again:
+```
+[sibling cache ↻ build undergraduate] cambridge=169 ielts=6.0 pte=50 toefl=60
+[sibling cache ↻ build postgraduate]  cambridge=169 ielts=6.0 pte=50 toefl=60   ← same as UG
+```
+
+Earlier today (post-43380d8) the postgraduate line correctly showed `ielts=6.5`. Vision OCR was picking up the JS-rendered Master's row and feeding it to the bucket. After 873838a deployed, that's gone.
+
+Possible cause: the `_gather_one()` change in 873838a (preferring `payload["course_name"]` over discovery name) might have inadvertently changed what data gets carried forward to the vision/sibling-cache pipeline. Or `import asyncio` at module level interacted with something else.
+
+This is the **fix-one-uni-breaks-another pattern** — same root cause as the issues I described in the original ticket. **No regression test in place to catch this**, so every PR has a ~50% chance of breaking something else.
+
+---
+
+## Now THREE things need fixing in the next PR
+
+1. "MBA – Two Specialisations" still passes filter (Issue 1 from previous message)
+2. KBS PG English scores being wrongly skipped (Issue 2 from previous message)
+3. **NEW: ASA Master IELTS regressed back to 6.0** — whatever in 873838a broke this needs to be untangled
+
+---
+
+## Proposal
+
+Before next PR ships, please run these TWO test scrapes locally and verify the results match expectations:
+
+**ASA expectation:**
+- Bachelor's IELTS = 6.0, PTE = 50, TOEFL = 60, CAE = 169
+- Master's IELTS = 6.5, PTE = 58, TOEFL = 85, CAE = 169 (DIFFERENT from Bachelor's)
+
+**KBS expectation:**
+- Bachelor's, Diploma, Master's, Graduate Cert: IELTS = 6.0, PTE = 50, TOEFL = 72, CAE = 169 (all same — KBS has uniform requirement)
+- "MBA – Two Specialisations" should NOT appear in staged courses
+
+If both pass, ship. If either fails, fix before pushing. This is the minimum gate until proper regression tests exist.
+
+---
+
+Prod state: ASA wrong again, KBS wrong (PG English null + Two Specialisations), worker idle.

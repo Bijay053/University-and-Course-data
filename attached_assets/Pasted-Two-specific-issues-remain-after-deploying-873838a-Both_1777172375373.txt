@@ -1,0 +1,83 @@
+Two specific issues remain after deploying 873838a. Both confirmed via fresh KBS scrape (35 courses, 30 staged).
+
+---
+
+## Issue 1: "MBA – Two Specialisations" still passes filter
+
+The `_GENERIC_CATEGORY_NAMES` addition for `"two specialisations"` doesn't match because the staged course_name is `MBA – Two Specialisations` (with prefix from the title-tag extractor).
+
+Log shows the course flowing through:
+```
+[STAGE] saved: MBA – Two Specialisations
+```
+
+The set lookup `name.lower() in _GENERIC_CATEGORY_NAMES` requires exact match. `"mba – two specialisations"` != `"two specialisations"`.
+
+**Better fix — reject by URL pattern.** The URL `/mba-master-of-business-administration/two-specialisations` is a stable category-page indicator. Add to URL-based reject rules:
+```
+if url_path.endswith('/two-specialisations'):
+    reject('category_landing_page')
+```
+
+Cleaner than name-matching since the title extractor will keep adding prefixes that break exact matches.
+
+---
+
+## Issue 2: Your ASA fix (43380d8) is now blocking valid KBS PG English scores
+
+The `_CENTRAL_ENGLISH_PG_LEVELS` skip you added for ASA is firing on KBS Master's courses, but **KBS's central English page DOES have valid scores that apply to all levels**.
+
+Worker log proof — KBS English page parses correctly:
+```
+[CENTRAL] english page parsed → cambridge_overall=169.0, duolingo_overall=90.0, 
+  ielts_overall=6.0, ielts_speaking=6.0, ielts_writing=6.0, ielts_listening=5.5, 
+  ielts_reading=5.5, pte_overall=50.0, toefl_overall=72.0
+```
+
+Then for every PG course your guard fires:
+```
+[CENTRAL —] MBA – Digital Management — central english skipped for PG level (Master's): static HTML may only expose UG scores
+[CENTRAL —] Master of Information Technology — central english skipped for PG level (Master's)
+[CENTRAL —] Graduate Certificate in Business Administration — central english skipped for PG level (Graduate Certificate)
+```
+
+**Result:** All 22 KBS PG courses (Master's, Graduate Certificate, Graduate Diploma) staged with NULL English scores. UI shows blank. KBS publishes a single English requirement that applies to ALL levels — the central page values are correct for PG too.
+
+The ASA fix logic was: "static HTML only renders Bachelor's row, JS-rendered Master's row is invisible". That's TRUE for ASA. NOT TRUE for KBS — KBS's English page has one set of requirements.
+
+---
+
+## What I want
+
+The PG-skip rule needs to be per-university configurable, not a blanket global. Three options:
+
+**Option A (preferred): per-uni opt-in flag.** Add a config `central_english_pg_skip: true/false` per university. Default false. Set to true ONLY for ASA (and any future uni where the central page demonstrably hides PG scores). KBS = false.
+
+**Option B: detect at parse time.** Check whether the central English page contains level-specific markers (e.g., "Postgraduate", "Master's", "Bachelor's" headers). If only one set of values renders without level distinction, treat it as level-agnostic and apply to all. If multiple levels are detected and only one was extracted, apply the skip.
+
+**Option C: mark the central data with a `central_english_level` field.** When the parser extracts central English data, label whether it's level-specific (`undergraduate`/`postgraduate`/`all_levels`). The fallback block respects the label.
+
+C is cleanest architecturally. A is fastest to ship. Either is fine.
+
+---
+
+## Side note — sibling cache still says "build unknown"
+
+Log still shows:
+```
+[sibling cache ↻ build unknown] ielts_overall=6.0
+```
+
+No `build undergraduate` or `build postgraduate` lines. This was already on your radar from the previous PR. Worth investigating after Issues 1 and 2 are fixed — likely related to how degree_level is being read by the level routing for KBS specifically.
+
+---
+
+## State on prod
+
+- Bug A (`_asyncio` typo) confirmed fixed — KBS English page parses correctly now
+- Bug B (MBA names) confirmed fixed — `MBA – Project Management` etc. preserved
+- Bug C (Two Specialisations) **NOT fixed** — issue described above
+- New issue from ASA fix — PG-skip too aggressive for KBS
+- Worker idle, all other unis on hold
+
+Thanks. Will pull and re-test when next fix lands.

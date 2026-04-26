@@ -259,10 +259,21 @@ def _name_has_degree_qualifier(name: str) -> bool:
     return bool(_DEGREE_QUALIFIER_RE.match((name or "").strip()))
 
 
+# URL path suffixes that always indicate a category listing page rather than
+# a real course, regardless of how the page title is rendered.  Checked
+# BEFORE the degree-qualifier name check so that pages whose H1 accidentally
+# gains a degree prefix (e.g. "MBA – Two Specialisations" from the MBA title
+# extractor) are still rejected.
+_CATEGORY_URL_SUFFIXES: tuple[str, ...] = (
+    "/two-specialisations",
+    "/two-specializations",
+)
+
+
 def should_stage_course(
     course_name: str,
     payload: dict[str, Any],
-    source_url: str | None = None,  # kept for future URL-based heuristics
+    source_url: str | None = None,
 ) -> tuple[bool, str]:
     """Three-filter staging gate (Bugs A, B, C from the Torrens T007 sweep).
 
@@ -271,6 +282,7 @@ def should_stage_course(
     are designed to be grep-able in production logs:
 
     * ``"category_landing_page"`` — H1/course-name lacks a degree qualifier
+                                     OR URL matches a known category-page suffix
     * ``"no_international_fee"`` — international_fee is None after full extraction
     * ``"online_only"`` — study_mode is exactly "Online"
 
@@ -278,6 +290,16 @@ def should_stage_course(
     just before the DB write in ``stage_course``) so Bug B has a settled
     payload to inspect.
     """
+    # URL-based category-page rejection — runs FIRST so that pages whose
+    # title accidentally gains a degree-level prefix (e.g. "MBA – Two
+    # Specialisations" from the MBA title extractor) are still rejected.
+    # Name-matching alone cannot catch these because the prefix makes the
+    # name pass the degree-qualifier check.
+    if source_url:
+        _url_path = source_url.lower().split("?")[0]  # strip query string
+        if any(_url_path.endswith(sfx) for sfx in _CATEGORY_URL_SUFFIXES):
+            return (False, "category_landing_page")
+
     # Bug A: reject pages whose extracted title has no degree-level qualifier.
     # Prefer payload["course_name"] (from H1 via course_name extractor) over
     # the discovery-link name (passed as course_name param) — the H1 is the

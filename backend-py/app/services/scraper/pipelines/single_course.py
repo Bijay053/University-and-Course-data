@@ -664,20 +664,22 @@ async def extract_course(
                         )
 
             # ── English-requirements fallback ────────────────────────────
-            # SAFETY: skip postgraduate-level courses entirely.
+            # PG-skip: some universities JS-render only the undergraduate row
+            # of their English requirements page.  When fetched via plain HTTP
+            # (no browser), the extracted values reflect UG requirements only
+            # (e.g. IELTS 6.0) — applying them to Master's courses is wrong.
             #
-            # The central English page is fetched via plain HTTP (no browser),
-            # so only statically-rendered HTML is visible.  Many universities
-            # (ASA, KBS, …) JS-render their postgraduate row — the static HTML
-            # only exposes the undergraduate table (IELTS 6.0 / PTE 50 /
-            # TOEFL 60 / CAE 169).  Applying those UG values to a Master's
-            # course produces silently wrong data that survives review.
-            #
-            # Postgraduate courses will stage with NULL English scores instead.
-            # NULL is visible in the Review modal and recoverable; an incorrect
-            # 6.0 for a Master's that requires 6.5 is neither.
+            # This is per-university opt-in via scrape_config:
+            #   "central_english_pg_skip": true
+            # Default false — apply central English values to ALL degree levels.
+            # Set to true only for universities where the static HTML omits PG
+            # scores (confirmed: ASA entryPage).  KBS and most others publish a
+            # single requirement set that applies to all levels.
             _course_dl = (payload.get("degree_level") or "").strip()
-            _skip_central_english = _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+            _pg_skip_configured = bool(central_data.get("central_english_pg_skip", False))
+            _skip_central_english = (
+                _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+            )
             if _central_english and not _skip_central_english:
                 _eng_filled: list[str] = []
                 for _k, _v in _central_english.items():
@@ -713,7 +715,7 @@ async def extract_course(
                     "status",
                     f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
                     f"central english skipped for PG level ({_course_dl or 'unknown'}): "
-                    f"static HTML may only expose UG scores",
+                    f"central_english_pg_skip=true in scrape_config",
                     phase="fallback",
                     kind="central_english_skipped_pg",
                     url=url,
