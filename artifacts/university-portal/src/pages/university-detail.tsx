@@ -15,7 +15,7 @@ import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
   Database, CheckCircle2, Clock, Trash2, Pencil, Upload, RefreshCw, GitMerge,
-  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2,
+  ChevronsUpDown, Check, AlertTriangle, ClipboardList, Plus, Star, Wrench, Loader2, XCircle,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -795,6 +795,8 @@ export default function UniversityDetail() {
   const [rawSelectedIds, setRawSelectedIds] = useState<Set<number>>(new Set());
   const [bulkMapRunning, setBulkMapRunning] = useState(false);
   const [bulkApproveRunning, setBulkApproveRunning] = useState(false);
+  const [bulkRejectRunning, setBulkRejectRunning] = useState(false);
+  const [showBulkRejectConfirm, setShowBulkRejectConfirm] = useState(false);
 
   const toggleRawSelect = (id: number) =>
     setRawSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -853,6 +855,30 @@ export default function UniversityDetail() {
     setRawSelectedIds(new Set());
     await fetchRawData();
     setBulkApproveRunning(false);
+  };
+
+  const handleBulkRejectSelected = async () => {
+    if (rawSelectedIds.size === 0) return;
+    setBulkRejectRunning(true);
+    setShowBulkRejectConfirm(false);
+    let rejected = 0; let failed = 0;
+    for (const courseId of rawSelectedIds) {
+      try {
+        const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/reject`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "bulk_reset", fieldKey: "general" }),
+        });
+        if (res.ok) rejected++; else failed++;
+      } catch { failed++; }
+    }
+    toast({
+      title: "Bulk reject complete",
+      description: `${rejected} rejected${failed > 0 ? `, ${failed} failed` : ""}. Run a new scrape to get fresh data.`,
+    });
+    setRawSelectedIds(new Set());
+    await fetchRawData();
+    setBulkRejectRunning(false);
   };
 
   // ── Backup mapping state ────────────────────────────────────────────────
@@ -2386,6 +2412,16 @@ export default function UniversityDetail() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  disabled={bulkMapRunning || bulkApproveRunning || bulkRejectRunning}
+                  onClick={() => setShowBulkRejectConfirm(true)}
+                  className="h-7 text-xs border-red-400 text-red-700 bg-red-50 hover:bg-red-100"
+                >
+                  {bulkRejectRunning ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <XCircle className="h-3.5 w-3.5 mr-1" />}
+                  {bulkRejectRunning ? "Rejecting…" : `Reject (${rawSelectedIds.size})`}
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
                   onClick={() => setRawSelectedIds(new Set())}
                   className="h-7 text-xs text-muted-foreground"
@@ -2395,6 +2431,36 @@ export default function UniversityDetail() {
               </div>
             </div>
           )}
+
+          {/* Bulk reject confirmation dialog */}
+          <Dialog open={showBulkRejectConfirm} onOpenChange={(o) => { if (!o) setShowBulkRejectConfirm(false); }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-700">
+                  <XCircle className="w-5 h-5 shrink-0" />
+                  Reject {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""}?
+                </DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-gray-600">
+                The selected courses will be rejected with reason <code className="bg-gray-100 px-1 rounded text-xs">bulk_reset</code>.
+                They can be re-staged immediately on the next scrape run.
+              </p>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowBulkRejectConfirm(false)} disabled={bulkRejectRunning}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleBulkRejectSelected}
+                  disabled={bulkRejectRunning}
+                >
+                  {bulkRejectRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
+                  Reject All
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Table */}
           {rawLoading ? (
