@@ -1,0 +1,73 @@
+After deploying the timeout tier fix (`f7cc5a32`), ASA works perfectly. But KBS now exhibits the same browser-timeout pattern that ASA had:
+
+```
+[FALLBACK] [per-course browser ↻] https://www.kbs.edu.au/courses/master-of-business-analytics
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.kbs.edu.au/courses/master-of-business-analytics — moving on
+[GP-DEBUG] static=140609B rendered=0B using=static
+```
+
+Nearly every KBS course page (~25 of 29) times out at 20s. KBS is currently in the default tier (20s/domcontentloaded), but it needs the same `_SLOW_HOSTS` treatment as ASA.
+
+## Why KBS data still looks correct
+
+KBS gets away with browser timeouts because:
+1. KBS publishes English requirements on a central page (cached at university level)
+2. KBS publishes fees in a central PDF (cached at university level)
+3. The central caches are populated from earlier successful scrapes
+
+So even with `rendered=0B` everywhere, the central page fallback fills in the right values via:
+```
+[CENTRAL ✓] Master of Business Analytics — fee from 'Master of Business Analytics' row: intl=40800.0
+[CENTRAL ✓] Master of Business Analytics — english from central page: pte=50.0 ielts=6.0 toefl=72.0 cambridge=169.0
+```
+
+This works as long as central caches don't invalidate. If they do (cache TTL expires, or someone deletes them), KBS will start showing empty English/fees just like ASA did.
+
+## Fix
+
+Add `kbs.edu.au` to `_SLOW_HOSTS` in `per_course_browser.py`. Same 60s outer / 50s goto / networkidle that ASA gets.
+
+The tier should now be:
+
+| Host | Strategy | Outer | Goto |
+|------|----------|-------|------|
+| `asahe.edu.au` | networkidle | 60s | 50s |
+| `kbs.edu.au` | networkidle | 60s | 50s |
+| `vit.edu.au` / `csu.edu.au` | networkidle | 30s | 25s |
+| Default | domcontentloaded | 20s | 15s |
+
+## Optional: Reconsider the 20s default
+
+The 20s/`domcontentloaded` default seems too aggressive. KBS, ASA — both real Australian education sites — don't fit in 20s. May be worth raising the global default to 30s in the same PR. But this is optional; the immediate fix is just adding KBS.
+
+## Validation
+
+After the fix, fire KBS scrape from UI. Expected log signals:
+
+**Good:**
+```
+[FALLBACK] [per-course browser ✓] https://www.kbs.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=140609B rendered=180000B using=rendered
+```
+
+**Bad (still timing out):**
+```
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.kbs.edu.au/...
+```
+
+If still timing out at 60s, KBS is genuinely unreachable / Cloudflare-protected from our IP. Different problem.
+
+## State on prod
+
+- Code: `d682ea65` (latest)
+- KBS data: currently correct via central cache fallback
+- ASA data: correct, browser working at 60s timeout
+- KBS Gemini-primary: contributing 0 (architecture done, but pages don't have the data — known)
+
+## Constraints
+
+- Single small PR — just add KBS to `_SLOW_HOSTS`
+- Don't change anything else
+- No need to wipe caches or restart anything beyond uni-celery
+
+Quick fix, easy to verify.

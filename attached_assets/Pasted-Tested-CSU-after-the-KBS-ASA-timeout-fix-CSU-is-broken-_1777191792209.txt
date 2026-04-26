@@ -1,0 +1,83 @@
+Tested CSU after the KBS+ASA timeout fix. CSU is broken in the same way ASA was — every per-course browser fetch times out, no rendered content, no per-course data extracted.
+
+KBS got the 60s tier in your last PR. CSU is still in the 30s `_NETWORKIDLE_HOSTS` tier and times out on every page:
+
+```
+[FALLBACK] [per-course browser ↻] https://study.csu.edu.au/courses/bachelor-education-primary
+[FALLBACK] timeout: per-course browser exceeded 30s on https://study.csu.edu.au/courses/bachelor-education-primary — moving on
+[GP-DEBUG] static=1312051B rendered=0B using=static text_len=23007
+```
+
+CSU pages weigh 800KB-1.3MB of static HTML. They're heavy React/Drupal frontends. 30s isn't enough.
+
+## What CSU looks like before browser renders
+
+The static HTML is a React shell with interactive widget placeholders, NOT actual course content. Gemini sees text like:
+
+```
+text[:500]="Access Charles Sturt Entry I'm student, commencingstudent, looking to commence studying in. Change I am: A Domestic student: Australian or New Zealand citizen Australian permanent visa holder Australian permanent humanitarian visa holder An International student: You do not hold Australian or New Zealand citizenship or permanent residency in Australia There are no upcoming offerings for the year. This course has no domestic offering. This course has no international offering..."
+```
+
+No fees, no intake, no IELTS, no duration, no campus locations — these only appear after the React app fetches and renders. Without the browser succeeding, every other extractor gets nothing useful.
+
+## Cascading failures
+
+1. Browser times out at 30s → `rendered=0B` → `using=static`
+2. Static HTML is React shell → Gemini extracts 0 fields
+3. No per-course images either → no vision OCR
+4. CSU central English page works (`ielts_overall=6.0`)
+5. CSU central fee page parses 0 records (separate problem)
+6. Result: every CSU course only gets `ielts_overall=6.0` and category, missing fees, duration, intake, location
+
+## Fix
+
+**1. Add `csu.edu.au` to `_SLOW_HOSTS`** in `per_course_browser.py`. Same 60s outer / 50s goto / networkidle that ASA and KBS get.
+
+**2. Audit other educationsite hosts in `_NETWORKIDLE_HOSTS`** — if VIT, UTAS, Torrens have similar React/heavy frontends, they should be 60s too. Move them all into `_SLOW_HOSTS`.
+
+**3. Optional but recommended: collapse the tier system.** Instead of 3 separate tiers (default 20s / networkidle 30s / slow 60s), make the default 30s + networkidle for everyone. The 20s + domcontentloaded default is causing latent bugs across all university sites because none of them are simple enough for that.
+
+Proposed simpler tier:
+
+| Host | Strategy | Outer | Goto |
+|------|----------|-------|------|
+| `asahe.edu.au`, `kbs.edu.au`, `csu.edu.au` (heavy sites) | networkidle | 60s | 50s |
+| All others | networkidle | 30s | 25s |
+
+## Validation criteria
+
+After the fix, fire CSU scrape (start with just discovery, don't run all 200 courses to test):
+
+**Good signs:**
+```
+[FALLBACK] [per-course browser ✓] https://study.csu.edu.au/courses/bachelor-education-primary — IELTS=— PTE=— ...
+[GP-DEBUG] static=1312051B rendered=2400000B using=rendered
+[GP-DEBUG] text[:500]='Bachelor of Education (Primary)... 4 years full-time... International fee... IELTS 7.0 overall...'
+```
+
+**Bad signs:**
+```
+[FALLBACK] timeout: per-course browser exceeded 60s on https://study.csu.edu.au/...  # CSU genuinely too slow
+```
+
+If CSU is too slow even at 60s, suggests Cloudflare bot challenge or genuine site slowness. Different ticket.
+
+## State on prod
+
+- Code: `d682ea65`
+- ASA: ✓ working at 60s
+- KBS: pending KBS-tier PR (didn't deploy yet)
+- CSU: broken, every course fetch fails
+- 200 CSU courses currently won't get fees/duration/intake/location populated
+
+## Constraints
+
+- Single PR for both CSU addition and (optional) global tier collapse
+- Don't change anything in the data extractors — the timeout is the only issue
+- Test against a smaller sample (5-10 courses) before recommending full 200-course re-scrape
+
+## Don't bundle anything else
+
+Known broken: 0 fee records from `https://study.csu.edu.au/fees`. That's a separate fee-page parser bug, not a timeout problem. Keep that out of this PR.
+
+Ready when fixed.

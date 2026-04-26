@@ -84,54 +84,54 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # VIT: SPA that requires JS rendering + 3s settle to surface the
     # International tab's fee and english-requirements sections.
     "vit.edu.au",
-    # CSU (study.csu.edu.au): every per-course page is a pure SPA —
-    # the static HTML is a 39-byte shell. domcontentloaded fires
-    # immediately on the empty shell, before any English/fee content
-    # has rendered. networkidle + 30s outer ceiling keeps per-course
-    # scrapes accurate without burning extra time on the discovery phase
-    # (which now correctly uses the sitemap path for CSU).
-    # Scoped to `study.csu.edu.au` rather than the whole `csu.edu.au`
-    # TLD because only the study sub-domain uses the SPA framework;
-    # www.csu.edu.au is a conventional server-rendered site.
-    "study.csu.edu.au",
 )
 
-# Hosts that need extra-long timeouts beyond the networkidle tier.
-# ASA (asahe.edu.au): English requirements are image-only per-course;
-# the browser must fully load each page so vision OCR can sample those
-# images.  The site is slow from our DigitalOcean IP — every page takes
-# >20s, causing guaranteed timeouts under the default ceiling.
-# 60s outer / 50s goto gives it the headroom it needs.
+# Hosts that need the full 60s / networkidle treatment.
+# These are sites that are either genuinely slow from our DigitalOcean
+# IP, publish critical data via images (ASA), or use heavy React/Drupal
+# frontends that take >30s to reach idle (KBS, CSU).
+#
+# ASA  — English requirements are image-only; vision OCR can't fire
+#         unless the browser fully loads each page.
+# KBS  — Drupal-rendered pages take >20s; without rendered HTML
+#         Gemini-primary sees only the React shell.
+# CSU  — React SPA with 800KB-1.3MB pages; static HTML is a 39-byte
+#         shell, so every extractor gets nothing without a full render.
 _SLOW_HOSTS: tuple[str, ...] = (
     "asahe.edu.au",
+    "kbs.edu.au",
+    "study.csu.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
 # Outer ceilings keep a single hung page from wedging the Celery worker
 # (prod incident: job_2dc0ba6bf4c9 sat at 0/10 for 32min, zero log
-# output). VIT's networkidle path needs ~25s headroom; everyone else
-# gets the requested 20s ceiling. Slow hosts (ASA) need 60s.
+# output).
+# _SLOW_HOSTS get 60s outer / 50s goto / networkidle.
+# _NETWORKIDLE_HOSTS (VIT) get 30s outer / 25s goto / networkidle.
+# Default raised to 60s outer / 50s goto after KBS/ASA/CSU all proved
+# that the previous 20s ceiling was too aggressive for real education
+# sites on our DigitalOcean IP.
 _SLOW_OUTER_TIMEOUT_SEC = 60
 _SLOW_GOTO_TIMEOUT_MS = 50_000
 _NETWORKIDLE_OUTER_TIMEOUT_SEC = 30
-_DEFAULT_OUTER_TIMEOUT_SEC = 20
 _NETWORKIDLE_GOTO_TIMEOUT_MS = 25_000
-_DEFAULT_GOTO_TIMEOUT_MS = 15_000
+_DEFAULT_OUTER_TIMEOUT_SEC = 60
+_DEFAULT_GOTO_TIMEOUT_MS = 50_000
 
 
 def _browser_config_for(url: str) -> tuple[str, int, int, int]:
     """Return (wait_until, settle_ms, outer_timeout_sec, goto_timeout_ms)
     for the given URL.
 
-    * Hosts in :data:`_SLOW_HOSTS` get ``networkidle`` + 3s settle,
-      60s outer ceiling, 50s goto — for sites that are genuinely slow
-      but must be browser-rendered (e.g. ASA image-only English pages).
-    * Hosts in :data:`_NETWORKIDLE_HOSTS` get ``networkidle`` + 3s
+    * Hosts in :data:`_SLOW_HOSTS` (ASA, KBS, CSU) get ``networkidle``
+      + 3s settle, 60s outer ceiling, 50s goto.
+    * Hosts in :data:`_NETWORKIDLE_HOSTS` (VIT) get ``networkidle`` + 3s
       settle, 30s outer ceiling, 25s goto.
-    * Everyone else gets fast ``domcontentloaded`` + 1.5s settle, 20s
-      outer ceiling, 15s goto — so a hung XHR widget can't wedge the
-      whole budget.
+    * Everyone else gets ``domcontentloaded`` + 1.5s settle, 60s outer
+      ceiling, 50s goto.  The default was raised from 20s after multiple
+      Australian education sites proved too slow for the old ceiling.
     """
     try:
         host = (urlparse(url).hostname or "").lower()
