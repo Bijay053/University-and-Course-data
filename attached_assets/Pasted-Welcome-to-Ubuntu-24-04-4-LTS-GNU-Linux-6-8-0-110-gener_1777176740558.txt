@@ -1,0 +1,558 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sun Apr 26 02:19:57 UTC 2026
+
+  System load:           0.06
+  Usage of /:            3.1% of 231.44GB
+  Memory usage:          13%
+  Swap usage:            0%
+  Processes:             197
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Sun Apr 26 00:58:02 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -3
+git diff e4eccf3..origin/main --stat
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 8 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 2.63 KiB | 897.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   e4eccf3..43380d8  main       -> origin/main
+e4eccf3 (HEAD -> main) fix(sibling-cache): prevent central_page:english from poisoning bucket vote + canonicalize degree_level
+b6f7b67 fix(scraper): prevent ASA/all-university overnight hang — 3 hard ceilings
+ff46d04 fix(kbs): add sub_category mappings + normalize fee_term enum from central pages
+ backend-py/app/services/scraper/pipelines/single_course.py | 42 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 41 insertions(+), 1 deletion(-)
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating e4eccf3..43380d8
+Fast-forward
+ backend-py/app/services/scraper/pipelines/single_course.py | 42 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 41 insertions(+), 1 deletion(-)
+     Active: active (running) since Sun 2026-04-26 02:20:15 UTC; 5s ago
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+WITH latest_asa AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=2 AND status='completed' 
+    AND started_at > NOW() - INTERVAL '5 minutes'
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT course_name, degree_level, 
+       ielts_overall, pte_overall, toefl_overall
+FROM scraped_courses 
+WHERE university_id=2 AND scrape_job_id = (SELECT runtime_job_id FROM latest_asa)
+ORDER BY degree_level, course_name;
+"
+ course_name | degree_level | ielts_overall | pte_overall | toefl_overall 
+-------------+--------------+---------------+-------------+---------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+WITH latest_asa AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=2 AND status='completed' 
+    AND started_at > NOW() - INTERVAL '5 minutes'
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT course_name, degree_level, 
+       ielts_overall, pte_overall, toefl_overall
+FROM scraped_courses 
+WHERE university_id=2 AND scrape_job_id = (SELECT runtime_job_id FROM latest_asa)
+ORDER BY degree_level, course_name;
+"
+ course_name | degree_level | ielts_overall | pte_overall | toefl_overall 
+-------------+--------------+---------------+-------------+---------------
+(0 rows)
+
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+
+# Confirm the new scrape finished
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, started_at, completed_at, status,
+       (started_at > '2026-04-26 02:20:15+00'::timestamptz) as ran_with_new_code
+FROM scrape_runtime_jobs 
+WHERE university_id=2
+ORDER BY started_at DESC LIMIT 3;
+"
+
+# The verification: Master's IELTS should be NULL now
+psql "$DATABASE_URL" -c "
+WITH latest_asa AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=2 AND status='completed' 
+    AND started_at > '2026-04-26 02:20:15+00'::timestamptz
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT course_name, degree_level, 
+       ielts_overall, pte_overall, toefl_overall
+FROM scraped_courses 
+WHERE university_id=2 AND scrape_job_id = (SELECT runtime_job_id FROM latest_asa)
+ORDER BY degree_level, course_name;
+"
+
+# Smoking gun: confirm guard fired
+echo ""
+echo "=== Guard log lines (one per Master's course expected) ==="
+journalctl -u uni-celery --since "5 min ago" | grep "central_english_skipped_pg"
+  runtime_job_id  |          started_at           |         completed_at          |  status   | ran_with_new_code 
+------------------+-------------------------------+-------------------------------+-----------+-------------------
+ job_534926327f78 | 2026-04-26 02:20:36.244567+00 | 2026-04-26 02:22:57.735356+00 | completed | t
+ job_861902542e18 | 2026-04-26 02:02:27.906761+00 | 2026-04-26 02:04:03.325353+00 | completed | f
+ job_f9f037121d53 | 2026-04-26 01:55:56.936434+00 | 2026-04-26 01:57:38.580718+00 | completed | f
+(3 rows)
+
+                             course_name                             | degree_level | ielts_overall | pte_overall | toefl_overall 
+---------------------------------------------------------------------+--------------+---------------+-------------+---------------
+ Bachelor of Business                                                | Bachelor's   |             6 |          50 |            60
+ Bachelor of Business Hospitality Management                         | Bachelor's   |             6 |          50 |            60
+ Bachelor of Business International Business                         | Bachelor's   |             6 |          50 |            60
+ Bachelor of Business Technology Management                          | Bachelor's   |             6 |          50 |            60
+ Bachelor of Professional Accounting                                 | Bachelor's   |             6 |          50 |            60
+ Master of Information Technology (Artificial Intelligence)          | Master's     |           6.5 |          58 |            85
+ Master of Information Technology (Cyber Security)                   | Master's     |           6.5 |          58 |            85
+ Master of Information Technology (Software Application Development) | Master's     |           6.5 |          58 |            85
+ Master of Project Management                                        | Master's     |           6.5 |          58 |            85
+(9 rows)
+
+
+=== Guard log lines (one per Master's course expected) ===
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, started_at, completed_at, status
+FROM scrape_runtime_jobs 
+WHERE university_id=2 AND started_at > '2026-04-26 02:20:15+00'::timestamptz
+ORDER BY started_at DESC;
+"
+  runtime_job_id  |          started_at           |         completed_at          |  status   
+------------------+-------------------------------+-------------------------------+-----------
+ job_534926327f78 | 2026-04-26 02:20:36.244567+00 | 2026-04-26 02:22:57.735356+00 | completed
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -3
+git diff 43380d8..origin/main --stat
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (9/9), done.
+remote: Total 9 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 2.25 KiB | 576.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   43380d8..873838a  main       -> origin/main
+43380d8 (HEAD -> main) fix(english-scores): block central_page:english fallback for PG courses
+e4eccf3 fix(sibling-cache): prevent central_page:english from poisoning bucket vote + canonicalize degree_level
+b6f7b67 fix(scraper): prevent ASA/all-university overnight hang — 3 hard ceilings
+ backend-py/app/services/scraper/central_pages.py | 3 ++-
+ backend-py/app/services/scraper/guards.py        | 4 ++++
+ backend-py/app/services/scraper/orchestrator.py  | 9 ++++++++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 43380d8..873838a
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py | 3 ++-
+ backend-py/app/services/scraper/guards.py        | 4 ++++
+ backend-py/app/services/scraper/orchestrator.py  | 9 ++++++++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+     Active: active (running) since Sun 2026-04-26 02:47:35 UTC; 5s ago
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+
+# Bug B verification: MBA names preserved
+psql "$DATABASE_URL" -c "
+WITH latest_kbs AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=8 AND status='completed' 
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT course_name, degree_level, ielts_overall, pte_overall
+FROM scraped_courses 
+WHERE university_id=8 AND scrape_job_id = (SELECT runtime_job_id FROM latest_kbs)
+  AND (course_name ILIKE '%MBA%' OR course_name ILIKE '%management%' OR course_name ILIKE '%leadership%')
+ORDER BY course_name;
+"
+
+# Bug C verification: Two Specialisations should NOT be in there
+psql "$DATABASE_URL" -c "
+SELECT COUNT(*) as two_spec_count
+FROM scraped_courses 
+WHERE university_id=8 AND course_name ILIKE '%two specialisation%'
+  AND scrape_job_id = (
+    SELECT runtime_job_id FROM scrape_runtime_jobs 
+    WHERE university_id=8 AND status='completed' 
+    ORDER BY started_at DESC LIMIT 1
+  );
+"
+# Expected: 0
+
+# Bug A verification: any _asyncio errors?
+journalctl -u uni-celery --since "10 min ago" | grep -E "_asyncio|english page fetch"
+# Expected: no _asyncio errors. English page fetched successfully.
+                        course_name                        | degree_level | ielts_overall | pte_overall 
+-----------------------------------------------------------+--------------+---------------+-------------
+ Bachelor of Business (Hospitality and Tourism Management) | Bachelor's   |             6 |          50
+ Bachelor of Business (Management)                         | Bachelor's   |             6 |          50
+ MBA - Master of Business Administration                   | Master's     |               |            
+ MBA – (Women in Leadership)                               | Master's     |               |            
+ MBA – Data-driven Leadership                              | Master's     |               |            
+ MBA – Digital Management                                  | Master's     |               |            
+ MBA – Health Services Management                          | Master's     |               |            
+ MBA – International Leadership                            | Master's     |               |            
+ MBA – Project Management                                  | Master's     |               |            
+ MBA – Tourism and Hospitality Leadership                  | Master's     |               |            
+ MBA – Two Specialisations                                 | Master's     |               |            
+(11 rows)
+
+ two_spec_count 
+----------------
+              1
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# # 1. Verify what Replit pushed before pulling
+cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -5
+git diff 873838a..origin/main --stat
+
+# 2. Pull and restart
+git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+
+# 3. CRITICAL: Set the per-uni flag for ASA BEFORE any ASA scrape
+source /root/.env.backup
+psql "$DATABASE_URL" -c "
+UPDATE universities
+SET scrape_config = jsonb_set(
+    COALESCE(scrape_config::jsonb, '{}'),
+    '{central_english_pg_skip}', 'true'
+)::text
+WHERE id = 2;
+"
+
+# 4. Verify flag set
+psql "$DATABASE_URL" -c "
+SELECT id, name, scrape_config 
+FROM universities 
+WHERE id IN (2, 8);
+"
+remote: Enumerating objects: 19, done.
+remote: Counting objects: 100% (19/19), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 10 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (10/10), 3.27 KiB | 669.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   873838a..f3880c3  main       -> origin/main
+873838a (HEAD -> main) fix: three KBS regressions — _asyncio typo, MBA prefix stripped, Two Specialisations
+43380d8 fix(english-scores): block central_page:english fallback for PG courses
+e4eccf3 fix(sibling-cache): prevent central_page:english from poisoning bucket vote + canonicalize degree_level
+b6f7b67 fix(scraper): prevent ASA/all-university overnight hang — 3 hard ceilings
+ff46d04 fix(kbs): add sub_category mappings + normalize fee_term enum from central pages
+ backend-py/app/services/scraper/central_pages.py           |  6 ++++++
+ backend-py/app/services/scraper/guards.py                  | 24 +++++++++++++++++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py | 28 +++++++++++++++-------------
+ 3 files changed, 44 insertions(+), 14 deletions(-)
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 873838a..f3880c3
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py           |  6 ++++++
+ backend-py/app/services/scraper/guards.py                  | 24 +++++++++++++++++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py | 28 +++++++++++++++-------------
+ 3 files changed, 44 insertions(+), 14 deletions(-)
+     Active: active (running) since Sun 2026-04-26 03:11:09 UTC; 5s ago
+ERROR:  column "scrape_config" is of type jsonb but expression is of type text
+LINE 3: SET scrape_config = jsonb_set(
+                            ^
+HINT:  You will need to rewrite or cast the expression.
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+
+# Corrected SQL — scrape_config is jsonb, no cast needed
+psql "$DATABASE_URL" -c "
+UPDATE universities
+SET scrape_config = jsonb_set(
+    COALESCE(scrape_config, '{}'::jsonb),
+    '{central_english_pg_skip}', 'true'
+)
+WHERE id = 2;
+"
+
+# Verify flag is set on ASA, KBS unchanged
+psql "$DATABASE_URL" -c "
+SELECT id, name, scrape_config->'central_english_pg_skip' as pg_skip_flag
+FROM universities 
+WHERE id IN (2, 8);
+"
+UPDATE 1
+ id | name | pg_skip_flag 
+----+------+--------------
+  8 | KBS  | 
+  2 | asa  | true
+(2 rows)
+
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+WITH latest_asa AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=2 AND status='completed' 
+    AND started_at > '2026-04-26 03:11:09+00'::timestamptz
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT degree_level, course_name,
+       ielts_overall, pte_overall, toefl_overall
+FROM scraped_courses 
+WHERE university_id=2 AND scrape_job_id = (SELECT runtime_job_id FROM latest_asa)
+ORDER BY degree_level, course_name;
+"
+ degree_level |                             course_name                             | ielts_overall | pte_overall | toefl_overall 
+--------------+---------------------------------------------------------------------+---------------+-------------+---------------
+ Bachelor's   | Bachelor of Business                                                |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business Hospitality Management                         |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business International Business                         |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business Technology Management                          |             6 |          50 |            60
+ Bachelor's   | Bachelor of Professional Accounting                                 |             6 |          50 |            60
+ Master's     | Master of Information Technology (Artificial Intelligence)          |             6 |          50 |            60
+ Master's     | Master of Information Technology (Cyber Security)                   |             6 |          50 |            60
+ Master's     | Master of Information Technology (Software Application Development) |             6 |          50 |            60
+ Master's     | Master of Project Management                                        |             6 |          50 |            60
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data# psql "$DATABASE_URL" -c "
+WITH latest_kbs AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=8 AND status='completed' 
+    AND started_at > '2026-04-26 03:11:09+00'::timestamptz
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT degree_level, COUNT(*) as count,
+       array_agg(DISTINCT ielts_overall) as ielts,
+       array_agg(DISTINCT pte_overall) as pte,
+       array_agg(DISTINCT toefl_overall) as toefl
+FROM scraped_courses 
+WHERE university_id=8 AND scrape_job_id = (SELECT runtime_job_id FROM latest_kbs)
+GROUP BY degree_level
+ORDER BY degree_level;
+"
+
+# Two specialisations check
+psql "$DATABASE_URL" -c "
+SELECT COUNT(*) as count
+FROM scraped_courses 
+WHERE university_id=8 AND course_name ILIKE '%two specialisation%'
+  AND scrape_job_id = (
+    SELECT runtime_job_id FROM scrape_runtime_jobs 
+    WHERE university_id=8 AND status='completed' 
+      AND started_at > '2026-04-26 03:11:09+00'::timestamptz
+    ORDER BY started_at DESC LIMIT 1
+  );
+"
+     degree_level     | count |  ielts  |   pte   |  toefl  
+----------------------+-------+---------+---------+---------
+ Bachelor's           |     5 | {6}     | {50}    | {72}
+ Diploma              |     2 | {6}     | {50}    | {72}
+ Graduate Certificate |     7 | {6}     | {50}    | {72}
+ Master's             |    15 | {6,6.5} | {50,58} | {72,79}
+(4 rows)
+
+ count 
+-------
+     0
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+psql "$DATABASE_URL" -c "
+SELECT runtime_job_id, started_at, completed_at, status
+FROM scrape_runtime_jobs 
+WHERE university_id=8 AND started_at > '2026-04-26 03:11:09+00'::timestamptz
+ORDER BY started_at DESC;
+"
+  runtime_job_id  |          started_at          |         completed_at          |  status   
+------------------+------------------------------+-------------------------------+-----------
+ job_65b77a100c4a | 2026-04-26 03:11:43.04004+00 | 2026-04-26 03:17:48.327246+00 | completed
+(1 row)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -3
+git diff f3880c3..origin/main --stat
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (9/9), done.
+remote: Total 9 (delta 7), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 3.00 KiB | 439.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   f3880c3..4fd936c  main       -> origin/main
+f3880c3 (HEAD -> main) fix: URL-based Two Specialisations reject + per-uni central_english_pg_skip flag
+873838a fix: three KBS regressions — _asyncio typo, MBA prefix stripped, Two Specialisations
+43380d8 fix(english-scores): block central_page:english fallback for PG courses
+ backend-py/app/services/scraper/central_pages.py           | 12 +++++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 1 deletion(-)
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating f3880c3..4fd936c
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py           | 12 +++++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 1 deletion(-)
+     Active: active (running) since Sun 2026-04-26 03:36:58 UTC; 5s ago
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+     Active: active (running) since Sun 2026-04-26 03:37:36 UTC; 5s ago
+root@university-and-course-data:~/University-and-Course-data# source /root/.env.backup
+
+# Count PG-SKIP log lines (expecting 4 — one per Master's)
+echo "=== PG-SKIP log lines (expect 4) ==="
+journalctl -u uni-celery --since "5 min ago" | grep "PG-SKIP" | wc -l
+
+# Show all ASA results by level
+psql "$DATABASE_URL" -c "
+WITH latest_asa AS (
+  SELECT runtime_job_id FROM scrape_runtime_jobs 
+  WHERE university_id=2 AND status='completed' 
+  ORDER BY started_at DESC LIMIT 1
+)
+SELECT degree_level, course_name,
+       ielts_overall, pte_overall, toefl_overall
+FROM scraped_courses 
+WHERE university_id=2 AND scrape_job_id = (SELECT runtime_job_id FROM latest_asa)
+ORDER BY degree_level, course_name;
+"
+=== PG-SKIP log lines (expect 4) ===
+0
+ degree_level |                             course_name                             | ielts_overall | pte_overall | toefl_overall 
+--------------+---------------------------------------------------------------------+---------------+-------------+---------------
+ Bachelor's   | Bachelor of Business                                                |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business Hospitality Management                         |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business International Business                         |             6 |          50 |            60
+ Bachelor's   | Bachelor of Business Technology Management                          |             6 |          50 |            60
+ Bachelor's   | Bachelor of Professional Accounting                                 |             6 |          50 |            60
+ Master's     | Master of Information Technology (Artificial Intelligence)          |               |             |              
+ Master's     | Master of Information Technology (Cyber Security)                   |               |             |              
+ Master's     | Master of Information Technology (Software Application Development) |               |             |              
+ Master's     | Master of Project Management                                        |               |             |              
+(9 rows)
+
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git fetch origin main
+git log --oneline -5
+git diff 4fd936c..origin/main --stat
+remote: Enumerating objects: 18, done.
+remote: Counting objects: 100% (18/18), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 10 (delta 7), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (10/10), 6.00 KiB | 1.20 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   4fd936c..0ad3921  main       -> origin/main
+4fd936c (HEAD -> main) fix: two-layer fix for central_english_pg_skip not suppressing PG English scores
+f3880c3 fix: URL-based Two Specialisations reject + per-uni central_english_pg_skip flag
+873838a fix: three KBS regressions — _asyncio typo, MBA prefix stripped, Two Specialisations
+43380d8 fix(english-scores): block central_page:english fallback for PG courses
+e4eccf3 fix(sibling-cache): prevent central_page:english from poisoning bucket vote + canonicalize degree_level
+ backend-py/app/services/scraper/central_pages.py           | 188 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
+ backend-py/app/services/scraper/pipelines/single_course.py | 143 +++++++++++++++++++++++++++++++++++++++++++++++++++------------------------
+ 2 files changed, 271 insertions(+), 60 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# git pull origin main
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-celery --no-pager | grep "Active:"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Updating 4fd936c..0ad3921
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py           | 188 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
+ backend-py/app/services/scraper/pipelines/single_course.py | 143 +++++++++++++++++++++++++++++++++++++++++++++++++++------------------------
+ 2 files changed, 271 insertions(+), 60 deletions(-)
+     Active: active (running) since Sun 2026-04-26 04:05:38 UTC; 5s ago
+root@university-and-course-data:~/University-and-Course-data# git pull
+systemctl restart uni-api-py uni-celery
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# cd /opt/uni
+git pull
+systemctl restart uni-api-py uni-celery
+-bash: cd: /opt/uni: No such file or directory
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# # Check current ASA config
+psql $DATABASE_URL -c "SELECT id, name, scrape_config FROM universities WHERE id = 2;"
+
+# Set the flag (run this)
+psql $DATABASE_URL -c "UPDATE universities SET scrape_config = COALESCE(scrape_config, '{}'::jsonb) || '{\"central_english_pg_skip\": true}'::jsonb WHERE id = 2 RETURNING id, name, scrape_config->'central_english_pg_skip' as pg_skip;"
+ id | name | pg_skip 
+----+------+---------
+  2 | asa  | true
+(1 row)
+
+UPDATE 1
+root@university-and-course-data:~/University-and-Course-data# systemctl status uni-api-py uni-celery
+# Look for the "Active: active (running)" and the start time — 
+# it should be AFTER your git pull
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2026-04-26 04:10:45 UTC; 1min 28s ago
+   Main PID: 608459 (python)
+      Tasks: 16 (limit: 9483)
+     Memory: 187.0M (peak: 187.7M)
+        CPU: 3.834s
+     CGroup: /system.slice/uni-api-py.service
+             ├─608459 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log>
+             ├─608460 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─608461 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_han>
+             └─608462 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_han>
+
+Apr 26 04:10:45 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2026-04-26 04:10:57 UTC; 1min 16s ago
+   Main PID: 608494 (celery)
+      Tasks: 1 (limit: 9483)
+     Memory: 77.9M (peak: 78.1M)
+        CPU: 1.230s
+     CGroup: /system.slice/uni-celery.service
+             └─608494 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery>
+
+Apr 26 04:10:57 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+lines 1-26/26 (END)
