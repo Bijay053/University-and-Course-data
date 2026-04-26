@@ -74,6 +74,7 @@ class ScrapedCourse(Base):
     decision_score: Mapped[float | None] = mapped_column(Float)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_method: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

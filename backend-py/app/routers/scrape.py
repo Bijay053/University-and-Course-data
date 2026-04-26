@@ -1572,16 +1572,70 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
 
 
 @router.post("/staged/{sc_id}/reject")
-async def staged_reject(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+async def staged_reject(
+    sc_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    reason: Annotated[str | None, Body(embed=True)] = None,
+) -> dict:
     from app.models import ScrapedCourse
     from datetime import datetime, timezone
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
     sc.status = "rejected"
+    sc.rejection_reason = reason or "manual_reject"
     sc.reviewed_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"ok": True, "id": sc_id, "status": "rejected"}
+    return {"ok": True, "id": sc_id, "status": "rejected", "rejection_reason": sc.rejection_reason}
+
+
+@router.post("/staged/expire-rejections/{university_id}")
+async def expire_rejections(
+    university_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Mark all rejected rows for a university as 'bulk_reset' so the
+    7-day rejection cooldown guard skips them on the next scrape run.
+
+    Use this after fixing an extractor bug so corrected data can be
+    re-staged immediately without deleting rows or waiting 7 days.
+
+    Equivalent SQL (safe to run directly on prod):
+        UPDATE scraped_courses
+        SET rejection_reason = 'bulk_reset'
+        WHERE university_id = <id>
+          AND status = 'rejected'
+          AND (rejection_reason IS NULL
+               OR rejection_reason NOT IN ('manual_reject', 'online_only',
+                                           'category_landing_page'));
+    """
+    result = await db.execute(
+        text("""
+            UPDATE scraped_courses
+            SET rejection_reason = 'bulk_reset'
+            WHERE university_id = :uid
+              AND status = 'rejected'
+              AND (rejection_reason IS NULL
+                   OR rejection_reason NOT IN (
+                       'manual_reject', 'online_only', 'category_landing_page'
+                   ))
+        """),
+        {"uid": university_id},
+    )
+    await db.commit()
+    updated = result.rowcount or 0
+    return {
+        "ok": True,
+        "university_id": university_id,
+        "expired": updated,
+        "message": (
+            f"{updated} rejection(s) marked as bulk_reset — next scrape will "
+            "re-stage them without waiting for the 7-day cooldown."
+            if updated
+            else "No rejections to expire for this university."
+        ),
+    }
 
 
 @router.delete("/staged/{sc_id}")

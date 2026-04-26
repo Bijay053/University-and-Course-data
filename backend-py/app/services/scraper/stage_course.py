@@ -157,25 +157,41 @@ async def stage_course(
                 payload["sub_category"] = det.get("sub_category")
 
     # Bug #7: skip if a recent rejection exists (window = settings.rejection_block_days).
+    #
+    # Rejection reason awareness: only block on "permanent" disqualifiers
+    # (online_only, category_landing_page, manual_reject, or unknown/NULL).
+    # Transient reasons — extractor_bug, bulk_reset, no_international_fee,
+    # expired — do NOT trigger the cooldown so a code-side fix can re-stage
+    # the course on the very next run without DB surgery.
+    _TRANSIENT_REJECTION_REASONS = frozenset({
+        "extractor_bug",
+        "bulk_reset",
+        "no_international_fee",
+        "expired",
+    })
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.rejection_block_days)
-    recent_rejection = (
+    _recent_row = (
         await db.execute(
-            select(ScrapedCourse.id)
+            select(ScrapedCourse.id, ScrapedCourse.rejection_reason, ScrapedCourse.created_at)
             .where(
                 ScrapedCourse.university_id == university_id,
                 func.lower(ScrapedCourse.course_name) == name.lower(),
                 ScrapedCourse.status == "rejected",
                 ScrapedCourse.created_at >= cutoff,
             )
+            .order_by(ScrapedCourse.created_at.desc())
             .limit(1)
         )
-    ).scalar_one_or_none()
-    if recent_rejection:
-        return StageResult(
-            False,
-            f"recently rejected (within {settings.rejection_block_days}d)",
-            extra={"rejected_id": recent_rejection},
-        )
+    ).first()
+    if _recent_row:
+        _rej_id, _rej_reason, _rej_at = _recent_row
+        if _rej_reason not in _TRANSIENT_REJECTION_REASONS:
+            _rej_date = _rej_at.strftime("%Y-%m-%d") if _rej_at else "unknown"
+            return StageResult(
+                False,
+                f"recently rejected (within {settings.rejection_block_days}d, rejected {_rej_date})",
+                extra={"rejected_id": _rej_id, "rejection_reason": _rej_reason},
+            )
 
     # Canonicalize degree_level to the standard apostrophe-s forms used by
     # the degree_level extractor and the sibling-cache bucket logic.
