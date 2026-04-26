@@ -559,9 +559,16 @@ async def prefetch_central_pages(
     # through _fetch_with_browser_fallback() would check for "fee signals",
     # find none (it's not a fee page), and launch Playwright — which can
     # hang for hours blocking the entire Celery worker.
+    #
+    # Hard ceiling: some servers (ASA, etc.) accept the TCP connection but
+    # never send data, causing httpx's per-chunk read timeout to never fire.
+    # Wrap in asyncio.wait_for so a single slow host can't stall the job.
     if english_url and not english_url.endswith(".pdf"):
         try:
-            eng_html = await fetch_html(english_url)
+            eng_html = await _asyncio.wait_for(
+                fetch_html(english_url),
+                timeout=45,
+            )
             if eng_html:
                 english_vals = await _parse_english_page_html_async(eng_html, english_url)
                 result["english"] = english_vals

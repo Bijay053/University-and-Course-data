@@ -38,6 +38,13 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    # Hard ceiling so a single hung scrape can never block the worker
+    # indefinitely (prod incident: ASA job sat for 660+ minutes).
+    # soft_time_limit raises SoftTimeLimitExceeded inside the task so the
+    # orchestrator can mark the job failed cleanly; time_limit sends SIGKILL
+    # after an extra 10 minutes if the soft signal is not handled.
+    task_soft_time_limit=7200,   # 2 hours → raises SoftTimeLimitExceeded
+    task_time_limit=7800,        # 2 h 10 m → SIGKILL fallback
     # Diff item L (MIGRATION_AUDIT.md §6): daily snapshot at 03:00 UTC.
     # The Node ``daily-backup.ts`` ran hourly and short-circuited when
     # today's row already existed (catch-up safety net for missed

@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from celery.exceptions import SoftTimeLimitExceeded
+
 from app.database import AsyncSessionLocal, engine
 from app.services.scraper.orchestrator import run_scrape
 from app.services.scraper.repair import run_repair
@@ -42,6 +44,18 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     try:
         asyncio.run(_async_scrape(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
+    except SoftTimeLimitExceeded:
+        # 2-hour ceiling hit. Mark the job failed so the UI shows a real
+        # error instead of spinning forever, then let Celery clean up.
+        log.error(
+            "scrape_university soft time limit exceeded for job %s — marking failed",
+            runtime_job_id,
+        )
+        try:
+            asyncio.run(_mark_failed(runtime_job_id, "Scrape exceeded 2-hour time limit"))
+        except Exception:
+            pass
+        return {"ok": False, "id": runtime_job_id, "error": "soft_time_limit_exceeded"}
     except Exception as exc:
         log.exception("Task failed id=%s: %s", runtime_job_id, exc)
         # Mark job failed in DB so UI sees real status. No retry — the loop

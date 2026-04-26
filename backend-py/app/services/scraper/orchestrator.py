@@ -489,9 +489,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             if not has_fee_page and links:
                 course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
                 base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
-                discovered = await discover_fee_url_from_course_pages(
-                    course_sample, base_domain
-                )
+                try:
+                    discovered = await asyncio.wait_for(
+                        discover_fee_url_from_course_pages(course_sample, base_domain),
+                        timeout=120,
+                    )
+                except asyncio.TimeoutError:
+                    log.warning(
+                        "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
+                        base_domain,
+                    )
+                    discovered = None
                 if discovered:
                     await emit(
                         "status",
