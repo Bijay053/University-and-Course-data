@@ -1,0 +1,125 @@
+CSU scrape completed successfully (28m 56s, 193 courses, no browser timeouts, $0.094 Gemini cost) — the architectural fix WORKS. But the field extraction from the JS variables is wrong on nearly every field. Manual review of 193 courses in the UI shows:
+
+## Bugs in `csu_static_extract.py` field mappings
+
+### 1. International fee not being read (currently NULL in UI)
+
+**Symptom:** Every course shows blank `International Fee` column. 
+
+**Cause:** Logs show `[CSU static ✓] ... recovered fee=33680.0` populating, but the value is going to `domestic_fee`, not `international_fee`. The extractor is reading `fees.courseFee[DOM].annual_indicative_fee_ft` instead of `fees.courseFee[INT].annual_indicative_fee_ft`.
+
+**Fix:** Extractor must read BOTH `[DOM]` AND `[INT]` and populate `domestic_fee` and `international_fee` separately.
+
+### 2. IELTS = 6 for ALL 193 courses (wrong)
+
+**Symptom:** Every course shows IELTS=6, even Education courses (which actually require 7.5).
+
+**Cause:** The per-course IELTS at `ocb_metadata.ocb[1].course[X].language_requirements[0].requirements` is NOT being read. Instead, the central English page value (`ielts_overall=6.0`) is filling every row.
+
+**Fix:** Extract per-course IELTS from `ocb_metadata`. Use central English page only as fallback when per-course IELTS is missing.
+
+### 3. PTE = 31 for ALL courses (wrong)
+
+**Symptom:** Every course shows PTE=31. CSU PTE minimum is usually 50+.
+
+**Cause:** Likely sibling cache backfill propagating a bad value from one course to all others, OR misreading the JSON.
+
+**Fix:** Verify the actual PTE field path in `ocb_metadata` and don't propagate via sibling cache.
+
+### 4. Intake = "Feb" for almost everything (wrong)
+
+**Symptom:** Most courses show only "Feb" intake. CSU actually offers March, July, November universally.
+
+**Cause:** Teaching period code→month mapping is wrong. The code 30 → March (NOT February), code 60 → July, etc. Also the extractor may only be reading the first offering object, not all.
+
+**Fix:** Map teaching periods correctly:
+- term_code ending in `30` → March (Session 1)  
+- term_code ending in `60` → July (Session 2)
+- term_code ending in `90` → November (Session 3)
+
+Iterate ALL offerings per course, collect unique months.
+
+### 5. Location = "test" for ALL courses (literal placeholder)
+
+**Symptom:** Every course's `Course Location` column shows the string "test". Yes, literally `test`.
+
+**Cause:** Placeholder/debug value left in the extractor.
+
+**Fix:** Read actual `offering.location.value` from each offering, dedupe, join with " / " — e.g., "Bathurst / Port Macquarie / Wagga Wagga / Albury-Wodonga".
+
+### 6. Duration = "1 Year" for almost everything (wrong)
+
+**Symptom:** Bachelors show "1 Year" (should be 3-4). Masters show "1 Year" (should be 1.5-2). Doctorates show "1 Year" (should be 4+).
+
+**Cause:** Reading per-trimester duration instead of total `actual_full_time` or `full_time_minimum_years`.
+
+**Fix:** Use `actual_full_time` (e.g., "4 years" for Bachelor of Education) or `full_time_minimum_years` for total course duration. The original investigation found this exact field.
+
+### 7. Mode = "Blended" for almost everything (wrong)
+
+**Symptom:** Most courses show "Blended" mode. CSU has both "On Campus" and "Online" courses; "Blended" should be rare.
+
+**Cause:** Mode mapping is treating any course with multiple offering modes as "Blended".
+
+**Fix:** Map `offering.mode.value` directly. If a course has ONLY "On Campus" offerings, it's On Campus. Only mark Blended when actually mixed.
+
+## What's working
+
+- Browser skip for CSU ✓ (no timeouts, fast)
+- Static HTML parsing ✓ (extractor is reading the JS variables successfully)
+- Course discovery + naming ✓ (all 200 courses found)
+- Category detection ✓ (works correctly)
+- Total time: 28m 56s for 193 courses (vs 89min projected with browser) ✓
+
+## What needs verification
+
+Replit's investigation found these JSON paths in CSU's static HTML. Verify these are correct against a sample course (e.g., Bachelor of Education Primary which the user manually inspected):
+
+```
+fees.courseFee[INT].annual_indicative_fee_ft     → international_fee
+fees.courseFee[DOM].annual_indicative_fee_ft     → domestic_fee
+ocb_metadata.ocb[1].course[X].language_requirements[0].requirements  → IELTS, PTE, TOEFL, CAE
+ocb_metadata.ocb[1].course[X].actual_full_time   → duration_value + duration_unit
+ocb_metadata.ocb[1].course[X].offerings[].teaching_period.term_code  → intake_months
+ocb_metadata.ocb[1].course[X].offerings[].location.value  → course_location
+ocb_metadata.ocb[1].course[X].offerings[].mode.value  → study_mode_text
+```
+
+## How to test the fix
+
+Before re-running 193-course scrape:
+
+1. Pick 3 specific courses for unit tests:
+   - `bachelor-education-primary` (should have IELTS=7.5, duration=4 years, multiple campuses)
+   - `master-business-administration` (should have IELTS=6.5, duration=2 years)
+   - `bachelor-paramedicine` (should have IELTS=7.0, duration=3 years)
+
+2. Add unit test that fetches each, parses static HTML, asserts:
+   - `international_fee != null` AND > 0
+   - `domestic_fee != null` AND > 0  
+   - `ielts_overall` matches known correct value (7.5 / 6.5 / 7.0)
+   - `duration_value` matches known value (4 / 2 / 3) with correct unit (years)
+   - `intake_months` includes correct months (NOT just "Feb")
+   - `course_location` is real campus list, not the string "test"
+   - `study_mode_text` is correct
+
+3. Run those 3 unit tests offline first — only when all 3 pass, re-run full scrape.
+
+## State on prod
+
+- Code: `33f156bc` (CSU static extractor deployed)
+- 193 CSU courses currently in DB but data is unusable — wrong fees, wrong IELTS, wrong intake, "test" for location
+- ASA + KBS data still correct from earlier today
+
+## What to do with current bad CSU data
+
+Reject all 193 CSU courses currently in the staging queue — the data is wrong. After the fix lands and re-scrape happens, the new batch will be correct.
+
+## Constraints
+
+- One PR for all 7 field fixes (they're all in the same extractor file)
+- DON'T touch the architecture (browser skip, static HTML parsing) — those are correct
+- Add unit tests with real CSU course data so this can't regress
+- Verify against multiple degree levels (Bachelor, Master, Doctorate, Graduate Cert) before claiming complete
+
+Ready when Replit posts the fix.

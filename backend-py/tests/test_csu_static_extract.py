@@ -62,8 +62,8 @@ def _make_html(
 
     meta_json = json.dumps({
         "ocb": [
-            {},  # index 0 — ignored
-            {"course": [default_course]},  # index 1 — real course data
+            {},
+            {"course": [default_course]},
         ]
     })
 
@@ -76,6 +76,14 @@ def _make_html(
 </script>
 </body></html>
 """
+
+
+_STD_SESSIONS = [
+    {"term_code": "202630", "start_Date": "2026-03-02", "is_session": "Y"},
+    {"term_code": "202660", "start_Date": "2026-07-13", "is_session": "Y"},
+]
+
+_CSU_URL = "https://study.csu.edu.au/courses/test-course"
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +100,42 @@ def test_is_csu_url_matches_subdomain() -> None:
 
 def test_is_csu_url_rejects_other_hosts() -> None:
     assert not is_csu_url("https://vit.edu.au/courses/mba")
-    assert not is_csu_url("https://csu.edu.au/courses/mba")  # wrong subdomain
+    assert not is_csu_url("https://csu.edu.au/courses/mba")
+
+
+# ---------------------------------------------------------------------------
+# always-present keys (course_location / intake_months / study_mode)
+# ---------------------------------------------------------------------------
+
+def test_always_present_keys_even_when_empty_html() -> None:
+    """Empty HTML must still return the three always-present keys as None
+    so that standard regex extractors cannot poison the payload."""
+    result = apply_csu_static_extraction(_CSU_URL, "")
+    assert "course_location" in result
+    assert "intake_months" in result
+    assert "study_mode" in result
+    assert result["course_location"] is None
+    assert result["intake_months"] is None
+    assert result["study_mode"] is None
+
+
+def test_always_present_keys_when_no_js_vars() -> None:
+    result = apply_csu_static_extraction(
+        _CSU_URL, "<html><body>Nothing here</body></html>"
+    )
+    assert "course_location" in result
+    assert "intake_months" in result
+    assert "study_mode" in result
+
+
+def test_no_active_offerings_location_and_mode_are_none() -> None:
+    html = _make_html(
+        course_obj={"offerings": []},
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] is None
+    assert result["study_mode"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -109,22 +152,22 @@ def test_domestic_fee_extracted() -> None:
             }
         ]
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["domestic_fee"] == 6316.0
     assert result["fee_term"] == "year"
 
 
-def test_no_dom_fee_skipped() -> None:
+def test_no_dom_fee_gives_no_domestic_fee_key() -> None:
     html = _make_html(
         fees_entries=[
             {
                 "session_year": "2026",
-                "student_type_code": "INTL",
+                "student_type_code": "INT",
                 "annual_indicative_fee_ft": "30000",
             }
         ]
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert "domestic_fee" not in result
 
 
@@ -136,15 +179,54 @@ def test_fee_picks_earliest_year_with_data() -> None:
                 "student_type_code": "DOM",
                 "annual_indicative_fee_ft": "6316",
             },
-            {
-                "session_year": "2027",
-                "student_type_code": "DOM",
-                # future year — no fee yet
-            },
+            {"session_year": "2027", "student_type_code": "DOM"},
         ]
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["domestic_fee"] == 6316.0
+
+
+# ---------------------------------------------------------------------------
+# international_fee  (Bug #1 fix — student_type_code is "INT" not "INTL")
+# ---------------------------------------------------------------------------
+
+def test_international_fee_extracted_with_INT_code() -> None:
+    html = _make_html(
+        fees_entries=[
+            {
+                "session_year": "2026",
+                "student_type_code": "INT",
+                "annual_indicative_fee_ft": "35712",
+            }
+        ]
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["international_fee"] == 35712.0
+    assert result["fee_term"] == "year"
+
+
+def test_international_fee_also_accepts_INTL_code() -> None:
+    html = _make_html(
+        fees_entries=[
+            {
+                "session_year": "2026",
+                "student_type_code": "INTL",
+                "annual_indicative_fee_ft": "40000",
+            }
+        ]
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["international_fee"] == 40000.0
+
+
+def test_international_fee_absent_when_no_int_entries() -> None:
+    html = _make_html(
+        fees_entries=[
+            {"student_type_code": "DOM", "annual_indicative_fee_ft": "6000"}
+        ]
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "international_fee" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +235,7 @@ def test_fee_picks_earliest_year_with_data() -> None:
 
 def test_ielts_extracted_from_language_requirements() -> None:
     html = _make_html()
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["ielts_overall"] == 7.5
 
 
@@ -161,22 +243,69 @@ def test_ielts_out_of_range_discarded() -> None:
     html = _make_html(
         course_obj={
             "language_requirements": [
-                {
-                    "requirements": (
-                        "average band score of 3.0 across all four skill areas"
-                    )
-                }
+                {"requirements": "average band score of 3.0 across all four skill areas"}
             ]
         }
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert "ielts_overall" not in result
 
 
 def test_ielts_absent_when_no_language_requirements() -> None:
     html = _make_html(course_obj={"language_requirements": []})
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert "ielts_overall" not in result
+
+
+# ---------------------------------------------------------------------------
+# PTE  (Bug #3 fix — extract PTE from language_requirements HTML)
+# ---------------------------------------------------------------------------
+
+def test_pte_extracted_from_language_requirements() -> None:
+    html = _make_html(
+        course_obj={
+            "language_requirements": [
+                {
+                    "requirements": (
+                        "<p>PTE Academic score of 58 or above with no "
+                        "communicative skill below 50.</p>"
+                    )
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["pte_overall"] == 58.0
+
+
+def test_pte_out_of_range_discarded() -> None:
+    html = _make_html(
+        course_obj={
+            "language_requirements": [
+                {"requirements": "PTE score of 5"}
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "pte_overall" not in result
+
+
+def test_both_ielts_and_pte_extracted() -> None:
+    html = _make_html(
+        course_obj={
+            "language_requirements": [
+                {
+                    "requirements": (
+                        "average band score of 7.0 across all four skill areas "
+                        "or PTE Academic score of 64 with no communicative skill below 58."
+                    )
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["ielts_overall"] == 7.0
+    assert result["pte_overall"] == 64.0
 
 
 # ---------------------------------------------------------------------------
@@ -185,14 +314,14 @@ def test_ielts_absent_when_no_language_requirements() -> None:
 
 def test_duration_from_actual_full_time() -> None:
     html = _make_html()
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["duration"] == 4.0
     assert result["duration_term"] == "years"
 
 
 def test_duration_fractional() -> None:
     html = _make_html(course_obj={"actual_full_time": "1.5"})
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["duration"] == 1.5
 
 
@@ -204,88 +333,86 @@ def test_duration_fallback_to_max_years() -> None:
             "full_time_standard_eftsl": [],
         }
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
+    result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["duration"] == 3.0
 
 
 # ---------------------------------------------------------------------------
-# intakes
+# intake_months  (returns list[str], not a comma string)
 # ---------------------------------------------------------------------------
 
-def test_intake_months_from_session_data() -> None:
-    sessions = [
-        # Standard sessions (is_session=Y) with known start dates
-        {
-            "term_code": "202630",
-            "description": "Session 1 2026",
-            "start_Date": "2026-03-02",
-            "is_session": "Y",
-            "is_term": "N",
-        },
-        {
-            "term_code": "202660",
-            "description": "Session 2 2026",
-            "start_Date": "2026-07-13",
-            "is_session": "Y",
-            "is_term": "N",
-        },
-    ]
-    html = _make_html(sessions=sessions)
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
-    assert "intake_text" in result
-    assert "March" in result["intake_text"]
-    assert "July" in result["intake_text"]
+def test_intake_months_from_active_offering_sessions() -> None:
+    html = _make_html(sessions=_STD_SESSIONS)
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    months = result["intake_months"]
+    assert isinstance(months, list)
+    assert "March" in months
+    assert "July" in months
 
 
-def test_intake_empty_when_no_session_data() -> None:
+def test_intake_months_none_when_no_session_data() -> None:
+    """intake_months is None (not absent) when session_data is empty."""
     html = _make_html(sessions=[])
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
-    # No session dates → no intake_text
-    assert "intake_text" not in result
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "intake_months" in result
+    assert result["intake_months"] is None
+
+
+def test_intake_months_fallback_for_zero_offering_courses() -> None:
+    """Bug #4 fix: courses with no active offerings still get intake months
+    derived from standard sessions (is_session=Y) in session_data."""
+    html = _make_html(
+        course_obj={"offerings": []},
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    months = result["intake_months"]
+    assert isinstance(months, list)
+    assert "March" in months
+    assert "July" in months
+
+
+def test_intake_ignores_non_session_terms() -> None:
+    """8-week terms (is_session=N) must NOT be included."""
+    html = _make_html(
+        sessions=[
+            {"term_code": "202613", "start_Date": "2026-01-10", "is_session": "N"},
+            {"term_code": "202630", "start_Date": "2026-03-02", "is_session": "Y"},
+        ]
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    months = result["intake_months"]
+    assert months is not None
+    assert "January" not in months
+    assert "March" in months
 
 
 # ---------------------------------------------------------------------------
-# locations and modes
+# course_location and study_mode  (DB-aligned key names)
 # ---------------------------------------------------------------------------
 
-def test_location_and_mode_extracted() -> None:
+def test_course_location_and_study_mode_extracted() -> None:
     html = _make_html()
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
-    assert "location_text" in result
-    assert "Bathurst Campus" in result["location_text"]
-    assert "Online" in result["location_text"]
-    assert "study_mode_text" in result
-    assert "On Campus" in result["study_mode_text"]
-    assert "Online" in result["study_mode_text"]
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "Bathurst Campus" in result["course_location"]
+    assert "Online" in result["course_location"]
+    assert "On Campus" in result["study_mode"]
+    assert "Online" in result["study_mode"]
 
 
-def test_inactive_offerings_excluded() -> None:
+def test_inactive_offerings_excluded_from_location() -> None:
     html = _make_html(
         course_obj={
             "offerings": [
                 {
                     "active": "false",
-                    "teaching_period": {"label": "30 - Session 1", "value": "30"},
+                    "teaching_period": {"label": "30", "value": "30"},
                     "location": {"value": "Wagga Wagga Campus"},
                     "mode": {"value": "On Campus"},
                 }
             ]
         }
     )
-    result = apply_csu_static_extraction("https://study.csu.edu.au/test", html)
-    assert "location_text" not in result
-
-
-# ---------------------------------------------------------------------------
-# empty / bad HTML
-# ---------------------------------------------------------------------------
-
-def test_empty_html_returns_empty_dict() -> None:
-    assert apply_csu_static_extraction("https://study.csu.edu.au/test", "") == {}
-
-
-def test_html_without_js_vars_returns_empty_dict() -> None:
-    result = apply_csu_static_extraction(
-        "https://study.csu.edu.au/test", "<html><body>Nothing here</body></html>"
-    )
-    assert result == {}
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] is None
+    assert result["study_mode"] is None

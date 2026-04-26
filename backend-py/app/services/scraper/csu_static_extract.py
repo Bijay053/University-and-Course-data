@@ -12,19 +12,37 @@ Embedded JS variables we exploit
                   duration (actual_full_time), locations, study modes, AQF level, etc.
 ``session_data``  JSON: ``{session:[{term_code, start_Date, is_session, …}]}``
 
-Fields produced
----------------
-``domestic_fee``    – annual indicative fee for domestic students (float, AUD)
-``ielts_overall``   – IELTS overall band score parsed from language-req HTML text
-``duration``        – full-time standard years (float)
-``duration_term``   – "years"
-``intake_text``     – comma-separated intake month names ("March, July")
-``location_text``   – comma-separated campus names ("Bathurst Campus, Online")
-``study_mode_text`` – comma-separated delivery modes ("On Campus, Online")
+Fields produced  (DB-aligned key names)
+----------------------------------------
+``domestic_fee``      – annual indicative fee for domestic students (float, AUD)
+``international_fee`` – annual indicative fee for international students (float, AUD)
+``fee_term``          – "year"
+``ielts_overall``     – IELTS overall band score parsed from language-req HTML text
+``pte_overall``       – PTE Academic overall score parsed from language-req HTML text
+``duration``          – full-time standard years (float)
+``duration_term``     – "years"
+``intake_months``     – list of intake month names (e.g. ["March", "July"])
+                        Falls back to standard session calendar (is_session=Y) when
+                        the course has no active offerings.
+``course_location``   – comma-separated campus names ("Bathurst Campus, Online")
+                        Always included in the result dict (None when no active
+                        offerings) to block the regex extractor's "test" garbage.
+``study_mode``        – comma-separated delivery modes ("On Campus, Online")
+                        Always included (None when no active offerings) to block the
+                        regex extractor's "Blended" mis-fire.
+
+Design note
+-----------
+``apply_csu_static_extraction`` is designed to be called as a **pre-seed** before
+the standard regex extractor chain so that ``payload.setdefault(k, v)`` in the
+extractor loop is a no-op for every CSU field.  The result dict always contains
+``course_location``, ``intake_months``, and ``study_mode`` — even when their value
+is ``None`` — so the caller can do a plain ``payload[k] = v`` and the regex
+extractors that always mis-fire on CSU pages never win.
 
 Public entry-point
 ------------------
-:func:`is_csu_url`               – quick host check
+:func:`is_csu_url`                  – quick host check
 :func:`apply_csu_static_extraction` – ``(url, html) → dict[str, Any]``
 """
 from __future__ import annotations
@@ -110,7 +128,6 @@ def _domestic_fee(fees_data: dict) -> float | None:
     ]
     if not entries:
         return None
-    # Prefer the current/earliest year that has actual fee data
     entries.sort(key=lambda e: int(e.get("session_year", "0") or "0"))
     for e in entries:
         try:
@@ -122,27 +139,70 @@ def _domestic_fee(fees_data: dict) -> float | None:
     return None
 
 
-def _ielts_from_lang_req(lang_reqs: list) -> float | None:
-    """Parse IELTS overall from the raw HTML inside language_requirements."""
+def _international_fee(fees_data: dict) -> float | None:
+    """Annual indicative international fee (full-time), or None.
+
+    CSU uses student_type_code ``"INT"`` (not ``"INTL"``) for international fees.
+    Both codes are accepted defensively.
+    """
+    entries = [
+        e for e in fees_data.get("courseFee", [])
+        if e.get("student_type_code") in ("INT", "INTL")
+        and e.get("annual_indicative_fee_ft")
+    ]
+    if not entries:
+        return None
+    entries.sort(key=lambda e: int(e.get("session_year", "0") or "0"))
+    for e in entries:
+        try:
+            val = float(e["annual_indicative_fee_ft"])
+            if val > 0:
+                return val
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _english_from_lang_req(lang_reqs: list) -> tuple[float | None, float | None]:
+    """Parse IELTS overall and PTE overall from language_requirements HTML.
+
+    Returns ``(ielts_overall, pte_overall)``.  Either or both may be ``None``
+    when the course page links out to a central requirements page instead of
+    listing scores inline (e.g. MBA, BParamedic).
+
+    IELTS pattern: "average band score of 7.5 across all four skill areas"
+    PTE patterns:  "PTE Academic score of 58", "PTE score of 58", "PTE: 58"
+    """
+    ielts: float | None = None
+    pte: float | None = None
     for req in lang_reqs:
         text = req.get("requirements", "")
-        # CSU format: "average band score of 7.5 across all four skill areas"
-        m = re.search(
-            r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)", text, re.I
-        )
-        if m:
-            try:
-                val = float(m.group(1))
-                if 4.0 <= val <= 9.0:
-                    return val
-            except ValueError:
-                pass
-    return None
+        if ielts is None:
+            m = re.search(
+                r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)", text, re.I
+            )
+            if m:
+                try:
+                    val = float(m.group(1))
+                    if 4.0 <= val <= 9.0:
+                        ielts = val
+                except ValueError:
+                    pass
+        if pte is None:
+            # Match "PTE" followed by up to 30 non-digit chars then 2-3 digits
+            m = re.search(r"PTE[^0-9]{0,30}?(\d{2,3})", text, re.I)
+            if m:
+                try:
+                    val = float(m.group(1))
+                    if 10 <= val <= 90:
+                        pte = val
+                except ValueError:
+                    pass
+    return ielts, pte
 
 
 def _duration(course: dict) -> tuple[float | None, str | None]:
     """Return (years, "years") or (None, None)."""
-    # Best source: actual_full_time (e.g. "4" or "1.5")
     for key in ("actual_full_time", "full_time_maximum_years"):
         raw = course.get(key)
         if raw:
@@ -152,7 +212,6 @@ def _duration(course: dict) -> tuple[float | None, str | None]:
                     return val, "years"
             except (TypeError, ValueError):
                 pass
-    # Fallback: EFTSL list
     for entry in course.get("full_time_standard_eftsl", []):
         try:
             val = float(entry.get("short_description", ""))
@@ -163,10 +222,25 @@ def _duration(course: dict) -> tuple[float | None, str | None]:
     return None, None
 
 
-def _intakes(course: dict, sess_data: dict) -> str | None:
-    """Derive intake month names from offering teaching_period codes
-    cross-referenced with session_data."""
-    # Build code → earliest start_Date lookup from sessions with is_session=Y
+def _intakes(course: dict, sess_data: dict) -> list[str] | None:
+    """Return intake month names as a list, e.g. ``["March", "July"]``.
+
+    Strategy
+    --------
+    1. Build a ``term_code_suffix → start_Date`` map from sessions where
+       ``is_session=Y`` (standard semester sessions, not 8-week terms).
+       The suffix is the last 2 digits of the 6-digit term_code: ``"202630"``
+       → ``"30"`` (Session 1, starts March), ``"202660"`` → ``"60"`` (Session 2,
+       starts July), etc.
+
+    2. For courses **with active offerings**: collect the teaching_period codes
+       from those offerings and cross-reference with the map.
+
+    3. For courses **without active offerings** (e.g. MBA with
+       ``active_offerings=0``): fall back to ALL ``is_session=Y`` entries.
+       This gives the university's standard intake calendar even when
+       enrolments are temporarily closed.
+    """
     code_to_date: dict[str, str] = {}
     for s in sess_data.get("session", []):
         if s.get("is_session") != "Y":
@@ -174,20 +248,19 @@ def _intakes(course: dict, sess_data: dict) -> str | None:
         tc = s.get("term_code", "")
         start = s.get("start_Date", "")
         if len(tc) == 6 and start:
-            # term_code ends in the period code: "202630" → code "30"
-            code = tc[4:]  # "30", "60", "90"
+            code = tc[4:]
             if code not in code_to_date:
                 code_to_date[code] = start
 
-    # Collect unique teaching-period codes from all active offerings
     tp_codes: set[str] = set()
     for offering in course.get("offerings", []):
         if offering.get("active") == "true":
             tp_val = offering.get("teaching_period", {}).get("value", "")
             if tp_val:
-                # The offering stores period code as e.g. "30"; ensure
-                # 2-digit zero-padded to match session_data keys
                 tp_codes.add(tp_val.zfill(2))
+
+    if not tp_codes and code_to_date:
+        tp_codes = set(code_to_date.keys())
 
     months: list[str] = []
     for code in sorted(tp_codes):
@@ -201,11 +274,14 @@ def _intakes(course: dict, sess_data: dict) -> str | None:
                 months.append(month_name)
         except ValueError:
             pass
-    return ", ".join(months) if months else None
+    return months if months else None
 
 
 def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
-    """Return (location_text, study_mode_text) from active offerings."""
+    """Return ``(course_location, study_mode)`` from active offerings.
+
+    Returns ``(None, None)`` when there are no active offerings.
+    """
     locations: list[str] = []
     modes: list[str] = []
     for offering in course.get("offerings", []):
@@ -233,7 +309,6 @@ def _first_course(meta: dict) -> dict | None:
         return meta["ocb"][1]["course"][0]
     except (KeyError, IndexError, TypeError):
         pass
-    # Fallback: scan all blocks for a non-empty course list
     for block in meta.get("ocb", []):
         courses = block.get("course", [])
         if courses:
@@ -246,18 +321,25 @@ def _first_course(meta: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
-    """Parse the 1.3 MB static HTML of a CSU course page and return a
-    ``setdefault``-safe dict of extracted fields.
+    """Parse the 1.3 MB static HTML of a CSU course page and return a dict
+    of extracted fields.
 
-    Only non-None, non-empty values are included so the caller can safely
-    apply ``payload.setdefault(k, v)`` without overwriting already-filled slots.
+    The result is designed for use as a **pre-seed** before the standard
+    extractor chain.  The caller should do a plain ``payload[k] = v`` for
+    every key — this blocks the regex extractors (which always mis-fire on
+    CSU pages) from winning via ``payload.setdefault()``.
 
-    Fields returned (all optional):
-        domestic_fee (float), ielts_overall (float),
-        duration (float), duration_term (str),
-        intake_text (str), location_text (str), study_mode_text (str)
+    Three keys are **always present** in the result (even when ``None``):
+    ``course_location``, ``intake_months``, ``study_mode``.  The caller must
+    pre-seed even the ``None`` values so that the garbage regex extractors
+    cannot set ``course_location="test"``, ``intake_months=["February"]``,
+    ``study_mode="Blended"``.
     """
-    result: dict[str, Any] = {}
+    result: dict[str, Any] = {
+        "course_location": None,
+        "intake_months": None,
+        "study_mode": None,
+    }
 
     if not html:
         return result
@@ -270,6 +352,10 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
         if dom_fee is not None:
             result["domestic_fee"] = dom_fee
             result["fee_term"] = "year"
+        intl_fee = _international_fee(fees_data)
+        if intl_fee is not None:
+            result["international_fee"] = intl_fee
+            result.setdefault("fee_term", "year")
 
     # --- ocb_metadata variable -----------------------------------------------
     meta_raw = _extract_js_var(html, "ocb_metadata")
@@ -282,10 +368,12 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
     if meta:
         course = _first_course(meta)
         if course:
-            # IELTS
-            ielts = _ielts_from_lang_req(course.get("language_requirements", []))
+            # IELTS + PTE
+            ielts, pte = _english_from_lang_req(course.get("language_requirements", []))
             if ielts is not None:
                 result["ielts_overall"] = ielts
+            if pte is not None:
+                result["pte_overall"] = pte
 
             # Duration
             dur, dur_term = _duration(course)
@@ -293,21 +381,13 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
                 result["duration"] = dur
                 result["duration_term"] = dur_term  # type: ignore[assignment]
 
-            # Intakes
-            intake_text = _intakes(course, sess_data)
-            if intake_text:
-                result["intake_text"] = intake_text
+            # Intake months (list; None blocked above)
+            result["intake_months"] = _intakes(course, sess_data)
 
-            # Locations + modes
-            loc_text, mode_text = _locations_and_modes(course)
-            if loc_text:
-                result["location_text"] = loc_text
-            if mode_text:
-                result["study_mode_text"] = mode_text
+            # Location + mode (always overwrite; None is correct for 0-offering courses)
+            loc, mode = _locations_and_modes(course)
+            result["course_location"] = loc
+            result["study_mode"] = mode
 
-    log.debug(
-        "csu_static: %s → %s",
-        url,
-        {k: v for k, v in result.items()},
-    )
+    log.debug("csu_static: %s → %s", url, result)
     return result
