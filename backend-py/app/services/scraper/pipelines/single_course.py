@@ -544,6 +544,60 @@ async def extract_course(
     except Exception as exc:  # noqa: BLE001
         log.warning("vit_static_extract failed on %s: %s", url, exc)
 
+    # CSU-specific static extractor.  CSU pages are 1.3 MB of SSR HTML with
+    # all course data embedded as plain JS variables (fees, ocb_metadata,
+    # session_data).  We extract those variables directly — no browser needed.
+    # This block fires after the normal extractor chain so that any field
+    # already filled (e.g. course_name from <title>) is never overwritten.
+    try:
+        from app.services.scraper.csu_static_extract import (
+            apply_csu_static_extraction,
+            is_csu_url,
+        )
+        if is_csu_url(url):
+            csu_filled = apply_csu_static_extraction(url, html)
+            for k, v in csu_filled.items():
+                if v in (None, "", 0):
+                    continue
+                if payload.get(k) not in (None, "", 0):
+                    continue
+                payload[k] = v
+                evidence.append(
+                    {
+                        "field_key": k,
+                        "value": v,
+                        "confidence": 0.9,
+                        "method": "csu_static",
+                        "snippet": None,
+                    }
+                )
+            if emit and csu_filled:
+                parts = []
+                if "domestic_fee" in csu_filled:
+                    parts.append(f"fee={csu_filled['domestic_fee']}")
+                if "ielts_overall" in csu_filled:
+                    parts.append(f"ielts={csu_filled['ielts_overall']}")
+                if "duration" in csu_filled:
+                    parts.append(
+                        f"duration={csu_filled['duration']}"
+                        f"{csu_filled.get('duration_term','')}"
+                    )
+                if "intake_text" in csu_filled:
+                    parts.append(f"intakes={csu_filled['intake_text']}")
+                if parts:
+                    await emit(
+                        "status",
+                        f"[CSU static ✓] "
+                        f"{payload.get('course_name', url)[:40]} — "
+                        f"recovered {', '.join(parts)}",
+                        phase="fallback",
+                        kind="csu_static_done",
+                        url=url,
+                        filled=list(csu_filled.keys()),
+                    )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("csu_static_extract failed on %s: %s", url, exc)
+
     if use_ai_fallback:
         # Note which slots are still empty so the UI can show *what* the AI
         # is being asked to fill (helpful when diagnosing weak per-page

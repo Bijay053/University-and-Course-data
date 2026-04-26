@@ -1,0 +1,88 @@
+After deploying the concurrency bump (3→10, commit `c8f542a`), CSU scrape is **worse** than before. Need a real fix.
+
+## What's happening
+
+First CSU run today (commit `edc05e20`, concurrency=5):
+- Browser succeeded: `rendered=1546527B` per page
+- Each course took ~18s
+- 200 courses projected: 60+ min
+
+Second CSU run today (commit `c8f542a`, concurrency=10):
+- Browser fails: `rendered=0B using=static`
+- 60s timeouts on every page
+- 200 courses projected: 89+ min
+
+Log evidence:
+```
+[FALLBACK] [per-course browser ↻] https://study.csu.edu.au/courses/bachelor-education-primary
+[FALLBACK] timeout: per-course browser exceeded 60s on https://study.csu.edu.au/courses/bachelor-education-primary — moving on
+[GP-DEBUG] static=1312051B rendered=0B using=static text_len=23007
+[GP-DEBUG] text[:500]="Bachelor of Education (Primary) I'm student, commencingstudent, looking to commence studying in . Change I am: A Domestic student..."
+```
+
+The text is the un-hydrated React shell — CSU's React app never fired its data fetch. Every course gets `ielts=6.0` from central English page and nothing else — no fees, no intakes, no duration, no campus locations.
+
+## Why concurrency=10 made it worse
+
+Hypothesis: CSU has bot detection or rate limiting. Previous successful run was the 1st CSU attempt of the day with low concurrency. After multiple scrape attempts (3+ today), CSU likely throttled our IP. The 10 concurrent connections hitting it simultaneously may have triggered harder blocks.
+
+## What's needed
+
+Not another timeout/concurrency tweak. CSU needs a different scraping strategy:
+
+**Option A: API-based scrape**
+- CSU's React app fetches data from `https://study.csu.edu.au/api/...` endpoints 
+- Inspect network tab in browser devtools on a CSU course page
+- Find the JSON API endpoint that feeds the React app
+- Bypass the browser entirely — fetch JSON directly from the API
+- Massively faster, no Cloudflare interaction, no React hydration wait
+
+**Option B: Wait selector instead of networkidle**
+- networkidle is failing because CSU's React app keeps making background requests
+- Use `page.wait_for_selector('.course-detail-loaded', timeout=30000)` or whatever the actual content marker is
+- Once that selector appears, the data is rendered
+- Much faster than waiting for ALL network to be idle
+
+**Option C: Reduce concurrency for CSU specifically**
+- If CSU has anti-bot rate limiting, hammering it with 10 concurrent requests guarantees throttling
+- Per-uni concurrency override: CSU=2, others=10
+- Slower but more likely to succeed
+
+**My recommendation: Option A.** API endpoint inspection is a 10-minute task and would make CSU scrape complete in <30 seconds for all 200 courses. The other options are workarounds for symptoms.
+
+## Investigation steps
+
+Before writing code:
+
+1. Open `https://study.csu.edu.au/courses/bachelor-education-primary` in Chrome
+2. Open DevTools → Network tab
+3. Filter by Fetch/XHR
+4. Reload page
+5. Look for JSON responses with course data (fees, IELTS, duration, intakes)
+6. Note the API URL pattern
+7. Check if it requires auth headers / CSRF tokens / session cookies
+
+If the API is unauthenticated and returns clean JSON, the fix is to add a `csu_api.py` extractor that fetches from that endpoint instead of going through `per_course_browser.py`.
+
+## What we have working
+
+- ASA: ✓ 9 courses scraped correctly today
+- KBS: ✓ 29 courses scraped correctly today
+- Architecture (Gemini-primary, caching, tier system): ✓ deployed and working
+- CSU is the only blocker
+
+## State on prod
+
+- Code: `c8f542a`
+- DB: ASA + KBS data correct, CSU has nothing useful
+- All scrapes were cancelled tonight — CSU has no pending jobs
+- DigitalOcean droplet IP: `159.65.152.72` (may want different IP for CSU testing if Cloudflare blocked it)
+
+## Constraints
+
+- Don't bundle other fixes
+- Don't touch the existing tier system (it works for ASA/KBS)
+- Investigate API approach FIRST before writing code — may save hours of work
+- If API requires auth that we can't replicate, fall back to wait-selector strategy
+
+Start with the network tab investigation. Report findings before implementing.

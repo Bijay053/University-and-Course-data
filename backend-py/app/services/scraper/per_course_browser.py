@@ -63,6 +63,15 @@ _SKIP_BROWSER_PATH_PREFIXES: dict[str, tuple[str, ...]] = {
     "vit.edu.au": ("/vocational/",),
 }
 
+# Hosts for which the browser is ALWAYS skipped because a dedicated static
+# extractor handles the full field set (no path restrictions needed).
+# CSU: 1.3MB SSR pages already contain fees / IELTS / duration / intakes as
+# embedded JS variables.  The browser was causing rate-limiting at concurrency
+# ≥5 and never produced better data than the static extractor.
+_SKIP_BROWSER_HOSTS: tuple[str, ...] = (
+    "study.csu.edu.au",
+)
+
 
 def _skip_browser_for_url(url: str) -> bool:
     """Return True for URLs where a host-specific static fallback is
@@ -73,6 +82,9 @@ def _skip_browser_for_url(url: str) -> bool:
         path = (parsed.path or "").lower()
     except Exception:
         return False
+    # Whole-host skip (e.g. CSU static extractor covers all paths)
+    if any(host == h or host.endswith("." + h) for h in _SKIP_BROWSER_HOSTS):
+        return True
     for h, prefixes in _SKIP_BROWSER_PATH_PREFIXES.items():
         if host == h or host.endswith("." + h):
             if any(path.startswith(p) for p in prefixes):
