@@ -212,6 +212,8 @@ async def extract_course(
                     _csu_parts.append(f"int={_csu_pre['international_fee']}")
                 if _csu_pre.get("ielts_overall"):
                     _csu_parts.append(f"ielts={_csu_pre['ielts_overall']}")
+                if _csu_pre.get("pte_overall"):
+                    _csu_parts.append(f"pte={_csu_pre['pte_overall']}")
                 if _csu_pre.get("duration"):
                     _csu_parts.append(
                         f"dur={_csu_pre['duration']}"

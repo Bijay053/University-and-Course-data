@@ -174,35 +174,85 @@ def _english_from_lang_req(lang_reqs: list) -> tuple[float | None, float | None]
     when the course page links out to a central requirements page instead of
     listing scores inline (e.g. MBA, BParamedic).
 
-    IELTS pattern: "average band score of 7.5 across all four skill areas"
-    PTE patterns:  "PTE Academic score of 58", "PTE score of 58", "PTE: 58"
+    IELTS patterns: "average band score of 7.5", "minimum overall score of 6.0"
+    PTE patterns:   "PTE Academic score of 58", "PTE score of 58", "PTE: 58"
+                    Only matched when the score is plausibly a real PTE entry
+                    requirement (>= 36, which maps to IELTS 5.0+).
     """
     ielts: float | None = None
     pte: float | None = None
     for req in lang_reqs:
         text = req.get("requirements", "")
         if ielts is None:
-            m = re.search(
-                r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)", text, re.I
-            )
-            if m:
-                try:
-                    val = float(m.group(1))
-                    if 4.0 <= val <= 9.0:
-                        ielts = val
-                except ValueError:
-                    pass
+            for ielts_pattern in [
+                r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)",
+                r"minimum\s+overall\s+(?:band\s+)?score\s+of\s+(\d+(?:\.\d+)?)",
+                r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)",
+            ]:
+                m = re.search(ielts_pattern, text, re.I)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 4.0 <= val <= 9.0:
+                            ielts = val
+                            break
+                    except ValueError:
+                        pass
         if pte is None:
-            # Match "PTE" followed by up to 30 non-digit chars then 2-3 digits
-            m = re.search(r"PTE[^0-9]{0,30}?(\d{2,3})", text, re.I)
+            # Require PTE score >= 36 to avoid false positives (PTE 36 ≈ IELTS 4.5,
+            # the lowest plausible university entry requirement).
+            m = re.search(r"PTE\s*(?:Academic|Academic\s+score)?[^0-9]{0,30}?(\d{2,3})", text, re.I)
             if m:
                 try:
                     val = float(m.group(1))
-                    if 10 <= val <= 90:
+                    if 36 <= val <= 90:
                         pte = val
                 except ValueError:
                     pass
     return ielts, pte
+
+
+# CSU central requirements page (https://study.csu.edu.au/international/how-to-apply/course-entry-requirements)
+# specifies IELTS-only standards; PTE equivalences follow Australian DHA table.
+_IELTS_TO_PTE: dict[float, float] = {
+    5.0: 36,
+    5.5: 42,
+    6.0: 50,
+    6.5: 58,
+    7.0: 65,
+    7.5: 79,
+    8.0: 85,
+}
+
+
+def _pte_from_ielts(ielts: float) -> float | None:
+    """Return the closest standard PTE Academic equivalent for a given IELTS score."""
+    # Exact match first
+    if ielts in _IELTS_TO_PTE:
+        return _IELTS_TO_PTE[ielts]
+    # Round to nearest 0.5 and look up
+    rounded = round(ielts * 2) / 2
+    return _IELTS_TO_PTE.get(rounded)
+
+
+def _csu_default_ielts(course: dict) -> float:
+    """Return the standard CSU IELTS requirement based on AQF level.
+
+    From https://study.csu.edu.au/international/how-to-apply/course-entry-requirements:
+      - UG / PG coursework (AQF 5-9): overall 6.0, no band < 5.5 (UG) / 6.0 (PG)
+      - HDR / research (AQF 9 research, 10): overall 6.5, no band < 6.0
+
+    We use 6.5 for AQF 10 (doctoral) and research masters; 6.0 for everything else.
+    """
+    aqf = (course.get("aqf_level") or {}).get("value", "")
+    # Doctoral degrees
+    if "10" in aqf or "doctoral" in aqf.lower():
+        return 6.5
+    # Research-flavoured AQF 9 (Masters by Research / Professional Doctorate)
+    title = (course.get("title") or "").lower()
+    if "research" in title and ("master" in title or "doctor" in title):
+        return 6.5
+    return 6.0
 
 
 def _duration(course: dict) -> tuple[float | None, str | None]:
@@ -343,6 +393,13 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
         "course_location": None,
         "intake_months": None,
         "study_mode": None,
+        # Always initialise ielts_overall and pte_overall so that the regex
+        # extractor chain (which fires AFTER the pre-seed) can never win via
+        # payload.setdefault().  The regex extractors produce false positives on
+        # CSU pages (e.g. PTE=31 from unrelated HTML text).  Correct values are
+        # filled below from inline language_requirements or CSU-standard defaults.
+        "ielts_overall": None,
+        "pte_overall": None,
         # Staging gate: when international_fee cannot be extracted from the
         # page JS (e.g. research degrees, courses with no current INT intake),
         # this flag lets the course pass through for human review instead of
@@ -377,12 +434,25 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
     if meta:
         course = _first_course(meta)
         if course:
-            # IELTS + PTE
+            # ── IELTS + PTE ──────────────────────────────────────────────────
+            # Step 1: try to parse inline scores from language_requirements.
             ielts, pte = _english_from_lang_req(course.get("language_requirements", []))
-            if ielts is not None:
-                result["ielts_overall"] = ielts
-            if pte is not None:
-                result["pte_overall"] = pte
+
+            # Step 2: if no inline IELTS found, fall back to CSU-standard default
+            # sourced from the central requirements page.  This is correct for the
+            # ~90 % of courses that link out to the central page instead of listing
+            # scores inline.
+            if ielts is None:
+                ielts = _csu_default_ielts(course)
+
+            result["ielts_overall"] = ielts
+
+            # Step 3: derive PTE from IELTS using Australian DHA equivalence table
+            # when no inline PTE was found.  CSU's requirements page only lists IELTS;
+            # PTE equivalences are standard across Australian universities.
+            if pte is None and ielts is not None:
+                pte = _pte_from_ielts(ielts)
+            result["pte_overall"] = pte
 
             # Duration
             dur, dur_term = _duration(course)
@@ -393,8 +463,22 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
             # Intake months (list; None blocked above)
             result["intake_months"] = _intakes(course, sess_data)
 
-            # Location + mode (always overwrite; None is correct for 0-offering courses)
+            # ── Location + mode ──────────────────────────────────────────────
+            # Prefer active-offering data; fall back to "Online" for courses with
+            # no active offerings (most CSU grad certs / postgrad units are delivered
+            # fully online and have active_offerings=None or 0).
             loc, mode = _locations_and_modes(course)
+            if loc is None:
+                # Check if ANY offering (active or not) lists an on-campus location
+                all_locs = [
+                    (o.get("location") or {}).get("value", "")
+                    for o in course.get("offerings", [])
+                    if (o.get("location") or {}).get("value", "")
+                ]
+                if all_locs:
+                    loc = ", ".join(dict.fromkeys(all_locs))  # deduplicated
+                else:
+                    loc = "Online"
             result["course_location"] = loc
             result["study_mode"] = mode
 
