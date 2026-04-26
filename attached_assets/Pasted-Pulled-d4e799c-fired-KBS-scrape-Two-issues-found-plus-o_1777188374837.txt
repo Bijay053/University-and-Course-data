@@ -1,0 +1,97 @@
+Pulled `d4e799c`, fired KBS scrape. Two issues found, plus one win.
+
+## The win
+
+Gemini successfully extracted `international_fee: 34560` on Study Abroad Program for the first time in the entire system. So the architecture works when the page is clean.
+
+```
+[GP-DEBUG] static=86112B rendered=0B using=static text_len=8072
+[GP-DEBUG] text[:500]="Study Abroad Program - Kaplan Business School Skip to main content Current Students Agent Resources Find An Agent News Alumni Contact Us Menu Main navigation Courses Admissions Student Life Blog About Us Apply My saved courses (0) search Courses Close Search Block Search DOWNLOAD A BROCHURE Close Manuel's story Close Kim's story Close James's story Close Suzana's story Close Freda's story Close Renacris's story Close Payals' Story Close Ladia's Story Close Mohammed's story Home Courses Study Abr"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34560,'
+[GEMINI] .../study-abroad-program → 1 field(s) (cost=$0.000212, in=2793 out=9)
+```
+
+But Study Abroad is rejected as a category landing page so it doesn't count toward `had_gemini`.
+
+## Issue 1: Nav strip didn't work on KBS Drupal pages
+
+The truncation fix worked (text_len jumped from 8005 to 10K-15K), but the BeautifulSoup nav stripping is NOT removing the KBS navigation menu. Every text[:500] still starts with the same boilerplate:
+
+```
+text[:500]="Bachelor of Business - Kaplan Business School Skip to main content Current Students Agent Resources Find An Agent News Alumni Contact Us Main navigation Courses Admissions Student Life Blog About Us Apply My saved courses (0) search Courses Master's Degrees MBA – Master of Business Administration Master of Business Analytics Master of Business Analytics (Extension) Master of Business Analytics (Information Technology) Master of Information Technology Master of Information Technology (Extension) "
+```
+
+29 courses, all still start with this nav menu listing every other course.
+
+**Root cause hypothesis**: KBS uses Drupal which doesn't use semantic `<nav>`/`<header>`/`<footer>` tags. It uses generic `<div>` with Drupal-specific class patterns. The current BeautifulSoup filter (looking for tags or class names with "nav"/"menu"/"breadcrumb") isn't matching what's actually in the HTML.
+
+**What to do**:
+
+1. **Inspect the actual KBS rendered HTML structure**. The full rendered HTML is available in the cache. Run this to get a sample:
+   ```bash
+   psql $DATABASE_URL -c "SELECT LEFT(raw_html, 5000) FROM central_page_cache WHERE university_id = 8 LIMIT 1;"
+   ```
+   Or fetch a course page directly with Playwright to see what classes Drupal uses on KBS.
+
+2. **Update the content extraction** to also strip:
+   - Drupal `region--header`, `region--navigation`, `region--footer` regions
+   - Block-level CSS classes (`block-system-menu-block`, `block-search`, etc.)
+   - Any element where the `class` attribute contains "region", "block-menu", "block-search"
+   - The `<h1>` course title is fine, but the listing of all other courses (the nav menu) needs to go
+
+3. **Better strategy**: Instead of stripping nav, target Drupal's content area positively. KBS likely uses `<main role="main">` or `<div id="main-content">` or a `region--content` block. If we can find and extract just that, we skip the whole nav-strip problem.
+
+4. **As confirmation that the fix works**, the GP-DEBUG `text[:500]` for KBS Master of Information Technology should NOT start with "Skip to main content Current Students Agent Resources...". It should start with actual course content like "Master of Information Technology... 20 month master's degree... International Fee $43,680...".
+
+## Issue 2: IELTS=4 regression on Graduate Certificate courses
+
+2 courses now show wrong IELTS values:
+- **Graduate Certificate in Business Administration**: IELTS=4 (should be 6)
+- **Graduate Certificate in Accounting**: IELTS=4 (should be 6)
+
+Log evidence:
+```
+[per-course vision img 1/5 (cache hits 4)] .../graduate-certificate-in-business-administration — IELTS=4.0 PTE=— TOEFL=— CAE=—
+[per-course vision img 2/5 (cache hits 3)] .../graduate-certificate-in-accounting — IELTS=4.0 PTE=— TOEFL=— CAE=—
+[sibling cache ↻ build postgraduate] ielts_overall=4.0
+```
+
+Vision OCR misread 6 as 4 on 2 specific KBS course pages, then sibling cache propagated the wrong postgraduate value. The other 27 courses got correct values from central pages.
+
+**Why this is new**: The previous KBS scrape (commit `7aaa6b3` before the d4e799c deploy) had all courses at IELTS=6. Something in the d4e799c changes affected vision OCR confidence or which images it samples. 
+
+**What to do**:
+
+1. **Investigate why vision OCR is now seeing 4 instead of 6 on those 2 courses.** Compare `per-course vision` behavior between `7aaa6b3` and `d4e799c`. Did the d4e799c PR touch any vision-related code?
+
+2. **Add a sanity check on vision OCR results**: For KBS specifically, the central page caches IELTS=6.0 for all courses. If per-course vision returns a value that's drastically different (like 4.0 vs 6.0), the central page value should win. This is a generic fix that would prevent future similar issues for any uni with a clear central-page baseline.
+
+## Validation criteria for both fixes
+
+After the fix, the KBS scrape should produce:
+
+**Issue 1 fixed**:
+- GP-DEBUG `text[:500]` for KBS courses should contain actual course content (fees, durations, IELTS) NOT just nav menu
+- `had_gemini >= 15/29` (some courses might still resist, but most should work)
+- At least one full extraction_method JSON showing `gemini_primary` for `international_fee`, `ielts_overall`, `duration_value`
+
+**Issue 2 fixed**:
+- All 29 KBS courses show IELTS=6 (no IELTS=4 anywhere)
+- Sibling cache builds correctly: `[sibling cache ↻ build postgraduate] ielts_overall=6.0`
+
+## State on prod
+
+- Code: `d4e799c`
+- 29 KBS courses staged with mostly-correct data; 2 have wrong IELTS
+- Architecture proven to work on at least one page (Study Abroad)
+- Cost: $0.0098, expected to rise to maybe $0.02 once Gemini actually contributes
+
+## Constraints
+
+- Single PR for both fixes
+- Don't change call ordering
+- Don't change prompt text
+- Keep GP-DEBUG instrumentation in place
+- After deploying, run the same KBS scrape and paste GP-DEBUG output for any course (to verify nav is now stripped) plus the IELTS check
+
+Ready when both are fixed.

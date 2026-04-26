@@ -62,6 +62,18 @@ _PER_COURSE_VISION_METHODS: frozenset[str] = frozenset({
     "per_course_vision_cached",
 })
 
+# Maximum allowable delta between a per-course vision OCR reading and the
+# university-wide central-page value for the same English slot.  When vision
+# returns a value further away than this threshold the central-page value is
+# considered more reliable (vision misread), the vision value is reverted, and
+# a ``[VISION SANITY ✗]`` warning is emitted.
+_VISION_SANITY_THRESHOLDS: dict[str, float] = {
+    "ielts_overall": 1.0,    # e.g. 4.0 vs 6.0 → delta=2.0 > 1.0 → revert
+    "pte_overall": 10.0,
+    "toefl_overall": 10.0,
+    "cambridge_overall": 10.0,
+}
+
 
 # Hard ceiling on the AI fallback Gemini call. Same bug class as the
 # Playwright hang that started this hot-fix chain — if Gemini stalls
@@ -418,6 +430,60 @@ async def extract_course(
         for k, v in vision_filled.items():
             payload.setdefault(k, v)
         evidence.extend(vision_evidence)
+
+        # ── Vision sanity check ───────────────────────────────────────────
+        # When a per-course vision OCR reading for an English slot diverges
+        # too far from the university-wide central-page value, the central
+        # page is more trustworthy (vision misread).  Revert the slot and
+        # remove the stale vision evidence so downstream sibling-cache and
+        # staging logic don't propagate the wrong value.
+        if central_data and vision_filled:
+            _central_eng: dict = central_data.get("english") or {}
+            _central_eng_url: str | None = central_data.get("english_page_url")
+            for _slot, _max_delta in _VISION_SANITY_THRESHOLDS.items():
+                if _slot not in vision_filled:
+                    continue
+                _v_val = payload.get(_slot)
+                _c_val = _central_eng.get(_slot)
+                if _v_val is None or _c_val is None:
+                    continue
+                try:
+                    _delta = abs(float(_v_val) - float(_c_val))
+                except (TypeError, ValueError):
+                    continue
+                if _delta <= _max_delta:
+                    continue
+                # Revert payload to the central-page value
+                payload[_slot] = _c_val
+                # Drop stale vision evidence for this slot
+                evidence[:] = [
+                    ev for ev in evidence
+                    if not (
+                        ev.get("field_key") == _slot
+                        and ev.get("method", "") in _PER_COURSE_VISION_METHODS
+                    )
+                ]
+                # Record the correction
+                evidence.append({
+                    "field_key": _slot,
+                    "value": _c_val,
+                    "confidence": 0.50,
+                    "method": "central_page:english",
+                    "snippet": _central_eng_url,
+                })
+                if emit:
+                    await emit(
+                        "status",
+                        f"[VISION SANITY ✗] {payload.get('course_name', url)[:40]} — "
+                        f"{_slot}: vision={_v_val} vs central={_c_val} "
+                        f"(delta={_delta:.1f} > {_max_delta}) → reverted to central",
+                        phase="extract",
+                        kind="vision_sanity_override",
+                        url=url,
+                        slot=_slot,
+                        vision_val=_v_val,
+                        central_val=_c_val,
+                    )
     except Exception as exc:  # noqa: BLE001
         log.warning("per-course vision fallback errored on %s: %s", url, exc)
 

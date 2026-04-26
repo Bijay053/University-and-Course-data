@@ -138,57 +138,85 @@ _BOILERPLATE_CLASS_FRAGS = (
 )
 
 
+def _safe_strip(element: Any, tags: list[str], *, class_frags: tuple[str, ...] = ()) -> None:
+    """Collect-then-remove boilerplate from *element* without mutating during iteration.
+
+    The naive ``for tag in element.find_all(True): tag.decompose()`` pattern
+    crashes with ``'NoneType' object has no attribute 'get'`` because
+    ``find_all`` pre-builds a flat list of *all* descendants; when a parent is
+    decomposed its children become invalid but their list slots remain.  This
+    helper gathers candidates first, then removes each one with a guarded call
+    so that already-invalidated elements are silently skipped.
+    """
+    to_remove: list[Any] = list(element.find_all(tags))
+    if class_frags:
+        for tag in element.find_all(True):
+            try:
+                tag_id = (tag.get("id") or "").lower()
+                tag_cls = " ".join(tag.get("class") or []).lower()
+                if any(frag in f"{tag_id} {tag_cls}" for frag in class_frags):
+                    to_remove.append(tag)
+            except Exception:
+                pass
+    for tag in to_remove:
+        try:
+            tag.decompose()
+        except Exception:
+            pass
+
+
 def _extract_content_html(html: str) -> str:
     """Return the HTML fragment most likely to contain course-specific content.
 
     Strategy (in order of preference):
-    1. Prefer the ``<main>`` element — the semantic landmark for page content.
-    2. Fall back to the first ``<article>`` element.
-    3. Fall back to a ``<div>`` / ``<section>`` whose id/class suggests
-       "content" (e.g. id="content", class="page-content").
-    4. Last resort: strip the known boilerplate tags from the full document and
-       use whatever remains.
+    1. ``<main>`` — the semantic landmark; present on KBS, VIT, and most
+       modern sites.  Strip boilerplate *within* the extracted element so
+       sticky nav bars and course-listing sidebars don't bloat the text.
+    2. ``<article>`` — common on blog/CMS layouts.
+    3. A ``<div>`` / ``<section>`` whose id/class contains "content"/"main".
+    4. Full document stripped of ``<nav>``/``<header>``/``<footer>``/``<aside>``
+       and class-matching boilerplate.
 
-    Falls back gracefully at each step; never raises.
+    Uses :func:`_safe_strip` (collect-then-remove) throughout to avoid the
+    NoneType crash that silently aborted the previous implementation.
     """
     try:
         from bs4 import BeautifulSoup, Tag
 
         soup = BeautifulSoup(html, "lxml")
 
-        # Remove script / style first (always noise)
+        # Always safe to remove noise tags first — no parent/child ambiguity
         for tag in soup.find_all(["script", "style", "noscript", "template"]):
-            tag.decompose()
-
-        # Remove explicit boilerplate structural tags
-        for tag in soup.find_all(_BOILERPLATE_TAGS):
-            tag.decompose()
-
-        # Remove divs/sections whose id or class indicates nav/menu/footer
-        for tag in soup.find_all(True):
-            tag_id = (tag.get("id") or "").lower()
-            tag_cls = " ".join(tag.get("class") or []).lower()
-            combined = f"{tag_id} {tag_cls}"
-            if any(frag in combined for frag in _BOILERPLATE_CLASS_FRAGS):
+            try:
                 tag.decompose()
+            except Exception:
+                pass
 
-        # Now look for the primary content area
+        # ── Path 1: <main> ────────────────────────────────────────────────
         main = soup.find("main")
         if main and isinstance(main, Tag):
+            # Strip nav-like sub-elements from within <main> safely
+            _safe_strip(main, list(_BOILERPLATE_TAGS), class_frags=_BOILERPLATE_CLASS_FRAGS)
             return str(main)
 
+        # ── Path 2: <article> ────────────────────────────────────────────
         article = soup.find("article")
         if article and isinstance(article, Tag):
+            _safe_strip(article, list(_BOILERPLATE_TAGS), class_frags=_BOILERPLATE_CLASS_FRAGS)
             return str(article)
 
-        # Heuristic: a div/section whose id or class contains "content"
-        for tag in soup.find_all(["div", "section"]):
-            tag_id = (tag.get("id") or "").lower()
-            tag_cls = " ".join(tag.get("class") or []).lower()
-            if "content" in tag_id or "content" in tag_cls or "main" in tag_id:
-                return str(tag)
+        # ── Path 3 & 4: full-document strip then find content div ─────────
+        _safe_strip(soup, list(_BOILERPLATE_TAGS), class_frags=_BOILERPLATE_CLASS_FRAGS)
 
-        # Fall back to the cleaned full document
+        for tag in soup.find_all(["div", "section"]):
+            try:
+                tag_id = (tag.get("id") or "").lower()
+                tag_cls = " ".join(tag.get("class") or []).lower()
+                if "content" in tag_id or "content" in tag_cls or "main" in tag_id:
+                    return str(tag)
+            except Exception:
+                pass
+
         return str(soup)
     except Exception:
         return html  # never break on parse failure
