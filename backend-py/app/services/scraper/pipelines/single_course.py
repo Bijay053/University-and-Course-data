@@ -725,6 +725,44 @@ async def extract_course(
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)
 
+        # ── PG English clear-out ──────────────────────────────────────────────
+        # When `central_english_pg_skip` is True for a university, the central
+        # English page is fetched via plain HTTP and only the undergraduate row
+        # is visible (the PG row is JS-rendered).  Any English scores that
+        # landed in the payload for PG courses — whether from vision OCR, the
+        # AI fallback, a HTML extractor, or sibling-cache propagation — are
+        # equally unreliable: they reflect the same UG-only static HTML, not
+        # the actual PG requirement.
+        #
+        # This clear-out runs AFTER all extractors (vision OCR, AI, PDF) have
+        # already written to the payload, so it is the definitive last word.
+        # NULL is honest and recoverable; a silently-wrong 6.0 for a Master's
+        # that requires 6.5 is neither.
+        #
+        # The clear-out fires independently of whether an English URL was
+        # configured — the flag alone is sufficient because it means "no
+        # reliable PG English source exists for this university".
+        _pg_skip_final = bool(central_data.get("central_english_pg_skip", False))
+        _pg_dl_final = (payload.get("degree_level") or "").strip()
+        if _pg_skip_final and _pg_dl_final in _CENTRAL_ENGLISH_PG_LEVELS:
+            _cleared: list[str] = []
+            for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall"):
+                if payload.get(_slot) not in (None, "", 0):
+                    payload[_slot] = None
+                    _cleared.append(_slot)
+            if _cleared and emit:
+                await emit(
+                    "status",
+                    f"[PG-SKIP ✗] {payload.get('course_name', url)[:40]} — "
+                    f"nulled english for PG ({_pg_dl_final}): "
+                    f"{', '.join(_cleared)} (central_english_pg_skip=true)",
+                    phase="fallback",
+                    kind="pg_english_cleared",
+                    url=url,
+                    degree_level=_pg_dl_final,
+                    cleared=_cleared,
+                )
+
         # Signal to the staging gate that this university has a centralized fee
         # page.  Even if this specific course wasn't listed in the table, the
         # course may still be open to international students — the staging gate

@@ -514,7 +514,17 @@ async def prefetch_central_pages(
     )
 
     if not fee_url and not english_url:
-        return empty
+        # Preserve the pg_skip flag even when there are no central pages to
+        # fetch — single_course.py reads it AFTER all extractors have run to
+        # perform the PG clear-out pass.  Returning `empty` verbatim would
+        # silently drop the flag, causing vision-OCR scores to survive for PG
+        # courses on universities where the flag should suppress them.
+        return {
+            **empty,
+            "central_english_pg_skip": bool(
+                scrape_config.get("central_english_pg_skip", False)
+            ),
+        }
 
     result: CentralData = {
         "fees": [],

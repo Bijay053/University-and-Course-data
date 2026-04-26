@@ -1,0 +1,77 @@
+f3880c3 deployed and verified. Mostly working. One specific issue.
+
+## What works ✅
+
+**KBS scrape:**
+```
+degree_level         | count | ielts    | pte     | toefl
+Bachelor's           |   5   | {6}      | {50}    | {72}
+Diploma              |   2   | {6}      | {50}    | {72}
+Graduate Certificate |   7   | {6}      | {50}    | {72}
+Master's             |  15   | {6, 6.5} | {50,58} | {72,79}
+```
+- All PG levels populated (default-false flag working)
+- MBA prefixes preserved
+- Two Specialisations count: 0 (URL reject working)
+- One Master's row at 6.5/58/79 (Master of Business Analytics) — from vision OCR, matches KBS website, fine
+
+## What doesn't work ❌
+
+**ASA scrape — the `central_english_pg_skip: true` flag is set but not being read:**
+
+DB confirmed:
+```
+id | name | pg_skip_flag
+ 2 | asa  | true   ← set correctly
+```
+
+But ASA Master's are getting Bachelor's contamination again:
+```
+degree_level | course_name                              | ielts | pte | toefl
+Master's     | Master of Information Technology (AI)    | 6     | 50  | 60
+Master's     | Master of IT (Cyber Security)            | 6     | 50  | 60
+Master's     | Master of IT (Software App Development)  | 6     | 50  | 60
+Master's     | Master of Project Management             | 6     | 50  | 60
+```
+
+Expected: NULL (per the per-uni skip flag, which should be firing because `asa.scrape_config.central_english_pg_skip = true`).
+Actual: Bachelor's contamination (6/50/60) — the original bug we fixed in 43380d8 is back.
+
+Worker log smoking gun — sibling cache buckets identical, no skip log line:
+```
+[sibling cache ↻ build undergraduate] cambridge=169 ielts=6.0 pte=50 toefl=60
+[sibling cache ↻ build postgraduate]  cambridge=169 ielts=6.0 pte=50 toefl=60   ← same
+```
+
+No `central english skipped for PG` lines for ASA. The skip never fires.
+
+## Hypothesis
+
+The code reading the flag isn't loading it from `universities.scrape_config` correctly. Possibilities:
+1. Code reads from a different field path (e.g., `scrapeConfig.centralEnglishPgSkip` camelCase vs `scrape_config.central_english_pg_skip` snake_case)
+2. Code reads from a config table or env var, not `universities.scrape_config`
+3. Flag is read at startup and cached, requiring restart — but I did restart after setting the flag
+
+Verify queries in psql confirm flag is set:
+```
+SELECT scrape_config->'central_english_pg_skip' FROM universities WHERE id=2;
+→ 'true'
+```
+
+## What I want
+
+Check where the scraper reads `central_english_pg_skip` from. Make sure it's reading from `universities.scrape_config` jsonb column for `university_id=2`. If the read path is correct, add a log line that prints the flag value at scrape start so we can confirm what the scraper actually sees.
+
+Alternatively, if the design is to read from a different source, document it and tell me the exact SQL/config to set.
+
+## Side note
+
+With `central_english_pg_skip: true` working correctly, ASA Master's will be NULL (accepted tradeoff). With it not working (current state), ASA Master's are wrong (6/50/60 instead of 6.5/58/85 or NULL). **Wrong is worse than NULL.** Need this fix to land.
+
+## State
+
+- Code at f3880c3, deployed 03:11 UTC
+- ASA flag `central_english_pg_skip: true` set in `universities.scrape_config`
+- KBS verified working
+- ASA verified broken
+- Worker idle
