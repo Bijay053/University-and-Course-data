@@ -38,6 +38,21 @@ from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
 
+# Degree-level values that indicate a postgraduate course.
+# The central English-requirements page is fetched via plain HTTP (no JS
+# rendering), so it only captures whatever level the static HTML exposes
+# first — typically the undergraduate table.  Applying those UG values to
+# PG courses produces incorrect (too-low) English scores.
+# Courses at these levels are exempt from the central_page:english fallback;
+# they will stage with NULL English scores rather than wrong Bachelor's values.
+# NULL is always recoverable; wrong data propagates silently.
+_CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
+    "Master's",
+    "Graduate Certificate",
+    "Graduate Diploma",
+    "Doctorate",
+})
+
 
 # Hard ceiling on the AI fallback Gemini call. Same bug class as the
 # Playwright hang that started this hot-fix chain — if Gemini stalls
@@ -649,7 +664,21 @@ async def extract_course(
                         )
 
             # ── English-requirements fallback ────────────────────────────
-            if _central_english:
+            # SAFETY: skip postgraduate-level courses entirely.
+            #
+            # The central English page is fetched via plain HTTP (no browser),
+            # so only statically-rendered HTML is visible.  Many universities
+            # (ASA, KBS, …) JS-render their postgraduate row — the static HTML
+            # only exposes the undergraduate table (IELTS 6.0 / PTE 50 /
+            # TOEFL 60 / CAE 169).  Applying those UG values to a Master's
+            # course produces silently wrong data that survives review.
+            #
+            # Postgraduate courses will stage with NULL English scores instead.
+            # NULL is visible in the Review modal and recoverable; an incorrect
+            # 6.0 for a Master's that requires 6.5 is neither.
+            _course_dl = (payload.get("degree_level") or "").strip()
+            _skip_central_english = _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+            if _central_english and not _skip_central_english:
                 _eng_filled: list[str] = []
                 for _k, _v in _central_english.items():
                     if _v in (None, "", 0):
@@ -679,6 +708,17 @@ async def extract_course(
                         url=url,
                         filled=_eng_filled,
                     )
+            elif _central_english and _skip_central_english and emit:
+                await emit(
+                    "status",
+                    f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
+                    f"central english skipped for PG level ({_course_dl or 'unknown'}): "
+                    f"static HTML may only expose UG scores",
+                    phase="fallback",
+                    kind="central_english_skipped_pg",
+                    url=url,
+                    degree_level=_course_dl,
+                )
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)

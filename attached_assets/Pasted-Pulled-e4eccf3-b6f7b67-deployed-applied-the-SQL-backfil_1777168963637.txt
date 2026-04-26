@@ -1,0 +1,89 @@
+Pulled e4eccf3 + b6f7b67, deployed, applied the SQL backfill. Ran two fresh ASA scrapes (job_518ee6c387b6 and job_f9f037121d53, both confirmed running on new code via started_at > deploy time).
+
+**Fix didn't work.** Master's still showing IELTS=6 / PTE=50 / TOEFL=60 (Bachelor's values). All 4 Master's courses in the new scrape are wrong.
+
+```
+course_name                                                          | degree_level | ielts | pte | toefl | cambridge
+---------------------------------------------------------------------+--------------+-------+-----+-------+----------
+Bachelor of Business                                                 | Bachelor's   | 6     | 50  | 60    | 169
+Bachelor of Business Hospitality Management                          | Bachelor's   | 6     | 50  | 60    | 169
+Bachelor of Business International Business                         | Bachelor's   | 6     | 50  | 60    | 169
+Bachelor of Business Technology Management                          | Bachelor's   | 6     | 50  | 60    | 169
+Bachelor of Professional Accounting                                  | Bachelor's   | 6     | 50  | 60    | 169
+Master of Information Technology (Artificial Intelligence)           | Master's     | 6     | 50  | 60    | 169  ← WRONG
+Master of Information Technology (Cyber Security)                    | Master's     | 6     | 50  | 60    | 169  ← WRONG
+Master of Information Technology (Software Application Development)  | Master's     | 6     | 50  | 60    | 169  ← WRONG
+Master of Project Management                                         | Master's     | 6     | 50  | 60    | 169  ← WRONG
+```
+
+Expected ASA Master's: IELTS 6.5 / PTE 58 / TOEFL 85.
+
+---
+
+## Why your fix didn't catch the bug
+
+You fixed the sibling cache bucket vote contamination. That's a real bug, but it isn't the bug producing this symptom.
+
+**Smoking gun:** I grepped the worker log for `sibling cache` lines from this scrape — zero matches. The sibling cache code path isn't even running on ASA. So fixing what's inside `_build_bucket_cache()` doesn't help here.
+
+The actual contamination path on ASA, based on the worker log:
+
+```
+[ 3/9] Fetching 3/9: Bachelor of Business Technology Management
+[FALLBACK] [per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FALLBACK] timeout: per-course browser exceeded 20s on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — moving on
+[EXTRACT ] [FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+```
+
+EVERY ASA course (UG and PG) hits the same path:
+1. Per-course browser fetch times out at 20s
+2. No per-course HTML data → no per-course English scores extracted
+3. AI fallback is invoked with `missing: ielts_overall, ...`
+4. AI returns SOMETHING for IELTS
+
+That AI "something" appears to be 6.0 for every course regardless of degree level. Either:
+- **(a)** AI is being given the central English page as context (which only renders Bachelor's scores), and AI applies that uniformly without checking course level, OR
+- **(b)** Some other layer (maybe a fallback/default English block) writes IELTS=6.0 / PTE=50 / TOEFL=60 / CAE=169 across the board, OR  
+- **(c)** AI is being prompted with a generic "ASA international requirement" string that's level-agnostic
+
+The consistency of the values (every course gets EXACTLY 6.0/50/60/169 — no variance, even on Master's where the extracted course context differs) strongly suggests this is hardcoded fallback or a level-blind central prompt, not actual AI extraction.
+
+---
+
+## What I want you to investigate
+
+1. **Trace the AI fallback path for English scores.** In the per-course pipeline, when the browser times out and AI enriching kicks in, what English-test data does the AI prompt include? Is the central English page text being passed in as context? If yes, that's the contamination source — it's level-agnostic by construction.
+
+2. **Check if there's a fallback function that writes IELTS=6.0 / PTE=50 / TOEFL=60 / CAE=169 when no per-course data is found.** The numbers are too consistent across UG and PG to be AI extraction. Smells like a default block.
+
+3. **Per-course AI prompt audit.** When the AI is asked for `missing: ielts_overall`, is the course's `degree_level` (or course name) included in the prompt? If the AI sees "extract IELTS for this URL" without level context, AND the only IELTS info available is the central page (Bachelor's), it'll always return 6.0.
+
+---
+
+## What needs to fix this
+
+The sibling cache fix you shipped was correct in principle — it just doesn't activate when sibling cache isn't reached. Consider:
+
+- **Level-aware AI fallback prompt** — when AI is filling a Master's course, include `degree_level=Master's` in the prompt and explicitly instruct it not to use Bachelor's-level scores from any context source
+- **Block central_page:english data from being used in AI fallback for cross-level courses** — same principle as the bucket vote fix, but applied at the AI prompt-construction layer
+- **OR: explicitly null IELTS/PTE/TOEFL when AI can't verify level-correct scores**, and let downstream consumers see NULL rather than wrong data. NULL is recoverable; wrong data is not.
+
+---
+
+## State on prod
+
+- 2 new ASA scrapes done with new code, both confirmed wrong
+- All other unis on hold (CSU, USQ, UTAS, Torrens, VIT)
+- Worker idle, no active jobs
+- Bug 2 ceilings (b6f7b67) — those work fine, scrape completed in 1.5 min, no overnight hang
+- degree_level normalization (e4eccf3 part 2) — that works fine, all new rows use canonical forms
+
+The bucket-vote fix in sibling_cache.py is fine to keep. Just not where the bug is.
+
+---
+
+## Validation
+
+Third PR in a row where "validation failed" was dismissed by you. **Please share what the validator actually flagged on this PR before pushing the next fix.** If it would have caught this issue, that's important to know.
+
+Thanks. Will pull and re-test when next fix lands.
