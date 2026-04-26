@@ -1,0 +1,1561 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Master of Education (with Specialisations)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Education (Teacher Librarianship)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Cyber Security
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,712/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Customs Administration
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$23,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Critical Care Paramedicine
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$38,480/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Communication (with Specialisations)
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Master	2 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Cloud Computing and Virtualisation
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,712/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Clinical Psychology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	2 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Clinical Exercise Physiology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Business Data Analytics
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$32,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Business Administration (with Specialisations)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,712/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Business Administration (Computing)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,720/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Arts (Theological Studies)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College, Canberra Campus	Online, On Campus	
+
+
+
+	
+Master of Applied Business (with Specialisations)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$34,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Agriculture (with Specialisations)
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$37,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Agricultural Science (with Specialisations)
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$37,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Ageing and Pastoral Studies
+Publish: review
+Eligibility: review
+62%	Master	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Ageing and Health
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Master of Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Master	1.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Cyber Security
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$35,712/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Theological Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul	Canberra Campus, United Theological College	On Campus, Online	
+
+
+
+	
+Graduate Diploma of Terrorism and Security Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Psychology
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$35,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Project Management and Leadership
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$33,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Project Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$35,720/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Pastoral Counselling
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Organisational Coaching and Leadership
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Midwifery
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Mathematics
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$34,480/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Mammography
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Diploma of Leadership and Management (Policing and Security)
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Investigations
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Intelligence Analysis
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Financial Crime
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$28,000/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Dental Implantology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Customs Administration
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$23,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Critical Care Paramedicine
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$38,480/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Clinical Practice (Paramedicine)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Business Data Analytics
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$32,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Applied Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Ageing and Pastoral Studies
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	2 years		6	50	-	-	-	Mar, Jul	Canberra Campus	On Campus, Online	
+
+
+
+	
+Graduate Diploma of Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Adult Language, Literacy and Numeracy
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Diploma of Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Wiradyuri Language
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	2 years		6	50	-	-	-	Mar	Dubbo Campus	Online	
+
+
+
+	
+Graduate Certificate in Theological Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul	United Theological College, Canberra Campus	Online, On Campus	
+
+
+
+	
+Graduate Certificate in Terrorism and Security Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,900/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Sustainable Agriculture
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$18,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Social and Organisational Leadership
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Project Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,860/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Professional Supervision (Pastoral)
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	United Theological College, Canberra Campus	Online	
+
+
+
+	
+Graduate Certificate in Professional Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Ornithology
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$18,760/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Organisational Coaching and Leadership
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Organisational Change
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Nursing (Rural and Remote Nursing)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,560/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Nursing (Leadership and Management)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,560/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Nursing (Clinical Education)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,560/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Nursing (Aged Care)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Nuclear Safeguards and Security
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Networking and Systems Administration
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,860/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Ministry
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Mathematics
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,240/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Learning and Teaching in Higher Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Graduate Certificate in Leadership in Human Services
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Leadership and Management (Policing and Security)
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,900/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Islamic Psychology
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Intersectionality, Diversity and Inclusion
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Intelligence Analysis
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,900/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Information Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$13,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Industrial Relations
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Human Resource Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Health Management and Leadership
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$14,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Geostatistics and Spatial Modelling
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$18,440/year	6	50	-	-	-	Mar, Jul, Nov	Albury-Wodonga Campus	On Campus	
+
+
+
+	
+Graduate Certificate in Gis and Remote Sensing
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$18,440/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Financial Crime
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$14,000/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Fish Conservation and Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$17,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Environmental Management
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$18,440/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Digital Communication
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul	Bathurst Campus	Online	
+
+
+
+	
+Graduate Certificate in Digital Archiving
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Data Management
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Cyber Security
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,856/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Customs Administration
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$11,760/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Critical Care Paramedicine
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$19,240/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Computing (Career Transition)
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,860/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Communication
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul	Bathurst Campus	Online	
+
+
+
+	
+Graduate Certificate in Cloud Computing and Virtualisation
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,860/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Case Management and Coordinated Care
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Business Data Analytics
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,856/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Business Administration (Computing)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,860/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Business Administration
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,856/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Audiovisual Archiving
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$13,520/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Applied Data Science
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Applied Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Applied Artificial Intelligence
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$17,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Agriculture
+Agriculture & Environmental Science
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Agricultural Business Management
+Business & Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Ageing and Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$13,960/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Graduate Certificate in Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Veterinary Studies
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Doctorate	4 years		6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Social Work
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$33,120/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Public Safety
+Publish: review
+Eligibility: review
+69%	Doctorate	4 years	A$33,680/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Philosophy (Science and Agriculture)
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$39,840/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Philosophy (Business, Justice and Behavioural Sciences)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Doctorate	3 years	A$40,320/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Philosophy (Arts and Education)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$33,120/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Doctor of Business Administration
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$34,640/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Diploma of Psychological Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Diploma of Health Science (Mental Health)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Diploma of Exercise Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Diploma of Environmental Studies
+Agriculture & Environmental Science
+Publish: review
+Eligibility: review
+69%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Diploma of Agricultural Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Wine Science
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$37,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Viticulture
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$37,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Veterinary Technology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Veterinary Biology/ Bachelor of Veterinary Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	6 years	A$72,080/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Theology (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College, Canberra Campus	On Campus, Online	
+
+
+
+	
+Bachelor of Theology
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Social Work
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Social Science (Psychology) (Honours)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	1 years	A$30,400/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Social Science (Psychology)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$31,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$36,480/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Psychology
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$30,400/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Policing and Public Safety
+Publish: review
+Eligibility: review
+62%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Policing (Investigations)
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$25,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Policing
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$25,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Podiatric Medicine
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Physiotherapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$40,400/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Pharmacy (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Paramedicine
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$37,120/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Oral Health (Therapy and Hygiene)
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$44,560/year	7	65	-	-	-	Mar, Jul, Nov	Holmesglen, Wagga Wagga Campus	On Campus	
+
+
+
+	
+Bachelor of Occupational Therapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$36,480/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Nursing
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$34,640/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Nuclear Science and Safety
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Medical Radiation Science (with Specialisations)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$38,000/year	6.5	58	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Medical Laboratory Science (Pathology)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$37,120/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Laws / Bachelor of Criminal Justice
+Law & Legal Studies
+Publish: review
+Eligibility: review
+69%	Bachelor	5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Laws
+Publish: review
+Eligibility: review
+62%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Islamic Studies
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$33,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Information Studies (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$27,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Human Services
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Horticulture
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$36,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Health and Medical Science
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Health Science (Mental Health)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Food Science and Nutrition
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$36,880/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Exercise and Sport Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Equine Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$37,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Environmental Science and Management
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$35,840/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Engineering (Honours)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$38,000/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Emergency Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$29,760/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Educational Studies
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Education (Technology and Applied Studies)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Education (Secondary) Industry Entry Program
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	2.5 years		7.5	79	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Education (Secondary) - Science
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Bachelor of Education (Secondary) - Pdhpe
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Wagga Wagga Campus, Bathurst Campus, Albury-Wodonga Campus, Port Macquarie Campus	On Campus	
+
+
+
+	
+Bachelor of Education (Secondary) - Mathematics
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Bachelor of Education (Secondary) - Hsie
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Bachelor of Education (Secondary) - English
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Bachelor of Education (Secondary) - Creative Arts
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Bachelor of Education (K - 12)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	4 years		7.5	79	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Education (Early Childhood and Primary)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$27,280/year	7.5	79	-	-	-	Mar	Bathurst Campus, Albury-Wodonga Campus, Port Macquarie Campus, Wagga Wagga Campus	On Campus	
+
+
+
+	
+Bachelor of Education (Birth to Five Years)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Bachelor	2 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Dental Science
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 years	A$72,240/year	7	65	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Criminology
+Law & Legal Studies
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$28,320/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Computer Science
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$28,640/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Communication
+Media & Communications
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$27,920/year	6	50	-	-	-	Mar, Jul	Bathurst Campus	Online, On Campus	
+
+
+
+	
+Bachelor of Clinical Science (Medicine) / Doctor of Medicine
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Doctorate	5 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Business Studies
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$33,120/year	6	50	-	-	-	Mar, Jul, Nov	Bathurst Campus, Yunnan Uni-Finance & Economics, Wagga Wagga Campus, Jilin Uni- Finance & Economics, Albury-Wodonga Campus, Port Macquarie Campus, Yangzhou University, Tianjin University of Commerce	On Campus, Online	
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$33,120/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Border Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 years	A$23,200/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Arts and Social Science (Honours)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Bachelor	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Animal Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$37,600/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Agriculture
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$37,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Agricultural Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 years	A$37,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Agricultural Business Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$37,040/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Adult and Vocational Education (with Specialisations)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Bachelor	2 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Bachelor of Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$32,000/year	6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
+	
+Associate Degree in Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Associate Degree	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	On Campus	
+
+
+
