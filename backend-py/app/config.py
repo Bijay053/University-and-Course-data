@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Scraping
-    max_browser_concurrency: int = 5
+    max_browser_concurrency: int = 10
     max_http_concurrency: int = 20
     per_uni_timeout_seconds: int = 1500
 

@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import ScrapeRuntimeJob, University
 from app.services.scraper.discovery import discover_course_links
@@ -798,7 +799,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # for.
             f"[TIMING] Total: {mins}m {secs}s | Courses: {course_count} "
             f"| Avg: {avg_per_course:.1f}s/course "
-            f"| Concurrency: HTTP={_MAX_PARALLEL_FETCH} Browser=3",
+            f"| Concurrency: HTTP={_MAX_PARALLEL_FETCH} Browser={settings.max_browser_concurrency}",
             phase="complete",
             elapsed_seconds=elapsed_sec,
             avg_seconds_per_course=avg_per_course,

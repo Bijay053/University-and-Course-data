@@ -1,0 +1,66 @@
+Per-course browser concurrency is currently 3. With 200-course unis like CSU, this means a full scrape takes 60+ minutes wall-clock even when each page renders in 5-10 seconds.
+
+Log evidence from CSU scrape (commit `edc05e20`):
+
+```
+[FALLBACK] [per-course browser ✓] https://study.csu.edu.au/courses/bachelor-education-primary  # rendered=1546527B (succeeded)
+[FALLBACK] [per-course browser ✓] https://study.csu.edu.au/courses/bachelor-accounting       # rendered=1509101B (succeeded)
+...
+[TIMING] Concurrency: HTTP=4 Browser=3
+```
+
+Browsers succeed quickly. The bottleneck is the concurrency cap, not the per-page time.
+
+## Fix
+
+Raise per-course browser concurrency from 3 to 10 (or whatever the prod box can handle without OOM).
+
+## Risk: RAM
+
+Playwright Chromium ~ 200MB per worker. 10 concurrent = ~2GB. The DigitalOcean droplet has plenty of headroom (current usage 13%, ~30GB RAM total), but please confirm before committing:
+
+```bash
+free -h
+# Aim for browser_concurrency * 250MB < (available_mem * 0.6)
+```
+
+If the box is constrained, 6 or 8 is fine. The exact number matters less than getting it off 3.
+
+## Validation
+
+After the change, fire CSU scrape:
+
+**Good:**
+```
+[TIMING] Total: 5m 30s | Courses: 200 | Avg: 1.6s/course | Concurrency: HTTP=4 Browser=10
+```
+
+**Bad:**
+```
+# OOM in journalctl, Playwright crashes, droplet swap thrashing
+```
+
+If bad, drop concurrency to 6 and re-test.
+
+## Why not other approaches
+
+- **Skip per-course extraction for CSU** — too uni-specific, becomes tech debt. The data-quality risk of skipping is higher than the speed gain.
+- **Disable Gemini after N zero-field returns** — too clever, hard to tune, hides genuine failures.
+- **Lower per-course timeout** — already balanced, breaking sites we just fixed.
+
+Concurrency is the lever. It's one constant in one file.
+
+## Constraints
+
+- Single small PR, just the constant
+- Don't bundle with anything else (CSU fee parser, Gemini telemetry, etc.)
+- Don't change other extractor concurrency — just the per-course browser pool
+
+## State on prod
+
+- Code: `edc05e20`
+- ASA: ✓ 9 courses in 2m 49s (already fast, has central caches)
+- KBS: ✓ 29 courses in 7m 27s (slower because more pages)
+- CSU: 200 courses currently 60+ min projected; cancelled and doing manually tonight
+
+Speed fix needed for CSU and any future 200+ course universities (USQ likely similar).
