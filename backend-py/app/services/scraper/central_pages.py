@@ -332,8 +332,134 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
 
 
 # ---------------------------------------------------------------------------
-# English-requirements parser
+# English-requirements parser — flat + level-aware
 # ---------------------------------------------------------------------------
+
+# Matches headings that introduce an undergraduate or postgraduate section.
+# Used to split central requirements pages that publish separate rows per
+# degree level (e.g. ASA's /policies-and-forms page).
+_LEVEL_HEADING_RE = re.compile(
+    r"\b(undergraduate|postgraduate|under\s*grad(?:uate)?|post\s*grad(?:uate)?)\b",
+    re.IGNORECASE,
+)
+
+
+async def _parse_english_by_level_async(
+    html: str, page_url: str
+) -> dict[str, dict[str, Any]]:
+    """Parse a central English requirements page into per-level buckets.
+
+    Looks for ``Undergraduate`` / ``Postgraduate`` heading words in the
+    plain-text rendering of *html* and runs the english_test extractor on
+    the text window that follows each heading.  Returns a dict keyed by
+    ``"undergraduate"`` and/or ``"postgraduate"`` — each value is a flat
+    slot dict identical to what :func:`_parse_english_page_html_async`
+    returns.
+
+    Returns ``{}`` when no level headings are detected.
+    """
+    try:
+        from app.services.scraper.extractors import english_test
+
+        text = html_to_text(html)
+        matches = list(_LEVEL_HEADING_RE.finditer(text))
+        if not matches:
+            return {}
+
+        out: dict[str, dict[str, Any]] = {}
+        for idx, m in enumerate(matches):
+            raw_level = m.group(1).lower()
+            bucket = "undergraduate" if "under" in raw_level else "postgraduate"
+            # Take the text from this heading to just before the next heading
+            # (or the next 2 000 chars if there is none) so the extractor
+            # doesn't bleed into an adjacent level's section.
+            seg_start = m.start()
+            seg_end = (
+                matches[idx + 1].start() if idx + 1 < len(matches) else seg_start + 2_000
+            )
+            chunk = text[seg_start:seg_end]
+
+            results = await english_test.extract(chunk, page_url)
+            vals: dict[str, Any] = {}
+            for r in results:
+                if r.normalized:
+                    for k, v in r.normalized.items():
+                        if k in _ENGLISH_SLOTS and v not in (None, "", 0):
+                            vals.setdefault(k, v)
+
+            if vals:
+                # If the same level heading appears twice, keep the first hit.
+                if bucket not in out:
+                    out[bucket] = vals
+                else:
+                    for k, v in vals.items():
+                        out[bucket].setdefault(k, v)
+
+        return out
+    except Exception as exc:
+        log.warning(
+            "central_pages: level-aware english parse failed on %s: %s", page_url, exc
+        )
+        return {}
+
+
+async def _fetch_english_with_browser(url: str) -> str | None:
+    """Fetch an English-requirements page using Playwright.
+
+    Used when ``central_english_pg_skip`` is True — which signals that the
+    page JS-renders its postgraduate section (plain HTTP only exposes the UG
+    row).  Browser-first with plain-HTTP fallback.
+
+    Hard 60 s wall-clock timeout on the browser block prevents pool exhaustion
+    on servers that accept the TCP handshake but never send data.
+    """
+    import asyncio as _asyncio
+
+    async def _browser_fetch() -> str | None:
+        from app.services.scraper.browser_pool import pool as browser_pool
+
+        async with browser_pool.page() as page:
+            await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
+            # Give JS time to render the requirements table.
+            await page.wait_for_timeout(3_000)
+            rendered = await page.content()
+            if rendered and len(rendered) > 1_000:
+                return rendered
+        return None
+
+    try:
+        rendered = await _asyncio.wait_for(_browser_fetch(), timeout=60)
+        if rendered:
+            log.info(
+                "central_pages: browser fetch for english page OK (%s, %d bytes)",
+                url,
+                len(rendered),
+            )
+            return rendered
+    except _asyncio.TimeoutError:
+        log.warning(
+            "central_pages: browser fetch for english page timed out (60 s) — %s", url
+        )
+    except Exception as exc:
+        log.warning(
+            "central_pages: browser fetch for english page failed (%s): %s", url, exc
+        )
+
+    # Plain-HTTP fallback — returns the UG-only static HTML at minimum.
+    try:
+        html = await fetch_html(url)
+        log.info(
+            "central_pages: HTTP fallback for english page (%s, %d chars)",
+            url,
+            len(html or ""),
+        )
+        return html
+    except Exception as exc:
+        log.warning(
+            "central_pages: HTTP fallback for english page failed (%s): %s", url, exc
+        )
+        return None
+
 
 def _parse_english_page_html(html: str, page_url: str) -> dict[str, Any]:
     """Run the existing english_test extractor on a central requirements page.
@@ -570,25 +696,59 @@ async def prefetch_central_pages(
                 )
 
     # ── Fetch English-requirements page ────────────────────────────────────
-    # IMPORTANT: use plain HTTP only — no Playwright fallback.
-    # The entryPage/requirementsPage never needs browser rendering because
-    # English requirement tables are always in static HTML.  Passing it
-    # through _fetch_with_browser_fallback() would check for "fee signals",
-    # find none (it's not a fee page), and launch Playwright — which can
-    # hang for hours blocking the entire Celery worker.
+    # Default: plain HTTP only, bounded at 45 s.  Some servers (ASA, etc.)
+    # accept the TCP handshake but never send data — the wait_for cap
+    # ensures a single slow host can't stall the Celery worker.
     #
-    # Hard ceiling: some servers (ASA, etc.) accept the TCP connection but
-    # never send data, causing httpx's per-chunk read timeout to never fire.
-    # Wrap in asyncio.wait_for so a single slow host can't stall the job.
+    # Level-aware fetch path: when ``central_english_pg_skip`` is True the
+    # page JS-renders its postgraduate section (plain HTTP exposes only the
+    # UG row).  We use the browser to render the full page, then run both the
+    # flat extractor (for backward compat) and the new level-aware extractor.
+    # The level-keyed dict is stored in ``result["english_by_level"]`` and
+    # consumed by single_course.py to apply the correct values per degree
+    # level instead of falling back to the "same for all" flat dict.
+    _use_browser_for_english = bool(scrape_config.get("central_english_pg_skip", False))
+
     if english_url and not english_url.endswith(".pdf"):
         try:
-            eng_html = await asyncio.wait_for(
-                fetch_html(english_url),
-                timeout=45,
-            )
+            if _use_browser_for_english:
+                # Hard 75 s outer cap — the inner browser fetch has its own
+                # 60 s guard so the total wall time is bounded.
+                eng_html = await asyncio.wait_for(
+                    _fetch_english_with_browser(english_url),
+                    timeout=75,
+                )
+            else:
+                eng_html = await asyncio.wait_for(
+                    fetch_html(english_url),
+                    timeout=45,
+                )
             if eng_html:
+                # Flat parse — first-seen value wins (typically UG for ASA).
                 english_vals = await _parse_english_page_html_async(eng_html, english_url)
                 result["english"] = english_vals
+
+                # Level-aware parse — only meaningful when the browser
+                # rendered a page with separate UG / PG sections.
+                if _use_browser_for_english:
+                    by_level = await _parse_english_by_level_async(eng_html, english_url)
+                    if by_level:
+                        result["english_by_level"] = by_level
+                        if emit:
+                            _level_summary = "; ".join(
+                                f"{lvl}: "
+                                + ", ".join(f"{k}={v}" for k, v in sorted(vals.items()))
+                                for lvl, vals in sorted(by_level.items())
+                            )
+                            await emit(
+                                "status",
+                                f"[CENTRAL] english by level → {_level_summary}",
+                                phase="discover",
+                                kind="central_english_by_level",
+                                values=by_level,
+                                url=english_url,
+                            )
+
                 if emit:
                     slots_found = ", ".join(
                         f"{k}={v}" for k, v in sorted(english_vals.items())

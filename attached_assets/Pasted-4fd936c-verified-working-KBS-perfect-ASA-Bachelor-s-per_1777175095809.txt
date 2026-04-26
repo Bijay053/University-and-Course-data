@@ -1,0 +1,103 @@
+4fd936c verified working. KBS perfect, ASA Bachelor's perfect, ASA Master's NULL (as designed by the per-uni skip flag).
+
+Now need the proper fix for ASA Master's English scores. Currently 4 rows show NULL/NULL/NULL in UI. Should show 6.5 / 58 / 85 / 169 (CAE).
+
+---
+
+## Source of truth
+
+ASA's central English requirements page: http://asahe.edu.au/policies-and-forms
+
+The page renders TWO tables (visible in browser, NOT in static HTML):
+- Undergraduate: IELTS 6.0, PTE 50, TOEFL 60, CAE 169
+- Postgraduate: IELTS 6.5, PTE 58, TOEFL 85, CAE 169
+
+The Postgraduate row is rendered by JavaScript. `httpx`-style static fetch sees only the UG row. That's why `central_english_pg_skip: true` is required for ASA — to prevent contamination.
+
+Per-course pages (e.g., `/courses/master-of-project-management`) likely also render the Master's English block via JavaScript.
+
+---
+
+## What worked accidentally this morning
+
+During the window when the `_asyncio` typo was breaking central English fetch, vision OCR was the only English source available. It caught the correct 6.5/58/85 values for ASA Master's courses. UI confirmed correct values. Worker log:
+
+```
+[per-course vision img 1/5] .../master-of-project-management — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=176.0
+```
+
+After the typo was fixed, central page fetch started working again, and vision OCR ordering changed in a way that broke detection. Latest scrape log shows vision OCR returning empty:
+
+```
+[per-course vision img 0/6] .../master-of-project-management
+```
+
+0/6 means "0 fields extracted from 6 images." Compared to the working window where it was `1/5` or `2/6`. Same code path, different result.
+
+---
+
+## Hypothesis
+
+Vision OCR runs against per-course page screenshots. When central page fetch FAILED, vision was given fresh screenshots that included the JS-rendered English block. When central page fetch SUCCEEDS, perhaps:
+- Screenshot timing is faster (less wait time before screenshot)
+- The English block hasn't rendered when the screenshot is taken
+- A different page region is being captured
+- Browser context is reused/cached differently
+
+Something about the page-load -> screenshot -> OCR pipeline is timing-sensitive on ASA.
+
+---
+
+## What I want
+
+Reliable extraction of ASA Master's 6.5/58/85/169 values on every scrape. Three approaches in order of preference:
+
+**Option A (preferred): browser-render the central English page.** The PG-skip flag works around the static HTML limitation. The proper fix is to use the browser fallback path for ASA's central English page (just like per-course pages use it). Then `_parse_english_page_html_async` would see both UG and PG tables. Once central page returns level-keyed data (`undergraduate: {ielts:6, pte:50, toefl:60}`, `postgraduate: {ielts:6.5, pte:58, toefl:85}`), the PG-skip flag becomes obsolete — use the right value for each course's level.
+
+**Option B: fix vision OCR timing on ASA.** Investigate why `0/6` returns when the working pattern was `1-2/6`. Likely a screenshot-timing bug. Add a `wait_for_load_state("networkidle")` or `wait_for_selector` for an English-table element before screenshot. If you can reproduce the working window's behavior reliably, ASA Master's gets correct values without needing browser-rendering of the central page.
+
+**Option C: per-uni hardcoded override.** As a last resort if neither A nor B works, allow `scrape_config.english_overrides` to set per-level values directly:
+```
+{
+  "english_overrides": {
+    "postgraduate": { "ielts": 6.5, "pte": 58, "toefl": 85, "cambridge": 169 }
+  }
+}
+```
+This is brittle (manual maintenance) but guaranteed correct. Use only if the JS-rendered page can't be reliably extracted.
+
+A is the right architectural fix. B is the targeted bug-fix. C is the escape hatch.
+
+---
+
+## Validation criteria for the next PR
+
+After your fix, an ASA scrape should produce:
+```
+Bachelor's:  IELTS 6.0  PTE 50  TOEFL 60  CAE 169
+Master's:    IELTS 6.5  PTE 58  TOEFL 85  CAE 169
+```
+
+If option A is taken, the `central_english_pg_skip: true` flag on ASA's `scrape_config` can be removed (or left, the flag becomes a no-op when level-keyed data is available).
+
+---
+
+## Diagnostic data already in worker log
+
+The last 3 ASA scrapes are in `journalctl -u uni-celery`. Search for:
+- `per-course vision img` lines on `master-of-*` URLs — shows whether OCR succeeded
+- `[CENTRAL] english page parsed → no values` — confirms central page returns nothing
+- `[PG-SKIP ✗]` lines — confirms the skip is firing on PG courses
+
+---
+
+## State on prod
+
+- Code: `4fd936c`
+- ASA scrape_config: `{central_english_pg_skip: true}`
+- ASA Bachelor's: correct (6/50/60/169)
+- ASA Master's: NULL/NULL/NULL/169 — need 6.5/58/85/169
+- KBS: not affected, all correct
+- Worker idle
+
+No SQL changes anticipated for this PR. The flag stays as-is unless you take Option A and decide to retire it.

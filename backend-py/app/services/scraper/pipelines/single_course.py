@@ -664,25 +664,32 @@ async def extract_course(
                         )
 
             # ── English-requirements fallback ────────────────────────────
-            # PG-skip: some universities JS-render only the undergraduate row
-            # of their English requirements page.  When fetched via plain HTTP
-            # (no browser), the extracted values reflect UG requirements only
-            # (e.g. IELTS 6.0) — applying them to Master's courses is wrong.
+            # Two data paths, in priority order:
             #
-            # This is per-university opt-in via scrape_config:
-            #   "central_english_pg_skip": true
-            # Default false — apply central English values to ALL degree levels.
-            # Set to true only for universities where the static HTML omits PG
-            # scores (confirmed: ASA entryPage).  KBS and most others publish a
-            # single requirement set that applies to all levels.
+            # Path 1 — level-keyed data (``english_by_level``): populated when
+            #   ``central_english_pg_skip`` is True and the English page was
+            #   browser-rendered.  Contains separate dicts for "undergraduate"
+            #   and "postgraduate".  Apply the bucket that matches this course's
+            #   degree_level.  No skip needed — the values are already correct.
+            #
+            # Path 2 — flat data (``english``): populated for all universities.
+            #   For universities where the central page is level-uniform (KBS,
+            #   most others) this is the right value for every course.
+            #   For ASA-style pages it reflects UG-only values (6.0/50/60/169);
+            #   applying them to PG courses is wrong, hence the pg_skip flag.
             _course_dl = (payload.get("degree_level") or "").strip()
-            _pg_skip_configured = bool(central_data.get("central_english_pg_skip", False))
-            _skip_central_english = (
-                _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+            _english_by_level: dict = central_data.get("english_by_level") or {}
+            _level_bucket = (
+                "postgraduate"
+                if _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+                else "undergraduate"
             )
-            if _central_english and not _skip_central_english:
+            _level_english: dict = _english_by_level.get(_level_bucket) or {}
+
+            # Path 1: level-specific values available — use them unconditionally.
+            if _level_english:
                 _eng_filled: list[str] = []
-                for _k, _v in _central_english.items():
+                for _k, _v in _level_english.items():
                     if _v in (None, "", 0):
                         continue
                     if payload.get(_k) not in (None, "", 0):
@@ -691,8 +698,8 @@ async def extract_course(
                     evidence.append({
                         "field_key": _k,
                         "value": _v,
-                        "confidence": 0.50,
-                        "method": "central_page:english",
+                        "confidence": 0.55,
+                        "method": "central_page:english_level",
                         "snippet": _central_eng_url,
                     })
                     _eng_filled.append(_k)
@@ -704,47 +711,91 @@ async def extract_course(
                     await emit(
                         "status",
                         f"[CENTRAL ✓] {payload.get('course_name', url)[:40]} — "
-                        f"english from central page: {_scores}",
+                        f"english ({_level_bucket}) from central page: {_scores}",
                         phase="fallback",
-                        kind="central_english_applied",
+                        kind="central_english_level_applied",
                         url=url,
+                        bucket=_level_bucket,
                         filled=_eng_filled,
                     )
-            elif _central_english and _skip_central_english and emit:
-                await emit(
-                    "status",
-                    f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
-                    f"central english skipped for PG level ({_course_dl or 'unknown'}): "
-                    f"central_english_pg_skip=true in scrape_config",
-                    phase="fallback",
-                    kind="central_english_skipped_pg",
-                    url=url,
-                    degree_level=_course_dl,
+
+            # Path 2: fall back to flat values when no level-keyed data exists.
+            else:
+                _pg_skip_configured = bool(
+                    central_data.get("central_english_pg_skip", False)
                 )
+                _skip_central_english = (
+                    _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
+                )
+                if _central_english and not _skip_central_english:
+                    _eng_filled = []
+                    for _k, _v in _central_english.items():
+                        if _v in (None, "", 0):
+                            continue
+                        if payload.get(_k) not in (None, "", 0):
+                            continue
+                        payload[_k] = _v
+                        evidence.append({
+                            "field_key": _k,
+                            "value": _v,
+                            "confidence": 0.50,
+                            "method": "central_page:english",
+                            "snippet": _central_eng_url,
+                        })
+                        _eng_filled.append(_k)
+                    if emit and _eng_filled:
+                        _scores = " ".join(
+                            f"{k.replace('_overall', '')}={payload.get(k)}"
+                            for k in _eng_filled
+                        )
+                        await emit(
+                            "status",
+                            f"[CENTRAL ✓] {payload.get('course_name', url)[:40]} — "
+                            f"english from central page: {_scores}",
+                            phase="fallback",
+                            kind="central_english_applied",
+                            url=url,
+                            filled=_eng_filled,
+                        )
+                elif _central_english and _skip_central_english and emit:
+                    await emit(
+                        "status",
+                        f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
+                        f"central english skipped for PG level ({_course_dl or 'unknown'}): "
+                        f"no level-keyed data, pg_skip=true",
+                        phase="fallback",
+                        kind="central_english_skipped_pg",
+                        url=url,
+                        degree_level=_course_dl,
+                    )
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)
 
-        # ── PG English clear-out ──────────────────────────────────────────────
-        # When `central_english_pg_skip` is True for a university, the central
-        # English page is fetched via plain HTTP and only the undergraduate row
-        # is visible (the PG row is JS-rendered).  Any English scores that
-        # landed in the payload for PG courses — whether from vision OCR, the
-        # AI fallback, a HTML extractor, or sibling-cache propagation — are
-        # equally unreliable: they reflect the same UG-only static HTML, not
-        # the actual PG requirement.
+        # ── PG English clear-out (safety net) ────────────────────────────────
+        # When ``central_english_pg_skip`` is True AND the browser fetch did
+        # not return reliable level-keyed PG data (``english_by_level``
+        # missing or has no "postgraduate" entry), any English scores that
+        # landed in the payload are unreliable.  NULL is honest and
+        # recoverable; a silently-wrong 6.0 for a Master's that requires
+        # 6.5 is neither.
         #
-        # This clear-out runs AFTER all extractors (vision OCR, AI, PDF) have
-        # already written to the payload, so it is the definitive last word.
-        # NULL is honest and recoverable; a silently-wrong 6.0 for a Master's
-        # that requires 6.5 is neither.
+        # When the browser DID return level-keyed data and Path 1 applied
+        # the correct PG values above, this block is skipped — the values
+        # are already right and should not be cleared.
         #
-        # The clear-out fires independently of whether an English URL was
-        # configured — the flag alone is sufficient because it means "no
-        # reliable PG English source exists for this university".
+        # This runs AFTER all extractors have settled (including vision OCR
+        # and sibling-cache backfill) so it is the definitive last word.
         _pg_skip_final = bool(central_data.get("central_english_pg_skip", False))
         _pg_dl_final = (payload.get("degree_level") or "").strip()
-        if _pg_skip_final and _pg_dl_final in _CENTRAL_ENGLISH_PG_LEVELS:
+        _pg_has_level_data = bool(
+            (central_data.get("english_by_level") or {}).get("postgraduate")
+        )
+        if (
+            _pg_skip_final
+            and not _pg_has_level_data
+            and _pg_dl_final in _CENTRAL_ENGLISH_PG_LEVELS
+        ):
             _cleared: list[str] = []
             for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall"):
                 if payload.get(_slot) not in (None, "", 0):
@@ -755,7 +806,7 @@ async def extract_course(
                     "status",
                     f"[PG-SKIP ✗] {payload.get('course_name', url)[:40]} — "
                     f"nulled english for PG ({_pg_dl_final}): "
-                    f"{', '.join(_cleared)} (central_english_pg_skip=true)",
+                    f"{', '.join(_cleared)} (no level-keyed data from browser)",
                     phase="fallback",
                     kind="pg_english_cleared",
                     url=url,
