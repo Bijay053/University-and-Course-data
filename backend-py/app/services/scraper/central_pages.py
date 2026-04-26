@@ -26,6 +26,7 @@ a generic fee table).
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import Any
@@ -565,7 +566,7 @@ async def prefetch_central_pages(
     # Wrap in asyncio.wait_for so a single slow host can't stall the job.
     if english_url and not english_url.endswith(".pdf"):
         try:
-            eng_html = await _asyncio.wait_for(
+            eng_html = await asyncio.wait_for(
                 fetch_html(english_url),
                 timeout=45,
             )

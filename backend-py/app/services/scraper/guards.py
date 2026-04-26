@@ -85,6 +85,10 @@ _GENERIC_CATEGORY_NAMES = frozenset(
         "digital badges",
         "on demand short courses",
         "short courses",
+        # KBS MBA specialisation listing page — not a real course.
+        # URL: /courses/mba-master-of-business-administration/two-specialisations
+        "two specialisations",
+        "two specializations",
     }
 )
 

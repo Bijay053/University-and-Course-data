@@ -1,0 +1,105 @@
+Three regressions from the last few commits. All confirmed on KBS scrape job that just completed (35 courses, 30 staged).
+
+---
+
+## Bug A: `_asyncio` typo — English page fetch broken on every uni
+
+Worker log on EVERY scrape now:
+
+```
+[CENTRAL] english page fetch failed (https://www.kbs.edu.au/admissions/entry-requirements/english-entry-requirements): name '_asyncio' is not defined
+[CENTRAL] english page fetch failed (http://asahe.edu.au/policies-and-forms): name '_asyncio' is not defined
+```
+
+This was introduced in commit `b6f7b67` (the Bug 2 hang ceiling commit) when you added `asyncio.wait_for()` around the English page fetch in `central_pages.py`. Looks like there's a typo — `_asyncio` instead of `asyncio` somewhere, or a missing `import asyncio`.
+
+**Effect:** The central English page never gets fetched. No central English data available. Every course falls through to AI fallback for English scores, and AI returns nothing usable. Result: all KBS courses staged with NO IELTS/PTE/TOEFL/CAE values.
+
+**Fix:** Find the `_asyncio` reference in `central_pages.py` and change to `asyncio` (or fix the missing import).
+
+---
+
+## Bug B: KBS MBA specialisation names stripped of "MBA –" prefix
+
+**Old (correct) names that were working last week:**
+```
+MBA – Project Management
+MBA – Digital Management
+MBA – International Leadership
+MBA – Health Services Management
+MBA – Tourism and Hospitality Leadership
+MBA – (Women in Leadership)
+MBA – Data-driven Leadership
+```
+
+**New (broken) names being staged today:**
+```
+Project Management
+Digital Management
+International Leadership
+Health Services Management
+Tourism And Hospitality Leadership
+Women In Leadership
+Data Driven Leadership
+```
+
+The "MBA –" prefix is being stripped at staging time. The worker log proves the correct name exists during extraction:
+
+```
+[CENTRAL ✓] MBA – Digital Management — fee from 'Graduate Certificate in Business Administration' row
+[CATEGORY det] MBA – Digital Management → Business & Management / MBA
+```
+
+But staging writes `Digital Management`. So the name is correct internally, then truncated when written to DB.
+
+**Likely culprit:** Recent course_name extractor changes (commits `4d72717` filter two-specialisations URL + fix MBA specialisation names, or `ff46d04` sub_category mappings). Something in the title-tag-based name extraction is re-extracting from the URL slug or title and discarding the MBA prefix.
+
+**Fix:** Preserve the `MBA –` prefix in the staged course_name. The extracted name (with prefix) should win over any URL-derived shorter name.
+
+---
+
+## Bug C: "Two Specialisations" passing staging filter
+
+It's getting staged as a course. It's a category landing page, not a course.
+
+```
+[STAGE] saved: Two Specialisations          ← should be rejected
+[STAGE] skipped English For Academic Purposes: rejected: category_landing_page
+[STAGE] skipped Non Award Single Subject Enrolment: rejected: category_landing_page
+[STAGE] skipped It Specialisations System Requirements: rejected: category_landing_page
+[STAGE] skipped Study Abroad Program: rejected: category_landing_page
+```
+
+Four other category pages got correctly rejected. "Two Specialisations" slipped through. URL: `https://www.kbs.edu.au/courses/mba-master-of-business-administration/two-specialisations`
+
+**Fix:** Add to the `category_landing_page` rejection rules. Either by URL pattern (`/two-specialisations`) or by content signature (it's the page that says "choose two specialisations from the list below" — not a course).
+
+---
+
+## Side observation — might inform Bug A fix
+
+KBS sibling cache log on every scrape now says:
+
+```
+[sibling cache ↻ build unknown] ielts_overall=6.0
+[sibling cache ↻ backfill unknown] 3 slot(s) filled across siblings
+```
+
+`build unknown` means level routing isn't reading `degree_level` correctly for KBS courses. Every course is going into the "unknown" bucket regardless of its actual `Master's` / `Bachelor's` / `Diploma` etc. value. This may be related to Bug A (no central English data → nothing to vote with) but it's also possible the level lookup itself is broken for KBS specifically.
+
+Worth checking when you fix Bug A.
+
+---
+
+## What I want
+
+**Single focused PR.** Fix Bug A (typo — trivial), Bug B (MBA names — small), Bug C (filter rule — small). Don't touch fees, sub_category, sibling cache, or anything else.
+
+Please share validator output on this PR if it flags anything. Last 3 dismissals were one specific issue; want to know if this PR's validator catches anything different.
+
+## State on prod
+
+- ASA fix from earlier (commit `43380d8`) verified working — Master's IELTS=6.5, Bachelor's=6.0, distinct.
+- KBS scrape just completed, 30 rows staged, all wrong as described above.
+- Worker idle, all other unis on hold.
+- Ticket 2 (regression-test architecture) coming after this verifies. The pattern of new fixes breaking other unis is exactly why we need golden fixtures.

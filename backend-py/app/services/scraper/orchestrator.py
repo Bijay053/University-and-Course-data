@@ -227,7 +227,14 @@ async def _extract_only(
         )
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
-    return {"name": name, "url": url, **out}
+    # Prefer the course_name the extractor produced (e.g. "MBA – Digital
+    # Management") over the discovery-phase slug-derived name (e.g.
+    # "Digital Management").  The extractor has access to the page's H1,
+    # <title>, and URL-based MBA-prefix logic; the discovery name is a
+    # best-effort slug decode that can never reconstruct the prefix.
+    extracted_name = ((out.get("payload") or {}).get("course_name") or "").strip()
+    final_name = extracted_name if extracted_name else name
+    return {"name": final_name, "url": url, **out}
 
 
 async def _clear_stale_dedup(
