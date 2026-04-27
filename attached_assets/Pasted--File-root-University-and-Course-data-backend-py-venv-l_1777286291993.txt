@@ -1,0 +1,1033 @@
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+[1] 665633
+[2] 665634
+root      665633  5.0  0.3  38268 27784 pts/0    S    09:29   0:00 venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info
+root      665634 41.0  1.3 134152 106852 pts/0   S    09:29   0:01 venv/bin/python3.12 venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10
+nohup: ignoring input
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started parent process [665633]
+INFO:     Started server process [665637]
+INFO:     Waiting for application startup.
+INFO:uniportal:Python backend starting up (debug=False)
+INFO:     Application startup complete.
+INFO:     Started server process [665638]
+INFO:     Waiting for application startup.
+INFO:uniportal:Python backend starting up (debug=False)
+INFO:     Application startup complete.
+root@university-and-course-data:~/University-and-Course-data/backend-py# tail -f /var/log/fastapi.log
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1982, in create_connection
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+
+
+^C
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data && git fetch origin && git reset --hard origin/main && \
+cd backend-py && \
+pkill -f uvicorn; pkill -f "venv/bin/celery"; sleep 2 && \
+PYTHONPATH=. nohup venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info > /var/log/fastapi.log 2>&1 & \
+PYTHONPATH=. nohup venv/bin/python3.12 venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10 > /var/log/celery.log 2>&1 &
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+[3] 665703
+[4] 665704
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+
+# Find the .env file
+ls -la .env* ../.env* 2>/dev/null
+
+# Check how the original processes were started
+cat /etc/rc.local 2>/dev/null || true
+ls /etc/supervisor/conf.d/ 2>/dev/null || true
+ls /etc/systemd/system/*.service 2>/dev/null | head -10 || true
+[1]   Done                    PYTHONPATH=. nohup venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info > /var/log/fastapi.log 2>&1
+[2]   Done                    PYTHONPATH=. nohup venv/bin/python3.12 venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10 > /var/log/celery.log 2>&1
+-rw-r--r-- 1 root root  55 Apr 21 07:08 ../.env
+-rw-r--r-- 1 root root 250 Apr 21 05:39 ../.env.example
+-rw------- 1 root root 470 Apr 23 11:26 .env
+-rw-r--r-- 1 root root 505 Apr 23 11:07 .env.example
+/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
+/etc/systemd/system/dbus-org.freedesktop.resolve1.service
+/etc/systemd/system/dbus-org.freedesktop.timesync1.service
+/etc/systemd/system/do-agent.service
+/etc/systemd/system/droplet-agent.service
+/etc/systemd/system/iscsi.service
+/etc/systemd/system/redis.service
+/etc/systemd/system/syslog.service
+/etc/systemd/system/uni-api-py.service
+/etc/systemd/system/uni-celery.service
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+
+# Kill current broken processes
+pkill -f uvicorn; pkill -f "venv/bin/celery"; sleep 2
+
+# Source the .env file (adjust path if different)
+set -a && source .env && set +a
+
+# Start FastAPI
+PYTHONPATH=. nohup venv/bin/python -m uvicorn app.main:app \
+  --host 127.0.0.1 --port 8000 --workers 2 \
+  --access-log --log-level info \
+  > /var/log/fastapi.log 2>&1 &
+
+# Start Celery
+PYTHONPATH=. nohup venv/bin/python3.12 venv/bin/celery \
+  -A app.tasks.celery_app worker \
+  --pool=solo --loglevel=info --max-tasks-per-child=10 \
+  > /var/log/celery.log 2>&1 &
+
+sleep 3 && tail -5 /var/log/fastapi.log
+[3]-  Done                    sleep 2 && PYTHONPATH=. nohup venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log-level info > /var/log/fastapi.log 2>&1
+[4]+  Done                    PYTHONPATH=. nohup venv/bin/python3.12 venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10 > /var/log/celery.log 2>&1
+[1] 665753
+[2] 665754
+[2]+  Exit 2                  PYTHONPATH=. nohup venv/bin/python3.12 venv/bin/celery -A app.tasks.celery_app worker --pool=solo --loglevel=info --max-tasks-per-child=10 > /var/log/celery.log 2>&1
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+root@university-and-course-data:~/University-and-Course-data/backend-py# systemctl restart uni-api-py uni-celery
+sleep 3
+systemctl status uni-api-py uni-celery --no-pager
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-04-27 09:34:04 UTC; 3s ago
+   Main PID: 665864 (python)
+      Tasks: 8 (limit: 9483)
+     Memory: 150.4M (peak: 150.6M)
+        CPU: 2.991s
+     CGroup: /system.slice/uni-api-py.service
+             ├─665864 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --log…
+             ├─665865 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─665866 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_han…
+             └─665867 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_han…
+
+Apr 27 09:34:04 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-04-27 09:34:05 UTC; 3s ago
+   Main PID: 665872 (celery)
+      Tasks: 1 (limit: 9483)
+     Memory: 77.9M (peak: 78.2M)
+        CPU: 1.232s
+     CGroup: /system.slice/uni-celery.service
+             └─665872 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery…
+
+Apr 27 09:34:05 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data && git fetch origin && git reset --hard origin/main
+systemctl restart uni-api-py uni-celery
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data && git fetch origin && git reset --hard origin/main
+systemctl restart uni-api-py uni-celery
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+root@university-and-course-data:~/University-and-Course-data# # Check FastAPI service logs for errors
+journalctl -u uni-api-py -n 50 --no-pager
+
+# Also check if nginx is running and proxying correctly
+systemctl status nginx --no-pager
+tail -20 /var/log/nginx/error.log 2>/dev/null
+Apr 27 09:31:15 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:20 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 17.
+Apr 27 09:31:20 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:20 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:20 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:25 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 18.
+Apr 27 09:31:25 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:26 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:26 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:31 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 19.
+Apr 27 09:31:31 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:31 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:31 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:36 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 20.
+Apr 27 09:31:36 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:36 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:36 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:41 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 21.
+Apr 27 09:31:41 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:41 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:41 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:46 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 22.
+Apr 27 09:31:46 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:47 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:47 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:52 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 23.
+Apr 27 09:31:52 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:31:52 university-and-course-data systemd[1]: uni-api-py.service: Main process exited, code=exited, status=1/FAILURE
+Apr 27 09:31:52 university-and-course-data systemd[1]: uni-api-py.service: Failed with result 'exit-code'.
+Apr 27 09:31:57 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 24.
+Apr 27 09:31:57 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:33:15 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 27 09:33:15 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.298s CPU time.
+Apr 27 09:33:21 university-and-course-data systemd[1]: uni-api-py.service: Scheduled restart job, restart counter is at 25.
+Apr 27 09:33:21 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:04 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 27 09:34:04 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 27 09:34:04 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:04 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.667s CPU time.
+Apr 27 09:34:04 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:13 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 27 09:34:13 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 27 09:34:13 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:13 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.076s CPU time, 150.6M memory peak, 0B memory swap peak.
+Apr 27 09:34:13 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:47 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 27 09:34:48 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 27 09:34:48 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 27 09:34:48 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.256s CPU time.
+Apr 27 09:34:48 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-04-23 06:28:01 UTC; 4 days ago
+       Docs: man:nginx(8)
+   Main PID: 448991 (nginx)
+      Tasks: 5 (limit: 9483)
+     Memory: 9.2M (peak: 20.1M)
+        CPU: 10.429s
+     CGroup: /system.slice/nginx.service
+             ├─448991 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             ├─505680 "nginx: worker process"
+             ├─505681 "nginx: worker process"
+             ├─505682 "nginx: worker process"
+             └─505683 "nginx: worker process"
+
+Apr 23 11:58:21 university-and-course-data systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Apr 23 11:58:21 university-and-course-data nginx[494174]: 2026/04/23 11:58:21 [notice] 494174#494174: signal process started
+Apr 23 11:58:21 university-and-course-data systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+Apr 24 01:19:51 university-and-course-data systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Apr 24 01:19:51 university-and-course-data nginx[505677]: 2026/04/24 01:19:51 [notice] 505677#505677: signal process started
+Apr 24 01:19:51 university-and-course-data systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+root@university-and-course-data:~/University-and-Course-data# curl -s http://127.0.0.1:8000/api/scrape/active
+curl -s http://127.0.0.1:8000/api/scrape/history?limit=10&offset=0
+Internal Server Error[2] 666128
+root@university-and-course-data:~/University-and-Course-data# # Get the DATABASE_URL from the systemd service file systemd service file
+cat /etc/systemd/system/uni-api-py.service | grep -i database
+
+# Then run the migration using that URL
+cd ~/University-and-Course-data/backend-py
+DATABASE_URL="<paste the value from above>" PYTHONPATH=. venv/bin/python -m alembic upgrade head
+[2]+  Done                    curl -s http://127.0.0.1:8000/api/scrape/history?limit=10
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 551, in __call__
+    field_value = self.prepare_field_value(field_name, field, field_value, value_is_complex)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 134, in prepare_field_value
+    raise e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 131, in prepare_field_value
+    value = self.decode_complex_value(field_name, field, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 194, in decode_complex_value
+    return json.loads(value)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 12, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Get the DATABASE_URL from the systemd service file
+cat /etc/systemd/system/uni-api-py.service | grep -i database
+
+# Then run the migration using that URL
+cd ~/University-and-Course-data/backend-py
+DATABASE_URL="<paste the value from above>" PYTHONPATH=. venv/bin/python -m alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 551, in __call__
+    field_value = self.prepare_field_value(field_name, field, field_value, value_is_complex)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 134, in prepare_field_value
+    raise e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 131, in prepare_field_value
+    value = self.decode_complex_value(field_name, field, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 194, in decode_complex_value
+    return json.loads(value)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 12, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Find the env file the service uses
+cat /etc/systemd/system/uni-api-py.service
+
+# Then source it and run migrations
+cd ~/University-and-Course-data/backend-py
+source <env-file-path>
+PYTHONPATH=. venv/bin/python -m alembic upgrade head
+[Unit]
+Description=University Portal Python API (FastAPI + Uvicorn)
+After=network.target postgresql.service redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/University-and-Course-data/backend-py
+Environment="PATH=/root/University-and-Course-data/backend-py/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/root/University-and-Course-data/backend-py"
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --workers 2 \
+  --access-log \
+  --log-level info
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/uni-api-py.log
+StandardError=append:/var/log/uni-api-py.log
+
+[Install]
+WantedBy=multi-user.target
+-bash: syntax error near unexpected token `newline'
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 551, in __call__
+    field_value = self.prepare_field_value(field_name, field, field_value, value_is_complex)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 134, in prepare_field_value
+    raise e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 131, in prepare_field_value
+    value = self.decode_complex_value(field_name, field, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 194, in decode_complex_value
+    return json.loads(value)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 12, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+
+# Extract DATABASE_URL only — do NOT source the full .env (it breaks CORS_ORIGINS)
+export DATABASE_URL=$(grep '^DATABASE_URL' .env | cut -d'=' -f2-)
+
+# Run all pending migrations
+PYTHONPATH=. venv/bin/python -m alembic upgrade head
+
+# Check it succeeded
+echo "Exit code: $?"
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 551, in __call__
+    field_value = self.prepare_field_value(field_name, field, field_value, value_is_complex)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 134, in prepare_field_value
+    raise e
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/env.py", line 131, in prepare_field_value
+    value = self.decode_complex_value(field_name, field, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 194, in decode_complex_value
+    return json.loads(value)
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/__main__.py", line 4, in <module>
+    main(prog="alembic")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 12, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+Exit code: 1
+root@university-and-course-data:~/University-and-Course-data/backend-py# systemctl restart uni-api-py uni-celery
+sleep 5
+
+# Verify the endpoints are now working
+curl -s http://127.0.0.1:8000/api/scrape/active
+curl -s "http://127.0.0.1:8000/api/scrape/history?limit=5&offset=0"
+Internal Server ErrorInternal Server Errorroot@university-and-course-datacd ~/University-and-Course-data/backend-pycd ~/University-and-Course-data/backend-py
+
+# Read the DATABASE_URL from .env without sourcing the whole file
+DB=$(grep '^DATABASE_URL' .env | cut -d'=' -f2- | sed 's|postgresql+asyncpg://|postgresql://|')
+
+echo "Connecting to: $DB"
+
+# Run all missing columns directly via psql
+psql "$DB" <<'SQL'
+ALTER TABLE scraped_courses     ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE scraped_courses     ADD COLUMN IF NOT EXISTS extraction_method JSONB;
+ALTER TABLE scrape_runtime_jobs ADD COLUMN IF NOT EXISTS requeue_count  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE scrape_runtime_jobs ADD COLUMN IF NOT EXISTS claim_count    INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE scrape_runtime_jobs ADD COLUMN IF NOT EXISTS requeue_events JSONB;
+
+-- Also stamp alembic so it knows migrations are applied
+INSERT INTO alembic_version (version_num) VALUES ('005_add_claim_count')
+  ON CONFLICT (version_num) DO NOTHING;
+
+\echo 'All columns applied OK'
+SQL
+
+# Restart services to pick up the changes
+systemctl restart uni-api-py uni-celery
+sleep 5
+
+# Verify the endpoints work now
+curl -s http://127.0.0.1:8000/api/scrape/active | head -c 200
+curl -s "http://127.0.0.1:8000/api/scrape/history?limit=5&offset=0" | head -c 200
+Connecting to: postgresql://uniportal:Bij%40y12345@localhost:5432/university_portal
+NOTICE:  column "rejection_reason" of relation "scraped_courses" already exists, skipping
+ALTER TABLE
+NOTICE:  column "extraction_method" of relation "scraped_courses" already exists, skipping
+ALTER TABLE
+ALTER TABLE
+NOTICE:  column "claim_count" of relation "scrape_runtime_jobs" already exists, skipping
+ALTER TABLE
+ALTER TABLE
+ERROR:  relation "alembic_version" does not exist
+LINE 1: INSERT INTO alembic_version (version_num) VALUES ('005_add_c...
+                    ^
+All columns applied OK
+{"activeJobs":[]}{"runs":[{"runtimeJobId":"job_e09511cb9379","jobId":"job_e09511cb9379","universityId":4,"universityName":"Charles Sturt university","url":"https://study.csu.edu.au/","status":"completed","totalFound":root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# # Check Celery worker is alive
+systemctl status uni-celery --no-pager
+tail -30 /var/log/celery.log
+
+# Check Redis
+redis-cli ping
+
+# Check if Playwright browsers are installed
+ls ~/.cache/ms-playwright/ 2>/dev/null || echo "Playwright browsers NOT installed"
+● uni-celery.service - University Portal Celery Worker (background scraping)
+     Loaded: loaded (/etc/systemd/system/uni-celery.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-04-27 09:41:23 UTC; 2min 46s ago
+   Main PID: 666799 (celery)
+      Tasks: 59 (limit: 9483)
+     Memory: 223.2M (peak: 247.0M)
+        CPU: 6.436s
+     CGroup: /system.slice/uni-celery.service
+             ├─666799 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery…
+             ├─666992 /root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/playwright/driver/node /root/University-and-Course-data/backend-p…
+             ├─667010 /root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disa…
+             ├─667012 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-zygote-sandbox …
+             ├─667013 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=zygote --no-sandbox --headl…
+             ├─667029 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=gpu-process --no-sandbox --…
+             └─667035 "/root/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell --type=utility --utility-sub-type=…
+
+Apr 27 09:41:23 university-and-course-data systemd[1]: Started uni-celery.service - University Portal Celery Worker (background scraping).
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/utils/imports.py", line 105, in import_from_cwd
+    return imp(module, package=package)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/app/tasks/celery_app.py", line 18, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+
+PONG
+chromium-1208  chromium-1217  chromium_headless_shell-1208  chromium_headless_shell-1217  ffmpeg-1011
+root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Check celery log for what it's actually doing/failing on
+tail -50 /var/log/celery.log
+
+# 2. Check if Playwright browsers exist
+ls ~/.cache/ms-playwright/ 2>/dev/null || echo "NO BROWSERS INSTALLED"
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/bin/celery.py", line 137, in celery
+    app = find_app(app)
+          ^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/app/utils.py", line 386, in find_app
+    sym = imp(app)
+          ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/utils/imports.py", line 105, in import_from_cwd
+    return imp(module, package=package)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/app/tasks/celery_app.py", line 18, in <module>
+    from app.config import settings
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 96, in <module>
+    settings = get_settings()
+               ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/app/config.py", line 93, in get_settings
+    return Settings()
+           ^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/main.py", line 470, in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/pydantic_settings/sources/base.py", line 553, in __call__
+    raise SettingsError(
+pydantic_settings.exceptions.SettingsError: error parsing value for field "cors_origins" from source "EnvSettingsSource"
+
+chromium-1208  chromium-1217  chromium_headless_shell-1208  chromium_headless_shell-1217  ffmpeg-1011
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+venv/bin/python -m playwright install chromium
+venv/bin/python -m playwright install-deps chromium
+systemctl restart uni-celery
+Installing dependencies...
+Hit:1 https://repos-droplet.digitalocean.com/apt/droplet-agent main InRelease
+Hit:2 https://repos.insights.digitalocean.com/apt/do-agent main InRelease                                                
+Hit:3 https://deb.nodesource.com/node_24.x nodistro InRelease                                                            
+Hit:4 http://mirrors.digitalocean.com/ubuntu noble InRelease                                                             
+Get:5 http://mirrors.digitalocean.com/ubuntu noble-updates InRelease         
+Get:6 http://mirrors.digitalocean.com/ubuntu noble-backports InRelease       
+Get:7 http://security.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+Get:8 http://mirrors.digitalocean.com/ubuntu noble-updates/main amd64 Components [178 kB]
+Get:9 http://mirrors.digitalocean.com/ubuntu noble-updates/universe amd64 Components [386 kB]
+Get:10 http://mirrors.digitalocean.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:11 http://mirrors.digitalocean.com/ubuntu noble-backports/main amd64 Components [7348 B]
+Get:12 http://mirrors.digitalocean.com/ubuntu noble-backports/universe amd64 Components [10.6 kB]
+Get:13 http://security.ubuntu.com/ubuntu noble-security/main amd64 Components [21.9 kB]
+Get:14 http://security.ubuntu.com/ubuntu noble-security/universe amd64 Components [74.3 kB]
+Fetched 1057 kB in 9s (113 kB/s)           
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.2).
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libcairo2 is already the newest version (1.18.0-3build1).
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.9).
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.1).
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.1).
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.8).
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnss3 is already the newest version (2:3.98-1ubuntu0.1).
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libx11-6 is already the newest version (2:1.8.7-1build1).
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+xvfb is already the newest version (2:21.1.12-1ubuntu1.5).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+fonts-unifont is already the newest version (1:15.1.01-1build1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.1).
+xfonts-cyrillic is already the newest version (1:1.0.5+nmu1).
+xfonts-scalable is already the newest version (1:1.0.3-1.3).
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-freefont-ttf is already the newest version (20211204+svn4273-2).
+0 upgraded, 0 newly installed, 0 to remove and 4 not upgraded.
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git fetch origin && git reset --hard origin/main
+systemctl restart uni-api-py uni-celery
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+root@university-and-course-data:~/University-and-Course-data# # Clear the stale lock immediately
+redis-cli DEL "scrape:uni_lock:4"
+
+# Then pull the permanent fix and restart
+cd ~/University-and-Course-data
+git fetch origin && git reset --hard origin/main
+systemctl restart uni-api-py uni-celery
+(integer) 1
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+root@university-and-course-data:~/University-and-Course-data# # 1. Pull the latest code first
+cd ~/University-and-Course-data
+git fetch origin && git reset --hard origin/main
+systemctl restart uni-api-py uni-celery
+
+# 2. Apply missing columns to scraped_courses (safe — IF NOT EXISTS)
+export DB=$(grep '^DATABASE_URL' backend-py/.env | cut -d'=' -f2- | sed 's|postgresql+asyncpg://|postgresql://|')
+psql "$DB" << 'SQL'
+ALTER TABLE scraped_courses
+  ADD COLUMN IF NOT EXISTS student_market        TEXT,
+  ADD COLUMN IF NOT EXISTS delivery_mode         TEXT,
+  ADD COLUMN IF NOT EXISTS international_eligible BOOLEAN,
+  ADD COLUMN IF NOT EXISTS on_campus_available   BOOLEAN,
+  ADD COLUMN IF NOT EXISTS eligibility_status    TEXT NOT NULL DEFAULT 'unknown',
+  ADD COLUMN IF NOT EXISTS eligibility_reason    TEXT,
+  ADD COLUMN IF NOT EXISTS eligibility_confidence FLOAT,
+  ADD COLUMN IF NOT EXISTS auto_publish_status   TEXT NOT NULL DEFAULT 'pending_review',
+  ADD COLUMN IF NOT EXISTS decision_score        FLOAT,
+  ADD COLUMN IF NOT EXISTS reviewed_at           TIMESTAMPTZ;
+
+-- Confirm all columns are present now
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'scraped_courses'
+ORDER BY ordinal_position;
+SQL
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+
+NOTICE:  column "student_market" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "delivery_mode" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "international_eligible" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "on_campus_available" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "eligibility_status" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "eligibility_reason" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "eligibility_confidence" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "auto_publish_status" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "decision_score" of relation "scraped_courses" already exists, skipping
+NOTICE:  column "reviewed_at" of relation "scraped_courses" already exists, skipping
+ALTER TABLE
+      column_name       
+------------------------
+ id
+ scrape_job_id
+ university_id
+ course_name
+ category
+ sub_category
+ course_website
+ duration
+ duration_term
+ study_mode
+ degree_level
+ study_load
+ language
+ description
+ other_requirement
+ international_fee
+ fee_term
+ fee_year
+ currency
+ ielts_overall
+ ielts_listening
+ ielts_speaking
+ ielts_writing
+ ielts_reading
+ pte_overall
+ pte_listening
+ pte_speaking
+ pte_writing
+ pte_reading
+ toefl_overall
+ toefl_listening
+ toefl_speaking
+ toefl_writing
+ toefl_reading
+ cambridge_overall
+ duolingo_overall
+ intake_months
+ intake_days
+ academic_level
+ academic_score
+ score_type
+ academic_country
+ scholarship
+ status
+ notes
+ completeness
+ created_at
+ course_location
+ student_market
+ delivery_mode
+ international_eligible
+ on_campus_available
+ eligibility_status
+ eligibility_reason
+ eligibility_confidence
+ auto_publish_status
+ decision_score
+ reviewed_at
+ course_id
+ extraction_method
+ rejection_reason
+(61 rows)
+
+root@university-and-course-data:~/University-and-Course-data# 
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+
+DB=$(grep '^DATABASE_URL' .env | cut -d'=' -f2- | sed 's|postgresql+asyncpg://|postgresql://|')
+
+psql "$DB" << 'SQL'
+ALTER TABLE scraped_field_evidence
+  ADD COLUMN IF NOT EXISTS decision_score    FLOAT,
+  ADD COLUMN IF NOT EXISTS validation_status TEXT NOT NULL DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS decision_status   TEXT NOT NULL DEFAULT 'needs_review',
+  ADD COLUMN IF NOT EXISTS selected          BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Verify
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'scraped_field_evidence'
+ORDER BY ordinal_position;
+SQL
+NOTICE:  column "decision_score" of relation "scraped_field_evidence" already exists, skipping
+NOTICE:  column "validation_status" of relation "scraped_field_evidence" already exists, skipping
+NOTICE:  column "decision_status" of relation "scraped_field_evidence" already exists, skipping
+NOTICE:  column "selected" of relation "scraped_field_evidence" already exists, skipping
+ALTER TABLE
+    column_name    |        data_type         
+-------------------+--------------------------
+ id                | integer
+ scraped_course_id | integer
+ field_key         | text
+ candidate_value   | text
+ normalized_value  | text
+ source_url        | text
+ page_type         | text
+ extraction_method | text
+ raw_text          | text
+ snippet           | text
+ confidence        | real
+ decision_score    | real
+ validation_status | text
+ decision_status   | text
+ selected          | boolean
+ created_at        | timestamp with time zone
+(16 rows)
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Hit the endpoint and capture the response
+curl -s "http://127.0.0.1:8000/api/scrape/staged?universityId=4&status=approved"
+
+# 2. Get the actual traceback from the systemd-managed FastAPI log
+grep -A 30 "Exception\|Traceback\|Error" /var/log/uni-api-py.log | tail -60
+Internal Server ErrorINFO:     127.0.0.1:58794 - "GET /api/courses?universityId=1&limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58808 - "GET /api/courses?universityId=8&limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58814 - "GET /api/courses?universityId=5&limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58822 - "GET /api/courses?universityId=3&limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58826 - "GET /api/courses?universityId=6&limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58838 - "GET /api/scrape/status/job_941dcd2e69f6?since=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58846 - "GET /api/scrape/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58854 - "GET /api/scrape/status/job_941dcd2e69f6?since=142 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58860 - "GET /api/scrape/status/job_941dcd2e69f6?since=142 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58866 - "GET /api/scrape/status/job_941dcd2e69f6?since=142 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58876 - "GET /api/scrape/status/job_941dcd2e69f6?since=142 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58892 - "GET /api/scrape/status/job_941dcd2e69f6?since=144 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36228 - "GET /api/scrape/status/job_941dcd2e69f6?since=145 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36232 - "GET /api/scrape/status/job_941dcd2e69f6?since=145 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36240 - "GET /api/scrape/status/job_941dcd2e69f6?since=152 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36242 - "GET /api/scrape/status/job_941dcd2e69f6?since=152 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36254 - "GET /api/scrape/status/job_941dcd2e69f6?since=152 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36258 - "GET /api/scrape/status/job_941dcd2e69f6?since=152 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46736 - "GET /api/scrape/status/job_941dcd2e69f6?since=157 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46744 - "GET /api/scrape/status/job_941dcd2e69f6?since=158 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46758 - "GET /api/scrape/status/job_941dcd2e69f6?since=158 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46772 - "GET /api/scrape/status/job_941dcd2e69f6?since=163 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46774 - "GET /api/scrape/status/job_941dcd2e69f6?since=164 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46784 - "GET /api/scrape/status/job_941dcd2e69f6?since=164 HTTP/1.1" 200 OK
+--
+INFO:     127.0.0.1:60280 - "GET /api/scrape/staged?universityId=4&status=approved HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+--
+ValueError: Out of range float values are not JSON compliant: nan
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git fetch origin
+git reset --hard origin/main
+systemctl restart uni-api-py
+HEAD is now at f7fabd4 Improve data extraction by adding intake and location details
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data && git fetch origin && git reset --hard origin/main && systemctl restart uni-api-py
+remote: Enumerating objects: 93, done.
+remote: Counting objects: 100% (93/93), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 80 (delta 71), reused 79 (delta 70), pack-reused 0 (from 0)
+Unpacking objects: 100% (80/80), 1.09 MiB | 2.43 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   f7fabd4..45938d4  main       -> origin/main
+HEAD is now at 45938d4 Sanitize non-finite float values to null before JSON serialization
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data && git fetch origin && git reset --hard origin/main && systemctl restart uni-api-py uni-celery
+HEAD is now at 45938d4 Sanitize non-finite float values to null before JSON serialization
+root@university-and-course-data:~/University-and-Course-data# # Pull just the two patched files directly from GitHub
+curl -fsSL "https://raw.githubusercontent.com/Bijay053/University-and-Course-data/main/backend-py/app/routers/scrape.py" \
+  -o ~/University-and-Course-data/backend-py/app/routers/scrape.py
+
+curl -fsSL "https://raw.githubusercontent.com/Bijay053/University-and-Course-data/main/backend-py/app/services/scraper/stage_course.py" \
+  -o ~/University-and-Course-data/backend-py/app/services/scraper/stage_course.py
+
+# Confirm the fix landed
+grep -c "import math\|_nan_to_none" ~/University-and-Course-data/backend-py/app/routers/scrape.py
+
+# Restart
+systemctl restart uni-api-py
+11
+root@university-and-course-data:~/University-and-Course-data# git -C ~/University-and-Course-data remote get-url origin
+https://github.com/Bijay053/University-and-Course-data.git
+root@university-and-course-data:~/University-and-Course-data# curl -fsSL "https://raw.githubusercontent.com/Bijay053/University-and-Course-data/main/backend-py/app/routers/scrape.py" \
+  -o ~/University-and-Course-data/backend-py/app/routers/scrape.py
+
+curl -fsSL "https://raw.githubusercontent.com/Bijay053/University-and-Course-data/main/backend-py/app/services/scraper/stage_course.py" \
+  -o ~/University-and-Course-data/backend-py/app/services/scraper/stage_course.py
+
+grep -c "import math\|_nan_to_none" ~/University-and-Course-data/backend-py/app/routers/scrape.py && systemctl restart uni-api-py
+11
+root@university-and-course-data:~/University-and-Course-data# 
