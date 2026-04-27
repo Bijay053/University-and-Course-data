@@ -21,7 +21,7 @@ export type ScrapeJobCardProps = {
   canRemove?: boolean;
 };
 
-const MAX_LOGS = 200;
+const MAX_LOGS = 5000;
 const POLL_BASE = 1500;
 const POLL_MAX = 10000;
 const ALL = "__new__";
@@ -464,7 +464,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             })() : null}
 
             {/* Compact log stream */}
-            <div className="flex-1 min-h-[120px] max-h-[220px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+            <div className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
               {logs.length === 0 ? (
                 jobStatus === "queued" ? (
                   <div className="flex flex-col gap-1.5 pt-2">
@@ -524,9 +524,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               </div>
             )}
 
-            {/* Compact log (collapsed) */}
-            <div className="max-h-[120px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
-              {logs.slice(-50).map((l, i) => (
+            {/* Full log (scrollable) */}
+            <div className="max-h-[400px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+              {logs.map((l, i) => (
                 <div key={i} className={`${logColor(l.event)} break-words`}>{l.message || l.event}</div>
               ))}
             </div>
