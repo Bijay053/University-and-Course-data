@@ -28,8 +28,8 @@ from urllib.parse import urlparse
 log = logging.getLogger(__name__)
 
 _SETTLE_S = 3.0
-_NAV_SETTLE_S = 2.5
-_MAX_NAV_DEPTH = 10
+_NAV_SETTLE_S = 2.0
+_MAX_NAV_PAGES = 20   # total nav pages to visit across all BFS levels
 
 _EXTRACT_LINKS_JS = r"""
 (origin) => {
@@ -178,7 +178,18 @@ async def browser_discover_generic(
                 scrape_url, len(results), len(nav_queue),
             )
 
-            for nav_url in nav_queue[:_MAX_NAV_DEPTH]:
+            # BFS over nav links — newly discovered nav pages are appended
+            # to nav_queue inside _process_links, so the while-loop picks
+            # them up automatically (2+ level deep site hierarchies like
+            # ECU: homepage → study-area → individual course).
+            nav_visited: set[str] = set()
+            nav_i = 0
+            while nav_i < len(nav_queue) and nav_i < _MAX_NAV_PAGES:
+                nav_url = nav_queue[nav_i]
+                nav_i += 1
+                if nav_url in nav_visited:
+                    continue
+                nav_visited.add(nav_url)
                 if len(results) >= max_courses:
                     break
                 try:

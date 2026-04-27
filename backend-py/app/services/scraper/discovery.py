@@ -116,6 +116,23 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # KBS MBA specialisations overview page — not a real course, just a list
     # of MBA specialisation tracks.  Both British and American spellings kept.
     "/two-specialisations", "/two-specializations",
+    # ECU / generic: study-area browsing pages (not individual course pages).
+    # Real ECU courses are at /degrees/courses/NAME, not /degrees/study-areas/NAME.
+    "/study-areas/", "/study-area/",
+    "/subject-areas/", "/subject-area/",
+    "/discipline-areas/", "/discipline-area/",
+    "/fields-of-study/", "/field-of-study/",
+    "/areas-of-study/", "/area-of-study/",
+    "/our-courses/", "/our-programs/",
+    # Generic marketing / info page indicators (slash-bounded so partial
+    # path segments like /discover-X are not accidentally blocked).
+    "/explore/", "/discover/",
+    "/how-to-apply/", "/how-to-enrol/",
+    "/fees-and-scholarships/", "/fees-and-costs/",
+    "/international-students/info",
+    "/student-experience/",
+    "/life-at-",
+    "/campus/",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even

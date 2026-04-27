@@ -1,0 +1,198 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 10
+Fetching https://www.ecu.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://www.ecu.edu.au/ (max 25 pages, max 200 candidates)
+[DISCOVER] Page 1/25: fetch failed — https://www.ecu.edu.au/
+[DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://www.ecu.edu.au
+[DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] BFS returned 0 links — trying browser-based discovery (handles Cloudflare / JS-heavy sites)...
+[DISCOVER] Browser: navigating to https://www.ecu.edu.au/
+[DISCOVER] Browser: start page → 15 course links, 5 nav candidates to follow
+[DISCOVER] Browser: nav https://www.ecu.edu.au/degrees/study-areas → +23 courses (total 38)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/study/extra → +21 courses (total 59)
+[DISCOVER] Browser: discovered 59 course links
+Discovered 59 candidate course links
+Extracting course details (59 pages)...
+[EXTRACT] 1/59: View all courses
+[EXTRACT] 2/59: Arts & Humanities
+[EXTRACT] 3/59: Business & Law
+[EXTRACT] 4/59: Engineering & Technology
+Fetching 3/59: Business & Law
+Fetching 2/59: Arts & Humanities
+Fetching 1/59: View all courses
+Fetching 4/59: Engineering & Technology
+[EXTRACT] 5/59: Medical & Health Sciences
+[EXTRACT] 6/59: Nursing & Midwifery
+[EXTRACT] 7/59: Science
+[EXTRACT] 8/59: Teacher Education
+Fetching 5/59: Medical & Health Sciences
+Fetching 7/59: Science
+Fetching 6/59: Nursing & Midwifery
+Fetching 8/59: Teacher Education
+[EXTRACT] 9/59: Western Australian Academy of Performing Arts
+Fetching 9/59: Western Australian Academy of Performing Arts
+[EXTRACT] 10/59: Undergraduate study
+[EXTRACT] 11/59: Postgraduate study
+[EXTRACT] 12/59: Ask a student
+Fetching 12/59: Ask a student
+Fetching 10/59: Undergraduate study
+Fetching 11/59: Postgraduate study
+[EXTRACT] 13/59: Thinking about a career switch? Study might be a good start
+[EXTRACT] 14/59: Paige turns to crime for a life in the lab
+[EXTRACT] 15/59: What's a double degree and why would you study one?
+[EXTRACT] 16/59: Healthcare
+Fetching 13/59: Thinking about a career switch? Study might be a good start
+Fetching 15/59: What's a double degree and why would you study one?
+Fetching 16/59: Healthcare
+Fetching 14/59: Paige turns to crime for a life in the lab
+[EXTRACT] 17/59: Business
+Fetching 17/59: Business
+[EXTRACT] 18/59: Technology
+[EXTRACT] 19/59: Creative Humanities
+[EXTRACT] 20/59: Psychology, Counselling & Criminology
+Fetching 18/59: Technology
+Fetching 20/59: Psychology, Counselling & Criminology
+Fetching 19/59: Creative Humanities
+[EXTRACT] 21/59: Social Sciences, Social Work & Youth Work
+[EXTRACT] 22/59: Business
+[EXTRACT] 23/59: Law
+[EXTRACT] 24/59: Aviation
+Fetching 21/59: Social Sciences, Social Work & Youth Work
+Fetching 22/59: Business
+Fetching 23/59: Law
+Fetching 24/59: Aviation
+[EXTRACT] 25/59: Allied Health
+[EXTRACT] 26/59: Exercise & Sports Science
+[EXTRACT] 27/59: Health Science
+[EXTRACT] 28/59: Medical & Biomedical Science
+Fetching 25/59: Allied Health
+Fetching 26/59: Exercise & Sports Science
+Fetching 27/59: Health Science
+Fetching 28/59: Medical & Biomedical Science
+[EXTRACT] 29/59: Nutrition & Dietetics
+[EXTRACT] 30/59: Occupational Health & Safety
+[EXTRACT] 31/59: Paramedicine
+[EXTRACT] 32/59: Public Health
+Fetching 29/59: Nutrition & Dietetics
+Fetching 30/59: Occupational Health & Safety
+Fetching 31/59: Paramedicine
+Fetching 32/59: Public Health
+[EXTRACT] 33/59: Computing
+[EXTRACT] 34/59: Cyber Security
+[EXTRACT] 35/59: Security & Intelligence
+[EXTRACT] 36/59: Science
+Fetching 33/59: Computing
+Fetching 34/59: Cyber Security
+Fetching 35/59: Security & Intelligence
+Fetching 36/59: Science
+[EXTRACT] 37/59: Performing Arts
+[EXTRACT] 38/59: Production & Design
+[EXTRACT] 39/59: The ECU Experience
+Fetching 38/59: Production & Design
+Fetching 37/59: Performing Arts
+Fetching 39/59: The ECU Experience
+[EXTRACT] 40/59: Preparing for Uni
+Fetching 40/59: Preparing for Uni
+[EXTRACT] 41/59: The WA Experience
+Fetching 41/59: The WA Experience
+[EXTRACT] 42/59: Choose a flexible MBA for an ever-changing world
+[EXTRACT] 43/59: Start your new year in the education fast lane
+[EXTRACT] 44/59: How a high school 'dropout' discovered the magic of physics
+Fetching 42/59: Choose a flexible MBA for an ever-changing world
+Fetching 43/59: Start your new year in the education fast lane
+Fetching 44/59: How a high school 'dropout' discovered the magic of physics
+[EXTRACT] 45/59: Kaidyn's first taste of engineering leaves first class impressions
+[EXTRACT] 46/59: Jerry looks back to go forward with a career switch
+[EXTRACT] 47/59: See all The ECU Experience
+[EXTRACT] 48/59: Could a career in OT be your calling?
+Fetching 45/59: Kaidyn's first taste of engineering leaves first class impressions
+Fetching 46/59: Jerry looks back to go forward with a career switch
+Fetching 47/59: See all The ECU Experience
+Fetching 48/59: Could a career in OT be your calling?
+[EXTRACT] 49/59: How to make an impact with your new skills, while still a student
+[EXTRACT] 50/59: How sound career advice can take you around the world
+Fetching 49/59: How to make an impact with your new skills, while still a student
+Fetching 50/59: How sound career advice can take you around the world
+[EXTRACT] 51/59: See all Preparing for Employment
+[EXTRACT] 52/59: How to find your way into early childhood education
+Fetching 51/59: See all Preparing for Employment
+Fetching 52/59: How to find your way into early childhood education
+[EXTRACT] 53/59: Janice wins big for academic excellence and study-life balance
+[EXTRACT] 54/59: Look beyond the lectures when choosing uni courses
+[EXTRACT] 55/59: See all Preparing for Uni
+[EXTRACT] 56/59: University like you've never imagined
+Fetching 53/59: Janice wins big for academic excellence and study-life balance
+Fetching 55/59: See all Preparing for Uni
+Fetching 54/59: Look beyond the lectures when choosing uni courses
+Fetching 56/59: University like you've never imagined
+[EXTRACT] 57/59: Where on earth can you live in Perth?
+[EXTRACT] 58/59: What on earth can you do in Perth?
+[EXTRACT] 59/59: How one international student discovered the beauty of Western Australia
+Fetching 57/59: Where on earth can you live in Perth?
+Fetching 58/59: What on earth can you do in Perth?
+Fetching 59/59: How one international student discovered the beauty of Western Australia
+[STAGE] skipped View all courses: fetch_failed
+[STAGE] skipped Arts & Humanities: fetch_failed
+[STAGE] skipped Business & Law: fetch_failed
+[STAGE] skipped Engineering & Technology: fetch_failed
+[STAGE] skipped Medical & Health Sciences: fetch_failed
+[STAGE] skipped Nursing & Midwifery: fetch_failed
+[STAGE] skipped Science: fetch_failed
+[STAGE] skipped Teacher Education: fetch_failed
+[STAGE] skipped Western Australian Academy of Performing Arts: fetch_failed
+[STAGE] skipped Undergraduate study: fetch_failed
+[STAGE] skipped Postgraduate study: fetch_failed
+[STAGE] skipped Ask a student: fetch_failed
+[STAGE] skipped Thinking about a career switch? Study might be a good start: fetch_failed
+[STAGE] skipped Paige turns to crime for a life in the lab: fetch_failed
+[STAGE] skipped What's a double degree and why would you study one?: fetch_failed
+[STAGE] skipped Healthcare: fetch_failed
+[STAGE] skipped Business: fetch_failed
+[STAGE] skipped Technology: fetch_failed
+[STAGE] skipped Creative Humanities: fetch_failed
+[STAGE] skipped Psychology, Counselling & Criminology: fetch_failed
+[STAGE] skipped Social Sciences, Social Work & Youth Work: fetch_failed
+[STAGE] skipped Business: fetch_failed
+[STAGE] skipped Law: fetch_failed
+[STAGE] skipped Aviation: fetch_failed
+[STAGE] skipped Allied Health: fetch_failed
+[STAGE] skipped Exercise & Sports Science: fetch_failed
+[STAGE] skipped Health Science: fetch_failed
+[STAGE] skipped Medical & Biomedical Science: fetch_failed
+[STAGE] skipped Nutrition & Dietetics: fetch_failed
+[STAGE] skipped Occupational Health & Safety: fetch_failed
+[STAGE] skipped Paramedicine: fetch_failed
+[STAGE] skipped Public Health: fetch_failed
+[STAGE] skipped Computing: fetch_failed
+[STAGE] skipped Cyber Security: fetch_failed
+[STAGE] skipped Security & Intelligence: fetch_failed
+[STAGE] skipped Science: fetch_failed
+[STAGE] skipped Performing Arts: fetch_failed
+[STAGE] skipped Production & Design: fetch_failed
+[STAGE] skipped The ECU Experience: fetch_failed
+[STAGE] skipped Preparing for Uni: fetch_failed
+[STAGE] skipped The WA Experience: fetch_failed
+[STAGE] skipped Choose a flexible MBA for an ever-changing world: fetch_failed
+[STAGE] skipped Start your new year in the education fast lane: fetch_failed
+[STAGE] skipped How a high school 'dropout' discovered the magic of physics: fetch_failed
+[STAGE] skipped Kaidyn's first taste of engineering leaves first class impressions: fetch_failed
+[STAGE] skipped Jerry looks back to go forward with a career switch: fetch_failed
+[STAGE] skipped See all The ECU Experience: fetch_failed
+[STAGE] skipped Could a career in OT be your calling?: fetch_failed
+[STAGE] skipped How to make an impact with your new skills, while still a student: fetch_failed
+[STAGE] skipped How sound career advice can take you around the world: fetch_failed
+[STAGE] skipped See all Preparing for Employment: fetch_failed
+[STAGE] skipped How to find your way into early childhood education: fetch_failed
+[STAGE] skipped Janice wins big for academic excellence and study-life balance: fetch_failed
+[STAGE] skipped Look beyond the lectures when choosing uni courses: fetch_failed
+[STAGE] skipped See all Preparing for Uni: fetch_failed
+[STAGE] skipped University like you've never imagined: fetch_failed
+[STAGE] skipped Where on earth can you live in Perth?: fetch_failed
+[STAGE] skipped What on earth can you do in Perth?: fetch_failed
+[STAGE] skipped How one international student discovered the beauty of Western Australia: fetch_failed
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 4m 46s | Courses: 59 | Avg: 4.8s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:59 | Staged:0 | Skipped:0 | Errors:0
+Staged 0 courses, 0 skipped, 59 fetch errors

@@ -198,6 +198,23 @@ async def extract_course(
     if html is None:
         html = await fetch_html(url)
     if not html:
+        # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
+        # Try a real Playwright browser before giving up — this handles any
+        # site where plain httpx gets a 403/challenge/empty body.
+        try:
+            from app.services.scraper.browser_pool import pool as _bp
+            if emit:
+                await emit(
+                    "status",
+                    f"[BROWSER↑] HTTP blocked for {url[:70]} — retrying via browser",
+                    phase="extract", kind="browser_http_fallback", url=url,
+                )
+            html = await _bp.fetch_html(
+                url, wait_until="domcontentloaded", timeout=35_000, settle_ms=2000
+            )
+        except Exception as _exc:
+            log.warning("browser fallback failed for %s: %s", url, _exc)
+    if not html:
         return {"url": url, "error": "fetch_failed", "payload": {}, "evidence": []}
 
     payload: dict[str, Any] = {"course_website": url}
