@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import func, select
@@ -162,47 +162,11 @@ async def stage_course(
             if not payload.get("sub_category"):
                 payload["sub_category"] = det.get("sub_category")
 
-    # Bug #7: skip if a recent rejection exists (window = settings.rejection_block_days).
-    #
-    # Rejection reason awareness: only block on "permanent" disqualifiers
-    # (category_landing_page, manual_reject, or unknown/NULL).
-    # Transient reasons — extractor_bug, bulk_reset, no_international_fee,
-    # expired — do NOT trigger the cooldown so a code-side fix can re-stage
-    # the course on the very next run without DB surgery.
-    # online_only is transient: if the institution adds campus options the
-    # course should be re-staged automatically on the next scrape without
-    # manual DB cleanup.
-    _TRANSIENT_REJECTION_REASONS = frozenset({
-        "extractor_bug",
-        "bulk_reset",
-        "no_international_fee",
-        "expired",
-        "online_only",
-        "domestic_only",
-    })
-    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.rejection_block_days)
-    _recent_row = (
-        await db.execute(
-            select(ScrapedCourse.id, ScrapedCourse.rejection_reason, ScrapedCourse.created_at)
-            .where(
-                ScrapedCourse.university_id == university_id,
-                func.lower(ScrapedCourse.course_name) == name.lower(),
-                ScrapedCourse.status == "rejected",
-                ScrapedCourse.created_at >= cutoff,
-            )
-            .order_by(ScrapedCourse.created_at.desc())
-            .limit(1)
-        )
-    ).first()
-    if _recent_row:
-        _rej_id, _rej_reason, _rej_at = _recent_row
-        if _rej_reason not in _TRANSIENT_REJECTION_REASONS:
-            _rej_date = _rej_at.strftime("%Y-%m-%d") if _rej_at else "unknown"
-            return StageResult(
-                False,
-                f"recently rejected (within {settings.rejection_block_days}d, rejected {_rej_date})",
-                extra={"rejected_id": _rej_id, "rejection_reason": _rej_reason},
-            )
+    # All rejection reasons are transient: every re-scrape re-evaluates every
+    # course from scratch.  If the extraction code changes or a university
+    # updates its page, a previously rejected course gets a fresh chance
+    # automatically without any DB cleanup.
+    # (No blocking check — fall through to full extraction + guard evaluation.)
 
     # Canonicalize degree_level to the standard apostrophe-s forms used by
     # the degree_level extractor and the sibling-cache bucket logic.
