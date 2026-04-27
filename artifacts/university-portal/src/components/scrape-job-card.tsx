@@ -104,6 +104,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [fastMode, setFastMode] = useState(false);
 
   const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [jobStatus, setJobStatus] = useState<"queued" | "running" | "awaiting_approval" | null>(null);
   const [scraping, setScraping] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [logs, setLogs] = useState<ScrapeLog[]>([]);
@@ -146,6 +147,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setStartTime(null);
     setActiveJobId(null);
     setPhase("idle");
+    setJobStatus(null);
     setLogs([]);
     setResultSummary(null);
     setCompletedJobId(null);
@@ -180,6 +182,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
 
+        if (data.status === "queued" || data.status === "running" || data.status === "awaiting_approval") {
+          setJobStatus(data.status as "queued" | "running" | "awaiting_approval");
+        }
         if (data.universityName) setUniName(data.universityName);
         if (data.logs && data.logs.length > 0) {
           setLogs((prev) => [...prev, ...data.logs!].slice(-MAX_LOGS));
@@ -326,28 +331,32 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className={`relative flex flex-col rounded-xl border bg-white shadow-sm overflow-hidden ${
+      phase === "running" && jobStatus === "queued" ? "border-amber-300 shadow-amber-50" :
       phase === "running" ? "border-blue-300 shadow-blue-100" :
       phase === "done"    ? "border-green-300 shadow-green-50" :
       phase === "error"   ? "border-red-200"  : "border-gray-200"
     }`}>
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-2.5 border-b text-sm font-medium ${
+        phase === "running" && jobStatus === "queued" ? "bg-amber-50 border-amber-200 text-amber-800" :
         phase === "running" ? "bg-blue-50 border-blue-200 text-blue-800" :
         phase === "done"    ? "bg-green-50 border-green-200 text-green-800" :
         phase === "error"   ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-700"
       }`}>
         <div className="flex items-center gap-2">
-          {phase === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {phase === "running" && jobStatus === "queued" && <span className="text-base leading-none">⏳</span>}
+          {phase === "running" && jobStatus !== "queued" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {phase === "done"    && <CheckCircle2 className="w-3.5 h-3.5" />}
           {phase === "error"   && <AlertCircle className="w-3.5 h-3.5" />}
           <span>
             {phase === "idle"    && `Slot ${slotIndex + 1}`}
-            {phase === "running" && (uniName || `Slot ${slotIndex + 1} — Running`)}
+            {phase === "running" && jobStatus === "queued" && (uniName ? `${uniName} — Queued` : `Slot ${slotIndex + 1} — Queued`)}
+            {phase === "running" && jobStatus !== "queued" && (uniName || `Slot ${slotIndex + 1} — Running`)}
             {phase === "done"    && (uniName || `Slot ${slotIndex + 1} — Done`)}
             {phase === "error"   && (uniName || `Slot ${slotIndex + 1} — Error`)}
           </span>
           {elapsed && phase === "running" && (
-            <span className="text-xs font-normal text-blue-500 tabular-nums">({elapsed})</span>
+            <span className={`text-xs font-normal tabular-nums ${jobStatus === "queued" ? "text-amber-500" : "text-blue-500"}`}>({elapsed})</span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -456,14 +465,20 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
             {/* Compact log stream */}
             <div className="flex-1 min-h-[120px] max-h-[220px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
-              {logs.length === 0
-                ? <span className="text-gray-500">Starting…</span>
-                : logs.map((l, i) => (
-                  <div key={i} className={`${logColor(l.event)} break-words`}>
-                    {l.message || l.event}
+              {logs.length === 0 ? (
+                jobStatus === "queued" ? (
+                  <div className="flex flex-col gap-1.5 pt-2">
+                    <span className="text-amber-400 font-medium">⏳ Queued — waiting for a worker slot</span>
+                    <span className="text-gray-500">The Celery worker pool is full. This job will start automatically once a slot frees up.</span>
                   </div>
-                ))
-              }
+                ) : (
+                  <span className="text-gray-500">Starting…</span>
+                )
+              ) : logs.map((l, i) => (
+                <div key={i} className={`${logColor(l.event)} break-words`}>
+                  {l.message || l.event}
+                </div>
+              ))}
               <div ref={logEndRef} />
             </div>
 
