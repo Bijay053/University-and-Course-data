@@ -389,3 +389,56 @@ def test_parse_equivalence_table_pearson_colspan_captures_pte_overall():
     )
     assert mapping[6.5].get("toefl") == 79.0
     assert mapping[6.0].get("toefl") == 60.0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Task 60 — _parse_equivalence_table must capture PTE overall even when
+# <th colspan="3">Pearson Test of English</th> spans Overall, Listening,
+# and Writing sub-columns.  Verifies that the colspan expansion handles
+# three or more sub-skill columns, not just two.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_parse_equivalence_table_pearson_colspan3_captures_pte_overall():
+    """_parse_equivalence_table must return the correct PTE overall score
+    when the Pearson group header spans three sub-skill columns (Overall +
+    Listening + Writing) via ``colspan="3"``."""
+    from bs4 import BeautifulSoup
+
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>IELTS</th>
+          <th colspan="3">Pearson Test of English</th>
+          <th>TOEFL iBT</th>
+        </tr>
+        <tr>
+          <th>Overall</th>
+          <th>Overall</th>
+          <th>Listening</th>
+          <th>Writing</th>
+          <th>Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>6.5</td><td>58</td><td>50</td><td>50</td><td>79</td></tr>
+        <tr><td>6.0</td><td>50</td><td>42</td><td>42</td><td>60</td></tr>
+      </tbody>
+    </table>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table")
+    mapping = et._parse_equivalence_table(table)
+
+    assert mapping, "_parse_equivalence_table returned empty dict"
+    assert 6.5 in mapping, "IELTS 6.5 row missing from mapping"
+    assert mapping[6.5].get("pte") == 58.0, (
+        f"Expected PTE overall 58 for IELTS 6.5, got {mapping[6.5]}"
+    )
+    assert 6.0 in mapping, "IELTS 6.0 row missing from mapping"
+    assert mapping[6.0].get("pte") == 50.0, (
+        f"Expected PTE overall 50 for IELTS 6.0, got {mapping[6.0]}"
+    )
+    assert mapping[6.5].get("toefl") == 79.0
+    assert mapping[6.0].get("toefl") == 60.0
