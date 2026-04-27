@@ -33,11 +33,16 @@ function fmt(ms: number) {
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
-function logColor(event: string) {
-  if (event === "error") return "text-red-500";
-  if (event === "done") return "text-green-600";
-  if (event === "warn") return "text-amber-500";
-  return "text-gray-500";
+function logColor(event: string, phase?: string) {
+  if (event === "error") return "text-red-400";
+  if (event === "done") return "text-green-400 font-semibold";
+  if (event === "warn") return "text-amber-400";
+  if (event === "progress") return "text-blue-400";
+  if (phase === "extract") return "text-emerald-300";
+  if (phase === "discover" || phase === "fetch") return "text-cyan-400";
+  if (phase === "classify") return "text-violet-400";
+  if (phase === "stage") return "text-yellow-400";
+  return "text-gray-400";
 }
 
 // ── Mini university combobox ──────────────────────────────────────────────────
@@ -93,6 +98,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove }: ScrapeJobCardProps) {
+  const slotKey = `scrape_slot_${slotIndex}_jobId`;
   const [selectedUni, setSelectedUni] = useState("");
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [newUniName, setNewUniName] = useState("");
@@ -123,6 +129,17 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const logEndRef = useRef<HTMLDivElement>(null);
   const submittingRef = useRef(false);
 
+  // Restore any in-progress job after navigation
+  useEffect(() => {
+    const savedJobId = sessionStorage.getItem(slotKey);
+    if (savedJobId) {
+      setScraping(true);
+      setPhase("running");
+      setActiveJobId(savedJobId);
+      pollJobStatus(savedJobId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Tick the clock every second while running
   useEffect(() => {
     if (!scraping) return;
@@ -141,6 +158,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     pollInFlightRef.current = false;
     pollFailRef.current = 0;
     logIndexRef.current = 0;
+    sessionStorage.removeItem(slotKey);
     setScraping(false);
     setStopping(false);
     setProgress(null);
@@ -152,7 +170,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setResultSummary(null);
     setCompletedJobId(null);
     setUniName("");
-  }, []);
+  }, [slotKey]);
 
   const pollJobStatus = useCallback((jobId: string) => {
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -170,7 +188,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         });
         if (res.status === 304) { schedule(POLL_BASE); return; }
         if (!res.ok) {
-          if (res.status === 404) { setScraping(false); setPhase("error"); return; }
+          if (res.status === 404) { sessionStorage.removeItem(slotKey); setScraping(false); setPhase("error"); return; }
           pollFailRef.current += 1;
           schedule(Math.min(POLL_BASE * (pollFailRef.current + 1), POLL_MAX));
           return;
@@ -229,7 +247,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     logIndexRef.current = 0;
     pollFailRef.current = 0;
     void poll();
-  }, []);
+  }, [slotKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = useCallback(async () => {
     if (submittingRef.current || scraping) return;
@@ -294,18 +312,20 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         setLogs([{ event: "error", message: "Server did not return a job ID." }]); setScraping(false); setPhase("error"); return;
       }
       setActiveJobId(data.jobId);
+      sessionStorage.setItem(slotKey, data.jobId);
       pollJobStatus(data.jobId);
     } catch (e) {
       setLogs([{ event: "error", message: String(e) }]); setScraping(false); setPhase("error");
     }
-  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus]);
+  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey]);
 
   const handleStop = useCallback(async () => {
     if (!activeJobId) return;
     setStopping(true);
     try { await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" }); } catch {}
+    sessionStorage.removeItem(slotKey);
     setScraping(false); setStopping(false); setActiveJobId(null); setPhase("idle");
-  }, [activeJobId]);
+  }, [activeJobId, slotKey]);
 
   // Auto-fill URL when university is selected
   useEffect(() => {
@@ -475,7 +495,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                   <span className="text-gray-500">Starting…</span>
                 )
               ) : logs.map((l, i) => (
-                <div key={i} className={`${logColor(l.event)} break-words`}>
+                <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>
                   {l.message || l.event}
                 </div>
               ))}
@@ -527,7 +547,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             {/* Full log (scrollable) */}
             <div className="max-h-[400px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
               {logs.map((l, i) => (
-                <div key={i} className={`${logColor(l.event)} break-words`}>{l.message || l.event}</div>
+                <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>{l.message || l.event}</div>
               ))}
             </div>
 
