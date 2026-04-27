@@ -808,7 +808,35 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
             logs.append(entry)
     except Exception:
         pass
-    
+
+    # Inject synthetic log entries for every auto-recovery (requeue) event so
+    # operators can see exactly when and how many times the job was bounced.
+    requeue_events = job.requeue_events or []
+    for ev in requeue_events:
+        try:
+            num = int(ev.get("number", 0))
+            ts = ev.get("timestamp", "")
+            logs.append(
+                {
+                    "sequence": -(num),
+                    "event": "auto_recovery",
+                    "message": (
+                        f"\u21ba Job auto-recovered (attempt #{num}) \u2014 "
+                        "was stuck in 'queued' with no worker activity for >5 min"
+                    ),
+                    "createdAt": ts,
+                    "level": "warn",
+                    "isRequeueEvent": True,
+                    "requeueNumber": num,
+                }
+            )
+        except Exception:
+            pass
+
+    # Sort all entries (real + synthetic) by createdAt so the timeline is
+    # chronological regardless of the synthetic sequence numbers.
+    logs.sort(key=lambda e: (e.get("createdAt") or ""))
+
     # Staged courses for this job — return full ReviewStagedCourse shape so
     # ReviewScrapedCoursesTable renders correctly in the history "View Courses" panel.
     sc_rows = (await db.execute(

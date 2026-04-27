@@ -2871,13 +2871,28 @@ export default function Scraping() {
                                   String(l.phase ?? "").toLowerCase().includes(f)
                                 );
                               })
-                              .map((l) => (
-                                <div key={l.sequence} className="whitespace-pre-wrap break-words leading-relaxed">
-                                  <span className="text-gray-500">[{l.event}]</span>
-                                  {l.phase ? <span className="text-blue-300"> [{String(l.phase)}]</span> : null}
-                                  {l.message ? <> {String(l.message)}</> : null}
-                                </div>
-                              ))}
+                              .map((l) =>
+                                l.isRequeueEvent ? (
+                                  <div
+                                    key={`requeue-${String(l.requeueNumber)}`}
+                                    className="whitespace-pre-wrap break-words leading-relaxed my-0.5 px-2 py-0.5 rounded bg-amber-900/40 text-amber-300"
+                                  >
+                                    <span className="font-bold mr-1">↺</span>
+                                    {l.createdAt ? (
+                                      <span className="text-amber-500 mr-1 text-[10px]">
+                                        [{new Date(String(l.createdAt)).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}]
+                                      </span>
+                                    ) : null}
+                                    {String(l.message)}
+                                  </div>
+                                ) : (
+                                  <div key={l.sequence} className="whitespace-pre-wrap break-words leading-relaxed">
+                                    <span className="text-gray-500">[{l.event}]</span>
+                                    {l.phase ? <span className="text-blue-300"> [{String(l.phase)}]</span> : null}
+                                    {l.message ? <> {String(l.message)}</> : null}
+                                  </div>
+                                )
+                              )}
                             {(historyDetail?.logs.length ?? 0) === 0 && (
                               <div className="text-gray-500">No log lines recorded.</div>
                             )}

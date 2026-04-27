@@ -145,27 +145,36 @@ async def _async_find_stale() -> list[tuple[str, str, int]]:
 
 
 async def _async_increment_requeue(runtime_job_id: str) -> None:
-    """Atomically increment ``requeue_count`` for a job after it has been
+    """Atomically increment ``requeue_count`` and append a timestamped
+    requeue event to ``requeue_events`` for a job after it has been
     successfully re-dispatched.
 
-    Uses a SQL-level ``SET requeue_count = requeue_count + 1`` so the update
-    is strictly atomic — no read-modify-write race even if two beat ticks
-    overlap on the same job ID.
+    A single ``UPDATE`` statement handles both fields so there is no
+    read-modify-write race even if two beat ticks overlap on the same job.
 
     Disposes the engine first — each asyncio.run() in the Celery task body
     creates a fresh event loop and any pooled asyncpg connection from a prior
     run would be bound to the old, closed loop.
     """
-    from sqlalchemy import update
-
-    from app.models import ScrapeRuntimeJob
+    from sqlalchemy import text
 
     await engine.dispose()
     async with AsyncSessionLocal() as db:
         await db.execute(
-            update(ScrapeRuntimeJob)
-            .where(ScrapeRuntimeJob.runtime_job_id == runtime_job_id)
-            .values(requeue_count=ScrapeRuntimeJob.requeue_count + 1)
+            text(
+                "UPDATE scrape_runtime_jobs "
+                "SET requeue_count = requeue_count + 1, "
+                "    requeue_events = COALESCE(requeue_events, '[]'::jsonb) || "
+                "        jsonb_build_array(jsonb_build_object( "
+                "            'number', requeue_count + 1, "
+                "            'timestamp', to_char("
+                "                NOW() AT TIME ZONE 'UTC', "
+                "                'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'"
+                "            ) "
+                "        )) "
+                "WHERE runtime_job_id = :jid"
+            ),
+            {"jid": runtime_job_id},
         )
         await db.commit()
 
