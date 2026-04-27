@@ -275,7 +275,7 @@ def should_stage_course(
     payload: dict[str, Any],
     source_url: str | None = None,
 ) -> tuple[bool, str]:
-    """Three-filter staging gate (Bugs A, B, C from the Torrens T007 sweep).
+    """Two-filter staging gate (Bugs A and B from the Torrens T007 sweep).
 
     Returns ``(True, "accepted")`` when the course passes all filters, or
     ``(False, reject_reason)`` on the first failing check.  Reject reasons
@@ -284,7 +284,10 @@ def should_stage_course(
     * ``"category_landing_page"`` — H1/course-name lacks a degree qualifier
                                      OR URL matches a known category-page suffix
     * ``"no_international_fee"`` — international_fee is None after full extraction
-    * ``"online_only"`` — study_mode is exactly "Online"
+
+    Note: Bug C (``"online_only"``) has been removed.  Online-only courses are
+    valid international offerings (e.g. CSU Master of Veterinary Studies) and
+    should pass through to human review rather than being auto-rejected.
 
     Callers must invoke this AFTER all extractors + AI fallback have run (i.e.
     just before the DB write in ``stage_course``) so Bug B has a settled
@@ -317,10 +320,5 @@ def should_stage_course(
         if payload.get("has_central_fee_page"):
             return (True, "accepted")
         return (False, "no_international_fee")
-
-    # Bug C: online-only delivery.
-    mode = (payload.get("study_mode") or "").strip()
-    if mode.lower() == "online":
-        return (False, "online_only")
 
     return (True, "accepted")

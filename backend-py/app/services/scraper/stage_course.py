@@ -159,10 +159,12 @@ async def stage_course(
     # Bug #7: skip if a recent rejection exists (window = settings.rejection_block_days).
     #
     # Rejection reason awareness: only block on "permanent" disqualifiers
-    # (online_only, category_landing_page, manual_reject, or unknown/NULL).
+    # (category_landing_page, manual_reject, or unknown/NULL).
     # Transient reasons — extractor_bug, bulk_reset, no_international_fee,
     # expired — do NOT trigger the cooldown so a code-side fix can re-stage
     # the course on the very next run without DB surgery.
+    # Note: online_only has been removed as a rejection reason — online courses
+    # are now accepted and staged for human review.
     _TRANSIENT_REJECTION_REASONS = frozenset({
         "extractor_bug",
         "bulk_reset",
