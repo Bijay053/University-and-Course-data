@@ -1,0 +1,447 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Master of Education (with Specialisations)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Master	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Master of Clinical Exercise Physiology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Classical Arabic
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Master of Advanced Social Work Practice
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master	1 years	A$31,200/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Diploma of Cyber Security
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$35,712/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Theological Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	Canberra Campus, United Theological College	On Campus, Online	
+
+
+
+	
+Graduate Diploma of Terrorism and Security Studies
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Psychology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$35,520/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Project Management
+Business & Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$35,720/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Pastoral Counselling
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Graduate Diploma of Organisational Coaching and Leadership
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Midwifery
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Graduate Diploma of Mathematics
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$34,480/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Mammography
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Diploma of Leadership and Management (Policing and Security)
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Islamic Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Graduate Diploma of Investigations
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Intelligence Analysis
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Financial Crime
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$28,000/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Dental Implantology
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Graduate Diploma of Customs Administration
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$23,520/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Critical Care Paramedicine
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$38,480/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Clinical Practice (Paramedicine)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Graduate Diploma of Classical Arabic
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Graduate Diploma of Applied Business
+Business & Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Diploma of Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Graduate Diploma of Adult Language, Literacy and Numeracy
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	-	Online	
+
+
+
+	
+Graduate Diploma of Accounting
+Business & Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$34,640/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Certificate in Research
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$13,960/year	6	50	-	-	-	Mar	-	Online	
+
+
+
+	
+Graduate Certificate in Leadership in Human Services
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Graduate Certificate in Islamic Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Graduate Certificate in Intersectionality, Diversity and Inclusion
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Human Services
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$17,248/year	6	50	-	-	-	Mar, Jul, Nov	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Education (Generic and with Specialistions)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$13,960/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Digital Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$14,520/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Classical Arabic
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Graduate Certificate in Case Management and Coordinated Care
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Graduate Certificate in Ageing and Health
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years	A$13,960/year	6	50	-	-	-	Mar, Jul	-	Online	
+
+
+
+	
+Diploma of Psychological Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Diploma of Health Science (Mental Health)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Diploma of Exercise Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Diploma of Environmental Studies
+Agriculture & Environmental Science
+Publish: review
+Eligibility: review
+69%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Diploma of Agricultural Studies
+Publish: review
+Eligibility: review
+62%	Diploma	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Bachelor of Theology (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College, Canberra Campus	On Campus, Online	
+
+
+
+	
+Bachelor of Social Science (Psychology) (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	1 years	A$30,400/year	6	50	-	-	-	Mar	-	Online	
+
+
+
+	
+Bachelor of Science (Honours)
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	1 years	A$36,480/year	6	50	-	-	-	Mar, Jul	Albury-Wodonga Campus	Online	
+
+
+
+	
+Bachelor of Islamic Studies (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College	Online	
+
+
+
+	
+Bachelor of Geospatial Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$35,600/year	6	50	-	-	-	Mar, Jul	Albury-Wodonga Campus	Online	
+
+
+
+	
+Bachelor of Arts and Social Science (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Bachelor	1 years	A$27,920/year	6	50	-	-	-	Mar	-	Online	
+
+
+
+	
+Bachelor of Arts
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 years	A$24,560/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online	
+
+
+
+	
+Bachelor of Applied Research (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor	1 years	A$29,760/year	6	50	-	-	-	Mar	Bathurst Campus	Online	
+
+
+
+	
+Associate Degree in Adult and Vocational Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Associate Degree	1 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online
