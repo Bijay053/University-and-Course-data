@@ -1,0 +1,262 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode
+	
+Certificate IV in Allied Health Assistance
+Publish: review
+Eligibility: review
+38%	Certificate	-	A$13,650/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Engineering Technology (Civil Engineering)
+Engineering & Technology
+Publish: review
+Eligibility: review
+54%	Bachelor's	3 Year	A$30,345/yr	6	-	-	-	-		-	On Campus
+	
+Diploma of Business and Sports Management (Higher Education)
+Business & Management
+Publish: review
+Eligibility: review
+46%	Diploma	-	A$29,316/yr	6	-	-	-	-		-	On Campus
+	
+Master of Digital Business Transformation
+Business & Management
+Publish: review
+Eligibility: review
+46%	Master's	-	A$30,800/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Business Transformation (Management)
+Business & Management
+Publish: review
+Eligibility: review
+54%	Bachelor's	3 Year	A$28,140/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Business Transformation (Accounting)
+Business & Management
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$2,960/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Health (Gerontology)
+Publish: review
+Eligibility: review
+38%	Graduate Certificate	-	A$28,665/yr	6.5	-	-	-	-		-	On Campus
+	
+Associate Degree of Criminology and Criminal Justice
+Law & Legal Studies
+Publish: review
+Eligibility: review
+54%	Associate Degree	2 Year	A$28,980/yr	6	-	-	-	-		-	On Campus
+	
+Master of Engineering Technology (Mining)
+Engineering & Technology
+Publish: review
+Eligibility: review
+46%	Master's	-	A$31,500/yr	6.5	-	-	-	-		-	On Campus
+	
+Master of Engineering Technology (Civil)
+Engineering & Technology
+Publish: review
+Eligibility: review
+46%	Master's	-	A$31,500/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Engineering (Electrical) (Honours)
+Engineering & Technology
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$34,440/yr	6	-	-	-	-		-	Blended
+	
+Bachelor of Information Technology (Business Analysis)
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$27,248/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Information Technology (Professional Practice)
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$28,980/yr	6	-	-	-	-		-	On Campus
+	
+Diploma of Conservation and Ecosystem Management
+Publish: review
+Eligibility: review
+38%	Diploma	-	A$15,330/yr	6	-	-	-	-		-	On Campus
+	
+Master of Teaching (Secondary)
+Education & Social Work
+Publish: review
+Eligibility: review
+46%	Master's	-	A$30,240/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Education (Primary)
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Bachelor's	4 Year	A$29,085/yr	7.5	-	-	-	-		-	On Campus
+	
+Master of Teaching (Early Childhood)
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Master's	2 Year	A$29,400/yr	7	-	-	-	-		-	Blended
+	
+Bachelor of Secondary Education (Health and Physical Education Teaching)
+Education & Social Work
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$29,610/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Secondary Education (Applied Teaching)
+Education & Social Work
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$29,610/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Early Childhood Education
+Education & Social Work
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	-	A$32,100/yr	6.5	-	-	-	-		-	Blended
+	
+Bachelor of Social Work
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Bachelor's	4 Year	A$27,144/yr	7	-	-	-	-		-	On Campus
+	
+Bachelor of Speech Pathology (Honours)
+Publish: review
+Eligibility: review
+38%	Bachelor's	-	A$40,650/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Sport, Physical and Outdoor Education
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Bachelor's	3 Year	A$27,405/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Science (Advanced)
+Science & Mathematics
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$3,110/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Biomedical Science (Gippsland Partnership Program)
+Medicine & Health
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$31,395/yr	6	-	-	-	-		-	On Campus
+	
+Master of Applied Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+46%	Master's	-	A$31,185/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Visual Arts
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$27,405/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Paramedicine
+Publish: review
+Eligibility: review
+38%	Graduate Certificate	-	A$33,300/yr	6.5	-	-	-	-		-	On Campus
+	
+Diploma of Mental Health
+Publish: review
+Eligibility: review
+38%	Diploma	-	A$16,170/yr	6	-	-	-	-		-	On Campus
+	
+Diploma of Information Technology (Higher Education)
+Computer Science & IT
+Publish: review
+Eligibility: review
+54%	Diploma	1	A$27,136/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Mining
+Publish: review
+Eligibility: review
+38%	Graduate Certificate	-	A$31,400/yr	6.5	-	-	-	-		-	On Campus
+	
+Master of Data Science
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Master's	-	A$28,980/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Information Technology (Business Information Systems)
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$26,103/yr	6	-	-	-	-		-	On Campus
+	
+Master of Technology (Software Engineering)
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Master's	-	A$3,210/yr	6.5	-	-	-	-		-	On Campus
+	
+Certificate III in Baking
+Publish: review
+Eligibility: review
+38%	Certificate	-	A$16,954/yr	6	-	-	-	-		-	On Campus
+	
+Certificate III in Commercial Cookery
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+46%	Certificate	-	A$15,300/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Psychological Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$31,185/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Arts (Social Sciences) (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$27,300/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Arts (Humanities) (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$26,985/yr	6	-	-	-	-		-	On Campus
+	
+Bachelor of Arts (Creative Arts) (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$28,455/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Certificate in Health (Peri-operative Nursing)
+Medicine & Health
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	-	A$16,800/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Arts
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+54%	Bachelor's	3	A$27,100/yr	6	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Health (Advanced Nursing)
+Medicine & Health
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	-	A$33,524/yr	6.5	-	-	-	-		-	On Campus
+	
+Graduate Diploma of Health (Neonatal Care)
+Publish: review
+Eligibility: review
+38%	Graduate Certificate	-	A$29,715/yr	6.5	-	-	-	-		-	On Campus
+	
+Bachelor of Criminology and Criminal Justice
+Law & Legal Studies
+Publish: review
+Eligibility: review
+46%	Bachelor's	-	A$29,295/yr	6	-	-	-	-		-	On Campus
