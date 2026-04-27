@@ -1,6 +1,6 @@
 """Tests for the per-university Redis distributed lock.
 
-Three scenarios exercised for run_repair (same lock pattern lives in
+Four scenarios exercised for run_repair (same lock pattern lives in
 run_scrape / orchestrator.py):
 
 1. **Blocked duplicate** — SET NX returns falsy (lock already held by
@@ -17,9 +17,15 @@ run_scrape / orchestrator.py):
    key holds a *different* job ID (simulating TTL expiry + re-acquire
    by another worker) → DELETE is *not* called, protecting the new
    holder's lock.
+
+4. **True concurrent gather** — two jobs for the same university run
+   via ``asyncio.gather`` against a *real* Redis instance. Exactly one
+   must succeed (ok=True) and the other must be stopped with reason=
+   ``concurrent_university_scrape``.
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -250,3 +256,84 @@ async def test_repair_lock_ttl_expiry_skips_delete(
         mock_redis.delete.assert_not_called()
     finally:
         await _cleanup(ids)
+
+
+# ─── Test 4: true concurrent gather against real Redis ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_repair_lock_concurrent_gather(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two repairs for the same university run concurrently via
+    asyncio.gather against a *real* Redis instance.  Exactly one must
+    succeed (ok=True) and the other must be stopped with
+    reason='concurrent_university_scrape'."""
+    ids_a = await _seed()
+    uni_id = ids_a["uni_id"]
+
+    job_b = f"repair_{uuid.uuid4().hex[:12]}"
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, university_id, university_name, url, "
+                " job_type, status, request_payload) "
+                "VALUES (:j, :u, 'Lock Test Uni', "
+                "        'https://lock.test/', 'repair', 'queued', "
+                "        CAST(:pl AS jsonb))"
+            ),
+            {
+                "j": job_b,
+                "u": uni_id,
+                "pl": (
+                    '{"repair_targets": [{"course_id": '
+                    + str(ids_a["course_id"])
+                    + ', "url": "https://lock.test/course"}]}'
+                ),
+            },
+        )
+        await db.commit()
+    ids_b = {"uni_id": uni_id, "course_id": ids_a["course_id"], "job_id": job_b}
+
+    async def _fake_extract(
+        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None
+    ) -> dict:
+        return _noop_extract(link, country, uni_pdf_data, emit)
+
+    monkeypatch.setattr(repair_mod, "_extract_only", _fake_extract)
+
+    import redis.asyncio as _real_aioredis
+
+    lock_key = f"scrape:uni_lock:{uni_id}"
+    r_cleanup = _real_aioredis.from_url("redis://localhost:6379")
+
+    try:
+        async def _run_a() -> dict:
+            async with AsyncSessionLocal() as db:
+                return await repair_mod.run_repair(db, ids_a["job_id"])
+
+        async def _run_b() -> dict:
+            async with AsyncSessionLocal() as db:
+                return await repair_mod.run_repair(db, ids_b["job_id"])
+
+        result_a, result_b = await asyncio.gather(_run_a(), _run_b())
+
+        results = [result_a, result_b]
+        winners = [res for res in results if res.get("ok") is True]
+        losers = [
+            res
+            for res in results
+            if res.get("reason") == "concurrent_university_scrape"
+        ]
+
+        assert len(winners) == 1, (
+            f"Expected exactly 1 winner, got: {results}"
+        )
+        assert len(losers) == 1, (
+            f"Expected exactly 1 loser, got: {results}"
+        )
+    finally:
+        await r_cleanup.delete(lock_key)
+        await r_cleanup.aclose()
+        await _cleanup(ids_a)
