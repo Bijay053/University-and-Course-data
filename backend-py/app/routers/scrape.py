@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, desc, func, select, text
+from sqlalchemy import case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -214,7 +214,6 @@ async def start_scrape(
     if body.university_id:
         uni = await db.get(University, body.university_id)
     if not uni and body.url:
-        from sqlalchemy import select, or_, func
         result = await db.execute(
             select(University).where(
                 or_(
