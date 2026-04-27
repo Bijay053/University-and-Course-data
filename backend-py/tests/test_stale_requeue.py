@@ -19,6 +19,7 @@ Six behaviours exercised:
 """
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -326,28 +327,34 @@ def test_requeue_skips_job_when_nx_lock_is_held():
 # ─── Case 6: concurrent beat ticks against real Redis ────────────────────────
 
 
-def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
+@pytest.mark.asyncio
+async def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
     """Two simultaneous invocations of ``requeue_stale_queued`` against a *real*
     Redis instance must result in exactly one ``.delay()`` call.
 
     Strategy
     --------
-    - Both threads share a ``patch.object`` context so they race on the *real*
-      Redis NX lock while still skipping actual DB/Celery broker calls.
-    - ``asyncio.run`` is intercepted to return the same stale job from both
-      threads so we can measure the dispatch count without DB side-effects.
-    - The winning thread acquires the NX lock and calls ``.delay()``; the
-      losing thread sees a falsy ``set()`` return and skips silently.
+    - A *real* stale ``scrape_runtime_jobs`` row is seeded (async, same event
+      loop as the test) so the job actually exists in the database.
+    - Both invocations are submitted to a ``ThreadPoolExecutor`` via
+      ``loop.run_in_executor`` so they race concurrently while the async test
+      event loop stays live for DB cleanup — solving the cross-loop asyncpg
+      issue that arises from nesting ``asyncio.run()`` calls in a sync test.
+    - ``asyncio.run`` inside ``scrape_tasks`` is intercepted to return the
+      real stale-job tuple from both threads, keeping the race deterministic.
+    - The winner acquires the NX lock and dispatches; the loser skips silently.
+    - Cleanup runs in the same event loop: delete the Redis key and DB row.
     """
     import redis as redis_lib
-    from app.config import settings
     from app.tasks import scrape_tasks as st
+    from app.tasks.celery_app import celery_app as _celery
 
-    fake_job_id = f"test_conc_{uuid.uuid4().hex[:8]}"
-    stale_result = [(fake_job_id, "full", 0)]
-    lock_key = st._requeue_lock_key(fake_job_id)
-    r_cleanup = redis_lib.from_url(settings.redis_url, decode_responses=True)
+    real_job_id = await _seed_job(age_minutes=_STALE_QUEUED_MINUTES + 2)
+    stale_result = [(real_job_id, "full", 0)]
+    lock_key = st._requeue_lock_key(real_job_id)
+    r_cleanup = redis_lib.from_url(_celery.conf.broker_url, decode_responses=True)
 
+    loop = asyncio.get_running_loop()
     try:
         with (
             patch.object(st, "asyncio") as mock_asyncio,
@@ -357,15 +364,14 @@ def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
             mock_asyncio.run.side_effect = _make_asyncio_run_interceptor(stale_result)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-                fut_a = pool.submit(_call_requeue_stale, st)
-                fut_b = pool.submit(_call_requeue_stale, st)
-                result_a = fut_a.result(timeout=10)
-                result_b = fut_b.result(timeout=10)
+                fut_a = loop.run_in_executor(pool, _call_requeue_stale, st)
+                fut_b = loop.run_in_executor(pool, _call_requeue_stale, st)
+                result_a, result_b = await asyncio.gather(fut_a, fut_b)
 
         all_requeued = result_a.get("requeued", []) + result_b.get("requeued", [])
-        dispatch_count = all_requeued.count(fake_job_id)
+        dispatch_count = all_requeued.count(real_job_id)
         assert dispatch_count == 1, (
-            f"Expected exactly 1 dispatch for job {fake_job_id!r}, "
+            f"Expected exactly 1 dispatch for job {real_job_id!r}, "
             f"got {dispatch_count}: result_a={result_a}, result_b={result_b}"
         )
         assert mock_scrape.delay.call_count == 1, (
@@ -376,6 +382,7 @@ def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
     finally:
         r_cleanup.delete(lock_key)
         r_cleanup.close()
+        await _delete_job(real_job_id)
 
 
 # ─── Utility ──────────────────────────────────────────────────────────────────
