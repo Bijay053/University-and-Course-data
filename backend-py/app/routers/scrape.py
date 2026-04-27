@@ -866,8 +866,15 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     def _ts_sort_key(e: dict) -> tuple:
         """Normalise ISO-8601 UTC timestamps to a canonical form so that
         mixed ``+00:00`` / ``Z`` suffixes compare deterministically.
-        Falls back to the raw string (or empty string) when parsing fails."""
+        Falls back to the raw value coerced to str (or empty string) when
+        parsing fails, so the tuple is always (str, int) regardless of
+        the stored type."""
         raw = e.get("createdAt") or ""
+        # Guard against non-string types (e.g. numeric epoch timestamps stored
+        # in requeue_events): ensure raw is always a str before any str methods
+        # or fromisoformat are called, and that the fallback tuple is sortable.
+        if not isinstance(raw, str):
+            raw = str(raw)
         try:
             from datetime import datetime, timezone
             # datetime.fromisoformat handles both "+00:00" and "Z" (Py 3.11+).

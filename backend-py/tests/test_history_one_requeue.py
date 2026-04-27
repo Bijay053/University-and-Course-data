@@ -320,3 +320,196 @@ async def test_job_with_no_requeue_events_returns_only_real_logs() -> None:
         assert not any(e.get("isRequeueEvent") for e in logs)
     finally:
         await _delete_job(job_id)
+
+
+# ─── Edge-case tests (task #82) ───────────────────────────────────────────────
+
+
+async def _insert_job_raw_requeue(job_id: str, requeue_json: str) -> None:
+    """Insert a job row with an arbitrary JSON literal for requeue_events.
+
+    This bypasses the ORM so we can store non-array types (strings, null, etc.)
+    to simulate corruption or unexpected data in the column.
+    """
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, job_type, status, requeue_events) "
+                "VALUES (:id, 'scrape', 'failed', cast(:rev as jsonb))"
+            ),
+            {"id": job_id, "rev": requeue_json},
+        )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_requeue_events_as_plain_string_returns_200_with_no_requeue_entries(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When requeue_events is stored as a JSON string instead of an array the
+    endpoint must still return 200 and produce no synthetic requeue log entries.
+
+    Iterating over a Python string yields single characters; every character
+    lacks a ``.get()`` method so the per-event try/except fires for each one.
+    A warning must be logged for each bad element and the response must be safe.
+    """
+    import logging
+
+    job_id = _job_id()
+    await _insert_job_raw_requeue(job_id, '"not-a-list"')
+
+    try:
+        with caplog.at_level(logging.WARNING):
+            body = await _get_history(job_id)
+
+        assert body is not None, "endpoint must return a JSON body"
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 0, (
+            f"expected 0 requeue entries for a string-typed column, got {requeue_logs}"
+        )
+        assert any(
+            "malformed requeue event" in r.message and job_id in r.message
+            for r in caplog.records
+        ), "expected malformed-requeue warnings when iterating over a string"
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_requeue_event_with_null_timestamp_does_not_break_sort() -> None:
+    """A requeue event whose timestamp is null (JSON null) must not crash the sort.
+
+    ``ev.get("timestamp", "")`` returns ``None`` when the key exists but holds
+    JSON null; the synthetic log entry therefore has ``createdAt=None``.  The
+    ``_ts_sort_key`` helper must handle this via the ``or ""`` fallback and the
+    endpoint must still return 200 with the valid-timestamped requeue entry also
+    present.
+    """
+    job_id = _job_id()
+    ts_valid = "2025-08-01T10:00:00+00:00"
+
+    requeue_events = [
+        {"number": 1, "timestamp": None, "exhausted": False, "stale_minutes": 5},
+        {"number": 2, "timestamp": ts_valid, "exhausted": False, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 2, (
+            f"both requeue entries (null-ts and valid-ts) must appear; got {requeue_logs}"
+        )
+        valid_entry = next(e for e in requeue_logs if e["requeueNumber"] == 2)
+        assert valid_entry["createdAt"] == ts_valid, (
+            f"valid-timestamped entry must keep its createdAt; got {valid_entry}"
+        )
+        null_entry = next(e for e in requeue_logs if e["requeueNumber"] == 1)
+        assert null_entry.get("createdAt") is None, (
+            f"null-timestamp entry must have createdAt=None; got {null_entry}"
+        )
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_requeue_event_with_numeric_timestamp_does_not_break_sort() -> None:
+    """A requeue event whose timestamp is a number (not a string) must not crash
+    the sort or the endpoint.
+
+    When ``ev.get("timestamp", "")`` returns an integer (e.g. a Unix epoch),
+    the synthetic entry has ``createdAt=<int>``.  The ``_ts_sort_key`` helper
+    must coerce it to str before comparing so the sort key tuples are always
+    ``(str, int)`` and no ``TypeError`` is raised during ``logs.sort()``.
+    """
+    job_id = _job_id()
+    ts_valid = "2025-10-01T08:00:00+00:00"
+    numeric_epoch = 1_700_000_000
+
+    requeue_events: list[dict[str, Any]] = [
+        {"number": 1, "timestamp": numeric_epoch, "exhausted": False, "stale_minutes": 5},
+        {"number": 2, "timestamp": ts_valid, "exhausted": False, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 2, (
+            f"both requeue entries (numeric-ts and valid-ts) must appear; got {requeue_logs}"
+        )
+        valid_entry = next(e for e in requeue_logs if e["requeueNumber"] == 2)
+        assert valid_entry["createdAt"] == ts_valid, (
+            f"valid ISO entry must keep its createdAt string; got {valid_entry}"
+        )
+        numeric_entry = next(e for e in requeue_logs if e["requeueNumber"] == 1)
+        assert numeric_entry.get("createdAt") == numeric_epoch, (
+            f"numeric-timestamp entry must pass createdAt through unchanged; got {numeric_entry}"
+        )
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_requeue_events_as_json_null_returns_200_with_no_requeue_entries() -> None:
+    """When requeue_events is stored as JSON null (maps to Python None) the
+    endpoint must return 200 with no synthetic requeue entries.
+
+    The guard ``job.requeue_events or []`` converts None to an empty list so
+    the loop body is never entered.
+    """
+    job_id = _job_id()
+    await _insert_job_raw_requeue(job_id, "null")
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 0, (
+            f"null requeue_events must produce 0 synthetic entries; got {requeue_logs}"
+        )
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_attempt_numbers_both_appear() -> None:
+    """When two requeue events share the same attempt number both must be returned.
+
+    There is no deduplication logic in the endpoint; both entries should appear
+    as synthetic log rows and the response must be 200.
+    """
+    job_id = _job_id()
+    ts1 = "2025-09-01T08:00:00+00:00"
+    ts2 = "2025-09-01T09:00:00+00:00"
+
+    requeue_events = [
+        {"number": 1, "timestamp": ts1, "exhausted": False, "stale_minutes": 5},
+        {"number": 1, "timestamp": ts2, "exhausted": False, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 2, (
+            f"both duplicate-number requeue events must appear; got {requeue_logs}"
+        )
+        nums = [e["requeueNumber"] for e in requeue_logs]
+        assert nums == [1, 1], f"both entries must carry requeueNumber=1, got {nums}"
+        timestamps = [e["createdAt"] for e in requeue_logs]
+        assert timestamps == sorted(timestamps), (
+            f"duplicate-number entries must still be timestamp-sorted: {timestamps}"
+        )
+    finally:
+        await _delete_job(job_id)
