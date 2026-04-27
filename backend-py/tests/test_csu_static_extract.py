@@ -411,10 +411,13 @@ def test_intake_ignores_non_session_terms() -> None:
 # ---------------------------------------------------------------------------
 
 def test_course_location_and_study_mode_extracted() -> None:
+    # Fixture has two offerings: Bathurst Campus / On Campus and Online / Online.
+    # "Online" location.value is a delivery mode, not a campus name — it must
+    # appear in study_mode but NOT in course_location.
     html = _make_html()
     result = apply_csu_static_extraction(_CSU_URL, html)
     assert "Bathurst Campus" in result["course_location"]
-    assert "Online" in result["course_location"]
+    assert "Online" not in result["course_location"]
     assert "On Campus" in result["study_mode"]
     assert "Online" in result["study_mode"]
 
@@ -441,9 +444,7 @@ def test_dom_only_offering_excluded_from_location() -> None:
     """Domestic-only offerings must not appear in course_location.
 
     When every active offering is DOM-only the domestic campus name is
-    suppressed.  The fallback logic sets location to "Online" (the safe
-    default for any course with no identified international offerings),
-    so the important assertion is that the DOM campus name is absent.
+    suppressed and both course_location and study_mode are None.
     """
     html = _make_html(
         course_obj={
@@ -481,7 +482,12 @@ def test_int_offering_included_in_location() -> None:
 
 
 def test_intl_offering_included_in_location() -> None:
-    """Offerings with student_type_code='INTL' must also appear in location."""
+    """Offerings with student_type_code='INTL' are processed correctly.
+
+    An online-only INTL offering has location.value='Online' which is a mode
+    descriptor, not a campus name.  course_location must be None; study_mode
+    must be 'Online'.
+    """
     html = _make_html(
         course_obj={
             "offerings": [
@@ -495,8 +501,41 @@ def test_intl_offering_included_in_location() -> None:
         }
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
-    assert result["course_location"] == "Online"
+    assert result["course_location"] is None
     assert result["study_mode"] == "Online"
+
+
+def test_online_location_value_promoted_to_mode_not_location() -> None:
+    """location.value='Online' must NOT appear in course_location.
+
+    CSU uses location.value='Online' as a delivery-mode tag for distance
+    offerings.  The extractor must exclude it from course_location and add
+    'Online' to study_mode instead.  A course with a real campus AND an
+    online offering shows only the campus in course_location.
+    """
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "INT",
+                    "location": {"value": "United Theological College"},
+                    "mode": {"value": "On Campus"},
+                },
+                {
+                    "active": "true",
+                    "student_type_code": "INT",
+                    "location": {"value": "Online"},
+                    "mode": {"value": "Online"},
+                },
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "United Theological College"
+    assert "Online" not in result["course_location"]
+    assert "On Campus" in result["study_mode"]
+    assert "Online" in result["study_mode"]
 
 
 def test_offering_without_student_type_code_included() -> None:
@@ -518,7 +557,11 @@ def test_offering_without_student_type_code_included() -> None:
 
 
 def test_unknown_non_int_student_type_code_excluded() -> None:
-    """Any explicit non-international student_type_code (e.g. 'ATAR') is excluded."""
+    """Any explicit non-international student_type_code (e.g. 'ATAR') is excluded.
+
+    The ATAR campus is suppressed.  The INT offering has location='Online' which
+    is a mode descriptor — course_location is None and study_mode is 'Online'.
+    """
     html = _make_html(
         course_obj={
             "offerings": [
@@ -539,11 +582,17 @@ def test_unknown_non_int_student_type_code_excluded() -> None:
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
     assert "Albury-Wodonga Campus" not in (result["course_location"] or "")
-    assert "Online" in (result["course_location"] or "")
+    assert result["course_location"] is None
+    assert result["study_mode"] == "Online"
 
 
 def test_mixed_dom_int_offerings_only_int_campus_shown() -> None:
-    """When DOM and INT offerings coexist, only INT campus appears."""
+    """When DOM and INT offerings coexist, only INT campus appears.
+
+    The INT offering here has location='Online' which is a delivery-mode tag,
+    not a campus name.  So course_location is None; study_mode is 'Online'.
+    The DOM Albury-Wodonga campus must not appear.
+    """
     html = _make_html(
         course_obj={
             "offerings": [
@@ -563,6 +612,6 @@ def test_mixed_dom_int_offerings_only_int_campus_shown() -> None:
         }
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
-    assert result["course_location"] == "Online"
+    assert result["course_location"] is None
     assert "Albury-Wodonga Campus" not in (result["course_location"] or "")
     assert result["study_mode"] == "Online"

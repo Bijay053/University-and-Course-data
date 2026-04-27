@@ -24,7 +24,7 @@ Fields produced  (DB-aligned key names)
 ``intake_months``     – list of intake month names (e.g. ["March", "July"])
                         Falls back to standard session calendar (is_session=Y) when
                         the course has no active offerings.
-``course_location``      – comma-separated campus names ("Bathurst Campus, Online")
+``course_location``      – comma-separated physical campus names ("Bathurst Campus, Wagga Wagga Campus")
                           Always included in the result dict (None when no active
                           offerings) to block the regex extractor's "test" garbage.
 ``study_mode``           – comma-separated delivery modes ("On Campus, Online")
@@ -375,6 +375,12 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
 
     Only active offerings that pass ``_offering_is_international`` are
     considered.  Returns ``(None, None)`` when there are no such offerings.
+
+    CSU's JSON uses ``location.value = "Online"`` for distance-delivery
+    offerings — this is a mode descriptor, not a physical campus name.
+    Any offering whose ``location.value`` is "Online" (case-insensitive) is
+    excluded from the locations list; "Online" is added to ``modes`` instead
+    so the study_mode field still reflects online availability.
     """
     locations: list[str] = []
     modes: list[str] = []
@@ -384,8 +390,14 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
         if not _offering_is_international(offering):
             continue
         loc = (offering.get("location") or {}).get("value", "")
-        if loc and loc not in locations:
-            locations.append(loc)
+        if loc:
+            if loc.strip().lower() == "online":
+                # "Online" is a delivery mode in CSU data, not a campus name.
+                # Promote it to modes and skip it as a location.
+                if "Online" not in modes:
+                    modes.append("Online")
+            elif loc not in locations:
+                locations.append(loc)
         mode = (offering.get("mode") or {}).get("value", "")
         if mode and mode not in modes:
             modes.append(mode)
