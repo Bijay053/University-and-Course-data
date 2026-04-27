@@ -1557,7 +1557,7 @@ async def staged_clear_rejected(
 
 
 class _BulkRejectBody(BaseModel):
-    reason: str = "bulk_reject"
+    reason: str = "bulk_reset"
 
 
 @router.post("/staged/bulk-reject/{university_id}")

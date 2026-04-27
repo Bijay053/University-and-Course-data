@@ -861,7 +861,7 @@ export default function UniversityDetail() {
   };
 
   const handleBulkRejectSelected = async () => {
-    if (rawSelectedIds.size === 0 || !bulkRejectReason.trim()) return;
+    if (rawSelectedIds.size === 0) return;
     setBulkRejectRunning(true);
     setShowBulkRejectConfirm(false);
     let rejected = 0; let failed = 0;
@@ -871,7 +871,9 @@ export default function UniversityDetail() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            reason: bulkRejectReason.trim(),
+            // Always store "bulk_reset" so the 7-day rejection block does NOT
+            // apply — the courses can be re-staged on the very next scrape run.
+            reason: "bulk_reset",
             fieldKey: bulkRejectFieldKey === "general" ? null : bulkRejectFieldKey,
           }),
         });
@@ -2457,7 +2459,7 @@ export default function UniversityDetail() {
               </DialogHeader>
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Describe what was wrong on this university's website so the next rerun can use that guidance and produce more accurate data. This feedback is scoped to this university and its similar page layouts, not copied to other universities.
+                  Rejected courses can be re-staged on the very next scrape — no 7-day cooldown applies. Select the field that was wrong so the system knows what to look for on rerun.
                 </div>
                 <div>
                   <label className="text-sm font-medium">Field</label>
@@ -2475,13 +2477,13 @@ export default function UniversityDetail() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Reject reason</label>
+                  <label className="text-sm font-medium">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
                   <Textarea
-                    rows={4}
+                    rows={3}
                     className="mt-1"
                     value={bulkRejectReason}
                     onChange={(e) => setBulkRejectReason(e.target.value)}
-                    placeholder="Example: On this university site, intake is shown under Start Date / Class start date, and location is under Campus Location. Use those labels for rerun. Do not copy this rule to other universities."
+                    placeholder="Optional note for your own reference (e.g. 'fee was from domestic page'). Courses will be re-stageable on the very next scrape."
                   />
                 </div>
               </div>
@@ -2501,10 +2503,10 @@ export default function UniversityDetail() {
                   variant="destructive"
                   className="bg-red-600 hover:bg-red-700"
                   onClick={handleBulkRejectSelected}
-                  disabled={!bulkRejectReason.trim() || bulkRejectRunning}
+                  disabled={bulkRejectRunning}
                 >
                   {bulkRejectRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
-                  Reject And Save University Feedback
+                  Reject Selected
                 </Button>
               </DialogFooter>
             </DialogContent>
