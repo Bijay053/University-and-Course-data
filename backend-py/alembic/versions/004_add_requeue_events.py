@@ -7,8 +7,6 @@ Create Date: 2026-04-27
 from __future__ import annotations
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "004_add_requeue_events"
 down_revision = "003_add_requeue_count"
@@ -17,11 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "scrape_runtime_jobs",
-        sa.Column("requeue_events", JSONB(), nullable=True),
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs ADD COLUMN IF NOT EXISTS requeue_events JSONB"
     )
 
 
 def downgrade() -> None:
-    op.drop_column("scrape_runtime_jobs", "requeue_events")
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs DROP COLUMN IF EXISTS requeue_events"
+    )

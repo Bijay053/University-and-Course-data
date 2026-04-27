@@ -7,7 +7,6 @@ Create Date: 2026-04-26
 from __future__ import annotations
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "001_add_rejection_reason"
 down_revision = None
@@ -16,11 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "scraped_courses",
-        sa.Column("rejection_reason", sa.Text(), nullable=True),
+    op.execute(
+        "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS rejection_reason TEXT"
     )
 
 
 def downgrade() -> None:
-    op.drop_column("scraped_courses", "rejection_reason")
+    op.execute(
+        "ALTER TABLE scraped_courses DROP COLUMN IF EXISTS rejection_reason"
+    )

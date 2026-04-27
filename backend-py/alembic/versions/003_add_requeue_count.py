@@ -1,4 +1,4 @@
-"""Add requeue_count column to scrape_runtime_jobs.
+"""Add requeue_count and claim_count columns to scrape_runtime_jobs.
 
 Revision ID: 003_add_requeue_count
 Revises: 002_add_extraction_method
@@ -7,7 +7,6 @@ Create Date: 2026-04-27
 from __future__ import annotations
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "003_add_requeue_count"
 down_revision = "002_add_extraction_method"
@@ -16,11 +15,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "scrape_runtime_jobs",
-        sa.Column("requeue_count", sa.Integer(), nullable=False, server_default="0"),
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs"
+        " ADD COLUMN IF NOT EXISTS requeue_count INTEGER NOT NULL DEFAULT 0"
+    )
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs"
+        " ADD COLUMN IF NOT EXISTS claim_count INTEGER NOT NULL DEFAULT 0"
     )
 
 
 def downgrade() -> None:
-    op.drop_column("scrape_runtime_jobs", "requeue_count")
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs DROP COLUMN IF EXISTS requeue_count"
+    )
+    op.execute(
+        "ALTER TABLE scrape_runtime_jobs DROP COLUMN IF EXISTS claim_count"
+    )
