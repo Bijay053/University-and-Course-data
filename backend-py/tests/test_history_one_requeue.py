@@ -1,0 +1,273 @@
+"""Integration tests for the history_one endpoint's requeue event injection.
+
+Verifies three behaviours introduced in task #73:
+
+1. Requeue events stored in ``scrape_runtime_jobs.requeue_events`` are returned
+   as synthetic log entries with ``isRequeueEvent=True``, the correct
+   ``requeueNumber``, and a ``createdAt`` timestamp.
+2. Synthetic entries are interleaved chronologically with real log rows from
+   ``scrape_runtime_logs`` (sorted by normalised ISO timestamp).
+3. Multiple requeue events appear in the correct attempt-number order, and an
+   ``exhausted=True`` event produces an ``auto_recovery_exhausted`` entry with
+   ``level='error'``.
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
+import httpx
+import pytest
+from sqlalchemy import text
+
+from app.database import AsyncSessionLocal, engine
+from app.main import app
+from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
+
+
+# ─── Engine-pool fixture ───────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+async def _reset_engine_pool():
+    """Dispose the asyncpg connection pool around every test so connections
+    opened on a previous event loop are never reused."""
+    await engine.dispose()
+    yield
+    await engine.dispose()
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _job_id() -> str:
+    return f"test_requeue_{uuid.uuid4().hex[:12]}"
+
+
+async def _insert_job(
+    job_id: str,
+    requeue_events: list[dict[str, Any]],
+) -> None:
+    """Seed a minimal ScrapeRuntimeJob row with the given requeue_events."""
+    async with AsyncSessionLocal() as db:
+        db.add(
+            ScrapeRuntimeJob(
+                runtime_job_id=job_id,
+                job_type="scrape",
+                status="failed",
+                requeue_events=requeue_events,
+            )
+        )
+        await db.commit()
+
+
+def _parse_ts(ts: str) -> datetime:
+    """Parse an ISO-8601 timestamp string into an aware datetime."""
+    normalised = ts.replace("Z", "+00:00") if ts.endswith("Z") else ts
+    return datetime.fromisoformat(normalised)
+
+
+async def _insert_log(
+    job_id: str,
+    sequence: int,
+    event: str,
+    message: str,
+    created_at: str,
+) -> None:
+    """Seed a single scrape_runtime_logs row for the given job."""
+    async with AsyncSessionLocal() as db:
+        db.add(
+            ScrapeRuntimeLog(
+                runtime_job_id=job_id,
+                sequence=sequence,
+                event=event,
+                payload={"message": message, "level": "info"},
+                created_at=_parse_ts(created_at),
+            )
+        )
+        await db.commit()
+
+
+async def _delete_job(job_id: str) -> None:
+    """Remove the test job (cascades to logs)."""
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :id"),
+            {"id": job_id},
+        )
+        await db.commit()
+
+
+async def _get_history(job_id: str) -> dict[str, Any]:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as ac:
+        r = await ac.get(f"/api/scrape/history/{job_id}")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_requeue_events_appear_as_synthetic_log_entries() -> None:
+    """A job with one requeue event must return a log entry that has
+    ``isRequeueEvent=True``, ``requeueNumber=1``, and a non-empty ``createdAt``."""
+    job_id = _job_id()
+    ts = "2025-06-01T10:00:00+00:00"
+    requeue_events = [
+        {"number": 1, "timestamp": ts, "exhausted": False, "stale_minutes": 5}
+    ]
+    await _insert_job(job_id, requeue_events)
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 1, f"expected 1 requeue log entry, got {logs}"
+
+        entry = requeue_logs[0]
+        assert entry["isRequeueEvent"] is True
+        assert entry["requeueNumber"] == 1
+        assert entry["createdAt"] == ts
+        assert entry["event"] == "auto_recovery"
+        assert entry["level"] == "warn"
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_multiple_requeue_events_are_ordered_by_attempt_number() -> None:
+    """Two requeue events must appear in chronological (attempt-number) order."""
+    job_id = _job_id()
+    ts1 = "2025-06-01T09:00:00+00:00"
+    ts2 = "2025-06-01T10:00:00+00:00"
+    requeue_events = [
+        {"number": 2, "timestamp": ts2, "exhausted": False, "stale_minutes": 5},
+        {"number": 1, "timestamp": ts1, "exhausted": False, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 2, f"expected 2 requeue entries, got {logs}"
+
+        nums = [e["requeueNumber"] for e in requeue_logs]
+        assert nums == sorted(nums), (
+            f"requeue events are not in chronological order: {nums}"
+        )
+        assert nums[0] == 1
+        assert nums[1] == 2
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_exhausted_event_has_correct_shape() -> None:
+    """An event with ``exhausted=True`` must produce an ``auto_recovery_exhausted``
+    log entry at ``level='error'`` with ``exhausted=True`` in the payload."""
+    job_id = _job_id()
+    ts = "2025-06-01T11:00:00+00:00"
+    requeue_events = [
+        {"number": 3, "timestamp": ts, "exhausted": True, "stale_minutes": 5}
+    ]
+    await _insert_job(job_id, requeue_events)
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        exhausted_logs = [
+            e for e in logs if e.get("event") == "auto_recovery_exhausted"
+        ]
+        assert len(exhausted_logs) == 1, f"expected 1 exhausted entry, got {logs}"
+
+        entry = exhausted_logs[0]
+        assert entry["isRequeueEvent"] is True
+        assert entry["requeueNumber"] == 3
+        assert entry["exhausted"] is True
+        assert entry["level"] == "error"
+        assert entry["createdAt"] == ts
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_requeue_events_interleaved_chronologically_with_real_logs() -> None:
+    """Synthetic requeue entries must be sorted among real log rows by timestamp.
+
+    Timeline:
+      T1 09:00 — real log (sequence=1)
+      T2 10:00 — requeue event #1
+      T3 11:00 — real log (sequence=2)
+      T4 12:00 — requeue event #2 (exhausted)
+
+    The merged list must arrive in that exact order.
+    """
+    job_id = _job_id()
+    t1 = "2025-06-02T09:00:00+00:00"
+    t2 = "2025-06-02T10:00:00+00:00"
+    t3 = "2025-06-02T11:00:00+00:00"
+    t4 = "2025-06-02T12:00:00+00:00"
+
+    requeue_events = [
+        {"number": 1, "timestamp": t2, "exhausted": False, "stale_minutes": 5},
+        {"number": 2, "timestamp": t4, "exhausted": True, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+    await _insert_log(job_id, 1, "scrape_start", "Scrape started", t1)
+    await _insert_log(job_id, 2, "scrape_done", "Scrape done", t3)
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        assert len(logs) == 4, f"expected 4 entries, got {logs}"
+
+        timestamps = [e["createdAt"] for e in logs]
+        assert timestamps == sorted(timestamps), (
+            f"logs are not in chronological order: {timestamps}"
+        )
+
+        events = [e["event"] for e in logs]
+        assert events[0] == "scrape_start"
+        assert events[1] == "auto_recovery"
+        assert events[2] == "scrape_done"
+        assert events[3] == "auto_recovery_exhausted"
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_history_one_404_for_unknown_job() -> None:
+    """Requesting history for a non-existent job must return 404."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as ac:
+        r = await ac.get("/api/scrape/history/does_not_exist_xyz")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_job_with_no_requeue_events_returns_only_real_logs() -> None:
+    """When requeue_events is NULL or empty, the endpoint returns only real log rows."""
+    job_id = _job_id()
+    t1 = "2025-06-03T08:00:00+00:00"
+
+    await _insert_job(job_id, [])
+    await _insert_log(job_id, 1, "info_event", "Hello from scraper", t1)
+
+    try:
+        body = await _get_history(job_id)
+        logs: list[dict[str, Any]] = body["logs"]
+
+        assert len(logs) == 1, f"expected exactly 1 log entry, got {logs}"
+        assert logs[0]["event"] == "info_event"
+        assert not any(e.get("isRequeueEvent") for e in logs)
+    finally:
+        await _delete_job(job_id)
