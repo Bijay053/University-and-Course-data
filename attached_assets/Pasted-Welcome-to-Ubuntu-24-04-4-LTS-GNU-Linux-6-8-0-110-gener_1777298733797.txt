@@ -1,0 +1,79 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon Apr 27 14:02:37 UTC 2026
+
+  System load:           0.67
+  Usage of /:            3.2% of 231.44GB
+  Memory usage:          26%
+  Swap usage:            0%
+  Processes:             222
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There is 1 zombie process.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Mon Apr 27 13:13:12 2026 from 162.243.190.66
+root@university-and-course-data:~# cd ~/University-and-Course-data
+git pull
+
+# Restart backend (online_only guard fix from earlier)
+systemctl restart uni-api-py uni-celery
+
+# Rebuild frontend (log colors + navigation persistence)
+pnpm --filter @workspace/university-portal build
+remote: Enumerating objects: 30, done.
+remote: Counting objects: 100% (30/30), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 18 (delta 14), reused 16 (delta 12), pack-reused 0 (from 0)
+Unpacking objects: 100% (18/18), 467.10 KiB | 1.02 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   c2359db..a0c0b34  main       -> origin/main
+Updating c2359db..a0c0b34
+Fast-forward
+ artifacts/university-portal/src/components/scrape-job-card.tsx                                   |  10 +-
+ attached_assets/Pasted--status-queue-Worker-claimed-queued-scrape-job-status-c_1777297395631.txt | 981 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-Course-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TOE_1777297516307.txt | 339 +++++++++++++++++++++
+ attached_assets/image_1777297443307.png                                                          | Bin 0 -> 547608 bytes
+ backend-py/app/services/scraper/guards.py                                                        |  22 +-
+ 5 files changed, 1338 insertions(+), 14 deletions(-)
+ create mode 100644 attached_assets/Pasted--status-queue-Worker-claimed-queued-scrape-job-status-c_1777297395631.txt
+ create mode 100644 attached_assets/Pasted-Course-Name-Score-Level-Duration-Intl-Fee-IELTS-PTE-TOE_1777297516307.txt
+ create mode 100644 attached_assets/image_1777297443307.png
+
+> @workspace/university-portal@0.0.0 build /root/University-and-Course-data/artifacts/university-portal
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/command.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 1877 modules transformed.
+dist/public/index.html                                 0.74 kB │ gzip:   0.41 kB
+dist/public/assets/image_1776917782083-Beo3ixZx.png   10.01 kB
+dist/public/assets/index-CJ-OKtin.css                131.11 kB │ gzip:  21.64 kB
+dist/public/assets/index-DrWTQt7d.js                 858.41 kB │ gzip: 241.64 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.53s
+root@university-and-course-data:~/University-and-Course-data# 
