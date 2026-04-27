@@ -271,6 +271,43 @@ def _pte(text: str) -> dict[str, float] | None:
         ov = float(m.group(1))
         if 10 <= ov <= 90:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
+    # Pattern 3b (full name): "Pearson Test of English Academic 58" /
+    # "Pearson Test of English: 50" — some institutions write out the full
+    # test name rather than the "PTE" abbreviation.  Placed after Pattern 3
+    # to keep it as a catch-all for the long-form variant.
+    m = re.search(
+        r"pearson\s+test\s+of\s+english(?:\s+academic)?[^\n0-9]{0,60}?([1-9][0-9])\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 10 <= ov <= 90:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
+    # Pattern 4 (reverse-order): "50 in PTE Academic" / "a score of 50 in the
+    # PTE" / "50 on Pearson Test of English Academic".
+    #
+    # All three earlier patterns anchor on the PTE keyword and look forward to
+    # a number.  This reverse-order gap means phrases like "achieve 50 in PTE
+    # Academic" or "50 on the Pearson Test of English" silently return None.
+    #
+    # We require "in" or "on" between the digit and the test name to keep the
+    # match tight — bare "50 PTE" (no preposition) is ambiguous in table
+    # contexts.  The negative lookbehind (?<![0-9.]) prevents matching the
+    # trailing digit of a larger number (e.g. "150" → "50").
+    m = re.search(
+        r"(?<![0-9.])([1-9][0-9])\s+(?:in|on)\s+(?:the\s+)?"
+        r"(?:pearson\s+test\s+of\s+english|pte)(?:\s+academic)?\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 10 <= ov <= 90:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
     return None
 
 
@@ -307,6 +344,21 @@ def _toefl(text: str) -> dict[str, float] | None:
         ov = float(m.group(1))
         if 0 <= ov <= 120:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+    # Pattern 2.5 (vision-friendly overall): "TOEFL overall: 87" /
+    # "TOEFL iBT overall 87" / "TOEFL iBT Overall score: 87" — Gemini
+    # Vision's own response format.  Placed before the broad lookahead
+    # fallback so the explicit "overall" keyword shape wins and produces a
+    # result even if the broad fallback would also fire.  Mirrors PTE
+    # Pattern 2.5 and IELTS Pattern 4.5.
+    m = re.search(
+        r"\btoefl(?:\s+ibt)?\s+overall(?:\s+score)?[\s:.\-]{0,8}([0-9]{2,3})\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 0 <= ov <= 120:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
     # Loosest fallback: "TOEFL ... 60" within a short window — covers
     # PDFs that render "TOEFL iBT     60" with multiple spaces.
     m = re.search(r"toefl(?:\s+ibt)?[^\n0-9]{1,60}?([0-9]{2,3})\b", text, re.I)
@@ -314,18 +366,49 @@ def _toefl(text: str) -> dict[str, float] | None:
         ov = float(m.group(1))
         if 30 <= ov <= 120:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
+    # Pattern 4 (reverse-order): "87 in TOEFL iBT" / "87 on the TOEFL" /
+    # "a score of 87 on the TOEFL iBT".
+    #
+    # All earlier patterns anchor on the TOEFL keyword and look forward to a
+    # number.  This gap means "achieve 87 in TOEFL iBT" silently returns None.
+    # We require "in" or "on" to keep the match tight.  The negative lookbehind
+    # (?<![0-9.]) prevents matching the trailing digits of larger numbers.
+    # Floor of 30 avoids matching TOEFL section scores (0-30) as overall.
+    m = re.search(
+        r"(?<![0-9.])([0-9]{2,3})\s+(?:in|on)\s+(?:the\s+)?toefl(?:\s+ibt)?\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 30 <= ov <= 120:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
     return None
 
 
-# --- Cambridge CAE / C1 Advanced (140-230) -----------------------------------
+# --- Cambridge CAE / C1 Advanced / C2 Proficiency (140-230) -----------------
+# Aliases recognised:
+#   • "cambridge" / "cambridge english" (broad)
+#   • "CAE" (Certificate in Advanced English — C1 level)
+#   • "C1 Advanced" (renamed label post-2015)
+#   • "CPE" (Certificate of Proficiency in English — C2 level)
+#   • "C2 Proficiency" (renamed label post-2015)
+# All variants use the same 140-230 numeric scale.
+_CAM_ALT = r"(?:cambridge(?:\s+english)?|cae|cpe|c1\s*advanced|c2\s*proficiency)"
+
+
 def _cambridge(text: str) -> float | None:
     for pat in (
-        r"(?:cambridge|cae|c1\s*advanced)[^0-9]{0,40}?(\d{3})",
-        r"(\d{3})[^0-9]{0,20}(?:cambridge|cae|c1\s*advanced)",
+        # Forward-order: keyword then 3-digit score within 40 chars.
+        _CAM_ALT + r"[^0-9]{0,40}?(\d{3})",
+        # Reverse-order: 3-digit score then keyword within 20 chars.
+        r"(\d{3})[^0-9]{0,20}" + _CAM_ALT,
         # Table layout — wider window between label and number to clear
         # the cells in between. Capped at 80 chars so we don't cross row
         # boundaries.
-        r"(?:cambridge|cae|c1\s*advanced)[^\n0-9]{1,80}?(\d{3})",
+        _CAM_ALT + r"[^\n0-9]{1,80}?(\d{3})",
     ):
         m = re.search(pat, text, re.I)
         if m:
@@ -344,6 +427,13 @@ def _duolingo(text: str) -> float | None:
         r"duolingo(?:\s+english\s+test)?[^\n0-9]{1,80}?(\d{2,3})",
         # Bare DET in a table row.
         r"\bDET\b[^\n0-9]{1,40}?(\d{2,3})",
+        # Reverse-order: "105 in the Duolingo English Test" / "105 on Duolingo"
+        # / "105 in DET". All forward patterns anchor on the test name and look
+        # forward to a score; this catches the inverted phrasing used by some
+        # institutions. We require "in" or "on" + a boundary to keep the match
+        # tight. Negative lookbehind prevents matching trailing digits of larger
+        # numbers (e.g. "1105" → "105").
+        r"(?<![0-9])(\d{2,3})\s+(?:in|on)\s+(?:the\s+)?(?:duolingo(?:\s+english\s+test)?|det)\b",
     ):
         m = re.search(pat, text, re.I)
         if m:
