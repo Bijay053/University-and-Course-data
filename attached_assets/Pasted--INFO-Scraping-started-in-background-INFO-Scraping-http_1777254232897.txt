@@ -1,0 +1,556 @@
+[INFO ] Scraping started in background…
+[INFO ] Scraping https://study.csu.edu.au/international/courses...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[INFO ] Fetching https://study.csu.edu.au/international/courses...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://study.csu.edu.au/international/courses (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://study.csu.edu.au/international/courses: detail (course content present, only 0 outbound links)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://study.csu.edu.au/international/courses
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 8 URL(s) at https://study.csu.edu.au
+[DISCOVER] [DISCOVER] sitemap index https://study.csu.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] [DISCOVER] sub-sitemap https://study.csu.edu.au/sitemap-old-v2: +262 candidates (total 262)
+[DISCOVER] [DISCOVER] sitemap: done — 262 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Access Charles Sturt Entry
+[EXTRACT ] [EXTRACT] 2/200: University Certificate Workforce Essentials
+[EXTRACT ] [EXTRACT] 3/200: Associate Degree Adult Vocational Education
+[EXTRACT ] [EXTRACT] 4/200: Associate Degree Policing Practice
+[ 1/200] Fetching 1/200: Access Charles Sturt Entry
+[ 2/200] Fetching 2/200: University Certificate Workforce Essentials
+[ 4/200] Fetching 4/200: Associate Degree Policing Practice
+[ 3/200] Fetching 3/200: Associate Degree Adult Vocational Education
+[EXTRACT ] [CSU ✓] university-certificate-workforce-essenti — dom=700.0, ielts=6.0, pte=50, dur=0.13years, loc=Goulburn Campus
+[EXTRACT ] [CSU ✓] access-charles-sturt-entry — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/university-certificate-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] associate-degree-adult-vocational-educat — dom=5132.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] associate-degree-policing-practice — ielts=6.0, pte=50, dur=2.0years, loc=Goulburn Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/access-charles-sturt-entry → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 5/200: Bachelor Accounting
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-adult-voca → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/associate-degree-policing-p → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 6/200: Bachelor Adult Vocational Education
+[ 5/200] Fetching 5/200: Bachelor Accounting
+[EXTRACT ] [EXTRACT] 7/200: Bachelor Agricultural Business Management
+[EXTRACT ] [EXTRACT] 8/200: Bachelor Agricultural Science
+[ 6/200] Fetching 6/200: Bachelor Adult Vocational Education
+[ 7/200] Fetching 7/200: Bachelor Agricultural Business Management
+[ 8/200] Fetching 8/200: Bachelor Agricultural Science
+[EXTRACT ] [CSU ✓] bachelor-agricultural-business-managemen — dom=7896.0, int=37040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-adult-vocational-education — dom=5132.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-busin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-accounting — dom=15796.0, int=32000.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-agricultural-science — dom=7516.0, int=37040.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-adult-vocational-e → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agricultural-scien → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Bachelor of Agricultural Business Manage → Business & Management / Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-accounting → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 9/200: Bachelor Agriculture
+[INFO ] [CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 10/200: Bachelor Animal Science
+[EXTRACT ] [EXTRACT] 11/200: Bachelor Applied Research Honours
+[ 9/200] Fetching 9/200: Bachelor Agriculture
+[ 11/200] Fetching 11/200: Bachelor Applied Research Honours
+[EXTRACT ] [EXTRACT] 12/200: Bachelor Arts
+[ 10/200] Fetching 10/200: Bachelor Animal Science
+[ 12/200] Fetching 12/200: Bachelor Arts
+[EXTRACT ] [CSU ✓] bachelor-animal-science — dom=8716.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-animal-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-applied-research-honours — dom=14216.0, int=29760.0, ielts=6.0, pte=50, dur=1.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] bachelor-arts — dom=14900.0, int=24560.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] bachelor-agriculture — dom=7516.0, int=37040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 13/200: Bachelor Arts Social Science Honours
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-agriculture → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-applied-research-h → skipped (CSU pre-seed) (cost=$0.000000)
+[ 13/200] Fetching 13/200: Bachelor Arts Social Science Honours
+[EXTRACT ] [EXTRACT] 14/200: Bachelor Border Management
+[INFO ] [CATEGORY det] Bachelor of Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 15/200: Bachelor Business
+[ 14/200] Fetching 14/200: Bachelor Border Management
+[EXTRACT ] [EXTRACT] 16/200: Bachelor Business Studies
+[ 15/200] Fetching 15/200: Bachelor Business
+[ 16/200] Fetching 16/200: Bachelor Business Studies
+[EXTRACT ] [CSU ✓] bachelor-business — dom=17376.0, int=33120.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-arts-social-science-honours — dom=4736.0, int=27920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-business-studies — dom=17376.0, int=33120.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Bathurst Campus, Yunnan Uni-Fi
+[EXTRACT ] [CSU ✓] bachelor-border-management — dom=17376.0, int=23200.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 17/200: Bachelor Clinical Science Medicine Doctor Medicine
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-business-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-border-management → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-arts-social-scienc → skipped (CSU pre-seed) (cost=$0.000000)
+[ 17/200] Fetching 17/200: Bachelor Clinical Science Medicine Doctor Medicine
+[EXTRACT ] [EXTRACT] 18/200: Bachelor Communication
+[EXTRACT ] [EXTRACT] 19/200: Bachelor Computer Science
+[EXTRACT ] [EXTRACT] 20/200: Bachelor Criminology
+[ 18/200] Fetching 18/200: Bachelor Communication
+[EXTRACT ] [CSU ✓] bachelor-clinical-science-medicine-docto — ielts=6.0, pte=50, dur=5.0years, intakes=March,July,November, loc=Online
+[ 20/200] Fetching 20/200: Bachelor Criminology
+[ 19/200] Fetching 19/200: Bachelor Computer Science
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-clinical-science-m → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 21/200: Bachelor Dental Science
+[ 21/200] Fetching 21/200: Bachelor Dental Science
+[EXTRACT ] [CSU ✓] bachelor-communication — dom=17376.0, int=27920.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-communication → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-computer-science — dom=9100.0, int=28640.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-criminology — dom=17376.0, int=28320.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-dental-science — dom=12516.0, int=72240.0, ielts=7.0, pte=65, dur=5.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 22/200: Bachelor Education Birth To Five Years
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-computer-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-dental-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-criminology → skipped (CSU pre-seed) (cost=$0.000000)
+[ 22/200] Fetching 22/200: Bachelor Education Birth To Five Years
+[EXTRACT ] [EXTRACT] 23/200: Bachelor Education Early Childhood Primary
+[INFO ] [CATEGORY det] Bachelor of Dental Science → Medicine & Health / Dentistry
+[INFO ] [CATEGORY det] Bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[ 23/200] Fetching 23/200: Bachelor Education Early Childhood Primary
+[EXTRACT ] [EXTRACT] 24/200: Bachelor Education K 12
+[EXTRACT ] [EXTRACT] 25/200: Bachelor Education Primary
+[ 24/200] Fetching 24/200: Bachelor Education K 12
+[ 25/200] Fetching 25/200: Bachelor Education Primary
+[EXTRACT ] [CSU ✓] bachelor-education-birth-to-five-years — dom=6316.0, int=27920.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-birth-to → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-education-primary — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March,July, loc=Port Macquarie Campus, Bathurs
+[EXTRACT ] [CSU ✓] bachelor-education-k-12 — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-education-early-childhood-prima — dom=6170.0, int=27280.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus, Albury-Wodong
+[EXTRACT ] [EXTRACT] 26/200: Bachelor Education Secondary Creative Arts
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-primary → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-k-12 → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-early-ch → skipped (CSU pre-seed) (cost=$0.000000)
+[ 26/200] Fetching 26/200: Bachelor Education Secondary Creative Arts
+[EXTRACT ] [EXTRACT] 27/200: Bachelor Education Secondary English
+[INFO ] [CATEGORY det] Bachelor of Education (Early Childhood a → Education & Social Work / Early Childhood
+[EXTRACT ] [EXTRACT] 28/200: Bachelor Education Secondary Hsie
+[ 27/200] Fetching 27/200: Bachelor Education Secondary English
+[EXTRACT ] [EXTRACT] 29/200: Bachelor Education Secondary Mathematics
+[ 28/200] Fetching 28/200: Bachelor Education Secondary Hsie
+[ 29/200] Fetching 29/200: Bachelor Education Secondary Mathematics
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-hsie — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-mathematics — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-english — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-creative-ar — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 30/200: Bachelor Education Secondary Pdhpe
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Bachelor of Education (Secondary) - Math → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 31/200: Bachelor Education Secondary Science
+[ 30/200] Fetching 30/200: Bachelor Education Secondary Pdhpe
+[EXTRACT ] [EXTRACT] 32/200: Bachelor Education Secondary Industry Entry Program
+[EXTRACT ] [EXTRACT] 33/200: Bachelor Education Technology Applied Studies
+[ 31/200] Fetching 31/200: Bachelor Education Secondary Science
+[ 32/200] Fetching 32/200: Bachelor Education Secondary Industry Entry Program
+[ 33/200] Fetching 33/200: Bachelor Education Technology Applied Studies
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-pdhpe — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Wagga Wagga Campus, Bathurst C
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-science — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] bachelor-education-secondary-industry-en — dom=6316.0, ielts=7.5, pte=79, dur=2.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-education-technology-applied-st — dom=6316.0, ielts=7.5, pte=79, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 34/200: Bachelor Educational Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-technolo → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-education-secondar → skipped (CSU pre-seed) (cost=$0.000000)
+[ 34/200] Fetching 34/200: Bachelor Educational Studies
+[EXTRACT ] [EXTRACT] 35/200: Bachelor Emergency Management
+[EXTRACT ] [EXTRACT] 36/200: Bachelor Engineering Honours
+[EXTRACT ] [EXTRACT] 37/200: Bachelor Environmental Science Management
+[ 35/200] Fetching 35/200: Bachelor Emergency Management
+[ 37/200] Fetching 37/200: Bachelor Environmental Science Management
+[ 36/200] Fetching 36/200: Bachelor Engineering Honours
+[EXTRACT ] [CSU ✓] bachelor-educational-studies — dom=12600.0, int=27920.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-emergency-management — dom=10516.0, int=29760.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-educational-studie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-environmental-science-managemen — dom=9536.0, int=35840.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-engineering-honours — dom=9536.0, int=38000.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-emergency-manageme → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-environmental-scie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-engineering-honour → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 38/200: Bachelor Equine Science
+[EXTRACT ] [EXTRACT] 39/200: Bachelor Exercise Sport Science
+[EXTRACT ] [EXTRACT] 40/200: Bachelor Food Science Nutrition
+[ 38/200] Fetching 38/200: Bachelor Equine Science
+[ 39/200] Fetching 39/200: Bachelor Exercise Sport Science
+[EXTRACT ] [EXTRACT] 41/200: Bachelor Geospatial Science
+[ 40/200] Fetching 40/200: Bachelor Food Science Nutrition
+[ 41/200] Fetching 41/200: Bachelor Geospatial Science
+[EXTRACT ] [CSU ✓] bachelor-equine-science — dom=7516.0, int=37600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-equine-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-exercise-sport-science — dom=11284.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-food-science-nutrition — dom=11496.0, int=36880.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-geospatial-science — dom=8136.0, int=35600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July, loc=Albury-Wodonga Campus
+[EXTRACT ] [EXTRACT] 42/200: Bachelor Health Science Mental Health
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-food-science-nutri → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-geospatial-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-exercise-sport-sci → skipped (CSU pre-seed) (cost=$0.000000)
+[ 42/200] Fetching 42/200: Bachelor Health Science Mental Health
+[EXTRACT ] [EXTRACT] 43/200: Bachelor Health Medical Science
+[EXTRACT ] [EXTRACT] 44/200: Bachelor Horticulture
+[EXTRACT ] [EXTRACT] 45/200: Bachelor Human Services
+[ 44/200] Fetching 44/200: Bachelor Horticulture
+[ 45/200] Fetching 45/200: Bachelor Human Services
+[ 43/200] Fetching 43/200: Bachelor Health Medical Science
+[EXTRACT ] [CSU ✓] bachelor-health-medical-science — dom=13456.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-health-medical-sci → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-health-science-mental-health — dom=9536.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-horticulture — dom=7920.0, int=36320.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-human-services — dom=11496.0, int=27920.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 46/200: Bachelor Information Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-human-services → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-horticulture → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-health-science-men → skipped (CSU pre-seed) (cost=$0.000000)
+[ 46/200] Fetching 46/200: Bachelor Information Studies
+[EXTRACT ] [EXTRACT] 47/200: Bachelor Information Technology
+[INFO ] [CATEGORY det] Bachelor of Horticulture → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 48/200: Bachelor Islamic Studies
+[ 47/200] Fetching 47/200: Bachelor Information Technology
+[ 48/200] Fetching 48/200: Bachelor Islamic Studies
+[EXTRACT ] [EXTRACT] 49/200: Bachelor Islamic Studies Honours
+[ 49/200] Fetching 49/200: Bachelor Islamic Studies Honours
+[EXTRACT ] [CSU ✓] bachelor-information-technology — dom=10516.0, int=33600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-information-studies — dom=15416.0, int=27040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-information-techno → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-information-studie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-islamic-studies-honours — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July, loc=United Theological College
+[EXTRACT ] [CSU ✓] bachelor-islamic-studies — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-islamic-studies-ho → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 50/200: Bachelor Laws
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-islamic-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 51/200: Bachelor Laws Bachelor Criminal Justice
+[ 50/200] Fetching 50/200: Bachelor Laws
+[EXTRACT ] [EXTRACT] 52/200: Bachelor Medical Laboratory Science Pathology
+[ 51/200] Fetching 51/200: Bachelor Laws Bachelor Criminal Justice
+[EXTRACT ] [EXTRACT] 53/200: Bachelor Medical Radiation Science
+[ 52/200] Fetching 52/200: Bachelor Medical Laboratory Science Pathology
+[ 53/200] Fetching 53/200: Bachelor Medical Radiation Science
+[EXTRACT ] [CSU ✓] bachelor-laws-bachelor-criminal-justice — dom=16992.0, ielts=6.0, pte=50, dur=5.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-laws-bachelor-crim → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-medical-radiation-science — dom=11496.0, int=38000.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-laws — dom=17376.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-medical-laboratory-science-path — dom=11410.0, int=37120.0, ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Bachelor of Laws / Bachelor of Criminal → Law & Legal Studies / Criminal Justice
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-medical-radiation- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-laws → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-medical-laboratory → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 54/200: Bachelor Nuclear Science Safety
+[EXTRACT ] [EXTRACT] 55/200: Bachelor Nursing
+[EXTRACT ] [EXTRACT] 56/200: Bachelor Occupational Therapy
+[ 54/200] Fetching 54/200: Bachelor Nuclear Science Safety
+[EXTRACT ] [EXTRACT] 57/200: Bachelor Oral Health Therapy Hygiene
+[ 55/200] Fetching 55/200: Bachelor Nursing
+[ 56/200] Fetching 56/200: Bachelor Occupational Therapy
+[ 57/200] Fetching 57/200: Bachelor Oral Health Therapy Hygiene
+[EXTRACT ] [CSU ✓] bachelor-nuclear-science-safety — dom=11496.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-nuclear-science-sa → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-oral-health-therapy-hygiene — dom=14496.0, int=44560.0, ielts=7.0, pte=65, dur=3.0years, intakes=March,July,November, loc=Holmesglen, Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] bachelor-nursing — dom=6316.0, int=34640.0, ielts=7.0, pte=65, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-occupational-therapy — dom=10516.0, int=36480.0, ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 58/200: Bachelor Paramedicine
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-occupational-thera → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-nursing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-oral-health-therap → skipped (CSU pre-seed) (cost=$0.000000)
+[ 58/200] Fetching 58/200: Bachelor Paramedicine
+[EXTRACT ] [EXTRACT] 59/200: Bachelor Pharmacy Honours
+[INFO ] [CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[EXTRACT ] [EXTRACT] 60/200: Bachelor Physiotherapy
+[ 59/200] Fetching 59/200: Bachelor Pharmacy Honours
+[EXTRACT ] [EXTRACT] 61/200: Bachelor Podiatric Medicine
+[ 60/200] Fetching 60/200: Bachelor Physiotherapy
+[ 61/200] Fetching 61/200: Bachelor Podiatric Medicine
+[EXTRACT ] [CSU ✓] bachelor-pharmacy-honours — ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-pharmacy-honours → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-podiatric-medicine — dom=10516.0, ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-physiotherapy — dom=10516.0, int=40400.0, ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-paramedicine — dom=9536.0, int=37120.0, ielts=7.0, pte=65, dur=3.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Bachelor of Pharmacy (Honours) → Medicine & Health / Pharmacy
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-physiotherapy → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-paramedicine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-podiatric-medicine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 62/200: Bachelor Policing
+[INFO ] [CATEGORY det] Bachelor of Physiotherapy → Medicine & Health / Physiotherapy
+[EXTRACT ] [EXTRACT] 63/200: Bachelor Policing Investigations
+[EXTRACT ] [EXTRACT] 64/200: Bachelor Policing Public Safety
+[ 62/200] Fetching 62/200: Bachelor Policing
+[EXTRACT ] [EXTRACT] 65/200: Bachelor Psychology
+[ 63/200] Fetching 63/200: Bachelor Policing Investigations
+[ 64/200] Fetching 64/200: Bachelor Policing Public Safety
+[ 65/200] Fetching 65/200: Bachelor Psychology
+[EXTRACT ] [CSU ✓] bachelor-psychology — dom=10516.0, int=30400.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-policing — dom=17376.0, int=25600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-policing-public-safety — dom=16396.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-policing-investigations — dom=17376.0, int=25600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-public-sa → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-investiga → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 66/200: Bachelor Science
+[EXTRACT ] [EXTRACT] 67/200: Bachelor Science Honours
+[EXTRACT ] [EXTRACT] 68/200: Bachelor Social Science Psychology
+[ 66/200] Fetching 66/200: Bachelor Science
+[EXTRACT ] [EXTRACT] 69/200: Bachelor Social Science Psychology Honours
+[ 67/200] Fetching 67/200: Bachelor Science Honours
+[ 69/200] Fetching 69/200: Bachelor Social Science Psychology Honours
+[ 68/200] Fetching 68/200: Bachelor Social Science Psychology
+[EXTRACT ] [CSU ✓] bachelor-science — dom=9916.0, int=36480.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology — dom=13456.0, int=31040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology-honou — dom=9536.0, int=30400.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-science-honours — dom=9536.0, int=36480.0, ielts=6.0, pte=50, dur=1.0years, intakes=March, loc=Albury-Wodonga Campus
+[EXTRACT ] [EXTRACT] 70/200: Bachelor Social Work
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science-honours → skipped (CSU pre-seed) (cost=$0.000000)
+[ 70/200] Fetching 70/200: Bachelor Social Work
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 71/200: Bachelor Theology
+[EXTRACT ] [EXTRACT] 72/200: Bachelor Theology Honours
+[EXTRACT ] [EXTRACT] 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[ 71/200] Fetching 71/200: Bachelor Theology
+[ 72/200] Fetching 72/200: Bachelor Theology Honours
+[ 73/200] Fetching 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[EXTRACT ] [CSU ✓] bachelor-social-work — dom=11496.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-theology-honours — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=United Theological College, Ca
+[EXTRACT ] [CSU ✓] bachelor-veterinary-biology-bachelor-vet — dom=11316.0, int=72080.0, ielts=7.0, pte=65, dur=6.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-theology — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-biology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology-honours → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 74/200: Bachelor Veterinary Technology
+[EXTRACT ] [EXTRACT] 75/200: Bachelor Viticulture
+[ 74/200] Fetching 74/200: Bachelor Veterinary Technology
+[EXTRACT ] [EXTRACT] 76/200: Bachelor Wine Science
+[EXTRACT ] [EXTRACT] 77/200: Diploma Agricultural Studies
+[ 75/200] Fetching 75/200: Bachelor Viticulture
+[ 76/200] Fetching 76/200: Bachelor Wine Science
+[ 77/200] Fetching 77/200: Diploma Agricultural Studies
+[EXTRACT ] [CSU ✓] bachelor-veterinary-technology — dom=9724.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-technol → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-wine-science — dom=9308.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-agricultural-studies — dom=10076.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-viticulture — dom=7136.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 78/200: Diploma Environmental Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-viticulture → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-wine-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-agricultural-studie → skipped (CSU pre-seed) (cost=$0.000000)
+[ 78/200] Fetching 78/200: Diploma Environmental Studies
+[EXTRACT ] [EXTRACT] 79/200: Diploma Exercise Studies
+[EXTRACT ] [EXTRACT] 80/200: Diploma Health Science Mental Health
+[EXTRACT ] [EXTRACT] 81/200: Diploma Psychological Studies
+[ 79/200] Fetching 79/200: Diploma Exercise Studies
+[ 81/200] Fetching 81/200: Diploma Psychological Studies
+[ 80/200] Fetching 80/200: Diploma Health Science Mental Health
+[EXTRACT ] [CSU ✓] diploma-environmental-studies — dom=10516.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-environmental-studi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] diploma-exercise-studies — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-health-science-mental-health — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-psychological-studies — dom=17376.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 82/200: Doctor Business Administration
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-exercise-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-health-science-ment → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-psychological-studi → skipped (CSU pre-seed) (cost=$0.000000)
+[ 82/200] Fetching 82/200: Doctor Business Administration
+[EXTRACT ] [EXTRACT] 83/200: Doctor Philosophy Arts Education
+[EXTRACT ] [EXTRACT] 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[EXTRACT ] [EXTRACT] 85/200: Doctor Philosophy Science Agriculture
+[ 83/200] Fetching 83/200: Doctor Philosophy Arts Education
+[ 84/200] Fetching 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[ 85/200] Fetching 85/200: Doctor Philosophy Science Agriculture
+[EXTRACT ] [CSU ✓] doctor-philosophy-science-agriculture — dom=36880.0, int=39840.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-business-administration — dom=33680.0, int=34640.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-science-a → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] doctor-philosophy-business-justice-behav — dom=35920.0, int=40320.0, ielts=6.5, pte=58, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] doctor-philosophy-arts-education — dom=29120.0, int=33120.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Doctor of Philosophy (Science and Agricu → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 86/200: Doctor Public Safety
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-arts-educ → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-business- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 87/200: Doctor Social Work
+[ 86/200] Fetching 86/200: Doctor Public Safety
+[ 87/200] Fetching 87/200: Doctor Social Work
+[EXTRACT ] [EXTRACT] 88/200: Doctor Veterinary Studies
+[EXTRACT ] [EXTRACT] 89/200: Executive Masters International Police Leadership
+[ 89/200] Fetching 89/200: Executive Masters International Police Leadership
+[ 88/200] Fetching 88/200: Doctor Veterinary Studies
+[EXTRACT ] [CSU ✓] doctor-social-work — dom=29120.0, int=33120.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] executive-masters-international-police-l — ielts=6.0, pte=50, dur=0.75years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] doctor-veterinary-studies — dom=12800.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-public-safety — dom=33680.0, int=33680.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/executive-masters-internati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-public-safety → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Doctor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-veterinary-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 90/200: Graduate Certificate Adult Vocational Education
+[EXTRACT ] [EXTRACT] 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [EXTRACT] 92/200: Graduate Certificate Agricultural Business Management
+[EXTRACT ] [EXTRACT] 93/200: Graduate Certificate Agriculture
+[ 90/200] Fetching 90/200: Graduate Certificate Adult Vocational Education
+[ 91/200] Fetching 91/200: Graduate Certificate Ageing Health
+[ 93/200] Fetching 93/200: Graduate Certificate Agriculture
+[ 92/200] Fetching 92/200: Graduate Certificate Agricultural Business Management
+[EXTRACT ] [CSU ✓] graduate-certificate-ageing-health — dom=12920.0, int=13960.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ageing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-agriculture — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-agricultural-busine — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-adult-vocational-ed — dom=2368.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 94/200: Graduate Certificate Applied Artificial Intelligence
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-adult- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[ 94/200] Fetching 94/200: Graduate Certificate Applied Artificial Intelligence
+[INFO ] [CATEGORY det] Graduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[INFO ] [CATEGORY det] Graduate Certificate in Agricultural Bus → Business & Management / Management
+[EXTRACT ] [EXTRACT] 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [EXTRACT] 96/200: Graduate Certificate Applied Data Science
+[EXTRACT ] [EXTRACT] 97/200: Graduate Certificate Audiovisual Archiving
+[ 95/200] Fetching 95/200: Graduate Certificate Applied Business
+[ 96/200] Fetching 96/200: Graduate Certificate Applied Data Science
+[ 97/200] Fetching 97/200: Graduate Certificate Audiovisual Archiving
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-artificial- — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-audiovisual-archivi — dom=12920.0, int=13520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-business — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-data-scienc — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Artifici → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-audiov → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 98/200: Graduate Certificate Business Administration
+[EXTRACT ] [EXTRACT] 99/200: Graduate Certificate Business Administration Computing
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Data Sci → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 100/200: Graduate Certificate Business Data Analytics
+[ 98/200] Fetching 98/200: Graduate Certificate Business Administration
+[ 99/200] Fetching 99/200: Graduate Certificate Business Administration Computing
+[ 100/200] Fetching 100/200: Graduate Certificate Business Data Analytics
+[EXTRACT ] [EXTRACT] 101/200: Graduate Certificate Case Management Coordinated Care
+[ 101/200] Fetching 101/200: Graduate Certificate Case Management Coordinated Care
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-business-data-analy — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-case-management-coo — dom=7708.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [EXTRACT] 102/200: Graduate Certificate Classical Arabic
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-case-m → skipped (CSU pre-seed) (cost=$0.000000)
+[ 102/200] Fetching 102/200: Graduate Certificate Classical Arabic
+[EXTRACT ] [EXTRACT] 103/200: Graduate Certificate Cloud Computing Virtualisation
+[INFO ] [CATEGORY det] Graduate Certificate in Business Data An → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 104/200: Graduate Certificate Communication
+[ 103/200] Fetching 103/200: Graduate Certificate Cloud Computing Virtualisation
+[ 104/200] Fetching 104/200: Graduate Certificate Communication
+[EXTRACT ] [EXTRACT] 105/200: Graduate Certificate Computing Career Transition
+[ 105/200] Fetching 105/200: Graduate Certificate Computing Career Transition
+[EXTRACT ] [CSU ✓] graduate-certificate-classical-arabic — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-classi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-cloud-computing-vir — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-computing-career-tr — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-communication — dom=8688.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [EXTRACT] 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-comput → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cloud- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-commun → skipped (CSU pre-seed) (cost=$0.000000)
+[ 106/200] Fetching 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [EXTRACT] 107/200: Graduate Certificate Customs Administration
+[EXTRACT ] [EXTRACT] 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [EXTRACT] 109/200: Graduate Certificate Data Management
+[ 107/200] Fetching 107/200: Graduate Certificate Customs Administration
+[ 109/200] Fetching 109/200: Graduate Certificate Data Management
+[ 108/200] Fetching 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [CSU ✓] graduate-certificate-paramedicine — dom=14960.0, int=19240.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-parame → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-cyber-security — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-data-management — ielts=6.0, pte=50, dur=0.5years, intakes=March, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-customs-administrat — dom=10280.0, int=11760.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 110/200: Graduate Certificate Digital Archiving
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-custom → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-data-m → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cyber- → skipped (CSU pre-seed) (cost=$0.000000)
+[ 110/200] Fetching 110/200: Graduate Certificate Digital Archiving
+[EXTRACT ] [EXTRACT] 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [EXTRACT] 112/200: Graduate Certificate Digital Health
+[INFO ] [CATEGORY det] Graduate Certificate in Cyber Security → Computer Science & IT / Cyber Security
+[ 111/200] Fetching 111/200: Graduate Certificate Digital Communication
+[ 112/200] Fetching 112/200: Graduate Certificate Digital Health
+[EXTRACT ] [EXTRACT] 113/200: Graduate Certificate Education
+[ 113/200] Fetching 113/200: Graduate Certificate Education
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-communicati — ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-archiving — dom=12920.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-health — dom=13960.0, int=14520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-education — dom=3948.0, int=13960.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-educat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [EXTRACT] 115/200: Graduate Certificate In Fish Conservation And Management
+[ 114/200] Fetching 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [EXTRACT] 116/200: Graduate Certificate Financial Crime
+[EXTRACT ] [EXTRACT] 117/200: Graduate Certificate Gis Remote Sensing
+[ 115/200] Fetching 115/200: Graduate Certificate In Fish Conservation And Management
+[ 116/200] Fetching 116/200: Graduate Certificate Financial Crime
+[ 117/200] Fetching 117/200: Graduate Certificate Gis Remote Sensing
+[EXTRACT ] [CSU ✓] graduate-certificate-environmental-manag — dom=18160.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-enviro → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-in-fish-conservatio — int=17920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-financial-crime — dom=13200.0, int=14000.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-gis-remote-sensing — dom=17440.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-in-fis → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-gis-re → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-financ → skipped (CSU pre-seed) (cost=$0.000000)
+[ 118/200] Fetching 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[EXTRACT ] [EXTRACT] 119/200: Graduate Certificate Health Management Leadership
+[EXTRACT ] [EXTRACT] 120/200: Graduate Certificate Human Resource Management
+[EXTRACT ] [EXTRACT] 121/200: Graduate Certificate Human Services
+[ 119/200] Fetching 119/200: Graduate Certificate Health Management Leadership
+[ 120/200] Fetching 120/200: Graduate Certificate Human Resource Management
+[ 121/200] Fetching 121/200: Graduate Certificate Human Services
+[EXTRACT ] [CSU ✓] graduate-certificate-health-management-l — dom=13960.0, int=14520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-health → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-geostatistics-spati — dom=17440.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Albury-Wodonga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-human-resource-mana — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-human-services — dom=12920.0, int=17248.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [EXTRACT] 122/200: Graduate Certificate Industrial Relations
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-geosta → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[ 122/200] Fetching 122/200: Graduate Certificate Industrial Relations
+[EXTRACT ] [EXTRACT] 123/200: Graduate Certificate Information Studies
+[EXTRACT ] [EXTRACT] 124/200: Graduate Certificate Information Technology
+[INFO ] [CATEGORY det] Graduate Certificate in Human Resource M → Business & Management / Human Resources
+[ 123/200] Fetching 123/200: Graduate Certificate Information Studies
+[ 124/200] Fetching 124/200: Graduate Certificate Information Technology
+[EXTRACT ] [EXTRACT] 125/200: Graduate Certificate Intelligence Analysis
+[ 125/200] Fetching 125/200: Graduate Certificate Intelligence Analysis
+[EXTRACT ] [CSU ✓] graduate-certificate-industrial-relation — dom=16840.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-indust → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-information-studies — dom=12920.0, int=13520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-information-technol — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-intelligence-analys — dom=8688.0, int=12900.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-intell → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[ 126/200] Fetching 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[EXTRACT ] [EXTRACT] 127/200: Graduate Certificate Islamic Psychology
+[EXTRACT ] [EXTRACT] 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [EXTRACT] 129/200: Graduate Certificate Leadership Management Policing Security
+[ 127/200] Fetching 127/200: Graduate Certificate Islamic Psychology
+[ 129/200] Fetching 129/200: Graduate Certificate Leadership Management Policing Security
+[ 128/200] Fetching 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [CSU ✓] graduate-certificate-intersectionality-d — dom=12920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inters → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-psychology — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-studies — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] graduate-certificate-leadership-manageme — dom=8688.0, int=12900.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online

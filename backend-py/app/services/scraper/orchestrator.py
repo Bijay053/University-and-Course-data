@@ -430,9 +430,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")
-        links = await discover_course_links(
-            scrape_url, max_pages=max_pages, max_courses=max_courses, emit=emit
-        )
+
+        # CSU international listing is a React SPA — plain HTTP returns 0 links
+        # and the sitemap only has domestic /courses/ URLs.  Use Playwright to
+        # render the listing page and extract /international/courses/<slug> links
+        # before falling back to the normal BFS discovery.
+        links: list[dict] = []
+        if "study.csu.edu.au/international/courses" in scrape_url:
+            try:
+                from app.services.scraper.csu_browser_discover import (
+                    browser_discover_csu_international,
+                )
+                links = await browser_discover_csu_international(
+                    emit=emit,
+                    max_courses=max_courses,
+                )
+            except Exception as _csu_disc_exc:  # noqa: BLE001
+                log.warning("CSU browser discovery failed: %s — falling back to BFS", _csu_disc_exc)
+
+        if not links:
+            links = await discover_course_links(
+                scrape_url, max_pages=max_pages, max_courses=max_courses, emit=emit
+            )
         summary["discovered"] = len(links)
         log.info("Discovered %d candidate course links for %s", len(links), uni_name)
         await emit("status", f"Discovered {len(links)} candidate course links", phase="discover", count=len(links))
