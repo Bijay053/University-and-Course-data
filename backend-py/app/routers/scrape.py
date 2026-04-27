@@ -839,12 +839,29 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
                 ev_exc,
             )
 
-    # Sort all entries (real + synthetic) by (createdAt, sequence) so the
-    # timeline is chronological. The secondary sequence key makes ordering
-    # deterministic when two entries share the same timestamp or when
-    # createdAt is missing (synthetic requeue entries use negative sequence
-    # numbers so they slot before real log lines at the same second).
-    logs.sort(key=lambda e: (e.get("createdAt") or "", int(e.get("sequence") or 0)))
+    def _ts_sort_key(e: dict) -> tuple:
+        """Normalise ISO-8601 UTC timestamps to a canonical form so that
+        mixed ``+00:00`` / ``Z`` suffixes compare deterministically.
+        Falls back to the raw string (or empty string) when parsing fails."""
+        raw = e.get("createdAt") or ""
+        try:
+            from datetime import datetime, timezone
+            # datetime.fromisoformat handles both "+00:00" and "Z" (Py 3.11+).
+            # For earlier versions we replace "Z" with "+00:00" first.
+            normalised = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+            parsed = datetime.fromisoformat(normalised)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return (parsed.isoformat(), int(e.get("sequence") or 0))
+        except Exception:
+            return (raw, int(e.get("sequence") or 0))
+
+    # Sort all entries (real + synthetic) by (normalised_createdAt, sequence)
+    # so the timeline is chronological regardless of timestamp suffix format.
+    # The secondary sequence key is a tiebreaker; synthetic requeue entries
+    # use negative sequence numbers so they naturally precede real log lines
+    # recorded at the same second.
+    logs.sort(key=_ts_sort_key)
 
     # Staged courses for this job — return full ReviewStagedCourse shape so
     # ReviewScrapedCoursesTable renders correctly in the history "View Courses" panel.
