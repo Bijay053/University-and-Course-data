@@ -1,0 +1,117 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Mon Apr 27 08:24:51 UTC 2026
+
+  System load:           0.01
+  Usage of /:            3.1% of 231.44GB
+  Memory usage:          14%
+  Swap usage:            0%
+  Processes:             176
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Mon Apr 27 04:49:47 2026 from 162.243.190.66
+root@university-and-course-data:~# git pull origin main
+fatal: not a git repository (or any of the parent directories): .git
+root@university-and-course-data:~# git clone https://github.com/Bijay053/University-and-Course-data.git
+cd University-and-Course-data
+fatal: destination path 'University-and-Course-data' already exists and is not an empty directory.
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git pull origin main
+remote: Enumerating objects: 752, done.
+remote: Counting objects: 100% (556/556), done.
+remote: Compressing objects: 100% (134/134), done.
+remote: Total 752 (delta 456), reused 504 (delta 421), pack-reused 196 (from 1)
+Receiving objects: 100% (752/752), 5.66 MiB | 17.87 MiB/s, done.
+Resolving deltas: 100% (560/560), completed with 30 local objects.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+ + 0bfb0e4...5d50b57 main       -> origin/main  (forced update)
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git status
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 51 and 110 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        drizzle-kit
+
+nothing added to commit but untracked files present (use "git add" to track)
+root@university-and-course-data:~/University-and-Course-data# git fetch origin
+git reset --hard origin/main
+HEAD is now at 5d50b57 Consolidate inline logging imports in scrape.py to module level
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data
+git fetch origin
+git reset --hard origin/main
+HEAD is now at 5d50b57 Consolidate inline logging imports in scrape.py to module level
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+
+# If using systemd/supervisor restart your services, or manually:
+# Restart FastAPI
+pkill -f uvicorn && PYTHONPATH=. python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload &
+
+# Restart Celery worker
+pkill -f celery && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=2 --loglevel=info -Q scrape &
+[1] 665424
+[2] 665425
+root@university-and-course-data:~/University-and-Course-data/backend-py# Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+Command 'celery' not found, but can be installed with:
+apt install celery
+
+[1]-  Exit 127                pkill -f uvicorn && PYTHONPATH=. python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+[2]+  Exit 127                pkill -f celery && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=2 --loglevel=info -Q scrape
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 12 (delta 9), reused 12 (delta 9), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 7.99 KiB | 682.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   5d50b57..f7fabd4  main       -> origin/main
+Updating 5d50b57..f7fabd4
+Fast-forward
+ attached_assets/Pasted-Fetching-19-200-Commonwealth-Supported-19-200-66m-32s-l_1777281372134.txt | 454 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-110-gener_1777281253855.txt |  70 ++++++++++
+ attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-110-gener_1777281281067.txt |  77 +++++++++++
+ 3 files changed, 601 insertions(+)
+ create mode 100644 attached_assets/Pasted-Fetching-19-200-Commonwealth-Supported-19-200-66m-32s-l_1777281372134.txt
+ create mode 100644 attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-110-gener_1777281253855.txt
+ create mode 100644 attached_assets/Pasted-Welcome-to-Ubuntu-24-04-4-LTS-GNU-Linux-6-8-0-110-gener_1777281281067.txt
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+journalctl -u your-service-name -n 50 --no-pager
+-- No entries --
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
