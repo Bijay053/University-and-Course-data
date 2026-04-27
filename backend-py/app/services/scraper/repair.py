@@ -32,6 +32,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import (
     Course,
@@ -125,7 +126,71 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         phase="queue",
     )
 
+    # Per-university Redis lock variables — declared before the try block so
+    # the finally clause can always reference them regardless of exit path.
+    _uni_lock_redis: Any | None = None
+    _uni_lock_key: str | None = None
+    _uni_lock_acquired: bool = False
+
     try:
+        # ── Per-university Redis distributed lock ────────────────────────────
+        # Mirrors the same guard in run_scrape (orchestrator.py). Prevents a
+        # second repair (or a concurrent normal scrape) for the same university
+        # from running in parallel and producing duplicate english_requirements
+        # rows or conflicting on the unique index.
+        # Strategy: SET NX with a 4-hour TTL. Lock value is the job_id so the
+        # rightful holder can identify and release it. Fail open if Redis is
+        # unavailable so a Redis outage never blocks repairs entirely.
+        _uni_lock_key = f"scrape:uni_lock:{job.university_id}"
+        try:
+            import redis.asyncio as _aioredis
+            _uni_lock_redis = _aioredis.from_url(
+                settings.redis_url, decode_responses=True, socket_timeout=3
+            )
+            _uni_lock_acquired = bool(
+                await _uni_lock_redis.set(
+                    _uni_lock_key, runtime_job_id, nx=True, ex=14400
+                )
+            )
+        except Exception as _lock_err:  # noqa: BLE001
+            log.warning(
+                "Could not connect to Redis for uni lock (failing open): %s", _lock_err
+            )
+            _uni_lock_acquired = True  # fail open — allow the repair
+
+        if not _uni_lock_acquired:
+            _holder = "unknown"
+            try:
+                if _uni_lock_redis is not None:
+                    _holder = (await _uni_lock_redis.get(_uni_lock_key)) or "unknown"
+            except Exception:  # noqa: BLE001
+                pass
+            log.warning(
+                "University %d already being scraped/repaired (lock held by %s) — "
+                "aborting duplicate repair job %s",
+                job.university_id, _holder, runtime_job_id,
+            )
+            await emit(
+                "status",
+                f"Duplicate repair aborted — university {job.university_id} "
+                f"is already being scraped or repaired by job {_holder}",
+                phase="queue",
+                level="warn",
+            )
+            from sqlalchemy import text as _text
+            await db.execute(
+                _text(
+                    "UPDATE scrape_runtime_jobs "
+                    "SET status = 'stopped', completed_at = NOW(), "
+                    "error_message = 'Aborted: another scrape or repair for this "
+                    "university is already running' "
+                    "WHERE runtime_job_id = :jid AND status = 'running'"
+                ),
+                {"jid": runtime_job_id},
+            )
+            await db.commit()
+            return {"ok": False, "reason": "concurrent_university_scrape"}
+
         uni = (
             await db.execute(
                 select(University).where(University.id == job.university_id)
@@ -375,6 +440,25 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         job.error_message = str(exc)[:1000]
         await db.commit()
         return {"ok": False, "reason": str(exc), **summary}
+    finally:
+        # ── Release the per-university Redis distributed lock ────────────────
+        # Only release if we actually hold it (lock value must still match our
+        # job_id to guard against an expired TTL being re-acquired by a newer
+        # job before our finally block runs).
+        if _uni_lock_redis is not None:
+            try:
+                if _uni_lock_acquired and _uni_lock_key:
+                    current_holder = await _uni_lock_redis.get(_uni_lock_key)
+                    if current_holder == runtime_job_id:
+                        await _uni_lock_redis.delete(_uni_lock_key)
+            except Exception as _rel_err:  # noqa: BLE001
+                log.warning(
+                    "Failed to release uni lock %s: %s", _uni_lock_key, _rel_err
+                )
+            try:
+                await _uni_lock_redis.aclose()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def _safe_float(v: Any) -> float | None:
