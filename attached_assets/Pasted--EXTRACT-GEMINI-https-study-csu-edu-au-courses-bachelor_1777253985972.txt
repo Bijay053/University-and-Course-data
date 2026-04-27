@@ -1,0 +1,800 @@
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-public-sa → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-policing — dom=17376.0, int=25600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-podiatric-medicine — dom=10516.0, ielts=7.0, pte=65, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-policing-investigations — dom=17376.0, int=25600.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 65/200: Bachelor Psychology
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing-investiga → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-policing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-podiatric-medicine → skipped (CSU pre-seed) (cost=$0.000000)
+[ 65/200] Fetching 65/200: Bachelor Psychology
+[EXTRACT ] [EXTRACT] 66/200: Bachelor Science
+[EXTRACT ] [EXTRACT] 67/200: Bachelor Science Honours
+[EXTRACT ] [EXTRACT] 68/200: Bachelor Social Science Psychology
+[ 66/200] Fetching 66/200: Bachelor Science
+[ 68/200] Fetching 68/200: Bachelor Social Science Psychology
+[ 67/200] Fetching 67/200: Bachelor Science Honours
+[EXTRACT ] [CSU ✓] bachelor-science-honours — dom=9536.0, int=36480.0, ielts=6.0, pte=50, dur=1.0years, intakes=March, loc=Albury-Wodonga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science-honours → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-psychology — dom=10516.0, int=30400.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-science — dom=9916.0, int=36480.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology — dom=13456.0, int=31040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 69/200: Bachelor Social Science Psychology Honours
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[ 69/200] Fetching 69/200: Bachelor Social Science Psychology Honours
+[EXTRACT ] [EXTRACT] 70/200: Bachelor Social Work
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[INFO ] [CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[ 70/200] Fetching 70/200: Bachelor Social Work
+[EXTRACT ] [EXTRACT] 71/200: Bachelor Theology
+[EXTRACT ] [EXTRACT] 72/200: Bachelor Theology Honours
+[ 71/200] Fetching 71/200: Bachelor Theology
+[ 72/200] Fetching 72/200: Bachelor Theology Honours
+[EXTRACT ] [CSU ✓] bachelor-social-work — dom=11496.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-social-science-psychology-honou — dom=9536.0, int=30400.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-theology — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-theology-honours — dom=17376.0, int=24560.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=United Theological College, Ca
+[INFO ] [CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-social-science-psy → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-theology-honours → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[INFO ] [CATEGORY det] Bachelor of Social Science (Psychology) → Medicine & Health / Psychology
+[ 73/200] Fetching 73/200: Bachelor Veterinary Biology Bachelor Veterinary Science
+[EXTRACT ] [EXTRACT] 74/200: Bachelor Veterinary Technology
+[EXTRACT ] [EXTRACT] 75/200: Bachelor Viticulture
+[EXTRACT ] [EXTRACT] 76/200: Bachelor Wine Science
+[ 75/200] Fetching 75/200: Bachelor Viticulture
+[ 74/200] Fetching 74/200: Bachelor Veterinary Technology
+[ 76/200] Fetching 76/200: Bachelor Wine Science
+[EXTRACT ] [CSU ✓] bachelor-viticulture — dom=7136.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-viticulture → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] bachelor-veterinary-technology — dom=9724.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-veterinary-biology-bachelor-vet — dom=11316.0, int=72080.0, ielts=7.0, pte=65, dur=6.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] bachelor-wine-science — dom=9308.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 77/200: Diploma Agricultural Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-biology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-wine-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/bachelor-veterinary-technol → skipped (CSU pre-seed) (cost=$0.000000)
+[ 77/200] Fetching 77/200: Diploma Agricultural Studies
+[EXTRACT ] [EXTRACT] 78/200: Diploma Environmental Studies
+[EXTRACT ] [EXTRACT] 79/200: Diploma Exercise Studies
+[EXTRACT ] [EXTRACT] 80/200: Diploma Health Science Mental Health
+[ 78/200] Fetching 78/200: Diploma Environmental Studies
+[ 80/200] Fetching 80/200: Diploma Health Science Mental Health
+[ 79/200] Fetching 79/200: Diploma Exercise Studies
+[EXTRACT ] [CSU ✓] diploma-environmental-studies — dom=10516.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-environmental-studi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] diploma-agricultural-studies — dom=10076.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-exercise-studies — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-health-science-mental-health — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 81/200: Diploma Psychological Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-exercise-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-agricultural-studie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-health-science-ment → skipped (CSU pre-seed) (cost=$0.000000)
+[ 81/200] Fetching 81/200: Diploma Psychological Studies
+[EXTRACT ] [EXTRACT] 82/200: Doctor Business Administration
+[EXTRACT ] [EXTRACT] 83/200: Doctor Philosophy Arts Education
+[EXTRACT ] [EXTRACT] 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[ 83/200] Fetching 83/200: Doctor Philosophy Arts Education
+[ 82/200] Fetching 82/200: Doctor Business Administration
+[ 84/200] Fetching 84/200: Doctor Philosophy Business Justice Behavioural Sciences
+[EXTRACT ] [CSU ✓] doctor-philosophy-arts-education — dom=29120.0, int=33120.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-arts-educ → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] doctor-philosophy-business-justice-behav — dom=35920.0, int=40320.0, ielts=6.5, pte=58, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] diploma-psychological-studies — dom=17376.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-business-administration — dom=33680.0, int=34640.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 85/200: Doctor Philosophy Science Agriculture
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-business- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/diploma-psychological-studi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[ 85/200] Fetching 85/200: Doctor Philosophy Science Agriculture
+[EXTRACT ] [EXTRACT] 86/200: Doctor Public Safety
+[EXTRACT ] [EXTRACT] 87/200: Doctor Social Work
+[EXTRACT ] [EXTRACT] 88/200: Doctor Veterinary Studies
+[ 86/200] Fetching 86/200: Doctor Public Safety
+[ 87/200] Fetching 87/200: Doctor Social Work
+[ 88/200] Fetching 88/200: Doctor Veterinary Studies
+[EXTRACT ] [CSU ✓] doctor-philosophy-science-agriculture — dom=36880.0, int=39840.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-public-safety — dom=33680.0, int=33680.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-social-work — dom=29120.0, int=33120.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] doctor-veterinary-studies — dom=12800.0, ielts=6.5, pte=58, dur=4.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-public-safety → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-philosophy-science-a → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 89/200: Executive Masters International Police Leadership
+[INFO ] [CATEGORY det] Doctor of Social Work → Education & Social Work / Social Work
+[INFO ] [CATEGORY det] Doctor of Philosophy (Science and Agricu → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/doctor-veterinary-studies → skipped (CSU pre-seed) (cost=$0.000000)
+[ 89/200] Fetching 89/200: Executive Masters International Police Leadership
+[EXTRACT ] [EXTRACT] 90/200: Graduate Certificate Adult Vocational Education
+[EXTRACT ] [EXTRACT] 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [EXTRACT] 92/200: Graduate Certificate Agricultural Business Management
+[ 90/200] Fetching 90/200: Graduate Certificate Adult Vocational Education
+[ 92/200] Fetching 92/200: Graduate Certificate Agricultural Business Management
+[ 91/200] Fetching 91/200: Graduate Certificate Ageing Health
+[EXTRACT ] [CSU ✓] graduate-certificate-agricultural-busine — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-adult-vocational-ed — dom=2368.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-ageing-health — dom=12920.0, int=13960.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] executive-masters-international-police-l — ielts=6.0, pte=50, dur=0.75years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Agricultural Bus → Business & Management / Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-adult- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/executive-masters-internati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ageing → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [EXTRACT] 94/200: Graduate Certificate Applied Artificial Intelligence
+[ 93/200] Fetching 93/200: Graduate Certificate Agriculture
+[EXTRACT ] [EXTRACT] 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [EXTRACT] 96/200: Graduate Certificate Applied Data Science
+[ 94/200] Fetching 94/200: Graduate Certificate Applied Artificial Intelligence
+[ 96/200] Fetching 96/200: Graduate Certificate Applied Data Science
+[ 95/200] Fetching 95/200: Graduate Certificate Applied Business
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-artificial- — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-business — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-agriculture — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-applied-data-scienc — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Artifici → Computer Science & IT / Artificial Intelligence
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-agricu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-applie → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 97/200: Graduate Certificate Audiovisual Archiving
+[INFO ] [CATEGORY det] Graduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[ 97/200] Fetching 97/200: Graduate Certificate Audiovisual Archiving
+[INFO ] [CATEGORY det] Graduate Certificate in Applied Data Sci → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 98/200: Graduate Certificate Business Administration
+[EXTRACT ] [EXTRACT] 99/200: Graduate Certificate Business Administration Computing
+[ 98/200] Fetching 98/200: Graduate Certificate Business Administration
+[ 99/200] Fetching 99/200: Graduate Certificate Business Administration Computing
+[EXTRACT ] [EXTRACT] 100/200: Graduate Certificate Business Data Analytics
+[ 100/200] Fetching 100/200: Graduate Certificate Business Data Analytics
+[EXTRACT ] [CSU ✓] graduate-certificate-audiovisual-archivi — dom=12920.0, int=13520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-business-data-analy — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-business-administra — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-audiov → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 101/200: Graduate Certificate Case Management Coordinated Care
+[EXTRACT ] [EXTRACT] 102/200: Graduate Certificate Classical Arabic
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-busine → skipped (CSU pre-seed) (cost=$0.000000)
+[ 101/200] Fetching 101/200: Graduate Certificate Case Management Coordinated Care
+[INFO ] [CATEGORY det] Graduate Certificate in Business Data An → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 103/200: Graduate Certificate Cloud Computing Virtualisation
+[ 102/200] Fetching 102/200: Graduate Certificate Classical Arabic
+[ 103/200] Fetching 103/200: Graduate Certificate Cloud Computing Virtualisation
+[EXTRACT ] [EXTRACT] 104/200: Graduate Certificate Communication
+[ 104/200] Fetching 104/200: Graduate Certificate Communication
+[EXTRACT ] [CSU ✓] graduate-certificate-case-management-coo — dom=7708.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-case-m → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-communication — dom=8688.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-cloud-computing-vir — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-classical-arabic — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [EXTRACT] 105/200: Graduate Certificate Computing Career Transition
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-commun → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-classi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cloud- → skipped (CSU pre-seed) (cost=$0.000000)
+[ 105/200] Fetching 105/200: Graduate Certificate Computing Career Transition
+[EXTRACT ] [EXTRACT] 106/200: Graduate Certificate Paramedicine
+[EXTRACT ] [EXTRACT] 107/200: Graduate Certificate Customs Administration
+[EXTRACT ] [EXTRACT] 108/200: Graduate Certificate Cyber Security
+[ 106/200] Fetching 106/200: Graduate Certificate Paramedicine
+[ 107/200] Fetching 107/200: Graduate Certificate Customs Administration
+[ 108/200] Fetching 108/200: Graduate Certificate Cyber Security
+[EXTRACT ] [CSU ✓] graduate-certificate-customs-administrat — dom=10280.0, int=11760.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-cyber-security — dom=16840.0, int=17856.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-custom → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-computing-career-tr — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-paramedicine — dom=14960.0, int=19240.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-cyber- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 109/200: Graduate Certificate Data Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-parame → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-comput → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Graduate Certificate in Cyber Security → Computer Science & IT / Cyber Security
+[ 109/200] Fetching 109/200: Graduate Certificate Data Management
+[EXTRACT ] [EXTRACT] 110/200: Graduate Certificate Digital Archiving
+[EXTRACT ] [EXTRACT] 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [EXTRACT] 112/200: Graduate Certificate Digital Health
+[ 110/200] Fetching 110/200: Graduate Certificate Digital Archiving
+[ 112/200] Fetching 112/200: Graduate Certificate Digital Health
+[ 111/200] Fetching 111/200: Graduate Certificate Digital Communication
+[EXTRACT ] [CSU ✓] graduate-certificate-data-management — ielts=6.0, pte=50, dur=0.5years, intakes=March, loc=Wagga Wagga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-data-m → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-archiving — dom=12920.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-health — dom=13960.0, int=14520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-digital-communicati — ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Bathurst Campus
+[EXTRACT ] [EXTRACT] 113/200: Graduate Certificate Education
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-digita → skipped (CSU pre-seed) (cost=$0.000000)
+[ 113/200] Fetching 113/200: Graduate Certificate Education
+[EXTRACT ] [EXTRACT] 114/200: Graduate Certificate Environmental Management
+[EXTRACT ] [EXTRACT] 115/200: Graduate Certificate In Fish Conservation And Management
+[EXTRACT ] [EXTRACT] 116/200: Graduate Certificate Financial Crime
+[ 114/200] Fetching 114/200: Graduate Certificate Environmental Management
+[ 115/200] Fetching 115/200: Graduate Certificate In Fish Conservation And Management
+[ 116/200] Fetching 116/200: Graduate Certificate Financial Crime
+[EXTRACT ] [CSU ✓] graduate-certificate-financial-crime — dom=13200.0, int=14000.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-financ → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-education — dom=3948.0, int=13960.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-in-fish-conservatio — int=17920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-environmental-manag — dom=18160.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 117/200: Graduate Certificate Gis Remote Sensing
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-enviro → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-in-fis → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-educat → skipped (CSU pre-seed) (cost=$0.000000)
+[ 117/200] Fetching 117/200: Graduate Certificate Gis Remote Sensing
+[EXTRACT ] [EXTRACT] 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[EXTRACT ] [EXTRACT] 119/200: Graduate Certificate Health Management Leadership
+[EXTRACT ] [EXTRACT] 120/200: Graduate Certificate Human Resource Management
+[ 118/200] Fetching 118/200: Graduate Certificate Geostatistics Spatial Modelling
+[ 120/200] Fetching 120/200: Graduate Certificate Human Resource Management
+[ 119/200] Fetching 119/200: Graduate Certificate Health Management Leadership
+[EXTRACT ] [CSU ✓] graduate-certificate-gis-remote-sensing — dom=17440.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-health-management-l — dom=13960.0, int=14520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-gis-re → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-human-resource-mana — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-geostatistics-spati — dom=17440.0, int=18440.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Albury-Wodonga Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-health → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 121/200: Graduate Certificate Human Services
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-geosta → skipped (CSU pre-seed) (cost=$0.000000)
+[ 121/200] Fetching 121/200: Graduate Certificate Human Services
+[EXTRACT ] [EXTRACT] 122/200: Graduate Certificate Industrial Relations
+[INFO ] [CATEGORY det] Graduate Certificate in Human Resource M → Business & Management / Human Resources
+[ 122/200] Fetching 122/200: Graduate Certificate Industrial Relations
+[EXTRACT ] [EXTRACT] 123/200: Graduate Certificate Information Studies
+[EXTRACT ] [EXTRACT] 124/200: Graduate Certificate Information Technology
+[ 124/200] Fetching 124/200: Graduate Certificate Information Technology
+[ 123/200] Fetching 123/200: Graduate Certificate Information Studies
+[EXTRACT ] [CSU ✓] graduate-certificate-industrial-relation — dom=16840.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-information-technol — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-indust → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-human-services — dom=12920.0, int=17248.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-information-studies — dom=12920.0, int=13520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-human- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inform → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 125/200: Graduate Certificate Intelligence Analysis
+[INFO ] [CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[ 125/200] Fetching 125/200: Graduate Certificate Intelligence Analysis
+[EXTRACT ] [EXTRACT] 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[EXTRACT ] [EXTRACT] 127/200: Graduate Certificate Islamic Psychology
+[EXTRACT ] [EXTRACT] 128/200: Graduate Certificate Islamic Studies
+[ 127/200] Fetching 127/200: Graduate Certificate Islamic Psychology
+[ 126/200] Fetching 126/200: Graduate Certificate Intersectionality Diversity Inclusion
+[ 128/200] Fetching 128/200: Graduate Certificate Islamic Studies
+[EXTRACT ] [CSU ✓] graduate-certificate-intelligence-analys — dom=8688.0, int=12900.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-intell → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-studies — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] graduate-certificate-intersectionality-d — dom=12920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-certificate-islamic-psychology — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 129/200: Graduate Certificate Leadership Management Policing Security
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-islami → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-islami → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-inters → skipped (CSU pre-seed) (cost=$0.000000)
+[ 129/200] Fetching 129/200: Graduate Certificate Leadership Management Policing Security
+[INFO ] [CATEGORY det] Graduate Certificate in Islamic Psycholo → Medicine & Health / Psychology
+[EXTRACT ] [EXTRACT] 130/200: Graduate Certificate Leadership Human Services
+[EXTRACT ] [EXTRACT] 131/200: Graduate Certificate Learning Teaching Higher Education
+[EXTRACT ] [EXTRACT] 132/200: Graduate Certificate Mathematics
+[ 131/200] Fetching 131/200: Graduate Certificate Learning Teaching Higher Education
+[ 130/200] Fetching 130/200: Graduate Certificate Leadership Human Services
+[ 132/200] Fetching 132/200: Graduate Certificate Mathematics
+[EXTRACT ] [CSU ✓] graduate-certificate-learning-teaching-h — ielts=6.0, pte=50, dur=0.5years, intakes=March, loc=Bathurst Campus
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-learni → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-leadership-manageme — dom=8688.0, int=12900.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-leadership-human-se — dom=8688.0, int=27920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-mathematics — dom=16520.0, int=17240.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Learning and Tea → Education & Social Work / Teaching
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-leader → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-mathem → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-leader → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 133/200: Graduate Certificate Ministry
+[EXTRACT ] [EXTRACT] 134/200: Graduate Certificate Networking Systems Administration
+[ 133/200] Fetching 133/200: Graduate Certificate Ministry
+[INFO ] [CATEGORY det] Graduate Certificate in Mathematics → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 135/200: Graduate Certificate Nuclear Safeguards Security
+[ 134/200] Fetching 134/200: Graduate Certificate Networking Systems Administration
+[ 135/200] Fetching 135/200: Graduate Certificate Nuclear Safeguards Security
+[EXTRACT ] [EXTRACT] 136/200: Graduate Certificate Nursing Aged Care
+[ 136/200] Fetching 136/200: Graduate Certificate Nursing Aged Care
+[EXTRACT ] [CSU ✓] graduate-certificate-networking-systems- — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-networ → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-nuclear-safeguards- — dom=17528.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-aged-care — ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-ministry — dom=9680.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Networking and S → Computer Science & IT / Networking
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-minist → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nuclea → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 137/200: Graduate Certificate Nursing Clinical Education
+[EXTRACT ] [EXTRACT] 138/200: Graduate Certificate Nursing Leadership Management
+[ 137/200] Fetching 137/200: Graduate Certificate Nursing Clinical Education
+[EXTRACT ] [EXTRACT] 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Aged Ca → Medicine & Health / Nursing
+[ 138/200] Fetching 138/200: Graduate Certificate Nursing Leadership Management
+[ 139/200] Fetching 139/200: Graduate Certificate Nursing Rural Remote Nursing
+[EXTRACT ] [EXTRACT] 140/200: Graduate Certificate Organisational Change
+[ 140/200] Fetching 140/200: Graduate Certificate Organisational Change
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-rural-remot — dom=14320.0, int=17560.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-leadership- — dom=14320.0, int=17560.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-organisational-chan — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-nursing-clinical-ed — dom=14320.0, int=17560.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Rural a → Medicine & Health / Nursing
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Leaders → Medicine & Health / Nursing
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-organi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-nursin → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 141/200: Graduate Certificate Organisational Coaching Leadership
+[EXTRACT ] [EXTRACT] 142/200: Graduate Certificate Ornithology
+[EXTRACT ] [EXTRACT] 143/200: Graduate Certificate Professional Accounting
+[INFO ] [CATEGORY det] Graduate Certificate in Nursing (Clinica → Medicine & Health / Nursing
+[ 141/200] Fetching 141/200: Graduate Certificate Organisational Coaching Leadership
+[ 142/200] Fetching 142/200: Graduate Certificate Ornithology
+[ 143/200] Fetching 143/200: Graduate Certificate Professional Accounting
+[EXTRACT ] [EXTRACT] 144/200: Graduate Certificate Professional Supervision Pastoral
+[ 144/200] Fetching 144/200: Graduate Certificate Professional Supervision Pastoral
+[EXTRACT ] [CSU ✓] graduate-certificate-organisational-coac — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-organi → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-professional-accoun — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-ornithology — dom=14680.0, int=18760.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-professional-superv — dom=9680.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=United Theological College, Ca
+[EXTRACT ] [EXTRACT] 145/200: Graduate Certificate Project Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-profes → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-profes → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-ornith → skipped (CSU pre-seed) (cost=$0.000000)
+[ 145/200] Fetching 145/200: Graduate Certificate Project Management
+[INFO ] [CATEGORY det] Graduate Certificate in Professional Acc → Business & Management / Accounting
+[EXTRACT ] [EXTRACT] 146/200: Graduate Certificate Research
+[EXTRACT ] [EXTRACT] 147/200: Graduate Certificate Social Organisational Leadership
+[EXTRACT ] [EXTRACT] 148/200: Graduate Certificate Sustainable Agriculture
+[ 147/200] Fetching 147/200: Graduate Certificate Social Organisational Leadership
+[ 146/200] Fetching 146/200: Graduate Certificate Research
+[ 148/200] Fetching 148/200: Graduate Certificate Sustainable Agriculture
+[EXTRACT ] [CSU ✓] graduate-certificate-research — dom=8688.0, int=13960.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-resear → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-sustainable-agricul — dom=2968.0, int=18520.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-project-management — dom=16840.0, int=17860.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-social-organisation — dom=16840.0, int=17320.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 149/200: Graduate Certificate Terrorism Security Studies
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-social → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-projec → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-sustai → skipped (CSU pre-seed) (cost=$0.000000)
+[ 149/200] Fetching 149/200: Graduate Certificate Terrorism Security Studies
+[INFO ] [CATEGORY det] Graduate Certificate in Sustainable Agri → Agriculture & Environmental Science / Agriculture
+[EXTRACT ] [EXTRACT] 150/200: Graduate Certificate Theological Studies
+[INFO ] [CATEGORY det] Graduate Certificate in Project Manageme → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 151/200: Graduate Certificate Wiradyuri Language
+[EXTRACT ] [EXTRACT] 152/200: Graduate Diploma Accounting
+[ 151/200] Fetching 151/200: Graduate Certificate Wiradyuri Language
+[ 150/200] Fetching 150/200: Graduate Certificate Theological Studies
+[ 152/200] Fetching 152/200: Graduate Diploma Accounting
+[EXTRACT ] [CSU ✓] graduate-diploma-accounting — dom=33680.0, int=34640.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-accounting → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-certificate-terrorism-security- — dom=8688.0, int=12900.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-certificate-theological-studies — dom=9680.0, int=12280.0, ielts=6.0, pte=50, dur=0.5years, intakes=March,July, loc=United Theological College, Ca
+[EXTRACT ] [CSU ✓] graduate-certificate-wiradyuri-language — dom=2368.0, ielts=6.0, pte=50, dur=2.0years, intakes=March, loc=Dubbo Campus
+[INFO ] [CATEGORY det] Graduate Diploma of Accounting → Business & Management / Accounting
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-wirady → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-terror → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-certificate-theolo → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[EXTRACT ] [EXTRACT] 154/200: Graduate Diploma Adult Vocational Education
+[ 153/200] Fetching 153/200: Graduate Diploma Adult Language Literacy Numeracy
+[EXTRACT ] [EXTRACT] 155/200: Graduate Diploma Ageing Pastoral Studies
+[EXTRACT ] [EXTRACT] 156/200: Graduate Diploma Applied Business
+[ 154/200] Fetching 154/200: Graduate Diploma Adult Vocational Education
+[ 155/200] Fetching 155/200: Graduate Diploma Ageing Pastoral Studies
+[ 156/200] Fetching 156/200: Graduate Diploma Applied Business
+[EXTRACT ] [CSU ✓] graduate-diploma-adult-vocational-educat — dom=7896.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-adult-voca → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-ageing-pastoral-studies — ielts=6.0, pte=50, dur=2.0years, intakes=March,July, loc=Canberra Campus
+[EXTRACT ] [CSU ✓] graduate-diploma-applied-business — dom=33680.0, int=34640.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-adult-language-literacy — dom=4736.0, int=27920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 157/200: Graduate Diploma Of Business Data Analytics
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-ageing-pas → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-applied-bu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-adult-lang → skipped (CSU pre-seed) (cost=$0.000000)
+[ 157/200] Fetching 157/200: Graduate Diploma Of Business Data Analytics
+[EXTRACT ] [EXTRACT] 158/200: Graduate Diploma Classical Arabic
+[EXTRACT ] [EXTRACT] 159/200: Graduate Diploma Clinical Practice Paramedicine
+[EXTRACT ] [EXTRACT] 160/200: Graduate Diploma Paramedicine
+[ 158/200] Fetching 158/200: Graduate Diploma Classical Arabic
+[ 159/200] Fetching 159/200: Graduate Diploma Clinical Practice Paramedicine
+[ 160/200] Fetching 160/200: Graduate Diploma Paramedicine
+[EXTRACT ] [CSU ✓] graduate-diploma-of-business-data-analyt — int=32640.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-of-busines → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-clinical-practice-param — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-paramedicine — dom=29920.0, int=38480.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-classical-arabic — dom=19360.0, int=24560.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=United Theological College
+[INFO ] [CATEGORY det] Graduate Diploma of Business Data Analyt → Computer Science & IT / Data Science
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-clinical-p → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-paramedici → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-classical- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 161/200: Graduate Diploma Customs Administration
+[EXTRACT ] [EXTRACT] 162/200: Graduate Diploma Dental Implantology
+[ 161/200] Fetching 161/200: Graduate Diploma Customs Administration
+[EXTRACT ] [EXTRACT] 163/200: Graduate Diploma Financial Crime
+[EXTRACT ] [EXTRACT] 164/200: Graduate Diploma Information Technology
+[ 162/200] Fetching 162/200: Graduate Diploma Dental Implantology
+[ 163/200] Fetching 163/200: Graduate Diploma Financial Crime
+[ 164/200] Fetching 164/200: Graduate Diploma Information Technology
+[EXTRACT ] [CSU ✓] graduate-diploma-financial-crime — dom=26400.0, int=28000.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-financial- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-information-technology — dom=32400.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-dental-implantology — ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-customs-administration — dom=20560.0, int=23520.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 165/200: Graduate Diploma Intelligence Analysis
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-informatio → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-dental-imp → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-customs-ad → skipped (CSU pre-seed) (cost=$0.000000)
+[ 165/200] Fetching 165/200: Graduate Diploma Intelligence Analysis
+[INFO ] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[INFO ] [CATEGORY det] Graduate Diploma of Dental Implantology → Medicine & Health / Dentistry
+[EXTRACT ] [EXTRACT] 166/200: Graduate Diploma Investigations
+[EXTRACT ] [EXTRACT] 167/200: Graduate Diploma Islamic Studies
+[ 166/200] Fetching 166/200: Graduate Diploma Investigations
+[EXTRACT ] [EXTRACT] 168/200: Graduate Diploma Leadership Management Policing Security
+[ 167/200] Fetching 167/200: Graduate Diploma Islamic Studies
+[ 168/200] Fetching 168/200: Graduate Diploma Leadership Management Policing Security
+[EXTRACT ] [CSU ✓] graduate-diploma-leadership-management-p — dom=17376.0, int=25800.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-investigations — dom=17376.0, int=25800.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-leadership → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-intelligence-analysis — dom=17376.0, int=25800.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-investigat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-islamic-studies — dom=19360.0, int=24560.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [EXTRACT] 169/200: Graduate Diploma Mammography
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-intelligen → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-islamic-st → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 170/200: Graduate Diploma Mathematics
+[ 169/200] Fetching 169/200: Graduate Diploma Mammography
+[EXTRACT ] [EXTRACT] 171/200: Graduate Diploma Midwifery
+[ 170/200] Fetching 170/200: Graduate Diploma Mathematics
+[EXTRACT ] [EXTRACT] 172/200: Graduate Diploma Organisational Coaching Leadership
+[ 171/200] Fetching 171/200: Graduate Diploma Midwifery
+[ 172/200] Fetching 172/200: Graduate Diploma Organisational Coaching Leadership
+[EXTRACT ] [CSU ✓] graduate-diploma-organisational-coaching — dom=33680.0, int=34640.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-organisati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-midwifery — dom=4736.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-mammography — dom=36320.0, ielts=6.0, pte=50, dur=1.0years, intakes=March, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] graduate-diploma-mathematics — dom=4736.0, int=34480.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 173/200: Graduate Diploma Pastoral Counselling
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-mammograph → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-mathematic → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-midwifery → skipped (CSU pre-seed) (cost=$0.000000)
+[ 173/200] Fetching 173/200: Graduate Diploma Pastoral Counselling
+[INFO ] [CATEGORY det] Graduate Diploma of Mathematics → Science & Mathematics / Mathematics
+[EXTRACT ] [EXTRACT] 174/200: Graduate Diploma Project Management
+[INFO ] [CATEGORY det] Graduate Diploma of Midwifery → Medicine & Health / Nursing
+[ 174/200] Fetching 174/200: Graduate Diploma Project Management
+[EXTRACT ] [EXTRACT] 175/200: Graduate Diploma Of Project Management And Leadership
+[EXTRACT ] [EXTRACT] 176/200: Graduate Diploma Psychology
+[ 176/200] Fetching 176/200: Graduate Diploma Psychology
+[ 175/200] Fetching 175/200: Graduate Diploma Of Project Management And Leadership
+[EXTRACT ] [CSU ✓] graduate-diploma-project-management — dom=33680.0, int=35720.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-project-ma → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] graduate-diploma-pastoral-counselling — dom=19360.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-psychology — dom=17376.0, int=35520.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-of-project-management-a — int=33920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management → Business & Management / Project Management
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-of-project → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-pastoral-c → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 177/200: Graduate Diploma Terrorism Security Studies
+[INFO ] [CATEGORY det] Graduate Diploma of Project Management a → Business & Management / Project Management
+[EXTRACT ] [EXTRACT] 178/200: Graduate Diploma Theological Studies
+[INFO ] [CATEGORY det] Graduate Diploma of Psychology → Medicine & Health / Psychology
+[ 177/200] Fetching 177/200: Graduate Diploma Terrorism Security Studies
+[EXTRACT ] [EXTRACT] 179/200: Graduate Diploma Cyber Security
+[ 178/200] Fetching 178/200: Graduate Diploma Theological Studies
+[ 179/200] Fetching 179/200: Graduate Diploma Cyber Security
+[EXTRACT ] [EXTRACT] 180/200: Master Adult Vocational Education
+[ 180/200] Fetching 180/200: Master Adult Vocational Education
+[EXTRACT ] [CSU ✓] graduate-diploma-cyber-security — dom=33680.0, int=35712.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-theological-studies — dom=19360.0, int=24560.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Canberra Campus, United Theolo
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-cyber-secu → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-adult-vocational-education — dom=26720.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] graduate-diploma-terrorism-security-stud — dom=17376.0, int=25800.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-theologica → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-adult-vocational-edu → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Graduate Diploma of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/graduate-diploma-terrorism- → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 181/200: Master Advanced Social Work Practice
+[EXTRACT ] [EXTRACT] 182/200: Master Ageing Health
+[EXTRACT ] [EXTRACT] 183/200: Master Ageing Pastoral Studies
+[EXTRACT ] [EXTRACT] 184/200: Master Agricultural Science
+[ 181/200] Fetching 181/200: Master Advanced Social Work Practice
+[ 182/200] Fetching 182/200: Master Ageing Health
+[ 183/200] Fetching 183/200: Master Ageing Pastoral Studies
+[ 184/200] Fetching 184/200: Master Agricultural Science
+[EXTRACT ] [CSU ✓] master-ageing-health — dom=25840.0, int=27920.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-ageing-health → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-advanced-social-work-practice — dom=26720.0, int=31200.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July, loc=Wagga Wagga Campus
+[EXTRACT ] [CSU ✓] master-ageing-pastoral-studies — ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-agricultural-science — dom=36320.0, int=37040.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 185/200: Master Agriculture
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-advanced-social-work → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-agricultural-science → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-ageing-pastoral-stud → skipped (CSU pre-seed) (cost=$0.000000)
+[ 185/200] Fetching 185/200: Master Agriculture
+[INFO ] [CATEGORY det] Master of Advanced Social Work Practice → Education & Social Work / Social Work
+[EXTRACT ] [EXTRACT] 186/200: Master Applied Business
+[EXTRACT ] [EXTRACT] 187/200: Master Arts Theological Studies
+[EXTRACT ] [EXTRACT] 188/200: Master Business Administration Computing
+[ 187/200] Fetching 187/200: Master Arts Theological Studies
+[ 186/200] Fetching 186/200: Master Applied Business
+[ 188/200] Fetching 188/200: Master Business Administration Computing
+[EXTRACT ] [CSU ✓] master-applied-business — dom=33680.0, int=34640.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-applied-business → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-agriculture — dom=11056.0, int=37040.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-arts-theological-studies — dom=19360.0, int=24560.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July, loc=United Theological College, Ca
+[EXTRACT ] [CSU ✓] master-business-administration-computing — dom=33680.0, int=35720.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 189/200: Master Business Administration
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-agriculture → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-arts-theological-stu → skipped (CSU pre-seed) (cost=$0.000000)
+[ 189/200] Fetching 189/200: Master Business Administration
+[INFO ] [CATEGORY det] Master of Agriculture (with Specialisati → Agriculture & Environmental Science / Agriculture
+[INFO ] [CATEGORY det] Master of Business Administration (Compu → Business & Management / MBA
+[EXTRACT ] [EXTRACT] 190/200: Master Of Business Data Analytics
+[EXTRACT ] [EXTRACT] 191/200: Master Classical Arabic
+[ 190/200] Fetching 190/200: Master Of Business Data Analytics
+[EXTRACT ] [EXTRACT] 192/200: Master Clinical Exercise Physiology
+[ 191/200] Fetching 191/200: Master Classical Arabic
+[ 192/200] Fetching 192/200: Master Clinical Exercise Physiology
+[EXTRACT ] [CSU ✓] master-business-administration — dom=33680.0, int=35712.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-business-administrat → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-clinical-exercise-physiology — dom=9536.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-classical-arabic — dom=19360.0, int=24560.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=United Theological College
+[EXTRACT ] [CSU ✓] master-of-business-data-analytics — int=32640.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[INFO ] [CATEGORY det] Master of Business Administration (with → Business & Management / MBA
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-of-business-data-ana → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-classical-arabic → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-clinical-exercise-ph → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [EXTRACT] 193/200: Master Clinical Psychology
+[INFO ] [CATEGORY det] Master of Business Data Analytics → Computer Science & IT / Data Science
+[EXTRACT ] [EXTRACT] 194/200: Master Cloud Computing Virtualisation
+[EXTRACT ] [EXTRACT] 195/200: Master Communication
+[ 193/200] Fetching 193/200: Master Clinical Psychology
+[EXTRACT ] [EXTRACT] 196/200: Master Paramedicine
+[ 195/200] Fetching 195/200: Master Communication
+[ 194/200] Fetching 194/200: Master Cloud Computing Virtualisation
+[ 196/200] Fetching 196/200: Master Paramedicine
+[EXTRACT ] [CSU ✓] master-paramedicine — dom=29920.0, int=38480.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-paramedicine → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-clinical-psychology — dom=4736.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-communication — ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-cloud-computing-virtualisation — dom=33680.0, int=35712.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [EXTRACT] 197/200: Master Customs Administration
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-communication → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-cloud-computing-virt → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-clinical-psychology → skipped (CSU pre-seed) (cost=$0.000000)
+[ 197/200] Fetching 197/200: Master Customs Administration
+[EXTRACT ] [EXTRACT] 198/200: Master Cyber Security
+[EXTRACT ] [EXTRACT] 199/200: Master Education Teacher Librarianship
+[INFO ] [CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+[ 199/200] Fetching 199/200: Master Education Teacher Librarianship
+[EXTRACT ] [EXTRACT] 200/200: Master Education
+[ 198/200] Fetching 198/200: Master Cyber Security
+[ 200/200] Fetching 200/200: Master Education
+[EXTRACT ] [CSU ✓] master-customs-administration — dom=20560.0, int=23520.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-customs-administrati → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [CSU ✓] master-cyber-security — dom=33680.0, int=35712.0, ielts=6.0, pte=50, dur=1.5years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-education — dom=11656.0, int=27920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [CSU ✓] master-education-teacher-librarianship — dom=7896.0, int=27920.0, ielts=6.0, pte=50, dur=2.0years, intakes=March,July,November, loc=Online
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-cyber-security → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-education → skipped (CSU pre-seed) (cost=$0.000000)
+[EXTRACT ] [GEMINI] https://study.csu.edu.au/courses/master-education-teacher-li → skipped (CSU pre-seed) (cost=$0.000000)
+[INFO ] [CATEGORY det] Master of Cyber Security → Computer Science & IT / Cyber Security
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build unknown] ielts_overall=6.0 pte_overall=50
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=50
+[EXTRACT ] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.0 pte_overall=50
+[STAGE ] [STAGE] skipped Access Charles Sturt Entry: rejected: category_landing_page
+[STAGE ] [STAGE] skipped University Certificate in Workforce Essentials: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Associate Degree in Adult and Vocational Education: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Associate Degree in Policing Practice: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Accounting: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Adult and Vocational Education (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Agricultural Business Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Agricultural Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Agriculture: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Animal Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Applied Research (Honours): rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Arts: rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Arts and Social Science (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Border Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Business: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Business Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Clinical Science (Medicine) / Doctor of Medicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Communication: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Computer Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Criminology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Dental Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Birth to Five Years): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Early Childhood and Primary): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (K - 12): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Primary): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Creative Arts: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - English: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Hsie: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Mathematics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Pdhpe: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) - Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Secondary) Industry Entry Program: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Education (Technology and Applied Studies): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Educational Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Emergency Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Engineering (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Environmental Science and Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Equine Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Exercise and Sport Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Food Science and Nutrition: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Geospatial Science: rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Health Science (Mental Health): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Health and Medical Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Horticulture: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Human Services: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Information Studies (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Information Technology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Islamic Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Islamic Studies (Honours): rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Laws: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Laws / Bachelor of Criminal Justice: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Medical Laboratory Science (Pathology): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Medical Radiation Science (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Nuclear Science and Safety: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Nursing: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Occupational Therapy: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Oral Health (Therapy and Hygiene): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Paramedicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Pharmacy (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Physiotherapy: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Podiatric Medicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Policing: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Policing (Investigations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Policing and Public Safety: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Psychology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Science (Honours): rejected: online_only
+[STAGE ] [STAGE] skipped Bachelor of Social Science (Psychology): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Social Science (Psychology) (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Social Work: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Theology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Theology (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Veterinary Biology/ Bachelor of Veterinary Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Veterinary Technology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Viticulture: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Bachelor of Wine Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Diploma of Agricultural Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Diploma of Environmental Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Diploma of Exercise Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Diploma of Health Science (Mental Health): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Diploma of Psychological Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Business Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Arts and Education): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Business, Justice and Behavioural Sciences): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Philosophy (Science and Agriculture): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Public Safety: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Social Work: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Doctor of Veterinary Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Executive Masters in International Police Leadership: rejected: category_landing_page
+[STAGE ] [STAGE] skipped Graduate Certificate in Adult and Vocational Education: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Ageing and Health: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Agricultural Business Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Agriculture: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Artificial Intelligence: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Business: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Applied Data Science: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Audiovisual Archiving: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Administration (Computing): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Business Data Analytics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Case Management and Coordinated Care: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Cloud Computing and Virtualisation: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Communication: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Computing (Career Transition): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Critical Care Paramedicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Customs Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Cyber Security: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Data Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Archiving: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Communication: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Digital Health: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Education (Generic and with Specialistions): rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Environmental Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Fish Conservation and Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Financial Crime: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Gis and Remote Sensing: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Geostatistics and Spatial Modelling: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Health Management and Leadership: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Human Resource Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Human Services: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Industrial Relations: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Information Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Information Technology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Intelligence Analysis: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Intersectionality, Diversity and Inclusion: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Islamic Psychology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Islamic Studies: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Leadership and Management (Policing and Security): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Leadership in Human Services: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Learning and Teaching in Higher Education: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Mathematics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Ministry: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Networking and Systems Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Nuclear Safeguards and Security: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Aged Care): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Clinical Education): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Leadership and Management): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Nursing (Rural and Remote Nursing): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Organisational Change: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Organisational Coaching and Leadership: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Ornithology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Professional Accounting: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Professional Supervision (Pastoral): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Project Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Research: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Certificate in Social and Organisational Leadership: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Sustainable Agriculture: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Terrorism and Security Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Theological Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Certificate in Wiradyuri Language: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Accounting: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Adult Language, Literacy and Numeracy: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Adult and Vocational Education: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Ageing and Pastoral Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Applied Business: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Business Data Analytics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Diploma of Clinical Practice (Paramedicine): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Critical Care Paramedicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Customs Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Dental Implantology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Financial Crime: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Information Technology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Intelligence Analysis: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Investigations: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Islamic Studies: rejected: online_only
+[STAGE ] [STAGE] skipped Graduate Diploma of Leadership and Management (Policing and Security): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Mammography: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Mathematics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Midwifery: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Organisational Coaching and Leadership: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Pastoral Counselling: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Project Management: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Project Management and Leadership: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Psychology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Terrorism and Security Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Theological Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Graduate Diploma of Cyber Security: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Adult and Vocational Education: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Advanced Social Work Practice: rejected: online_only
+[STAGE ] [STAGE] skipped Master of Ageing and Health: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Ageing and Pastoral Studies: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Agricultural Science (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Agriculture (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Applied Business (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Arts (Theological Studies): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Business Administration (Computing): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Business Administration (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Business Data Analytics: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Classical Arabic: rejected: online_only
+[STAGE ] [STAGE] skipped Master of Clinical Exercise Physiology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Clinical Psychology: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Cloud Computing and Virtualisation: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Communication (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Critical Care Paramedicine: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Customs Administration: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Cyber Security: recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Education (Teacher Librarianship): recently rejected (within 7d, rejected 2026-04-26)
+[STAGE ] [STAGE] skipped Master of Education (with Specialisations): recently rejected (within 7d, rejected 2026-04-26)
+[COMPLETE] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[COMPLETE] [TIMING] Total: 3m 7s | Courses: 200 | Avg: 0.9s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:200 | Staged:0 | Skipped:200 | Errors:0
+[COMPLETE] Staged 0 courses, 200 skipped, 0 fetch errors
