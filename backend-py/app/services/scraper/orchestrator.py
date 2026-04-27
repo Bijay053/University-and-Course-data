@@ -475,30 +475,71 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _holder = (await _uni_lock_redis.get(_uni_lock_key)) or "unknown"
             except Exception:  # noqa: BLE001
                 pass
-            log.warning(
-                "University %d already being scraped (lock held by %s) — "
-                "aborting duplicate job %s",
-                job.university_id, _holder, runtime_job_id,
-            )
-            await emit(
-                "status",
-                f"Duplicate scrape aborted — university {job.university_id} "
-                f"is already being scraped by job {_holder}",
-                phase="queue",
-                level="warn",
-            )
-            await db.execute(
-                _text(
-                    "UPDATE scrape_runtime_jobs "
-                    "SET status = 'stopped', completed_at = NOW(), "
-                    "error_message = 'Aborted: another scrape for this university "
-                    "is already running' "
-                    "WHERE runtime_job_id = :jid AND status = 'running'"
-                ),
-                {"jid": runtime_job_id},
-            )
-            await db.commit()
-            return {"ok": False, "reason": "concurrent_university_scrape"}
+
+            # ── Stale-lock detection ─────────────────────────────────────────
+            # If the job that holds the lock is no longer active in the DB
+            # (completed, stopped, failed, etc.) the lock is stale — steal it
+            # so the new scrape can proceed rather than being falsely blocked.
+            _lock_is_stale = False
+            if _holder != "unknown" and _uni_lock_redis is not None:
+                try:
+                    _holder_row = await db.execute(
+                        _text(
+                            "SELECT status FROM scrape_runtime_jobs "
+                            "WHERE runtime_job_id = :jid"
+                        ),
+                        {"jid": _holder},
+                    )
+                    _holder_status = _holder_row.scalar()
+                    if _holder_status not in (None, "running", "queued"):
+                        _lock_is_stale = True
+                        log.warning(
+                            "Uni lock %s held by %s has status=%s — "
+                            "treating as stale, stealing lock for %s",
+                            _uni_lock_key, _holder, _holder_status, runtime_job_id,
+                        )
+                except Exception as _check_err:  # noqa: BLE001
+                    log.warning("Could not verify holder job status: %s", _check_err)
+
+            if _lock_is_stale:
+                try:
+                    await _uni_lock_redis.delete(_uni_lock_key)
+                    _uni_lock_acquired = bool(
+                        await _uni_lock_redis.set(
+                            _uni_lock_key, runtime_job_id, nx=True, ex=14400
+                        )
+                    )
+                    if not _uni_lock_acquired:
+                        _uni_lock_acquired = True  # fail open if race
+                except Exception as _steal_err:  # noqa: BLE001
+                    log.warning("Could not steal stale lock: %s", _steal_err)
+                    _uni_lock_acquired = True  # fail open
+
+            if not _uni_lock_acquired:
+                log.warning(
+                    "University %d already being scraped (lock held by %s) — "
+                    "aborting duplicate job %s",
+                    job.university_id, _holder, runtime_job_id,
+                )
+                await emit(
+                    "status",
+                    f"Duplicate scrape aborted — university {job.university_id} "
+                    f"is already being scraped by job {_holder}",
+                    phase="queue",
+                    level="warn",
+                )
+                await db.execute(
+                    _text(
+                        "UPDATE scrape_runtime_jobs "
+                        "SET status = 'stopped', completed_at = NOW(), "
+                        "error_message = 'Aborted: another scrape for this university "
+                        "is already running' "
+                        "WHERE runtime_job_id = :jid AND status = 'running'"
+                    ),
+                    {"jid": runtime_job_id},
+                )
+                await db.commit()
+                return {"ok": False, "reason": "concurrent_university_scrape"}
 
         # ── Snapshot uni fields to plain locals ──────────────────────────────
         # The session will be used by other coroutines during gather() and we
