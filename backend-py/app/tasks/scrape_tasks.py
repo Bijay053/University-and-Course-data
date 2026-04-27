@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import select
 
+from app.config import STALE_QUEUED_MINUTES
 from app.database import AsyncSessionLocal, engine
 from app.services.scraper.orchestrator import run_scrape
 from app.services.scraper.repair import run_repair
@@ -22,8 +23,8 @@ from app.tasks.celery_app import celery_app
 
 log = logging.getLogger(__name__)
 
-# How old (in minutes) a queued job must be before the reaper re-dispatches it.
-_STALE_QUEUED_MINUTES = 5
+# Alias for internal use within this module.
+_STALE_QUEUED_MINUTES = STALE_QUEUED_MINUTES
 
 # Redis lock TTL (seconds) set per-job after dispatch to prevent duplicate
 # Celery messages while a task is already queued in the broker backlog.

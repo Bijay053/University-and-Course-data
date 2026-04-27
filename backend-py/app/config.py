@@ -94,3 +94,9 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+# ── Scrape / requeue constants accessible to both task and router layers ──
+
+#: A queued job with no ``updated_at`` change for this many minutes is
+#: considered stale and eligible for automatic re-dispatch by the beat task.
+STALE_QUEUED_MINUTES: int = 5

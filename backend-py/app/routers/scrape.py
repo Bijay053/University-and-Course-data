@@ -812,10 +812,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     # Inject synthetic log entries for every auto-recovery (requeue) event so
     # operators can see exactly when and how many times the job was bounced.
     requeue_events = job.requeue_events or []
-    try:
-        from app.tasks.scrape_tasks import _STALE_QUEUED_MINUTES as _stale_min
-    except Exception:
-        _stale_min = 5
+    from app.config import STALE_QUEUED_MINUTES as _stale_min
     for ev in requeue_events:
         try:
             num = int(ev.get("number", 0))
