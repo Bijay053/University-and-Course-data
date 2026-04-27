@@ -92,18 +92,19 @@ class TestIeltsPattern6ReverseOrder:
         assert res["overall"] == 7.5
 
     def test_two_digit_pte_score_before_ielts_not_matched(self):
-        """'58 on the IELTS scale' must NOT yield ielts_overall=8.
+        """'58 on the IELTS scale' must NOT yield ielts_overall=8 or any score.
 
         A two-digit number like 58 could be misread as '8' (the trailing digit
-        matching [4-9]) if the word boundary \\b is absent before the capture
-        group.  Pattern 6 uses \\b to prevent this.
+        matching [4-9]) if the negative-lookbehind (?<![0-9.]) is absent.  The
+        lookbehind ensures "8" in "58" is skipped because it is preceded by "5".
+        Pattern 5 also returns None because no digit in 4-9 follows "IELTS" on
+        the same line.  The net result is None.
         """
         res = et._ielts("A PTE score of 58 on the IELTS equivalent scale is accepted.")
-        # If a match fires it must not be the spurious '8' from '58'.
-        if res is not None:
-            assert res["overall"] != 8.0, (
-                "spurious match: trailing digit '8' of '58' must not be read as IELTS 8.0"
-            )
+        assert res is None, (
+            "no IELTS score should be extracted: '58' is a PTE value, "
+            "and the lookbehind must prevent '8' from being read as IELTS 8.0"
+        )
 
     def test_reverse_order_no_preposition_not_matched(self):
         """'6.5 IELTS' without 'in'/'on' must NOT trigger Pattern 6.
@@ -111,20 +112,16 @@ class TestIeltsPattern6ReverseOrder:
         We require a preposition between the score and the keyword to avoid
         ambiguous parses like score labels or table cell data (e.g. a cell
         containing just '6.5' followed by 'IELTS' in the next cell).
+
+        Pattern 5 also returns None here: "IELTS Academic" has no digit
+        following within 80 chars, so no pattern fires at all.
         """
-        # Without 'in'/'on', Pattern 6 must not fire.
-        # Patterns 1-5 also won't fire (no 'overall', no 'no band below', etc.)
-        # unless Pattern 5 catches 'IELTS' later in the string.
         text = "score 6.5 IELTS Academic"
         res = et._ielts(text)
-        # Pattern 5 fires on "IELTS Academic" → no digit follows within 80 chars
-        # so this should be None — but even if something fires, verify it isn't
-        # a false-positive from the bare-juxtaposition form.
-        if res is not None:
-            # Pattern 5 could extract '6.5' via the broad "ielts[^\n0-9]{0,80}?" →
-            # "IELTS " → no digit immediately → actually "IELTS Academic" has no
-            # digit following within 80 chars, so None is the expected result.
-            pass
+        assert res is None, (
+            "bare '6.5 IELTS' without a preposition must not match: "
+            "Pattern 6 requires 'in' or 'on' between the score and the IELTS keyword"
+        )
 
     def test_prior_patterns_win_over_pattern6(self):
         """When a richer form (Pattern 1) is also present, it wins.
@@ -231,22 +228,23 @@ class TestCsuIeltsAdditionalPatterns:
         )
 
     def test_reverse_order_large_number_before_ielts_rejected(self):
-        """'58 on the IELTS scale' (PTE-like number) must not match.
+        """'58 on the IELTS scale' (PTE-like number) must not set ielts_overall.
 
-        The word boundary \\b before the capture group ensures the trailing
-        digit '8' of '58' is not matched.  The range gate (4-9) would catch
-        it anyway, but the \\b prevents the spurious ielts_pattern_found flag
-        from being raised, which would otherwise suppress the default fallback.
+        The negative lookbehind (?<![0-9.]) ensures the trailing digit '8' of
+        '58' is rejected (it is preceded by '5').  The '5' itself does not
+        match either: after '5' comes '8', not whitespace, so \\s+ fails.
+
+        Additionally, because PTE is explicitly mentioned, pte_pattern_found
+        is True, which suppresses the CSU default IELTS fallback.  The result
+        must therefore contain NO ielts_overall key at all.
         """
         text = "PTE Academic 58 on the IELTS equivalent scale is accepted."
         result = apply_csu_static_extraction(_CSU_URL, _make_html(text))
-        # '8' could match [4-9] but \\b should block it.  Even if not, '8' is
-        # in range 4-9 so the only safe assertion is that we don't produce a
-        # spurious IELTS value of 8.0 from a PTE score.
-        if "ielts_overall" in result:
-            assert result["ielts_overall"] != 8.0, (
-                "last digit of '58' must not be read as IELTS 8.0"
-            )
+        assert "ielts_overall" not in result, (
+            "PTE-context text with IELTS only as a reference scale must not "
+            "produce an ielts_overall value — the PTE mention suppresses the "
+            "default fallback, and no reverse-order pattern should match '58'"
+        )
 
     def test_existing_average_band_score_still_works(self):
         """Regression guard: original Pattern 1 'average band score of X' unaffected."""
