@@ -285,3 +285,54 @@ def test_classify_test_label_pte_abbreviation_unchanged():
     """Regression guard: the existing 'pte' abbreviation still maps correctly."""
     assert et._classify_test_label("pte") == "pte"
     assert et._classify_test_label("pte academic") == "pte"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Task 56 — End-to-end: _parse_equivalence_table must yield the correct
+# PTE score when the column header uses the full "Pearson Test of English"
+# name instead of the "PTE" abbreviation.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_parse_equivalence_table_pearson_full_name_extracts_pte_score():
+    """_parse_equivalence_table must read the PTE score from a column whose
+    header says 'Pearson Test of English' (not 'PTE').  This catches any
+    row-parser regression that the label-classifier tests (Task 55) cannot
+    detect on their own."""
+    from bs4 import BeautifulSoup
+
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>IELTS</th>
+          <th>Pearson Test of English</th>
+          <th>TOEFL iBT</th>
+        </tr>
+        <tr>
+          <th>Overall</th>
+          <th>Overall</th>
+          <th>Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>6.5</td><td>58</td><td>79</td></tr>
+        <tr><td>6.0</td><td>50</td><td>60</td></tr>
+      </tbody>
+    </table>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table")
+    mapping = et._parse_equivalence_table(table)
+
+    assert mapping, "_parse_equivalence_table returned empty dict"
+    assert 6.5 in mapping, "IELTS 6.5 row not found in mapping"
+    assert mapping[6.5].get("pte") == 58.0, (
+        f"Expected PTE 58 for IELTS 6.5, got {mapping[6.5]}"
+    )
+    assert 6.0 in mapping, "IELTS 6.0 row not found in mapping"
+    assert mapping[6.0].get("pte") == 50.0, (
+        f"Expected PTE 50 for IELTS 6.0, got {mapping[6.0]}"
+    )
+    assert mapping[6.5].get("toefl") == 79.0
+    assert mapping[6.0].get("toefl") == 60.0
