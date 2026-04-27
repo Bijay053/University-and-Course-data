@@ -105,10 +105,9 @@ async def _persist_evidence(
     # ON CONFLICT DO NOTHING prevents orphaned duplicate evidence rows (e.g.
     # when a previous scrape left evidence behind after its ScrapedCourse was
     # deleted and the sequence later re-issued the same id) from poisoning the
-    # entire session with an IntegrityError.
-    stmt = pg_insert(ScrapedFieldEvidence).values(values).on_conflict_do_nothing(
-        constraint="scraped_field_evidence_dedup"
-    )
+    # entire session with an IntegrityError.  No named constraint is referenced
+    # so this works even before the DB index is fully in place.
+    stmt = pg_insert(ScrapedFieldEvidence).values(values).on_conflict_do_nothing()
     await db.execute(stmt)
     return len(values)
 
