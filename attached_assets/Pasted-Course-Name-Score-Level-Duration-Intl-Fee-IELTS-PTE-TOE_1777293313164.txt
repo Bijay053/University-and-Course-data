@@ -1,0 +1,236 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Master of Veterinary Studies
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Master	5 years		6.5	58	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Theology
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul	Canberra, United Theological College	On Campus, Online	
+
+
+
+	
+Master of Terrorism and Security Studies
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$25,800/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Social Work (Professional Qualifying)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$34,496/year	7	65	-	-	-	Mar, Jul, Nov	Sydney	On Campus	
+
+
+
+	
+Master of Social and Organisational Leadership (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$35,712/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Psychological Practice (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Master	2 years	A$35,520/year	6	50	-	-	-	Mar	Online	Online	
+
+
+
+	
+Master of Project Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,720/year	6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Professional Information Technology (with Specialisations)
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$35,760/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Port Macquarie, Sydney	On Campus	
+
+
+
+	
+Master of Professional Accounting (Professional Practice)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$35,280/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Sydney	On Campus	
+
+
+
+	
+Master of Professional Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,280/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Philosophy (Arts and Education)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$33,120/year	6	50	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online	
+
+
+
+	
+Master of Philosophy
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master	2 years	A$39,680/year	6	50	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online	
+
+
+
+	
+Master of Networking and Systems Administration
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$35,720/year	6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Leadership in Human Services (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$27,920/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Leadership and Management (Policing and Security)
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$25,800/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Islamic Studies (Research)
+Publish: review
+Eligibility: review
+69%	Master	2 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Master of Islamic Studies
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online	
+
+
+
+	
+Master of Investigations
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$25,800/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Intelligence Analysis
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$25,800/year	6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Information Technology (with Specialisations)
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Master	1.5 years		6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Information Studies (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Master	2 years	A$27,040/year	6	50	-	-	-	Mar, Jul, Nov	SPACE University of Hong Kong	On Campus, Online	
+
+
+
+	
+Master of Inclusive Education
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master	1 years	A$27,920/year	6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Human Resource Management (with Specialisations)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$34,640/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Health Management and Leadership
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$29,040/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Financial Crime
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$28,000/year	6	50	-	-	-	Mar, Jul, Nov	Online	Online	
+
+
+
+	
+Master of Ethics and Legal Studies
+Law & Legal Studies
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$27,920/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Environmental Management (with Specialisations)
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Master	1.5 years	A$37,600/year	6	50	-	-	-	Mar, Jul	Online	Online	
+
+
+
+	
+Master of Emergency Management
+Publish: review
+Eligibility: review
+69%	Master	1.5 years	A$33,680/year	6	50	-	-	-	Mar, Jul	Online	Online
