@@ -37,6 +37,7 @@ type CourseResult = {
   application_fee: number | null;
   english_requirements: {
     ielts_overall: number | null; pte_overall: number | null;
+    pte_listening: number | null; pte_writing: number | null;
     toefl_overall: number | null; cae_overall: number | null;
     duolingo_overall: number | null;
   };
@@ -765,6 +766,13 @@ export default function SearchPage() {
                         {r.english_requirements.pte_overall && (
                           <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700">
                             <Award className="w-3 h-3 mr-0.5" />PTE {r.english_requirements.pte_overall}
+                            {(r.english_requirements.pte_listening || r.english_requirements.pte_writing) && (
+                              <span className="ml-1 text-blue-500">
+                                {r.english_requirements.pte_listening ? `L:${r.english_requirements.pte_listening}` : ""}
+                                {r.english_requirements.pte_listening && r.english_requirements.pte_writing ? " " : ""}
+                                {r.english_requirements.pte_writing ? `W:${r.english_requirements.pte_writing}` : ""}
+                              </span>
+                            )}
                           </Badge>
                         )}
                         {r.english_requirements.toefl_overall && (

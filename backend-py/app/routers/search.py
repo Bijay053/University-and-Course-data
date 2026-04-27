@@ -208,9 +208,13 @@ async def search_courses(
                c.toefl_overall,
                c.cae_overall,
                c.duolingo_overall,
+               pte_er.listening AS pte_listening,
+               pte_er.writing  AS pte_writing,
                c.intakes      AS intake_months,
                {rank_select}
         FROM course_search_view c
+        LEFT JOIN english_requirements pte_er
+               ON pte_er.course_id = c.id AND pte_er.test_type = 'PTE'
         WHERE {where_sql}
         ORDER BY {sort_clause}
         LIMIT :limit OFFSET :offset
@@ -272,6 +276,8 @@ async def search_courses(
         d["english_requirements"] = {
             "ielts_overall": d.get("ielts_overall"),
             "pte_overall": d.get("pte_overall"),
+            "pte_listening": d.get("pte_listening"),
+            "pte_writing": d.get("pte_writing"),
             "toefl_overall": d.get("toefl_overall"),
             "cae_overall": d.get("cae_overall"),
             "duolingo_overall": d.get("duolingo_overall"),
