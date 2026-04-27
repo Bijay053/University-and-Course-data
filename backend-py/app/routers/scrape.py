@@ -6,6 +6,7 @@ available, returning a 503).
 """
 from __future__ import annotations
 
+import logging
 import re
 import json
 import uuid
@@ -27,6 +28,8 @@ from app.schemas.scrape import (
 )
 
 router = APIRouter()
+
+log = logging.getLogger(__name__)
 
 
 # ── snake_case → camelCase helper (used by _staged_row_to_dict and below) ────
@@ -480,8 +483,7 @@ async def force_cancel_all(
         # Also purge any queued-but-not-started tasks in the scrape queue.
         _capp.control.purge()
     except Exception as exc:  # noqa: BLE001 — never let celery failure block UI
-        import logging as _log
-        _log.getLogger(__name__).warning("force_cancel_all: celery revoke failed: %s", exc)
+        log.warning("force_cancel_all: celery revoke failed: %s", exc)
 
     return {"ok": True, "cancelled": len(rows), "celery_killed": celery_killed}
 
@@ -813,8 +815,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     # operators can see exactly when and how many times the job was bounced.
     requeue_events = job.requeue_events or []
     if not isinstance(requeue_events, list):
-        import logging as _logging
-        _logging.getLogger(__name__).warning(
+        log.warning(
             "history_one: requeue_events for job %s is not a list (type=%s); skipping",
             job_id,
             type(requeue_events).__name__,
@@ -863,8 +864,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
                     }
                 )
         except Exception as ev_exc:
-            import logging as _logging
-            _logging.getLogger(__name__).warning(
+            log.warning(
                 "history_one: malformed requeue event for job %s: %r — %s",
                 job_id,
                 ev,
