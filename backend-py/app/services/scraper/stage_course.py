@@ -17,6 +17,7 @@ instead of a blank body.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -93,7 +94,7 @@ async def _persist_evidence(
                 "extraction_method": (ev.get("method") or "unknown")[:200],
                 "snippet": (ev.get("snippet") or None) and str(ev["snippet"])[:1000],
                 "confidence": (
-                    float(ev["confidence"])
+                    (lambda c: None if not math.isfinite(c) else c)(float(ev["confidence"]))
                     if isinstance(ev.get("confidence"), (int, float))
                     else None
                 ),
@@ -220,11 +221,16 @@ async def stage_course(
         payload = dict(payload)
         payload["degree_level"] = _canon
 
+    # Sanitize NaN/Inf floats before writing — PostgreSQL accepts NaN as a
+    # FLOAT value but Python's JSON encoder will later raise ValueError on it.
+    def _clean(v: Any) -> Any:
+        return None if isinstance(v, float) and not math.isfinite(v) else v
+
     sc = ScrapedCourse(
         scrape_job_id=scrape_job_id,
         university_id=university_id,
         course_name=name,
-        **{k: v for k, v in payload.items() if hasattr(ScrapedCourse, k) and k != "course_name"},
+        **{k: _clean(v) for k, v in payload.items() if hasattr(ScrapedCourse, k) and k != "course_name"},
     )
     db.add(sc)
     await db.flush()  # need sc.id for the FK on evidence rows

@@ -7,6 +7,7 @@ available, returning a 503).
 from __future__ import annotations
 
 import logging
+import math
 import re
 import json
 import uuid
@@ -45,6 +46,18 @@ def _camel(s: str) -> str:
     return _SNAKE_TO_CAMEL_RE.sub(lambda m: m.group(1).upper(), s)
 
 
+def _nan_to_none(v):
+    """Return None for NaN/Inf floats; leave all other values untouched.
+
+    Python's stdlib json encoder raises ValueError for float('nan') and
+    float('inf').  PostgreSQL FLOAT columns can legally hold NaN, so we
+    normalise them to JSON null before the response is serialised.
+    """
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    return v
+
+
 def _staged_row_to_dict(r) -> dict:
     """Build complete UI-friendly dict from a ScrapedCourse row.
 
@@ -57,7 +70,7 @@ def _staged_row_to_dict(r) -> dict:
     """
     d = {}
     for col in r.__table__.columns:
-        v = getattr(r, col.name)
+        v = _nan_to_none(getattr(r, col.name))
         if hasattr(v, "isoformat"):
             v = v.isoformat()
         d[col.name] = v                  # snake_case (keep for compat)
@@ -71,12 +84,12 @@ def _staged_row_to_dict(r) -> dict:
     d["universityId"] = r.university_id
     d["scrapeJobId"] = r.scrape_job_id
     d["createdAt"] = d.get("created_at")
-    d["internationalFee"] = r.international_fee
-    d["ieltsOverall"] = r.ielts_overall
-    d["pteOverall"] = r.pte_overall
-    d["toeflOverall"] = r.toefl_overall
-    d["cambridgeOverall"] = r.cambridge_overall
-    d["duolingoOverall"] = r.duolingo_overall
+    d["internationalFee"] = _nan_to_none(r.international_fee)
+    d["ieltsOverall"] = _nan_to_none(r.ielts_overall)
+    d["pteOverall"] = _nan_to_none(r.pte_overall)
+    d["toeflOverall"] = _nan_to_none(r.toefl_overall)
+    d["cambridgeOverall"] = _nan_to_none(r.cambridge_overall)
+    d["duolingoOverall"] = _nan_to_none(r.duolingo_overall)
     d["intakeMonths"] = r.intake_months
     d["intakes"] = r.intake_months or []
     d["courseLocation"] = r.course_location
@@ -118,7 +131,7 @@ def _staged_row_to_dict(r) -> dict:
     d["level"] = d["degreeLevel"]
     d["intake"] = r.intake_months
     d["field"] = r.category
-    d["fees"] = r.international_fee
+    d["fees"] = _nan_to_none(r.international_fee)
     # Default empty so UI's `course.evidence?.length` is a number, not undefined.
     d["evidence"] = []
     return d
@@ -159,7 +172,7 @@ async def _attach_evidence_bulk(
 
     grouped: dict[int, list[dict]] = {}
     for ev in rows:
-        ev_dict = dict(ev)
+        ev_dict = {k: _nan_to_none(v) for k, v in ev.items()}
         ts = ev_dict.get("created_at")
         if hasattr(ts, "isoformat"):
             ev_dict["created_at"] = ts.isoformat()
