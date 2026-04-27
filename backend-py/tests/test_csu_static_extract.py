@@ -435,3 +435,134 @@ def test_inactive_offerings_excluded_from_location() -> None:
     result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["course_location"] is None
     assert result["study_mode"] is None
+
+
+def test_dom_only_offering_excluded_from_location() -> None:
+    """Domestic-only offerings must not appear in course_location.
+
+    When every active offering is DOM-only the domestic campus name is
+    suppressed.  The fallback logic sets location to "Online" (the safe
+    default for any course with no identified international offerings),
+    so the important assertion is that the DOM campus name is absent.
+    """
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "DOM",
+                    "location": {"value": "Wagga Wagga Campus"},
+                    "mode": {"value": "On Campus"},
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "Wagga Wagga Campus" not in (result["course_location"] or "")
+
+
+def test_int_offering_included_in_location() -> None:
+    """Offerings with student_type_code='INT' must appear in location."""
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "INT",
+                    "location": {"value": "Bathurst Campus"},
+                    "mode": {"value": "On Campus"},
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Bathurst Campus"
+    assert result["study_mode"] == "On Campus"
+
+
+def test_intl_offering_included_in_location() -> None:
+    """Offerings with student_type_code='INTL' must also appear in location."""
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "INTL",
+                    "location": {"value": "Online"},
+                    "mode": {"value": "Online"},
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Online"
+    assert result["study_mode"] == "Online"
+
+
+def test_offering_without_student_type_code_included() -> None:
+    """Offerings with no student_type_code are treated as available to all."""
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "location": {"value": "Port Macquarie Campus"},
+                    "mode": {"value": "On Campus"},
+                }
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Port Macquarie Campus"
+    assert result["study_mode"] == "On Campus"
+
+
+def test_unknown_non_int_student_type_code_excluded() -> None:
+    """Any explicit non-international student_type_code (e.g. 'ATAR') is excluded."""
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "ATAR",
+                    "location": {"value": "Albury-Wodonga Campus"},
+                    "mode": {"value": "On Campus"},
+                },
+                {
+                    "active": "true",
+                    "student_type_code": "INT",
+                    "location": {"value": "Online"},
+                    "mode": {"value": "Online"},
+                },
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "Albury-Wodonga Campus" not in (result["course_location"] or "")
+    assert "Online" in (result["course_location"] or "")
+
+
+def test_mixed_dom_int_offerings_only_int_campus_shown() -> None:
+    """When DOM and INT offerings coexist, only INT campus appears."""
+    html = _make_html(
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "student_type_code": "DOM",
+                    "location": {"value": "Albury-Wodonga Campus"},
+                    "mode": {"value": "On Campus"},
+                },
+                {
+                    "active": "true",
+                    "student_type_code": "INT",
+                    "location": {"value": "Online"},
+                    "mode": {"value": "Online"},
+                },
+            ]
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Online"
+    assert "Albury-Wodonga Campus" not in (result["course_location"] or "")
+    assert result["study_mode"] == "Online"

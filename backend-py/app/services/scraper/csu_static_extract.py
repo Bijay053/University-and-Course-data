@@ -331,15 +331,35 @@ def _intakes(course: dict, sess_data: dict) -> list[str] | None:
     return months if months else None
 
 
-def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
-    """Return ``(course_location, study_mode)`` from active offerings.
+_INT_STUDENT_TYPE_CODES: frozenset[str] = frozenset({"INT", "INTL"})
 
-    Returns ``(None, None)`` when there are no active offerings.
+
+def _offering_is_international(offering: dict) -> bool:
+    """Return True when an offering is available to international students.
+
+    An offering is considered international when:
+    - its ``student_type_code`` is ``"INT"`` or ``"INTL"``, **or**
+    - it has no ``student_type_code`` at all (i.e. unrestricted).
+
+    Offerings that carry any other explicit code (e.g. ``"DOM"``) are
+    treated as domestic-only and excluded.
+    """
+    stc = offering.get("student_type_code")
+    return stc is None or stc in _INT_STUDENT_TYPE_CODES
+
+
+def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
+    """Return ``(course_location, study_mode)`` from active international offerings.
+
+    Only active offerings that pass ``_offering_is_international`` are
+    considered.  Returns ``(None, None)`` when there are no such offerings.
     """
     locations: list[str] = []
     modes: list[str] = []
     for offering in course.get("offerings", []):
         if offering.get("active") != "true":
+            continue
+        if not _offering_is_international(offering):
             continue
         loc = (offering.get("location") or {}).get("value", "")
         if loc and loc not in locations:
@@ -469,11 +489,15 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
             # fully online and have active_offerings=None or 0).
             loc, mode = _locations_and_modes(course)
             if loc is None:
-                # Check if ANY offering (active or not) lists an on-campus location
+                # Check if ANY offering (active or not) that is available to
+                # international students lists an on-campus location.
+                # Uses the same _offering_is_international guard as
+                # _locations_and_modes() to keep both paths consistent.
                 all_locs = [
                     (o.get("location") or {}).get("value", "")
                     for o in course.get("offerings", [])
                     if (o.get("location") or {}).get("value", "")
+                    and _offering_is_international(o)
                 ]
                 if all_locs:
                     loc = ", ".join(dict.fromkeys(all_locs))  # deduplicated
