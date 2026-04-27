@@ -12,6 +12,10 @@ import pytest
 from app.services.scraper.csu_static_extract import (
     apply_csu_static_extraction,
     is_csu_url,
+    _locations_and_modes_from_co,
+    _intakes_from_co,
+    _build_session_code_map,
+    _strip_csu_prefix,
 )
 
 
@@ -725,3 +729,343 @@ def test_mixed_dom_int_offerings_only_int_campus_shown() -> None:
     assert result["course_location"] is None
     assert "Albury-Wodonga Campus" not in (result["course_location"] or "")
     assert result["study_mode"] == "Online"
+
+
+# ---------------------------------------------------------------------------
+# Tests for the new course_offerings-based extraction (standard CSU courses)
+# ---------------------------------------------------------------------------
+
+def _make_html_with_co(
+    course_offerings_entries: list | None = None,
+    course_obj: dict | None = None,
+    sessions: list | None = None,
+    fees_entries: list | None = None,
+) -> str:
+    """Assemble minimal CSU-like HTML with embedded ``course_offerings`` variable.
+
+    Unlike ``_make_html``, this helper embeds a ``course_offerings`` JS variable
+    that the new extractor reads for location / mode / intakes on standard CSU
+    courses (where ``ocb_metadata.offerings`` is always empty ``[]``).
+    """
+    fees_json = json.dumps({"courseFee": fees_entries or []})
+    session_json = json.dumps({"session": sessions or []})
+    co_json = json.dumps({"course_offering": course_offerings_entries or []})
+
+    course_base = {
+        "actual_full_time": "2",
+        "full_time_maximum_years": "2",
+        "language_requirements": [
+            {
+                "requirements": (
+                    "IELTS average band score of 6.5 with no band below 6.0"
+                )
+            }
+        ],
+        "offerings": [],
+    }
+    if course_obj:
+        course_base.update(course_obj)
+
+    meta_json = json.dumps({
+        "ocb": [
+            {},
+            {"course": [course_base]},
+        ]
+    })
+
+    return f"""
+<html><body>
+<script>
+  fees = {fees_json};
+  ocb_metadata = {meta_json};
+  session_data = {session_json};
+  course_offerings = {co_json};
+</script>
+</body></html>
+"""
+
+
+_STD_SESSIONS = [
+    {"term_code": "202630", "start_Date": "2026-03-02", "is_session": "Y"},
+    {"term_code": "202660", "start_Date": "2026-07-07", "is_session": "Y"},
+    {"term_code": "202690", "start_Date": "2026-11-02", "is_session": "Y"},
+]
+
+
+def test_strip_csu_prefix() -> None:
+    """_strip_csu_prefix removes 'Charles Sturt University ' prefix."""
+    assert _strip_csu_prefix("Charles Sturt University Sydney") == "Sydney"
+    assert _strip_csu_prefix("Charles Sturt University Melbourne") == "Melbourne"
+    assert _strip_csu_prefix("United Theological College") == "United Theological College"
+    assert _strip_csu_prefix("Bathurst") == "Bathurst"
+
+
+def test_build_session_code_map() -> None:
+    """_build_session_code_map extracts suffix → start_date from session_data."""
+    sess_data = {"session": _STD_SESSIONS + [
+        {"term_code": "202613", "start_Date": "2026-01-10", "is_session": "N"},
+    ]}
+    m = _build_session_code_map(sess_data)
+    assert m == {"30": "2026-03-02", "60": "2026-07-07", "90": "2026-11-02"}
+
+
+def test_locations_and_modes_from_co_on_campus() -> None:
+    """FPOS On Campus offerings populate course_location and study_mode."""
+    co_data = {
+        "course_offering": [
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Charles Sturt University Sydney",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Charles Sturt University Melbourne",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202660",
+            },
+        ]
+    }
+    loc, mode = _locations_and_modes_from_co(co_data)
+    assert loc == "Melbourne, Sydney"
+    assert mode == "On Campus"
+
+
+def test_locations_and_modes_from_co_online_no_campus() -> None:
+    """Online-only FPOS offerings produce mode='Online' but location=None."""
+    co_data = {
+        "course_offering": [
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Bathurst",
+                "attendance_mode_code": "2",
+                "attendance_mode_name": "Online",
+                "session_code": "202630",
+            },
+        ]
+    }
+    loc, mode = _locations_and_modes_from_co(co_data)
+    assert loc is None
+    assert mode == "Online"
+
+
+def test_locations_and_modes_from_co_mixed_modes() -> None:
+    """Mixed On Campus + Online offerings produce both mode and location entries."""
+    co_data = {
+        "course_offering": [
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Port Macquarie",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Bathurst",
+                "attendance_mode_code": "2",
+                "attendance_mode_name": "Online",
+                "session_code": "202660",
+            },
+        ]
+    }
+    loc, mode = _locations_and_modes_from_co(co_data)
+    assert loc == "Port Macquarie"
+    assert "On Campus" in mode
+    assert "Online" in mode
+
+
+def test_locations_and_modes_from_co_dom_only_returns_none() -> None:
+    """Non-FPOS (DOM) offerings are excluded; returns (None, None)."""
+    co_data = {
+        "course_offering": [
+            {
+                "fund_source_code": "CGS",
+                "campus_name": "Bathurst",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+        ]
+    }
+    loc, mode = _locations_and_modes_from_co(co_data)
+    assert loc is None
+    assert mode is None
+
+
+def test_intakes_from_co_two_sessions() -> None:
+    """Only sessions present in FPOS offerings are returned."""
+    co_data = {
+        "course_offering": [
+            {"fund_source_code": "FPOS", "session_code": "202630"},
+            {"fund_source_code": "FPOS", "session_code": "202660"},
+            {"fund_source_code": "CGS", "session_code": "202690"},
+        ]
+    }
+    code_to_date = {"30": "2026-03-02", "60": "2026-07-07", "90": "2026-11-02"}
+    months = _intakes_from_co(co_data, code_to_date)
+    assert months == ["March", "July"]
+
+
+def test_intakes_from_co_all_three_sessions() -> None:
+    """When FPOS offerings span all three sessions all three months are returned."""
+    co_data = {
+        "course_offering": [
+            {"fund_source_code": "FPOS", "session_code": "202630"},
+            {"fund_source_code": "FPOS", "session_code": "202660"},
+            {"fund_source_code": "FPOS", "session_code": "202690"},
+            {"fund_source_code": "FPOS", "session_code": "202730"},
+        ]
+    }
+    code_to_date = {"30": "2026-03-02", "60": "2026-07-07", "90": "2026-11-02"}
+    months = _intakes_from_co(co_data, code_to_date)
+    assert months == ["March", "July", "November"]
+
+
+def test_intakes_from_co_no_fpos_returns_none() -> None:
+    """Returns None when there are no FPOS offerings (caller falls back)."""
+    co_data = {
+        "course_offering": [
+            {"fund_source_code": "CGS", "session_code": "202630"},
+        ]
+    }
+    code_to_date = {"30": "2026-03-02"}
+    assert _intakes_from_co(co_data, code_to_date) is None
+
+
+def test_apply_with_course_offerings_standard_course() -> None:
+    """End-to-end: course_offerings populates location/mode for standard CSU courses."""
+    html = _make_html_with_co(
+        course_offerings_entries=[
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Charles Sturt University Sydney",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Bathurst",
+                "attendance_mode_code": "2",
+                "attendance_mode_name": "Online",
+                "session_code": "202660",
+            },
+        ],
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Sydney"
+    assert "Online" in result["study_mode"]
+    assert "On Campus" in result["study_mode"]
+    assert "March" in result["intake_months"]
+    assert "July" in result["intake_months"]
+    assert "November" not in result["intake_months"]
+
+
+def test_apply_with_course_offerings_two_session_intakes() -> None:
+    """course_offerings with only Session 1+2 intakes gives March/July."""
+    html = _make_html_with_co(
+        course_offerings_entries=[
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Port Macquarie",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Port Macquarie",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202660",
+            },
+        ],
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["intake_months"] == ["March", "July"]
+    assert "November" not in (result["intake_months"] or [])
+
+
+def test_apply_co_overrides_empty_ocb_offerings() -> None:
+    """course_offerings data beats empty ocb_metadata offerings for location/mode."""
+    html = _make_html_with_co(
+        course_offerings_entries=[
+            {
+                "fund_source_code": "FPOS",
+                "campus_name": "Charles Sturt University Melbourne",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+        ],
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "Melbourne"
+    assert result["study_mode"] == "On Campus"
+
+
+def test_apply_ocb_offerings_take_priority_for_utc_partner() -> None:
+    """For UTC courses: ocb_metadata.offerings location is preferred over co_data."""
+    utc_co_entries = [
+        {
+            "fund_source_code": "FPOS",
+            "campus_name": "United Theological College",
+            "attendance_mode_code": "2",
+            "attendance_mode_name": "Online",
+            "session_code": "202630",
+        },
+    ]
+    utc_course_obj = {
+        "offerings": [
+            {
+                "active": "true",
+                "student_type_code": None,
+                "location": {"value": "United Theological College"},
+                "mode": {"value": "Online"},
+                "teaching_period": {"value": "30"},
+            },
+        ]
+    }
+    html = _make_html_with_co(
+        course_offerings_entries=utc_co_entries,
+        course_obj=utc_course_obj,
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["course_location"] == "United Theological College"
+    assert result["study_mode"] == "Online"
+
+
+def test_apply_no_fpos_co_falls_back_to_ocb_intakes() -> None:
+    """Without FPOS offerings in course_offerings, ocb_metadata intakes are used."""
+    html = _make_html_with_co(
+        course_offerings_entries=[
+            {
+                "fund_source_code": "CGS",
+                "campus_name": "Bathurst",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+                "session_code": "202630",
+            },
+        ],
+        course_obj={
+            "offerings": [
+                {
+                    "active": "true",
+                    "teaching_period": {"value": "60"},
+                    "location": {"value": "Online"},
+                    "mode": {"value": "Online"},
+                },
+            ]
+        },
+        sessions=_STD_SESSIONS,
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["intake_months"] == ["July"]

@@ -7,10 +7,17 @@ NOT needed because every field we care about is already in the static payload.
 
 Embedded JS variables we exploit
 ---------------------------------
-``fees``          JSON: ``{courseFee:[{student_type_code, annual_indicative_fee_ft, …}]}``
-``ocb_metadata``  JSON: rich course object with language_requirements, offerings,
-                  duration (actual_full_time), locations, study modes, AQF level, etc.
-``session_data``  JSON: ``{session:[{term_code, start_Date, is_session, …}]}``
+``fees``             JSON: ``{courseFee:[{student_type_code, annual_indicative_fee_ft, …}]}``
+``ocb_metadata``     JSON: rich course object with language_requirements, offerings (partner
+                     courses only), duration (actual_full_time), AQF level, etc.
+``session_data``     JSON: ``{session:[{term_code, start_Date, is_session, …}]}``
+``course_offerings`` JSON: ``{course_offering:[{fund_source_code, campus_name,
+                     attendance_mode_code, attendance_mode_name, session_code, …}]}``
+                     Present for ALL CSU courses (not just partner/UTC ones).
+                     This is the primary source for location, study_mode, and
+                     intake_months because the ocb_metadata.offerings array is
+                     only pre-populated for UTC/partner courses — standard CSU
+                     courses have an empty offerings array in ocb_metadata.
 
 Fields produced  (DB-aligned key names)
 ----------------------------------------
@@ -419,6 +426,10 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
     Any offering whose ``location.value`` is "Online" (case-insensitive) is
     excluded from the locations list; "Online" is added to ``modes`` instead
     so the study_mode field still reflects online availability.
+
+    NOTE: This reads from ``ocb_metadata.ocb[1].course[0].offerings`` which
+    is only populated for UTC/partner courses (~26 of ~170 CSU courses).
+    Standard CSU courses use :func:`_locations_and_modes_from_co` instead.
     """
     locations: list[str] = []
     modes: list[str] = []
@@ -443,6 +454,121 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
         ", ".join(locations) if locations else None,
         ", ".join(modes) if modes else None,
     )
+
+
+# CSU campus name prefix to strip (mirrors JS: replaceAll(/Charles Sturt University /gi, ""))
+_CSU_CAMPUS_PREFIX = re.compile(r"^charles\s+sturt\s+university\s+", re.IGNORECASE)
+
+
+def _strip_csu_prefix(campus: str) -> str:
+    """Remove 'Charles Sturt University ' prefix from a campus name."""
+    return _CSU_CAMPUS_PREFIX.sub("", campus).strip()
+
+
+def _locations_and_modes_from_co(co_data: dict) -> tuple[str | None, str | None]:
+    """Return ``(course_location, study_mode)`` from the ``course_offerings`` JS variable.
+
+    This is the primary location/mode source for standard CSU courses because
+    ``ocb_metadata.offerings`` is only pre-populated for UTC/partner courses.
+
+    Filtering rules (mirrors CSU's ``ocb-page-logic.js:populateSessionAndLocationInfo``):
+    * Only international offerings: ``fund_source_code == "FPOS"``
+    * Only add campus to locations when ``attendance_mode_code == "1"`` (On Campus).
+      Online offerings (code ``"2"``) contribute a mode entry but NOT a campus name.
+    * Strip "Charles Sturt University " prefix from campus names (e.g.
+      "Charles Sturt University Sydney" → "Sydney").
+
+    Returns ``(None, None)`` when there are no FPOS offerings.
+    """
+    intl = [
+        o for o in co_data.get("course_offering", [])
+        if o.get("fund_source_code") == "FPOS"
+    ]
+    if not intl:
+        return None, None
+
+    locations: list[str] = []
+    modes: list[str] = []
+    for o in intl:
+        mode_name = (o.get("attendance_mode_name") or "").strip()
+        mode_code = (o.get("attendance_mode_code") or "").strip()
+        campus = (o.get("campus_name") or "").strip()
+
+        if mode_name and mode_name not in modes:
+            modes.append(mode_name)
+
+        # Only add campus for On Campus (mode_code "1") — same rule as CSU's JS.
+        if mode_code == "1" and campus:
+            clean = _strip_csu_prefix(campus)
+            if clean and clean not in locations:
+                locations.append(clean)
+
+    locations.sort()
+    modes.sort()
+    return (
+        ", ".join(locations) if locations else None,
+        ", ".join(modes) if modes else None,
+    )
+
+
+def _build_session_code_map(sess_data: dict) -> dict[str, str]:
+    """Build a mapping from 2-digit session suffix to start date string.
+
+    Reads ``session_data.session`` entries where ``is_session == "Y"`` and
+    extracts the suffix from the 6-digit ``term_code`` (e.g. ``"202630"``
+    → ``"30"``).  The first occurrence of each suffix wins (earliest year).
+    """
+    code_to_date: dict[str, str] = {}
+    for s in sess_data.get("session", []):
+        if s.get("is_session") != "Y":
+            continue
+        tc = s.get("term_code", "")
+        start = s.get("start_Date", "")
+        if len(tc) == 6 and start:
+            suffix = tc[4:]
+            if suffix not in code_to_date:
+                code_to_date[suffix] = start
+    return code_to_date
+
+
+def _intakes_from_co(co_data: dict, code_to_date: dict[str, str]) -> list[str] | None:
+    """Return intake month names from the ``course_offerings`` JS variable.
+
+    Filters for international offerings (``fund_source_code == "FPOS"``),
+    extracts the 2-digit session suffix from each ``session_code`` (e.g.
+    ``"202630"`` → ``"30"``), and maps to start months via ``code_to_date``.
+
+    Returns ``None`` when no FPOS offerings are found (caller should fall
+    back to :func:`_intakes`).
+    """
+    intl = [
+        o for o in co_data.get("course_offering", [])
+        if o.get("fund_source_code") == "FPOS"
+    ]
+    if not intl:
+        return None
+
+    suffixes: set[str] = set()
+    for o in intl:
+        sc = (o.get("session_code") or "").strip()
+        if len(sc) == 6:
+            suffixes.add(sc[4:])
+        elif len(sc) == 2:
+            suffixes.add(sc)
+
+    months: list[str] = []
+    for code in sorted(suffixes):
+        date_str = code_to_date.get(code)
+        if not date_str:
+            continue
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            month_name = dt.strftime("%B")
+            if month_name not in months:
+                months.append(month_name)
+        except ValueError:
+            pass
+    return months if months else None
 
 
 # ---------------------------------------------------------------------------
@@ -520,6 +646,17 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
     sess_raw = _extract_js_var(html, "session_data")
     sess_data = _parse_json(sess_raw, "session_data") or {}
 
+    # --- course_offerings variable (primary source for location/mode/intakes) -
+    # Present in ALL CSU course pages (not just UTC partner courses).
+    # ``ocb_metadata.ocb[1].course[0].offerings`` is empty for most courses;
+    # the ``course_offerings`` top-level variable always has the full offering
+    # list including campus, mode, fund_source_code, and session_code.
+    co_raw = _extract_js_var(html, "course_offerings")
+    co_data = _parse_json(co_raw, "course_offerings")
+
+    # Build session suffix → start-date map once (shared by both intake paths)
+    code_to_date = _build_session_code_map(sess_data)
+
     if meta:
         course = _first_course(meta)
         if course:
@@ -563,18 +700,31 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
                 result["duration"] = dur
                 result["duration_term"] = dur_term  # type: ignore[assignment]
 
-            # Intake months (list; None blocked above)
-            result["intake_months"] = _intakes(course, sess_data)
-
             # ── Location + mode ──────────────────────────────────────────────
-            # Primary: collect from active international offerings.
-            loc, mode = _locations_and_modes(course)
-            # No fallback to "Online" or inactive offerings — if there are no
-            # active international offerings the location is genuinely unknown
-            # and should be None.  Returning None lets the caller decide, and
-            # keeps inactive-offering campus names from bleeding through.
-            result["course_location"] = loc
-            result["study_mode"] = mode
+            # Primary: course_offerings variable (available for all CSU courses).
+            # Fallback: ocb_metadata.offerings (only populated for UTC/partner
+            # courses, ~26 of ~170 courses — master-islamic-studies etc.).
+            # We prefer the ocb_metadata result when it has data because it
+            # carries the partner institution name (e.g. "United Theological
+            # College") as the location, which is more informative than None.
+            loc_co, mode_co = (
+                _locations_and_modes_from_co(co_data) if co_data else (None, None)
+            )
+            loc_ocb, mode_ocb = _locations_and_modes(course)
+            result["course_location"] = loc_ocb or loc_co
+            result["study_mode"] = mode_ocb or mode_co
+
+            # ── Intake months ─────────────────────────────────────────────────
+            # Primary: course_offerings FPOS session codes → month names.
+            # Fallback: ocb_metadata.offerings active teaching_period codes
+            # (used by UTC courses), then all is_session=Y sessions.
+            intakes_co = (
+                _intakes_from_co(co_data, code_to_date) if co_data else None
+            )
+            if intakes_co:
+                result["intake_months"] = intakes_co
+            else:
+                result["intake_months"] = _intakes(course, sess_data)
 
     log.debug("csu_static: %s → %s", url, result)
     return result
