@@ -9,12 +9,13 @@ course links — all cards are injected by the React bundle after hydration.
 This module uses the same Playwright browser pool used by per-course
 extraction to:
   1. Navigate to the listing page and wait for the SPA to hydrate.
-  2. Scroll to the bottom in a loop, triggering any infinite-scroll or
-     lazy-load behaviour.
-  3. Click any "Load more" / "Show more" buttons that appear.
-  4. Repeat until no new course links appear in two consecutive passes.
-  5. Extract every ``/international/courses/<slug>`` link with its visible
-     text (the course name shown on the card).
+  2. Read ``window.course_finder.resultsArr`` — the full in-memory array
+     that the page's search widget populates on hydration.  This array
+     contains **all** international courses regardless of how many cards
+     are currently rendered in the DOM (the DOM paginates at 12 per page,
+     but the full dataset is loaded up-front).
+  3. Fall back to a scroll / "Show more" DOM scrape if ``resultsArr`` is
+     unavailable or suspiciously small (< 3 entries).
 
 Public entry-point
 ------------------
@@ -33,37 +34,84 @@ log = logging.getLogger(__name__)
 
 _LISTING_URL = "https://study.csu.edu.au/international/courses"
 
-# Maximum scroll attempts before giving up on pagination
+# Maximum scroll attempts before giving up on pagination (fallback path only)
 _MAX_SCROLL_ITERS = 30
 
 # Seconds to wait after each scroll / button click for content to render
 _SCROLL_SETTLE_S = 2.5
 
-# JavaScript evaluated inside the rendered page to collect every
-# /international/courses/<slug> anchor.  Returns a JSON-serialisable array
-# of {url, name} objects.
-_EXTRACT_LINKS_JS = r"""
+# Minimum number of entries in window.course_finder.resultsArr before we trust
+# it as a complete listing and skip the scroll fallback.  CSU currently returns
+# 179 entries; 20 is chosen well above the first-page DOM count (12) so a
+# partial hydration or pagination regression triggers the scroll fallback rather
+# than returning a silently small result set.
+_RESULTS_ARR_MIN_FLOOR = 20
+
+# Warn threshold: emit a log/status warning when resultsArr is above the min
+# floor but still below this value (signals unexpected shrinkage).
+_RESULTS_ARR_WARN_FLOOR = 30
+
+# ── Primary extraction: read window.course_finder.resultsArr ─────────────────
+# The CSU course-finder widget loads its complete filtered dataset into
+# window.course_finder.resultsArr on hydration.  Each entry has at minimum
+# { url: string, label: string }.  This gives us all courses in one shot
+# without any scrolling or button-clicking.
+_EXTRACT_FROM_RESULTS_JS = r"""
 () => {
+  const cf = window.course_finder;
+  if (!cf || !Array.isArray(cf.resultsArr) || cf.resultsArr.length === 0) {
+    return null;  // Signal: resultsArr not available, use DOM fallback
+  }
   const ORIGIN = 'https://study.csu.edu.au';
-  // Exact same-origin path pattern: /international/courses/<slug>
-  // where <slug> is at least one non-separator character and there is
-  // no further path segment (avoids sub-pages like /international/courses/health/fees).
-  const PATH_RE = /^\/international\/courses\/[^/?#]+\/?$/;
+  // Accept any /courses/<slug> or /international/courses/<slug> path.
+  const PATH_RE = /^\/(?:international\/)?courses\/[^/?#]+\/?$/;
   const results = [];
   const seen = new Set();
-  document.querySelectorAll('a[href]').forEach(a => {
-    const raw = (a.getAttribute('href') || '').trim();
-    // Resolve to absolute URL (handle relative, absolute-same-origin, and
-    // fully-qualified same-origin URLs)
+  for (const item of cf.resultsArr) {
+    const raw = (item.url || '').trim();
+    if (!raw) continue;
+    // Resolve relative or absolute same-origin URLs
     let url;
     if (raw.startsWith('/')) {
       url = ORIGIN + raw;
     } else if (raw.startsWith(ORIGIN)) {
       url = raw;
     } else {
-      return;  // Off-site or protocol-relative — skip
+      continue;
     }
-    // Strip query-string and hash before testing the path
+    const [base] = url.split(/[?#]/);
+    const path = base.replace(ORIGIN, '');
+    if (!PATH_RE.test(path)) continue;
+    if (seen.has(base)) continue;
+    seen.add(base);
+    const name = (item.label || item.name || '').replace(/\s+/g, ' ').trim();
+    results.push({ url: base, name });
+  }
+  return results;
+}
+"""
+
+# ── Fallback extraction: scan DOM anchors ────────────────────────────────────
+# Used when window.course_finder.resultsArr is not available.  Matches both
+# /international/courses/<slug> and /courses/<slug> paths so it works
+# regardless of which URL scheme CSU uses on the rendered cards.
+_EXTRACT_LINKS_JS = r"""
+() => {
+  const ORIGIN = 'https://study.csu.edu.au';
+  // Match /international/courses/<slug> OR /courses/<slug>
+  const PATH_RE = /^\/(?:international\/)?courses\/[^/?#]+\/?$/;
+  const results = [];
+  const seen = new Set();
+  document.querySelectorAll('a[href]').forEach(a => {
+    const raw = (a.getAttribute('href') || '').trim();
+    let url;
+    if (raw.startsWith('/')) {
+      url = ORIGIN + raw;
+    } else if (raw.startsWith(ORIGIN)) {
+      url = raw;
+    } else {
+      return;
+    }
     const [base] = url.split(/[?#]/);
     const path = base.replace(ORIGIN, '');
     if (!PATH_RE.test(path)) return;
@@ -76,9 +124,7 @@ _EXTRACT_LINKS_JS = r"""
 }
 """
 
-# Patterns for "Load more" buttons — tried in order, first match wins.
-# Using JS-based click to avoid strict-mode locator failures on sites
-# that have multiple matching elements.
+# Patterns for "Load more" / "Show more" buttons — used in the fallback path.
 _LOAD_MORE_JS = r"""
 () => {
   const patterns = [
@@ -94,11 +140,11 @@ _LOAD_MORE_JS = r"""
       const style = window.getComputedStyle(el);
       if (style.display !== 'none' && style.visibility !== 'hidden') {
         el.click();
-        return text;  // Return the button text for logging
+        return text;
       }
     }
   }
-  return null;  // Nothing clicked
+  return null;
 }
 """
 
@@ -108,8 +154,15 @@ async def browser_discover_csu_international(
     *,
     max_courses: int = 300,
 ) -> list[dict]:
-    """Fetch the CSU international courses listing via Playwright with
-    full scroll/paginate support.
+    """Fetch the CSU international courses listing via Playwright.
+
+    Primary strategy: read ``window.course_finder.resultsArr`` which the
+    page's search widget populates with the full filtered dataset on
+    hydration (typically 100–200 courses).  This is faster and more
+    reliable than DOM scrolling because all data is already in memory.
+
+    Fallback strategy: scroll + "Show more" DOM scrape (used when
+    ``resultsArr`` is unavailable or returns < 3 entries).
 
     Returns a list of ``{"url": str, "name": str}`` dicts — one per
     discovered international course URL — or ``[]`` on failure.
@@ -117,7 +170,7 @@ async def browser_discover_csu_international(
     Failure modes that return [] (caller falls back to normal BFS):
     * Browser pool unavailable (test environment).
     * Navigation timeout / Chromium error page.
-    * Fewer than 3 course links found after all scroll passes (probable
+    * Fewer than 3 course links found after all strategies (probable
       render failure or bot-block).
     """
 
@@ -143,7 +196,6 @@ async def browser_discover_csu_international(
 
     try:
         async with _pool.page() as page:
-            # Mimic a real browser navigating from Google
             await page.set_extra_http_headers({"Referer": "https://www.google.com/"})
 
             # ── 2. Navigate ──────────────────────────────────────────────
@@ -163,10 +215,7 @@ async def browser_discover_csu_international(
                 await _emit(f"[DISCOVER] CSU: navigation failed ({exc}) — falling back")
                 return []
 
-            # ── 2b. Error-page sniff (parity with browser_pool.fetch_html) ─
-            # Chromium can land on an error interstitial (DNS failure, cert
-            # error, site down) that looks like a page with no links.  Detect
-            # and bail early rather than burning the full scroll budget.
+            # ── 2b. Error-page sniff ─────────────────────────────────────
             try:
                 partial = await asyncio.wait_for(page.content(), timeout=5.0)
                 lowered = (partial or "")[:4096].lower()
@@ -185,26 +234,91 @@ async def browser_discover_csu_international(
                     )
                     return []
             except Exception:
-                pass  # If we can't sniff the content, proceed anyway
+                pass
 
             # ── 3. Initial settle ────────────────────────────────────────
             await asyncio.sleep(4.0)
 
-            # ── 4. Scroll + Load-More loop ───────────────────────────────
-            # Strategy: scroll to the bottom, pause for content to render,
-            # check for Load-More buttons, then compare link counts.
-            # Stop when two consecutive passes find no new links.
+            # ── 4. Primary: extract from window.course_finder.resultsArr ─
+            # The widget loads the full filtered dataset into resultsArr on
+            # hydration — no scrolling needed.  This is the fast path.
+            #
+            # Guard: require at least _RESULTS_ARR_MIN_FLOOR entries to use
+            # this path.  If resultsArr ever regresses to a partial subset
+            # (e.g. 12 items — the initial DOM page) we skip the fast path
+            # and run the scroll fallback so we still attempt a fuller scan
+            # rather than silently returning a partial list.
+            try:
+                results_raw = await page.evaluate(_EXTRACT_FROM_RESULTS_JS)
+            except Exception as exc:
+                log.warning(
+                    "csu_browser_discover: resultsArr JS extraction failed — %s", exc
+                )
+                results_raw = None
+
+            raw_count = len(results_raw) if results_raw else 0
+
+            if results_raw and raw_count >= _RESULTS_ARR_MIN_FLOOR:
+                if raw_count < _RESULTS_ARR_WARN_FLOOR:
+                    log.warning(
+                        "csu_browser_discover: resultsArr returned only %d course(s) "
+                        "(below expected ~%d) — possible partial hydration",
+                        raw_count,
+                        _RESULTS_ARR_WARN_FLOOR,
+                    )
+                    await _emit(
+                        f"[DISCOVER] CSU: WARNING — resultsArr has only {raw_count} "
+                        f"course(s); expected ~{_RESULTS_ARR_WARN_FLOOR}+"
+                    )
+                await _emit(
+                    f"[DISCOVER] CSU: extracted {raw_count} courses from "
+                    "window.course_finder.resultsArr (no scrolling needed)"
+                )
+                log.info(
+                    "csu_browser_discover: resultsArr path — %d course(s) found",
+                    raw_count,
+                )
+                seen: set[str] = set()
+                for item in results_raw:
+                    url = (item.get("url") or "").strip()
+                    name = (item.get("name") or "").strip()
+                    if url and url not in seen:
+                        seen.add(url)
+                        links.append({"url": url, "name": name})
+                    if len(links) >= max_courses:
+                        break
+                # Skip scroll fallback — we have a sufficiently complete list
+                return await _validate_and_return(links, emit_fn=_emit)
+
+            # ── 5. Fallback: scroll + "Show more" DOM scrape ─────────────
+            if results_raw is not None and raw_count < _RESULTS_ARR_MIN_FLOOR:
+                await _emit(
+                    f"[DISCOVER] CSU: resultsArr returned only {raw_count} entries "
+                    f"(< floor {_RESULTS_ARR_MIN_FLOOR}) — "
+                    "falling back to scroll/DOM approach"
+                )
+                log.warning(
+                    "csu_browser_discover: resultsArr has only %d entries "
+                    "(floor=%d) — scroll fallback",
+                    raw_count,
+                    _RESULTS_ARR_MIN_FLOOR,
+                )
+            else:
+                await _emit(
+                    "[DISCOVER] CSU: resultsArr unavailable — "
+                    "falling back to scroll/DOM approach"
+                )
+                log.debug("csu_browser_discover: resultsArr unavailable — scroll fallback")
+
             prev_count = -1
             stall_streak = 0
 
             for iteration in range(_MAX_SCROLL_ITERS):
-                # Scroll to absolute bottom of page
                 await page.evaluate(
                     "window.scrollTo(0, document.body.scrollHeight)"
                 )
                 await asyncio.sleep(_SCROLL_SETTLE_S)
 
-                # Try to click any "Load more" style button
                 try:
                     btn_text = await page.evaluate(_LOAD_MORE_JS)
                     if btn_text:
@@ -212,7 +326,6 @@ async def browser_discover_csu_international(
                             f"[DISCOVER] CSU: clicked '{btn_text}' button "
                             f"(iter {iteration + 1})"
                         )
-                        # Wait for the new batch to load
                         try:
                             await page.wait_for_load_state(
                                 "networkidle", timeout=8_000
@@ -223,7 +336,6 @@ async def browser_discover_csu_international(
                 except Exception:
                     pass
 
-                # Count links now visible
                 try:
                     current_js = await page.evaluate(_EXTRACT_LINKS_JS)
                     current_count = len(current_js)
@@ -233,7 +345,6 @@ async def browser_discover_csu_international(
                 if current_count == prev_count:
                     stall_streak += 1
                     if stall_streak >= 2:
-                        # Two passes with no growth → all content loaded
                         log.debug(
                             "csu_browser_discover: link count stable at %d "
                             "after %d scroll iters — done",
@@ -255,7 +366,6 @@ async def browser_discover_csu_international(
                     )
                     break
 
-            # ── 5. Final extraction ──────────────────────────────────────
             try:
                 raw = await page.evaluate(_EXTRACT_LINKS_JS)
             except Exception as exc:
@@ -265,13 +375,12 @@ async def browser_discover_csu_international(
                 )
                 return []
 
-            # De-duplicate and cap at max_courses
-            seen: set[str] = set()
+            seen_set: set[str] = set()
             for item in raw:
                 url = (item.get("url") or "").strip()
                 name = (item.get("name") or "").strip()
-                if url and url not in seen:
-                    seen.add(url)
+                if url and url not in seen_set:
+                    seen_set.add(url)
                     links.append({"url": url, "name": name})
                 if len(links) >= max_courses:
                     break
@@ -281,25 +390,28 @@ async def browser_discover_csu_international(
         await _emit(f"[DISCOVER] CSU: browser discovery error — {exc}")
         return []
 
-    # ── 6. Validate & return ─────────────────────────────────────────────
+    return await _validate_and_return(links, emit_fn=_emit)
+
+
+async def _validate_and_return(links: list[dict], *, emit_fn) -> list[dict]:
+    """Log and return discovered links, or empty list if too few found."""
     if len(links) < 3:
         log.warning(
             "csu_browser_discover: only %d link(s) found — page may not have "
             "hydrated correctly; falling back to normal discovery",
             len(links),
         )
-        await _emit(
-            f"[DISCOVER] CSU: only {len(links)} link(s) found after scroll — "
+        await emit_fn(
+            f"[DISCOVER] CSU: only {len(links)} link(s) found after all strategies — "
             "falling back"
         )
         return []
 
     log.info(
-        "csu_browser_discover: found %d international course links "
-        "(scroll iters exhausted or stable)",
+        "csu_browser_discover: found %d international course links",
         len(links),
     )
-    await _emit(
+    await emit_fn(
         f"[DISCOVER] CSU: browser discovered {len(links)} international course link(s)"
     )
     return links
