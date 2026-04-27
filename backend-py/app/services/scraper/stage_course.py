@@ -163,13 +163,15 @@ async def stage_course(
     # Transient reasons — extractor_bug, bulk_reset, no_international_fee,
     # expired — do NOT trigger the cooldown so a code-side fix can re-stage
     # the course on the very next run without DB surgery.
-    # Note: online_only has been removed as a rejection reason — online courses
-    # are now accepted and staged for human review.
+    # online_only is transient: if the institution adds campus options the
+    # course should be re-staged automatically on the next scrape without
+    # manual DB cleanup.
     _TRANSIENT_REJECTION_REASONS = frozenset({
         "extractor_bug",
         "bulk_reset",
         "no_international_fee",
         "expired",
+        "online_only",
     })
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.rejection_block_days)
     _recent_row = (

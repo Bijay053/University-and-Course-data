@@ -10,6 +10,7 @@ import pytest
 from app.services.scraper.guards import (
     has_course_specific_fee_evidence,
     is_generic_course_category_name,
+    should_stage_course,
     should_trust_generic_university_fee_fallback,
 )
 
@@ -182,3 +183,88 @@ class TestShouldTrustGenericUniversityFeeFallback:
             )
             is True
         )
+
+
+class TestShouldStageCourseOnlineOnly:
+    """Bug C (re-added): online-only courses must be auto-rejected.
+
+    Rule: study_mode stripped+lowercased == "online" → reject with "online_only".
+    Courses with "On Campus, Online", "Blended", or no study_mode pass through.
+    """
+
+    _BASE_PAYLOAD: dict = {
+        "course_name": "Master of Business Administration",
+        "international_fee": 35000,
+    }
+
+    @pytest.mark.parametrize(
+        "study_mode",
+        [
+            "Online",
+            "online",
+            "ONLINE",
+            "  Online  ",   # leading/trailing spaces
+        ],
+    )
+    def test_rejects_online_only_study_modes(self, study_mode: str) -> None:
+        payload = {**self._BASE_PAYLOAD, "study_mode": study_mode}
+        ok, reason = should_stage_course("Master of Business Administration", payload)
+        assert ok is False
+        assert reason == "online_only"
+
+    @pytest.mark.parametrize(
+        "study_mode",
+        [
+            "On Campus",
+            "On Campus, Online",
+            "on campus, online",
+            "Blended",
+            "blended",
+            "On Campus and Online",
+            "",
+            None,
+        ],
+    )
+    def test_passes_non_online_only_modes(self, study_mode) -> None:
+        payload = {**self._BASE_PAYLOAD, "study_mode": study_mode}
+        ok, reason = should_stage_course("Master of Business Administration", payload)
+        assert ok is True
+        assert reason == "accepted"
+
+    def test_csu_master_psychological_practice_rejected(self) -> None:
+        """Concrete CSU example the user reported as incorrectly appearing in review."""
+        payload = {
+            "course_name": "Master of Psychological Practice",
+            "international_fee": 28000,
+            "study_mode": "Online",
+            "course_location": None,
+        }
+        ok, reason = should_stage_course("Master of Psychological Practice", payload)
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_csu_master_project_management_rejected(self) -> None:
+        payload = {
+            "course_name": "Master of Project Management",
+            "international_fee": 28000,
+            "study_mode": "Online",
+        }
+        ok, reason = should_stage_course("Master of Project Management", payload)
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_online_only_checked_before_no_fee(self) -> None:
+        """online_only rejection takes precedence over no_international_fee.
+
+        A course that is both online-only AND has no fee should be rejected
+        as "online_only", not "no_international_fee", so the rejection reason
+        is stable across fee-extraction changes.
+        """
+        payload = {
+            "course_name": "Master of Networking Systems Administration",
+            "international_fee": None,
+            "study_mode": "Online",
+        }
+        ok, reason = should_stage_course("Master of Networking Systems Administration", payload)
+        assert ok is False
+        assert reason == "online_only"

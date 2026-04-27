@@ -256,6 +256,29 @@ async def start_scrape(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=err_msg,
         )
+    # Deduplication: if there is already a queued or running job for this
+    # university, return it instead of creating a duplicate. This prevents the
+    # "5 workers claimed the same job" loop seen when UEL's 403 caused every
+    # attempt to complete with 0 courses, the UI showed "completed", and the
+    # operator clicked "Re-run" multiple times in quick succession.
+    existing_job = (
+        await db.execute(
+            select(ScrapeRuntimeJob)
+            .where(
+                ScrapeRuntimeJob.university_id == uni.id,
+                ScrapeRuntimeJob.status.in_(["queued", "running"]),
+            )
+            .order_by(ScrapeRuntimeJob.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing_job:
+        return ScrapeStartResponse(
+            job_id=existing_job.runtime_job_id,
+            runtime_job_id=existing_job.runtime_job_id,
+            status=existing_job.status,
+        )
+
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     # request_payload MUST be Node-StartRuntimePayload-compatible because the
     # Node API server's scrape-worker may also claim queued rows in prod (it

@@ -1,0 +1,47 @@
+[INFO ] Scraping started in background…
+[INFO ] Scraping https://www.uel.ac.uk/...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 18
+[INFO ] Fetching https://www.uel.ac.uk/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.uel.ac.uk/ (max 25 pages, max 200 candidates)
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 18
+[INFO ] Fetching https://www.uel.ac.uk/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.uel.ac.uk/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] Page 1/25: fetch failed — https://www.uel.ac.uk/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.uel.ac.uk
+[DISCOVER] [DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] Discovered 0 candidate course links
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 18
+[INFO ] Fetching https://www.uel.ac.uk/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.uel.ac.uk/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] Page 1/25: fetch failed — https://www.uel.ac.uk/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.uel.ac.uk
+[DISCOVER] [DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] Discovered 0 candidate course links
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 18
+[INFO ] Fetching https://www.uel.ac.uk/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.uel.ac.uk/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] Page 1/25: fetch failed — https://www.uel.ac.uk/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.uel.ac.uk
+[DISCOVER] [DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] Discovered 0 candidate course links
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 18
+[INFO ] Fetching https://www.uel.ac.uk/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Crawling from https://www.uel.ac.uk/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] Page 1/25: fetch failed — https://www.uel.ac.uk/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.uel.ac.uk
+[DISCOVER] [DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] Discovered 0 candidate course links

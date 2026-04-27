@@ -275,7 +275,7 @@ def should_stage_course(
     payload: dict[str, Any],
     source_url: str | None = None,
 ) -> tuple[bool, str]:
-    """Two-filter staging gate (Bugs A and B from the Torrens T007 sweep).
+    """Three-filter staging gate (Bugs A, B, and C from the T007 sweep).
 
     Returns ``(True, "accepted")`` when the course passes all filters, or
     ``(False, reject_reason)`` on the first failing check.  Reject reasons
@@ -284,14 +284,14 @@ def should_stage_course(
     * ``"category_landing_page"`` — H1/course-name lacks a degree qualifier
                                      OR URL matches a known category-page suffix
     * ``"no_international_fee"`` — international_fee is None after full extraction
-
-    Note: Bug C (``"online_only"``) has been removed.  Online-only courses are
-    valid international offerings (e.g. CSU Master of Veterinary Studies) and
-    should pass through to human review rather than being auto-rejected.
+    * ``"online_only"``           — study_mode is exactly "Online" (case-insensitive).
+                                     Only on-campus or blended courses are ingested.
+                                     Marked transient so courses re-stage if campus
+                                     options are later added by the institution.
 
     Callers must invoke this AFTER all extractors + AI fallback have run (i.e.
-    just before the DB write in ``stage_course``) so Bug B has a settled
-    payload to inspect.
+    just before the DB write in ``stage_course``) so Bug B and C have settled
+    payloads to inspect.
     """
     # URL-based category-page rejection — runs FIRST so that pages whose
     # title accidentally gains a degree-level prefix (e.g. "MBA – Two
@@ -310,6 +310,16 @@ def should_stage_course(
     effective_name = (payload.get("course_name") or course_name or "").strip()
     if effective_name and not _name_has_degree_qualifier(effective_name):
         return (False, "category_landing_page")
+
+    # Bug C (re-added): online-only courses are auto-rejected.
+    # Rule: study_mode stripped and lowercased equals exactly "online".
+    # Courses with "On Campus, Online" or "Blended" pass through.
+    # Marked transient in stage_course._TRANSIENT_REJECTION_REASONS so the
+    # course can be re-staged automatically if the institution later adds
+    # campus options (without requiring manual DB cleanup).
+    _study_mode = (payload.get("study_mode") or "").strip().lower()
+    if _study_mode == "online":
+        return (False, "online_only")
 
     # Bug B: no international fee after all extraction is done.
     if payload.get("international_fee") is None:

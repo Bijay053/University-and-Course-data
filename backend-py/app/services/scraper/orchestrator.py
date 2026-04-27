@@ -311,15 +311,39 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     completed/failed). Per-course staging uses a fresh AsyncSession from
     AsyncSessionLocal so we never share a session across coroutines.
     """
+    from sqlalchemy import text as _text
+
+    # Atomic claim: only succeed if the job is still in 'queued' state.
+    # Two Celery workers can both dequeue the same Celery task message when
+    # Redis delivers it at-least-once (e.g. redelivery after an ack timeout).
+    # Without this guard both workers set status='running' and run a full
+    # duplicate scrape in parallel — producing duplicate scraped_courses rows
+    # and duplicate log streams that confuse the UI.
+    #
+    # The UPDATE returns the claimed row. If it returns 0 rows the job was
+    # already claimed by another worker (or cancelled) and we bail immediately.
+    now = datetime.now(timezone.utc)
+    claimed = await db.execute(
+        _text(
+            "UPDATE scrape_runtime_jobs "
+            "SET status = 'running', claimed_at = :now, heartbeat_at = :now "
+            "WHERE runtime_job_id = :jid AND status = 'queued' "
+            "RETURNING runtime_job_id"
+        ),
+        {"jid": runtime_job_id, "now": now},
+    )
+    await db.commit()
+    if not claimed.first():
+        log.warning(
+            "run_scrape: job %s already claimed or not queued — aborting duplicate run",
+            runtime_job_id,
+        )
+        return {"ok": False, "reason": "already_claimed"}
+
     job = await db.get(ScrapeRuntimeJob, runtime_job_id)
     if not job:
         log.warning("run_scrape: no job %s", runtime_job_id)
         return {"ok": False, "reason": "job_not_found"}
-
-    job.status = "running"
-    job.claimed_at = datetime.now(timezone.utc)
-    job.heartbeat_at = datetime.now(timezone.utc)
-    await db.commit()
     _seq = [1]
     async def emit(event: str, message: str, **kw):
         # Allocate the sequence number BEFORE awaiting the insert. asyncio is
@@ -459,6 +483,42 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.total_found = len(links)
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
+
+        # Zero-discovery = hard failure. The site is either blocking our
+        # crawler (403/Cloudflare), misconfigured, or the URL changed.
+        # Marking as "completed" with 0 found hides the real error and
+        # causes the UI to silently show the job as successful even though
+        # nothing was scraped — and any automated retry loop will keep
+        # spinning up new jobs that all fail the same way.
+        if len(links) == 0:
+            err_msg = (
+                f"Discovery returned 0 course links from {scrape_url}. "
+                "The site may be blocking the crawler (403/Cloudflare) or "
+                "the scrape URL is incorrect. No courses were staged."
+            )
+            await emit(
+                "status",
+                f"[ERROR] {err_msg}",
+                phase="discover",
+                kind="discovery_failed",
+                level="error",
+            )
+            await emit(
+                "done",
+                f"══ FAILED ══ Found:0 | Staged:0 | Skipped:0 | Errors:0",
+                phase="complete",
+                totalFound=0,
+                imported=0,
+                skipped=0,
+                errors=0,
+                level="error",
+            )
+            job.status = "failed"
+            job.error_message = err_msg[:1000]
+            job.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+            # The outer try-finally will cancel stop_poll_task / heartbeat_task.
+            return {"ok": False, "reason": "discovery_failed", **summary}
 
         # University-level PDF data (fee schedule, admissions/IELTS policy)
         # — fetched ONCE per job, used as last-resort fallback for every course.
