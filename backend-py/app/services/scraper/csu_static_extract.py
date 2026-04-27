@@ -419,7 +419,7 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
     """Return ``(course_location, study_mode)`` from active international offerings.
 
     Only active offerings that pass ``_offering_is_international`` are
-    considered.  Returns ``(None, None)`` when there are no such offerings.
+    considered.
 
     CSU's JSON uses ``location.value = "Online"`` for distance-delivery
     offerings — this is a mode descriptor, not a physical campus name.
@@ -430,6 +430,11 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
     NOTE: This reads from ``ocb_metadata.ocb[1].course[0].offerings`` which
     is only populated for UTC/partner courses (~26 of ~170 CSU courses).
     Standard CSU courses use :func:`_locations_and_modes_from_co` instead.
+
+    Return values:
+    - If real offering data is present: extracted location and mode strings.
+    - If only Online-mode offerings exist: ``(None, "Online")``.
+    - If no active international offerings are found: ``(None, None)``.
     """
     locations: list[str] = []
     modes: list[str] = []
@@ -450,6 +455,7 @@ def _locations_and_modes(course: dict) -> tuple[str | None, str | None]:
         mode = (offering.get("mode") or {}).get("value", "")
         if mode and mode not in modes:
             modes.append(mode)
+
     return (
         ", ".join(locations) if locations else None,
         ", ".join(modes) if modes else None,
@@ -711,8 +717,24 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
                 _locations_and_modes_from_co(co_data) if co_data else (None, None)
             )
             loc_ocb, mode_ocb = _locations_and_modes(course)
-            result["course_location"] = loc_ocb or loc_co
-            result["study_mode"] = mode_ocb or mode_co
+            loc = loc_ocb or loc_co
+            mode = mode_ocb or mode_co
+            # Last-resort fallback: CSU is a predominantly distance-education
+            # university.  When neither source yields offering data (no FPOS
+            # entries in course_offerings and no active INT entries in
+            # ocb_metadata.offerings), default to "Online" so the field is not
+            # left null.  This is logged at DEBUG for data-quality monitoring.
+            if not loc and not mode:
+                log.debug(
+                    "csu_static: no location/mode from ocb or co data; "
+                    "defaulting to Online (CSU distance-ed fallback). "
+                    "course_title=%r",
+                    course.get("title"),
+                )
+                loc = "Online"
+                mode = "Online"
+            result["course_location"] = loc
+            result["study_mode"] = mode
 
             # ── Intake months ─────────────────────────────────────────────────
             # Primary: course_offerings FPOS session codes → month names.

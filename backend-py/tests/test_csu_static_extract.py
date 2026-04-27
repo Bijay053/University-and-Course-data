@@ -151,14 +151,22 @@ def test_has_central_fee_page_true_even_when_int_fee_present() -> None:
     assert result["has_central_fee_page"] is True
 
 
-def test_no_active_offerings_location_and_mode_are_none() -> None:
+def test_no_active_offerings_defaults_to_online() -> None:
+    """When offerings is empty, both fields default to 'Online'.
+
+    CSU embeds ``"offerings": []`` for the majority of courses (140+ out of
+    168 observed in live scrapes).  Rather than leaving location and mode as
+    None, the extractor defaults to 'Online' because CSU is a predominantly
+    distance-education university and such courses are almost universally
+    delivered online.
+    """
     html = _make_html(
         course_obj={"offerings": []},
         sessions=_STD_SESSIONS,
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
-    assert result["course_location"] is None
-    assert result["study_mode"] is None
+    assert result["course_location"] == "Online"
+    assert result["study_mode"] == "Online"
 
 
 # ---------------------------------------------------------------------------
@@ -536,7 +544,13 @@ def test_course_location_and_study_mode_extracted() -> None:
     assert "Online" in result["study_mode"]
 
 
-def test_inactive_offerings_excluded_from_location() -> None:
+def test_inactive_offerings_fall_back_to_online() -> None:
+    """Inactive offerings are excluded; the Online fallback then applies.
+
+    When only inactive offerings are present, no active international offering
+    is found, so the extractor falls back to ("Online", "Online").  Crucially,
+    the inactive campus name must NOT appear in course_location.
+    """
     html = _make_html(
         course_obj={
             "offerings": [
@@ -550,15 +564,19 @@ def test_inactive_offerings_excluded_from_location() -> None:
         }
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
-    assert result["course_location"] is None
-    assert result["study_mode"] is None
+    # Inactive campus name must NOT bleed through
+    assert "Wagga Wagga Campus" not in (result["course_location"] or "")
+    # Fallback applies: course is treated as online when no active intl offerings
+    assert result["course_location"] == "Online"
+    assert result["study_mode"] == "Online"
 
 
 def test_dom_only_offering_excluded_from_location() -> None:
     """Domestic-only offerings must not appear in course_location.
 
-    When every active offering is DOM-only the domestic campus name is
-    suppressed and both course_location and study_mode are None.
+    When every active offering is DOM-only, no international offering is found,
+    so the Online fallback applies: domestic campus name is suppressed and both
+    course_location and study_mode default to "Online".
     """
     html = _make_html(
         course_obj={
@@ -573,7 +591,11 @@ def test_dom_only_offering_excluded_from_location() -> None:
         }
     )
     result = apply_csu_static_extraction(_CSU_URL, html)
+    # Domestic campus name must NOT bleed into the international location field
     assert "Wagga Wagga Campus" not in (result["course_location"] or "")
+    # Fallback applies: no active international offerings → Online defaults
+    assert result["course_location"] == "Online"
+    assert result["study_mode"] == "Online"
 
 
 def test_int_offering_included_in_location() -> None:
