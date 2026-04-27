@@ -1,6 +1,6 @@
 """Tests for the stale-job requeue logic in ``app/tasks/scrape_tasks.py``.
 
-Five behaviours exercised:
+Six behaviours exercised:
 
 1. Jobs younger than 5 minutes are NOT returned by ``_async_find_stale``
    (i.e. they are NOT re-dispatched).
@@ -13,9 +13,13 @@ Five behaviours exercised:
 5. Redis NX lock collision: if the lock is already held (``set(nx=True)``
    returns falsy), the job must be skipped — not dispatched, not in
    ``result["requeued"]``.
+6. **Concurrent beat ticks against real Redis**: two invocations fired
+   simultaneously must produce exactly one dispatch — the NX lock is the
+   sole serialisation point and must survive a genuine thread race.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -317,6 +321,61 @@ def test_requeue_skips_job_when_nx_lock_is_held():
     )
     mock_scrape.delay.assert_not_called()
     mock_repair.delay.assert_not_called()
+
+
+# ─── Case 6: concurrent beat ticks against real Redis ────────────────────────
+
+
+def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
+    """Two simultaneous invocations of ``requeue_stale_queued`` against a *real*
+    Redis instance must result in exactly one ``.delay()`` call.
+
+    Strategy
+    --------
+    - Both threads share a ``patch.object`` context so they race on the *real*
+      Redis NX lock while still skipping actual DB/Celery broker calls.
+    - ``asyncio.run`` is intercepted to return the same stale job from both
+      threads so we can measure the dispatch count without DB side-effects.
+    - The winning thread acquires the NX lock and calls ``.delay()``; the
+      losing thread sees a falsy ``set()`` return and skips silently.
+    """
+    import redis as redis_lib
+    from app.config import settings
+    from app.tasks import scrape_tasks as st
+
+    fake_job_id = f"test_conc_{uuid.uuid4().hex[:8]}"
+    stale_result = [(fake_job_id, "full", 0)]
+    lock_key = st._requeue_lock_key(fake_job_id)
+    r_cleanup = redis_lib.from_url(settings.redis_url, decode_responses=True)
+
+    try:
+        with (
+            patch.object(st, "asyncio") as mock_asyncio,
+            patch.object(st, "scrape_university") as mock_scrape,
+            patch.object(st, "repair_university") as mock_repair,
+        ):
+            mock_asyncio.run.side_effect = _make_asyncio_run_interceptor(stale_result)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                fut_a = pool.submit(_call_requeue_stale, st)
+                fut_b = pool.submit(_call_requeue_stale, st)
+                result_a = fut_a.result(timeout=10)
+                result_b = fut_b.result(timeout=10)
+
+        all_requeued = result_a.get("requeued", []) + result_b.get("requeued", [])
+        dispatch_count = all_requeued.count(fake_job_id)
+        assert dispatch_count == 1, (
+            f"Expected exactly 1 dispatch for job {fake_job_id!r}, "
+            f"got {dispatch_count}: result_a={result_a}, result_b={result_b}"
+        )
+        assert mock_scrape.delay.call_count == 1, (
+            f"scrape_university.delay should be called exactly once, "
+            f"got {mock_scrape.delay.call_count}"
+        )
+        mock_repair.delay.assert_not_called()
+    finally:
+        r_cleanup.delete(lock_key)
+        r_cleanup.close()
 
 
 # ─── Utility ──────────────────────────────────────────────────────────────────
