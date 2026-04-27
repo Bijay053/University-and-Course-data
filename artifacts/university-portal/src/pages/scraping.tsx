@@ -2880,7 +2880,7 @@ export default function Scraping() {
                                     <span className="font-bold mr-1">↺</span>
                                     {l.createdAt ? (
                                       <span className="text-amber-500 mr-1 text-[10px]">
-                                        [{new Date(String(l.createdAt)).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}]
+                                        [{new Date(String(l.createdAt)).toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}]
                                       </span>
                                     ) : null}
                                     {String(l.message)}

@@ -833,9 +833,12 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         except Exception:
             pass
 
-    # Sort all entries (real + synthetic) by createdAt so the timeline is
-    # chronological regardless of the synthetic sequence numbers.
-    logs.sort(key=lambda e: (e.get("createdAt") or ""))
+    # Sort all entries (real + synthetic) by (createdAt, sequence) so the
+    # timeline is chronological. The secondary sequence key makes ordering
+    # deterministic when two entries share the same timestamp or when
+    # createdAt is missing (synthetic requeue entries use negative sequence
+    # numbers so they slot before real log lines at the same second).
+    logs.sort(key=lambda e: (e.get("createdAt") or "", int(e.get("sequence") or 0)))
 
     # Staged courses for this job — return full ReviewStagedCourse shape so
     # ReviewScrapedCoursesTable renders correctly in the history "View Courses" panel.
