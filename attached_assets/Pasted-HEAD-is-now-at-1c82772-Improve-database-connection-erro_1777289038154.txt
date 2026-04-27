@@ -1,0 +1,106 @@
+HEAD is now at 1c82772 Improve database connection error handling and logging
+root@university-and-course-data:~/University-and-Course-data# python3 << 'EOF'
+path = "/root/University-and-Course-data/backend-py/app/services/scraper/stage_course.py"
+with open(path) as f:
+    src = f.read()
+
+OLD = '.on_conflict_do_nothing(\n        constraint="scraped_field_evidence_dedup"\n    )'
+NEW = '.on_conflict_do_nothing()'
+
+if NEW in src or 'on_conflict_do_nothing()' in src.replace(OLD, ''):
+    # Try the one-liner form too
+    OLD2 = '.on_conflict_do_nothing(\n        constraint="scraped_field_evidence_dedup"\n    )'
+    if OLD in src:
+        src = src.replace(OLD, NEW)
+        with open(path, "w") as f:
+            f.write(src)
+        print("Patched OK")
+    else:
+        print("Already patched or different format — checking...")
+        if 'constraint="scraped_field_evidence_dedup"' in src:
+            import re
+            src2 = re.sub(
+                r'\.on_conflict_do_nothing\s*\(\s*\n?\s*constraint="scraped_field_evidence_dedup"\s*\n?\s*\)',
+                '.on_conflict_do_nothing()',
+                src
+            )
+            if src2 != src:
+                with open(path, "w") as f:
+                    f.write(src2)
+                print("Patched OK (regex)")
+            else:
+                print("FAILED to patch — check file manually")
+        else:
+            print("Already clean — no constraint reference found")
+else:
+    src2 = src.replace(OLD, NEW)
+    with open(path, "w") as f:
+        f.write(src2)
+    print("Patched OK")
+EOF
+
+# Verify and restart
+grep -n "constraint" ~/University-and-Course-data/backend-py/app/services/scraper/stage_course.py || echo "CLEAN — no constraint reference"
+systemctl restart uni-api-py uni-celery
+echo "Services restarted"
+Patched OK
+CLEAN — no constraint reference
+
+Services restarted
+root@university-and-course-data:~/University-and-Course-data# 
+root@university-and-course-data:~/University-and-Course-data# DB=$(grep '^DATABASE_URL' ~/University-and-Course-data/backend-py/.env | cut -d'=' -f2- | sed 's|postgresql+asyncpg://|postgresql://|')
+
+psql "$DB" << 'SQL'
+-- Drop the broken expression-based index
+DROP INDEX IF EXISTS scraped_field_evidence_dedup;
+
+-- Recreate as a clean column-only index (NULLS NOT DISTINCT requires PG15+)
+CREATE UNIQUE INDEX scraped_field_evidence_dedup
+  ON scraped_field_evidence (scraped_course_id, field_key, extraction_method, source_url)
+  NULLS NOT DISTINCT;
+
+-- Promote to a named constraint
+ALTER TABLE scraped_field_evidence
+  ADD CONSTRAINT scraped_field_evidence_dedup
+  UNIQUE USING INDEX scraped_field_evidence_dedup;
+
+\echo 'Constraint created OK'
+SQL
+DROP INDEX
+ERROR:  could not create unique index "scraped_field_evidence_dedup"
+DETAIL:  Key (scraped_course_id, field_key, extraction_method, source_url)=(4901, toeflOverall, ai, https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration) is duplicated.
+ERROR:  index "scraped_field_evidence_dedup" does not exist
+LINE 2:   ADD CONSTRAINT scraped_field_evidence_dedup
+              ^
+Constraint created OK
+root@university-and-course-data:~/University-and-Course-data# DB=$(grep '^DATABASE_URL' ~/University-and-Course-data/backend-py/.env | cut -d'=' -f2- | sed 's|postgresql+asyncpg://|postgresql://|')
+
+psql "$DB" << 'SQL'
+-- 1. Remove duplicate evidence rows, keeping only the highest-id row per group
+DELETE FROM scraped_field_evidence
+WHERE id NOT IN (
+    SELECT MAX(id)
+    FROM scraped_field_evidence
+    GROUP BY scraped_course_id,
+             field_key,
+             COALESCE(extraction_method, ''),
+             COALESCE(source_url, '')
+);
+
+-- 2. Now create the unique index (no more duplicates to block it)
+CREATE UNIQUE INDEX scraped_field_evidence_dedup
+  ON scraped_field_evidence (scraped_course_id, field_key, extraction_method, source_url)
+  NULLS NOT DISTINCT;
+
+-- 3. Promote to a named constraint
+ALTER TABLE scraped_field_evidence
+  ADD CONSTRAINT scraped_field_evidence_dedup
+  UNIQUE USING INDEX scraped_field_evidence_dedup;
+
+\echo 'Done — duplicates removed, constraint created OK'
+SQL
+DELETE 812
+CREATE INDEX
+ALTER TABLE
+Done — duplicates removed, constraint created OK
+root@university-and-course-data:~/University-and-Course-data# 
