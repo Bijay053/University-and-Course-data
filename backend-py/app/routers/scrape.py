@@ -830,8 +830,14 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
                     "requeueNumber": num,
                 }
             )
-        except Exception:
-            pass
+        except Exception as ev_exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "history_one: malformed requeue event for job %s: %r — %s",
+                job_id,
+                ev,
+                ev_exc,
+            )
 
     # Sort all entries (real + synthetic) by (createdAt, sequence) so the
     # timeline is chronological. The secondary sequence key makes ordering
