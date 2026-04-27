@@ -347,12 +347,14 @@ export default function Scraping() {
 
   // ── Multi-slot state ──────────────────────────────────────────────────────
   const [slotIds, setSlotIds] = useState<number[]>(() => {
-    // Restore how many slots were open by checking which slot keys exist in sessionStorage
-    let count = 1;
-    for (let i = 1; i < 4; i++) {
-      if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) count = i + 1;
+    // Restore slots for all positions that have an active job saved.
+    // We always show at least slot 0. Any higher-index slots that have a
+    // saved jobId are also restored so running scrapes survive navigation.
+    let highest = 0;
+    for (let i = 0; i < 4; i++) {
+      if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) highest = i;
     }
-    return Array.from({ length: count }, (_, i) => i);
+    return Array.from({ length: highest + 1 }, (_, i) => i);
   });
   const nextSlotId = useRef(4); // safe ceiling — slot IDs 0-3 are pre-allocated
 

@@ -99,6 +99,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove }: ScrapeJobCardProps) {
   const slotKey = `scrape_slot_${slotIndex}_jobId`;
+  const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
   const [selectedUni, setSelectedUni] = useState("");
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [newUniName, setNewUniName] = useState("");
@@ -136,6 +137,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       setScraping(true);
       setPhase("running");
       setActiveJobId(savedJobId);
+      // Restore elapsed timer — use saved start time if available
+      const savedT0 = sessionStorage.getItem(startTimeKey);
+      if (savedT0) setStartTime(parseInt(savedT0, 10));
       pollJobStatus(savedJobId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -159,6 +163,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     pollFailRef.current = 0;
     logIndexRef.current = 0;
     sessionStorage.removeItem(slotKey);
+    sessionStorage.removeItem(startTimeKey);
     setScraping(false);
     setStopping(false);
     setProgress(null);
@@ -170,7 +175,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setResultSummary(null);
     setCompletedJobId(null);
     setUniName("");
-  }, [slotKey]);
+  }, [slotKey, startTimeKey]);
 
   const pollJobStatus = useCallback((jobId: string) => {
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -296,7 +301,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
-    setStartTime(Date.now());
+    const t0 = Date.now();
+    setStartTime(t0);
+    sessionStorage.setItem(startTimeKey, String(t0));
     submittingRef.current = false;
 
     try {
