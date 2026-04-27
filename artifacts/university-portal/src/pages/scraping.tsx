@@ -346,8 +346,15 @@ export default function Scraping() {
   const submittingRef = useRef(false);
 
   // ── Multi-slot state ──────────────────────────────────────────────────────
-  const [slotIds, setSlotIds] = useState<number[]>([0]);
-  const nextSlotId = useRef(1);
+  const [slotIds, setSlotIds] = useState<number[]>(() => {
+    // Restore how many slots were open by checking which slot keys exist in sessionStorage
+    let count = 1;
+    for (let i = 1; i < 4; i++) {
+      if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) count = i + 1;
+    }
+    return Array.from({ length: count }, (_, i) => i);
+  });
+  const nextSlotId = useRef(4); // safe ceiling — slot IDs 0-3 are pre-allocated
 
   const addSlot = useCallback(() => {
     if (slotIds.length >= 4) return;
@@ -355,8 +362,11 @@ export default function Scraping() {
   }, [slotIds.length]);
 
   const removeSlot = useCallback((id: number) => {
+    // Clear the sessionStorage key for this slot's position before removing
+    const idx = slotIds.indexOf(id);
+    if (idx !== -1) sessionStorage.removeItem(`scrape_slot_${idx}_jobId`);
     setSlotIds((prev) => prev.filter((s) => s !== id));
-  }, []);
+  }, [slotIds]);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
