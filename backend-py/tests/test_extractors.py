@@ -224,6 +224,54 @@ def test_english_equivalence_table_ignores_non_equivalence_tables():
     assert "cambridge_overall" not in out
 
 
+def test_english_equivalence_fallback_propagates_pte_listening_and_writing():
+    """Task 62: when a multi-column Pearson header exposes Listening/Writing
+    sub-columns, _equivalence_fallback must include pte_listening and
+    pte_writing in the normalized dict of the pte_overall ExtractionResult.
+
+    Before this fix, sub-skill keys were silently dropped — the loop
+    generated ``pte_listening_overall`` (wrong) instead of treating them as
+    already-namespaced field keys.  The pipeline writes normalized[k] to the
+    payload, so this is the gate between extraction and DB persistence."""
+    html = """
+    <p>IELTS Academic: Overall score 6.5, with no band below 6.0.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>IELTS</th>
+          <th colspan="3">Pearson Test of English</th>
+          <th>TOEFL iBT</th>
+        </tr>
+        <tr>
+          <th>Overall</th>
+          <th>Overall</th>
+          <th>Listening</th>
+          <th>Writing</th>
+          <th>Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>6.5</td><td>58</td><td>50</td><td>50</td><td>79</td></tr>
+        <tr><td>6.0</td><td>50</td><td>42</td><td>42</td><td>60</td></tr>
+      </tbody>
+    </table>
+    """
+    out = {
+        r.field_key: r
+        for r in _run(english_test.extract(html, "https://example.edu.au"))
+    }
+    pte = out.get("pte_overall")
+    assert pte is not None, "pte_overall must be extracted from the equivalence table"
+    assert pte.value == 58.0
+    assert pte.method == "equivalence_table"
+    assert pte.normalized.get("pte_listening") == 50.0, (
+        "pte_listening must appear in normalized when the table has a Listening column"
+    )
+    assert pte.normalized.get("pte_writing") == 50.0, (
+        "pte_writing must appear in normalized when the table has a Writing column"
+    )
+
+
 # --- Intake ------------------------------------------------------------------
 def test_intake_parses_keyword_window():
     html = "<p>Available intakes: February, July and September.</p>"

@@ -818,15 +818,35 @@ def _equivalence_fallback(
             continue
         row = mapping[match_key]
         snippet = f"equivalence table row IELTS={match_key}"
-        for test, val in row.items():
+
+        # Separate top-level test overalls (e.g. "pte" -> 58.0) from
+        # sub-skill entries (e.g. "pte_listening" -> 50.0) that
+        # _parse_equivalence_table writes when multi-column Pearson headers
+        # expose individual skill bands.
+        test_overalls: dict[str, float] = {}
+        test_subskills: dict[str, dict[str, float]] = {}
+        for key, val in row.items():
+            if "_" in key:
+                # Sub-skill key — group under the parent test name.
+                parent = key.split("_")[0]
+                test_subskills.setdefault(parent, {})[key] = val
+            else:
+                test_overalls[key] = val
+
+        for test, val in test_overalls.items():
             field_key = f"{test}_overall"
             if field_key not in missing:
                 continue
+            # Include any sub-skill scores for this test in the normalized
+            # dict so the pipeline writes them to the payload alongside
+            # the overall (mirrors the convention used by _emit()).
+            normalized: dict[str, float] = {field_key: val}
+            normalized.update(test_subskills.get(test, {}))
             extra.append(
                 ExtractionResult(
                     field_key=field_key,
                     value=val,
-                    normalized={field_key: val},
+                    normalized=normalized,
                     confidence=0.8,  # high — direct cell read, no OCR
                     snippet=snippet,
                     method="equivalence_table",
