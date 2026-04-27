@@ -221,6 +221,23 @@ def _english_from_lang_req(
                 # where the score appears before the IELTS keyword.
                 _ielts_patterns.append(r"minimum\s+score\s+of\s+(\d+(?:\.\d+)?)")
                 _ielts_patterns.append(r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)")
+                # "band score of 6.5 on the IELTS Academic test" — "band" without
+                # "average" prefix, score before the IELTS keyword.  Pattern 1
+                # only catches "average band score of X"; this catches the bare
+                # "band score of X" phrasing when IELTS is confirmed in the block.
+                _ielts_patterns.append(r"band\s+score\s+of\s+(\d+(?:\.\d+)?)")
+                # Reverse-order "X in/on [the] [Academic] IELTS" — score comes
+                # before the IELTS keyword.  Mirrors Pattern 6 added to the
+                # general _ielts() extractor for pages such as "achieve 6.5 on
+                # the IELTS Academic test" or "6.5 on IELTS".  We gate on
+                # _text_has_ielts to keep it CSU-safe.
+                # `(?<![0-9.])` prevents matching the trailing digit of a
+                # larger number (e.g. "PTE 58 on the IELTS scale" → "8 on
+                # IELTS").  Plain `\b` is insufficient because "." is not a
+                # word character, so \b matches between "." and "5" in "3.5".
+                _ielts_patterns.append(
+                    r"(?<![0-9.])([4-9](?:\.\d+)?)\s+(?:in|on)\s+(?:the\s+)?(?:academic\s+)?ielts\b"
+                )
             else:
                 _ielts_patterns.append(r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)")
             for ielts_pattern in _ielts_patterns:

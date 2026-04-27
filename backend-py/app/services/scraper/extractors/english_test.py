@@ -162,6 +162,35 @@ def _ielts(text: str) -> dict[str, float] | None:
         ov = float(broad.group(1))
         if 4 <= ov <= 9:
             return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
+    # Pattern 6: score BEFORE the IELTS keyword — "a score of 6.5 on the IELTS
+    # test", "6.5 in IELTS Academic", "at least 7.0 on IELTS", "band score of
+    # 6.5 on the IELTS Academic examination".
+    #
+    # All 5 earlier patterns start with the "ielts" keyword and look forward to
+    # a number. This reverse-order gap means pages that phrase requirements as
+    # "achieve 6.5 on the IELTS" or "a band score of 6.5 in IELTS Academic"
+    # silently return None for every course even when the score is clearly stated.
+    #
+    # We require "in" or "on" between the digit and "ielts" to keep the match
+    # tight — bare "6.5 ielts" (no preposition) is too ambiguous. The word
+    # boundary `\b` after "ielts" prevents matching "ielts academic" when the
+    # label continues with subscores on the same line.
+    # The negative lookbehind `(?<![0-9.])` prevents matching the trailing
+    # digit of a larger number: in "3.5 on the IELTS", `\b` alone would still
+    # match "5" (because "." is a non-word char), giving the spurious score 5.0.
+    # The lookbehind requires that the digit not be preceded by another digit
+    # or decimal point, so "5" in "3.5" is correctly excluded.
+    m = re.search(
+        r"(?<![0-9.])([4-9](?:\.[05])?)\s+(?:in|on)\s+(?:the\s+)?(?:academic\s+)?ielts\b",
+        text,
+        re.I,
+    )
+    if m:
+        ov = float(m.group(1))
+        if 4 <= ov <= 9:
+            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+
     return None
 
 
