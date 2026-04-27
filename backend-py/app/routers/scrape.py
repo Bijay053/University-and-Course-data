@@ -255,6 +255,14 @@ async def start_scrape(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=err_msg,
         )
+    # Serialise concurrent start_scrape calls for the same university with a
+    # PostgreSQL advisory lock so the check-and-insert below is atomic even
+    # when two browser tabs or a retry loop fire simultaneously.
+    # pg_advisory_xact_lock() is transaction-scoped and releases automatically
+    # when the current transaction commits or rolls back — no manual unlock.
+    from sqlalchemy import text as _text
+    await db.execute(_text("SELECT pg_advisory_xact_lock(:uid)"), {"uid": uni.id})
+
     # Deduplication: if there is already a queued or running job for this
     # university, return it instead of creating a duplicate. This prevents the
     # "5 workers claimed the same job" loop seen when UEL's 403 caused every

@@ -399,6 +399,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # job just because the orchestrator's main session hasn't committed.
     heartbeat_task = asyncio.create_task(_heartbeat_pulser(runtime_job_id, stop_flag))
 
+    # Per-university Redis lock state — initialised here so the finally
+    # block can always reference them regardless of where we exit.
+    _uni_lock_redis: Any | None = None
+    _uni_lock_key: str | None = None
+    _uni_lock_acquired: bool = False
+
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
         log.info("Scrape %s stopped by user request", runtime_job_id)
@@ -432,8 +438,71 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         return {"ok": True, "stopped": True, **summary}
 
     try:
-        # Snapshot uni fields to plain locals — the session will be used
-        # by other coroutines during gather() and we must NOT touch `uni`.
+        # ── Per-university Redis distributed lock ────────────────────────────
+        # Prevents multiple Celery workers from scraping the same university
+        # concurrently.  This can happen because:
+        #   • task_acks_late=True keeps the Celery message unacked until the
+        #     task returns; a Redis blip or a Node-reaper status reset (queued
+        #     → running) can let a second worker claim a different job_id for
+        #     the same university and both clear the DB atomic-claim guard.
+        #   • The user may submit while a previous job is still running.
+        # Strategy: SET NX (only if not exists) with a 4-hour TTL that matches
+        # the Celery soft-time-limit ceiling.  The lock value is the job_id so
+        # the rightful holder can identify and release it.  If Redis is
+        # unavailable we fail open (allow the scrape to proceed unlocked) so a
+        # Redis outage never blocks scraping entirely.
+        _uni_lock_key = f"scrape:uni_lock:{job.university_id}"
+        try:
+            import redis.asyncio as _aioredis
+            _uni_lock_redis = _aioredis.from_url(
+                settings.redis_url, decode_responses=True, socket_timeout=3
+            )
+            _uni_lock_acquired = bool(
+                await _uni_lock_redis.set(
+                    _uni_lock_key, runtime_job_id, nx=True, ex=14400
+                )
+            )
+        except Exception as _lock_err:  # noqa: BLE001
+            log.warning(
+                "Could not connect to Redis for uni lock (failing open): %s", _lock_err
+            )
+            _uni_lock_acquired = True  # fail open — allow the scrape
+
+        if not _uni_lock_acquired:
+            _holder = "unknown"
+            try:
+                if _uni_lock_redis is not None:
+                    _holder = (await _uni_lock_redis.get(_uni_lock_key)) or "unknown"
+            except Exception:  # noqa: BLE001
+                pass
+            log.warning(
+                "University %d already being scraped (lock held by %s) — "
+                "aborting duplicate job %s",
+                job.university_id, _holder, runtime_job_id,
+            )
+            await emit(
+                "status",
+                f"Duplicate scrape aborted — university {job.university_id} "
+                f"is already being scraped by job {_holder}",
+                phase="queue",
+                level="warn",
+            )
+            await db.execute(
+                _text(
+                    "UPDATE scrape_runtime_jobs "
+                    "SET status = 'stopped', completed_at = NOW(), "
+                    "error_message = 'Aborted: another scrape for this university "
+                    "is already running' "
+                    "WHERE runtime_job_id = :jid AND status = 'running'"
+                ),
+                {"jid": runtime_job_id},
+            )
+            await db.commit()
+            return {"ok": False, "reason": "concurrent_university_scrape"}
+
+        # ── Snapshot uni fields to plain locals ──────────────────────────────
+        # The session will be used by other coroutines during gather() and we
+        # must NOT touch `uni` after that point.
         uni = (
             await db.execute(select(University).where(University.id == job.university_id))
         ).scalar_one_or_none()
@@ -1065,6 +1134,25 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         await db.commit()
         return {"ok": False, "reason": str(exc), **summary}
     finally:
+        # ── Release the per-university Redis distributed lock ────────────────
+        # Only release if we actually hold it (lock value must still match our
+        # job_id to guard against an expired TTL being re-acquired by a newer
+        # job before our finally block runs).
+        if _uni_lock_redis is not None:
+            try:
+                if _uni_lock_acquired and _uni_lock_key:
+                    current_holder = await _uni_lock_redis.get(_uni_lock_key)
+                    if current_holder == runtime_job_id:
+                        await _uni_lock_redis.delete(_uni_lock_key)
+            except Exception as _rel_err:  # noqa: BLE001
+                log.warning(
+                    "Failed to release uni lock %s: %s", _uni_lock_key, _rel_err
+                )
+            try:
+                await _uni_lock_redis.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+
         # Always tear the background tasks down — each holds its own
         # AsyncSession and would keep ticking past the worker process
         # otherwise. Setting the flag first lets each `await
