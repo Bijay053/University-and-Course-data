@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -74,36 +75,41 @@ async def _persist_evidence(
 ) -> int:
     if not evidence:
         return 0
-    rows: list[ScrapedFieldEvidence] = []
+    values: list[dict[str, Any]] = []
     for ev in evidence[:_MAX_EVIDENCE_ROWS]:
         if not isinstance(ev, dict):
             continue
         field_key = ev.get("field_key")
         if not field_key:
             continue
-        rows.append(
-            ScrapedFieldEvidence(
-                scraped_course_id=scraped_course_id,
-                field_key=str(field_key)[:200],
-                candidate_value=_to_text(ev.get("value")),
-                normalized_value=_to_text(ev.get("normalized") or ev.get("value")),
-                source_url=(ev.get("source_url") or source_url),
-                page_type=ev.get("page_type"),
-                extraction_method=(ev.get("method") or "unknown")[:200],
-                snippet=(ev.get("snippet") or None) and str(ev["snippet"])[:1000],
-                confidence=(
+        values.append(
+            {
+                "scraped_course_id": scraped_course_id,
+                "field_key": str(field_key)[:200],
+                "candidate_value": _to_text(ev.get("value")),
+                "normalized_value": _to_text(ev.get("normalized") or ev.get("value")),
+                "source_url": (ev.get("source_url") or source_url),
+                "page_type": ev.get("page_type"),
+                "extraction_method": (ev.get("method") or "unknown")[:200],
+                "snippet": (ev.get("snippet") or None) and str(ev["snippet"])[:1000],
+                "confidence": (
                     float(ev["confidence"])
                     if isinstance(ev.get("confidence"), (int, float))
                     else None
                 ),
-                # Defaults are fine for validation_status / decision_status /
-                # selected — operator review fills these in via the modal.
-            )
+            }
         )
-    if not rows:
+    if not values:
         return 0
-    db.add_all(rows)
-    return len(rows)
+    # ON CONFLICT DO NOTHING prevents orphaned duplicate evidence rows (e.g.
+    # when a previous scrape left evidence behind after its ScrapedCourse was
+    # deleted and the sequence later re-issued the same id) from poisoning the
+    # entire session with an IntegrityError.
+    stmt = pg_insert(ScrapedFieldEvidence).values(values).on_conflict_do_nothing(
+        constraint="scraped_field_evidence_dedup"
+    )
+    await db.execute(stmt)
+    return len(values)
 
 
 async def stage_course(

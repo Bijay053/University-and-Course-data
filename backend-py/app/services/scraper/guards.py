@@ -317,8 +317,11 @@ def should_stage_course(
     # Marked transient in stage_course._TRANSIENT_REJECTION_REASONS so the
     # course can be re-staged automatically if the institution later adds
     # campus options (without requiring manual DB cleanup).
+    # Exception: universities that are recognised distance-education providers
+    # (e.g. CSU) set bypass_online_only=True in their pre-seed payload so
+    # that legitimate online international offerings are not auto-rejected.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
-    if _study_mode == "online":
+    if _study_mode == "online" and not payload.get("bypass_online_only"):
         return (False, "online_only")
 
     # Bug B: no international fee after all extraction is done.
