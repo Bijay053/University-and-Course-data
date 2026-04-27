@@ -503,7 +503,7 @@ def _emit(test: str, scores: dict[str, float] | float | None, snippet: str) -> l
 def _classify_test_label(label_lc: str) -> str | None:
     if "toefl" in label_lc:
         return "toefl"
-    if "pte" in label_lc:
+    if "pte" in label_lc or "pearson" in label_lc:
         return "pte"
     if "cambridge" in label_lc or re.search(r"\bcae\b", label_lc):
         return "cambridge"
@@ -523,7 +523,7 @@ def _is_equivalence_table(table) -> bool:
     headers_lc = headers.lower()
     if "ielts" not in headers_lc:
         return False
-    return any(t in headers_lc for t in ("pte", "toefl", "cambridge", "cae", "duolingo"))
+    return any(t in headers_lc for t in ("pte", "pearson", "toefl", "cambridge", "cae", "duolingo"))
 
 
 def _parse_equivalence_table(table) -> dict[float, dict[str, float]]:

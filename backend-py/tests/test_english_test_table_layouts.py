@@ -234,3 +234,54 @@ def test_toefl_verbose_extraction_unchanged():
     res = et._toefl(_MASTER_PNG_GEMINI_OUTPUT)
     assert res is not None
     assert res["overall"] == 85
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Task 55 — "Pearson Test of English" full-name recognised as PTE in
+# the equivalence-table fallback (_classify_test_label / _is_equivalence_table).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_classify_test_label_pearson_full_name():
+    """`_classify_test_label` must map 'pearson test of english' → 'pte'."""
+    assert et._classify_test_label("pearson test of english") == "pte"
+
+
+def test_classify_test_label_pearson_academic():
+    """`_classify_test_label` must map 'pearson test of english academic' → 'pte'."""
+    assert et._classify_test_label("pearson test of english academic") == "pte"
+
+
+def test_is_equivalence_table_pearson_header(tmp_path):
+    """A table whose header says 'Pearson Test of English' (no 'PTE' abbreviation)
+    must still be recognised as an equivalence table."""
+    from bs4 import BeautifulSoup
+
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>IELTS</th>
+          <th>Pearson Test of English</th>
+          <th>TOEFL iBT</th>
+        </tr>
+        <tr>
+          <th>Overall</th>
+          <th>Overall</th>
+          <th>Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>6.5</td><td>58</td><td>79</td></tr>
+      </tbody>
+    </table>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table")
+    assert et._is_equivalence_table(table) is True
+
+
+def test_classify_test_label_pte_abbreviation_unchanged():
+    """Regression guard: the existing 'pte' abbreviation still maps correctly."""
+    assert et._classify_test_label("pte") == "pte"
+    assert et._classify_test_label("pte academic") == "pte"
