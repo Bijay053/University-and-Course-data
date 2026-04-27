@@ -77,12 +77,22 @@ _ALL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("reverse_order_loose", _PATTERN_REVERSE_ORDER_LOOSE),
 ]
 
+_IELTS_PRESENT = re.compile(r"\bielts\b", re.I)
+
 
 def _find_pattern(text: str | None) -> tuple[str, str] | None:
-    """Return (pattern_name, matched_substring) for the first new pattern hit."""
+    """Return (pattern_name, matched_substring) for the first new pattern hit.
+
+    band_score_of is only considered when the text block also contains the
+    word "IELTS" — the pattern is too broad on its own and "band score of X"
+    without an IELTS reference is not meaningful in this audit context.
+    """
     if not text:
         return None
+    ielts_present = bool(_IELTS_PRESENT.search(text))
     for name, pat in _ALL_PATTERNS:
+        if name == "band_score_of" and not ielts_present:
+            continue
         m = pat.search(text)
         if m:
             return name, m.group(0)
@@ -291,6 +301,10 @@ async def audit(statuses: list[str], queue: bool, csv_path: str | None) -> None:
         # 6. Queue re-scrapes if requested.
         if queue:
             # Collect university IDs of universities that have pending null-IELTS courses.
+            # Note: this queues ALL pending null-IELTS universities broadly, not just those
+            # where stored text matched the new patterns. This is intentional — since the DB
+            # does not retain full page HTML per course, a live re-scrape is the only way to
+            # determine whether the new patterns would find a score on the actual page.
             # (We only queue for 'pending' status — approved/rejected are not re-scraped
             # automatically.)
             pending_uni_ids: set[int] = set()
@@ -313,7 +327,10 @@ async def audit(statuses: list[str], queue: bool, csv_path: str | None) -> None:
                         await conn.execute(_UPDATE_NEXT_RUN_SQL, {"uids": list(pending_uni_ids)})
                     ).mappings().all()
                     await conn.commit()
-                    print(f"  --queue: updated next_run = NOW() on {len(updated)} scraping job(s):")
+                    print(
+                        f"  --queue: updated next_run = NOW() on {len(updated)} scraping job(s)"
+                        " (broad sweep — all pending null-IELTS universities):"
+                    )
                     for job in updated:
                         print(f"    scraping_job #{job['id']}  {job['url']}")
                 print()
