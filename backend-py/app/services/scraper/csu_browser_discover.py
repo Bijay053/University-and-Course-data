@@ -80,12 +80,20 @@ _EXTRACT_FROM_RESULTS_JS = r"""
       continue;
     }
     const [base] = url.split(/[?#]/);
-    const path = base.replace(ORIGIN, '');
+    let path = base.replace(ORIGIN, '');
     if (!PATH_RE.test(path)) continue;
-    if (seen.has(base)) continue;
-    seen.add(base);
+    // Always normalise to /international/courses/<slug> so the per-course
+    // static extractor reads the international-student page which carries
+    // INT-tagged offering data (location, mode, IELTS).  The /courses/<slug>
+    // pages have the same slug but show domestic-student offering data.
+    if (path.startsWith('/courses/')) {
+      path = '/international' + path;
+    }
+    const intlUrl = ORIGIN + path;
+    if (seen.has(intlUrl)) continue;
+    seen.add(intlUrl);
     const name = (item.label || item.name || '').replace(/\s+/g, ' ').trim();
-    results.push({ url: base, name });
+    results.push({ url: intlUrl, name });
   }
   return results;
 }
@@ -113,12 +121,17 @@ _EXTRACT_LINKS_JS = r"""
       return;
     }
     const [base] = url.split(/[?#]/);
-    const path = base.replace(ORIGIN, '');
+    let path = base.replace(ORIGIN, '');
     if (!PATH_RE.test(path)) return;
-    if (seen.has(base)) return;
-    seen.add(base);
+    // Normalise to /international/courses/<slug> (same reason as primary path).
+    if (path.startsWith('/courses/')) {
+      path = '/international' + path;
+    }
+    const intlUrl = ORIGIN + path;
+    if (seen.has(intlUrl)) return;
+    seen.add(intlUrl);
     const text = (a.innerText || a.textContent || '').replace(/\s+/g, ' ').trim();
-    results.push({ url: base, name: text });
+    results.push({ url: intlUrl, name: text });
   });
   return results;
 }

@@ -277,6 +277,94 @@ def test_ielts_absent_when_no_language_requirements() -> None:
 
 
 # ---------------------------------------------------------------------------
+# IELTS fallback: central requirements page link (Task #40)
+# ---------------------------------------------------------------------------
+# CSU's most common real-world case: the lang_reqs entry contains a generic
+# sentence linking to the central requirements page rather than an inline score.
+# The extractor must recognise this as "no inline score" and apply the
+# _csu_default_ielts() fallback.
+
+def test_ielts_default_for_central_page_reference_coursework() -> None:
+    """Generic central-page lang_req → default IELTS 6.0 for a coursework master."""
+    central_text = (
+        "See <a href='https://study.csu.edu.au/international/how-to-apply/"
+        "course-entry-requirements'>our requirements page</a> for details."
+    )
+    html = _make_html(
+        course_obj={
+            "language_requirements": [{"requirements": central_text}],
+            # Default fixture has no aqf_level → coursework → 6.0
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["ielts_overall"] == 6.0, (
+        "Coursework master with central-page link should fall back to 6.0"
+    )
+
+
+def test_ielts_default_for_central_page_reference_doctoral() -> None:
+    """Generic central-page lang_req → default IELTS 6.5 for a doctoral course."""
+    central_text = (
+        "See our requirements page for course entry requirements."
+    )
+    html = _make_html(
+        course_obj={
+            "language_requirements": [{"requirements": central_text}],
+            "aqf_level": {"value": "10"},
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["ielts_overall"] == 6.5, (
+        "Doctoral (AQF 10) course with central-page link should fall back to 6.5"
+    )
+
+
+def test_ielts_minimum_score_of_format() -> None:
+    """'minimum score of X … IELTS' inline text (e.g. Master of Social Work).
+
+    CSU's entry-requirements text for some Master's programmes reads:
+        'must have a minimum score of 7.0 or higher in each component
+         (listening, reading, writing and speaking) of the Academic IELTS test'
+    The score precedes the IELTS keyword so earlier patterns miss it.
+    The 'minimum score of' pattern must capture it correctly.
+    """
+    sw_text = (
+        "International students … must have a minimum score of 7.0 or higher "
+        "in each component (listening, reading, writing and speaking) of the "
+        "Academic IELTS test upon application."
+    )
+    html = _make_html(
+        course_obj={
+            "language_requirements": [{"requirements": sw_text}],
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["ielts_overall"] == 7.0, (
+        "Inline 'minimum score of 7.0 … IELTS' should be parsed as 7.0"
+    )
+
+
+def test_ielts_minimum_score_pte_out_of_range_safe() -> None:
+    """'minimum score of 58' (PTE context) must not produce ielts_overall=58.
+
+    When 'minimum score of X' matches but X is outside the IELTS range (4–9),
+    the match is discarded.  Because a pattern *was* found (ielts_pattern_found=True),
+    the default fallback is also suppressed — the result has no ielts_overall key.
+    This is intentional: the page explicitly stated a value we can't interpret as
+    IELTS, so we prefer None over a potentially wrong default.
+    """
+    pte_text = "minimum score of 58 in the PTE Academic test."
+    html = _make_html(
+        course_obj={
+            "language_requirements": [{"requirements": pte_text}],
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    # Pattern fires but 58 is out of IELTS range → no ielts_overall in result
+    assert "ielts_overall" not in result
+
+
+# ---------------------------------------------------------------------------
 # PTE  (Bug #3 fix — extract PTE from language_requirements HTML)
 # ---------------------------------------------------------------------------
 

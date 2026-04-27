@@ -186,7 +186,8 @@ def _english_from_lang_req(
 
     Likewise for ``pte_pattern_found``.
 
-    IELTS patterns: "average band score of 7.5", "minimum overall score of 6.0"
+    IELTS patterns: "average band score of 7.5", "minimum overall score of 6.0",
+                    "minimum score of 7.0 … in each component … IELTS"
     PTE patterns:   "PTE Academic score of 58", "PTE score of 58", "PTE: 58"
                     Only matched when the score is plausibly a real PTE entry
                     requirement (>= 36, which maps to IELTS 5.0+).
@@ -201,6 +202,9 @@ def _english_from_lang_req(
             for ielts_pattern in [
                 r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)",
                 r"minimum\s+overall\s+(?:band\s+)?score\s+of\s+(\d+(?:\.\d+)?)",
+                # Catches "minimum score of 7.0 … in each component … IELTS"
+                # where the score appears before the IELTS keyword.
+                r"minimum\s+score\s+of\s+(\d+(?:\.\d+)?)",
                 r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)",
             ]:
                 m = re.search(ielts_pattern, text, re.I)
