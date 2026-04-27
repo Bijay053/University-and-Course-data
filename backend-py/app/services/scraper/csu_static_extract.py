@@ -622,10 +622,6 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
         # this flag lets the course pass through for human review instead of
         # being auto-rejected with "no_international_fee".
         "has_central_fee_page": True,
-        # CSU is a recognised distance-education university.  Online delivery
-        # to international students is legitimate and expected — skip the
-        # online_only guard that would otherwise reject every distance course.
-        "bypass_online_only": True,
         # NOTE: ielts_overall and pte_overall are NOT pre-initialised here.
         # They are only written when a non-None value is available (inline parse
         # or CSU-standard default for courses that reference the central page).
