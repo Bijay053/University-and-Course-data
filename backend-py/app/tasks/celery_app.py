@@ -2,7 +2,7 @@
 
     celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info
 
-Run beat (daily snapshot scheduler) with:
+Run beat (daily snapshot scheduler + stale-job reaper) with:
 
     celery -A app.tasks.celery_app beat --loglevel=info
 
@@ -66,6 +66,19 @@ celery_app.conf.update(
         "snapshot-editable-tables-daily": {
             "task": "tasks.snapshot.editable",
             "schedule": crontab(hour=3, minute=0),
+            "args": (),
+            "options": {"queue": "scrape"},
+        },
+        # Re-dispatch any scrape/repair jobs that are stuck in ``queued``
+        # status with no Celery task in-flight (e.g. after a worker restart
+        # that left running→queued rows but never enqueued a new task).
+        # Fires every minute; the task only re-dispatches jobs whose
+        # ``updated_at`` is older than 5 minutes, so rapid re-fires within
+        # the cooldown window are prevented by the updated_at bump the task
+        # performs before calling ``.delay()``.
+        "requeue-stale-queued-jobs": {
+            "task": "scrape.requeue_stale",
+            "schedule": 60.0,
             "args": (),
             "options": {"queue": "scrape"},
         },
