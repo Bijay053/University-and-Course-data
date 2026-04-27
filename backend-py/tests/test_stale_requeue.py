@@ -1,6 +1,6 @@
 """Tests for the stale-job requeue logic in ``app/tasks/scrape_tasks.py``.
 
-Four behaviours exercised:
+Five behaviours exercised:
 
 1. Jobs younger than 5 minutes are NOT returned by ``_async_find_stale``
    (i.e. they are NOT re-dispatched).
@@ -10,6 +10,9 @@ Four behaviours exercised:
 4. Job-type routing: ``repair`` jobs dispatch to ``repair_university``
    (``scrape.repair``); all other types dispatch to ``scrape_university``
    (``scrape.university``).
+5. Redis NX lock collision: if the lock is already held (``set(nx=True)``
+   returns falsy), the job must be skipped — not dispatched, not in
+   ``result["requeued"]``.
 """
 from __future__ import annotations
 
@@ -278,6 +281,42 @@ def test_requeue_exhausted_job_goes_to_exhausted_list():
         if _coro_name(c.args[0]) == "_async_mark_failed_max_requeue"
     ]
     assert len(mark_calls) == 1, "mark_failed should be called exactly once for exhausted job"
+
+
+# ─── Case 5: Redis NX lock already held → job is silently skipped ────────────
+
+
+def test_requeue_skips_job_when_nx_lock_is_held():
+    """If the Redis NX lock for a job is already held (``r.set(nx=True)``
+    returns falsy), ``requeue_stale_queued`` must skip that job entirely:
+    - the job must NOT appear in ``result["requeued"]``
+    - ``scrape_university.delay`` and ``repair_university.delay`` must NOT
+      be called
+    This prevents double-dispatch when two beat ticks overlap."""
+    from app.tasks import scrape_tasks as st
+
+    fake_job_id = f"test_nx_{uuid.uuid4().hex[:8]}"
+    stale_result = [(fake_job_id, "full", 0)]
+
+    # nx_result=None simulates SET NX returning falsy (lock already held).
+    mock_redis = _make_sync_redis(nx_result=None)
+
+    with (
+        patch.object(st, "asyncio") as mock_asyncio,
+        patch.object(st, "scrape_university") as mock_scrape,
+        patch.object(st, "repair_university") as mock_repair,
+        patch("redis.from_url", return_value=mock_redis),
+    ):
+        mock_asyncio.run.side_effect = _make_asyncio_run_interceptor(stale_result)
+
+        result = _call_requeue_stale(st)
+
+    assert result["ok"] is True
+    assert fake_job_id not in result.get("requeued", []), (
+        f"Locked job {fake_job_id!r} must NOT be in requeued list; got {result}"
+    )
+    mock_scrape.delay.assert_not_called()
+    mock_repair.delay.assert_not_called()
 
 
 # ─── Utility ──────────────────────────────────────────────────────────────────
