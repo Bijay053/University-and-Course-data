@@ -246,6 +246,14 @@ async def extract_course(
             # so every AI call is pure waste.  Skip all Gemini calls.
             use_ai_fallback = False
             _is_csu_page = True
+            # The pre-seed only writes ielts_overall/pte_overall when they
+            # are non-None (so that tests can assert "not in result").
+            # Block the regex extractors from setting false positives on
+            # CSU pages by ensuring both keys are in payload now — even as
+            # None — so downstream setdefault() calls are no-ops.
+            for _guard_k in ("ielts_overall", "pte_overall"):
+                if _guard_k not in payload:
+                    payload[_guard_k] = None
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
 
