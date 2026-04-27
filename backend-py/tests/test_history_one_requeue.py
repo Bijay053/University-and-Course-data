@@ -350,9 +350,8 @@ async def test_requeue_events_as_plain_string_returns_200_with_no_requeue_entrie
     """When requeue_events is stored as a JSON string instead of an array the
     endpoint must still return 200 and produce no synthetic requeue log entries.
 
-    Iterating over a Python string yields single characters; every character
-    lacks a ``.get()`` method so the per-event try/except fires for each one.
-    A warning must be logged for each bad element and the response must be safe.
+    The isinstance guard short-circuits the whole loop and emits exactly one
+    warning (not one per character), making diagnostics clean.
     """
     import logging
 
@@ -370,10 +369,14 @@ async def test_requeue_events_as_plain_string_returns_200_with_no_requeue_entrie
         assert len(requeue_logs) == 0, (
             f"expected 0 requeue entries for a string-typed column, got {requeue_logs}"
         )
-        assert any(
-            "malformed requeue event" in r.message and job_id in r.message
-            for r in caplog.records
-        ), "expected malformed-requeue warnings when iterating over a string"
+        not_a_list_warnings = [
+            r for r in caplog.records
+            if "not a list" in r.message and job_id in r.message
+        ]
+        assert len(not_a_list_warnings) == 1, (
+            f"expected exactly one 'not a list' warning; "
+            f"got {[r.message for r in caplog.records]}"
+        )
     finally:
         await _delete_job(job_id)
 
