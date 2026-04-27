@@ -317,17 +317,21 @@ def should_stage_course(
         return (False, "domestic_only")
 
     # Bug C: online-only courses with no real physical campus are rejected.
-    # A course_location of "Online" is NOT a campus — it's a delivery mode
-    # word that CSU uses as a fallback when there are no FPOS offerings.
-    # Rule: study_mode contains "online" AND (course_location is empty OR
-    # course_location is the word "Online" with no real campus name).
-    # Courses that have BOTH online AND a real campus location pass through
-    # (e.g. study_mode="On Campus, Online" loc="Sydney" — still on-campus).
+    # The study_mode field is the authoritative signal — location strings like
+    # "United Theological College" or "Wagga Wagga Campus" are partner/delivery
+    # names and do NOT imply an on-campus offering if the mode is purely Online.
+    # Rule: reject when study_mode has "online" but NO campus/blended keyword.
+    # Courses that are genuinely blended (study_mode="On Campus, Online") pass.
     # Marked transient so the course re-stages if a campus option is added later.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
-    _course_location = (payload.get("course_location") or "").strip()
-    _loc_is_online_only = _course_location.lower() == "online"
-    if "online" in _study_mode and (not _course_location or _loc_is_online_only):
+    _has_campus_component = any(
+        kw in _study_mode
+        for kw in (
+            "on campus", "on-campus", "campus", "on site", "on-site",
+            "face-to-face", "blended", "in-person", "in person",
+        )
+    )
+    if "online" in _study_mode and not _has_campus_component:
         return (False, "online_only")
 
     # Bug B: no international fee after all extraction is done.

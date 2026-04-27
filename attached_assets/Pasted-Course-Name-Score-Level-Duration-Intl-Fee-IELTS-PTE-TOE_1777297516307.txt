@@ -1,0 +1,339 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode
+	
+Master of Theology
+Publish: review
+Eligibility: review
+69%	Master's	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul	Canberra, United Theological College	On Campus, Online
+	
+Master of Social Work (Professional Qualifying)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$34,496/year	7	65	-	-	-	Mar, Jul, Nov	Sydney	On Campus
+	
+Master of Professional Information Technology (with Specialisations)
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$35,760/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Port Macquarie, Sydney	On Campus
+	
+Master of Professional Accounting (Professional Practice)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$35,280/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Sydney	On Campus
+	
+Master of Philosophy (Arts and Education)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$33,120/year	6	50	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online
+	
+Master of Philosophy
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$39,680/year	6	50	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online
+	
+Master of Islamic Studies (Research)
+Publish: review
+Eligibility: review
+69%	Master's	2 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Master of Islamic Studies
+Publish: review
+Eligibility: review
+69%	Master's	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Master of Information Studies (with Specialisations)
+Publish: review
+Eligibility: review
+69%	Master's	2 years	A$27,040/year	6	50	-	-	-	Mar, Jul, Nov	SPACE University of Hong Kong	On Campus, Online
+	
+Master of Classical Arabic
+Publish: review
+Eligibility: review
+69%	Master's	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Master of Business Data Analytics
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$32,640/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Sydney	On Campus
+	
+Master of Arts (Theological Studies)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Master's	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College, Canberra Campus	Online, On Campus
+	
+Master of Applied Business (with Specialisations)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$34,640/year	6	50	-	-	-	Mar, Jul	Economic and Finance Institute	On Campus, Online
+	
+Master of Agriculture (with Specialisations)
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Master's	1.5 years	A$37,040/year	6	50	-	-	-	Mar, Jul	Wagga Wagga	On Campus
+	
+Master of Agricultural Science (with Specialisations)
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Master's	2 years	A$37,040/year	6	50	-	-	-	Mar, Jul	Wagga Wagga	On Campus
+	
+Master of Advanced Social Work Practice
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Master's	1 years	A$31,200/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online
+	
+Graduate Diploma of Theological Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	Canberra Campus, United Theological College	On Campus, Online
+	
+Graduate Diploma of Islamic Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Graduate Diploma of Classical Arabic
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Graduate Certificate in Theological Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College, Canberra Campus	Online, On Campus
+	
+Graduate Certificate in Learning and Teaching in Higher Education
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul	Bathurst Campus	Online
+	
+Graduate Certificate in Islamic Studies
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Graduate Certificate in Intersectionality, Diversity and Inclusion
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	1 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online
+	
+Graduate Certificate in Human Services
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$17,248/year	6	50	-	-	-	Mar, Jul, Nov	Wagga Wagga Campus	Online
+	
+Graduate Certificate in Fish Conservation and Management
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 years	A$17,920/year	6	50	-	-	-	Nov	Albury-Wodonga	On Campus
+	
+Graduate Certificate in Education (Generic and with Specialistions)
+Education & Social Work
+Publish: ready
+Eligibility: ready
+77%	Graduate Certificate	0.5 years	A$13,960/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online
+	
+Graduate Certificate in Digital Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$14,520/year	6	50	-	-	-	Mar, Jul	Wagga Wagga Campus	Online
+	
+Graduate Certificate in Data Management
+Publish: review
+Eligibility: review
+62%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar	Wagga Wagga Campus	Online
+	
+Graduate Certificate in Communication
+Media & Communications
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years		6	50	-	-	-	Mar, Jul	Bathurst Campus	Online
+	
+Graduate Certificate in Classical Arabic
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	0.5 years	A$12,280/year	6	50	-	-	-	Mar, Jul, Nov	United Theological College	Online
+	
+Doctor of Philosophy (Science and Agriculture)
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$39,840/year	6.5	58	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online
+	
+Doctor of Philosophy (Business, Justice and Behavioural Sciences)
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Doctorate	3 years	A$40,320/year	6.5	58	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online
+	
+Doctor of Philosophy (Arts and Education)
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Doctorate	4 years	A$33,120/year	6.5	58	-	-	-	Mar, Jul, Nov	Uni Wide	On Campus, Online
+	
+Bachelor of Veterinary Biology/ Bachelor of Veterinary Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	6 years	A$72,080/year	7	65	-	-	-	Mar	Wagga Wagga	On Campus
+	
+Bachelor of Theology (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor's	1 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College, Canberra Campus	On Campus, Online
+	
+Bachelor of Theology
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 years	A$24,560/year	6	50	-	-	-	Mar, Jul, Nov	Canberra, United Theological College	On Campus, Online
+	
+Bachelor of Social Science (Psychology)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$31,040/year	6	50	-	-	-	Mar, Jul, Nov	Port Macquarie	On Campus, Online
+	
+Bachelor of Science (Honours)
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	1 years	A$36,480/year	6	50	-	-	-	Mar, Jul	Albury-Wodonga Campus	Online
+	
+Bachelor of Physiotherapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$40,400/year	7	50	-	-	-	Mar	Albury-Wodonga, Orange, Port Macquarie	On Campus
+	
+Bachelor of Paramedicine
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 years	A$37,120/year	7	65	-	-	-	Mar, Jul	Bathurst, Port Macquarie	On Campus, Online
+	
+Bachelor of Oral Health (Therapy and Hygiene)
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 years	A$44,560/year	7	65	-	-	-	Mar	Holmesglen, Wagga Wagga Campus	On Campus
+	
+Bachelor of Occupational Therapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$36,480/year	7	50	-	-	-	Mar	Albury-Wodonga, Port Macquarie	On Campus
+	
+Bachelor of Nursing
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$34,640/year	7	50	-	-	-	Mar, Jul	Albury-Wodonga, Bathurst, Dubbo, Port Macquarie, Wagga Wagga	On Campus
+	
+Bachelor of Medical Radiation Science (with Specialisations)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$38,000/year	6.5	58	-	-	-	Mar	Port Macquarie, Wagga Wagga	On Campus
+	
+Bachelor of Islamic Studies (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor's	1.5 years	A$24,560/year	6	50	-	-	-	Mar, Jul	United Theological College	Online
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$33,600/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Port Macquarie, Sydney	On Campus, Online
+	
+Bachelor of Geospatial Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$35,600/year	6	50	-	-	-	Mar, Jul	Albury-Wodonga Campus	Online
+	
+Bachelor of Equine Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$37,600/year	6	50	-	-	-	Mar	Wagga Wagga	On Campus, Online
+	
+Bachelor of Environmental Science and Management
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$35,840/year	6	50	-	-	-	Mar, Jul, Nov	Albury-Wodonga	On Campus, Online
+	
+Bachelor of Engineering (Honours)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$38,000/year	6	50	-	-	-	Mar	Bathurst	On Campus
+	
+Bachelor of Dental Science
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	5 years	A$72,240/year	7	65	-	-	-	Mar	Orange	On Campus
+	
+Bachelor of Communication
+Media & Communications
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$27,920/year	6	50	-	-	-	Mar, Jul	Bathurst Campus	Online, On Campus
+	
+Bachelor of Business Studies
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$33,120/year	6	50	-	-	-	Mar, Jul	Bathurst Campus, Yunnan Uni-Finance & Economics, Wagga Wagga Campus, Jilin Uni- Finance & Economics, Albury-Wodonga Campus, Port Macquarie Campus, Yangzhou University, Tianjin University of Commerce	On Campus, Online
+	
+Bachelor of Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$33,120/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Sydney	On Campus, Online
+	
+Bachelor of Applied Research (Honours)
+Publish: review
+Eligibility: review
+69%	Bachelor's	1 years	A$29,760/year	6	50	-	-	-	Mar	Bathurst Campus	Online
+	
+Bachelor of Animal Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$37,600/year	6	50	-	-	-	Mar	Wagga Wagga	On Campus
+	
+Bachelor of Agriculture
+Agriculture & Environmental Science
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$37,040/year	6	50	-	-	-	Mar, Jul	Wagga Wagga	On Campus, Online
+	
+Bachelor of Agricultural Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	4 years	A$37,040/year	6	50	-	-	-	Mar, Jul	Wagga Wagga	On Campus, Online
+	
+Bachelor of Agricultural Business Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$37,040/year	6	50	-	-	-	Mar, Jul	Wagga Wagga	On Campus, Online
+	
+Bachelor of Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 years	A$32,000/year	6	50	-	-	-	Mar, Jul, Nov	Melbourne, Port Macquarie, Sydney	On Campus, Online
