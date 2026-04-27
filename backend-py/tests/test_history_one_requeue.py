@@ -254,6 +254,55 @@ async def test_history_one_404_for_unknown_job() -> None:
 
 
 @pytest.mark.asyncio
+async def test_malformed_requeue_event_is_skipped_and_valid_entry_returned(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A malformed requeue entry must be silently skipped while valid entries
+    in the same array are still returned.
+
+    Covers the exception handler at scrape.py lines 857-864:
+    - The endpoint must still return 200.
+    - The malformed entry must NOT appear in the logs list.
+    - The valid entry that follows it must appear correctly.
+    - A warning must be emitted for the bad entry.
+    """
+    import logging
+
+    job_id = _job_id()
+    ts_valid = "2025-07-01T10:00:00+00:00"
+
+    requeue_events = [
+        {"number": "not-an-int", "timestamp": None},
+        {"number": 1, "timestamp": ts_valid, "exhausted": False, "stale_minutes": 5},
+    ]
+    await _insert_job(job_id, requeue_events)
+
+    try:
+        with caplog.at_level(logging.WARNING):
+            body = await _get_history(job_id)
+
+        logs: list[dict[str, Any]] = body["logs"]
+
+        requeue_logs = [e for e in logs if e.get("isRequeueEvent")]
+        assert len(requeue_logs) == 1, (
+            f"expected exactly 1 valid requeue entry; got {requeue_logs}"
+        )
+
+        entry = requeue_logs[0]
+        assert entry["requeueNumber"] == 1
+        assert entry["createdAt"] == ts_valid
+        assert entry["event"] == "auto_recovery"
+        assert entry["level"] == "warn"
+
+        assert any(
+            "malformed requeue event" in record.message and job_id in record.message
+            for record in caplog.records
+        ), "expected a warning about the malformed requeue entry"
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
 async def test_job_with_no_requeue_events_returns_only_real_logs() -> None:
     """When requeue_events is NULL or empty, the endpoint returns only real log rows."""
     job_id = _job_id()
