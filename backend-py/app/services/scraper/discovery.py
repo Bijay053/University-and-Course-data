@@ -64,9 +64,25 @@ _COURSE_TEXT = re.compile(
 # ADC", "bits and pieces"). Mirrors the host-slug list in
 # `home_page_redirect._HOST_CATEGORY_SLUGS` — keep the two in sync.
 _COURSE_BRAND_TEXT = re.compile(r"\b(BITS|MITS|BBus)\b", re.I)
+
+# Promotional card / CTA link text: long blurb ending in "LEARN MORE" /
+# "ENQUIRE" / "APPLY NOW" etc.  These sometimes contain degree keywords
+# (e.g. "…offered in the Bachelor of Science… LEARN MORE") so they pass
+# the _COURSE_TEXT check, but are NOT individual course detail pages.
+# Max real course-name length is ~80 chars; anything ≥ 120 chars is
+# almost always a promotional blurb.
+_PROMO_TEXT_RE = re.compile(
+    r"(learn\s+more|enquire(?:\s+now)?|apply\s+now|find\s+out\s+more|"
+    r"click\s+here|get\s+started|read\s+more)\s*$",
+    re.I,
+)
+_MAX_COURSE_NAME_LEN = 120  # chars — real course titles are shorter
 _JUNK_TEXT = re.compile(
     r"^(home|about|contact|news|events?|search|menu|login|sign\s*in|"
     r"apply\s*now|read\s*more|learn\s*more|view\s*all|see\s*all|"
+    r"enquire|enquire\s*now|enquiry|enquiries|"
+    r"register|register\s*now|register\s*here|"
+    r"find\s*out\s*more|click\s*here|get\s*started|"
     # CSU (and other SPA sites) produce bare section-header link text
     # like "Undergraduate" / "Postgraduate" as nav anchors — these are
     # never course names and must be blocked here so the BFS candidate
@@ -133,6 +149,19 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/student-experience/",
     "/life-at-",
     "/campus/",
+    # Audience / info pages that are never course detail pages
+    "/parents-and-carers", "/for-parents", "/parents/",
+    "/interstate/", "/interstate-students/",
+    "/high-achiever", "/high-achievers/",
+    "/starting-at-the-university", "/starting-university",
+    "/international-partners/", "/agent-partners/", "/agent-resources/",
+    "/learning-abroad/", "/exchange-programs/",
+    "/unigo", "/study-tours/", "/study-tour/",
+    # Short-course category/search pages (NOT individual short-course pages)
+    "/short-courses/category/", "/short-courses/topic/",
+    # UTAS orientation / prep program info hubs
+    "/orientation-program", "/orientation/",
+    "/university-preparation", "/pathway-college",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
@@ -145,7 +174,14 @@ _JUNK_LAST_SEG_RE = re.compile(
     r"guide|information|handbook|tips|process|pathway|pathways?|"
     r"class(?:es)?|fair|expo|hub|community|connect|network|info-night|"
     r"open-day|keydates?|key-dates?|story|stories|testimonials?|"
-    r"two-specialisations?|two-specializations?|specialisations?|specializations?)$",
+    r"two-specialisations?|two-specializations?|specialisations?|specializations?|"
+    # Application / enrolment admin pages — never real course detail pages.
+    r"refund|refund-request|refund-request-form|"
+    r"application|application-form|application-form-new-students|"
+    r"application-form-returning-students|"
+    r"enrolment|enrollment|enrol|enroll|"
+    r"orientation|induction|"
+    r"enquire|enquiry|enquiries|contact-us)$",
     re.I,
 )
 
@@ -274,6 +310,15 @@ def _looks_like_course(url: str, text: str) -> bool:
             pass  # fall through to the URL-hint / text-match acceptance
         else:
             return False
+    # Reject promotional-card / CTA link text regardless of URL.
+    # Real course names are short; blurbs ending in "LEARN MORE" / "ENQUIRE"
+    # are marketing cards and must never be treated as course pages even if
+    # their anchor text happens to contain a degree keyword.
+    if text and (
+        len(text) > _MAX_COURSE_NAME_LEN
+        or _PROMO_TEXT_RE.search(text)
+    ):
+        return False
     lurl = url.lower()
     if any(h in lurl for h in _COURSE_URL_HINTS):
         return True

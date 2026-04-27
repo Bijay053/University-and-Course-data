@@ -1,0 +1,330 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 5
+Fetching https://www.utas.edu.au...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://www.utas.edu.au (max 25 pages, max 200 candidates)
+[DISCOVER] Page 1/25: fetch failed — https://www.utas.edu.au
+[DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://www.utas.edu.au
+[DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] BFS returned 0 links — trying browser-based discovery (handles Cloudflare / JS-heavy sites)...
+[DISCOVER] Browser: navigating to https://www.utas.edu.au
+[DISCOVER] Browser: start page → 12 course links, 16 nav candidates to follow
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/apply → +29 courses (total 41)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/starting-at-the-university → +1 courses (total 42)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/pathways-to-university → +7 courses (total 49)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/online → +36 courses (total 85)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/short-courses → +8 courses (total 93)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/sustainability → +5 courses (total 98)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/parents-and-carers → +1 courses (total 99)
+[DISCOVER] Browser: nav https://www.utas.edu.au/study/interstate → +2 courses (total 101)
+[DISCOVER] Browser: discovered 101 course links
+Discovered 101 candidate course links
+Extracting course details (101 pages)...
+[EXTRACT] 1/101: Undergraduate courses
+[EXTRACT] 2/101: Postgraduate courses
+[EXTRACT] 3/101: Double degrees
+[EXTRACT] 4/101: English language courses
+Fetching 3/101: Double degrees
+Fetching 2/101: Postgraduate courses
+Fetching 1/101: Undergraduate courses
+Fetching 4/101: English language courses
+[EXTRACT] 5/101: Our agent partners
+[EXTRACT] 6/101: Business and Law
+Fetching 5/101: Our agent partners
+[EXTRACT] 7/101: Creative Arts and Design
+Fetching 6/101: Business and Law
+[EXTRACT] 8/101: Earth, Sea, Antarctic and Environment
+Fetching 7/101: Creative Arts and Design
+Fetching 8/101: Earth, Sea, Antarctic and Environment
+[EXTRACT] 9/101: Education, Humanities and Social Sciences
+Fetching 9/101: Education, Humanities and Social Sciences
+[EXTRACT] 10/101: Health and Medicine
+[EXTRACT] 11/101: Science, Technology and Engineering
+[EXTRACT] 12/101: International Pathway CollegePathway programs into an undergraduate degree
+Fetching 11/101: Science, Technology and Engineering
+Fetching 12/101: International Pathway CollegePathway programs into an undergraduate degree
+Fetching 10/101: Health and Medicine
+[EXTRACT] 13/101: Direct Entry / English for Academic Purposes (EAP) Program
+[EXTRACT] 14/101: Study tours
+Fetching 13/101: Direct Entry / English for Academic Purposes (EAP) Program
+[EXTRACT] 15/101: English Test Centre
+Fetching 14/101: Study tours
+[EXTRACT] 16/101: Language Support Programs
+Fetching 15/101: English Test Centre
+Fetching 16/101: Language Support Programs
+[EXTRACT] 17/101: University Connections Program overview
+Fetching 17/101: University Connections Program overview
+[EXTRACT] 18/101: Application form - new students
+Fetching 18/101: Application form - new students
+[EXTRACT] 19/101: Application form - returning students
+[EXTRACT] 20/101: High Achiever Program
+Fetching 19/101: Application form - returning students
+Fetching 20/101: High Achiever Program
+[EXTRACT] 21/101: Undergraduate courses A-Z listing
+[EXTRACT] 22/101: Climate Action
+Fetching 21/101: Undergraduate courses A-Z listing
+Fetching 22/101: Climate Action
+[EXTRACT] 23/101: Honours degrees
+[EXTRACT] 24/101: Postgraduate courses A-Z listing
+Fetching 23/101: Honours degrees
+Fetching 24/101: Postgraduate courses A-Z listing
+[EXTRACT] 25/101: Sustainable Business
+[EXTRACT] 26/101: Elevate your healthcare career
+[EXTRACT] 27/101: Business and Law
+Fetching 25/101: Sustainable Business
+Fetching 26/101: Elevate your healthcare career
+Fetching 27/101: Business and Law
+[EXTRACT] 28/101: Creative Arts and Design
+Fetching 28/101: Creative Arts and Design
+[EXTRACT] 29/101: Earth, Sea, Antarctic and Environment
+[EXTRACT] 30/101: Education and Humanities
+[EXTRACT] 31/101: Health and Medicine
+[EXTRACT] 32/101: Science, Technology and Engineering
+Fetching 32/101: Science, Technology and Engineering
+Fetching 31/101: Health and Medicine
+Fetching 29/101: Earth, Sea, Antarctic and Environment
+Fetching 30/101: Education and Humanities
+[EXTRACT] 33/101: Undergraduate certificates and diplomas
+[EXTRACT] 34/101: Learning abroad - Outbound programs
+[EXTRACT] 35/101: Learning abroad - Inbound programs
+[EXTRACT] 36/101: UniGO: Global Opportunity Program overview
+Fetching 33/101: Undergraduate certificates and diplomas
+Fetching 34/101: Learning abroad - Outbound programs
+Fetching 36/101: UniGO: Global Opportunity Program overview
+Fetching 35/101: Learning abroad - Inbound programs
+[EXTRACT] 37/101: UniGO: Future application
+[EXTRACT] 38/101: UniGO: Malaysia
+[EXTRACT] 39/101: UniGO: Indonesia
+[EXTRACT] 40/101: UniGO: Northern Vietnam
+Fetching 38/101: UniGO: Malaysia
+Fetching 37/101: UniGO: Future application
+Fetching 39/101: UniGO: Indonesia
+Fetching 40/101: UniGO: Northern Vietnam
+[EXTRACT] 41/101: UniGO: Southern Vietnam
+[EXTRACT] 42/101: ORIENTATION PROGRAM
+[EXTRACT] 43/101: University Preparation Program
+[EXTRACT] 44/101: Diploma of University Studies
+Fetching 41/101: UniGO: Southern Vietnam
+Fetching 42/101: ORIENTATION PROGRAM
+Fetching 43/101: University Preparation Program
+Fetching 44/101: Diploma of University Studies
+[EXTRACT] 45/101: Read more about Murina (Aboriginal enabling)
+[EXTRACT] 46/101: AI
+Fetching 46/101: AI
+Fetching 45/101: Read more about Murina (Aboriginal enabling)
+[EXTRACT] 47/101: brewing
+[EXTRACT] 48/101: drone mapping
+Fetching 47/101: brewing
+Fetching 48/101: drone mapping
+[EXTRACT] 49/101: climate change
+[EXTRACT] 50/101: Agribusiness
+[EXTRACT] 51/101: Business
+Fetching 49/101: climate change
+Fetching 50/101: Agribusiness
+Fetching 51/101: Business
+[EXTRACT] 52/101: Economics
+Fetching 52/101: Economics
+[EXTRACT] 53/101: Global Logistics and Maritime Management
+[EXTRACT] 54/101: Behavioural Insights
+[EXTRACT] 55/101: Business Administration
+[EXTRACT] 56/101: Digital Health
+Fetching 53/101: Global Logistics and Maritime Management
+Fetching 54/101: Behavioural Insights
+Fetching 55/101: Business Administration
+Fetching 56/101: Digital Health
+[EXTRACT] 57/101: Leadership in Health and Human Services *Not available for international students
+[EXTRACT] 58/101: Organisational Resilience
+[EXTRACT] 59/101: Professional Accounting
+Fetching 57/101: Leadership in Health and Human Services *Not available for international students
+Fetching 58/101: Organisational Resilience
+Fetching 59/101: Professional Accounting
+[EXTRACT] 60/101: Creative Arts and Health
+Fetching 60/101: Creative Arts and Health
+[EXTRACT] 61/101: Ocean Seafaring
+[EXTRACT] 62/101: Economic Geology
+[EXTRACT] 63/101: Global Logistics and Supply Chain Management
+Fetching 61/101: Ocean Seafaring
+Fetching 63/101: Global Logistics and Supply Chain Management
+Fetching 62/101: Economic Geology
+[EXTRACT] 64/101: Healthcare in Remote and Extreme Environments
+Fetching 64/101: Healthcare in Remote and Extreme Environments
+[EXTRACT] 65/101: Maritime Management
+[EXTRACT] 66/101: Planning
+[EXTRACT] 67/101: Protected Area Conservation
+Fetching 65/101: Maritime Management
+Fetching 66/101: Planning
+[EXTRACT] 68/101: Education
+Fetching 67/101: Protected Area Conservation
+Fetching 68/101: Education
+[EXTRACT] 69/101: Humanities and Social Sciences
+[EXTRACT] 70/101: Languages
+[EXTRACT] 71/101: Psychology
+[EXTRACT] 72/101: Education
+Fetching 69/101: Humanities and Social Sciences
+Fetching 70/101: Languages
+Fetching 72/101: Education
+Fetching 71/101: Psychology
+[EXTRACT] 73/101: Teaching
+[EXTRACT] 74/101: Applied Health and Community Support
+[EXTRACT] 75/101: Dementia Care
+[EXTRACT] 76/101: Advanced Nursing
+Fetching 73/101: Teaching
+Fetching 74/101: Applied Health and Community Support
+Fetching 75/101: Dementia Care
+Fetching 76/101: Advanced Nursing
+[EXTRACT] 77/101: Advanced Practice
+[EXTRACT] 78/101: Clinical Pharmacy
+[EXTRACT] 79/101: Counselling
+[EXTRACT] 80/101: Dementia
+Fetching 78/101: Clinical Pharmacy
+Fetching 79/101: Counselling
+Fetching 77/101: Advanced Practice
+Fetching 80/101: Dementia
+[EXTRACT] 81/101: Healthcare Redesign
+[EXTRACT] 82/101: Public Health
+[EXTRACT] 83/101: Applied Technologies
+Fetching 81/101: Healthcare Redesign
+[EXTRACT] 84/101: Sustainable Living
+Fetching 82/101: Public Health
+Fetching 83/101: Applied Technologies
+Fetching 84/101: Sustainable Living
+[EXTRACT] 85/101: Maritime Engineering
+Fetching 85/101: Maritime Engineering
+[EXTRACT] 86/101: ENQUIRE
+Fetching 86/101: ENQUIRE
+[EXTRACT] 87/101: Project Management Bundle
+[EXTRACT] 88/101: Preparing for Industry 4.0
+Fetching 88/101: Preparing for Industry 4.0
+Fetching 87/101: Project Management Bundle
+[EXTRACT] 89/101: Time Management, Planning and Organisation
+Fetching 89/101: Time Management, Planning and Organisation
+[EXTRACT] 90/101: Industrial Cyber Security
+[EXTRACT] 91/101: Data Driven Decision Making
+[EXTRACT] 92/101: Effective Communication Skills
+Fetching 91/101: Data Driven Decision Making
+Fetching 92/101: Effective Communication Skills
+Fetching 90/101: Industrial Cyber Security
+[EXTRACT] 93/101: Refund request form
+Fetching 93/101: Refund request form
+[EXTRACT] 94/101: Add our Sustainability major to your degree Did you know you can study the Sustainability major offered in the Bachelor of Science as part of most other bachelor's degrees as well? LEARN MORE
+[EXTRACT] 95/101: Study a Graduate Certificate in Sustainable Business online or on-campus Now more than ever, business leaders need to consider a multitude of issues linked to 'sustainable development' when managing their organisation. LEARN MORE
+[EXTRACT] 96/101: LEARN MORE
+Fetching 95/101: Study a Graduate Certificate in Sustainable Business online or on-campus Now more than ever, business leaders need to consider a multitude of issues linked to 'sustainable development' when managing their organisation. LEARN MORE
+Fetching 94/101: Add our Sustainability major to your degree Did you know you can study the Sustainability major offered in the Bachelor of Science as part of most other bachelor's degrees as well? LEARN MORE
+Fetching 96/101: LEARN MORE
+[EXTRACT] 97/101: LEARN MORE
+Fetching 97/101: LEARN MORE
+[EXTRACT] 98/101: LEARN MORE
+[EXTRACT] 99/101: Bachelor of Philosophy
+[EXTRACT] 100/101: Nursing
+Fetching 99/101: Bachelor of Philosophy
+Fetching 100/101: Nursing
+Fetching 98/101: LEARN MORE
+[EXTRACT] 101/101: Paramedicine
+Fetching 101/101: Paramedicine
+[STAGE] skipped Undergraduate courses: fetch_failed
+[STAGE] skipped Postgraduate courses: fetch_failed
+[STAGE] skipped Double degrees: fetch_failed
+[STAGE] skipped English language courses: fetch_failed
+[STAGE] skipped Our agent partners: fetch_failed
+[STAGE] skipped Business and Law: fetch_failed
+[STAGE] skipped Creative Arts and Design: fetch_failed
+[STAGE] skipped Earth, Sea, Antarctic and Environment: fetch_failed
+[STAGE] skipped Education, Humanities and Social Sciences: fetch_failed
+[STAGE] skipped Health and Medicine: fetch_failed
+[STAGE] skipped Science, Technology and Engineering: fetch_failed
+[STAGE] skipped International Pathway CollegePathway programs into an undergraduate degree: fetch_failed
+[STAGE] skipped Direct Entry / English for Academic Purposes (EAP) Program: fetch_failed
+[STAGE] skipped Study tours: fetch_failed
+[STAGE] skipped English Test Centre: fetch_failed
+[STAGE] skipped Language Support Programs: fetch_failed
+[STAGE] skipped University Connections Program overview: fetch_failed
+[STAGE] skipped Application form - new students: fetch_failed
+[STAGE] skipped Application form - returning students: fetch_failed
+[STAGE] skipped High Achiever Program: fetch_failed
+[STAGE] skipped Undergraduate courses A-Z listing: fetch_failed
+[STAGE] skipped Climate Action: fetch_failed
+[STAGE] skipped Honours degrees: fetch_failed
+[STAGE] skipped Postgraduate courses A-Z listing: fetch_failed
+[STAGE] skipped Sustainable Business: fetch_failed
+[STAGE] skipped Elevate your healthcare career: fetch_failed
+[STAGE] skipped Business and Law: fetch_failed
+[STAGE] skipped Creative Arts and Design: fetch_failed
+[STAGE] skipped Earth, Sea, Antarctic and Environment: fetch_failed
+[STAGE] skipped Education and Humanities: fetch_failed
+[STAGE] skipped Health and Medicine: fetch_failed
+[STAGE] skipped Science, Technology and Engineering: fetch_failed
+[STAGE] skipped Undergraduate certificates and diplomas: fetch_failed
+[STAGE] skipped Learning abroad - Outbound programs: fetch_failed
+[STAGE] skipped Learning abroad - Inbound programs: fetch_failed
+[STAGE] skipped UniGO: Global Opportunity Program overview: fetch_failed
+[STAGE] skipped UniGO: Future application: fetch_failed
+[STAGE] skipped UniGO: Malaysia: fetch_failed
+[STAGE] skipped UniGO: Indonesia: fetch_failed
+[STAGE] skipped UniGO: Northern Vietnam: fetch_failed
+[STAGE] skipped UniGO: Southern Vietnam: fetch_failed
+[STAGE] skipped ORIENTATION PROGRAM: fetch_failed
+[STAGE] skipped University Preparation Program: fetch_failed
+[STAGE] skipped Diploma of University Studies: fetch_failed
+[STAGE] skipped Read more about Murina (Aboriginal enabling): fetch_failed
+[STAGE] skipped AI: fetch_failed
+[STAGE] skipped brewing: fetch_failed
+[STAGE] skipped drone mapping: fetch_failed
+[STAGE] skipped climate change: fetch_failed
+[STAGE] skipped Agribusiness: fetch_failed
+[STAGE] skipped Business: fetch_failed
+[STAGE] skipped Economics: fetch_failed
+[STAGE] skipped Global Logistics and Maritime Management: fetch_failed
+[STAGE] skipped Behavioural Insights: fetch_failed
+[STAGE] skipped Business Administration: fetch_failed
+[STAGE] skipped Digital Health: fetch_failed
+[STAGE] skipped Leadership in Health and Human Services *Not available for international students: fetch_failed
+[STAGE] skipped Organisational Resilience: fetch_failed
+[STAGE] skipped Professional Accounting: fetch_failed
+[STAGE] skipped Creative Arts and Health: fetch_failed
+[STAGE] skipped Ocean Seafaring: fetch_failed
+[STAGE] skipped Economic Geology: fetch_failed
+[STAGE] skipped Global Logistics and Supply Chain Management: fetch_failed
+[STAGE] skipped Healthcare in Remote and Extreme Environments: fetch_failed
+[STAGE] skipped Maritime Management: fetch_failed
+[STAGE] skipped Planning: fetch_failed
+[STAGE] skipped Protected Area Conservation: fetch_failed
+[STAGE] skipped Education: fetch_failed
+[STAGE] skipped Humanities and Social Sciences: fetch_failed
+[STAGE] skipped Languages: fetch_failed
+[STAGE] skipped Psychology: fetch_failed
+[STAGE] skipped Education: fetch_failed
+[STAGE] skipped Teaching: fetch_failed
+[STAGE] skipped Applied Health and Community Support: fetch_failed
+[STAGE] skipped Dementia Care: fetch_failed
+[STAGE] skipped Advanced Nursing: fetch_failed
+[STAGE] skipped Advanced Practice: fetch_failed
+[STAGE] skipped Clinical Pharmacy: fetch_failed
+[STAGE] skipped Counselling: fetch_failed
+[STAGE] skipped Dementia: fetch_failed
+[STAGE] skipped Healthcare Redesign: fetch_failed
+[STAGE] skipped Public Health: fetch_failed
+[STAGE] skipped Applied Technologies: fetch_failed
+[STAGE] skipped Sustainable Living: fetch_failed
+[STAGE] skipped Maritime Engineering: fetch_failed
+[STAGE] skipped ENQUIRE: fetch_failed
+[STAGE] skipped Project Management Bundle: fetch_failed
+[STAGE] skipped Preparing for Industry 4.0: fetch_failed
+[STAGE] skipped Time Management, Planning and Organisation: fetch_failed
+[STAGE] skipped Industrial Cyber Security: fetch_failed
+[STAGE] skipped Data Driven Decision Making: fetch_failed
+[STAGE] skipped Effective Communication Skills: fetch_failed
+[STAGE] skipped Refund request form: fetch_failed
+[STAGE] skipped Add our Sustainability major to your degree Did you know you can study the Sustainability major offered in the Bachelor of Science as part of most other bachelor's degrees as well? LEARN MORE: fetch_failed
+[STAGE] skipped Study a Graduate Certificate in Sustainable Business online or on-campus Now more than ever, business leaders need to consider a multitude of issues linked to 'sustainable development' when managing their organisation. LEARN MORE: fetch_failed
+[STAGE] skipped LEARN MORE: fetch_failed
+[STAGE] skipped LEARN MORE: fetch_failed
+[STAGE] skipped LEARN MORE: fetch_failed
+[STAGE] skipped Bachelor of Philosophy: fetch_failed
+[STAGE] skipped Nursing: fetch_failed
+[STAGE] skipped Paramedicine: fetch_failed
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 6m 27s | Courses: 101 | Avg: 3.8s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:101 | Staged:0 | Skipped:0 | Errors:0
+Staged 0 courses, 0 skipped, 101 fetch errors
