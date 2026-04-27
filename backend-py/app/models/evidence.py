@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -10,6 +10,12 @@ from app.database import Base
 
 class ScrapedFieldEvidence(Base):
     __tablename__ = "scraped_field_evidence"
+    __table_args__ = (
+        UniqueConstraint(
+            "scraped_course_id", "field_key", "extraction_method", "source_url",
+            name="scraped_field_evidence_dedup",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     scraped_course_id: Mapped[int] = mapped_column(
