@@ -476,6 +476,64 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             links = await discover_course_links(
                 scrape_url, max_pages=max_pages, max_courses=max_courses, emit=emit
             )
+
+        # ── Fallback 1: Generic Playwright browser discovery ─────────────────
+        # Fires when the plain-HTTP BFS crawler returns 0 results, which
+        # happens on Cloudflare-protected or JS-rendered sites (e.g. UEL).
+        # A real Chromium browser renders the page, passes JS challenges,
+        # and harvests course links from the DOM.
+        if not links:
+            try:
+                from app.services.scraper.browser_discover_generic import (
+                    browser_discover_generic,
+                )
+                await emit(
+                    "status",
+                    "[DISCOVER] BFS returned 0 links — trying browser-based discovery "
+                    "(handles Cloudflare / JS-heavy sites)...",
+                    phase="discover",
+                )
+                links = await browser_discover_generic(
+                    scrape_url, max_courses=max_courses, emit=emit
+                )
+                if links:
+                    log.info(
+                        "browser_discover_generic: found %d course links for %s",
+                        len(links), uni_name,
+                    )
+            except Exception as _br_exc:  # noqa: BLE001
+                log.warning(
+                    "browser_discover_generic failed for %s: %s — trying Wayback CDX",
+                    uni_name, _br_exc,
+                )
+
+        # ── Fallback 2: Wayback Machine CDX API ──────────────────────────────
+        # If even the browser is blocked (aggressive bot detection, CAPTCHA,
+        # IP bans), the Internet Archive CDX index gives us the full set of
+        # URLs Wayback has ever crawled for this domain — completely free,
+        # no API key, and cannot be blocked because we query archive.org.
+        if not links:
+            try:
+                from app.services.scraper.wayback_discover import wayback_discover
+                await emit(
+                    "status",
+                    "[DISCOVER] Browser discovery returned 0 links — "
+                    "trying Wayback Machine CDX archive...",
+                    phase="discover",
+                )
+                links = await wayback_discover(
+                    scrape_url, max_courses=max_courses, emit=emit
+                )
+                if links:
+                    log.info(
+                        "wayback_discover: found %d course URLs for %s",
+                        len(links), uni_name,
+                    )
+            except Exception as _wb_exc:  # noqa: BLE001
+                log.warning(
+                    "wayback_discover failed for %s: %s", uni_name, _wb_exc
+                )
+
         summary["discovered"] = len(links)
         log.info("Discovered %d candidate course links for %s", len(links), uni_name)
         await emit("status", f"Discovered {len(links)} candidate course links", phase="discover", count=len(links))
