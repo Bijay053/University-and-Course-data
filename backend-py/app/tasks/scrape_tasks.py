@@ -168,6 +168,7 @@ async def _async_increment_requeue(runtime_job_id: str) -> None:
                 "    requeue_events = COALESCE(requeue_events, '[]'::jsonb) || "
                 "        jsonb_build_array(jsonb_build_object( "
                 "            'number', requeue_count + 1, "
+                "            'stale_minutes', :stale_min, "
                 "            'timestamp', to_char("
                 "                NOW() AT TIME ZONE 'UTC', "
                 "                'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'"
@@ -175,7 +176,7 @@ async def _async_increment_requeue(runtime_job_id: str) -> None:
                 "        )) "
                 "WHERE runtime_job_id = :jid"
             ),
-            {"jid": runtime_job_id},
+            {"jid": runtime_job_id, "stale_min": _STALE_QUEUED_MINUTES},
         )
         await db.commit()
 

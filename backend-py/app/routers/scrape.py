@@ -812,18 +812,22 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     # Inject synthetic log entries for every auto-recovery (requeue) event so
     # operators can see exactly when and how many times the job was bounced.
     requeue_events = job.requeue_events or []
-    from app.config import STALE_QUEUED_MINUTES as _stale_min
+    from app.config import STALE_QUEUED_MINUTES as _default_stale_min
     for ev in requeue_events:
         try:
             num = int(ev.get("number", 0))
             ts = ev.get("timestamp", "")
+            # Use the threshold stored in the event for historical accuracy;
+            # fall back to the current config value for legacy rows that
+            # pre-date this field.
+            stale_min = int(ev.get("stale_minutes") or _default_stale_min)
             logs.append(
                 {
                     "sequence": -(num),
                     "event": "auto_recovery",
                     "message": (
                         f"\u21ba Job auto-recovered (attempt #{num}) \u2014 "
-                        f"was stuck in 'queued' with no worker activity for >{_stale_min} min"
+                        f"was stuck in 'queued' with no worker activity for >{stale_min} min"
                     ),
                     "createdAt": ts,
                     "level": "warn",
