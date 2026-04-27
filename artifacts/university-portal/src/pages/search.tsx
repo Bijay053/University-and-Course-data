@@ -762,6 +762,26 @@ export default function SearchPage() {
                             <Award className="w-3 h-3 mr-0.5" />IELTS {r.english_requirements.ielts_overall}
                           </Badge>
                         )}
+                        {r.english_requirements.pte_overall && (
+                          <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700">
+                            <Award className="w-3 h-3 mr-0.5" />PTE {r.english_requirements.pte_overall}
+                          </Badge>
+                        )}
+                        {r.english_requirements.toefl_overall && (
+                          <Badge variant="outline" className="text-[10px] border-purple-200 text-purple-700">
+                            <Award className="w-3 h-3 mr-0.5" />TOEFL {r.english_requirements.toefl_overall}
+                          </Badge>
+                        )}
+                        {r.english_requirements.cae_overall && (
+                          <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-700">
+                            <Award className="w-3 h-3 mr-0.5" />CAE {r.english_requirements.cae_overall}
+                          </Badge>
+                        )}
+                        {r.english_requirements.duolingo_overall && (
+                          <Badge variant="outline" className="text-[10px] border-teal-200 text-teal-700">
+                            <Award className="w-3 h-3 mr-0.5" />Duolingo {r.english_requirements.duolingo_overall}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 flex-shrink-0">

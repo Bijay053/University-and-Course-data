@@ -1124,8 +1124,18 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     }
     out["english_requirements"] = {
         "ielts_overall": out.get("ielts_overall"),
+        "ielts_listening": out.get("ielts_listening"),
+        "ielts_speaking": out.get("ielts_speaking"),
+        "ielts_writing": out.get("ielts_writing"),
+        "ielts_reading": out.get("ielts_reading"),
         "pte_overall": out.get("pte_overall"),
+        "pte_listening": out.get("pte_listening"),
+        "pte_speaking": out.get("pte_speaking"),
+        "pte_writing": out.get("pte_writing"),
+        "pte_reading": out.get("pte_reading"),
         "toefl_overall": out.get("toefl_overall"),
+        "toefl_listening": out.get("toefl_listening"),
+        "toefl_writing": out.get("toefl_writing"),
         "cae_overall": out.get("cambridge_overall"),
         "duolingo_overall": out.get("duolingo_overall"),
     }

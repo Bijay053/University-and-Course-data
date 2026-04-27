@@ -1,0 +1,47 @@
+[INFO ] Scraping started in background…
+[INFO ] Scraping https://www.federation.edu.au/...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.federation.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.federation.edu.au/study/search/ (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.federation.edu.au/study/search/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.federation.edu.au/study/search/: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.federation.edu.au/study/search/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.federation.edu.au
+[DISCOVER] [DISCOVER] sitemap https://www.federation.edu.au/sitemap.xml: +368 candidates (total 368)
+[DISCOVER] [DISCOVER] sitemap: done — 368 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Placement Support Scholarship
+[EXTRACT ] [EXTRACT] 2/200: Vice Chancellors Award Semester 1 2026
+[EXTRACT ] [EXTRACT] 3/200: Vice Chancellors Award Semester 2 2026
+[EXTRACT ] [EXTRACT] 4/200: Vice Chancellors Award Summer Semester 2026
+[ 1/200] Fetching 1/200: Placement Support Scholarship
+[ 2/200] Fetching 2/200: Vice Chancellors Award Semester 1 2026
+[ 4/200] Fetching 4/200: Vice Chancellors Award Summer Semester 2026
+[ 3/200] Fetching 3/200: Vice Chancellors Award Semester 2 2026
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-summer-semester-2026/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-1-2026/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-2-2026/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/scholarships/details/international/placement-support-scholarship/
+[FALLBACK] [per-course browser ✓] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-2-2026/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course browser ✓] https://www.federation.edu.au/study/scholarships/details/international/placement-support-scholarship/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course browser ✓] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-1-2026/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] [per-course browser ✓] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-summer-semester-2026/ — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT ] [GP-DEBUG] static=117916B rendered=131785B using=rendered text_len=968
+[EXTRACT ] [GP-DEBUG] text[:500]="Vice-Chancellor's Award (Semester 2 2026) Share LocationBallarat, Berwick, Gippsland, Melbourne City Open date21/07/2025 Close date29/05/2026 Study sectorHigher education Study levelBachelor, Postgraduate Student typeInternational Student statusNew / commencing Additional eligibility criteria Must be a citizen of South Asia, Southeast Asia or China Must be commencing in Semester 2 2026 Must have achieved an average mark of 90% (or equivalent) in previous studies that are the basis of admission H"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/scholarships/details/int → 0 field(s) (cost=$0.000081, in=1031 out=12)
+[FALLBACK] [per-course vision img 0/5] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-2-2026/
+[EXTRACT ] [GP-DEBUG] static=117923B rendered=131790B using=rendered text_len=968
+[EXTRACT ] [GP-DEBUG] text[:500]="Vice-Chancellor's Award (Semester 1 2026) Share LocationBallarat, Berwick, Gippsland, Melbourne City Open date21/07/2025 Close date07/11/2025 Study sectorHigher education Study levelBachelor, Postgraduate Student typeInternational Student statusNew / commencing Additional eligibility criteria Must be a citizen of South Asia, Southeast Asia or China Must be commencing in Semester 1 2026 Must have achieved an average mark of 90% (or equivalent) in previous studies that are the basis of admission H"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/scholarships/details/int → 0 field(s) (cost=$0.000082, in=1031 out=14)
+[FALLBACK] [per-course vision img 0/5] https://www.federation.edu.au/study/scholarships/details/international/vice-chancellors-award-semester-1-2026/
+[EXTRACT ] [GP-DEBUG] static=118106B rendered=129498B using=rendered text_len=1105
+[EXTRACT ] [GP-DEBUG] text[:500]="Paid Placement Support Guarantee Share LocationBallarat, Berwick, Gippsland, Melbourne City ValueUp to $10,000 Open date06/01/2025 Close date11/12/2026 Study sectorHigher education Study levelBachelor, Postgraduate Student typeInternational Student statusNew / commencing Additional eligibility criteria Must be enrolled in one of the eligible courses (see below) Must not be a study abroad, exchange or online student How do I apply for this scholarship? You don't have to apply. The International A"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/scholarships/details/int → 0 field(s) (cost=$0.000083, in=1063 out=12)
+[FALLBACK] [per-course vision img 0/5] https://www.federation.edu.au/study/scholarships/details/international/placement-support-scholarship/

@@ -204,6 +204,10 @@ async def search_courses(
                c.duration_term,
                c.international_fee,
                c.ielts_overall,
+               c.pte_overall,
+               c.toefl_overall,
+               c.cae_overall,
+               c.duolingo_overall,
                c.intakes      AS intake_months,
                {rank_select}
         FROM course_search_view c
@@ -260,13 +264,17 @@ async def search_courses(
             "logoUrl": d.get("uni_logo_url"),
         }
 
-        # Required by UI: english_requirements nested object
+        # Required by UI: english_requirements nested object.
+        # pte_overall / toefl_overall / cae_overall / duolingo_overall all
+        # live in course_search_view alongside ielts_overall — previously
+        # they were hardcoded to None here, which prevented the search card
+        # from showing PTE/TOEFL badges even when data existed.
         d["english_requirements"] = {
             "ielts_overall": d.get("ielts_overall"),
-            "pte_overall": None,
-            "toefl_overall": None,
-            "cae_overall": None,
-            "duolingo_overall": None,
+            "pte_overall": d.get("pte_overall"),
+            "toefl_overall": d.get("toefl_overall"),
+            "cae_overall": d.get("cae_overall"),
+            "duolingo_overall": d.get("duolingo_overall"),
         }
 
         # Currency / fee_term / fee_yearly — UI reads them on the result
