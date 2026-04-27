@@ -158,11 +158,19 @@ async def _delete_runtime_job(runtime_job_id: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_preserves_rows_from_completed_jobs():
-    """Pending rows whose source job is COMPLETED must survive cleanup —
-    they're rows the user is still reviewing in the staging table.
-    Wiping them caused job_440a0e26c6df's COUNT(*)=0 vs imported=9
-    debugging-hell mismatch in PR-1.5 prod."""
+async def test_clear_stale_dedup_clears_completed_job_rows_for_fresh_replacement():
+    """Pending rows from COMPLETED jobs are cleared by dedup cleanup.
+
+    Context: the original PR-1.5 fix protected completed-job rows from cleanup
+    to prevent job_440a0e26c6df's counter-vs-rows mismatch. That protection
+    caused a worse regression: new scrapes found all courses blocked by existing
+    pending rows from the completed run and staged 0 new courses.
+
+    Current behaviour: ONLY running-job rows are protected (their rows are
+    mid-flight and must not be wiped from under the active worker). All other
+    pending rows — from failed, orphaned, or previously completed jobs — are
+    cleared so that re-scrapes always see a clean slate and can stage fresh data.
+    """
     uni_a, _ = await _pick_two_universities()
     prefix = f"test_completed_{uuid.uuid4().hex[:8]}_"
     completed_job = prefix + "completed_job"
@@ -173,8 +181,7 @@ async def test_clear_stale_dedup_preserves_rows_from_completed_jobs():
         await _insert_runtime_job(completed_job, uni_a, "completed")
         await _insert_runtime_job(failed_job, uni_a, "failed")
         # orphan_job intentionally has no scrape_runtime_jobs entry —
-        # this is the "scraper crashed before flushing the job row"
-        # case the cleanup was originally built for.
+        # this is the "scraper crashed before flushing the job row" case.
         from_completed = await _insert(completed_job, uni_a, prefix + "from-completed", "pending", age_min=30)
         from_failed = await _insert(failed_job, uni_a, prefix + "from-failed", "pending", age_min=30)
         from_orphan = await _insert(orphan_job, uni_a, prefix + "from-orphan", "pending", age_min=30)
@@ -182,12 +189,10 @@ async def test_clear_stale_dedup_preserves_rows_from_completed_jobs():
         async with AsyncSessionLocal() as db:
             cleared = await _clear_stale_dedup(db, uni_a, minutes=10)
 
-        # Failed-job and orphan rows: gone. Completed-job row: kept.
-        assert cleared == 2, f"expected 2 deletions (failed + orphan), got {cleared}"
-        assert await _exists(from_completed), (
-            "completed-job pending row MUST survive — it's the staged-for-review "
-            "data behind the imported counter (root cause of job_440a0e26c6df "
-            "counter-vs-rows mismatch)"
+        # All three stale pending rows are cleared — only running-job rows survive.
+        assert cleared == 3, f"expected 3 deletions (completed + failed + orphan), got {cleared}"
+        assert not await _exists(from_completed), (
+            "completed-job pending row should be cleared so a re-scrape can stage fresh data"
         )
         assert not await _exists(from_failed), "failed-job pending row should be cleared"
         assert not await _exists(from_orphan), "orphan-job pending row should be cleared"

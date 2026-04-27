@@ -179,7 +179,14 @@ async def test_stage_course_persists_completeness_and_evidence():
 @pytest.mark.asyncio
 async def test_stage_course_review_status_when_blockers_present():
     """A course missing degree_level + english test must land as 'review'
-    with auto_publish_status='review' and a human-readable reason."""
+    with auto_publish_status='review' and a human-readable reason.
+
+    The staging gate requires (a) a degree-qualified name and (b) an
+    international_fee before a row can be staged.  Both are supplied here
+    so the gate passes and the completeness / eligibility step runs.
+    The missing degree_level + english-test fields then trigger both
+    hard blockers and force the row into 'review' status.
+    """
     uni_id = await _pick_university()
     job_id = f"test_bugcd_blk_{uuid.uuid4().hex[:10]}"
     try:
@@ -188,8 +195,13 @@ async def test_stage_course_review_status_when_blockers_present():
                 db,
                 scrape_job_id=job_id,
                 university_id=uni_id,
-                course_name="Foundation Pathway Program",
-                payload={"course_name": "Foundation Pathway Program"},
+                # "Master of Science" passes the degree-qualifier name gate.
+                # No degree_level or english-test fields → both hard blockers fire.
+                course_name="Master of Science",
+                payload={
+                    "course_name": "Master of Science",
+                    "international_fee": 25000,   # satisfies the fee gate
+                },
                 evidence=[],
             )
         assert res.saved

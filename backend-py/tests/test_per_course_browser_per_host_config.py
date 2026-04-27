@@ -8,9 +8,22 @@ the network never goes idle, so every per-course browser hit on those
 hosts ate the 60s budget and timed out (prod sweeps job_8af4a... ASA
 9/9, Torrens 22/22).
 
-Fix: allow-list networkidle for SPAs that need it, default everyone
-else to fast `domcontentloaded` + 1.5s settle, with a tight 20s outer
-ceiling so a hung widget can't wedge the worker.
+The fix was implemented in two phases:
+
+Phase 1 (original PR-5 plan): allow-list networkidle for SPAs only;
+  default everyone else to domcontentloaded + 20s.
+
+Phase 2 (post-prod refinement): real sweeps showed 20s was too tight
+  for Australian education sites on our DigitalOcean IP, and ASA's
+  english requirements are image-only (vision OCR can't fire unless
+  the browser fully loads the page). So:
+  - Default outer ceiling raised 20s → 60s / 50s goto.
+  - ASA + KBS + study.csu.edu.au promoted to _SLOW_HOSTS
+    (networkidle + 3s settle + 60s outer / 50s goto).
+  - VIT stays in _NETWORKIDLE_HOSTS with a tighter 30s / 25s budget
+    (enough for SPA hydration, avoids over-waiting).
+
+These tests assert the CURRENT (phase-2) production behaviour.
 """
 from __future__ import annotations
 
@@ -32,7 +45,8 @@ def test_vit_subdomain_uses_networkidle():
 
 
 def test_vit_gets_30s_outer_ceiling():
-    # VIT legitimately needs ~25s for hydration; 20s would over-cancel.
+    # VIT legitimately needs ~25s for hydration; the tighter budget
+    # prevents the vocational-page third-party widget from eating 60s.
     _, _, outer_sec, goto_ms = _browser_config_for(
         "https://vit.edu.au/courses/bachelor-of-business"
     )
@@ -40,29 +54,32 @@ def test_vit_gets_30s_outer_ceiling():
     assert goto_ms == 25_000
 
 
-def test_asa_uses_domcontentloaded():
-    # ASA was the trigger for this fix — long-poll widgets keep the
-    # network busy forever, so domcontentloaded is the only safe default.
-    wait_until, settle_ms, _, _ = _browser_config_for(
+def test_asa_uses_networkidle_for_vision_ocr():
+    # ASA's english requirements are image-only: vision OCR can't fire
+    # unless the browser fully loads the page.  ASA is therefore in
+    # _SLOW_HOSTS (networkidle + 60s), not on the domcontentloaded path.
+    wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(
         "https://www.asahe.edu.au/courses/bachelor-of-business"
     )
-    assert wait_until == "domcontentloaded"
-    assert settle_ms == 1500
+    assert wait_until == "networkidle"
+    assert settle_ms == 3000
+    assert outer_sec == 60
+    assert goto_ms == 50_000
 
 
-def test_default_outer_timeout_is_20s():
-    # User explicitly requested 15-20s, not 60s. Default ceiling is 20s
-    # for non-VIT hosts so a hung XHR widget can't wedge the worker.
+def test_default_outer_timeout_is_60s():
+    # Default outer ceiling is 60s after prod evidence showed 20s was
+    # too tight for real Australian education sites on our DO IP.
     _, _, outer_sec, goto_ms = _browser_config_for(
         "https://www.torrens.edu.au/courses/design"
     )
-    assert outer_sec == 20
-    assert goto_ms == 15_000
+    assert outer_sec == 60
+    assert goto_ms == 50_000
 
 
 def test_unknown_host_uses_domcontentloaded():
     # New universities discovered by the scraper default to the safe
-    # path. Adding them to _NETWORKIDLE_HOSTS is opt-in only.
+    # path. Adding them to _NETWORKIDLE_HOSTS or _SLOW_HOSTS is opt-in.
     for url in (
         "https://www.usq.edu.au/courses/foo",
         "https://www.torrens.edu.au/courses/bar",
@@ -74,8 +91,8 @@ def test_unknown_host_uses_domcontentloaded():
             f"{url} should not opt into networkidle"
         )
         assert settle_ms == 1500
-        assert outer_sec == 20
-        assert goto_ms == 15_000
+        assert outer_sec == 60
+        assert goto_ms == 50_000
 
 
 def test_malformed_url_falls_back_to_safe_default():
@@ -84,28 +101,31 @@ def test_malformed_url_falls_back_to_safe_default():
     wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for("not-a-url")
     assert wait_until == "domcontentloaded"
     assert settle_ms == 1500
-    assert outer_sec == 20
-    assert goto_ms == 15_000
+    assert outer_sec == 60
+    assert goto_ms == 50_000
 
 
 def test_empty_url_falls_back_to_safe_default():
-    wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for("")
+    wait_until, settle_ms, outer_sec, _ = _browser_config_for("")
     assert wait_until == "domcontentloaded"
     assert settle_ms == 1500
-    assert outer_sec == 20
+    assert outer_sec == 60
 
 
 def test_csu_study_subdomain_uses_networkidle():
     # study.csu.edu.au is a Vue.js SPA — static HTML is a 39-byte shell.
-    # domcontentloaded fires before any content renders, so networkidle
-    # is required to get extractable fee / english-requirements sections.
+    # It is in _SLOW_HOSTS: networkidle + 3s settle + 60s outer / 50s goto.
+    # (Note: _skip_browser_for_url also returns True for this host, so the
+    # browser pass is entirely skipped in practice — but the config helper
+    # must still return a valid tuple for hosts that may be added or removed
+    # from the skip list in future.)
     wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(
         "https://study.csu.edu.au/courses/bachelor-accounting"
     )
     assert wait_until == "networkidle"
     assert settle_ms == 3000
-    assert outer_sec == 30
-    assert goto_ms == 25_000
+    assert outer_sec == 60
+    assert goto_ms == 50_000
 
 
 def test_csu_www_subdomain_uses_domcontentloaded():
@@ -130,4 +150,4 @@ def test_substring_match_does_not_match_unrelated_host():
         assert wait_until == "domcontentloaded", (
             f"{url} should NOT match vit.edu.au allow-list (substring leak)"
         )
-        assert outer_sec == 20
+        assert outer_sec == 60
