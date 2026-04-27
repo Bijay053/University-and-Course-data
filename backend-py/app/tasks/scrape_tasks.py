@@ -198,6 +198,17 @@ async def _async_mark_failed_max_requeue(runtime_job_id: str) -> None:
                 f"Auto-recovery abandoned after {job.requeue_count} requeue attempts "
                 f"(limit: {_MAX_REQUEUES}). Worker may be crashing before claiming the job."
             )
+            from datetime import datetime, timezone as _tz
+            exhausted_ts = datetime.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            current_events = list(job.requeue_events or [])
+            current_events.append(
+                {
+                    "number": job.requeue_count,
+                    "timestamp": exhausted_ts,
+                    "exhausted": True,
+                }
+            )
+            job.requeue_events = current_events
             await db.commit()
 
 

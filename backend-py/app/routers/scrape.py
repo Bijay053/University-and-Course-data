@@ -817,24 +817,43 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         try:
             num = int(ev.get("number", 0))
             ts = ev.get("timestamp", "")
-            # Use the threshold stored in the event for historical accuracy;
-            # fall back to the current config value for legacy rows that
-            # pre-date this field.
-            stale_min = int(ev.get("stale_minutes") or _default_stale_min)
-            logs.append(
-                {
-                    "sequence": -(num),
-                    "event": "auto_recovery",
-                    "message": (
-                        f"\u21ba Job auto-recovered (attempt #{num}) \u2014 "
-                        f"was stuck in 'queued' with no worker activity for >{stale_min} min"
-                    ),
-                    "createdAt": ts,
-                    "level": "warn",
-                    "isRequeueEvent": True,
-                    "requeueNumber": num,
-                }
-            )
+            exhausted = bool(ev.get("exhausted", False))
+            if exhausted:
+                logs.append(
+                    {
+                        "sequence": -(num) - 0.5,
+                        "event": "auto_recovery_exhausted",
+                        "message": (
+                            f"\u2717 Auto-recovery exhausted after {num} "
+                            f"attempt{'s' if num != 1 else ''} \u2014 "
+                            f"job permanently abandoned"
+                        ),
+                        "createdAt": ts,
+                        "level": "error",
+                        "isRequeueEvent": True,
+                        "requeueNumber": num,
+                        "exhausted": True,
+                    }
+                )
+            else:
+                # Use the threshold stored in the event for historical accuracy;
+                # fall back to the current config value for legacy rows that
+                # pre-date this field.
+                stale_min = int(ev.get("stale_minutes") or _default_stale_min)
+                logs.append(
+                    {
+                        "sequence": -(num),
+                        "event": "auto_recovery",
+                        "message": (
+                            f"\u21ba Job auto-recovered (attempt #{num}) \u2014 "
+                            f"was stuck in 'queued' with no worker activity for >{stale_min} min"
+                        ),
+                        "createdAt": ts,
+                        "level": "warn",
+                        "isRequeueEvent": True,
+                        "requeueNumber": num,
+                    }
+                )
         except Exception as ev_exc:
             import logging as _logging
             _logging.getLogger(__name__).warning(

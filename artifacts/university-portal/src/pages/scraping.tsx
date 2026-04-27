@@ -2873,6 +2873,20 @@ export default function Scraping() {
                               })
                               .map((l) =>
                                 l.isRequeueEvent ? (
+                                  l.exhausted ? (
+                                    <div
+                                      key={`requeue-exhausted-${String(l.requeueNumber)}`}
+                                      className="whitespace-pre-wrap break-words leading-relaxed my-0.5 px-2 py-0.5 rounded bg-red-900/50 text-red-300"
+                                    >
+                                      <span className="font-bold mr-1">✗</span>
+                                      {l.createdAt ? (
+                                        <span className="text-red-400 mr-1 text-[10px]">
+                                          [{new Date(String(l.createdAt)).toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC", timeZoneName: "short" })}]
+                                        </span>
+                                      ) : null}
+                                      {String(l.message)}
+                                    </div>
+                                  ) : (
                                   <div
                                     key={`requeue-${String(l.requeueNumber)}`}
                                     className="whitespace-pre-wrap break-words leading-relaxed my-0.5 px-2 py-0.5 rounded bg-amber-900/40 text-amber-300"
@@ -2885,6 +2899,7 @@ export default function Scraping() {
                                     ) : null}
                                     {String(l.message)}
                                   </div>
+                                  )
                                 ) : (
                                   <div key={l.sequence} className="whitespace-pre-wrap break-words leading-relaxed">
                                     <span className="text-gray-500">[{l.event}]</span>
