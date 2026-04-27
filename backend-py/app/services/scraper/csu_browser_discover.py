@@ -29,10 +29,62 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 
 log = logging.getLogger(__name__)
 
 _LISTING_URL = "https://study.csu.edu.au/international/courses"
+_CSU_ORIGIN = "https://study.csu.edu.au"
+
+# Matches /courses/<slug> or /international/courses/<slug> with no query/fragment.
+# Slug must be at least one char and may have a trailing slash.
+_COURSE_PATH_RE = re.compile(
+    r"^/(?:international/)?courses/[^/?#]+/?$"
+)
+
+
+def _normalise_csu_course_url(raw: str) -> str | None:
+    """Normalise a raw CSU course URL to the canonical international path.
+
+    Mirrors the inline URL-normalisation logic in :data:`_EXTRACT_FROM_RESULTS_JS`
+    and :data:`_EXTRACT_LINKS_JS` so the same behaviour can be unit-tested in
+    Python without a browser.
+
+    Rules (identical to the JS snippets):
+    * Only ``https://study.csu.edu.au`` origin is accepted.
+    * Path must match ``/courses/<slug>`` or ``/international/courses/<slug>``.
+    * Query strings and fragments are stripped before matching.
+    * ``/courses/<slug>`` is rewritten to ``/international/courses/<slug>``.
+    * Already-correct ``/international/courses/<slug>`` paths are returned
+      unchanged (no double-prefixing).
+
+    Returns the full normalised URL on success, or ``None`` when the input is
+    not a recognised CSU course URL.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+
+    # Resolve relative same-origin paths.
+    if raw.startswith("/"):
+        url = _CSU_ORIGIN + raw
+    elif raw.startswith(_CSU_ORIGIN):
+        url = raw
+    else:
+        return None
+
+    # Strip query and fragment.
+    base = url.split("?")[0].split("#")[0]
+    path = base[len(_CSU_ORIGIN):]
+
+    if not _COURSE_PATH_RE.match(path):
+        return None
+
+    # Normalise /courses/<slug> → /international/courses/<slug>.
+    if path.startswith("/courses/"):
+        path = "/international" + path
+
+    return _CSU_ORIGIN + path
 
 # Maximum scroll attempts before giving up on pagination (fallback path only)
 _MAX_SCROLL_ITERS = 30
