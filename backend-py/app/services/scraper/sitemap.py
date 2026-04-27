@@ -29,6 +29,7 @@ from app.services.scraper.discovery import (
     _COURSE_TEXT,
     _COURSE_URL_HINTS,
     _JUNK_TEXT,
+    _is_known_non_course_url,
 )
 from app.services.scraper.http_fetcher import fetch_html
 
@@ -103,8 +104,11 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
     1. Same registrable host as the sitemap's origin (SSRF guard) —
        prevents a hostile/misconfigured sitemap from injecting off-domain
        URLs that downstream stages would then fetch.
-    2. URL hint matching one of ``_COURSE_URL_HINTS``.
-    3. Slug-derived name that doesn't look like junk, so generic
+    2. Not a known non-course URL (scholarships, news, events, etc.) —
+       uses the same blocklist as the BFS crawler so sitemap-sourced
+       URLs go through identical filtering.
+    3. URL hint matching one of ``_COURSE_URL_HINTS``.
+    4. Slug-derived name that doesn't look like junk, so generic
        ``/courses/`` index pages and obvious non-courses (search,
        login, privacy) never make it into the candidate list.
     """
@@ -112,6 +116,14 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
         loc_host = urlparse(loc).netloc
         if loc_host and not _same_registrable_host(base_host, loc_host):
             return False
+    # Apply the same non-course blocklist used by the BFS HTML crawler.
+    # Without this, URLs like /study/scholarships/... and /study/events/...
+    # pass through because they contain /study/ (a course URL hint) but
+    # are clearly not course pages. The BFS crawler never stages these
+    # because _looks_like_course() calls _is_known_non_course_url() first;
+    # the sitemap path previously skipped that check (Federation regression).
+    if _is_known_non_course_url(loc):
+        return False
     if not _looks_like_course_url(loc):
         return False
     name = _slug_to_name(loc)
