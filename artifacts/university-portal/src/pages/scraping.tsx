@@ -23,6 +23,7 @@ import {
   type ReviewStagedCourse,
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
+import { ScrapeJobCard } from "@/components/scrape-job-card";
 
 type ImportJob = {
   id: number;
@@ -344,6 +345,19 @@ export default function Scraping() {
   const pollRequestTimeoutRef = useRef<number | null>(null);
   const submittingRef = useRef(false);
 
+  // ── Multi-slot state ──────────────────────────────────────────────────────
+  const [slotIds, setSlotIds] = useState<number[]>([0]);
+  const nextSlotId = useRef(1);
+
+  const addSlot = useCallback(() => {
+    if (slotIds.length >= 4) return;
+    setSlotIds((prev) => [...prev, nextSlotId.current++]);
+  }, [slotIds.length]);
+
+  const removeSlot = useCallback((id: number) => {
+    setSlotIds((prev) => prev.filter((s) => s !== id));
+  }, []);
+
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
   const [showReview, setShowReview] = useState(false);
@@ -547,6 +561,10 @@ export default function Scraping() {
       }
     } catch {}
   }, []);
+
+  const handleReviewReady = useCallback((jobId: string) => {
+    loadStagedCourses(jobId);
+  }, [loadStagedCourses]);
 
   const resetActiveScrapeState = useCallback((message?: string) => {
     if (pollRef.current) {
@@ -1335,641 +1353,56 @@ export default function Scraping() {
         </Link>
       </div>
 
-      <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50/50 to-purple-50/30">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+      {/* ── Multi-Slot Scraper Panel ─────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
               <Bot className="w-5 h-5 text-white" />
             </div>
-            AI-Powered Web Scraper
-            {scraping && (
-              <Badge className="ml-2 bg-blue-100 text-blue-700 border-blue-200 animate-pulse">
-                Running in Background
-              </Badge>
-            )}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Paste a university course listing URL and AI will automatically extract all course data. Scraped courses go to a staging area for your review before saving.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            {scrapeUrls.map((url, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <div className="flex-1 relative">
-                  <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="https://www.university.edu/courses"
-                    value={url}
-                    onChange={(e) => {
-                      const next = [...scrapeUrls];
-                      next[idx] = e.target.value;
-                      setScrapeUrls(next);
-                    }}
-                    className="pl-9 h-11 bg-white"
-                    disabled={scraping}
-                  />
-                </div>
-                {scrapeUrls.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setScrapeUrls(scrapeUrls.filter((_, i) => i !== idx))}
-                    disabled={scraping}
-                    className="text-gray-400 hover:text-red-500 disabled:opacity-40 transition-colors"
-                    title="Remove URL"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setScrapeUrls([...scrapeUrls, ""])}
-              disabled={scraping}
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 disabled:opacity-40 transition-colors"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Add another URL
-            </button>
-
-            <label className="flex items-start gap-2 mt-1 p-2.5 rounded-md border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors">
-              <input
-                type="checkbox"
-                checked={fastMode}
-                onChange={(e) => setFastMode(e.target.checked)}
-                disabled={scraping}
-                className="mt-0.5 w-4 h-4 accent-amber-600"
-              />
-              <div className="flex-1 text-xs">
-                <div className="font-medium text-amber-900">Fast Mode (skip browser automation)</div>
-                <div className="text-amber-700 mt-0.5">
-                  5–10× faster (~1 min for 1000 pages). May miss JS-rendered fields on sites like VIT, Newcastle, UEL, RMIT (International toggle, expandable Entry Requirements). Recommended for static-HTML sites.
-                </div>
-              </div>
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              disabled={scraping}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-40 transition-colors"
-            >
-              <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-              {showAdvanced ? "Hide advanced options" : "Advanced: specify fee & requirements pages"}
-            </button>
-
-            {showAdvanced && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Fee Schedule Page URL
-                    <span className="ml-1 text-gray-400 font-normal">(optional — overrides auto-discovery)</span>
-                  </label>
-                  <Input
-                    placeholder="https://university.edu/fees"
-                    value={feePageUrl}
-                    onChange={(e) => setFeePageUrl(e.target.value)}
-                    className="bg-white h-9 text-sm"
-                    disabled={scraping}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    English Requirements Page URL
-                    <span className="ml-1 text-gray-400 font-normal">(optional — overrides auto-discovery)</span>
-                  </label>
-                  <Input
-                    placeholder="https://university.edu/english-requirements"
-                    value={requirementsPageUrl}
-                    onChange={(e) => setRequirementsPageUrl(e.target.value)}
-                    className="bg-white h-9 text-sm"
-                    disabled={scraping}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Academic Requirements Page URL
-                    <span className="ml-1 text-gray-400 font-normal">(optional — academic/entry criteria)</span>
-                  </label>
-                  <Input
-                    placeholder="https://university.edu/academic-requirements"
-                    value={academicRequirementsPageUrl}
-                    onChange={(e) => setAcademicRequirementsPageUrl(e.target.value)}
-                    className="bg-white h-9 text-sm"
-                    disabled={scraping}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Scholarships Page URL
-                    <span className="ml-1 text-gray-400 font-normal">(optional — scholarship listings)</span>
-                  </label>
-                  <Input
-                    placeholder="https://university.edu/scholarships"
-                    value={scholarshipPageUrl}
-                    onChange={(e) => setScholarshipPageUrl(e.target.value)}
-                    className="bg-white h-9 text-sm"
-                    disabled={scraping}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Default Study Mode
-                    <span className="ml-1 text-gray-400 font-normal">(override when extractor uncertain)</span>
-                  </label>
-                  <select
-                    value={defaultStudyMode}
-                    onChange={(e) => setDefaultStudyMode(e.target.value)}
-                    disabled={scraping}
-                    className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm disabled:opacity-50"
-                  >
-                    <option value="">— auto-detect —</option>
-                    <option value="On Campus">On Campus</option>
-                    <option value="Online">Online</option>
-                    <option value="Blended">Blended</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="text-xs font-medium text-gray-500 mb-1 block">University</label>
-              <UniversityCombobox
-                value={selectedUni}
-                onChange={(val) => {
-                  setSelectedUni(val);
-                  if (val && val !== ALL) {
-                    const uni = uniData?.data?.find((u) => String(u.id) === val);
-                    setScrapeUrls([uni?.scrapeUrl || ""]);
-                    setFeePageUrl(uni?.feePageUrl || "");
-                    setRequirementsPageUrl(uni?.requirementsPageUrl || "");
-                    setScholarshipPageUrl((uni as { scholarshipPageUrl?: string })?.scholarshipPageUrl || "");
-                    setAcademicRequirementsPageUrl((uni as { academicRequirementsPageUrl?: string })?.academicRequirementsPageUrl || "");
-                    if (uni?.feePageUrl || uni?.requirementsPageUrl || (uni as { scholarshipPageUrl?: string })?.scholarshipPageUrl || (uni as { academicRequirementsPageUrl?: string })?.academicRequirementsPageUrl) setShowAdvanced(true);
-                  } else {
-                    setFeePageUrl("");
-                    setRequirementsPageUrl("");
-                    setScholarshipPageUrl("");
-                    setAcademicRequirementsPageUrl("");
-                  }
-                }}
-                universities={uniData?.data || []}
-                disabled={scraping}
-              />
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">AI-Powered Web Scraper</h2>
+              <p className="text-xs text-muted-foreground">Run up to 4 simultaneous scrapes. Each slot is independent.</p>
             </div>
-
-            {(!selectedUni || selectedUni === ALL) && (
-              <>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">University Name</label>
-                  <Input placeholder="University of Example" value={newUniName} onChange={(e) => setNewUniName(e.target.value)} className="bg-white h-9" disabled={scraping} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">Country</label>
-                  <Input placeholder="United Kingdom" value={newUniCountry} onChange={(e) => setNewUniCountry(e.target.value)} className="bg-white h-9" disabled={scraping} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">City</label>
-                  <Input placeholder="London" value={newUniCity} onChange={(e) => setNewUniCity(e.target.value)} className="bg-white h-9" disabled={scraping} />
-                </div>
-              </>
-            )}
           </div>
-
-          <div className="flex gap-2 items-center flex-wrap">
+          <div className="flex items-center gap-2">
+            {slotIds.length < 4 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addSlot}
+                className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                Add Slot
+              </Button>
+            )}
             <Button
-              onClick={startScraping}
-              disabled={
-                scraping ||
-                scrapeUrls.every((u) => !u.trim()) ||
-                // Creating a new university: require name + country + city
-                ((!selectedUni || selectedUni === ALL) &&
-                  (!newUniName.trim() || !newUniCountry.trim() || !newUniCity.trim()))
-              }
-              className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
-              size="lg"
+              variant="outline"
+              size="sm"
+              onClick={forceCancelAll}
+              className="h-8 border-red-200 text-red-600 hover:bg-red-50"
+              title="Force cancel all running scrapes"
             >
-              {scraping ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Scraping in Background...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-2" />
-                  {scrapeUrls.filter((u) => u.trim()).length > 1
-                    ? `Start AI Scraping (${scrapeUrls.filter((u) => u.trim()).length} URLs)`
-                    : "Start AI Scraping"}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </>
-              )}
+              <StopCircle className="w-3.5 h-3.5 mr-1.5" />
+              Cancel All
             </Button>
-            {urlQueueProgress && urlQueueProgress.total > 1 && (
-              <span className="text-sm text-gray-500 font-medium">
-                URL {urlQueueProgress.current} of {urlQueueProgress.total}
-              </span>
-            )}
-            {selectedUni && selectedUni !== ALL && uniData?.data?.find((u) => String(u.id) === selectedUni)?.scrapeConfig && (
-              <Button
-                onClick={async () => {
-                  setScraping(true);
-                  setScrapeLogs([]);
-                  setScrapeResult(null);
-                  setShowReview(false);
-                  setStagedCourses([]);
-                  setStopping(false);
-                  const uni = uniData?.data?.find((u) => String(u.id) === selectedUni);
-                  if (uni) setScrapeUniName(uni.name);
-                  setScrapeTargetUrl(uni?.scrapeUrl || "");
-                  try {
-                    const resp = await fetch("/api/scrape/rescrape", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ universityId: parseInt(selectedUni) }),
-                    });
-                    if (!resp.ok) {
-                      const msg = await getFetchErrorMessage(resp);
-                      setScrapeLogs([{ event: "error", message: msg }].slice(-MAX_SCRAPE_LOG_LINES));
-                      setScraping(false);
-                      return;
-                    }
-                    const data = await readResponseJson<{ jobId: string }>(resp);
-                    if (!data?.jobId) {
-                      setScrapeLogs([{ event: "error", message: "Invalid response from server" }].slice(-MAX_SCRAPE_LOG_LINES));
-                      setScraping(false);
-                      return;
-                    }
-                    setActiveJobId(data.jobId);
-                    sessionStorage.setItem("activeScrapeJob", data.jobId);
-                    setScrapeLogs([{ event: "status", message: "Re-scraping started (no AI, zero cost)..." }].slice(-MAX_SCRAPE_LOG_LINES));
-                    pollJobStatus(data.jobId);
-                  } catch (err) {
-                    setScrapeLogs([{ event: "error", message: (err as Error).message }].slice(-MAX_SCRAPE_LOG_LINES));
-                    setScraping(false);
-                  }
-                }}
-                disabled={scraping}
-                variant="outline"
-                className="h-11 px-4 border-green-300 text-green-700 hover:bg-green-50"
-                size="lg"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Re-scrape (No AI)
-              </Button>
-            )}
-            {scraping && (
-              <Button
-                onClick={stopScraping}
-                disabled={stopping}
-                variant="destructive"
-                className="h-11 px-6"
-                size="lg"
-              >
-                {stopping ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Stopping...
-                  </>
-                ) : (
-                  <>
-                    <Square className="w-4 h-4 mr-2" />
-                    Stop Scraping
-                  </>
-                )}
-              </Button>
-            )}
-            {/* B15: emergency hatch — visible whenever any job is
-                considered active OR when the page just shows
-                "Scraping in Background…" with no logs (i.e. wedged
-                state restored across reload). */}
-            {scraping && (
-              <Button
-                onClick={forceCancelAll}
-                variant="outline"
-                size="lg"
-                className="h-11 px-4 border-red-300 text-red-700 hover:bg-red-50"
-                title="Mark every running scrape as stopped — use if Stop is wedged"
-              >
-                Force Cancel All
-              </Button>
-            )}
           </div>
+        </div>
 
-          {(scraping || scrapeLogs.length > 0) && (
-            <div className="border rounded-xl bg-white shadow-sm p-4 space-y-3">
-              {(scrapeUniName || scrapeTargetUrl) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
-                  {scrapeUniName && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-blue-800">University:</span>
-                      <span className="text-blue-700">{scrapeUniName}</span>
-                    </div>
-                  )}
-                  {scrapeTargetUrl && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                      <a href={scrapeTargetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
-                        {scrapeTargetUrl}
-                      </a>
-                      <ExternalLink className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {progressLog && progressLog.total && (() => {
-                const current = progressLog.current ?? 0;
-                const total = progressLog.total ?? 1;
-                const pct = (current / total) * 100;
-                let eta: string | null = null;
-                let elapsed: string | null = null;
-                if (scrapeStartTime) {
-                  // Use the ticking `now` state — it's bumped every second by
-                  // the elapsed-timer effect, so the label increments live
-                  // instead of only when the status poll lands.
-                  const elapsedMs = now - scrapeStartTime;
-                  const fmt = (ms: number) => {
-                    const s = Math.max(0, Math.round(ms / 1000));
-                    const m = Math.floor(s / 60);
-                    const r = s % 60;
-                    return m > 0 ? `${m}m ${r}s` : `${r}s`;
-                  };
-                  elapsed = fmt(elapsedMs);
-                  if (current > 0 && current < total) {
-                    const pacePerItem = elapsedMs / current;
-                    const remainingMs = pacePerItem * (total - current);
-                    eta = fmt(remainingMs);
-                  }
-                }
-                return (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>{progressLog.message || "Scraping courses..."}</span>
-                      <span className="tabular-nums">
-                        {current}/{total}
-                        {eta && (
-                          <span className="ml-2 text-blue-600 font-medium">
-                            ~{eta} left
-                          </span>
-                        )}
-                        {elapsed && (
-                          <span className="ml-2 text-gray-400">
-                            ({elapsed} elapsed)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {scraping && !progressLog && !awaitingApproval && (() => {
-                // Pre-progress phase (discovery, sitemap fetch, candidate
-                // sampling) can take 30s–2min before the per-course loop
-                // emits its first ``progress`` event. Show an elapsed
-                // counter here so the UI doesn't look frozen — same
-                // ``scrapeStartTime`` baseline + ``now`` ticker as the
-                // progress block above so it stays in sync once total
-                // becomes known and the bar takes over.
-                let elapsed: string | null = null;
-                if (scrapeStartTime) {
-                  const s = Math.max(0, Math.round((now - scrapeStartTime) / 1000));
-                  const m = Math.floor(s / 60);
-                  const r = s % 60;
-                  elapsed = m > 0 ? `${m}m ${r}s` : `${r}s`;
-                }
-                return (
-                  <div className="flex items-center justify-between gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      <span className="truncate">{scrapeLogs.length > 0 ? (scrapeLogs[scrapeLogs.length - 1]?.message || "Processing...") : "Starting scraper..."}</span>
-                    </div>
-                    {elapsed && (
-                      <span className="text-xs text-gray-400 tabular-nums shrink-0">
-                        ({elapsed} elapsed)
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {awaitingApproval && (
-                <div className="border-2 border-amber-300 bg-amber-50 rounded-xl p-5 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-5 h-5 text-amber-600" />
-                    <span className="font-semibold text-amber-900">Research Complete — Confirm Bulk Fetch</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-white border border-amber-200 rounded-lg p-3">
-                      <div className="text-2xl font-bold text-gray-800">{awaitingApproval.totalCourses}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Courses Found</div>
-                    </div>
-                    <div className="bg-white border border-green-200 rounded-lg p-3">
-                      <div className="text-2xl font-bold text-green-700">{awaitingApproval.validSamples}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Samples Valid</div>
-                    </div>
-                    <div className="bg-white border border-red-200 rounded-lg p-3">
-                      <div className="text-2xl font-bold text-red-600">{awaitingApproval.rejectedSamples}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Samples Rejected</div>
-                    </div>
-                  </div>
-
-                  {awaitingApproval.validExamples.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Valid Course Samples</div>
-                      <div className="space-y-1">
-                        {awaitingApproval.validExamples.map((name, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-sm text-green-700">
-                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span className="truncate">{name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {awaitingApproval.rejectedExamples.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Rejected Samples</div>
-                      <div className="space-y-1">
-                        {awaitingApproval.rejectedExamples.map((name, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-sm text-red-600">
-                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span className="truncate">{name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2">
-                    <Info className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>Estimated time: ~{awaitingApproval.estimatedMinutes} minute{awaitingApproval.estimatedMinutes !== 1 ? "s" : ""} to fetch all {awaitingApproval.totalCourses} course pages in parallel.</span>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => handleApproval(true)}
-                      disabled={approvalLoading}
-                      className="flex-1 bg-green-600 hover:bg-green-700 h-11"
-                      size="lg"
-                    >
-                      {approvalLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
-                      Proceed — Fetch {awaitingApproval.totalCourses} Courses
-                    </Button>
-                    <Button
-                      onClick={() => handleApproval(false)}
-                      disabled={approvalLoading}
-                      variant="outline"
-                      className="border-red-300 text-red-600 hover:bg-red-50 h-11 px-6"
-                      size="lg"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div ref={logRef} className="bg-gray-900 rounded-lg p-4 max-h-80 overflow-auto font-mono text-xs space-y-0.5">
-                {scrapeLogs.map((log, i) => {
-                  const phasePrefix = (phase?: string, sampleResult?: string) => {
-                    if (sampleResult === "valid") return "[SAMPLE✓]";
-                    if (sampleResult === "rejected") return "[SAMPLE✗]";
-                    switch (phase) {
-                      case "analyze":   return "[CLASSIFY]";
-                      case "discover":  return "[DISCOVER]";
-                      case "validate":  return "[VALIDATE]";
-                      case "extract":   return "[EXTRACT ]";
-                      case "fallback":  return "[FALLBACK]";
-                      case "stage":     return "[STAGE   ]";
-                      // B9: orchestrator emits the final TIMING summary
-                      // with phase="complete". Without an explicit case
-                      // it fell through to [INFO    ] and the user lost
-                      // the visual cue that the run had wrapped up.
-                      case "complete":  return "[COMPLETE]";
-                      default:          return "[INFO    ]";
-                    }
-                  };
-                  // T210: prefer the explicit ``level`` field that the
-                  // orchestrator now stamps onto every log row (mapped from
-                  // the message via infer_log_level). Falls back to the
-                  // event/phase heuristics so older logs still render
-                  // sensibly. error/approval_required/done/sampleResult
-                  // semantics are preserved at the top because they're
-                  // structural (different shapes), not just severity.
-                  const levelColor: Record<string, string> = {
-                    error: "text-red-400",
-                    warn: "text-amber-300",
-                    success: "text-green-400",
-                    info: "text-gray-300",
-                    discover: "text-blue-300",
-                    classify: "text-sky-300",
-                    extract: "text-orange-300",
-                    fallback: "text-yellow-300",
-                    stage: "text-purple-300",
-                  };
-                  const logColor =
-                    log.event === "error" ? "text-red-400" :
-                    log.event === "approval_required" ? "text-amber-400 font-semibold" :
-                    log.event === "course" && (log.status === "staged" || log.status?.startsWith("staged")) ? "text-green-400" :
-                    log.event === "course" && log.status === "skipped" ? "text-yellow-500" :
-                    log.event === "course" && log.status === "error" ? "text-red-400" :
-                    log.event === "done" ? "text-cyan-400 font-bold" :
-                    log.event === "status" && log.sampleResult === "valid" ? "text-green-300" :
-                    log.event === "status" && log.sampleResult === "rejected" ? "text-red-300" :
-                    (log.level && levelColor[log.level as string]) ? levelColor[log.level as string] :
-                    log.event === "status" && log.phase === "discover" ? "text-blue-300" :
-                    log.event === "status" && log.phase === "validate" ? "text-purple-300" :
-                    log.event === "status" && log.phase === "extract" ? "text-orange-300" :
-                    log.event === "status" && log.phase === "fallback" ? "text-yellow-300" :
-                    log.event === "status" && log.phase === "analyze" ? "text-sky-300" :
-                    "text-gray-300";
-                  return (
-                    <div key={i} className={logColor}>
-                      {log.event === "status" && (
-                        <span>
-                          {phasePrefix(log.phase, log.sampleResult)} {log.message}
-                          {log.totalCourses ? ` (${log.totalCourses} courses)` : ""}
-                        </span>
-                      )}
-                      {log.event === "approval_required" && <span>[WAITING ] {log.message}</span>}
-                      {log.event === "progress" && (
-                        <span>[{String(log.current).padStart(4, " ")}/{log.total}] {log.message}</span>
-                      )}
-                      {log.event === "course" && (
-                        <span>
-                          {log.status === "staged" || log.status?.startsWith("staged") ? "  ✓" :
-                           log.status === "skipped" ? "  –" :
-                           log.status === "error" ? "  ✗" : "   "}{" "}
-                          {log.name}
-                          {log.status === "error" && log.message ? ` — ${log.message}` : ""}
-                          {log.status && log.status !== "staged" && log.status !== "error" ? ` [${log.status}]` : ""}
-                        </span>
-                      )}
-                      {log.event === "error" && <span>[ERROR   ] {log.message}</span>}
-                      {log.event === "done" && (
-                        <span>
-                          ══ DONE ══ Found:{log.totalFound} | Staged:{log.imported} | Skipped:{log.skipped} | Errors:{log.errors}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                {/* B16: removed the "Processing in background..."
-                    pulse that lived here. The Start button at the
-                    top already says "Scraping in Background..." with
-                    the same spinner — having both was confusing
-                    dual-state. The waiting-for-approval message
-                    stays because it's a different signal. */}
-                {awaitingApproval && (
-                  <div className="text-amber-400 animate-pulse">
-                    Waiting for your confirmation above...
-                  </div>
-                )}
-              </div>
-
-              {scrapeResult && (
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="bg-white border rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-gray-800">{scrapeResult.totalFound}</div>
-                    <div className="text-xs text-gray-400">Found</div>
-                  </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-blue-600">{scrapeResult.imported}</div>
-                    <div className="text-xs text-blue-500">Staged for Review</div>
-                  </div>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-amber-600">{scrapeResult.skipped}</div>
-                    <div className="text-xs text-amber-500">Skipped</div>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                    <div className="text-2xl font-bold text-red-600">{scrapeResult.errors}</div>
-                    <div className="text-xs text-red-500">Errors</div>
-                  </div>
-                </div>
-              )}
-
-              {scrapeResult && !showReview && activeJobId && (
-                <Button onClick={() => loadStagedCourses(activeJobId)} className="w-full bg-green-600 hover:bg-green-700">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Review Scraped Courses
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <div className={`grid gap-4 ${slotIds.length === 1 ? "grid-cols-1 max-w-2xl" : slotIds.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2"}`}>
+          {slotIds.map((id, index) => (
+            <ScrapeJobCard
+              key={id}
+              slotIndex={index}
+              universities={uniData?.data || []}
+              onReviewReady={handleReviewReady}
+              onRemove={() => removeSlot(id)}
+              canRemove={slotIds.length > 1}
+            />
+          ))}
+        </div>
+      </div>
 
       {showReview && stagedCourses.length === 0 && selectedUni && selectedUni !== ALL && (
         <Card className="border border-amber-200 bg-amber-50">
