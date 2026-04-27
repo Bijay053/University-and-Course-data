@@ -389,6 +389,12 @@ def test_parse_equivalence_table_pearson_colspan_captures_pte_overall():
     )
     assert mapping[6.5].get("toefl") == 79.0
     assert mapping[6.0].get("toefl") == 60.0
+    assert mapping[6.5].get("pte_listening") == 50.0, (
+        f"Expected pte_listening 50 for IELTS 6.5, got {mapping[6.5]}"
+    )
+    assert mapping[6.0].get("pte_listening") == 42.0, (
+        f"Expected pte_listening 42 for IELTS 6.0, got {mapping[6.0]}"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -442,3 +448,15 @@ def test_parse_equivalence_table_pearson_colspan3_captures_pte_overall():
     )
     assert mapping[6.5].get("toefl") == 79.0
     assert mapping[6.0].get("toefl") == 60.0
+    assert mapping[6.5].get("pte_listening") == 50.0, (
+        f"Expected pte_listening 50 for IELTS 6.5, got {mapping[6.5]}"
+    )
+    assert mapping[6.0].get("pte_listening") == 42.0, (
+        f"Expected pte_listening 42 for IELTS 6.0, got {mapping[6.0]}"
+    )
+    assert mapping[6.5].get("pte_writing") == 50.0, (
+        f"Expected pte_writing 50 for IELTS 6.5, got {mapping[6.5]}"
+    )
+    assert mapping[6.0].get("pte_writing") == 42.0, (
+        f"Expected pte_writing 42 for IELTS 6.0, got {mapping[6.0]}"
+    )

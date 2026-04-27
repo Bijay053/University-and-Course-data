@@ -559,9 +559,16 @@ def _parse_equivalence_table(table) -> dict[float, dict[str, float]]:
 
         # Map each test → column index of its 'overall'.
         overall_col: dict[str, int] = {}
+        # Map (test, sub_label) → column index for non-overall sub-skills.
+        subskill_col: dict[tuple[str, str], int] = {}
         for i, (g, s) in enumerate(zip(group_per_col, sub_per_col)):
-            if g and s == "overall" and g not in overall_col:
-                overall_col[g] = i
+            if not g:
+                continue
+            if s == "overall":
+                if g not in overall_col:
+                    overall_col[g] = i
+            elif s in ("listening", "writing", "reading", "speaking"):
+                subskill_col[(g, s)] = i
         # IELTS sometimes labels its first column with prose like "band score"
         # rather than the literal "overall" — fall back to the leftmost
         # IELTS-group column when that happens.
@@ -631,6 +638,19 @@ def _parse_equivalence_table(table) -> dict[float, dict[str, float]]:
                 if test == "duolingo" and not (50 <= v <= 160):
                     continue
                 row_data[test] = v
+
+            # Also capture sub-skill scores (e.g. pte_listening, pte_writing).
+            for (test, sub), c in subskill_col.items():
+                t = cells.get(c, "").strip()
+                m3 = re.match(r"^([0-9]+(?:\.[0-9]+)?)$", t)
+                if not m3:
+                    continue
+                v = float(m3.group(1))
+                if test == "pte" and not (10 <= v <= 90):
+                    continue
+                if test == "toefl" and not (0 <= v <= 120):
+                    continue
+                row_data[f"{test}_{sub}"] = v
 
             if row_data:
                 out[ielts_val] = row_data
