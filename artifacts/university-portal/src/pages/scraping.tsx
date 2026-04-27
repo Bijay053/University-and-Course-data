@@ -403,6 +403,7 @@ export default function Scraping() {
     stagedCount: number;
     approvedCount: number;
     rejectedCount: number;
+    requeueCount: number;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -2813,6 +2814,16 @@ export default function Scraping() {
                       <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
                       <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
                       <span>Rejected: <span className="font-semibold text-red-700">{run.rejectedCount}</span></span>
+                      {(run.requeueCount ?? 0) > 0 && (
+                        <span
+                          title={`Auto-recovered ${run.requeueCount} time${run.requeueCount === 1 ? "" : "s"} by the stale-job reaper`}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono ${
+                            run.requeueCount >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          ↺ {run.requeueCount}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button

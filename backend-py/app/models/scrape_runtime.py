@@ -45,6 +45,7 @@ class ScrapeRuntimeJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
     claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    requeue_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -761,6 +761,7 @@ async def history_list(
             "stagedCount": int(staged or 0),
             "approvedCount": int(approved or 0),
             "rejectedCount": int(rejected or 0),
+            "requeueCount": int(r.requeue_count or 0),
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

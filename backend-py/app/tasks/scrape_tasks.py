@@ -31,6 +31,10 @@ _STALE_QUEUED_MINUTES = 5
 # before the lock expires.
 _REQUEUE_LOCK_TTL_S = _STALE_QUEUED_MINUTES * 60
 
+# Maximum number of automatic re-dispatches before a job is declared failed.
+# Prevents infinite requeue loops when a worker crashes before claiming the job.
+_MAX_REQUEUES = 5
+
 
 def _requeue_lock_key(runtime_job_id: str) -> str:
     return f"scrape:requeue_lock:{runtime_job_id}"
@@ -102,9 +106,9 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
 
 
-async def _async_find_stale() -> list[tuple[str, str]]:
-    """Return (runtime_job_id, job_type) for every job that is stuck in
-    ``queued`` status with no DB activity for longer than
+async def _async_find_stale() -> list[tuple[str, str, int]]:
+    """Return (runtime_job_id, job_type, requeue_count) for every job that is
+    stuck in ``queued`` status with no DB activity for longer than
     ``_STALE_QUEUED_MINUTES``.
 
     The ``updated_at`` timestamp is bumped to *now* inside the DB transaction
@@ -137,7 +141,53 @@ async def _async_find_stale() -> list[tuple[str, str]]:
 
         await db.commit()
 
-    return [(j.runtime_job_id, j.job_type) for j in stale_jobs]
+    return [(j.runtime_job_id, j.job_type, j.requeue_count) for j in stale_jobs]
+
+
+async def _async_increment_requeue(runtime_job_id: str) -> None:
+    """Atomically increment ``requeue_count`` for a job after it has been
+    successfully re-dispatched.
+
+    Uses a SQL-level ``SET requeue_count = requeue_count + 1`` so the update
+    is strictly atomic — no read-modify-write race even if two beat ticks
+    overlap on the same job ID.
+
+    Disposes the engine first — each asyncio.run() in the Celery task body
+    creates a fresh event loop and any pooled asyncpg connection from a prior
+    run would be bound to the old, closed loop.
+    """
+    from sqlalchemy import update
+
+    from app.models import ScrapeRuntimeJob
+
+    await engine.dispose()
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(ScrapeRuntimeJob)
+            .where(ScrapeRuntimeJob.runtime_job_id == runtime_job_id)
+            .values(requeue_count=ScrapeRuntimeJob.requeue_count + 1)
+        )
+        await db.commit()
+
+
+async def _async_mark_failed_max_requeue(runtime_job_id: str) -> None:
+    """Mark a job ``failed`` because it has exceeded the maximum number of
+    automatic requeue attempts, indicating a pathological loop.
+
+    Disposes the engine first for the same reason as ``_async_increment_requeue``.
+    """
+    from app.models import ScrapeRuntimeJob
+
+    await engine.dispose()
+    async with AsyncSessionLocal() as db:
+        job = await db.get(ScrapeRuntimeJob, runtime_job_id)
+        if job:
+            job.status = "failed"
+            job.error_message = (
+                f"Auto-recovery abandoned after {job.requeue_count} requeue attempts "
+                f"(limit: {_MAX_REQUEUES}). Worker may be crashing before claiming the job."
+            )
+            await db.commit()
 
 
 @celery_app.task(name="scrape.requeue_stale", bind=True, max_retries=0)
@@ -178,7 +228,27 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         return {"ok": False, "error": f"redis connect: {exc}"}
 
     dispatched: list[str] = []
-    for jid, jtype in stale:
+    exhausted: list[str] = []
+    for jid, jtype, requeue_count in stale:
+        # ── Max-requeue guard ─────────────────────────────────────────────
+        if requeue_count >= _MAX_REQUEUES:
+            log.error(
+                "requeue_stale_queued: job %s has been requeued %d times (limit %d) "
+                "without a worker claiming it — marking failed",
+                jid,
+                requeue_count,
+                _MAX_REQUEUES,
+            )
+            try:
+                asyncio.run(_async_mark_failed_max_requeue(jid))
+            except Exception as exc:
+                log.exception(
+                    "requeue_stale_queued: could not mark job %s failed: %s", jid, exc
+                )
+            exhausted.append(jid)
+            continue
+
+        # ── Normal re-dispatch path ───────────────────────────────────────
         lock_key = _requeue_lock_key(jid)
         acquired = r.set(lock_key, "1", nx=True, ex=_REQUEUE_LOCK_TTL_S)
         if not acquired:
@@ -197,16 +267,28 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
             r.delete(lock_key)
             log.error("requeue_stale_queued: dispatch failed for %s: %s", jid, exc)
             continue
+
+        # Increment the persistent counter so operators can track bouncing jobs.
+        try:
+            asyncio.run(_async_increment_requeue(jid))
+        except Exception as exc:
+            log.warning(
+                "requeue_stale_queued: could not increment requeue_count for %s: %s",
+                jid,
+                exc,
+            )
+
         log.warning(
             "requeue_stale_queued: re-dispatched stale %s job %s "
-            "(queued for >%d min with no worker activity)",
+            "(queued for >%d min with no worker activity, requeue #%d)",
             jtype,
             jid,
             _STALE_QUEUED_MINUTES,
+            requeue_count + 1,
         )
         dispatched.append(jid)
 
-    return {"ok": True, "requeued": dispatched}
+    return {"ok": True, "requeued": dispatched, "exhausted": exhausted}
 
 
 async def _mark_failed(runtime_job_id: str, err: str) -> None:
