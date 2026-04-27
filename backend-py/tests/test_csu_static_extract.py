@@ -364,6 +364,28 @@ def test_ielts_minimum_score_pte_out_of_range_safe() -> None:
     assert "ielts_overall" not in result
 
 
+def test_minimum_score_of_without_ielts_keyword_not_misclassified() -> None:
+    """'minimum score of X' without 'IELTS' in the text must not set ielts_overall.
+
+    The 'minimum score of' pattern is only enabled when the text block also
+    contains the word 'IELTS'.  This prevents misclassifying in-range scores
+    from TOEFL, Cambridge, or other tests that happen to use the same phrase.
+    """
+    non_ielts_text = (
+        "Applicants must have a minimum score of 6.5 in the Cambridge C1 Advanced "
+        "examination with no component below 6.0."
+    )
+    html = _make_html(
+        course_obj={
+            "language_requirements": [{"requirements": non_ielts_text}],
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert "ielts_overall" not in result, (
+        "'minimum score of 6.5' in a non-IELTS block should not be parsed as IELTS 6.5"
+    )
+
+
 # ---------------------------------------------------------------------------
 # PTE  (Bug #3 fix — extract PTE from language_requirements HTML)
 # ---------------------------------------------------------------------------

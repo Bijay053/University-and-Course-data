@@ -196,17 +196,34 @@ def _english_from_lang_req(
     pte: float | None = None
     ielts_pattern_found = False
     pte_pattern_found = False
+    # True when any lang_req block explicitly names a non-IELTS, non-PTE English
+    # test (Cambridge, TOEFL, Duolingo, OET, TOEIC).  When set, the CSU-standard
+    # IELTS default fallback is suppressed: the page clearly states a different
+    # test is required, so injecting an IELTS default would be misleading.
+    other_english_pat = False
+    _OTHER_ENGLISH_RE = re.compile(
+        r"\b(TOEFL|Cambridge|Duolingo|OET\b|TOEIC)\b", re.I
+    )
     for req in lang_reqs:
         text = req.get("requirements", "")
+        if not other_english_pat and _OTHER_ENGLISH_RE.search(text):
+            other_english_pat = True
         if ielts is None:
-            for ielts_pattern in [
+            _text_has_ielts = bool(re.search(r"\bIELTS\b", text, re.I))
+            _ielts_patterns = [
                 r"average\s+band\s+score\s+of\s+(\d+(?:\.\d+)?)",
                 r"minimum\s+overall\s+(?:band\s+)?score\s+of\s+(\d+(?:\.\d+)?)",
+            ]
+            if _text_has_ielts:
+                # Only used when IELTS is mentioned in the same block to avoid
+                # misclassifying component-level scores from TOEFL/PTE/etc.
                 # Catches "minimum score of 7.0 … in each component … IELTS"
                 # where the score appears before the IELTS keyword.
-                r"minimum\s+score\s+of\s+(\d+(?:\.\d+)?)",
-                r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)",
-            ]:
+                _ielts_patterns.append(r"minimum\s+score\s+of\s+(\d+(?:\.\d+)?)")
+                _ielts_patterns.append(r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)")
+            else:
+                _ielts_patterns.append(r"IELTS[^0-9]{0,40}?(\d+(?:\.\d+)?)")
+            for ielts_pattern in _ielts_patterns:
                 m = re.search(ielts_pattern, text, re.I)
                 if m:
                     ielts_pattern_found = True
@@ -235,7 +252,7 @@ def _english_from_lang_req(
                             pte = val
                     except ValueError:
                         pass
-    return ielts, pte, ielts_pattern_found, pte_pattern_found
+    return ielts, pte, ielts_pattern_found, pte_pattern_found, other_english_pat
 
 
 # CSU central requirements page (https://study.csu.edu.au/international/how-to-apply/course-entry-requirements)
@@ -492,7 +509,7 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
             # ── IELTS + PTE ──────────────────────────────────────────────────
             # Step 1: try to parse inline scores from language_requirements.
             lang_reqs = course.get("language_requirements", [])
-            ielts, pte, ielts_pat, pte_pat = _english_from_lang_req(lang_reqs)
+            ielts, pte, ielts_pat, pte_pat, other_eng_pat = _english_from_lang_req(lang_reqs)
 
             # Step 2: if no inline IELTS found AND no out-of-range IELTS pattern
             # was detected, fall back to the CSU-standard default from the central
@@ -502,7 +519,11 @@ def apply_csu_static_extraction(url: str, html: str) -> dict[str, Any]:
             #   - lang_reqs is empty  (course has no language requirement at all)
             #   - an IELTS pattern was found but the value was out of range
             #     (data is present but unreliable; don't substitute a guess)
-            if ielts is None and lang_reqs and not ielts_pat:
+            #   - PTE was explicitly mentioned (pte_pat): the page names a different
+            #     test; injecting an IELTS default would be misleading
+            #   - another recognised English test was named (other_eng_pat), e.g.
+            #     Cambridge, TOEFL, Duolingo, OET — same reasoning as PTE above
+            if ielts is None and lang_reqs and not ielts_pat and not pte_pat and not other_eng_pat:
                 ielts = _csu_default_ielts(course)
 
             if ielts is not None:
