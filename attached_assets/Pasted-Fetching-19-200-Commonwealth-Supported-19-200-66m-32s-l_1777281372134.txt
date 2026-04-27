@@ -1,0 +1,454 @@
+Fetching 19/200: Commonwealth Supported
+19/200~66m 32s left(6m 59s elapsed)
+[INFO ] Scraping started in background…
+[INFO ] Scraping https://www.federation.edu.au/...
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.federation.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.federation.edu.au/study/search/ (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.federation.edu.au/study/search/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.federation.edu.au/study/search/: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.federation.edu.au/study/search/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.federation.edu.au
+[DISCOVER] [DISCOVER] sitemap https://www.federation.edu.au/sitemap.xml: +236 candidates (total 236)
+[DISCOVER] [DISCOVER] sitemap: done — 236 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Study Skills
+[EXTRACT ] [EXTRACT] 2/200: Guaranteed Atars
+[EXTRACT ] [EXTRACT] 3/200: Early Offer Program
+[EXTRACT ] [EXTRACT] 4/200: Advance To University
+[ 1/200] Fetching 1/200: Study Skills
+[ 2/200] Fetching 2/200: Guaranteed Atars
+[ 4/200] Fetching 4/200: Advance To University
+[ 3/200] Fetching 3/200: Early Offer Program
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/advance-to-university/
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.federation.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.federation.edu.au/study/search/ (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.federation.edu.au/study/search/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.federation.edu.au/study/search/: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.federation.edu.au/study/search/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.federation.edu.au
+[DISCOVER] [DISCOVER] sitemap https://www.federation.edu.au/sitemap.xml: +236 candidates (total 236)
+[DISCOVER] [DISCOVER] sitemap: done — 236 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Study Skills
+[EXTRACT ] [EXTRACT] 2/200: Guaranteed Atars
+[EXTRACT ] [EXTRACT] 3/200: Early Offer Program
+[EXTRACT ] [EXTRACT] 4/200: Advance To University
+[ 1/200] Fetching 1/200: Study Skills
+[ 2/200] Fetching 2/200: Guaranteed Atars
+[ 4/200] Fetching 4/200: Advance To University
+[ 3/200] Fetching 3/200: Early Offer Program
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/advance-to-university/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ — moving on
+[EXTRACT ] [GP-DEBUG] static=124620B rendered=0B using=static text_len=2988
+[EXTRACT ] [GP-DEBUG] text[:500]='Early offer program Guaranteed ATARs The Guaranteed ATAR allows you to know the likelihood of receiving an offer for specific courses. If you receive an ATAR equal to or above this number and meet the course prerequisites and any extra requirements, we will guarantee you a place. If you receive an ATAR below this guarantee, you may still receive a place. The lowest ATAR and selection rank for our courses varies from year to year and is influenced by the number of applicants for the course at eac'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000119, in=1535 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=198761B rendered=0B using=static text_len=3503
+[EXTRACT ] [GP-DEBUG] text[:500]='Why apply for an Early Offer? An Early Offer gives you peace of mind with guaranteed entry to Federation University (as long as you meet the entry requirements) and that’s just the start. You’ll unlock early access to campus libraries and study spaces, receive a free Exam Ready Pack to help you prepare with confidence, while gaining access to exclusive scholarships. It’s all about getting a head start, feeling supported, and stepping into university life knowing you’re already on the right track'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000129, in=1660 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=89771B rendered=0B using=static text_len=866
+[EXTRACT ] [GP-DEBUG] text[:500]='Start preparing Plan to ace those exams. Watch tips on how to plan and prepare for your exams Watch tips on engaging ways to study Put yourself first Watch video Watch video Watch video Get in the zone Set yourself up for a win. Watch tips on managing your time and study space Watch tips for reading effectively Not sure on your next steps? Learn about our early offer program Ditch the uncertainty, skip the queues and lock in your dream degree before you finish year 12. Learn about our early offe'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000079, in=1004 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 5/200: Federation College
+[ 5/200] Fetching 5/200: Federation College
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/federation-college/
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 6/200: Free Tafe
+[ 6/200] Fetching 6/200: Free Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/vet/free-tafe/
+[EXTRACT ] [EXTRACT] 7/200: Mid Year Entry
+[ 7/200] Fetching 7/200: Mid Year Entry
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/intakes/mid-year-entry/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/federation-college/ — moving on
+[EXTRACT ] [GP-DEBUG] static=164415B rendered=0B using=static text_len=3084
+[EXTRACT ] [GP-DEBUG] text[:500]="Why choose Federation College? We do things differently If you’re 16–19 and mainstream school just hasn’t worked out, it might be time to consider Federation College. There's no uniform, no bells, no exams – just dedicated teachers and extra support so you can complete VCE Vocational Major (VM) stress free. Whether you’re starting Year 11 or finishing Year 12, we’ll help you build your confidence, discover what you’re good at and figure out what comes next. Federation College offers pathways int"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000120, in=1555 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/federation-college/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.federation.edu.au/study/information/high-school-students/federation-college/: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 8/200: Tafe To Undergraduate
+[ 8/200] Fetching 8/200: Tafe To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/fees/vet/free-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=138311B rendered=0B using=static text_len=2535
+[EXTRACT ] [GP-DEBUG] text[:500]='Vocational education and training (TAFE) Free TAFE Making study more accessible Free TAFE is a State Government initiative designed to make it easier for Victorians to get a qualification in an area of skills shortage. If you’re eligible, your course tuition fees will be completely covered (but you’ll still need to pay student services and materials fees if applicable). Am I eligible for Free TAFE? To enrol in a Free TAFE course, you must: be an Australian citizen, permanent resident or a New Ze'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/fees/vet/free-tafe/ → 0 field(s) (cost=$0.000109, in=1409 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/fees/vet/free-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 9/200: Pathways To Undergraduate
+[ 9/200] Fetching 9/200: Pathways To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/
+[EXTRACT ] [EXTRACT] 10/200: Pathways Through Tafe
+[ 10/200] Fetching 10/200: Pathways Through Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/intakes/mid-year-entry/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ — moving on
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/intakes/mid-year-entry/ → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/intakes/mid-year-entry/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=114557B rendered=0B using=static text_len=673
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students First stop, TAFE If you don’t meet the entry requirements for your dream course, use a TAFE qualification as a stepping-stone. You’ll get the skills you need to transition easily into a related higher education course. There are so many pathway options, and lots of our certificate or diploma courses give you credit towards a relevant degree. Pathwa'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/tafe-to-u → 0 field(s) (cost=$0.000076, in=948 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 11/200: Regional Students
+[ 11/200] Fetching 11/200: Regional Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/regional-students/
+[EXTRACT ] [EXTRACT] 12/200: International Students
+[ 12/200] Fetching 12/200: International Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/international-students/
+[EXTRACT ] [GP-DEBUG] static=132375B rendered=0B using=static text_len=1009
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students We want you to pursue your passion no matter what. If you can’t take the most direct route, consider an alternative. Build your general literacy and numeracy skills with our FAST course, or get specific with a diploma of business, IT or engineering or a degree in education. The best part? When you’ve completed your pathway course, you’ll get guaran'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000080, in=1033 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=111874B rendered=0B using=static text_len=896
+[EXTRACT ] [GP-DEBUG] text[:500]="Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students If you're not quite ready to jump straight into a TAFE course, there are plenty of other options to get you on your way to your dream career. It doesn't matter if you're still at school, between jobs or thinking about a career change – you'll find something that suits your level and interests. Pathways for high schoolers VCE Vocational Major (VM) S"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000079, in=1004 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 13/200: High School Students
+[ 13/200] Fetching 13/200: High School Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/
+[EXTRACT ] [EXTRACT] 14/200: Early School Leavers
+[ 14/200] Fetching 14/200: Early School Leavers
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/early-school-leavers/
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.federation.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.federation.edu.au/study/search/ (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.federation.edu.au/study/search/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.federation.edu.au/study/search/: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.federation.edu.au/study/search/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.federation.edu.au
+[DISCOVER] [DISCOVER] sitemap https://www.federation.edu.au/sitemap.xml: +236 candidates (total 236)
+[DISCOVER] [DISCOVER] sitemap: done — 236 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Study Skills
+[EXTRACT ] [EXTRACT] 2/200: Guaranteed Atars
+[EXTRACT ] [EXTRACT] 3/200: Early Offer Program
+[EXTRACT ] [EXTRACT] 4/200: Advance To University
+[ 1/200] Fetching 1/200: Study Skills
+[ 2/200] Fetching 2/200: Guaranteed Atars
+[ 4/200] Fetching 4/200: Advance To University
+[ 3/200] Fetching 3/200: Early Offer Program
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/advance-to-university/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ — moving on
+[EXTRACT ] [GP-DEBUG] static=124620B rendered=0B using=static text_len=2988
+[EXTRACT ] [GP-DEBUG] text[:500]='Early offer program Guaranteed ATARs The Guaranteed ATAR allows you to know the likelihood of receiving an offer for specific courses. If you receive an ATAR equal to or above this number and meet the course prerequisites and any extra requirements, we will guarantee you a place. If you receive an ATAR below this guarantee, you may still receive a place. The lowest ATAR and selection rank for our courses varies from year to year and is influenced by the number of applicants for the course at eac'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000119, in=1535 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=198761B rendered=0B using=static text_len=3503
+[EXTRACT ] [GP-DEBUG] text[:500]='Why apply for an Early Offer? An Early Offer gives you peace of mind with guaranteed entry to Federation University (as long as you meet the entry requirements) and that’s just the start. You’ll unlock early access to campus libraries and study spaces, receive a free Exam Ready Pack to help you prepare with confidence, while gaining access to exclusive scholarships. It’s all about getting a head start, feeling supported, and stepping into university life knowing you’re already on the right track'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000129, in=1660 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=89771B rendered=0B using=static text_len=866
+[EXTRACT ] [GP-DEBUG] text[:500]='Start preparing Plan to ace those exams. Watch tips on how to plan and prepare for your exams Watch tips on engaging ways to study Put yourself first Watch video Watch video Watch video Get in the zone Set yourself up for a win. Watch tips on managing your time and study space Watch tips for reading effectively Not sure on your next steps? Learn about our early offer program Ditch the uncertainty, skip the queues and lock in your dream degree before you finish year 12. Learn about our early offe'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000079, in=1004 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 5/200: Federation College
+[ 5/200] Fetching 5/200: Federation College
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/federation-college/
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 6/200: Free Tafe
+[ 6/200] Fetching 6/200: Free Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/vet/free-tafe/
+[EXTRACT ] [EXTRACT] 7/200: Mid Year Entry
+[ 7/200] Fetching 7/200: Mid Year Entry
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/intakes/mid-year-entry/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/federation-college/ — moving on
+[EXTRACT ] [GP-DEBUG] static=164415B rendered=0B using=static text_len=3084
+[EXTRACT ] [GP-DEBUG] text[:500]="Why choose Federation College? We do things differently If you’re 16–19 and mainstream school just hasn’t worked out, it might be time to consider Federation College. There's no uniform, no bells, no exams – just dedicated teachers and extra support so you can complete VCE Vocational Major (VM) stress free. Whether you’re starting Year 11 or finishing Year 12, we’ll help you build your confidence, discover what you’re good at and figure out what comes next. Federation College offers pathways int"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000120, in=1555 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/federation-college/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.federation.edu.au/study/information/high-school-students/federation-college/: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 8/200: Tafe To Undergraduate
+[ 8/200] Fetching 8/200: Tafe To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/fees/vet/free-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=138311B rendered=0B using=static text_len=2535
+[EXTRACT ] [GP-DEBUG] text[:500]='Vocational education and training (TAFE) Free TAFE Making study more accessible Free TAFE is a State Government initiative designed to make it easier for Victorians to get a qualification in an area of skills shortage. If you’re eligible, your course tuition fees will be completely covered (but you’ll still need to pay student services and materials fees if applicable). Am I eligible for Free TAFE? To enrol in a Free TAFE course, you must: be an Australian citizen, permanent resident or a New Ze'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/fees/vet/free-tafe/ → 0 field(s) (cost=$0.000109, in=1409 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/fees/vet/free-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 9/200: Pathways To Undergraduate
+[ 9/200] Fetching 9/200: Pathways To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/
+[EXTRACT ] [EXTRACT] 10/200: Pathways Through Tafe
+[ 10/200] Fetching 10/200: Pathways Through Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/intakes/mid-year-entry/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ — moving on
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/intakes/mid-year-entry/ → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/intakes/mid-year-entry/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=114557B rendered=0B using=static text_len=673
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students First stop, TAFE If you don’t meet the entry requirements for your dream course, use a TAFE qualification as a stepping-stone. You’ll get the skills you need to transition easily into a related higher education course. There are so many pathway options, and lots of our certificate or diploma courses give you credit towards a relevant degree. Pathwa'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/tafe-to-u → 0 field(s) (cost=$0.000076, in=948 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 11/200: Regional Students
+[ 11/200] Fetching 11/200: Regional Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/regional-students/
+[EXTRACT ] [EXTRACT] 12/200: International Students
+[ 12/200] Fetching 12/200: International Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/international-students/
+[EXTRACT ] [GP-DEBUG] static=132375B rendered=0B using=static text_len=1009
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students We want you to pursue your passion no matter what. If you can’t take the most direct route, consider an alternative. Build your general literacy and numeracy skills with our FAST course, or get specific with a diploma of business, IT or engineering or a degree in education. The best part? When you’ve completed your pathway course, you’ll get guaran'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000080, in=1033 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=111874B rendered=0B using=static text_len=896
+[EXTRACT ] [GP-DEBUG] text[:500]="Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students If you're not quite ready to jump straight into a TAFE course, there are plenty of other options to get you on your way to your dream career. It doesn't matter if you're still at school, between jobs or thinking about a career change – you'll find something that suits your level and interests. Pathways for high schoolers VCE Vocational Major (VM) S"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000079, in=1004 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 13/200: High School Students
+[ 13/200] Fetching 13/200: High School Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/
+[EXTRACT ] [EXTRACT] 14/200: Early School Leavers
+[ 14/200] Fetching 14/200: Early School Leavers
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/early-school-leavers/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/regional-students/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/international-students/ — moving on
+[EXTRACT ] [GP-DEBUG] static=157297B rendered=0B using=static text_len=1564
+[EXTRACT ] [GP-DEBUG] text[:500]="Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers International students talk about their experience at Federation. View transcript Understanding costs We can give you an idea of how much rent, food and bills will cost. You can also use this cost of living calculator if you want to add transport and entertainment expenses. Moving to Australia Moving to a foreign country doesn'"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/internationa → 0 field(s) (cost=$0.000092, in=1171 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/international-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 15/200: Aboriginal And Torres Strait Islander Students
+[ 15/200] Fetching 15/200: Aboriginal And Torres Strait Islander Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/aboriginal-and-torres-strait-islander-students/
+[EXTRACT ] [GP-DEBUG] static=142570B rendered=0B using=static text_len=1468
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Campus atmosphere Our campuses feel large. And small. There’s bushland and manicured gardens – space to breathe – but also the Student Lounge, the café, the library – where you’ll probably run into someone you know. Local industry links Our connection to local businesses means you’ll not only get real-world knowledge and work e'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/regional-stu → 0 field(s) (cost=$0.000090, in=1145 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/regional-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 16/200: Pay Your Fees
+[ 16/200] Fetching 16/200: Pay Your Fees
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/pay-your-fees/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/ — moving on
+[EXTRACT ] [GP-DEBUG] static=136211B rendered=0B using=static text_len=1558
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Course preferencing Figuring out what order to put your courses in can be tricky. Decide on your priorities and do your research. Location, student support, work experience options – what are you looking for? VTAC offers When you submit your course preference list to VTAC, they’ll work out what your highest-placed university of'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000092, in=1169 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/early-school-leavers/ — moving on
+[EXTRACT ] [EXTRACT] 17/200: International Fees
+[ 17/200] Fetching 17/200: International Fees
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/international-fees/
+[EXTRACT ] [GP-DEBUG] static=146599B rendered=0B using=static text_len=1206
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Pathways to higher education VCE Vocational Major (VM) Federation Access Studies program (FAST) Learn more about FAST Discover your direct pathway to university. View transcript Student support You’re an individual. You have specific needs. So we’ll listen to your story and offer you assistance that’s useful and relevant. We wa'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/early-school → 0 field(s) (cost=$0.000085, in=1081 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/early-school-leavers/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/aboriginal-and-torres-strait-islander-students/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/fees/pay-your-fees/ — moving on
+[EXTRACT ] [GP-DEBUG] static=111161B rendered=0B using=static text_len=693
+[EXTRACT ] [GP-DEBUG] text[:500]='Fees and costs Commonwealth supportedDomestic full fee–payingInternationalResearch Vocational education and training (TAFE) Paying your fees We’ll send you an invoice for each semester or teaching period you’re enrolled in. The amount listed will be for the units you’ve enrolled in for that upcoming semester or teaching period. Your invoice will show the total, due date and payment methods. Missing a payment deadline can result in a cancelled enrolment and withheld academic results. If you’re el'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/fees/pay-your-fees/ → 0 field(s) (cost=$0.000075, in=949 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/fees/pay-your-fees/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 18/200: Domestic Full Fee
+[ 18/200] Fetching 18/200: Domestic Full Fee
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/domestic-full-fee/
+[INFO ] Worker claimed queued scrape job
+[INFO ] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 8
+[INFO ] Fetching https://www.federation.edu.au/...
+[DISCOVER] Discovering candidate course pages...
+[DISCOVER] [DISCOVER] Home page detected → course listing at https://www.federation.edu.au/study/search/ (high-priority probe)
+[DISCOVER] [DISCOVER] Crawling from https://www.federation.edu.au/study/search/ (max 25 pages, max 200 candidates)
+[DISCOVER] [DISCOVER] classified https://www.federation.edu.au/study/search/: unknown (no course links or degree content detected)
+[DISCOVER] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://www.federation.edu.au/study/search/
+[DISCOVER] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] [DISCOVER] sitemap: probing 4 URL(s) at https://www.federation.edu.au
+[DISCOVER] [DISCOVER] sitemap https://www.federation.edu.au/sitemap.xml: +236 candidates (total 236)
+[DISCOVER] [DISCOVER] sitemap: done — 236 unique candidates
+[DISCOVER] Discovered 200 candidate course links
+[EXTRACT ] Extracting course details (200 pages)...
+[EXTRACT ] [EXTRACT] 1/200: Study Skills
+[EXTRACT ] [EXTRACT] 2/200: Guaranteed Atars
+[EXTRACT ] [EXTRACT] 3/200: Early Offer Program
+[EXTRACT ] [EXTRACT] 4/200: Advance To University
+[ 1/200] Fetching 1/200: Study Skills
+[ 2/200] Fetching 2/200: Guaranteed Atars
+[ 4/200] Fetching 4/200: Advance To University
+[ 3/200] Fetching 3/200: Early Offer Program
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/advance-to-university/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ — moving on
+[EXTRACT ] [GP-DEBUG] static=124620B rendered=0B using=static text_len=2988
+[EXTRACT ] [GP-DEBUG] text[:500]='Early offer program Guaranteed ATARs The Guaranteed ATAR allows you to know the likelihood of receiving an offer for specific courses. If you receive an ATAR equal to or above this number and meet the course prerequisites and any extra requirements, we will guarantee you a place. If you receive an ATAR below this guarantee, you may still receive a place. The lowest ATAR and selection rank for our courses varies from year to year and is influenced by the number of applicants for the course at eac'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000119, in=1535 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/guaranteed-atars/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=198761B rendered=0B using=static text_len=3503
+[EXTRACT ] [GP-DEBUG] text[:500]='Why apply for an Early Offer? An Early Offer gives you peace of mind with guaranteed entry to Federation University (as long as you meet the entry requirements) and that’s just the start. You’ll unlock early access to campus libraries and study spaces, receive a free Exam Ready Pack to help you prepare with confidence, while gaining access to exclusive scholarships. It’s all about getting a head start, feeling supported, and stepping into university life knowing you’re already on the right track'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000129, in=1660 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=89771B rendered=0B using=static text_len=866
+[EXTRACT ] [GP-DEBUG] text[:500]='Start preparing Plan to ace those exams. Watch tips on how to plan and prepare for your exams Watch tips on engaging ways to study Put yourself first Watch video Watch video Watch video Get in the zone Set yourself up for a win. Watch tips on managing your time and study space Watch tips for reading effectively Not sure on your next steps? Learn about our early offer program Ditch the uncertainty, skip the queues and lock in your dream degree before you finish year 12. Learn about our early offe'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000079, in=1004 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/early-offer-program/study-skills/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 5/200: Federation College
+[ 5/200] Fetching 5/200: Federation College
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/federation-college/
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/advance-to-university/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 6/200: Free Tafe
+[ 6/200] Fetching 6/200: Free Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/vet/free-tafe/
+[EXTRACT ] [EXTRACT] 7/200: Mid Year Entry
+[ 7/200] Fetching 7/200: Mid Year Entry
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/intakes/mid-year-entry/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/federation-college/ — moving on
+[EXTRACT ] [GP-DEBUG] static=164415B rendered=0B using=static text_len=3084
+[EXTRACT ] [GP-DEBUG] text[:500]="Why choose Federation College? We do things differently If you’re 16–19 and mainstream school just hasn’t worked out, it might be time to consider Federation College. There's no uniform, no bells, no exams – just dedicated teachers and extra support so you can complete VCE Vocational Major (VM) stress free. Whether you’re starting Year 11 or finishing Year 12, we’ll help you build your confidence, discover what you’re good at and figure out what comes next. Federation College offers pathways int"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000120, in=1555 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/federation-college/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [FALLBACK] AI filled 2 field(s) on https://www.federation.edu.au/study/information/high-school-students/federation-college/: duration_value, duration_unit
+[EXTRACT ] [EXTRACT] 8/200: Tafe To Undergraduate
+[ 8/200] Fetching 8/200: Tafe To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/fees/vet/free-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=138311B rendered=0B using=static text_len=2535
+[EXTRACT ] [GP-DEBUG] text[:500]='Vocational education and training (TAFE) Free TAFE Making study more accessible Free TAFE is a State Government initiative designed to make it easier for Victorians to get a qualification in an area of skills shortage. If you’re eligible, your course tuition fees will be completely covered (but you’ll still need to pay student services and materials fees if applicable). Am I eligible for Free TAFE? To enrol in a Free TAFE course, you must: be an Australian citizen, permanent resident or a New Ze'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/fees/vet/free-tafe/ → 0 field(s) (cost=$0.000109, in=1409 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/fees/vet/free-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 9/200: Pathways To Undergraduate
+[ 9/200] Fetching 9/200: Pathways To Undergraduate
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/
+[EXTRACT ] [EXTRACT] 10/200: Pathways Through Tafe
+[ 10/200] Fetching 10/200: Pathways Through Tafe
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/intakes/mid-year-entry/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ — moving on
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/intakes/mid-year-entry/ → 0 field(s) (cost=$0.000000, in=0 out=0)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/intakes/mid-year-entry/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [GP-DEBUG] static=114557B rendered=0B using=static text_len=673
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students First stop, TAFE If you don’t meet the entry requirements for your dream course, use a TAFE qualification as a stepping-stone. You’ll get the skills you need to transition easily into a related higher education course. There are so many pathway options, and lots of our certificate or diploma courses give you credit towards a relevant degree. Pathwa'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/tafe-to-u → 0 field(s) (cost=$0.000076, in=948 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/tafe-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 11/200: Regional Students
+[ 11/200] Fetching 11/200: Regional Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/regional-students/
+[EXTRACT ] [EXTRACT] 12/200: International Students
+[ 12/200] Fetching 12/200: International Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/international-students/
+[EXTRACT ] [GP-DEBUG] static=132375B rendered=0B using=static text_len=1009
+[EXTRACT ] [GP-DEBUG] text[:500]='Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students We want you to pursue your passion no matter what. If you can’t take the most direct route, consider an alternative. Build your general literacy and numeracy skills with our FAST course, or get specific with a diploma of business, IT or engineering or a degree in education. The best part? When you’ve completed your pathway course, you’ll get guaran'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000080, in=1033 out=10)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-to-undergraduate/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ — moving on
+[EXTRACT ] [GP-DEBUG] static=111874B rendered=0B using=static text_len=896
+[EXTRACT ] [GP-DEBUG] text[:500]="Entry pathways Pathways through TAFEFrom TAFE to undergraduateOther pathways to undergraduatePostgraduate pathwaysPathways for international students If you're not quite ready to jump straight into a TAFE course, there are plenty of other options to get you on your way to your dream career. It doesn't matter if you're still at school, between jobs or thinking about a career change – you'll find something that suits your level and interests. Pathways for high schoolers VCE Vocational Major (VM) S"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/entry-pathways/pathways- → 0 field(s) (cost=$0.000079, in=1004 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/entry-pathways/pathways-through-tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 13/200: High School Students
+[ 13/200] Fetching 13/200: High School Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/high-school-students/
+[EXTRACT ] [EXTRACT] 14/200: Early School Leavers
+[ 14/200] Fetching 14/200: Early School Leavers
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/early-school-leavers/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/regional-students/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/international-students/ — moving on
+[EXTRACT ] [GP-DEBUG] static=157297B rendered=0B using=static text_len=1564
+[EXTRACT ] [GP-DEBUG] text[:500]="Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers International students talk about their experience at Federation. View transcript Understanding costs We can give you an idea of how much rent, food and bills will cost. You can also use this cost of living calculator if you want to add transport and entertainment expenses. Moving to Australia Moving to a foreign country doesn'"
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/internationa → 0 field(s) (cost=$0.000092, in=1171 out=14)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/international-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 15/200: Aboriginal And Torres Strait Islander Students
+[ 15/200] Fetching 15/200: Aboriginal And Torres Strait Islander Students
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/information/aboriginal-and-torres-strait-islander-students/
+[EXTRACT ] [GP-DEBUG] static=142570B rendered=0B using=static text_len=1468
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Campus atmosphere Our campuses feel large. And small. There’s bushland and manicured gardens – space to breathe – but also the Student Lounge, the café, the library – where you’ll probably run into someone you know. Local industry links Our connection to local businesses means you’ll not only get real-world knowledge and work e'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/regional-stu → 0 field(s) (cost=$0.000090, in=1145 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/regional-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 16/200: Pay Your Fees
+[ 16/200] Fetching 16/200: Pay Your Fees
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/pay-your-fees/
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/high-school-students/ — moving on
+[EXTRACT ] [GP-DEBUG] static=136211B rendered=0B using=static text_len=1558
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Course preferencing Figuring out what order to put your courses in can be tricky. Decide on your priorities and do your research. Location, student support, work experience options – what are you looking for? VTAC offers When you submit your course preference list to VTAC, they’ll work out what your highest-placed university of'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/high-school- → 0 field(s) (cost=$0.000092, in=1169 out=15)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/high-school-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/early-school-leavers/ — moving on
+[EXTRACT ] [EXTRACT] 17/200: International Fees
+[ 17/200] Fetching 17/200: International Fees
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/international-fees/
+[EXTRACT ] [GP-DEBUG] static=146599B rendered=0B using=static text_len=1206
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Pathways to higher education VCE Vocational Major (VM) Federation Access Studies program (FAST) Learn more about FAST Discover your direct pathway to university. View transcript Student support You’re an individual. You have specific needs. So we’ll listen to your story and offer you assistance that’s useful and relevant. We wa'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/early-school → 0 field(s) (cost=$0.000085, in=1081 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/early-school-leavers/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/information/aboriginal-and-torres-strait-islander-students/ — moving on
+[FALLBACK] timeout: per-course browser exceeded 60s on https://www.federation.edu.au/study/fees/pay-your-fees/ — moving on
+[EXTRACT ] [GP-DEBUG] static=111161B rendered=0B using=static text_len=693
+[EXTRACT ] [GP-DEBUG] text[:500]='Fees and costs Commonwealth supportedDomestic full fee–payingInternationalResearch Vocational education and training (TAFE) Paying your fees We’ll send you an invoice for each semester or teaching period you’re enrolled in. The amount listed will be for the units you’ve enrolled in for that upcoming semester or teaching period. Your invoice will show the total, due date and payment methods. Missing a payment deadline can result in a cancelled enrolment and withheld academic results. If you’re el'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/fees/pay-your-fees/ → 0 field(s) (cost=$0.000075, in=949 out=13)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/fees/pay-your-fees/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT ] [EXTRACT] 18/200: Domestic Full Fee
+[ 18/200] Fetching 18/200: Domestic Full Fee
+[FALLBACK] [per-course browser ↻] https://www.federation.edu.au/study/fees/domestic-full-fee/
+[EXTRACT ] [GP-DEBUG] static=141522B rendered=0B using=static text_len=2234
+[EXTRACT ] [GP-DEBUG] text[:500]='Information for you High school students Early school leavers International students Regional studentsAboriginal and Torres Strait Islander studentsParents and caregivers Community connection and culture Community, connection and culture is at the heart of Federation. The Aboriginal Education Centre host cultural events on our campuses for Aboriginal and Torres Strait Islander staff and students throughout the year, so come along and join us. Closing the gap in education Financial assistance Our'
+[EXTRACT ] [GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[EXTRACT ] [GEMINI] https://www.federation.edu.au/study/information/aboriginal-a → 0 field(s) (cost=$0.000104, in=1344 out=12)
+[EXTRACT ] [FALLBACK] AI enriching https://www.federation.edu.au/study/information/aboriginal-and-torres-strait-islander-students/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
