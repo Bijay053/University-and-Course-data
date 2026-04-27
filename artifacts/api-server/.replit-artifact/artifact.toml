@@ -1,6 +1,6 @@
 kind = "api"
 previewPath = "/api" # TODO - should be excluded from preview in the first place
-title = "API Server"
+title = "API Server (REMOVED — Python FastAPI only)"
 version = "1.0.0"
 id = "3B4_FFSkEVBkAeYMFRJ2e"
 
@@ -10,38 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-# Local Node API server is intentionally inert in dev — Python FastAPI
-# (workflow `backend-py: FastAPI`) owns port 8080 and serves all `/api/*`
-# routes. The Node Express server is **production-only** (built and run
-# by PM2 on the DigitalOcean droplet via `deploy.sh`); starting it here
-# would race FastAPI for :8080 and leave the workflow stuck in a
-# permanent failed state.
-#
-# This command exits cleanly after printing a status line, so the
-# workflow lands in the "finished" state instead of "failed". The
-# /api preview proxy still routes correctly to localhost:8080 →
-# FastAPI via the [[services]] block above.
-#
-# To debug the Node API locally, stop `backend-py: FastAPI` and run
-# `pnpm --filter @workspace/api-server run dev` in a shell. See
-# replit.md "Local Dev API".
-run = "echo 'api-server local dev workflow is inert by design — Python FastAPI on :8080 serves /api in dev. See replit.md Local Dev API.'; exit 0"
-
-[services.production]
-
-[services.production.build]
-args = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
-
-[services.production.build.env]
-NODE_ENV = "production"
-
-[services.production.run]
-# we don't run through pnpm to make startup faster in production
-args = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
-
-[services.production.run.env]
-PORT = "8080"
-NODE_ENV = "production"
-
-[services.production.health.startup]
-path = "/api/healthz"
+# Node API server has been DELETED. Python FastAPI (backend-py: FastAPI)
+# is now the sole API server on port 8080 for all /api/* routes.
+# Both in Replit dev and on DigitalOcean production.
+run = "echo 'Node API server deleted — Python FastAPI on :8080 is the sole API server. See replit.md.'; exit 0"

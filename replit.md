@@ -9,7 +9,7 @@ This project provides a centralized administrative portal for universities to ma
 - Provide commands in the format `cd /root/University-and-Course-data && <command>`.
 - Always provide commands in the specified format, especially for production deployment and verification.
 - When schema changes are needed, explicitly provide the `pnpm --filter @workspace/db push --force` command before builds.
-- For frontend-only changes, specify skipping the `api-server` build and `pm2 delete/start` commands.
+- The Node.js API server has been deleted. Python FastAPI is now the sole API server in both dev and production.
 - Provide verification commands to confirm commit deployment, new bundle serving, and correct PM2 environment variables.
 
 ## System Architecture
@@ -19,8 +19,7 @@ The system is built as a monorepo utilizing `pnpm workspaces`.
 ### Technology Stack
 
 - **Frontend**: React with Vite, styled using Tailwind CSS and `shadcn/ui`. Data fetching is managed by TanStack React Query, and routing by `wouter`.
-- **Backend (Local Dev)**: FastAPI (Python) serving on port 8080.
-- **Backend (Production)**: Express 5 (Node.js) managed by PM2 and Nginx.
+- **Backend**: FastAPI (Python / Uvicorn) serving on port 8080 — both dev and production. Node.js API server has been deleted.
 - **Database**: PostgreSQL with Drizzle ORM for type-safe data access.
 - **Type Safety & Validation**: TypeScript 5.9, Zod (`zod/v4`), and `drizzle-zod`.
 - **API Code Generation**: Orval, generating client code from an OpenAPI specification.
@@ -46,7 +45,7 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 ### Deployment Architecture
 
 - **Production Server**: DigitalOcean droplet running Ubuntu 24.04.
-- **Process Management**: PM2 with `ecosystem.config.cjs` for Node.js API server.
+- **Process Management**: PM2 or systemd for Python FastAPI (uvicorn). Node.js API server has been deleted — Nginx must proxy /api to Python FastAPI on port 8080. Stop the old Node PM2 process and update Nginx config on the droplet.
 - **Database**: Local PostgreSQL instance.
 - **Environment Management**: `.env.backup` file on the server storing sensitive credentials.
 
