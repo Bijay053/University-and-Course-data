@@ -103,6 +103,13 @@ _HARD_FIELDS: dict[str, str] = {
         "(e.g. 'January, April, July, October'). "
         "Null if not stated."
     ),
+    "location_text": (
+        "Campus location(s) where this course is physically taught "
+        "(e.g. 'Melbourne', 'Sydney, Brisbane', 'Ballarat'). "
+        "Use only real city/campus names. "
+        "Do NOT include 'Online' or 'Virtual'. "
+        "Null if not explicitly stated on this page."
+    ),
 }
 
 _PROMPT_TEMPLATE = """\
@@ -288,7 +295,7 @@ def _coerce(field_key: str, value: Any) -> Any | None:
     }
     _STR_FIELDS = {
         "fee_term", "duration_unit", "duration_text",
-        "sub_category", "category", "mode", "intake_text",
+        "sub_category", "category", "mode", "intake_text", "location_text",
     }
 
     if field_key in _FLOAT_FIELDS:

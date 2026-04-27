@@ -492,6 +492,36 @@ async def extract_course(
                 if _gp_term:
                     _gp_filled["duration_term"] = _gp_term
 
+            # Map intake_text → canonical intake_months (JSONB list of month
+            # name strings). Gemini returns a comma-separated string like
+            # "January, July"; the DB stores a list like ["January", "July"].
+            # Without this translation intake_text lands in the payload but
+            # is silently dropped by stage_course because intake_text is not
+            # a column on ScrapedCourse — causing intakes to always show as "-".
+            if _gp_filled.get("intake_text"):
+                import re as _re
+                from app.services.scraper.extractors.intake import (
+                    _normalise_month as _nm,
+                )
+                _months: list[str] = []
+                for _part in _re.split(r"[,;/\n]", str(_gp_filled["intake_text"])):
+                    _mo = _nm(_part.strip())
+                    if _mo and _mo not in _months:
+                        _months.append(_mo)
+                if _months:
+                    _gp_filled["intake_months"] = _months
+
+            # Map location_text → canonical course_location (Text). Gemini
+            # returns a string like "Melbourne" or "Ballarat, Gippsland"; the
+            # DB column is course_location. The regex extractor only succeeds
+            # when the page has a structured DOM label (strong/dt/th), which
+            # many modern sites omit — making AI the primary source for
+            # location on generic sites like Federation University.
+            if _gp_filled.get("location_text"):
+                _loc = str(_gp_filled["location_text"]).strip()
+                if _loc:
+                    _gp_filled["course_location"] = _loc
+
             for _gp_k, _gp_v in _gp_filled.items():
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above

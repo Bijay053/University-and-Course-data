@@ -22,6 +22,12 @@ _FIELD_HINTS: dict[str, str] = {
     "fee_currency": "ISO currency code of the international tuition (AUD, USD, GBP, etc.).",
     "ielts_overall": "Required IELTS overall band score (e.g. 6.5). Number only.",
     "intake_months": "List of intake month numbers (1-12) when this course starts.",
+    "course_location": (
+        "Campus city/location where this course is physically taught "
+        "(e.g. 'Melbourne', 'Ballarat', 'Sydney, Brisbane'). "
+        "Use real place names only. Omit 'Online' or 'Virtual'. "
+        "Null if not stated."
+    ),
     # Bug: prod ASA Masters rows showed duration=5 because the page text
     # contained "5 units of 8 credit points each across 2 years" and the
     # vague old hint ("Course duration as a number") let Gemini return 5.
@@ -126,7 +132,7 @@ def _coerce(field_key: str, value: Any) -> Any | None:
             if 1 <= n <= 12:
                 out.append(n)
         return out or None
-    if field_key in {"fee_currency", "duration_unit"}:
+    if field_key in {"fee_currency", "duration_unit", "course_location"}:
         return str(value).strip() or None
     return value
 
