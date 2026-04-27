@@ -311,22 +311,30 @@ def should_stage_course(
     if effective_name and not _name_has_degree_qualifier(effective_name):
         return (False, "category_landing_page")
 
-    # Bug C (re-added): online-only courses are auto-rejected.
-    # Rule: study_mode stripped and lowercased equals exactly "online".
-    # Courses with "On Campus, Online" or "Blended" pass through.
-    # Marked transient in stage_course._TRANSIENT_REJECTION_REASONS so the
-    # course can be re-staged automatically if the institution later adds
-    # campus options (without requiring manual DB cleanup).
+    # Explicit domestic-only flag: set by extractors when the page text
+    # states "this course is not available to international students" etc.
+    if payload.get("domestic_only"):
+        return (False, "domestic_only")
+
+    # Bug C: online-only courses with no real physical campus are rejected.
+    # A course_location of "Online" is NOT a campus — it's a delivery mode
+    # word that CSU uses as a fallback when there are no FPOS offerings.
+    # Rule: study_mode contains "online" AND (course_location is empty OR
+    # course_location is the word "Online" with no real campus name).
+    # Courses that have BOTH online AND a real campus location pass through
+    # (e.g. study_mode="On Campus, Online" loc="Sydney" — still on-campus).
+    # Marked transient so the course re-stages if a campus option is added later.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
-    if _study_mode == "online" and not payload.get("bypass_online_only"):
+    _course_location = (payload.get("course_location") or "").strip()
+    _loc_is_online_only = _course_location.lower() == "online"
+    if "online" in _study_mode and (not _course_location or _loc_is_online_only):
         return (False, "online_only")
 
     # Bug B: no international fee after all extraction is done.
+    # If the university has a centralized fee page, the fee may simply not
+    # be listed for this specific course yet — stage for human review instead
+    # of auto-rejecting.  International fees on a separate page are legitimate.
     if payload.get("international_fee") is None:
-        # If the university has a centralized fee page configured, the course
-        # may still be open to international students even though the fee
-        # wasn't found in the central table (e.g. a new program not yet listed).
-        # Stage for human review instead of auto-rejecting.
         if payload.get("has_central_fee_page"):
             return (True, "accepted")
         return (False, "no_international_fee")

@@ -38,6 +38,40 @@ from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Domestic-only detection — regex patterns on visible page text
+# ---------------------------------------------------------------------------
+import re as _re
+
+_DOMESTIC_ONLY_RE = _re.compile(
+    r"(?:"
+    r"this\s+course\s+is\s+(?:only\s+)?not\s+available\s+(?:for|to)\s+international"
+    r"|not\s+available\s+(?:for|to)\s+international\s+students"
+    r"|this\s+course\s+is\s+not\s+open\s+to\s+international"
+    r"|available\s+to\s+domestic\s+students\s+only"
+    r"|domestic\s+students\s+only"
+    r"|this\s+course\s+is\s+only\s+available\s+to\s+(?:australian|domestic)"
+    r"|open\s+to\s+domestic\s+applicants\s+only"
+    r"|sorry[,.]?\s+this\s+course\s+is\s+not\s+available\s+to\s+international"
+    r"|this\s+(?:program|course)\s+is\s+only\s+for\s+(?:australian|domestic)"
+    r")",
+    _re.IGNORECASE,
+)
+
+
+def _is_domestic_only_page(html: str) -> bool:
+    """Return True when the page explicitly states it is for domestic students only.
+
+    Strips HTML tags before matching so tag noise doesn't break patterns.
+    Only fires on unambiguous phrases to avoid false positives.
+    """
+    if not html:
+        return False
+    text = _re.sub(r"<[^>]+>", " ", html)
+    text = _re.sub(r"\s+", " ", text)
+    return bool(_DOMESTIC_ONLY_RE.search(text))
+
+
 # Degree-level values that indicate a postgraduate course.
 # The central English-requirements page is fetched via plain HTTP (no JS
 # rendering), so it only captures whatever level the static HTML exposes
@@ -170,6 +204,21 @@ async def extract_course(
     evidence: list[dict[str, Any]] = []
     _gemini_primary_cost: float = 0.0
     _is_csu_page: bool = False  # set True by the CSU pre-seed; gates Gemini Primary
+
+    # ── Domestic-only early exit ──────────────────────────────────────────────
+    # If the page text explicitly states the course is not available to
+    # international students, flag it immediately.  The staging guard will
+    # reject it with reason "domestic_only" without running any more extractors.
+    if _is_domestic_only_page(html):
+        payload["domestic_only"] = True
+        await emit(
+            "status",
+            f"[DOMESTIC ONLY] {url} — course page states domestic-students-only; skipping",
+            phase="extract",
+            kind="domestic_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
 
     # ── CSU pre-seed: runs BEFORE _EXTRACTORS ────────────────────────────────
     # CSU pages embed all course data as inline JS (fees, ocb_metadata,

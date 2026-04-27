@@ -178,6 +178,7 @@ async def stage_course(
         "no_international_fee",
         "expired",
         "online_only",
+        "domestic_only",
     })
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.rejection_block_days)
     _recent_row = (
