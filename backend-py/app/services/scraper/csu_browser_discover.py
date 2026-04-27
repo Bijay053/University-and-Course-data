@@ -28,13 +28,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
-from urllib.parse import urljoin
 
 log = logging.getLogger(__name__)
 
 _LISTING_URL = "https://study.csu.edu.au/international/courses"
-_CSU_ORIGIN = "https://study.csu.edu.au"
 
 # Maximum scroll attempts before giving up on pagination
 _MAX_SCROLL_ITERS = 30
@@ -47,22 +44,33 @@ _SCROLL_SETTLE_S = 2.5
 # of {url, name} objects.
 _EXTRACT_LINKS_JS = r"""
 () => {
-  const origin = 'https://study.csu.edu.au';
+  const ORIGIN = 'https://study.csu.edu.au';
+  // Exact same-origin path pattern: /international/courses/<slug>
+  // where <slug> is at least one non-separator character and there is
+  // no further path segment (avoids sub-pages like /international/courses/health/fees).
+  const PATH_RE = /^\/international\/courses\/[^/?#]+\/?$/;
   const results = [];
   const seen = new Set();
   document.querySelectorAll('a[href]').forEach(a => {
-    const href = (a.getAttribute('href') || '').trim();
-    // Accept relative /international/courses/<slug> AND absolute URLs
-    const isRelIntl = /^\/international\/courses\/[^/#?]+/.test(href);
-    const isAbsIntl = href.includes('study.csu.edu.au/international/courses/');
-    if (!isRelIntl && !isAbsIntl) return;
-    const url = href.startsWith('http') ? href : origin + href;
-    // Strip query/hash — we only want the canonical course URL
-    const clean = url.split('?')[0].split('#')[0];
-    if (seen.has(clean)) return;
-    seen.add(clean);
+    const raw = (a.getAttribute('href') || '').trim();
+    // Resolve to absolute URL (handle relative, absolute-same-origin, and
+    // fully-qualified same-origin URLs)
+    let url;
+    if (raw.startsWith('/')) {
+      url = ORIGIN + raw;
+    } else if (raw.startsWith(ORIGIN)) {
+      url = raw;
+    } else {
+      return;  // Off-site or protocol-relative — skip
+    }
+    // Strip query-string and hash before testing the path
+    const [base] = url.split(/[?#]/);
+    const path = base.replace(ORIGIN, '');
+    if (!PATH_RE.test(path)) return;
+    if (seen.has(base)) return;
+    seen.add(base);
     const text = (a.innerText || a.textContent || '').replace(/\s+/g, ' ').trim();
-    results.push({ url: clean, name: text });
+    results.push({ url: base, name: text });
   });
   return results;
 }
@@ -154,6 +162,30 @@ async def browser_discover_csu_international(
                 log.warning("csu_browser_discover: goto failed — %s", exc)
                 await _emit(f"[DISCOVER] CSU: navigation failed ({exc}) — falling back")
                 return []
+
+            # ── 2b. Error-page sniff (parity with browser_pool.fetch_html) ─
+            # Chromium can land on an error interstitial (DNS failure, cert
+            # error, site down) that looks like a page with no links.  Detect
+            # and bail early rather than burning the full scroll budget.
+            try:
+                partial = await asyncio.wait_for(page.content(), timeout=5.0)
+                lowered = (partial or "")[:4096].lower()
+                if (
+                    "neterror" in lowered
+                    or "chrome-error://" in lowered
+                    or "err_name_not_resolved" in lowered
+                    or "err_connection_" in lowered
+                    or "err_cert_" in lowered
+                ):
+                    log.warning(
+                        "csu_browser_discover: Chromium error page detected — falling back"
+                    )
+                    await _emit(
+                        "[DISCOVER] CSU: Chromium error page detected — falling back"
+                    )
+                    return []
+            except Exception:
+                pass  # If we can't sniff the content, proceed anyway
 
             # ── 3. Initial settle ────────────────────────────────────────
             await asyncio.sleep(4.0)

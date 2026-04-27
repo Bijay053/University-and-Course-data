@@ -1,0 +1,76 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 207
+[status] [fetch] Fetching https://study.csu.edu.au/international/courses...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] CSU: fetching international listing via browser → https://study.csu.edu.au/international/courses
+[status] [discover] [DISCOVER] CSU: browser found 12 international course link(s)
+[status] [discover] Discovered 12 candidate course links
+[status] [extract] Extracting course details (12 pages)...
+[status] [extract] [EXTRACT] 1/12: Bachelor of Accounting
+[status] [extract] [EXTRACT] 2/12: Bachelor of Agricultural Business Management
+[status] [extract] [EXTRACT] 3/12: Bachelor of Agricultural Science
+[status] [extract] [EXTRACT] 4/12: Bachelor of Agriculture
+[progress] [extract] Fetching 1/12: Bachelor of Accounting
+[progress] [extract] Fetching 2/12: Bachelor of Agricultural Business Management
+[progress] [extract] Fetching 3/12: Bachelor of Agricultural Science
+[progress] [extract] Fetching 4/12: Bachelor of Agriculture
+[status] [extract] [CSU ✓] bachelor-agricultural-business-managemen — dom=7896.0, int=37040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [CSU ✓] bachelor-agriculture — dom=7516.0, int=37040.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [CSU ✓] bachelor-agricultural-science — dom=7516.0, int=37040.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-agri → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-agri → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [CSU ✓] bachelor-accounting — dom=15796.0, int=32000.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-agri → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [classify] [CATEGORY det] Bachelor of Agriculture → Agriculture & Environmental Science / Agriculture
+[status] [classify] [CATEGORY det] Bachelor of Agricultural Business Manage → Business & Management / Management
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-acco → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [EXTRACT] 5/12: Bachelor of Animal Science
+[status] [extract] [EXTRACT] 6/12: Bachelor of Applied Research (Honours)
+[status] [extract] [EXTRACT] 7/12: Bachelor of Arts and Social Science (Honours)
+[status] [classify] [CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[progress] [extract] Fetching 7/12: Bachelor of Arts and Social Science (Honours)
+[progress] [extract] Fetching 6/12: Bachelor of Applied Research (Honours)
+[progress] [extract] Fetching 5/12: Bachelor of Animal Science
+[status] [extract] [EXTRACT] 8/12: Bachelor of Border Management
+[progress] [extract] Fetching 8/12: Bachelor of Border Management
+[status] [extract] [CSU ✓] bachelor-animal-science — dom=8716.0, int=37600.0, ielts=6.0, pte=50, dur=4.0years, intakes=March,July,November, loc=Online
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-anim → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [CSU ✓] bachelor-applied-research-honours — dom=14216.0, int=29760.0, ielts=6.0, pte=50, dur=1.0years, intakes=March, loc=Bathurst Campus
+[status] [extract] [CSU ✓] bachelor-border-management — dom=17376.0, int=23200.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [EXTRACT] 9/12: Bachelor of Business
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-appl → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-bord → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [CSU ✓] bachelor-arts-social-science-honours — dom=4736.0, int=27920.0, ielts=6.0, pte=50, dur=1.0years, intakes=March,July,November, loc=Online
+[progress] [extract] Fetching 9/12: Bachelor of Business
+[status] [extract] [EXTRACT] 10/12: Bachelor of Business Studies
+[status] [extract] [EXTRACT] 11/12: Bachelor of Communication
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-arts → skipped (CSU pre-seed) (cost=$0.000000)
+[progress] [extract] Fetching 10/12: Bachelor of Business Studies
+[progress] [extract] Fetching 11/12: Bachelor of Communication
+[status] [extract] [EXTRACT] 12/12: Bachelor of Computer Science
+[progress] [extract] Fetching 12/12: Bachelor of Computer Science
+[status] [extract] [CSU ✓] bachelor-business-studies — dom=17376.0, int=33120.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Bathurst Campus, Yunnan Uni-Fi
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-busi → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [CSU ✓] bachelor-communication — dom=17376.0, int=27920.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July, loc=Bathurst Campus
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-comm → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [CSU ✓] bachelor-computer-science — dom=9100.0, int=28640.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [CSU ✓] bachelor-business — dom=17376.0, int=33120.0, ielts=6.0, pte=50, dur=3.0years, intakes=March,July,November, loc=Online
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-busi → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [GEMINI] https://study.csu.edu.au/international/courses/bachelor-comp → skipped (CSU pre-seed) (cost=$0.000000)
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=50
+[status] [stage] [STAGE] skipped Bachelor of Accounting: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Agricultural Business Management: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Agricultural Science: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Agriculture: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Animal Science: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Applied Research (Honours): rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Arts and Social Science (Honours): recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Border Management: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Business: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Business Studies: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Communication: recently rejected (within 7d, rejected 2026-04-26)
+[status] [stage] [STAGE] skipped Bachelor of Computer Science: recently rejected (within 7d, rejected 2026-04-26)
+[status] [complete] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[status] [complete] [TIMING] Total: 1m 41s | Courses: 12 | Avg: 8.4s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:12 | Staged:0 | Skipped:12 | Errors:0
+[status] [complete] Staged 0 courses, 12 skipped, 0 fetch errors
