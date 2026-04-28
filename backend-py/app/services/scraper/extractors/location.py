@@ -58,6 +58,87 @@ _COMMON_CITIES = (
     "Ipswich", "Springfield",
 )
 
+# Campus short-code → full city name mapping.
+# Universities (e.g. APIC College) publish location as 3-letter codes
+# ("SYD | MEL | BNE") rather than full city names. This map expands
+# those codes so the stored location is always human-readable.
+_CAMPUS_CODE_MAP: dict[str, str] = {
+    "SYD": "Sydney",
+    "MEL": "Melbourne",
+    "BNE": "Brisbane",
+    "PER": "Perth",
+    "ADL": "Adelaide",
+    "CBR": "Canberra",
+    "DAR": "Darwin",
+    "HOB": "Hobart",
+    "GC":  "Gold Coast",
+    "OOL": "Gold Coast",
+    "TWD": "Tweed Heads",
+    "GEE": "Geelong",
+    "NEW": "Newcastle",
+    "WOL": "Wollongong",
+    "MAN": "Manly",
+    "PARR": "Parramatta",
+    "ROCK": "Rockingham",
+    "JOON": "Joondalup",
+    "FREM": "Fremantle",
+    # NZ codes
+    "AKL": "Auckland",
+    "WLG": "Wellington",
+    "CHC": "Christchurch",
+}
+
+# Separators used between campus codes: " | ", " / ", ", ", "-"
+_CAMPUS_CODE_SEP_RE = re.compile(r"\s*[|/,\-–—]\s*")
+
+
+def _expand_campus_codes(text: str) -> str:
+    """Replace campus short codes with full city names.
+
+    Handles "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane".
+    Leaves values that are already full city names unchanged.
+    Only expands when EVERY non-empty token is a known code or a
+    recognised city name — avoids mangling arbitrary text that
+    happens to contain a 3-letter substring.
+    """
+    if not text:
+        return text
+    parts = [p.strip() for p in _CAMPUS_CODE_SEP_RE.split(text) if p.strip()]
+    if not parts or len(parts) < 2:
+        # Single token: try a direct code lookup but only apply if it's a pure code
+        single = text.strip().upper()
+        if single in _CAMPUS_CODE_MAP:
+            return _CAMPUS_CODE_MAP[single]
+        return text
+
+    expanded: list[str] = []
+    all_known = True
+    for part in parts:
+        upper = part.upper()
+        if upper in _CAMPUS_CODE_MAP:
+            expanded.append(_CAMPUS_CODE_MAP[upper])
+        else:
+            # Already a city name or unknown token — keep as-is
+            expanded.append(part)
+            # If it's not a recognised city and not a code, mark as "unknown"
+            # so we don't blindly expand partial matches.
+            if part not in _COMMON_CITIES:
+                all_known = False
+
+    # Only substitute when all tokens were resolved (either code→city or
+    # already a city name). If we see truly unknown tokens the input is
+    # probably not a code-list and should be left unchanged.
+    if all_known:
+        # De-dup while preserving order
+        seen: set[str] = set()
+        out: list[str] = []
+        for city in expanded:
+            if city.lower() not in seen:
+                seen.add(city.lower())
+                out.append(city)
+        return ", ".join(out)
+    return text
+
 _PERIOD_LABEL_RE = re.compile(
     r"^(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+"
     r"(?:\s*[-–—]\s*.{0,50})?$",
@@ -172,6 +253,9 @@ def _normalise(raw: str | None) -> str | None:
     if not raw:
         return None
     cleaned = re.sub(r"\s+", " ", raw).replace(" , ", ", ").strip()
+    # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
+    # before any marketing / junk checks so the expanded text can be validated normally.
+    cleaned = _expand_campus_codes(cleaned)
     if _looks_marketing(cleaned):
         return None
     head = _TRAILING_KEYS.split(cleaned, maxsplit=1)[0].strip() or cleaned
