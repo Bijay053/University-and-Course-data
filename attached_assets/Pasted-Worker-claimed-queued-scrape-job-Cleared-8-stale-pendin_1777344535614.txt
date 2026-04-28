@@ -1,0 +1,1158 @@
+Worker claimed queued scrape job
+Cleared 8 stale pending/rejected scraped_courses rows (>10m old) for university 1
+Fetching https://www.unisq.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.unisq.edu.au/study/degrees-and-courses (high-priority probe)
+[DISCOVER] Crawling from https://www.unisq.edu.au/study/degrees-and-courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses: listing (14 course links found)
+[DISCOVER] Page 1/25: +15 candidates (total 15) — https://www.unisq.edu.au/study/degrees-and-courses
+[DISCOVER] classified https://www.unisq.edu.au/study: listing (14 course links found)
+[DISCOVER] Page 2/25: +1 candidates (total 16) — https://www.unisq.edu.au/study
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/mature-age-students: listing (7 course links found)
+[DISCOVER] Page 3/25: +1 candidates (total 17) — https://www.unisq.edu.au/study/information-for/mature-age-students
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder: listing (5 course links found)
+[DISCOVER] Page 4/25: +0 candidates (total 17) — https://www.unisq.edu.au/study/career-finder
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/high-school-students: listing (17 course links found)
+[DISCOVER] Page 5/25: +2 candidates (total 19) — https://www.unisq.edu.au/study/information-for/high-school-students
+[DISCOVER] classified https://www.unisq.edu.au/study/key-dates: listing (10 course links found)
+[DISCOVER] Page 6/25: +5 candidates (total 24) — https://www.unisq.edu.au/study/key-dates
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/parents-and-guardians: listing (9 course links found)
+[DISCOVER] Page 7/25: +2 candidates (total 26) — https://www.unisq.edu.au/study/information-for/parents-and-guardians
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/schools: listing (6 course links found)
+[DISCOVER] Page 8/25: +0 candidates (total 26) — https://www.unisq.edu.au/study/information-for/schools
+[DISCOVER] classified https://www.unisq.edu.au/study/fees-and-scholarships: listing (5 course links found)
+[DISCOVER] Page 9/25: +0 candidates (total 26) — https://www.unisq.edu.au/study/fees-and-scholarships
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/unisq-stories: listing (5 course links found)
+[DISCOVER] Page 10/25: +0 candidates (total 26) — https://www.unisq.edu.au/study/why-unisq/unisq-stories
+[DISCOVER] classified https://www.unisq.edu.au/study/apply: listing (5 course links found)
+[DISCOVER] Page 11/25: +0 candidates (total 26) — https://www.unisq.edu.au/study/apply
+[DISCOVER] classified https://www.unisq.edu.au/current-students/your-study/academic-calendar-dates: listing (6 course links found)
+[DISCOVER] Page 12/25: +0 candidates (total 26) — https://www.unisq.edu.au/current-students/your-study/academic-calendar-dates
+[DISCOVER] classified https://www.unisq.edu.au/about-unisq/schools: listing (6 course links found)
+[DISCOVER] Page 13/25: +0 candidates (total 26) — https://www.unisq.edu.au/about-unisq/schools
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/short-courses: listing (19 course links found)
+[DISCOVER] Page 14/25: +14 candidates (total 40) — https://www.unisq.edu.au/study/degrees-and-courses/short-courses
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/double-degrees: listing (5 course links found)
+[DISCOVER] Page 15/25: +0 candidates (total 40) — https://www.unisq.edu.au/study/degrees-and-courses/double-degrees
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/new-degrees: listing (5 course links found)
+[DISCOVER] Page 16/25: +0 candidates (total 40) — https://www.unisq.edu.au/study/degrees-and-courses/new-degrees
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/ways-to-study: listing (5 course links found)
+[DISCOVER] Page 17/25: +0 candidates (total 40) — https://www.unisq.edu.au/study/why-unisq/ways-to-study
+[DISCOVER] classified https://www.unisq.edu.au/study/apply/entry-requirements: listing (5 course links found)
+[DISCOVER] Page 18/25: +0 candidates (total 40) — https://www.unisq.edu.au/study/apply/entry-requirements
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/english-language-programs: listing (71 course links found)
+[DISCOVER] Page 19/25: +57 candidates (total 97) — https://www.unisq.edu.au/study/degrees-and-courses/english-language-programs
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq: listing (5 course links found)
+[DISCOVER] Page 20/25: +0 candidates (total 97) — https://www.unisq.edu.au/study/why-unisq
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/fraser: listing (7 course links found)
+[DISCOVER] Page 21/25: +2 candidates (total 99) — https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/fraser
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/lisa-hopkins: listing (8 course links found)
+[DISCOVER] Page 22/25: +1 candidates (total 100) — https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/lisa-hopkins
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/joshua-de-grussa: listing (6 course links found)
+[DISCOVER] Page 23/25: +0 candidates (total 100) — https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/joshua-de-grussa
+[DISCOVER] classified https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/melanie-oliver: listing (7 course links found)
+[DISCOVER] Page 24/25: +0 candidates (total 100) — https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/melanie-oliver
+[DISCOVER] classified https://www.unisq.edu.au/study/contact: listing (5 course links found)
+[DISCOVER] Page 25/25: +0 candidates (total 100) — https://www.unisq.edu.au/study/contact
+Discovered 100 candidate course links
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.unisq.edu.au/fees
+[CACHE] english_requirements hit → ielts_overall=6.5 (cached, skipping fetch of https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements)
+Extracting course details (100 pages)...
+[EXTRACT] 1/100: Pathways to uni
+[EXTRACT] 2/100: Undergraduate study
+[EXTRACT] 3/100: Study online
+[EXTRACT] 4/100: Postgraduate study
+Fetching 3/100: Study online
+Fetching 1/100: Pathways to uni
+Fetching 2/100: Undergraduate study
+Fetching 4/100: Postgraduate study
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/online-study
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/online-study — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=96229B rendered=105241B using=rendered text_len=3944
+[GP-DEBUG] text[:500]='Study your way Online, on-campus or both – UniSQ fits around your life, not the other way. Personalised learning 5-star student to teacher ratio means more support and guidance for your learning.* Experts in online learning With 40+ years of experience, we deliver high-quality education – wherever you are. *Good Universities Guide, 2025 Explore our study areas Arts and Communication Aviation Business Education and Teaching Engineering and Surveying Health Information Technology Law Sciences and '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/online-st → 0 field(s) (cost=$0.000157, in=2038 out=13)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/online-study
+[GP-DEBUG] static=127049B rendered=139563B using=rendered text_len=8469
+[GP-DEBUG] text[:500]="Your study options UniSQ's pathway programs are your stepping stone into your dream degree. UniSQ Ready UniPrep Indigenous Higher Education Pathway Program Head Start Who is it for? UniSQ Ready is for anyone not currently in high school who doesn’t meet the entry requirements of their dream degree. Why this program? It will help you get into your chosen UniSQ degree and prepare you to thrive at university by building your academic study skills. Cost: Free Location: Online Learn more Go to top Wh"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/pathway-p → 0 field(s) (cost=$0.000241, in=3170 out=10)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs
+[GP-DEBUG] static=162883B rendered=170904B using=rendered text_len=21596
+[GP-DEBUG] text[:500]='Explore our study areas Arts and Communication Aviation Business Education and Teaching Engineering and Surveying Health Information Technology Law Sciences and Agriculture Explore our degrees Download our course guide and explore your study options. Download now Earn more We are number one in Australia for graduate starting salary. Personalised learning Experience education that is tailored to you. UniSQ is rated five stars for student-to-teacher ratio. Be in demand Feel confident in your futur'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/undergrad → 0 field(s) (cost=$0.000488, in=6452 out=15)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study
+[GP-DEBUG] static=112521B rendered=120359B using=rendered text_len=8176
+[GP-DEBUG] text[:500]='Study your way Online, on-campus or both – UniSQ fits around your life, not the other way. Save big on postgrad Get up to 83% off with a Commonwealth Supported Place – no loan, no payback. Personalised learning 5-star student to teacher ratio means more support and guidance for your learning.* *Good Universities Guide, 2026 Explore our study areas Arts and Communication Aviation Business Education and Teaching Engineering and Surveying Health Information Technology Law Sciences and Agriculture O'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/postgradu → 0 field(s) (cost=$0.000236, in=3097 out=14)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study
+[per-course vision img 5/6 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 4/4] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 5/6 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/online-study — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/online-study (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Undergraduate Study — english from central page: ielts=6.5
+[EXTRACT] 5/100: Research degrees and PhD
+Fetching 5/100: Research degrees and PhD
+[per-course vision img 6/6] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=114191B rendered=0B using=static text_len=8605
+[GP-DEBUG] text[:500]='World-class UniSQ is within the top 2% of universities worldwide.* Affordable tuition Zero tuition fees for domestic higher degree by research students. Priority research UniSQ is one of only six lead Australian Trailblazer universities and spearheads space manufacturing research of national priority. *THE World University Rankings, 2024 Your study options Study a Masters Advance your career or specialise further—UniSQ’s master’s degrees offer flexible, expert-led study options. Study a Doctorat'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/research- → 0 field(s) (cost=$0.000244, in=3203 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/research-study (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[CENTRAL ✓] Pathways to University — english from central page: ielts=6.5
+[EXTRACT] 6/100: Saved Degrees (#)
+Fetching 6/100: Saved Degrees (#)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/compare
+[CENTRAL ✓] Online Study — english from central page: ielts=6.5
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/compare — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 7/100: Arts and Communication
+Fetching 7/100: Arts and Communication
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication
+[GP-DEBUG] static=47338B rendered=60912B using=rendered text_len=282
+[GP-DEBUG] text[:500]='Compare degrees You haven’t added any degrees yet. To begin, browse our degrees and click the ‘Add to compare’ button on any degree that interests you. As you add degrees, you’ll see key information like ATAR, duration, location, and start dates to help you make an informed choice.'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/compare → 0 field(s) (cost=$0.000088, in=1121 out=13)
+[per-course vision img 0/3] https://www.unisq.edu.au/study/degrees-and-courses/compare
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication — IELTS=— PTE=— TOEFL=— CAE=—
+[CENTRAL ✓] Postgraduate Study — english from central page: ielts=6.5
+[EXTRACT] 8/100: Aviation
+Fetching 8/100: Aviation
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/aviation
+[EXTRACT] 9/100: Business
+Fetching 9/100: Business
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/business
+[per-course vision img 2/3 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/compare — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/compare (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/aviation — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/business — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=221014B rendered=233660B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/aviation → 0 field(s) (cost=$0.000656, in=8693 out=12)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/aviation
+[GP-DEBUG] static=262386B rendered=274544B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/business → 0 field(s) (cost=$0.000656, in=8693 out=13)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/business
+[GP-DEBUG] static=255874B rendered=267938B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/arts-and- → 0 field(s) (cost=$0.000656, in=8696 out=12)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication
+[CENTRAL ✓] Compare Degrees — english from central page: ielts=6.5
+[EXTRACT] 10/100: Education and Teaching
+Fetching 10/100: Education and Teaching
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=264654B rendered=274931B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/education → 0 field(s) (cost=$0.000657, in=8696 out=15)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/aviation — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/aviation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/aviation: duration_value, duration_unit
+[CENTRAL ✓] Aviation Degrees — english from central page: ielts=6.5
+[EXTRACT] 11/100: Engineering and Surveying
+Fetching 11/100: Engineering and Surveying
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/business: duration_value, duration_unit
+[CENTRAL ✓] Business Degrees — english from central page: ielts=6.5
+[EXTRACT] 12/100: Health
+Fetching 12/100: Health
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/health
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/health — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=244868B rendered=257383B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/engineeri → 0 field(s) (cost=$0.000656, in=8697 out=12)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Arts and Communication Degrees — english from central page: ielts=6.5
+[EXTRACT] 13/100: Information Technology
+Fetching 13/100: Information Technology
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/information-technology
+[GP-DEBUG] static=314146B rendered=326007B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/health → 0 field(s) (cost=$0.000656, in=8692 out=13)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/health
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[CENTRAL ✓] Education and Teaching Degrees — english from central page: ielts=6.5
+[CATEGORY det] Education and Teaching Degrees → Education & Social Work / Teaching
+[EXTRACT] 14/100: Sciences and Agriculture
+Fetching 14/100: Sciences and Agriculture
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=252549B rendered=264944B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/sciences- → 0 field(s) (cost=$0.000657, in=8697 out=15)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture
+[per-course vision img 3/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=243650B rendered=256099B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/informati → 0 field(s) (cost=$0.000657, in=8696 out=15)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/information-technology
+[CENTRAL ✓] Engineering and Surveying Degrees — english from central page: ielts=6.5
+[EXTRACT] 15/100: Law
+Fetching 15/100: Law
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/law
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/law — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/health — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=232888B rendered=245377B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/law → 0 field(s) (cost=$0.000656, in=8691 out=14)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/law
+[CENTRAL ✓] Sciences and Agriculture Degrees — english from central page: ielts=6.5
+[CATEGORY det] Sciences and Agriculture Degrees → Agriculture & Environmental Science / Agriculture
+[EXTRACT] 16/100: + New degrees
+Fetching 16/100: + New degrees
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/information-technology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees — IELTS=— PTE=— TOEFL=— CAE=—
+[CENTRAL ✓] Health Degrees — english from central page: ielts=6.5
+[EXTRACT] 17/100: UniSQ Ready
+Fetching 17/100: UniSQ Ready
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/unisqready
+[GP-DEBUG] static=69900B rendered=83347B using=rendered text_len=5109
+[GP-DEBUG] text[:500]="New degrees at UniSQ As the world changes, UniSQ degrees evolve. We are always creating new, flexible degrees that give you modern, industry-relevant qualifications. Everything on offer is designed for busy lifestyles, to allow you to fit study into your life and career goals. Let's take a look. UniSQ is rated 5/5 stars for graduate starting salary. Good Universities Guide 2026 Aviation Master of Business Administration Aviation Join the only Australian university offering an MBA Aviation degree"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/new-degre → 0 field(s) (cost=$0.000178, in=2329 out=12)
+[per-course vision img 0/3] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/unisqready — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 3/3] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/new-degrees (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=129368B rendered=139990B using=rendered text_len=291
+[GP-DEBUG] text[:500]='Domestic student Compare Entry requirements View full details Duration 0.2 years (or part-time equivalent) Location Online Start Jan, Mar, May, Jul, Aug, Oct View dates Fees View fees QTAC codes View QTAC details Recently viewed UniSQ Ready Location Online Start Jan, Mar, May, Jul, Aug, Oct'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/unisqread → 0 field(s) (cost=$0.000089, in=1124 out=15)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/unisqready
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/information-technology: duration_value, duration_unit
+[CENTRAL ✓] Information Technology Degrees — english from central page: ielts=6.5
+[CATEGORY det] Information Technology Degrees → Computer Science & IT / Information Systems
+[EXTRACT] 18/100: Download our Undergraduate Guide
+Fetching 18/100: Download our Undergraduate Guide
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/law — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/law (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 4/6 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/unisqready — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/unisqready (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] New Degrees At Unisq — english from central page: ielts=6.5
+[EXTRACT] 19/100: UniPrep
+Fetching 19/100: UniPrep
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/uniprep
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/uniprep — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/law: duration_value, duration_unit
+[GP-DEBUG] static=111146B rendered=120086B using=rendered text_len=193
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/unisqready: duration_value, duration_unit
+[CENTRAL ✓] Law Degrees — english from central page: ielts=6.5
+[GP-DEBUG] text[:500]='Domestic student Compare Entry requirements View full details Duration 2 sessions Location Online Start Mar, Jul View dates Fees View fees Recently viewed UniPrep Location Online Start Mar, Jul'
+[EXTRACT] 20/100: Bachelor of Science (Honours) (Psychology)
+[GP-DEBUG] raw_response="1 year), value is 1.\n * Let's check the text"
+[CENTRAL ✓] Unisq Ready — english from central page: ielts=6.5
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/uniprep → 0 field(s) (cost=$0.000086, in=1099 out=13)
+Fetching 20/100: Bachelor of Science (Honours) (Psychology)
+[EXTRACT] 21/100: Master of Clinical Psychology
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/uniprep
+Fetching 21/100: Master of Clinical Psychology
+[per-course browser ✗] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26: empty response
+[per-course vision img 2/6 (cache hits 4)] https://www.unisq.edu.au/study/degrees-and-courses/uniprep — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/uniprep (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=8458891B rendered=0B using=static text_len=50005
+[GP-DEBUG] text[:500]='%PDF-1.7 %���� 2419 0 obj <> endobj 2436 0 obj <>/Filter/FlateDecode/ID[<23036E4414280B4AA472D3A7A4A8B965>]/Index[2419 32]/Info 2418 0 R/Length 86/Prev 8622421/Root 2420 0 R/Size 2451/Type/XRef/W[1 2 1]>>stream h�bbd\x10``b�8 $\x18�\x02 ��@��\x17�e\x02"D@�)�\x12! � $���\x04�\x01��\x04\x11��@�w\x03�0�\x0f$B\x16101r\x02u2000�K��Q�\x05 ��V� 8 endstream endobj startxref 0 %%EOF 2450 0 obj <>stream h��UgT\x13Y\x14~o&;\x19���I�\x18D\x13�bC�!V�(\x16T\x14\x15 � � * \x02��\x04D"6�\x02��\x15l\x08*��\x1bvET\x14��$��㞳�MB��\x0f��sN�����}�d&\x01���\x10U@ ��\x07���K\x0e��4\x10\x01�R ��5\x12Ih�qӑ\x14�R\x01H�h�Ri bT@\x03q䆢������JK�t'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-cou → 0 field(s) (cost=$0.001023, in=13577 out=15)
+[FALLBACK] AI enriching https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=150317B rendered=0B using=static text_len=434
+[GP-DEBUG] static=140275B rendered=0B using=static text_len=644
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 2 years (or part-time equivalent) Location Ipswich External Start Jan View dates Fees AUD 4,736 (Indicative annual fee) Note: If enrolled in the External study mode, your mandatory residential school courses and internships will be held on-campus at UniSQ Toowoomba. Recently viewed Master of Clinical Psychology Location Ipswich, External Start Jan'
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Ipswich Toowoomba External Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) Note: The Bachelor of Science (Honours) Psychology major is an APAC-accredited Level 2 psychology qualification designed for graduates of an APAC-approved 3-year degree. If you are commencing your psychology studies, the Bachelor of Psychology (Honours) degree will be '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000091, in=1164 out=12)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000095, in=1216 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical-psychology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/uniprep: duration_value, duration_unit
+[CENTRAL ✓] Uniprep — english from central page: ielts=6.5
+[EXTRACT] 22/100: Master of Clinical Psychology - Advanced Entry
+Fetching 22/100: Master of Clinical Psychology - Advanced Entry
+[GP-DEBUG] static=132690B rendered=0B using=static text_len=558
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 1 year (or part-time equivalent) Location External Start Jan View dates Fees AUD 4,736 (Indicative annual fee) Notes: All coursework courses are offered via a combination of online workshops and mandatory 5-day residential schools held on-campus at UniSQ Ipswich. Commonwealth Supported Places (CSPs) for this degree are limited. Once filled, remaining places will be offered at the full-fee paying rate. Recently viewed Master of Clinic'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000094, in=1199 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical-psychology-advanced-entry (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 23/100: Master of Counselling
+Fetching 23/100: Master of Counselling
+[CENTRAL ✓] https://www.unisq.edu.au/-/media/unisq/s — english from central page: ielts=6.5
+[EXTRACT] 24/100: Master of Professional Psychology
+Fetching 24/100: Master of Professional Psychology
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical-psychology-advanced-entry: duration_value, duration_unit
+[CATEGORY det] Master of Clinical Psychology - Advanced → Medicine & Health / Psychology
+[EXTRACT] 25/100: University terms explained
+Fetching 25/100: University terms explained
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology
+[GP-DEBUG] static=209380B rendered=0B using=static text_len=387
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 2 years (or part-time equivalent) Location External Start Feb, Jun, Sep View dates Fees AUD 29,760 (Indicative annual fee) Note: There are mandatory residential school components in this degree held on-campus at UniSQ Ipswich. Recently viewed Master of Counselling Location External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 2976'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 1 field(s) (cost=$0.000089, in=1151 out=9)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-counselling (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=144450B rendered=0B using=static text_len=438
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Ipswich External Start Jan View dates Fees AUD 17,392 (Indicative annual fee) Note: If enrolled in the External study mode, your mandatory residential school courses and internships will be held on-campus at UniSQ Toowoomba. Recently viewed Master of Professional Psychology Location Ipswich, External Start Jan'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000092, in=1166 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-professional-psychology (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=69545B rendered=83589B using=rendered text_len=13020
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-counselling: fee_currency, duration_value, duration_unit
+[EXTRACT] 26/100: Browse our undergrad guide
+[GP-DEBUG] text[:500]="Understanding university terminology Are you new to university lingo? Don’t worry – we have created this quick guide to help you understand key university terms at UniSQ. A Anti-requisite An anti-requisite course contains substantially equivalent content and Learning Outcomes to the course for which it is nominated as an anti-requisite such that it is not in the student's best interest to complete both courses. Associate degree Two-year associate degrees (if studying full-time) are an ideal midd"
+Fetching 26/100: Browse our undergrad guide
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/undergrad → 0 field(s) (cost=$0.000326, in=4312 out=10)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-professional-psychology: fee_currency, duration_value, duration_unit
+[CATEGORY det] Master of Professional Psychology → Medicine & Health / Psychology
+[EXTRACT] 27/100: Digital badges
+Fetching 27/100: Digital badges
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical-psychology: duration_value, duration_unit
+[CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+[EXTRACT] 28/100: Adaptive Educational Leadership 100% online | 1 year
+Fetching 28/100: Adaptive Educational Leadership 100% online | 1 year
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 3/4 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership
+[GP-DEBUG] static=47206B rendered=62239B using=rendered text_len=1138
+[GP-DEBUG] text[:500]='Digital badges Digital badges are certifications that can be used in email signatures, resumés, and on sites such as LinkedIn and Twitter. Your badge contains verified metadata that describes the qualification and the process required to earn it. You will be issued a digital badge once you successfully pass the course assessment. At UniSQ, we issue our badges through My eQuals which is the official platform of Australian and New Zealand tertiary education providers. It provides secure access to '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000105, in=1340 out=15)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 3/4 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd
+[CENTRAL ✓] Understanding University Terminology — english from central page: ielts=6.5
+[GP-DEBUG] static=57059B rendered=71474B using=rendered text_len=4983
+[CENTRAL ✓] Digital Badges — english from central page: ielts=6.5
+[GP-DEBUG] text[:500]='Develop adaptive, informed, effective school leadership This course is made up of two parts. In Part A you will explore the prevalence of change in education settings, and the importance of adaptive leadership in initiating and sustaining meaningful change in your school context. You will critically reflect on your own experiences of change in the educational context and explore what successful change management looks like in schools. This section will build your capacity in data analysis and in'
+[EXTRACT] 29/100: Science iSTEM 100% online | 1 year
+[EXTRACT] 30/100: Supporting Students with Intellectual Disability 100% online | 6 weeks
+Fetching 30/100: Supporting Students with Intellectual Disability 100% online | 6 weeks
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+Fetching 29/100: Science iSTEM 100% online | 1 year
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000176, in=2306 out=10)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership
+[per-course browser ✗] https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd: empty response
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=12719616B rendered=0B using=static text_len=50005
+[GP-DEBUG] text[:500]='%PDF-1.7 %���� 2637 0 obj <> endobj 2654 0 obj <>/Filter/FlateDecode/ID[]/Index[2637 34]/Info 2636 0 R/Length 87/Prev 13044969/Root 2638 0 R/Size 2671/Type/XRef/W[1 2 1]>>stream h�bbd\x10``b`�\x0f$\x18W\x01 �> �\x1a\x07$��A�\x03�8\x05$8�\x02 �h �� "��\x04�!�\x10\x05�x\x0e�\x08�\x04 \x11������\x0e����H9����O�\x01\x06��2\x0e> endstream endobj startxref 0 %%EOF 2670 0 obj <>stream h��UkL\x14W\x14>3;̲��ΰ �aÂ���V"\x10m탁\x05]�K�� \x06;+[И�ڂ�����H�� \x04�X7��\x1a-\x15\x13�\x01\x13^b+�B �4 Ƥ��_��ZImzgX�Bm��7�w��������\x0e������\x01�͠���\x07\x02H4C\x19�םli�ju:~�.4}W*�ㄖI=1�\x10�5��a\x15�5�\x06��\x08�S��YuZ\x14�n�(�zqM�^�]�#* '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/-/media/usq/study/degrees/undergrad → 0 field(s) (cost=$0.001022, in=13572 out=15)
+[FALLBACK] AI enriching https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=53186B rendered=68108B using=rendered text_len=3524
+[GP-DEBUG] text[:500]='The course equips teachers to effectively support students with intellectual disabilities. Participants will analyse characteristics and support needs, evaluate evidence-based practices, and generate strategies for teaching. Reflective practice and integrating research and assessment data will be emphasised. Through a scenario-based case study, participants will identify specific learning needs and consider individualised education plans, classroom environments and available resources. It utilis'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000150, in=1945 out=13)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability
+[per-course vision img 3/5 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 2/5 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] https://www.unisq.edu.au/-/media/usq/stu — english from central page: ielts=6.5
+[EXTRACT] 31/100: Professional Conversations - Coaching 100% online | 4 weeks
+Fetching 31/100: Professional Conversations - Coaching 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching
+[GP-DEBUG] static=56163B rendered=70377B using=rendered text_len=4315
+[GP-DEBUG] text[:500]='How science powers STEM learning and future innovation Science is central to innovation and national prosperity and plays a key role in STEM education. The study of science strengthens critical thinking and problem-solving capability and knowledge of science is also essential for informed and critical citizenship. Education in science is, for example, vital in responding to disruptive phenomena such as COVID-19 and climate change. Research-informed approaches to science education are important f'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000164, in=2134 out=14)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem
+[per-course vision img 2/5 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership: duration_value, duration_unit
+[CENTRAL ✓] Adaptive Educational Leadership — english from central page: ielts=6.5
+[EXTRACT] 32/100: Professional Conversations - Feedback 100% online | 4 weeks
+Fetching 32/100: Professional Conversations - Feedback 100% online | 4 weeks
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability: duration_value, duration_unit
+[CENTRAL ✓] Supporting Students with Intellectual Di — english from central page: ielts=6.5
+[EXTRACT] 33/100: Professional Conversations - Mentoring 100% online | 4 weeks
+Fetching 33/100: Professional Conversations - Mentoring 100% online | 4 weeks
+[GP-DEBUG] static=51491B rendered=66021B using=rendered text_len=2065
+[GP-DEBUG] text[:500]='Coaching is an essential element of managing better This course will introduce you to the coaching skills you’ll need to assist others to reach their goals. You will learn how to plan, implement and evaluate coaching conversations within your professional context. With these skills, you’ll also learn how to build a positive culture at work through coaching conversations. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning mater'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 825,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000121, in=1577 out=9)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem: duration_value, duration_unit
+[CENTRAL ✓] Science Istem — english from central page: ielts=6.5
+[EXTRACT] 34/100: Campaigning for Change 100% online | 4 weeks
+Fetching 34/100: Campaigning for Change 100% online | 4 weeks
+[GP-DEBUG] static=51755B rendered=66245B using=rendered text_len=2106
+[GP-DEBUG] text[:500]='Learning to effectively give feedback is a vital skill for leaders This course will show you how to give effective feedback to enhance the performance and expectations of your team. You will apply specialist knowledge of tools, models and techniques to deliver feedback within your professional context. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning materials are available on demand. About the course What will you achieve? '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000123, in=1587 out=12)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Professional Conversations - Coaching — english from central page: ielts=6.5
+[EXTRACT] 35/100: Connecting with Audience 100% online | 4 weeks
+Fetching 35/100: Connecting with Audience 100% online | 4 weeks
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience
+[GP-DEBUG] static=51980B rendered=66498B using=rendered text_len=2311
+[GP-DEBUG] text[:500]='Mentoring assists leaders in their ability to manage better This course will introduce you to the mentoring skills needed to support others in building capacity and confidence. You will learn how to plan, implement and evaluate mentoring conversations within your professional context. You will also gain an understanding of the benefits, limitations, barriers and risks for successful mentoring conversations. This course has a four-week teaching period requiring a total of approximately 40 hours o'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 825,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000126, in=1639 out=10)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Professional Conversations - Feedback — english from central page: ielts=6.5
+[EXTRACT] 36/100: Crafting Professional Publications 100% online | 4 weeks
+Fetching 36/100: Crafting Professional Publications 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication
+[GP-DEBUG] static=54186B rendered=68406B using=rendered text_len=2968
+[GP-DEBUG] text[:500]='Knowing how to create behavioural change is essential to public relations. This course illustrates how to develop a change communication campaign. You will be guided through the research process that will allow you to understand your target publics, and what motivates each group. You will be presented with a framework that will help you design an effective communications plan. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 11472.'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 1 field(s) (cost=$0.000138, in=1800 out=9)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Professional Conversations - Mentoring — english from central page: ielts=6.5
+[EXTRACT] 37/100: Creating Credible Content 100% online | 4 weeks
+Fetching 37/100: Creating Credible Content 100% online | 4 weeks
+[GP-DEBUG] static=56527B rendered=70879B using=rendered text_len=4031
+[GP-DEBUG] text[:500]='The use of publications has changed dramatically over the last few years. This course will show you have to present print information in a highly engaging way. You will develop skills to engage an audience through the creation of effective, dynamic publications that sell your brand story and deliver value to your readers. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning materials are available on demand. About the course Wha'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 11473,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 1 field(s) (cost=$0.000158, in=2068 out=9)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 3/5 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=56636B rendered=70849B using=rendered text_len=4252
+[GP-DEBUG] text[:500]='Create content that is reliable, valid, and builds trust and credibility This course will build your awareness of the importance of sourcing high quality, credible content for your role as a communications professional. The coursework aims to engage you in the critical evaluation of a variety of sources to determine their credibility, and the development of skills in sourcing information from key sources, including interviewees, and approaching your role as a communicator ethically. This course '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 10920,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 1 field(s) (cost=$0.000162, in=2121 out=9)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content
+[per-course vision img 2/5 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=56438B rendered=70671B using=rendered text_len=4064
+[GP-DEBUG] text[:500]='A professional communicator understands how to connect with their audience. This course will help you understand your audiences, including both internal and external stakeholders. It will look at how you communicate to colleagues, staff and management, as well as how to target your ideal clients, sponsors and shareholders. You will develop a clear understanding on the starting point of communication, and how to adapt your messages to suit. This course has a four-week teaching period requiring a '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000160, in=2074 out=15)
+[per-course vision img 0/5] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience
+[per-course vision img 2/5 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Crafting Professional Publications — english from central page: ielts=6.5
+[EXTRACT] 38/100: Generating Social Media 100% online | 4 weeks
+Fetching 38/100: Generating Social Media 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change: fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Campaigning for Change — english from central page: ielts=6.5
+[EXTRACT] 39/100: PR Tools for Making Sense of Chaos 100% online | 4 weeks
+Fetching 39/100: PR Tools for Making Sense of Chaos 100% online | 4 weeks
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Connecting with Audience — english from central page: ielts=6.5
+[EXTRACT] 40/100: Starting a Sustainability-Focused Business 100% online | On demand
+Fetching 40/100: Starting a Sustainability-Focused Business 100% online | On demand
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content: fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Creating Credible Content — english from central page: ielts=6.5
+[EXTRACT] 41/100: UniSQ Brochure
+Fetching 41/100: UniSQ Brochure
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/brochure
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/brochure — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=56285B rendered=68474B using=rendered text_len=3923
+[GP-DEBUG] text[:500]='Communicators have quickly moved online to meet the increasing demand for faster information. This course introduces students to effective communication over these online platforms. The emphasis is on developing knowledge and skills to effectively use social media and blogging to deliver targeted communications. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning materials are available on demand. About the course What will you'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000157, in=2039 out=13)
+[per-course vision img 0/3] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media
+[per-course vision img 0/3 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=4273B rendered=6222B using=rendered text_len=0
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/brochure → 0 field(s) (cost=$0.000082, in=1051 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/brochure (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=51695B rendered=66163B using=rendered text_len=2353
+[GP-DEBUG] text[:500]="Unlock Your Sustainable Venture's Potential: Master the Essentials of Green Entrepreneurship! Starting up a sustainability venture requires far more than a good idea and motivation. If you are someone with a strong interest in environmental sustainability or have a “green idea” then this course is for you! All course learning materials are available on demand. About the course What will you achieve? By the end of the course, you'll be able to: Examine the interrelation of entrepreneurship, creat"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 0,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000128, in=1648 out=13)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Unisq Brochure | University of Southern — english from central page: ielts=6.5
+[EXTRACT] 42/100: Diploma of Agriculture and Environmental Science Studies
+Fetching 42/100: Diploma of Agriculture and Environmental Science Studies
+[GP-DEBUG] static=54080B rendered=68476B using=rendered text_len=2895
+[GP-DEBUG] text[:500]='Knowing how to create a behavioural change is essential to public relations work. This course examines the framework that guides change communication campaigns. You will see the process of synthesising research results to gain insights into how to connect with target publics. This process provides the foundation for a change communication campaign. This course has a four-week teaching period requiring a total of approximately 40 hours of learning. All course learning materials are available on d'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000138, in=1784 out=13)
+[per-course vision img 0/4] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos
+[per-course vision img 2/4 (cache hits 2)] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business: international_fee, intake_months
+[CENTRAL ✓] Starting A Sustainability-focused Busine — english from central page: ielts=6.5
+[CATEGORY det] Starting A Sustainability-focused Busine → Agriculture & Environmental Science / Sustainability
+[EXTRACT] 43/100: Diploma of Business and Management Studies
+Fetching 43/100: Diploma of Business and Management Studies
+[GP-DEBUG] static=138848B rendered=0B using=static text_len=305
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 50.00 View full details Duration 1 year (or part-time equivalent) Location External Start Jan, May, Aug View dates Fees AUD 4,768 (Indicative annual fee) Recently viewed Diploma of Agriculture and Environmental Science Studies Location External Start Jan, May, Aug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000089, in=1139 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-agriculture-and-environmental-science-studies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Generating Social Media — english from central page: ielts=6.5
+[EXTRACT] 44/100: Diploma of Education and Teaching Studies
+Fetching 44/100: Diploma of Education and Teaching Studies
+[FALLBACK] AI filled 4 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos: international_fee, fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Pr Tools for Making Sense of Chaos — english from central page: ielts=6.5
+[EXTRACT] 45/100: Diploma of Engineering and Technologies
+Fetching 45/100: Diploma of Engineering and Technologies
+[GP-DEBUG] static=130527B rendered=0B using=static text_len=286
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 50.00 View full details Duration 1 year (or part-time equivalent) Location Online Start Jan, May, Aug View dates Fees AUD 2,960 (Indicative annual fee) Recently viewed Diploma of Education and Teaching Studies Location Online Start Jan, May, Aug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000088, in=1130 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-education-and-teaching-studies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=129036B rendered=0B using=static text_len=288
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 50.00 View full details Duration 1 year (or part-time equivalent) Location External Start Jan, May, Aug View dates Fees AUD 4,168 (Indicative annual fee) Recently viewed Diploma of Engineering and Technologies Location External Start Jan, May, Aug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000088, in=1130 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-engineering-and-technologies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-engineering-and-technologies: duration_value, duration_unit
+[EXTRACT] 46/100: Diploma of Law and Justice Studies
+Fetching 46/100: Diploma of Law and Justice Studies
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-education-and-teaching-studies: duration_value, duration_unit
+[CATEGORY det] Diploma of Education and Teaching Studie → Education & Social Work / Teaching
+[EXTRACT] 47/100: Find a degree
+Fetching 47/100: Find a degree
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree
+[GP-DEBUG] static=134671B rendered=0B using=static text_len=280
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 50.00 View full details Duration 1 year (or part-time equivalent) Location Online Start Jan, May, Aug View dates Fees AUD 13,044 (Indicative annual fee) Recently viewed Diploma of Law and Justice Studies Location Online Start Jan, May, Aug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000089, in=1127 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-law-and-justice-studies (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=134975B rendered=0B using=static text_len=334
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 50.00 View full details Duration 1 year (or part-time equivalent) Location Springfield Toowoomba Online Start Jan, May, Aug View dates Fees AUD 10,870 (Indicative annual fee) Recently viewed Diploma of Business and Management Studies Location Springfield, Toowoomba, Online Start Jan, May, Aug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000090, in=1143 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-business-and-management-studies (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-agriculture-and-environmental-science-studies: duration_value, duration_unit
+[CATEGORY det] Diploma of Agriculture and Environmental → Agriculture & Environmental Science / Agriculture
+[EXTRACT] 48/100: Associate Degree of Allied Health
+Fetching 48/100: Associate Degree of Allied Health
+[GP-DEBUG] static=76290B rendered=163656B using=rendered text_len=9630
+[GP-DEBUG] text[:500]='Show filters Study level Undergraduate Postgraduate Pathways Research Location External Ipswich Online Springfield Toowoomba Study area Arts and Communication Aviation Business Education and Teaching Engineering and Surveying Health Information Technology Law Sciences and Agriculture Pathways Start Jan Feb Mar Apr Jun May Jul Aug Sep Oct Nov ATAR Any 90 and below 80 and below 70 and below Below 60 Found 136 results. Undergraduate Associate Degree of Allied Health Go to degree (Associate Degree o'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/find-a-de → 0 field(s) (cost=$0.000264, in=3459 out=14)
+[per-course vision img 0/3] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree
+[per-course vision img 2/3 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-law-and-justice-studies: fee_currency, duration_value, duration_unit
+[EXTRACT] 49/100: Associate Degree of Criminology and Criminal Justice
+Fetching 49/100: Associate Degree of Criminology and Criminal Justice
+[GP-DEBUG] static=153985B rendered=0B using=static text_len=309
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 62.70 View full details Duration 2 years (or part-time equivalent) Location Ipswich Start Feb View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Ipswich 936191 Recently viewed Associate Degree of Allied Health Location Ipswich Start Feb'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000089, in=1134 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-allied-health (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-business-and-management-studies: fee_currency, duration_value, duration_unit
+[CATEGORY det] Diploma of Business and Management Studi → Business & Management / Management
+[EXTRACT] 50/100: Associate Degree of Medical Laboratory Science
+Fetching 50/100: Associate Degree of Medical Laboratory Science
+[GP-DEBUG] static=147976B rendered=0B using=static text_len=336
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 61.00 View full details Duration 2 years (or part-time equivalent) Location Online Start Feb, Jun View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 904215 Recently viewed Associate Degree of Criminology and Criminal Justice Location Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000090, in=1146 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-criminology-and-criminal-justice (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-criminology-and-criminal-justice: fee_currency, duration_value, duration_unit
+[CATEGORY det] Associate Degree of Criminology and Crim → Law & Legal Studies / Criminal Justice
+[EXTRACT] 51/100: Bachelor of Agricultural Technology
+Fetching 51/100: Bachelor of Agricultural Technology
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-allied-health: fee_currency, duration_value, duration_unit
+[EXTRACT] 52/100: Bachelor of Arts
+Fetching 52/100: Bachelor of Arts
+[GP-DEBUG] static=156203B rendered=0B using=static text_len=372
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 62.00 View full details Duration 3 years (or part-time equivalent) Location Toowoomba External Start Feb, Jun, Sep View dates Fees AUD 7,136 (Indicative annual fee) QTAC codes External 907445 Toowoomba 907231 Recently viewed Bachelor of Agricultural Technology Location Toowoomba, External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1150 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-agricultural-technology (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=195986B rendered=0B using=static text_len=687
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 58.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 909405 Toowoomba 909441 Springfield 929441 Notes: Only the Artificial Intelligence and Data Science (Extended) major and English Literature major are offered on-campus at UniSQ Springfield. Only the Artificial Intelligence and Data Science (Ex'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000096, in=1224 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[CENTRAL ✓] Unisq Degrees — english from central page: ielts=6.5
+[EXTRACT] 53/100: Bachelor of Arts and Bachelor of Business
+Fetching 53/100: Bachelor of Arts and Bachelor of Business
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-agricultural-technology: fee_currency, duration_value, duration_unit
+[EXTRACT] 54/100: Bachelor of Arts and Bachelor of Laws
+Fetching 54/100: Bachelor of Arts and Bachelor of Laws
+[GP-DEBUG] static=205092B rendered=0B using=static text_len=476
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 4 years (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 909625 Springfield 929621 Toowoomba 909621 Note: Not all courses are available at Springfield campus. Recently viewed Bachelor of Arts and Bachelor of Business Location Springfield, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000092, in=1178 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts: fee_currency, duration_value, duration_unit
+[EXTRACT] 55/100: Bachelor of Arts and Bachelor of Science
+Fetching 55/100: Bachelor of Arts and Bachelor of Science
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-business: fee_currency, duration_value, duration_unit
+[EXTRACT] 56/100: Bachelor of Arts (Honours)
+Fetching 56/100: Bachelor of Arts (Honours)
+[GP-DEBUG] static=206464B rendered=0B using=static text_len=487
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 4 years (or part-time equivalent) Location Toowoomba External Start Feb, Jun, Sep View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes External 909785 Toowoomba 909781 Note: Some majors within the Bachelor of Arts and Bachelor of Science are available via external study only. Recently viewed Bachelor of Arts and Bachelor of Science Location Toowoomba, External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000093, in=1180 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=131486B rendered=0B using=static text_len=273
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Online Start Feb, Jun View dates Fees AUD 17,392 (Indicative annual fee) Recently viewed Bachelor of Arts (Honours) Location Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000088, in=1123 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=156396B rendered=0B using=static text_len=373
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 62.70 View full details Duration 2 years (or part-time equivalent) Location Toowoomba External Start Feb, Jun View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Toowoomba 906921 External 906925 Recently viewed Associate Degree of Medical Laboratory Science Location Toowoomba, External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000091, in=1153 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-medical-laboratory-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 57/100: Bachelor of Clinical Exercise Physiology (Honours)
+Fetching 57/100: Bachelor of Clinical Exercise Physiology (Honours)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 58/100: Bachelor of Communication and Creative Industries
+Fetching 58/100: Bachelor of Communication and Creative Industries
+[GP-DEBUG] static=225533B rendered=0B using=static text_len=480
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 75.00 View full details Duration 5 years (or part-time equivalent) Location Ipswich Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Springfield 929911 Toowoomba 909911 Online 909915 Ipswich 939911 Note: Not all Arts majors are available to study on-campus. Recently viewed Bachelor of Arts and Bachelor of Laws Location Ipswich, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000093, in=1178 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-laws (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-laws: fee_currency, duration_value, duration_unit
+[EXTRACT] 59/100: Bachelor of Creative Arts and Community Wellbeing
+Fetching 59/100: Bachelor of Creative Arts and Community Wellbeing
+[GP-DEBUG] static=175642B rendered=0B using=static text_len=372
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 69.35 View full details Duration 4 years (or part-time equivalent) Location Ipswich External Start Feb, Jun View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes External 906215 Ipswich 936211 Recently viewed Bachelor of Clinical Exercise Physiology (Honours) Location Ipswich, External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1154 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-clinical-exercise-physiology-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=177564B rendered=0B using=static text_len=425
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 63.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 909885 Toowoomba 909881 Springfield 929881 Recently viewed Bachelor of Communication and Creative Industries Location Springfield, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000092, in=1167 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-communication-and-creative-industries (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-communication-and-creative-industries: fee_currency, duration_value, duration_unit
+[EXTRACT] 60/100: Bachelor of Creative Arts (Honours)
+Fetching 60/100: Bachelor of Creative Arts (Honours)
+[GP-DEBUG] static=176938B rendered=0B using=static text_len=565
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes Springfield 929941 Online 909945 Toowoomba 909941 Toowoomba campus: Theatre and Visual Art majors only. Springfield campus: Music major only. Online study: Music and Visual Art majors only. Recently viewed Bachelor of Creative Arts and Community Well'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000094, in=1202 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-and-community-wellbeing (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-medical-laboratory-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 61/100: Bachelor of Digital Design
+Fetching 61/100: Bachelor of Digital Design
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-and-community-wellbeing: fee_currency, duration_value, duration_unit
+[EXTRACT] 62/100: Bachelor of Environmental Science
+Fetching 62/100: Bachelor of Environmental Science
+[GP-DEBUG] static=141885B rendered=0B using=static text_len=337
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) Recently viewed Bachelor of Creative Arts (Honours) Location Springfield, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1141 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=155263B rendered=0B using=static text_len=354
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Online Start Feb, Jun View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes Springfield 929931 Online 909935 Recently viewed Bachelor of Digital Design Location Springfield, Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1144 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-digital-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 63/100: Bachelor of Film and Screen Production
+Fetching 63/100: Bachelor of Film and Screen Production
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-digital-design: fee_currency, duration_value, duration_unit
+[EXTRACT] 64/100: Bachelor of Laws
+Fetching 64/100: Bachelor of Laws
+[GP-DEBUG] static=154066B rendered=0B using=static text_len=370
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 62.00 View full details Duration 3 years (or part-time equivalent) Location Toowoomba External Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Toowoomba 906441 External 907375 Recently viewed Bachelor of Environmental Science Location Toowoomba, External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1149 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-environmental-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=181534B rendered=0B using=static text_len=380
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 75.00 View full details Duration 3 years (or part-time equivalent) Location Ipswich Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Ipswich 934111 Online 904115 Toowoomba 904111 Recently viewed Bachelor of Laws Location Ipswich, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1148 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=161480B rendered=0B using=static text_len=404
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes Toowoomba 909961 Springfield 929961 Online 909965 Recently viewed Bachelor of Film and Screen Production Location Springfield, Toowoomba, Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1159 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-film-and-screen-production (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-environmental-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 65/100: Bachelor of Laws (Honours)
+Fetching 65/100: Bachelor of Laws (Honours)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-clinical-exercise-physiology-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 66/100: Bachelor of Medical Laboratory Science
+Fetching 66/100: Bachelor of Medical Laboratory Science
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-film-and-screen-production: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Film and Screen Production → Media & Communications / Film & Screen
+[EXTRACT] 67/100: Bachelor of Music
+Fetching 67/100: Bachelor of Music
+[GP-DEBUG] static=142423B rendered=0B using=static text_len=283
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) Recently viewed Bachelor of Laws (Honours) Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1125 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=170389B rendered=0B using=static text_len=367
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 65.60 View full details Duration 3.5 years (or part-time equivalent) Location Toowoomba External Start Feb, Jun View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Toowoomba 906891 External 906895 Recently viewed Bachelor of Medical Laboratory Science Location Toowoomba, External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1150 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-medical-laboratory-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-medical-laboratory-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 68/100: Bachelor of Nursing
+Fetching 68/100: Bachelor of Nursing
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws: fee_currency, duration_value, duration_unit
+[EXTRACT] 69/100: Bachelor of Occupational Therapy (Honours)
+Fetching 69/100: Bachelor of Occupational Therapy (Honours)
+[GP-DEBUG] static=154310B rendered=0B using=static text_len=344
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Springfield Online Start Feb, Jun View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Springfield 929991 Online 909995 Recently viewed Bachelor of Music Location Springfield, Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1139 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-music (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 70/100: Bachelor of Paramedicine
+Fetching 70/100: Bachelor of Paramedicine
+[GP-DEBUG] static=169752B rendered=0B using=static text_len=357
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 75.00 View full details Duration 4 years (or part-time equivalent) Location Ipswich Toowoomba Start Feb View dates Fees AUD 10,518 (Indicative annual fee) QTAC codes Ipswich 936181 Toowoomba 906181 Recently viewed Bachelor of Occupational Therapy (Honours) Location Ipswich, Toowoomba Start Feb'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1148 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-occupational-therapy-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=164642B rendered=0B using=static text_len=418
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 65.60 View full details Duration 3 years (or part-time equivalent) Location Ipswich Start Feb View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Ipswich 936151 Recently viewed Bachelor of Sport and Exercise Science Location Ipswich, External Start Feb, Jun Bachelor of Education (Primary) Location Springfield, Toowoomba, External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000091, in=1159 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-paramedicine (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-occupational-therapy-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 71/100: Bachelor of Physiotherapy (Honours)
+Fetching 71/100: Bachelor of Physiotherapy (Honours)
+[GP-DEBUG] static=185694B rendered=0B using=static text_len=502
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Ipswich Toowoomba External Start Feb, Jun, Sep View dates Fees AUD 5,336 (Indicative annual fee) QTAC codes View QTAC details Recently viewed Bachelor of Paramedicine Location Ipswich Start Feb Bachelor of Sport and Exercise Science Location Ipswich, External Start Feb, Jun Bachelor of Education (Primary) Location Springfield, Toowoomba, External Start Feb, J'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000093, in=1179 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-nursing (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-music: fee_currency, duration_value, duration_unit
+[EXTRACT] 72/100: Bachelor of Psychology (Honours)
+Fetching 72/100: Bachelor of Psychology (Honours)
+[GP-DEBUG] static=173795B rendered=0B using=static text_len=349
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 85.00 View full details Duration 4 years (or part-time equivalent) Location Ipswich Toowoomba Start Feb View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Toowoomba 906232 Ipswich 936232 Recently viewed Bachelor of Physiotherapy (Honours) Location Ipswich, Toowoomba Start Feb'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1144 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-physiotherapy-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-physiotherapy-honours: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Physiotherapy (Honours) → Medicine & Health / Physiotherapy
+[EXTRACT] 73/100: Bachelor of Science
+Fetching 73/100: Bachelor of Science
+[GP-DEBUG] static=177579B rendered=0B using=static text_len=793
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 68.25 View full details Duration 4 years (or part-time equivalent) Location Ipswich Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Ipswich 936801 Online 906805 Notes: Domestic students can only study this degree with a full-time load if starting in February (Trimester 1). Part-time study is offered if starting in June (Trimester 2) or September (Trimester 3). This degree is an APAC-accredited '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000098, in=1254 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-psychology-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-paramedicine: fee_currency, duration_value, duration_unit
+[EXTRACT] 74/100: Bachelor of Science (Psychology)
+Fetching 74/100: Bachelor of Science (Psychology)
+[GP-DEBUG] static=167207B rendered=0B using=static text_len=385
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Toowoomba External Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes External 906185 Toowoomba 906161 Online 906195 Recently viewed Bachelor of Science Location Toowoomba, External, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1150 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=153651B rendered=0B using=static text_len=432
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Ipswich Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes View QTAC details Note: The September (Trimester 3) intake is offered online only. Recently viewed Bachelor of Science (Psychology) Location Ipswich, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='pswich Toowoomba".\n\n * `international_fee`: Null'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000091, in=1164 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science-psychology (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-nursing: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[EXTRACT] 75/100: Bachelor of Social Work
+Fetching 75/100: Bachelor of Social Work
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 76/100: Bachelor of Social Work (Honours)
+Fetching 76/100: Bachelor of Social Work (Honours)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-psychology-honours: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Psychology (Honours) → Medicine & Health / Psychology
+[EXTRACT] 77/100: Bachelor of Speech Pathology (Honours)
+Fetching 77/100: Bachelor of Speech Pathology (Honours)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours
+[GP-DEBUG] static=175152B rendered=0B using=static text_len=400
+[GP-DEBUG] text[:500]='Domestic student Entry requirements ATAR 65.60 View full details Duration 4 years (or part-time equivalent) Location External Start Feb, Jun View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes External 909135 Note: This degree includes mandatory residential school courses and workshops at the UniSQ Toowoomba campus. Recently viewed Bachelor of Social Work Location External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1154 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social-work (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=168944B rendered=177868B using=rendered text_len=322
+[GP-DEBUG] text[:500]='Domestic student International student Compare Entry requirements ATAR 75.00 View full details Duration 4 years (or part-time equivalent) Location Ipswich Start Feb View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Ipswich 936371 Recently viewed Bachelor of Speech Pathology (Honours) Location Ipswich Start Feb'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1138 out=12)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science-psychology: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT] 78/100: Bachelor of Sport and Exercise Science
+Fetching 78/100: Bachelor of Sport and Exercise Science
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social-work: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT] 79/100: Bachelor of Theatre
+Fetching 79/100: Bachelor of Theatre
+[GP-DEBUG] static=166363B rendered=0B using=static text_len=399
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 4 years (or part-time equivalent) Location External Start Feb, Jun View dates Fees AUD 13,464 (Indicative annual fee) QTAC codes External 909185 Note: This degree includes mandatory residential school courses and workshops at the UniSQ Toowoomba campus. Recently viewed Bachelor of Social Work (Honours) Location External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000091, in=1156 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social-work-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=160073B rendered=0B using=static text_len=301
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Toowoomba Start Feb View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Toowoomba 909981 Recently viewed Bachelor of Theatre Location Toowoomba Start Feb'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000089, in=1129 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-theatre (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social-work-honours: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Social Work (Honours) → Education & Social Work / Social Work
+[EXTRACT] 80/100: Bachelor of Visual Art
+Fetching 80/100: Bachelor of Visual Art
+[GP-DEBUG] static=159191B rendered=0B using=static text_len=343
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 60.00 View full details Duration 3 years (or part-time equivalent) Location Toowoomba Online Start Feb, Jun View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes Online 909975 Toowoomba 909971 Recently viewed Bachelor of Visual Art Location Toowoomba, Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1140 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-visual-art (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-visual-art: fee_currency, duration_value, duration_unit
+[EXTRACT] 81/100: Diploma of Arts
+Fetching 81/100: Diploma of Arts
+[GP-DEBUG] static=175192B rendered=0B using=static text_len=390
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 58.00 View full details Duration 1 year (or part-time equivalent) Location Springfield Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 909355 Toowoomba 909351 Springfield 929351 Recently viewed Diploma of Arts Location Springfield, Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000090, in=1150 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-arts: fee_currency, duration_value, duration_unit
+[EXTRACT] 82/100: Diploma of Professional Communication
+Fetching 82/100: Diploma of Professional Communication
+[GP-DEBUG] static=174060B rendered=0B using=static text_len=368
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 65.60 View full details Duration 3 years (or part-time equivalent) Location Ipswich External Start Feb, Jun View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Ipswich 936111 External 906145 Recently viewed Bachelor of Education (Primary) Location Springfield, Toowoomba, External Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000090, in=1150 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-sport-and-exercise-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-theatre: duration_value, duration_unit
+[EXTRACT] 83/100: Diploma of Professional Photography
+Fetching 83/100: Diploma of Professional Photography
+[per-course vision img 5/6 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=143964B rendered=0B using=static text_len=353
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 63.00 View full details Duration 1.5 years part-time Location Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Online 909545 Toowoomba 909541 Recently viewed Diploma of Professional Photography Location Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000090, in=1146 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-photography (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-sport-and-exercise-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 84/100: Graduate Certificate of Counselling
+Fetching 84/100: Graduate Certificate of Counselling
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours: fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Bachelor of Speech Pathology (Honours) — english from central page: ielts=6.5
+[EXTRACT] 85/100: Graduate Certificate of Nursing
+Fetching 85/100: Graduate Certificate of Nursing
+[FALLBACK] AI filled 1 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-photography: fee_currency
+[EXTRACT] 86/100: Graduate Certificate of Public Health
+Fetching 86/100: Graduate Certificate of Public Health
+[GP-DEBUG] static=147595B rendered=0B using=static text_len=368
+[GP-DEBUG] static=136655B rendered=0B using=static text_len=276
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 63.00 View full details Duration 1 year (or part-time equivalent) Location Toowoomba Online Start Feb, Jun, Sep View dates Fees AUD 17,392 (Indicative annual fee) QTAC codes Toowoomba 909521 Online 909525 Recently viewed Diploma of Professional Communication Location Toowoomba, Online Start Feb, Jun, Sep'
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year part-time Location Online Start Feb, Jun, Sep View dates Fees AUD 14,880 (Indicative annual fee) Recently viewed Graduate Certificate of Counselling Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 14880,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000090, in=1150 out=14)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 1 field(s) (cost=$0.000087, in=1126 out=9)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-communication (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-counselling (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=135668B rendered=0B using=static text_len=271
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year part-time Location Online Start Feb, Jun, Sep View dates Fees AUD 4,768 (Indicative annual fee) Recently viewed Graduate Certificate of Nursing Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000088, in=1124 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-nursing (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=124365B rendered=0B using=static text_len=303
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 0.5 years (or part-time equivalent) Location Ipswich Online Start Feb, Sep View dates Fees AUD 4,768 (Indicative annual fee) Recently viewed Graduate Certificate of Public Health Location Ipswich, Online Start Feb, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000089, in=1134 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-public-health: duration_value, duration_unit
+[CATEGORY det] Graduate Certificate of Public Health → Medicine & Health / Public Health
+[EXTRACT] 87/100: Graduate Diploma of Counselling
+Fetching 87/100: Graduate Diploma of Counselling
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-communication: duration_value, duration_unit
+[EXTRACT] 88/100: Graduate Diploma of Midwifery
+Fetching 88/100: Graduate Diploma of Midwifery
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-counselling: fee_currency, duration_value, duration_unit
+[EXTRACT] 89/100: Graduate Diploma of Nursing
+Fetching 89/100: Graduate Diploma of Nursing
+[GP-DEBUG] static=138338B rendered=0B using=static text_len=292
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location External Start Feb, Jun, Sep View dates Fees AUD 29,760 (Indicative annual fee) Recently viewed Graduate Diploma of Counselling Location External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 29760,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 1 field(s) (cost=$0.000087, in=1129 out=9)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-counselling (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Graduate Certificate of Nursing → Medicine & Health / Nursing
+[EXTRACT] 90/100: Graduate Diploma of Public Health
+Fetching 90/100: Graduate Diploma of Public Health
+[GP-DEBUG] static=144484B rendered=0B using=static text_len=268
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 2 years part-time Location Online Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) Recently viewed Graduate Diploma of Nursing Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000088, in=1122 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-nursing (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=129304B rendered=0B using=static text_len=296
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Ipswich Online Start Feb, Sep View dates Fees AUD 9,536 (Indicative annual fee) Recently viewed Graduate Diploma of Public Health Location Ipswich, Online Start Feb, Sep'
+[GP-DEBUG] static=134610B rendered=0B using=static text_len=247
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 1 year (or part-time equivalent) Location External Start Feb View dates Fees AUD 4,736 (Indicative annual fee) Recently viewed Graduate Diploma of Midwifery Location External Start Feb'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000088, in=1131 out=10)
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-public-health (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000088, in=1118 out=13)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-midwifery (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-public-health: fee_currency, duration_value, duration_unit
+[CATEGORY det] Graduate Diploma of Public Health → Medicine & Health / Public Health
+[EXTRACT] 91/100: Juris Doctor
+Fetching 91/100: Juris Doctor
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-nursing: duration_value, duration_unit
+[CATEGORY det] Graduate Diploma of Nursing → Medicine & Health / Nursing
+[EXTRACT] 92/100: Master of Laws
+Fetching 92/100: Master of Laws
+[GP-DEBUG] static=161947B rendered=0B using=static text_len=270
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 3 years (or part-time equivalent) Location Online Start Feb, Jun, Sep View dates Fees AUD 34,200 (Indicative annual fee) Recently viewed Juris Doctor Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34200,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/juris-doc → 1 field(s) (cost=$0.000087, in=1119 out=9)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/juris-doctor (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-midwifery: duration_value, duration_unit
+[CATEGORY det] Graduate Diploma of Midwifery → Medicine & Health / Nursing
+[EXTRACT] 93/100: Master of Nursing
+Fetching 93/100: Master of Nursing
+[GP-DEBUG] static=160034B rendered=0B using=static text_len=271
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 1 year (or part-time equivalent) Location Online Start Feb, Jun, Sep View dates Fees AUD 34,200 (Indicative annual fee) Recently viewed Master of Laws Location Online Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34200,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 1 field(s) (cost=$0.000087, in=1120 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-laws (missing: domestic_fee, duration_text, intake_text, location_text)
+[DOMESTIC ONLY] https://www.unisq.edu.au/study/degrees-and-courses/master-of-nursing — course page states domestic-students-only; skipping
+[EXTRACT] 94/100: Master of Public Health
+Fetching 94/100: Master of Public Health
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-counselling: fee_currency, duration_value, duration_unit
+[EXTRACT] 95/100: Undergraduate Certificate of Psychology Fundamentals
+Fetching 95/100: Undergraduate Certificate of Psychology Fundamentals
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-laws: fee_currency, duration_value, duration_unit
+[EXTRACT] 96/100: English Language Preparatory Courses for Domestic Students
+Fetching 96/100: English Language Preparatory Courses for Domestic Students
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/juris-doctor: fee_currency, duration_value, duration_unit
+[CATEGORY det] Juris Doctor → Law & Legal Studies / Juris Doctor
+[EXTRACT] 97/100: English for Academic Purposes
+Fetching 97/100: English for Academic Purposes
+[GP-DEBUG] static=122167B rendered=0B using=static text_len=279
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 0.5 years (or part-time equivalent) Location Online Start Feb, Jun View dates Fees AUD 8,696 (Indicative annual fee) Recently viewed Undergraduate Certificate of Psychology Fundamentals Location Online Start Feb, Jun'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/undergrad → 0 field(s) (cost=$0.000088, in=1131 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-certificate-of-psychology-fundamentals (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-certificate-of-psychology-fundamentals: fee_currency, duration_value, duration_unit
+[CATEGORY det] Undergraduate Certificate of Psychology → Medicine & Health / Psychology
+[EXTRACT] 98/100: Bachelor of Engineering (Honours)
+Fetching 98/100: Bachelor of Engineering (Honours)
+[GP-DEBUG] static=156950B rendered=0B using=static text_len=287
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements View full details Duration 2 years (or part-time equivalent) Location Ipswich Online Start Feb, Sep View dates Fees AUD 9,536 (Indicative annual fee) Recently viewed Master of Public Health Location Ipswich, Online Start Feb, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000087, in=1126 out=10)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-public-health (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=179613B rendered=0B using=static text_len=414
+[GP-DEBUG] text[:500]='Domestic student International student Entry requirements ATAR 69.50 View full details Duration 4 years (or part-time equivalent) Location Springfield Toowoomba External Start Feb, Jun, Sep View dates Fees AUD 9,536 (Indicative annual fee) QTAC codes External 907335 Toowoomba 907331 Springfield 927331 Recently viewed Bachelor of Engineering (Honours) Location Springfield, Toowoomba, External Start Feb, Jun, Sep'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000091, in=1160 out=14)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-engineering-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=116375B rendered=0B using=static text_len=252
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 0.4 years (or part-time equivalent) Location Online Start Jan, Mar, Aug, Oct View dates Fees View fees Recently viewed English for Academic Purposes Location Online Start Jan, Mar, Aug, Oct'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/english-f → 0 field(s) (cost=$0.000088, in=1119 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/english-for-academic-purposes (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/master-of-public-health: fee_currency, duration_value, duration_unit
+[CATEGORY det] Master of Public Health → Medicine & Health / Public Health
+[EXTRACT] 99/100: Discover more
+Fetching 99/100: Discover more
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering
+[GP-DEBUG] static=118438B rendered=0B using=static text_len=265
+[GP-DEBUG] text[:500]='Domestic student Entry requirements View full details Duration 0.5 years (or part-time equivalent) Location External Start Mar, Jul View dates Fees View fees Recently viewed English Language Preparatory Courses for Domestic Students Location External Start Mar, Jul'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/english-l → 0 field(s) (cost=$0.000088, in=1129 out=12)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/english-language-preparatory-courses-for-domestic-students (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/english-for-academic-purposes: duration_value, duration_unit
+[EXTRACT] 100/100: Bachelor of Science (Food and Beverage Science)
+Fetching 100/100: Bachelor of Science (Food and Beverage Science)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/food-beverage-science
+[GP-DEBUG] static=229439B rendered=242217B using=rendered text_len=30568
+[GP-DEBUG] text[:500]='Take your first step First Name * Email Address * I’m not sure I’m in high school I’m looking to do my first degree I’m looking to do another bachelor degree I’m looking to do a university preparation program I’m looking to do a postgraduate degree I’m looking for a short course I’m looking to do a research project I’m a parent or guardian What best describes you? * Please select 2026 2027 2028 2029 2030 What year will you finish? Not listed Highlands Christian College Agnew School (Toowoomba) D'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/engineeri → 0 field(s) (cost=$0.000657, in=8700 out=14)
+[per-course vision img 0/6] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/food-beverage-science — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=72095B rendered=85242B using=rendered text_len=0
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34160,'
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/foo → 1 field(s) (cost=$0.000082, in=1055 out=9)
+[per-course vision img 0/3] https://www.unisq.edu.au/study/degrees-and-courses/major/food-beverage-science
+[FALLBACK] AI filled 2 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/english-language-preparatory-courses-for-domestic-students: duration_value, duration_unit
+[per-course vision img 3/6 (cache hits 3)] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 1/3 (cache hits 1)] https://www.unisq.edu.au/study/degrees-and-courses/major/food-beverage-science — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/food-beverage-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-engineering-honours: fee_currency, duration_value, duration_unit
+[CENTRAL ✓] Food and Beverage Science — english from central page: ielts=6.5
+[CENTRAL ✓] Engineering Degrees — english from central page: ielts=6.5
+[EXTRACT] [sibling cache ↻ build unknown] ielts_overall=4.5
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=14.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5 pte_overall=14.0
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 27 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 6 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill unknown] 2 slot(s) filled across siblings
+[STAGE] skipped Pathways to University: rejected: category_landing_page
+[STAGE] skipped Undergraduate Study: rejected: category_landing_page
+[STAGE] skipped Online Study: rejected: category_landing_page
+[STAGE] skipped Postgraduate Study: rejected: category_landing_page
+[STAGE] skipped Research Degrees: rejected: category_landing_page
+[STAGE] skipped Compare Degrees: rejected: category_landing_page
+[STAGE] skipped Arts and Communication Degrees: rejected: category_landing_page
+[STAGE] skipped Aviation Degrees: rejected: category_landing_page
+[STAGE] skipped Business Degrees: rejected: category_landing_page
+[STAGE] skipped Education and Teaching Degrees: rejected: category_landing_page
+[STAGE] skipped Engineering and Surveying Degrees: rejected: category_landing_page
+[STAGE] skipped Health Degrees: rejected: category_landing_page
+[STAGE] skipped Information Technology Degrees: rejected: category_landing_page
+[STAGE] skipped Sciences and Agriculture Degrees: rejected: category_landing_page
+[STAGE] skipped Law Degrees: rejected: category_landing_page
+[STAGE] skipped New Degrees At Unisq: rejected: category_landing_page
+[STAGE] skipped Unisq Ready: rejected: category_landing_page
+[STAGE] skipped Download our Undergraduate Guide: rejected: category_landing_page
+[STAGE] skipped Uniprep: rejected: category_landing_page
+[STAGE] saved: Bachelor of Science (Honours)
+[STAGE] saved: Master of Clinical Psychology
+[STAGE] skipped Master of Clinical Psychology - Advanced Entry: rejected: online_only
+[STAGE] saved: Master of Counselling
+[STAGE] saved: Master of Professional Psychology
+[STAGE] skipped Understanding University Terminology: rejected: category_landing_page
+[STAGE] skipped Browse our undergrad guide: rejected: category_landing_page
+[STAGE] skipped Digital Badges: rejected: generic category page
+[STAGE] skipped Adaptive Educational Leadership: rejected: category_landing_page
+[STAGE] skipped Science Istem: rejected: category_landing_page
+[STAGE] skipped Supporting Students with Intellectual Disability to Be Successful Learners: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Coaching: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Feedback: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Mentoring: rejected: category_landing_page
+[STAGE] skipped Campaigning for Change: rejected: category_landing_page
+[STAGE] skipped Connecting with Audience: rejected: category_landing_page
+[STAGE] skipped Crafting Professional Publications: rejected: category_landing_page
+[STAGE] skipped Creating Credible Content: rejected: category_landing_page
+[STAGE] skipped Generating Social Media: rejected: category_landing_page
+[STAGE] skipped Pr Tools for Making Sense of Chaos: rejected: category_landing_page
+[STAGE] skipped Starting a Sustainability-Focused Business 100% online | On demand: extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Unisq Brochure | University of Southern Queensland: rejected: category_landing_page
+[STAGE] saved: Diploma of Agriculture and Environmental Science Studies
+[STAGE] saved: Diploma of Business and Management Studies
+[STAGE] skipped Diploma of Education and Teaching Studies: rejected: online_only
+[STAGE] saved: Diploma of Engineering and Technologies
+[STAGE] skipped Diploma of Law and Justice Studies: rejected: online_only
+[STAGE] skipped Unisq Degrees: rejected: category_landing_page
+[STAGE] saved: Associate Degree of Allied Health
+[STAGE] saved: Associate Degree of Criminology and Criminal Justice
+[STAGE] skipped Associate Degree of Medical Laboratory Science: rejected: online_only
+[STAGE] skipped Bachelor of Agricultural Technology: rejected: online_only
+[STAGE] saved: Bachelor of Arts
+[STAGE] saved: Bachelor of Arts and Bachelor of Business
+[STAGE] saved: Bachelor of Arts and Bachelor of Laws
+[STAGE] saved: Bachelor of Arts and Bachelor of Science
+[STAGE] saved: Bachelor of Arts (Honours)
+[STAGE] saved: Bachelor of Clinical Exercise Physiology (Honours)
+[STAGE] saved: Bachelor of Communication and Creative Industries
+[STAGE] skipped Bachelor of Creative Arts and Community Wellbeing: rejected: online_only
+[STAGE] saved: Bachelor of Creative Arts (Honours)
+[STAGE] saved: Bachelor of Digital Design
+[STAGE] saved: Bachelor of Environmental Science
+[STAGE] saved: Bachelor of Film and Screen Production
+[STAGE] saved: Bachelor of Laws
+[STAGE] skipped Bachelor of Laws (Honours): rejected: online_only
+[STAGE] saved: Bachelor of Medical Laboratory Science
+[STAGE] skipped Bachelor of Music: rejected: online_only
+[STAGE] skipped Bachelor of Nursing: rejected: online_only
+[STAGE] saved: Bachelor of Occupational Therapy (Honours)
+[STAGE] skipped Bachelor of Paramedicine: rejected: online_only
+[STAGE] saved: Bachelor of Physiotherapy (Honours)
+[STAGE] skipped Bachelor of Psychology (Honours): rejected: online_only
+[STAGE] skipped Bachelor of Science: rejected: online_only
+[STAGE] saved: Bachelor of Science (Psychology)
+[STAGE] saved: Bachelor of Social Work
+[STAGE] saved: Bachelor of Social Work (Honours)
+[STAGE] saved: Bachelor of Speech Pathology (Honours)
+[STAGE] saved: Bachelor of Sport and Exercise Science
+[STAGE] saved: Bachelor of Theatre
+[STAGE] saved: Bachelor of Visual Art
+[STAGE] saved: Diploma of Arts
+[STAGE] skipped Diploma of Professional Communication: rejected: online_only
+[STAGE] skipped Diploma of Professional Photography: rejected: online_only
+[STAGE] saved: Graduate Certificate of Counselling
+[STAGE] skipped Graduate Certificate of Nursing: rejected: online_only
+[STAGE] saved: Graduate Certificate of Public Health
+[STAGE] skipped Graduate Diploma of Counselling: rejected: online_only
+[STAGE] saved: Graduate Diploma of Midwifery
+[STAGE] skipped Graduate Diploma of Nursing: rejected: online_only
+[STAGE] skipped Graduate Diploma of Public Health: rejected: online_only
+[STAGE] skipped Juris Doctor: rejected: category_landing_page
+[STAGE] skipped Master of Laws: rejected: online_only
+[STAGE] skipped Master of Nursing: rejected: domestic_only
+[STAGE] saved: Master of Public Health
+[STAGE] skipped Undergraduate Certificate of Psychology Fundamentals: rejected: category_landing_page
+[STAGE] skipped English Language Preparatory Courses for Domestic Students: rejected: category_landing_page
+[STAGE] skipped English for Academic Purposes: rejected: category_landing_page
+[STAGE] skipped Bachelor of Engineering (Honours): rejected: online_only
+[STAGE] skipped Engineering Degrees: rejected: category_landing_page
+[STAGE] skipped Food and Beverage Science: rejected: category_landing_page
+[GEMINI] Total cost: $0.0184 USD across 36 course(s) (~$0.00051/course)
+[TIMING] Total: 13m 49s | Courses: 36 | Avg: 23.0s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:100 | Staged:36 | Skipped:63 | Errors:1
+Staged 36 courses, 63 skipped, 0 fetch errors

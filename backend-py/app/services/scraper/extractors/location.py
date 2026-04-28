@@ -339,6 +339,36 @@ def _from_headings(soup: BeautifulSoup) -> str | None:
     return None
 
 
+# Pattern used by Flinders University (and similar) to encode the
+# delivery campus inside the delivery-mode field:
+#   <div class="international_content_marker">In person (Bedford Park, City)</div>
+# We extract the campus name(s) from inside the parentheses.
+_IN_PERSON_RE = re.compile(r"\bIn\s+person\s*\(([^)]+)\)", re.I)
+
+
+def _from_delivery_mode_inperson(soup: BeautifulSoup) -> str | None:
+    """Extract campus from 'In person (Campus, ...)' delivery-mode markers.
+
+    First preference: elements with class ``international_content_marker``
+    (Flinders, and others that distinguish domestic vs international delivery).
+    Second preference: any element whose text matches the pattern.
+    """
+    # Prefer international-specific elements
+    for cls in ("international_content_marker", "delivery_mode"):
+        for el in soup.find_all(class_=cls):
+            text = el.get_text(separator=" ", strip=True)
+            m = _IN_PERSON_RE.search(text)
+            if m:
+                campuses_raw = m.group(1)
+                # Split on commas, strip, filter blanks
+                parts = [p.strip() for p in campuses_raw.split(",") if p.strip()]
+                # Drop pure "Online" / "remote" variants
+                parts = [p for p in parts if not _REMOVE_VIRTUAL.search(p)]
+                if parts:
+                    return _normalise(", ".join(parts))
+    return None
+
+
 def _from_text_block(text: str) -> str | None:
     text = compact(text)
     if not text:
@@ -370,6 +400,8 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         ("dl", _from_dl(soup), 0.9),
         ("table", _from_tables(soup), 0.85),
         ("heading", _from_headings(soup), 0.7),
+        # "In person (CampusName)" delivery-mode pattern (Flinders, etc.)
+        ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
         ("text_block", _from_text_block(html_to_text(html)), 0.5),
     )
     for method, raw, conf in cascade:

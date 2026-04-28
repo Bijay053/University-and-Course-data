@@ -561,12 +561,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         max_pages = 12 if job.fast_mode else 25
         max_courses = 20 if job.fast_mode else _MAX_COURSES_PER_JOB
-        # UOW has ~62 listing pages — raise the BFS page budget so all
-        # pre-seeded pagination URLs (?page=N) can be visited in one pass.
+        # Per-university overrides for BFS page/course budgets.
         from urllib.parse import urlparse as _urlparse_mp
         _scrape_host = (_urlparse_mp(scrape_url).netloc or "").lower()
-        if not job.fast_mode and _scrape_host in ("www.uow.edu.au", "uow.edu.au"):
-            max_pages = 80
+        if not job.fast_mode:
+            # UOW has ~62 listing pages — raise the BFS page budget so all
+            # pre-seeded pagination URLs (?page=N) can be visited in one pass.
+            if _scrape_host in ("www.uow.edu.au", "uow.edu.au"):
+                max_pages = 80
+            # Flinders listing puts pure Masters after position 255; add the
+            # postgraduate seed and raise the course cap to capture all ~250
+            # eligible courses (bachelors + masters + combined programs).
+            if _scrape_host in ("www.flinders.edu.au", "flinders.edu.au"):
+                max_courses = 400
         log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")
