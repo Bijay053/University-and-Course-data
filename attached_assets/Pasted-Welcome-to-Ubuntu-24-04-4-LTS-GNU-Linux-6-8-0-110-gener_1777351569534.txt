@@ -1,0 +1,52 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 03:47:03 UTC 2026
+
+  System load:           0.95
+  Usage of /:            3.3% of 231.44GB
+  Memory usage:          13%
+  Swap usage:            0%
+  Processes:             176
+  Users logged in:       0
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+12 updates can be applied immediately.
+8 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 03:43:24 2026 from 198.211.111.194
+root@university-and-course-data:~# cd /path/to/University-and-Course-data && git pull origin main
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+root@university-and-course-data:~# cd /path/to/University-and-Course-data
+git pull origin main
+
+# Restart the backend services so the new gate is loaded
+sudo systemctl restart fastapi
+sudo systemctl restart celery-worker
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+Failed to restart fastapi.service: Unit fastapi.service not found.
+Failed to restart celery-worker.service: Unit celery-worker.service not found.
+root@university-and-course-data:~# cd /path/to/University-and-Course-data
+git pull origin main
+docker compose restart backend-py celery-worker
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+Command 'docker' not found, but can be installed with:
+apt install docker.io      # version 29.1.3-0ubuntu3~24.04.1, or
+apt install podman-docker  # version 4.9.3+ds1-1ubuntu0.2
+root@university-and-course-data:~# 
