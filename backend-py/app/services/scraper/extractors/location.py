@@ -53,6 +53,11 @@ _COMMON_CITIES = (
     "Port Macquarie", "Toowoomba",
 )
 
+_PERIOD_LABEL_RE = re.compile(
+    r"^(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+$",
+    re.I,
+)
+
 
 def _looks_marketing(text: str) -> bool:
     t = text.strip()
@@ -73,6 +78,11 @@ def _normalise(raw: str | None) -> str | None:
     if len(head) <= 2 or "<" in head or ">" in head:
         return None
     if _JUNK.search(head):
+        return None
+    # Reject bare period/semester labels (e.g. "Semester 1", "Trimester 2") —
+    # these appear as ECU-style pivot-table column headers and must never be
+    # returned as a campus location.
+    if _PERIOD_LABEL_RE.match(head):
         return None
     return head[:120]
 
@@ -202,7 +212,46 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
             continue
         if not LOCATION_LABEL.match(cells[0].get_text(strip=True)):
             continue
-        v = _normalise(cells[1].get_text(" ", strip=True))
+        c1_text = cells[1].get_text(strip=True)
+
+        # ECU-style pivot table: "Location | Semester 1 | Semester 2"
+        # The header row has period labels as column headers.  Real campus
+        # names live in the first column of subsequent data rows — rows
+        # with FT/PT values in column 2+ and no colspan spanning the row.
+        if _PERIOD_LABEL_RE.match(c1_text):
+            parent_table = tr.find_parent("table")
+            if not parent_table:
+                continue
+            locations: list[str] = []
+            seen_locs: set[str] = set()
+            for data_tr in parent_table.find_all("tr"):
+                dcells = data_tr.find_all(["th", "td"])
+                # Skip header row and single-cell group-header rows
+                if len(dcells) < 2:
+                    continue
+                if LOCATION_LABEL.match(dcells[0].get_text(strip=True)):
+                    continue
+                # Skip group-header rows whose first cell spans all columns
+                try:
+                    if int(dcells[0].get("colspan") or 1) > 1:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+                # Only accept rows that have a non-empty value column (FT/PT…)
+                c2 = dcells[1].get_text(strip=True) if len(dcells) > 1 else ""
+                if not c2:
+                    continue
+                loc_text = dcells[0].get_text(strip=True)
+                if loc_text and loc_text.lower() not in seen_locs:
+                    seen_locs.add(loc_text.lower())
+                    locations.append(loc_text)
+            if locations:
+                v = _normalise(", ".join(locations))
+                if v:
+                    return v
+            continue  # don't fall through to the normal single-cell path
+
+        v = _normalise(c1_text)
         if v:
             return v
     return None

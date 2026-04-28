@@ -1,0 +1,1086 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 15
+Fetching https://www.murdoch.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.murdoch.edu.au/study/courses (high-priority probe)
+[DISCOVER] Crawling from https://www.murdoch.edu.au/study/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.murdoch.edu.au/study/courses: listing (54 course links found)
+[DISCOVER] Page 1/25: +55 candidates (total 55) — https://www.murdoch.edu.au/study/courses
+[DISCOVER] classified https://www.murdoch.edu.au/study: listing (54 course links found)
+[DISCOVER] Page 2/25: +1 candidates (total 56) — https://www.murdoch.edu.au/study
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch: listing (54 course links found)
+[DISCOVER] Page 3/25: +0 candidates (total 56) — https://www.murdoch.edu.au/study/why-choose-murdoch
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/flexible-study-options: listing (54 course links found)
+[DISCOVER] Page 4/25: +9 candidates (total 65) — https://www.murdoch.edu.au/study/why-choose-murdoch/flexible-study-options
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/flexible-study-options/attendance-modes: listing (54 course links found)
+[DISCOVER] Page 5/25: +0 candidates (total 65) — https://www.murdoch.edu.au/study/why-choose-murdoch/flexible-study-options/attendance-modes
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/personalised-courses: listing (54 course links found)
+[DISCOVER] Page 6/25: +9 candidates (total 74) — https://www.murdoch.edu.au/study/why-choose-murdoch/personalised-courses
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities: listing (54 course links found)
+[DISCOVER] Page 7/25: +1 candidates (total 75) — https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/engineering-facilities: listing (54 course links found)
+[DISCOVER] Page 8/25: +0 candidates (total 75) — https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/engineering-facilities
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/media-arts-centre: listing (54 course links found)
+[DISCOVER] Page 9/25: +4 candidates (total 79) — https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/media-arts-centre
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/veterinary-facilities: listing (54 course links found)
+[DISCOVER] Page 10/25: +0 candidates (total 79) — https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/veterinary-facilities
+[DISCOVER] classified https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/exercise-science-facilities: listing (54 course links found)
+[DISCOVER] Page 11/25: +1 candidates (total 80) — https://www.murdoch.edu.au/study/why-choose-murdoch/learning-facilities/exercise-science-facilities
+[DISCOVER] classified https://www.murdoch.edu.au/study/pathways-to-uni: listing (54 course links found)
+[DISCOVER] Page 12/25: +0 candidates (total 80) — https://www.murdoch.edu.au/study/pathways-to-uni
+[DISCOVER] classified https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways: listing (54 course links found)
+[DISCOVER] Page 13/25: +3 candidates (total 83) — https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways
+[DISCOVER] classified https://www.murdoch.edu.au/study/study-levels: listing (54 course links found)
+[DISCOVER] Page 14/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/study-levels
+[DISCOVER] classified https://www.murdoch.edu.au/study/study-levels/research/your-research-project: listing (54 course links found)
+[DISCOVER] Page 15/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/study-levels/research/your-research-project
+[DISCOVER] classified https://www.murdoch.edu.au/study/study-levels/research/life-as-a-research-student: listing (54 course links found)
+[DISCOVER] Page 16/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/study-levels/research/life-as-a-research-student
+[DISCOVER] classified https://www.murdoch.edu.au/study/international-students: listing (54 course links found)
+[DISCOVER] Page 17/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/international-students
+[DISCOVER] classified https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/fees-and-scholarships: listing (54 course links found)
+[DISCOVER] Page 18/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/fees-and-scholarships
+[DISCOVER] classified https://www.murdoch.edu.au/study/international-students/life-in-perth/accommodation: listing (54 course links found)
+[DISCOVER] Page 19/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/international-students/life-in-perth/accommodation
+[DISCOVER] classified https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/fees-and-scholarships: listing (54 course links found)
+[DISCOVER] Page 20/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/fees-and-scholarships
+[DISCOVER] classified https://www.murdoch.edu.au/study/regional-and-remote-students: listing (54 course links found)
+[DISCOVER] Page 21/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/regional-and-remote-students
+[DISCOVER] classified https://www.murdoch.edu.au/study/how-to-apply: listing (54 course links found)
+[DISCOVER] Page 22/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/how-to-apply
+[DISCOVER] classified https://www.murdoch.edu.au/study/how-to-apply/entry-requirements: listing (54 course links found)
+[DISCOVER] Page 23/25: +0 candidates (total 83) — https://www.murdoch.edu.au/study/how-to-apply/entry-requirements
+[DISCOVER] classified https://www.murdoch.edu.au/study/how-to-apply/entry-requirements/english-proficiency-tests: listing (54 course links found)
+[DISCOVER] Page 24/25: +1 candidates (total 84) — https://www.murdoch.edu.au/study/how-to-apply/entry-requirements/english-proficiency-tests
+[DISCOVER] classified https://www.murdoch.edu.au/study/how-to-apply/entry-requirements/university-preparation-courses: listing (54 course links found)
+[DISCOVER] Page 25/25: +0 candidates (total 84) — https://www.murdoch.edu.au/study/how-to-apply/entry-requirements/university-preparation-courses
+Discovered 84 candidate course links
+[CENTRAL] auto-discovered fee page: https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/fees-and-scholarships
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/fees-and-scholarships
+Extracting course details (84 pages)...
+[EXTRACT] 1/84: Find a course
+[EXTRACT] 2/84: Study areas
+[EXTRACT] 3/84: Study online
+[EXTRACT] 4/84: Award titles and abbreviations
+Fetching 1/84: Find a course
+Fetching 2/84: Study areas
+Fetching 3/84: Study online
+Fetching 4/84: Award titles and abbreviations
+[per-course browser ↻] https://www.murdoch.edu.au/study/courses/study-areas
+[per-course browser ↻] https://www.murdoch.edu.au/study/courses/study-online
+[per-course browser ↻] https://www.murdoch.edu.au/study/courses/award-titles-and-abbreviations
+[per-course browser ✓] https://www.murdoch.edu.au/study/courses/study-online — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/courses/study-areas — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/courses/award-titles-and-abbreviations — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=296578B rendered=876507B using=rendered text_len=1729
+[GP-DEBUG] text[:500]='Life is busy, but your education doesn’t have to take a back seat. Studying online gives you the flexibility to learn when and where it suits you without missing out on expert guidance or the chance to connect with peers. Whether you’re a parent planning your return to the workforce, a professional looking to upskill, or living regionally and can’t make it to campus, our online options let you study on your terms. Find the right online courses To find an online course that suits you, check the H'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/courses/study-online → 0 field(s) (cost=$0.000099, in=1268 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/courses/study-online
+[GP-DEBUG] static=270498B rendered=855995B using=rendered text_len=5355
+[GP-DEBUG] text[:500]='Agricultural Science Are you ready to shape a thriving future for sustainable agriculture and ensure global food security? Pursue a career in agricultural science and spearhead ground-breaking advancements in agribusiness management, drive production efficiencies, and skilfully oversee livestock management. Allied Health Are you committed to enhancing the health and wellbeing of both individuals and communities? Pursue a career in allied health utilising the power of Exercise Science, Chiropract'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/courses/study-areas → 0 field(s) (cost=$0.000168, in=2174 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/courses/study-areas
+[GP-DEBUG] static=447117B rendered=903280B using=rendered text_len=1538
+[GP-DEBUG] text[:500]='Every course at Murdoch University has an award title and abbreviation, which can be used to denote the qualification achieved after study. On this page you will find a listing of all Murdoch University awards, current and historical, and recommended award abbreviations. Award abbreviations refer to the award only and do not include components of a course such as majors, co-majors or minors. If you have completed a combined course, list the award abbreviations for each award. Do not use punctuat'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/study/courses/award-titles-and-ab → 0 field(s) (cost=$0.000095, in=1225 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/courses/award-titles-and-abbreviations
+[per-course browser ↻] https://www.murdoch.edu.au/study/courses/find-a-course
+[per-course browser ✓] https://www.murdoch.edu.au/study/courses/find-a-course — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 4/6 (cache hits 2)] https://www.murdoch.edu.au/study/courses/study-online — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/6 (cache hits 4)] https://www.murdoch.edu.au/study/courses/award-titles-and-abbreviations — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/courses/study-online (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/courses/award-titles-and-abbreviations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=135188B rendered=148087B using=rendered text_len=0
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/courses/find-a-course → 0 field(s) (cost=$0.000067, in=836 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/courses/find-a-course
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/courses/find-a-course — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/courses/find-a-course (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 5/84: High school leavers
+Fetching 5/84: High school leavers
+[EXTRACT] 6/84: Entry requirements for high school leavers
+Fetching 6/84: Entry requirements for high school leavers
+[EXTRACT] 7/84: Parents and families
+Fetching 7/84: Parents and families
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/parents-and-families
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 6/6] https://www.murdoch.edu.au/study/courses/study-areas — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/courses/study-areas (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=273346B rendered=858648B using=rendered text_len=4757
+[GP-DEBUG] text[:500]='World class facilities Our newest building, Boola Katitjin, was named the best Academic Building in the world. National Architecture Awards #1 in WA For social equity and five-star rating for student support. Good Universities Guide 2026* Personalised courses Personalise your course to suit your interests and career goals. Starting your Murdoch journey Entry requirements for high school leavers If you’ve completed high school within the last two years and are ready to start your degree, there’s '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/high-school → 0 field(s) (cost=$0.000156, in=2029 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers
+[GP-DEBUG] static=307204B rendered=887649B using=rendered text_len=7228
+[GP-DEBUG] text[:500]='Finished high school and ready to apply for uni? If you’ve completed high school within the last two years and are ready to start your degree, there’s a variety of ways you can gain entry into Murdoch. Some people use their Australian Tertiary Admission Rank (ATAR) while others take a different path, such as completing one of our free enabling pathway courses, so let’s find the best option for you. Academic and English requirements To study at Murdoch, you’ll need a Selection Rank of 70 or highe'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/high-school → 0 field(s) (cost=$0.000204, in=2657 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 8/84: Work and life experience
+Fetching 8/84: Work and life experience
+[EXTRACT] 9/84: Vocational education and training
+Fetching 9/84: Vocational education and training
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/work-and-life-experience
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/work-and-life-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=304327B rendered=884536B using=rendered text_len=4668
+[GP-DEBUG] text[:500]='Getting into uni without a prior qualification Perhaps you didn’t get a chance to finish Year 12. Maybe you have been busy building a career or are seeking a career change but don’t have a qualification. If you want to start uni but haven’t completed any prior study, our range of admission pathways can get you where you want to be. Mature age pathway If you don’t meet the academic entry requirements but have relevant work and life experience for the undergraduate course you’re interested in, our'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/work-and-li → 0 field(s) (cost=$0.000155, in=2008 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/work-and-life-experience
+[GP-DEBUG] static=301156B rendered=881840B using=rendered text_len=2517
+[GP-DEBUG] text[:500]='Get into uni with your TAFE or VET qualification We think completing a vocational education and training (VET) qualification is an achievement that deserves recognition. If you can also demonstrate English Language Competency (ELC) and your VET qualification is a Certificate IV or higher, you could be eligible to start your undergraduate degree sooner than you think. Not sure if you can demonstrate ELC or have a different VET qualification? No problem. There are still ways we can help you qualif'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/vocational- → 0 field(s) (cost=$0.000115, in=1472 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/pathways-to-uni/work-and-life-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/work-and-life-experience (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✗] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/parents-and-families: empty response
+[EXTRACT] 10/84: Our pathway with SM TAFE
+Fetching 10/84: Our pathway with SM TAFE
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training/our-pathway-with-sm-tafe
+[GP-DEBUG] static=301889B rendered=0B using=static text_len=2526
+[EXTRACT] 11/84: Higher education
+[GP-DEBUG] text[:500]='How to prepare your teen for university Preparing for university can be a big step for many high school students and their parents and families alike. As a parent or guardian, you play a key role in providing guidance and advice to your teen and with so much information out there it can be hard to know where to start. We’ve created many resources and tools to help you and your teen on this journey. Helping your teen decide what to study There are a range of factors to consider when deciding what'
+Fetching 11/84: Higher education
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/high-school → 0 field(s) (cost=$0.000114, in=1476 out=12)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/parents-and-families (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/higher-education
+[per-course vision img 6/6] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 12/84: Law Start
+Fetching 12/84: Law Start
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training/our-pathway-with-sm-tafe — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/law-start
+[EXTRACT] 13/84: Ngoolark
+Fetching 13/84: Ngoolark
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/higher-education — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=301754B rendered=882626B using=rendered text_len=3318
+[GP-DEBUG] text[:500]="Kickstart your business or finance journey at South Metropolitan (SM) TAFE and continue your education here at Murdoch. You'll graduate with a certificate and a Bachelor degree, making you a key contender for any career. Completing a diploma or advanced diploma in Business or Finance at SM TAFE gives you credit towards units in a Bachelor of Business at Murdoch, meaning you could reduce the length of your degree by up to one year. This makes kicking off your journey at SM TAFE a smart choice in "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/vocational- → 0 field(s) (cost=$0.000130, in=1679 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training/our-pathway-with-sm-tafe
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark
+[GP-DEBUG] static=300483B rendered=880396B using=rendered text_len=2346
+[GP-DEBUG] text[:500]='Have you started or completed a higher education course? We recognise the time and effort you’ve previously put into higher education so if you’ve completed an enabling course, studied at uni before, or are currently studying at another university, you could be eligible to apply direct to Murdoch. You’ve studied at university before or are currently studying at another university If you have successfully completed at least two units at an Australian university or through Open Universities Austra'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/higher-educ → 0 field(s) (cost=$0.000110, in=1425 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/higher-education
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/higher-education — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/higher-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/law-start — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training/our-pathway-with-sm-tafe — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/vocational-education-and-training/our-pathway-with-sm-tafe (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 14/84: Pre-Law
+[GP-DEBUG] static=297900B rendered=878248B using=rendered text_len=3463
+Fetching 14/84: Pre-Law
+[GP-DEBUG] text[:500]="Your pathway from high schooler to law student Aiming to study law at uni? Law Start might be the pathway for you. Law Start is an alternative admission pathway that allows students an alternative entry into an undergraduate law degree outside of traditional requirements, because at Murdoch we know people’s circumstances aren’t a direct reflection of their ability to succeed. As long as you're excelling in one or more ATAR subjects with a strong focus on essay writing and communication, our Law "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000131, in=1707 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/law-start
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/law-start — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/law-start (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=296234B rendered=876299B using=rendered text_len=2183
+[EXTRACT] 15/84: Experienced Based Entry
+[GP-DEBUG] text[:500]='Get tailored support through Ngoolark The first year of your degree is both exciting and challenging so if you’d like extra support settling in, our free Ngoolark unit can help. Run by Kulbardi Aboriginal Centre, Ngoolark helps Aboriginal and Torres Strait Islander students transition into a Bachelor of Arts, Business, Education or Nursing. It’s tailored to your individual needs and is designed to enhance your capacity for success in the other units you’re studying. Key details Course code - N10'
+Fetching 15/84: Experienced Based Entry
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 0,'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000106, in=1387 out=8)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 16/84: Pathways for international students
+Fetching 16/84: Pathways for international students
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/ngoolark: duration_value, duration_unit
+[EXTRACT] 17/84: Honours
+Fetching 17/84: Honours
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students
+[GP-DEBUG] static=296069B rendered=876425B using=rendered text_len=2454
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/honours
+[GP-DEBUG] text[:500]='Your different pathway into Law If you believe in your ability to study law, then we do too. We know people take different paths to get into uni and even if they haven’t studied recently, can still be ready to succeed. If this sounds like you, our Pre-Law admissions pathway can provide entry into our Bachelor of Laws if you don’t qualify for standard entry. Course description Designed to assess your current ability, rather than fill a gap in your knowledge, Pre-Law allows you to demonstrate that'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000113, in=1454 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=324115B rendered=902870B using=rendered text_len=9535
+[GP-DEBUG] text[:500]='At Murdoch University, we are inclusive and understand that ability, aptitude and motivation to succeed in degree studies can be demonstrated in many ways. If you’re a domestic student and haven’t met a selection rank of 70 via academic ATAR or IB scores, AQF qualifications, or enabling programs, then regardless of whether you are a high school leaver or over the age of 20, our Experience Based Entry (EBE) could be the ideal option for you. Experience Based Entry assesses your academic and vocat'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000247, in=3228 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 18/84: Honours opportunities
+Fetching 18/84: Honours opportunities
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pre-law: duration_value, duration_unit
+[EXTRACT] 19/84: Postgraduate Degrees
+Fetching 19/84: Postgraduate Degrees
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/postgraduate
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=323406B rendered=902544B using=rendered text_len=12780
+[GP-DEBUG] text[:500]='Improve your employment prospects, enhance your research skills or prepare for postgraduate study by undertaking an Honours degree in one of the specialisations below. These projects are available at the times indicated under each proposal as full-time (9-month) or part-time (18-month) undertakings. Students with interests in Animal Science, Animal Health or Crop and Pasture Science should consider these projects. For general information on Honours in this area, contact Associate-Professor David'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/honours/honour → 0 field(s) (cost=$0.000307, in=4036 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/study/study-levels/honours/honours-opportunities: duration_value, duration_unit
+[EXTRACT] 20/84: Research
+Fetching 20/84: Research
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/research
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/honours — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/postgraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/research — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=255857B rendered=841933B using=rendered text_len=1498
+[GP-DEBUG] text[:500]='Progress towards your PhD Studying honours can create a pathway to pursue postgraduate study. Research your passion Spend a year researching your topic to become a subject matter expert. Work with leading researchers Learn from world-class academics who can support you through your studies. Ignite your research potential with Honours Honours opportunities There are two ways to choose an honours topic, otherwise known as your program of study. You can select from a range of available honours oppo'
+[GP-DEBUG] raw_response='round_location_text*: "five campuses spanning across three countries". It doesn\''
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/honours → 0 field(s) (cost=$0.000097, in=1210 out=20)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/honours
+[GP-DEBUG] static=260718B rendered=847715B using=rendered text_len=2592
+[GP-DEBUG] text[:500]='Your Postgraduate journey Flexible study options You can tailor your postgraduate study to suit your schedule with our flexible study modes, including the option of intensive contact periods. Plus, if you’re not ready to pursue a full master’s or PhD, you can choose to earn industry-recognised qualifications along the way. Why choose Murdoch? Murdoch University provides an unparalleled postgraduate experience, with our 5-star ratings for overall satisfaction, inclusiveness and employability (Goo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/postgraduate → 0 field(s) (cost=$0.000116, in=1485 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/postgraduate
+[GP-DEBUG] static=310646B rendered=889564B using=rendered text_len=5852
+[GP-DEBUG] text[:500]='Are you an international student aiming to study at Murdoch, but do not currently meet our minimum English or academic requirements? We have a range of options available through our partner institutions that can help you meet our admission requirements and get you into a Murdoch degree. Register your interest Murdoch College At Murdoch College, we provide a range of pathways into undergraduate and postgraduate studies at Murdoch University, in addition to English language courses. With a curricu'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000177, in=2311 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=254357B rendered=840772B using=rendered text_len=2529
+[GP-DEBUG] text[:500]="Career opportunities Become an expert in your field to explore new specialisations and interests. Make a difference Work alongside our team to tackle significant social and scientific challenges you care about. Leading researchers Work with world-class academics who can support you through your studies. What’s it like to be a Research student? If you're committed to your research topic and have the determination and motivation you need, completing your Postgraduate thesis can be one of the most "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/research → 0 field(s) (cost=$0.000113, in=1468 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/research
+[EXTRACT] 21/84: Study Abroad and Exchange
+Fetching 21/84: Study Abroad and Exchange
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 4/6 (cache hits 2)] https://www.murdoch.edu.au/study/study-levels/honours — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=302289B rendered=882056B using=rendered text_len=2807
+[GP-DEBUG] text[:500]='When you choose Murdoch’s Study Abroad and Exchange program, you’ll experience the best of what education, Australia and life have to offer. Your time at Murdoch University will give you the chance to experience, study and live and on a beautiful campus, make lifelong friends and visit different parts of a fascinating and unique landscape. Apply now Why study at Murdoch Uni in Perth We are proud to welcome new students into our ever-growing global community, bringing pioneering minds together to'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000120, in=1544 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/study/study-levels/honours: duration_value, duration_unit
+[EXTRACT] 22/84: Decide what to study
+Fetching 22/84: Decide what to study
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=317895B rendered=897083B using=rendered text_len=8685
+[GP-DEBUG] text[:500]='As a Study Abroad or Exchange student, you can choose from hundreds of Murdoch subjects, called ‘units’. You’ll study three or four different units each semester, with every unit worth 3 credit points. Due to Australian Government student visa requirements, you need to enrol in at least 9 credit points per semester. Before you apply, discuss what you intend to study at Murdoch with your home university, and check if there are any credit approval or transfer forms you need to complete. Choosing y'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000231, in=3019 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study
+[per-course vision img 3/6 (cache hits 3)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 4/6 (cache hits 2)] https://www.murdoch.edu.au/study/study-levels/research — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 6/6] https://www.murdoch.edu.au/study/study-levels/postgraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/postgraduate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 23/84: How to apply
+Fetching 23/84: How to apply
+[EXTRACT] 24/84: Life on campus
+Fetching 24/84: Life on campus
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/life-on-campus
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 25/84: Our social program
+Fetching 25/84: Our social program
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/our-social-program
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/life-on-campus — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 26/84: When you leave
+Fetching 26/84: When you leave
+[GP-DEBUG] static=300039B rendered=880199B using=rendered text_len=3574
+[GP-DEBUG] static=304705B rendered=884216B using=rendered text_len=6254
+[GP-DEBUG] text[:500]='Join fun activities, events and experiences Life at Murdoch isn’t just about getting to class on time and studying for exams. Getting involved on campus is the best way to meet new people, connect with other students and make the most of your time at Murdoch. Discover Perth Located in Murdoch, just 15 minutes from the bustling central business district of Perth and the historic port city of Fremantle, our Perth campus offers all of our courses along with state-of-the-art teaching facilities, sup'
+[GP-DEBUG] text[:500]='Apply for Study Abroad or Exchange Before you apply, it’s important to know whether you’re recognised as an Exchange student or a Study Abroad student: If you are studying at one of our official partner universities and you’ve been nominated for a placement at Murdoch University, you’re known as an Exchange student. If you’re applying to study at Murdoch directly, even if you’re from one of our partner universities, you’re known as a Study Abroad student. Our partner universities China Zhejiang '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GP-DEBUG] raw_response='English Requirements: It says "You must meet our minimum English Language Requirements... Contact the team to find out'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000189, in=2409 out=29)
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000135, in=1740 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/life-on-campus
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/our-social-program — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/when-you-leave
+[GP-DEBUG] static=299987B rendered=880494B using=rendered text_len=3731
+[GP-DEBUG] text[:500]='Western Australia provides a diversity of experiences to explore - from the crystal-clear waters of Ningaloo Reef, to the awe-inspiring Karri Forrests of the South-West. We’ve designed a social program for our Study Abroad and Exchange students to help you make the most of your free time and experience as much of Perth and WA as possible. Social Program Activities: Included as part of the program, the team will run activities specific to the Study Abroad and Exchange cohort. Our Social Program a'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000138, in=1780 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/our-social-program
+[FALLBACK] AI filled 1 field(s) on https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/how-to-apply: intake_months
+[EXTRACT] 27/84: Before moving to Perth
+Fetching 27/84: Before moving to Perth
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/when-you-leave — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/our-social-program — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/life-on-campus — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/life-on-campus (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/our-social-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=296099B rendered=876643B using=rendered text_len=2080
+[GP-DEBUG] text[:500]='Get your results and transcripts After completing your studies at Murdoch, you’ll receive a transcript of your results. These will usually be available two weeks after the final exam day of the semester. Please allow another two to three weeks for us to print and prepare your transcript to send by post. You will receive your transcript through one of the following ways: If you’re a Study Abroad student who applied via an agent or provider, your transcript will automatically be sent to the agent '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000107, in=1366 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/when-you-leave
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/when-you-leave — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/when-you-leave (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 28/84: Apply for a visa
+Fetching 28/84: Apply for a visa
+[EXTRACT] 29/84: Relocating as a family
+Fetching 29/84: Relocating as a family
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/apply-for-a-visa
+[GP-DEBUG] static=295043B rendered=875377B using=rendered text_len=1821
+[EXTRACT] 30/84: Overseas Student Health Cover (OSHC)
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/relocating-as-a-family
+[GP-DEBUG] text[:500]="Getting ready to move to a different country to study can be a bit overwhelming. We've got all the information you need to be fully prepared by the time you leave. We understand that there are many important steps in planning your journey to Australia. After accepting your offer, you will receive a copy of Murdoch University's Pre-Departure and Arrival Guide for international students. Within this guide, you'll find a checklist of things to do before you leave, and information about living in Au"
+Fetching 30/84: Overseas Student Health Cover (OSHC)
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/befo → 0 field(s) (cost=$0.000101, in=1297 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/before-moving-to-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/overseas-student-health-cover-(oshc)
+[EXTRACT] 31/84: Arrival in Perth
+Fetching 31/84: Arrival in Perth
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/relocating-as-a-family — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/arrival-in-perth
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/overseas-student-health-cover-(oshc) — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=298034B rendered=878894B using=rendered text_len=3161
+[GP-DEBUG] text[:500]='Perth is a great place for families with plenty of family-friendly activities, venues and facilities. Read about what you need to consider if you are thinking about moving to Australia as a family. Enjoy a great family lifestyle Perth is known as a very family-friendly city. With beaches, parks, playgrounds, Perth Zoo, world-class aquarium AQWA, nature reserves, play centres and more, there’s always plenty to do. Find things to do in and around Perth Sending your children to school You can enrol'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/befo → 0 field(s) (cost=$0.000126, in=1638 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/relocating-as-a-family
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/relocating-as-a-family — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/relocating-as-a-family (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/arrival-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=298280B rendered=878700B using=rendered text_len=3599
+[GP-DEBUG] text[:500]="You need to have health cover before you can apply for a student visa. Your insurance needs to be valid for the entire time you are in Australia. Unless your country has an insurance arrangement in place, you will need to purchase Overseas Student Health Cover (OSHC) to be covered for your stay in Australia. If you are a student from Belgium, Norway or Sweden, you may be covered by your country's insurance schemes. Learn more about Overseas Student Health Cover How to get OSHC At Murdoch Univers"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/befo → 0 field(s) (cost=$0.000136, in=1751 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/overseas-student-health-cover-(oshc)
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/overseas-student-health-cover-(oshc) — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/overseas-student-health-cover-(oshc) (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 32/84: Airport pickups
+Fetching 32/84: Airport pickups
+[GP-DEBUG] static=296386B rendered=876220B using=rendered text_len=1450
+[GP-DEBUG] text[:500]="Whether you’re travelling from a nearby country or from the other side of the world, landing in Perth is the beginning of your new adventure studying in Australia. Here are some important things to know about arriving in Perth to help you make a smooth transition to your studies. Visit the Welcome Desk You've just landed in Perth, Western Australia on your way to Murdoch and we're so glad you're here. Before you leave the airport, make sure to stop by the StudyPerth Welcome Desk. You can talk to"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/arri → 0 field(s) (cost=$0.000095, in=1203 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/arrival-in-perth
+[EXTRACT] 33/84: Getting organised
+Fetching 33/84: Getting organised
+[per-course vision img 2/6 (cache hits 4)] https://www.murdoch.edu.au/study/international-students/arrival-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/arrival-in-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 34/84: Working in Perth
+Fetching 34/84: Working in Perth
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/airport-pickups
+[per-course browser ✗] https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/apply-for-a-visa: empty response
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/working-in-perth
+[GP-DEBUG] static=297318B rendered=0B using=static text_len=3187
+[GP-DEBUG] text[:500]='You will need a student visa to study in Australia if you are not an Australian citizen, permanent resident or temporary resident. Here is a guide to the steps you need to take and the documents you will need. You need to apply for your university course first Before you can apply for a student visa, you need to apply to study a registered course at Murdoch University. You can apply for any course that is registered on the Commonwealth Register of Institutions and Courses for Overseas Students ('
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/befo → 0 field(s) (cost=$0.000127, in=1643 out=12)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/before-moving-to-perth/apply-for-a-visa (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/airport-pickups — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=296602B rendered=876990B using=rendered text_len=2550
+[GP-DEBUG] text[:500]='After all your planning and preparation, actually landing in Perth is a big step in your journey as an international student. Here’s a guide to the options you can take to get safely to your accommodation from the Perth International and Domestic Airport Terminals. Free airport pick-up service The Murdoch Student Guild offers an airport pick-up service for new international students. The service runs all year round and transports new students arriving from another country safely to their accommo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/arri → 0 field(s) (cost=$0.000114, in=1482 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/airport-pickups
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/airport-pickups — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/arrival-in-perth/airport-pickups (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 35/84: Life in Perth
+Fetching 35/84: Life in Perth
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/life-in-perth
+[EXTRACT] 36/84: Facts about Perth, WA
+Fetching 36/84: Facts about Perth, WA
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/life-in-perth/facts-about-perth-wa
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/life-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/getting-organised
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/life-in-perth/facts-about-perth-wa — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=295152B rendered=876049B using=rendered text_len=1399
+[GP-DEBUG] text[:500]='With a sunny climate, plenty of outdoor activities and everything a cosmopolitan city has to offer, there are plenty of reasons people love living in Perth. Facts about Perth, WA The city was named after Perth, Scotland and sits on the northern banks of the Swan River. Find out more about Perth, the capital city of Western Australia. Facts about Perth, WA Things to do in and around Perth Perth offers something to suit every taste – from shopping and fine dining to exploring amazing natural lands'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/life → 0 field(s) (cost=$0.000094, in=1189 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/life-in-perth
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/life-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/life-in-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=296987B rendered=877359B using=rendered text_len=3021
+[GP-DEBUG] text[:500]="Perth is a growing city, home to more than two million people, located on the western edge of the Australian mainland. Changes to international flight routes will turn Perth into the gateway to Australia, bringing even more visitors, residents and exciting opportunities. Western Australia's capital The state of Western Australia (WA) is almost the size of Western Europe. Here are some other interesting facts: WA covers one third of the Australian continent. WA spans more than 2.5 million square "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/life → 0 field(s) (cost=$0.000124, in=1600 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/life-in-perth/facts-about-perth-wa
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/life-in-perth/facts-about-perth-wa — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/life-in-perth/facts-about-perth-wa (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/getting-organised — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 37/84: Things to do in and around Perth
+Fetching 37/84: Things to do in and around Perth
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/life-in-perth/things-to-do-in-and-around-perth
+[EXTRACT] 38/84: Climate and culture
+Fetching 38/84: Climate and culture
+[GP-DEBUG] static=296018B rendered=876412B using=rendered text_len=2207
+[GP-DEBUG] text[:500]='When you arrive, it can take some time to get set up and ready for your studies. Here’s a guide to some of the things you can do to get organised for your life in Perth. Finalise your enrolment Enrolling is one of the most important things you will need to do when you first arrive. You need to enrol in your units, tutorials, labs and workshops. This will create a timetable to help you know where you need to be on which days. For details on enrolling in units, important information about your cou'
+[GP-DEBUG] raw_response='text`: Mentions "Perth". -> `"Perth"` (The URL and text clearly indicate the'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/arri → 0 field(s) (cost=$0.000110, in=1397 out=19)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/getting-organised
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/getting-organised — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/arrival-in-perth/getting-organised (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/life-in-perth/climate-and-culture
+[per-course browser ✗] https://www.murdoch.edu.au/study/international-students/arrival-in-perth/working-in-perth: empty response
+[EXTRACT] 39/84: Living costs
+Fetching 39/84: Living costs
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/life-in-perth/things-to-do-in-and-around-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/life-in-perth/living-costs
+[GP-DEBUG] static=294404B rendered=0B using=static text_len=1194
+[GP-DEBUG] text[:500]='You might want to balance part-time work with your studies to help you meet even more people and earn extra spending money. Find out what you need to know about working in Perth. Permission to Work On a student visa, Permission to Work means you can work up to 40 hours per fortnight during semester and full-time hours during semester breaks. Here are some important details to know about working on your student visa: When you apply for your student visa, you will need to prove that you have enoug'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/arri → 0 field(s) (cost=$0.000090, in=1143 out=14)
+[GP-DEBUG] static=300780B rendered=881779B using=rendered text_len=4774
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/arrival-in-perth/working-in-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/life-in-perth/climate-and-culture — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] text[:500]='Whether you love the beach, want to explore some natural landscapes, dine out on local cuisine or explore shopping outlets, you’ll find there’s something for everyone in Perth. Explore the great outdoors Being on the river and near the ocean makes Perth perfect for fishing, windsurfing, sailing or simply relaxing with friends for a picnic at the park or around a barbeque. Here are some of the most popular outdoor spaces in and around Perth. Kings Park Just minutes from the city centre with views'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/life → 0 field(s) (cost=$0.000157, in=2041 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/life-in-perth/things-to-do-in-and-around-perth
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/life-in-perth/things-to-do-in-and-around-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/life-in-perth/things-to-do-in-and-around-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/life-in-perth/living-costs — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 40/84: Studying at Murdoch
+Fetching 40/84: Studying at Murdoch
+[EXTRACT] 41/84: Life on campus
+Fetching 41/84: Life on campus
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch
+[GP-DEBUG] static=295872B rendered=876709B using=rendered text_len=2351
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/life-on-campus
+[GP-DEBUG] static=296040B rendered=876404B using=rendered text_len=2429
+[GP-DEBUG] text[:500]='Perth is officially Australia’s sunniest capital city, with more hours of sunshine than any other city. Here are some more details about Perth’s Mediterranean climate and culture. If you would like to learn more about Perth’s climate, visit the Australian Government Bureau of Meteorology website. Summer Perth summers officially stretch from December to February but the hot weather often continues through March. In summer, the temperature can peak at 40°C on some days, so people generally stay in'
+[GP-DEBUG] text[:500]="When you're planning to move to Perth to study, you'll want to know what you can expect to pay for some of the common living expenses. Please remember, the prices given on this page are just estimates. Your living costs will depend on a number of factors including your financial capacity, where you stay, the costs associated with your studies and other lifestyle needs and preferences. Everyday expenses As a general guide, you should budget approximately AU$500 per week for your living expenses i"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/life → 0 field(s) (cost=$0.000113, in=1450 out=15)
+[GEMINI] https://www.murdoch.edu.au/study/international-students/life → 0 field(s) (cost=$0.000112, in=1432 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/life-in-perth/living-costs
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/life-in-perth/climate-and-culture
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/life-in-perth/living-costs — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/life-in-perth/climate-and-culture — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/life-in-perth/living-costs (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/life-in-perth/climate-and-culture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 42/84: International student groups
+Fetching 42/84: International student groups
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/international-student-groups
+[EXTRACT] 43/84: Support services
+Fetching 43/84: Support services
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/life-on-campus — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services
+[GP-DEBUG] static=295123B rendered=875450B using=rendered text_len=1640
+[GP-DEBUG] text[:500]='We’re here to help you adjust to life at university and living in Perth. We offer a range of support services, groups, clubs and opportunities for you to meet people, enjoy new experiences and have your questions answered. Life on campus Student life at Murdoch is about more than just learning in your chosen field – it is also about getting involved, having fun and making lifelong friends. Learn more about life on campus International student groups Meet new friends and get involved in universit'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000098, in=1251 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/international-student-groups — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=296767B rendered=876274B using=rendered text_len=3054
+[GP-DEBUG] text[:500]='As a Murdoch University student, you can get involved in campus life, have fun and make lifelong friends through our range of facilities, services and events. Student life There’s more to being a student than attending lectures and tutorials. When you first arrive at Murdoch, you’ll attend our orientation sessions to help you find your way around campus. Our Library is the education hub of the campus, and is the perfect space for quiet study or a collaboration session with your classmates. The L'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000125, in=1608 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/life-on-campus
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/life-on-campus — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/life-on-campus (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 44/84: Information for parents
+Fetching 44/84: Information for parents
+[GP-DEBUG] static=294819B rendered=874895B using=rendered text_len=1410
+[GP-DEBUG] text[:500]='Whether you want to join a sporting team, volunteer for environmental groups, play team video games or share Perth with people from your own area of the world, you’ll find a club or social group to suit you. Join a social club or group There are more than 100 different clubs you can join at Murdoch – or you can even start your own! You can join an international students club related to your home country to meet students from your region and share special customs, events and celebrations together'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000095, in=1201 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/international-student-groups
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/international-student-groups — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/international-student-groups (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/information-for-parents
+[GP-DEBUG] static=299367B rendered=879743B using=rendered text_len=4584
+[GP-DEBUG] text[:500]='We offer a range of support services and events to help you adjust to university life. You’ll find a dedicated support team for first year students, course advisors at Student Central and a range of health, academic and other support services. Start with Student Central The Student Central team provides support to all our students, from when you first arrive to your graduation. Speak with our Student Central team to learn more about: Your course Visa requirements Overseas Student Health Cover (O'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000154, in=1991 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 45/84: Staying at home
+Fetching 45/84: Staying at home
+[per-course browser ↻] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home
+[EXTRACT] 46/84: Support for studying from home
+[EXTRACT] 47/84: Moving to Perth
+Fetching 47/84: Moving to Perth
+Fetching 46/84: Support for studying from home
+[per-course browser ↻] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/information-for-parents — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=296036B rendered=876892B using=rendered text_len=2160
+[GP-DEBUG] text[:500]='Moving overseas to study is a big step. At Murdoch, we’ve got the support and services in place to help your child feel happy, healthy and secure while they study. Doctor appointments and medical treatment Our students have access to a team of qualified and experienced doctors and nurses who are registered with the Australian Health Practitioner Regulation Agency. We have both male and female health practitioners with a variety of skills and experience to suit individual health needs. Students c'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000108, in=1387 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/information-for-parents
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/information-for-parents — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/information-for-parents (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=309103B rendered=888787B using=rendered text_len=5882
+[GP-DEBUG] text[:500]='We know that it’s not always feasible to move away from home for further study. Thankfully there are still ways to complete your degree away from our campuses in Perth, Rockingham and Mandurah – whether you just need a year or two to settle in, or if you need to study your whole degree online. And as a regional or remote student, you may have access to our educational access scheme, Murdoch RISE. Flexible study options There are plenty of options if you wish to study from home, including part-ti'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.murdoch.edu.au/study/regional-and-remote-student → 0 field(s) (cost=$0.000176, in=2312 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home
+[GP-DEBUG] static=309074B rendered=888462B using=rendered text_len=5690
+[GP-DEBUG] text[:500]='There are plenty of reasons to move to Perth and study your degree on-campus with us. Murdoch University has courses for every passion and interest area. You’ll learn from our industry experts, get hands-on experience and the flexibility to study online or on campus. Whatever your goals, Murdoch gives you the freedom to shape your own study journey. And as a regional or remote student, you may have access to our educational access scheme, Murdoch RISE. More about moving to Perth Leaving home Thi'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/regional-and-remote-student → 0 field(s) (cost=$0.000174, in=2264 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth
+[EXTRACT] 48/84: Leaving home
+Fetching 48/84: Leaving home
+[per-course browser ↻] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/leaving-home
+[per-course browser ✓] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/leaving-home — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 2/6 (cache hits 4)] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=314160B rendered=893207B using=rendered text_len=5676
+[GP-DEBUG] text[:500]="Moving out can be an exciting but scary thing, especially when you’re moving far from family, friends, and community. Things to know When you're planning to move to Perth to study, you'll want to know what you can expect to pay for some of the common living expenses. Please remember, the prices given on this page are just estimates. Your living costs will depend on a number of factors including your financial capacity, where you stay, the costs associated with your studies and other lifestyle ne"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/regional-and-remote-student → 0 field(s) (cost=$0.000174, in=2264 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/leaving-home
+[per-course vision img 3/6 (cache hits 3)] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 49/84: Support for moving to Perth
+Fetching 49/84: Support for moving to Perth
+[EXTRACT] 50/84: Course fees
+Fetching 50/84: Course fees
+[per-course browser ↻] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/support-for-moving-to-perth
+[per-course vision img 2/6 (cache hits 4)] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/leaving-home — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/leaving-home (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/fees/course-fees
+[EXTRACT] 51/84: Job Ready Graduates – Student FAQs
+Fetching 51/84: Job Ready Graduates – Student FAQs
+[per-course browser ✓] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/support-for-moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home/support-for-studying-from-home
+[per-course browser ↻] https://www.murdoch.edu.au/study/fees/government-support/job-ready-graduates-student-faqs
+[GP-DEBUG] static=299239B rendered=879122B using=rendered text_len=1396
+[GP-DEBUG] text[:500]="Murdoch University has many support services to help you with the transition from moving from your hometown to Perth. Scholarships We offer a wide range of scholarships to support your needs and circumstances. To find regional scholarships: Visit our Scholarship finder Select your study level Under ‘Filter’, select ‘Regional, remote or region-specific' Select ‘Apply filters’. Find scholarships Government support You may be eligible for support from the Australian government through Commonwealth "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/regional-and-remote-student → 0 field(s) (cost=$0.000094, in=1198 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/support-for-moving-to-perth
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/support-for-moving-to-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/regional-and-remote-students/moving-to-perth/support-for-moving-to-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/fees/course-fees — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/fees/government-support/job-ready-graduates-student-faqs — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 52/84: Student Services and Amenities Fee
+Fetching 52/84: Student Services and Amenities Fee
+[per-course browser ✓] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home/support-for-studying-from-home — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=314439B rendered=893629B using=rendered text_len=5955
+[GP-DEBUG] text[:500]='Your course or tuition fees will vary depending on the course you are studying, the units you’re enrolled in and your citizenship status. Course fees cover the cost of your units, but not the cost of textbooks or other materials and equipment required. You may also need to pay for: student services and amenities fee textbooks field trips laboratory equipment such as lab coats and safety goggles printing and photocopying compliance requirements for your course, such as immunisations and police ch'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/fees/course-fees → 0 field(s) (cost=$0.000178, in=2323 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/fees/course-fees
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/fees/course-fees — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/fees/course-fees (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/fees/student-services-and-amenities-fee
+[GP-DEBUG] static=301169B rendered=881393B using=rendered text_len=2584
+[GP-DEBUG] static=325976B rendered=904008B using=rendered text_len=9008
+[GP-DEBUG] text[:500]="Studying from home doesn’t mean studying alone. You’ll have access to the same support, advice and connection as our on-campus students. Our online students have full access to academic guidance, wellbeing support and dedicated support from our lecturers and tutors, no matter where you live and study. How online study works All your learning happens online through an easy-to-use Learning Management System. You'll watch lectures, complete assignments, and connect with teachers and classmates from"
+[GP-DEBUG] text[:500]='Progression and Job Ready Graduates As of 1 January 2024, the Australian Government has amended the Higher Education Support Act Bill to remove the requirement for students to maintain a pass rate requirement to be eligible for a Commonwealth Supported Place and Fee-Help assistance. Students that lost their Commonwealth Support Place or Fee-help assistance in 2023 will receive an email with further information and will be reinstated in 2024. However, this is only applicable for units with a cens'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/fees/government-support/job → 0 field(s) (cost=$0.000236, in=3097 out=13)
+[GEMINI] https://www.murdoch.edu.au/study/regional-and-remote-student → 0 field(s) (cost=$0.000116, in=1495 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/fees/government-support/job-ready-graduates-student-faqs
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home/support-for-studying-from-home
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/fees/government-support/job-ready-graduates-student-faqs — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/fees/government-support/job-ready-graduates-student-faqs (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/study/fees/student-services-and-amenities-fee — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 53/84: Cost of living
+Fetching 53/84: Cost of living
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home/support-for-studying-from-home — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/regional-and-remote-students/staying-at-home/support-for-studying-from-home (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/fees/cost-of-living
+[GP-DEBUG] static=296716B rendered=877048B using=rendered text_len=2293
+[EXTRACT] 54/84: High school leavers
+[EXTRACT] 55/84: View Understanding ATAR
+[GP-DEBUG] text[:500]='As a Murdoch student you can expect a university experience that goes beyond the classroom and the opportunities to make the most of it. To help you do this, we use the Student Services and Amenities Fee (SSAF) to provide a range of non-academic services and programs. The SSAF is a compulsory fee charged by all higher education providers. How the fee is spent We work closely with the Murdoch Student Guild to allocate the funds. The Murdoch Student Guild is a democratically elected student body t'
+Fetching 55/84: View Understanding ATAR
+Fetching 54/84: High school leavers
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/fees/student-services-and-a → 0 field(s) (cost=$0.000111, in=1414 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/fees/student-services-and-amenities-fee
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/fees/student-services-and-amenities-fee — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/fees/student-services-and-amenities-fee (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/understanding-atar
+[per-course browser ✓] https://www.murdoch.edu.au/study/fees/cost-of-living — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 56/84: View Undergraduate
+Fetching 56/84: View Undergraduate
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/undergraduate/high-school-leavers
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/understanding-atar — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=301808B rendered=881933B using=rendered text_len=4358
+[GP-DEBUG] text[:500]='Planning your budget Uni life goes beyond the classroom so learn about the expenses you may need to budget for to get the most out of your Murdoch experience. Things to budget for Whether you’ve called Perth home for a while, or are joining us from regional WA, interstate or overseas, you’ll need to plan for a range of living expenses. Depending on your circumstances and lifestyle, these costs will vary. Below are example figures from Study Australia to help you put together an estimated guide o'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/fees/cost-of-living → 0 field(s) (cost=$0.000148, in=1925 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/fees/cost-of-living
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/undergraduate/high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=300175B rendered=880163B using=rendered text_len=3007
+[GP-DEBUG] text[:500]='What is an ATAR? Wondering what an ATAR is and why you might need one? If you’re at high school and are thinking about starting university soon, an Australian Tertiary Admission Rank (ATAR) is one way to gain direct entry into university. An ATAR is a number between 0 and 99.95 and represents your position amongst all the other year 12s in Western Australia. It is a rank, not a score or mark. For example, an ATAR of 75 means you have performed better than 75% of year 12s in WA. How is an ATAR ca'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/high-school → 0 field(s) (cost=$0.000124, in=1607 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/understanding-atar
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/understanding-atar — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/understanding-atar (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/study-levels/undergraduate
+[GP-DEBUG] static=273346B rendered=858644B using=rendered text_len=4757
+[GP-DEBUG] text[:500]='World class facilities Our newest building, Boola Katitjin, was named the best Academic Building in the world. National Architecture Awards #1 in WA For social equity and five-star rating for student support. Good Universities Guide 2026* Personalised courses Personalise your course to suit your interests and career goals. Starting your Murdoch journey Entry requirements for high school leavers If you’ve completed high school within the last two years and are ready to start your degree, there’s '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/undergraduate/ → 0 field(s) (cost=$0.000157, in=2031 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/undergraduate/high-school-leavers
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/study-levels/undergraduate/high-school-leavers — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/undergraduate/high-school-leavers (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 57/84: Selection rank adjustment
+Fetching 57/84: Selection rank adjustment
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/fees/cost-of-living — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/fees/cost-of-living (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/selection-rank-adjustment
+[EXTRACT] 58/84: Media portfolio
+[EXTRACT] 59/84: Academies Australasia
+Fetching 59/84: Academies Australasia
+Fetching 58/84: Media portfolio
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry/media-portfolio
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/academies-australasia
+[per-course browser ✓] https://www.murdoch.edu.au/study/study-levels/undergraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/selection-rank-adjustment — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=267920B rendered=854387B using=rendered text_len=3553
+[GP-DEBUG] text[:500]='#1 in WA For social equity and five-star rating for student support. Good Universities Guide 2026* Industry experience Our partnerships contribute towards completing your degree and help you gain practical skills for your future career. World class facilities Access our state-of-the-art learning facilities, featuring real-world equipment and resources as well as the latest in virtual technologies. Explore our study areas Our courses are grouped into study areas to help you find the path that’s r'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/study-levels/undergraduate → 0 field(s) (cost=$0.000133, in=1725 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/study-levels/undergraduate
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/academies-australasia — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=312135B rendered=892470B using=rendered text_len=8582
+[GP-DEBUG] text[:500]='Reach your goals with Murdoch RISE If you achieve an ATAR but don’t get the score you need, keep an open mind. People join Murdoch from all walks of life so our educational access scheme, Murdoch RISE, could do the same for you. Murdoch RISE provides a selection rank adjustment to support access to uni for students from a range of backgrounds, including regional and low socio-economic. What is a selection rank adjustment? We calculate your adjustment factors and automatically add them to your ra'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/high-school → 0 field(s) (cost=$0.000230, in=3002 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/selection-rank-adjustment
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/selection-rank-adjustment — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/high-school-leavers/entry-requirements-for-high-school-leavers/selection-rank-adjustment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=321501B rendered=896146B using=rendered text_len=2582
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now Academies Australasia is a unique education group with a wide range of operations offering English language, senior high school, Singapore Government School Preparatory, certificate, diploma, advanced diploma and higher education courses. With Academies Australasia Institute (AAI) and Language Links International (LLI) offering En'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000116, in=1499 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/academies-australasia
+[EXTRACT] 60/84: Canning College
+Fetching 60/84: Canning College
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/canning-college
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/canning-college — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 3/6 (cache hits 3)] https://www.murdoch.edu.au/study/study-levels/undergraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/study-levels/undergraduate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=296166B rendered=876617B using=rendered text_len=2012
+[GP-DEBUG] text[:500]='As Australia’s first government international college, Canning College have offered specialised education programs and student services for international students since 1982. Canning College boasts an extraordinary success rate for students continuing their education at university. The friendly staff at Canning College provide a supportive and nurturing environment which lays the foundation to your success at Murdoch University. Canning College offers quality pathways to university for internati'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000106, in=1355 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/canning-college
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/canning-college — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/canning-college (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 61/84: NIT Australia
+Fetching 61/84: NIT Australia
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/nit-australia
+[EXTRACT] 62/84: Phoenix Academy
+Fetching 62/84: Phoenix Academy
+[per-course browser ↻] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/phoenix-academy
+[per-course browser ✗] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry/media-portfolio: empty response
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/nit-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/phoenix-academy — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 6/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/academies-australasia — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/academies-australasia (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=316814B rendered=0B using=static text_len=7035
+[GP-DEBUG] text[:500]='Your creative pathway into uni Creativity isn’t confined to just one pathway so why should you be? If you have the motivation to push creative boundaries but don’t qualify for entry into an Arts, Communications or Creative Media course using an ATAR, your portfolio could get you there instead. Whether you’re a school leaver or a non-school leaver, we encourage you to apply if you meet our eligibility criteria: Demonstration of English language competency by completing two years of vocational edu'
+[GP-DEBUG] raw_response='fee`: `null`\n * `domestic_fee`: `null`\n *'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000199, in=2607 out=12)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/experience-based-entry/media-portfolio (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=296909B rendered=876785B using=rendered text_len=2743
+[GP-DEBUG] text[:500]='The focus of the NIT Australia is to help you develop the skills and knowledge needed to get a job, advance your education or launch your career. The learning outcomes are industry focused to prepare you for a highly competitive business world. NIT Australia’s unique learning environment enables you to enjoy student life with small class sizes and a dedicated team who work closely to support successful learning outcomes. NIT Australia is Murdoch University’s Preferred Pathway Partner for our Bac'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000120, in=1537 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/nit-australia
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/nit-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/nit-australia (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=323424B rendered=897841B using=rendered text_len=3551
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now In being one of Murdoch University’s Preferred Pathway Partners to offer both English and Academic programs, you will have the flexibility to choose the right pathway that suits your needs and receive a Packaged Letter of Offer with Murdoch University. Phoenix Academy is consistently highly rated by its students for providing the '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pa → 0 field(s) (cost=$0.000134, in=1740 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/phoenix-academy
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/phoenix-academy — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/pathways-to-uni/enabling-pathways/pathways-for-international-students/phoenix-academy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 63/84: Tropical Marine Biology
+Fetching 63/84: Tropical Marine Biology
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology
+[EXTRACT] 64/84: Storytelling in Australia
+Fetching 64/84: Storytelling in Australia
+[EXTRACT] 65/84: International student safety
+Fetching 65/84: International student safety
+[EXTRACT] 66/84: Primary Teaching
+Fetching 66/84: Primary Teaching
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia
+[per-course browser ↻] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services/international-student-safety
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1404
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services/international-student-safety — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=299756B rendered=880470B using=rendered text_len=4983
+[GP-DEBUG] text[:500]='Explore Ningaloo Reef At Murdoch University, we’re proud to have earned an outstanding reputation for marine and environmental science. We were the first university in Australia to offer an undergraduate degree in Environmental Science and the first in Western Australia to offer Marine Science. In this short intensive program, you’ll cover three main areas: The diversity and physical processes of Western Australia’s marine habitats A focus on coral reef environments and the biodiversity of reef '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000161, in=2100 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=298967B rendered=878853B using=rendered text_len=4169
+[GP-DEBUG] static=299822B rendered=879859B using=rendered text_len=3175
+[GP-DEBUG] text[:500]='Australians have been telling stories for thousands of years, from the Dreamtime stories of the creation of the Indigenous world to digitally produced contemporary narratives. These are stories of the land, of nature, of the city and the country, of experiences and ideas, of people and events – great and small. To understand this place and its people, writers and artists have told stories using traditions and techniques from diverse disciplines. These include forms of fiction and non-fiction wri'
+[GP-DEBUG] text[:500]='Murdoch University is one of the first universities in Australia to arrange specialist 24/7 multilingual emergency, safety and wellbeing off-campus support for international students with eligible Overseas Student Health Cover (OSHC). This OHSC is brought to you by Allianz Care Australia, Murdoch’s preferred OHSC provider, in partnership with Sonder Australia. Stay safe with Sonder As an international student arriving in Australia, you may feel both excited and anxious. The prospect of arriving '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000146, in=1897 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia
+[GEMINI] https://www.murdoch.edu.au/study/international-students/stud → 0 field(s) (cost=$0.000127, in=1646 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services/international-student-safety
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services/international-student-safety — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/studying-at-murdoch/support-services/international-student-safety (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1404 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=530345B rendered=1131870B using=rendered text_len=31932
+[EXTRACT] 67/84: Nursing
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "7a5ca9a0-805a-43c4-8205-74ad8c912c2c", "originalId" : "dd94320f-420e-4f79-80c3-f8e137e95689", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+Fetching 67/84: Nursing
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36000,'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1404 → 1 field(s) (cost=$0.000664, in=8819 out=9)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1404
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1404 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1404 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 1/6 (cache hits 5)] https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/course/Undergraduate/b1417
+[FALLBACK] AI filled 4 field(s) on https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/tropical-marine-biology: international_fee, fee_currency, duration_value, duration_unit
+[EXTRACT] 68/84: Psychology
+Fetching 68/84: Psychology
+[per-course browser ↻] https://www.murdoch.edu.au/course/Undergraduate/b1413
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1404: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Education (Primary Teaching) → Education & Social Work / Teaching
+[EXTRACT] 69/84: Law
+Fetching 69/84: Law
+[per-course browser ✓] https://www.murdoch.edu.au/course/Undergraduate/b1417 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1395
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/study/international-students/study-abroad-and-exchange/decide-what-to-study/storytelling-in-australia: duration_value, duration_unit
+[EXTRACT] 70/84: Law – Graduate Entry
+Fetching 70/84: Law – Graduate Entry
+[GP-DEBUG] static=456448B rendered=1046641B using=rendered text_len=30669
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "d661c7b8-d630-49bd-8cc2-45509da5ed35", "originalId" : "17569c5c-f84a-41ca-94dc-cbfd943ad4d7", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42250,\n "'
+[GEMINI] https://www.murdoch.edu.au/course/Undergraduate/b1417 → 1 field(s) (cost=$0.000641, in=8503 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/Undergraduate/b1417
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/Undergraduate/b1417 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/Undergraduate/b1417 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1340
+[per-course browser ✓] https://www.murdoch.edu.au/course/Undergraduate/b1413 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1395 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/Undergraduate/b1417: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[EXTRACT] 71/84: Clinical Laboratory Science
+Fetching 71/84: Clinical Laboratory Science
+[GP-DEBUG] static=451157B rendered=1043114B using=rendered text_len=24960
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "dc3829d4-0e38-440e-9131-72e2abab9d04", "originalId" : "9ee70453-b724-4d95-96d2-fd4fa8c32f71", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41160,'
+[GEMINI] https://www.murdoch.edu.au/course/Undergraduate/b1413 → 1 field(s) (cost=$0.000533, in=7076 out=9)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/Undergraduate/b1413
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/Undergraduate/b1413 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/Undergraduate/b1413 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1340 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/mj-cls
+[GP-DEBUG] static=474237B rendered=1063333B using=rendered text_len=36131
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "5e9f179d-431c-4bce-8cef-18ab6b31e3b3", "originalId" : "3063add6-68db-4a3c-92b8-42f1c8047a83", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36730,\n "'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1395 → 1 field(s) (cost=$0.000743, in=9868 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1395
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1395 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1395 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=405778B rendered=992893B using=rendered text_len=15798
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "d82db801-fed8-4195-9b9e-c559f75e837a", "originalId" : "41bdbefe-cad6-4efa-ba52-1932cca72193", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36730,\n "'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1340 → 1 field(s) (cost=$0.000362, in=4785 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1340
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1340 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1340 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/Undergraduate/b1413: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT] 72/84: Laboratory Medicine
+Fetching 72/84: Laboratory Medicine
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/mj-cls — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1395: fee_currency, duration_value, duration_unit
+[EXTRACT] 73/84: Veterinary Science
+Fetching 73/84: Veterinary Science
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1340: fee_currency, duration_value, duration_unit
+[EXTRACT] 74/84: Bachelor of Laws / Bachelor of Criminology
+Fetching 74/84: Bachelor of Laws / Bachelor of Criminology
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1402
+[GP-DEBUG] static=428882B rendered=1014288B using=rendered text_len=25303
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1374
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "1ede649b-2b69-416b-93a0-e74acc3f3151", "originalId" : "64425b68-e700-48a3-b209-a3ec7ba0a52f", "curriculumType" : "Major", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMon'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/mj-cls → 0 field(s) (cost=$0.000541, in=7162 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/mj-cls
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/mj-cls — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/mj-cls (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1402 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1374 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/study/courses/undergraduate/b1346
+[GP-DEBUG] static=486588B rendered=1078468B using=rendered text_len=29226
+[GP-DEBUG] static=463242B rendered=1054589B using=rendered text_len=23199
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "bf403f9e-9a7a-455c-ac37-f96152d6dc15", "originalId" : "01d43299-ad70-4a6a-8416-79c2edd62267", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "a2be1b8d-a2ed-459c-b4e9-1e8ae5b578d4", "originalId" : "8fc0d3dd-ee0b-417c-b4e0-e061270ee9fe", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41160,'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 68400,\n "'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1374 → 1 field(s) (cost=$0.000613, in=8142 out=9)
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1402 → 1 field(s) (cost=$0.000501, in=6635 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1374
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1402
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1374 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1402 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1374 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1402 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/undergraduate/mj-cls: duration_value, duration_unit
+[EXTRACT] 75/84: View Law moot court
+Fetching 75/84: View Law moot court
+[per-course browser ↻] https://www.murdoch.edu.au/schools/law-and-criminology/study/mooting-at-murdoch
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1374: fee_currency, duration_value, duration_unit
+[EXTRACT] 76/84: screen production
+Fetching 76/84: screen production
+[per-course browser ✓] https://www.murdoch.edu.au/study/courses/undergraduate/b1346 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/schools/law-and-criminology/study/mooting-at-murdoch — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/mj-scp
+[GP-DEBUG] static=483967B rendered=1073508B using=rendered text_len=35014
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "5af2cb38-9ca4-421e-8528-ab91db234b7f", "originalId" : "cbbcffa4-d7b4-47f8-bca3-23c56d45b84f", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36730,'
+[GEMINI] https://www.murdoch.edu.au/study/courses/undergraduate/b1346 → 1 field(s) (cost=$0.000722, in=9591 out=9)
+[per-course vision img 0/6] https://www.murdoch.edu.au/study/courses/undergraduate/b1346
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/study/courses/undergraduate/b1346 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/study/courses/undergraduate/b1346 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=85098B rendered=702234B using=rendered text_len=9235
+[GP-DEBUG] text[:500]="The Murdoch Moot Program is a high-quality and innovative moot program that provides you with the opportunity to develop your practical legal skills in a real-life setting. What is mooting? 'Mooting' is a form of advocacy training where a court case is simulated. You prepare written arguments and then present your argument before a panel of judges in our purpose-built courtroom. Our program is overseen by experienced academics and offers credit point units to competing students. By participating"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/schools/law-and-criminology/study → 0 field(s) (cost=$0.000241, in=3151 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/schools/law-and-criminology/study/mooting-at-murdoch
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/schools/law-and-criminology/study/mooting-at-murdoch — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/schools/law-and-criminology/study/mooting-at-murdoch (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1402: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 77/84: communications
+Fetching 77/84: communications
+[per-course browser ↻] https://www.murdoch.edu.au/course/Undergraduate/B1344
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/mj-scp — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/study/courses/undergraduate/b1346: fee_currency, duration_value, duration_unit
+[EXTRACT] 78/84: Graphic Design
+[CATEGORY det] Bachelor of Laws / Bachelor of Criminolo → Law & Legal Studies / Criminal Justice
+Fetching 78/84: Graphic Design
+[EXTRACT] 79/84: Games, Art and Design
+Fetching 79/84: Games, Art and Design
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/mj-gph
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/mj-gmad
+[GP-DEBUG] static=412159B rendered=997996B using=rendered text_len=20001
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "3bd2f853-1f84-47a4-8048-2dc5e8cea4e1", "originalId" : "652054a8-4328-47a8-95b4-a30045496d56", "curriculumType" : "Major", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMon'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/mj-scp → 0 field(s) (cost=$0.000442, in=5836 out=15)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/mj-scp
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/mj-scp — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/mj-scp (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/Undergraduate/B1344 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/mj-gph — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/mj-gmad — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=517058B rendered=1117603B using=rendered text_len=27088
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "ba6772da-38d5-484b-b5d8-e7819f7c8e38", "originalId" : "fa0f5a0f-efd4-4b12-800a-eacba9a46aac", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 3600'
+[GEMINI] https://www.murdoch.edu.au/course/Undergraduate/B1344 → 1 field(s) (cost=$0.000573, in=7608 out=9)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/Undergraduate/B1344
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/Undergraduate/B1344 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/Undergraduate/B1344 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=412563B rendered=997703B using=rendered text_len=20412
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "7e748b3e-0003-4017-b24f-56de00928c1f", "originalId" : "3020f5f7-fc4e-4e8b-be81-bfb239894f38", "curriculumType" : "Major", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMon'
+[GP-DEBUG] raw_response='ll check if there\'s any other phrase. Wait, "offerDisplayYears":'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/mj-gph → 0 field(s) (cost=$0.000450, in=5939 out=16)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/mj-gph
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/mj-gph — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/mj-gph (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=430068B rendered=1017526B using=rendered text_len=21545
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "69b7ab69-9c0b-4405-8432-31f52136afbd", "originalId" : "6e9e65a9-3763-4448-a2a6-8920f8189d2d", "curriculumType" : "Major", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMon'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/mj-gmad → 0 field(s) (cost=$0.000471, in=6222 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/mj-gmad
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/mj-gmad — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/mj-gmad (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/undergraduate/mj-scp: duration_value, duration_unit
+[CATEGORY det] Screen Production → Media & Communications / Film & Screen
+[EXTRACT] 80/84: exercise science
+Fetching 80/84: exercise science
+[per-course browser ↻] https://www.murdoch.edu.au/course/undergraduate/b1348
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/Undergraduate/B1344: fee_currency, duration_value, duration_unit
+[EXTRACT] 81/84: Learn about Waardong
+Fetching 81/84: Learn about Waardong
+[per-course browser ↻] https://www.murdoch.edu.au/course/enabling/n1022
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/undergraduate/mj-gph: duration_value, duration_unit
+[CATEGORY det] Graphic Design → Architecture, Building & Design / Graphic Design
+[EXTRACT] 82/84: TLC Learning for Tomorrow
+Fetching 82/84: TLC Learning for Tomorrow
+[per-course browser ↻] https://www.murdoch.edu.au/course/enabling/n1110
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/undergraduate/mj-gmad: duration_value, duration_unit
+[EXTRACT] 83/84: FlexiTrack High
+Fetching 83/84: FlexiTrack High
+[per-course browser ✓] https://www.murdoch.edu.au/course/undergraduate/b1348 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.murdoch.edu.au/course/enabling/n1101
+[per-course browser ✓] https://www.murdoch.edu.au/course/enabling/n1022 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=447798B rendered=1036396B using=rendered text_len=27333
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "839506ab-1576-4ad2-b64d-8437502d97df", "originalId" : "3a62c938-0bb2-4c57-87ec-5bd97f67970e", "curriculumType" : "Course", "studyLevelTaxonId" : "ce262074-68d2-43a0-9b6a-715b1807686c", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41990,\n "'
+[GEMINI] https://www.murdoch.edu.au/course/undergraduate/b1348 → 1 field(s) (cost=$0.000578, in=7669 out=10)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/undergraduate/b1348
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/undergraduate/b1348 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/undergraduate/b1348 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/enabling/n1110 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=360978B rendered=947380B using=rendered text_len=11600
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "dc42cb1a-c537-47c7-9065-4527629c02b4", "originalId" : "735367c5-f9c8-4dc3-a4a7-4612afbd619d", "curriculumType" : "Course", "studyLevelTaxonId" : "a5d59d17-0313-46cd-9314-d41e4f173abc", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.murdoch.edu.au/course/enabling/n1022 → 0 field(s) (cost=$0.000284, in=3734 out=13)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/enabling/n1022
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/enabling/n1022 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/enabling/n1022 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.murdoch.edu.au/course/enabling/n1101 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=371811B rendered=955881B using=rendered text_len=19226
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "23e0ac2d-f665-4cf1-8220-5de46f92c42b", "originalId" : "b49ed51d-2da6-467a-9cdc-cb4d3a46c344", "curriculumType" : "Course", "studyLevelTaxonId" : "a5d59d17-0313-46cd-9314-d41e4f173abc", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.murdoch.edu.au/course/enabling/n1110 → 0 field(s) (cost=$0.000427, in=5641 out=14)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/enabling/n1110
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/enabling/n1110 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/enabling/n1110 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/undergraduate/b1348: fee_currency, duration_value, duration_unit
+[EXTRACT] 84/84: Nursing
+Fetching 84/84: Nursing
+[GP-DEBUG] static=373373B rendered=958480B using=rendered text_len=19308
+[GP-DEBUG] text[:500]='Live Chat Live Chat Want advice about your study, your wellbeing or getting the most out of university? Agents are available in 0:01 (0 Minutes and 1 Second). Chat now { "id": "cf341a59-31dd-463c-8d6b-6e54dd6b7972", "originalId" : "6d58aaa2-580b-4e85-83a3-27f2e22eba50", "curriculumType" : "Course", "studyLevelTaxonId" : "a5d59d17-0313-46cd-9314-d41e4f173abc", "studentTypesId" : "825fc59d-48cf-404a-845c-e103afece326", "teachingPeriodsId" : "8decd6ae-e029-46db-95e9-90b8d78727b9", "offerCutOffDayMo'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.murdoch.edu.au/course/enabling/n1101 → 0 field(s) (cost=$0.000428, in=5661 out=12)
+[per-course vision img 0/6] https://www.murdoch.edu.au/course/enabling/n1101
+[per-course vision img 0/6 (cache hits 6)] https://www.murdoch.edu.au/course/enabling/n1101 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.murdoch.edu.au/course/enabling/n1101 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/enabling/n1110: duration_value, duration_unit
+[FALLBACK] AI filled 2 field(s) on https://www.murdoch.edu.au/course/enabling/n1022: duration_value, duration_unit
+[FALLBACK] AI filled 3 field(s) on https://www.murdoch.edu.au/course/enabling/n1101: intake_months, duration_value, duration_unit
+[BROWSER↑] HTTP blocked for https://www.murdoch.edu.au/course/undergraduate/B1373 — retrying via browser
+[STAGE] skipped Murdoch Search: rejected: category_landing_page
+[STAGE] skipped Study Areas: rejected: category_landing_page
+[STAGE] skipped Study Online: rejected: category_landing_page
+[STAGE] skipped Award Titles and Abbreviations: rejected: category_landing_page
+[STAGE] skipped High School Leavers: rejected: category_landing_page
+[STAGE] skipped Entry Requirements for High School Leavers: rejected: category_landing_page
+[STAGE] skipped Parents and Families: rejected: category_landing_page
+[STAGE] skipped Work and Life Experience: rejected: category_landing_page
+[STAGE] skipped Vocational Education and Training: rejected: category_landing_page
+[STAGE] skipped Our Pathway with Sm Tafe: rejected: category_landing_page
+[STAGE] skipped Higher Education: rejected: category_landing_page
+[STAGE] skipped Law Start: rejected: category_landing_page
+[STAGE] skipped Ngoolark: rejected: category_landing_page
+[STAGE] skipped Pre-law: rejected: category_landing_page
+[STAGE] skipped Experienced Based Entry: rejected: category_landing_page
+[STAGE] skipped Pathways for International Students: rejected: category_landing_page
+[STAGE] skipped Honours: rejected: category_landing_page
+[STAGE] skipped Honours Opportunities: rejected: category_landing_page
+[STAGE] skipped Postgraduate Degrees: rejected: category_landing_page
+[STAGE] skipped Research: rejected: generic category page
+[STAGE] skipped Study Abroad and Exchange: rejected: category_landing_page
+[STAGE] skipped Decide What to Study: rejected: category_landing_page
+[STAGE] skipped How to apply: extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Life on Campus: rejected: category_landing_page
+[STAGE] skipped Our Social Program: rejected: category_landing_page
+[STAGE] skipped When You Leave: rejected: category_landing_page
+[STAGE] skipped Before Moving to Perth: rejected: category_landing_page
+[STAGE] skipped Apply for A Visa: rejected: category_landing_page
+[STAGE] skipped Relocating As A Family: rejected: category_landing_page
+[STAGE] skipped Overseas Student Health Cover (Oshc): rejected: category_landing_page
+[STAGE] skipped Arrival in Perth: rejected: category_landing_page
+[STAGE] skipped Airport Pickups: rejected: category_landing_page
+[STAGE] skipped Getting Organised: rejected: category_landing_page
+[STAGE] skipped Working in Perth: rejected: category_landing_page
+[STAGE] skipped Life in Perth: rejected: category_landing_page
+[STAGE] skipped Facts About Perth, Wa: rejected: category_landing_page
+[STAGE] skipped Things to Do in and Around Perth: rejected: category_landing_page
+[STAGE] skipped Climate and Culture: rejected: category_landing_page
+[STAGE] skipped Living Costs: rejected: category_landing_page
+[STAGE] skipped Studying At Murdoch: rejected: category_landing_page
+[STAGE] skipped Life on Campus: rejected: category_landing_page
+[STAGE] skipped International Student Groups: rejected: category_landing_page
+[STAGE] skipped Support Services: rejected: category_landing_page
+[STAGE] skipped Information for Parents: rejected: category_landing_page
+[STAGE] skipped Staying At Home: rejected: category_landing_page
+[STAGE] skipped Support for Studying From Home: rejected: category_landing_page
+[STAGE] skipped Moving to Perth: rejected: category_landing_page
+[STAGE] skipped Leaving Home: rejected: category_landing_page
+[STAGE] skipped Support for Moving to Perth: rejected: category_landing_page
+[STAGE] skipped Course Fees: rejected: category_landing_page
+[STAGE] skipped Job Ready Graduates – Student Faqs: rejected: category_landing_page
+[STAGE] skipped Student Services and Amenities Fee: rejected: category_landing_page
+[STAGE] skipped Cost of Living: rejected: category_landing_page
+[STAGE] skipped High School Leavers: rejected: category_landing_page
+[STAGE] skipped Understanding Atar: rejected: category_landing_page
+[STAGE] skipped Undergraduate: rejected: category_landing_page
+[STAGE] skipped Selection Rank Adjustment: rejected: category_landing_page
+[STAGE] skipped Media Portfolio: rejected: category_landing_page
+[STAGE] skipped Academies Australasia: rejected: category_landing_page
+[STAGE] skipped Canning College: rejected: category_landing_page
+[STAGE] skipped Nit Australia: rejected: category_landing_page
+[STAGE] skipped Phoenix Academy: rejected: category_landing_page
+[STAGE] skipped Tropical Marine Biology: rejected: category_landing_page
+[STAGE] skipped Storytelling in Australia: rejected: category_landing_page
+[STAGE] skipped International Student Safety: rejected: category_landing_page
+[STAGE] saved: Bachelor of Education (Primary Teaching)
+[STAGE] saved: Bachelor of Nursing
+[STAGE] saved: Bachelor of Psychology
+[STAGE] saved: Bachelor of Laws
+[STAGE] saved: Bachelor of Laws (LLB) - Graduate Entry
+[STAGE] skipped Clinical Laboratory Science: rejected: category_landing_page
+[STAGE] saved: Bachelor of Laboratory Medicine
+[STAGE] skipped Veterinary Science: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Laws / Bachelor of Criminology
+[STAGE] skipped Mooting At Murdoch: rejected: category_landing_page
+[STAGE] skipped Screen Production: rejected: category_landing_page
+[STAGE] saved: Bachelor of Communication / Bachelor of Creative Media
+[STAGE] skipped Graphic Design: rejected: category_landing_page
+[STAGE] skipped Games Art and Design: rejected: category_landing_page
+[STAGE] saved: Bachelor of Sport and Exercise Science
+[STAGE] skipped Waardong First Nations Veterinary Medicine and Science Path: rejected: category_landing_page
+[STAGE] skipped Tlc Learning for Tomorrow: rejected: category_landing_page
+[STAGE] skipped FlexiTrack High: extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Nursing: fetch_failed
+[GEMINI] Total cost: $0.0171 USD across 9 course(s) (~$0.00190/course)
+[TIMING] Total: 11m 37s | Courses: 9 | Avg: 77.4s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:84 | Staged:9 | Skipped:71 | Errors:3
+Staged 9 courses, 71 skipped, 1 fetch errors

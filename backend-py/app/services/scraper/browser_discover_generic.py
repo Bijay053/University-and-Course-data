@@ -23,13 +23,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
 _SETTLE_S = 3.0
 _NAV_SETTLE_S = 2.0
-_MAX_NAV_PAGES = 20   # total nav pages to visit across all BFS levels
+_MAX_NAV_PAGES = 30   # total nav pages to visit across all BFS levels
 
 _EXTRACT_LINKS_JS = r"""
 (origin) => {
@@ -55,6 +56,37 @@ _NAV_URL_HINTS = (
     "/study", "/course", "/program", "/academ",
     "/facult", "/school", "/department", "/undergrad", "/postgrad",
 )
+
+_HOST_EXTRA_SEEDS: dict[str, list[str]] = {
+    "www.ecu.edu.au": [
+        "https://www.ecu.edu.au/degrees/courses/all",
+        "https://www.ecu.edu.au/degrees/postgraduate",
+    ],
+    "ecu.edu.au": [
+        "https://www.ecu.edu.au/degrees/courses/all",
+        "https://www.ecu.edu.au/degrees/postgraduate",
+    ],
+}
+
+_LISTING_URL_RE = re.compile(
+    r"/(?:degrees|courses?|programs?)"
+    r"(?:/courses?)?"
+    r"/(?:all|search|list|postgrad(?:uate)?|undergrad(?:uate)?)",
+    re.I,
+)
+
+_SCROLL_AND_LOAD_JS = r"""
+async () => {
+  let prev = 0;
+  for (let i = 0; i < 6; i++) {
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(r => setTimeout(r, 1800));
+    const cur = document.body.scrollHeight;
+    if (cur === prev) break;
+    prev = cur;
+  }
+}
+"""
 
 
 def _is_nav_url(url: str) -> bool:
@@ -98,6 +130,11 @@ async def browser_discover_generic(
     seen: set[str] = set()
     results: list[dict] = []
     nav_queue: list[str] = []
+
+    for seed_url in _HOST_EXTRA_SEEDS.get(host, []):
+        if seed_url not in seen:
+            nav_queue.append(seed_url)
+            seen.add(seed_url)
 
     try:
         from app.services.scraper.discovery import (
@@ -201,6 +238,31 @@ async def browser_discover_generic(
                     before = len(results)
                     _process_links(raw2 or [])
                     gained = len(results) - before
+
+                    # Scroll-to-load: for paginated/infinite-scroll course
+                    # listing pages, scroll to the bottom repeatedly so that
+                    # JavaScript-rendered results fully hydrate before the
+                    # second link harvest.
+                    if _LISTING_URL_RE.search(nav_url):
+                        try:
+                            await page.evaluate(_SCROLL_AND_LOAD_JS)
+                            raw3 = await page.evaluate(_EXTRACT_LINKS_JS, origin_str)
+                            before2 = len(results)
+                            _process_links(raw3 or [])
+                            scroll_gained = len(results) - before2
+                            gained += scroll_gained
+                            if scroll_gained:
+                                await _emit(
+                                    f"[DISCOVER] Browser: scroll {nav_url} "
+                                    f"→ +{scroll_gained} more courses "
+                                    f"(total {len(results)})"
+                                )
+                        except Exception as se:
+                            log.debug(
+                                "browser_discover_generic: scroll failed for %s — %s",
+                                nav_url, se,
+                            )
+
                     if gained:
                         await _emit(
                             f"[DISCOVER] Browser: nav {nav_url} → +{gained} courses "

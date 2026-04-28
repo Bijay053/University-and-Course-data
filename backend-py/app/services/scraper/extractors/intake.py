@@ -59,6 +59,13 @@ _MONTH_RE = re.compile(rf"\b({_MONTH_ANY})\b", re.I)
 # <div><strong>Intake</strong></div><div>February, July</div>` —
 # tag-stripping concatenates "March" and "Intake" and the keyword
 # window would then walk forward from the wrong offset).
+_SEMESTER_MONTH_MAP: dict[str, str] = {
+    "1": "February",
+    "2": "July",
+    "3": "October",
+}
+_SEMESTER_RE = re.compile(r"\bSemester\s+([1-3])\b", re.I)
+
 _INTAKE_LABEL_RE = re.compile(
     r"(?:intakes?|intake\s+(?:dates?|months?|periods?)|"
     r"next\s+(?:available\s+)?intakes?|available\s+intakes?|"
@@ -252,6 +259,16 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             month = _normalise_month(raw)
             if month and month not in months:
                 months.append(month)
+
+    # Pass 3: Semester N → month mapping (Australian academic calendar).
+    # Fires only when passes 1 & 2 found nothing — handles pages that expose
+    # "Semester 1" / "Semester 2" availability labels with no explicit dates
+    # (e.g. ECU's "Availability & Campus" pivot table).
+    if not months:
+        for m in _SEMESTER_RE.finditer(text):
+            mapped = _SEMESTER_MONTH_MAP.get(m.group(1))
+            if mapped and mapped not in months:
+                months.append(mapped)
 
     if not months:
         return []

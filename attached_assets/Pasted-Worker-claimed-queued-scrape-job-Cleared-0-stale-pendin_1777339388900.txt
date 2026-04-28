@@ -1,0 +1,1270 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 10
+Fetching https://www.ecu.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://www.ecu.edu.au/ (max 25 pages, max 200 candidates)
+[DISCOVER] Page 1/25: fetch failed — https://www.ecu.edu.au/
+[DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://www.ecu.edu.au
+[DISCOVER] sitemap: done — 0 unique candidates
+[DISCOVER] BFS returned 0 links — trying browser-based discovery (handles Cloudflare / JS-heavy sites)...
+[DISCOVER] Browser: navigating to https://www.ecu.edu.au/
+[DISCOVER] Browser: start page → 7 course links, 3 nav candidates to follow
+[DISCOVER] Browser: nav https://www.ecu.edu.au/study/extra → +21 courses (total 28)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/future-students/course-entry → +3 courses (total 31)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/future-students/course-entry/credit-and-recognition-of-prior-learning → +1 courses (total 32)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/future-students/course-entry/atar-requirements → +73 courses (total 105)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/future-students/course-entry/experience-based-entry-scheme → +1 courses (total 106)
+[DISCOVER] Browser: nav https://www.ecu.edu.au/centres/international-office/our-services/international-relations/study-offshore → +2 courses (total 108)
+[DISCOVER] Browser: discovered 108 course links
+Discovered 108 candidate course links
+Extracting course details (108 pages)...
+[EXTRACT] 1/108: View all courses
+[EXTRACT] 2/108: Undergraduate study
+[EXTRACT] 3/108: Postgraduate study
+[EXTRACT] 4/108: Ask a student
+Fetching 1/108: View all courses
+Fetching 3/108: Postgraduate study
+Fetching 2/108: Undergraduate study
+Fetching 4/108: Ask a student
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/all — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/international/ask-a-student — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/undergraduate — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/postgraduate — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/postgraduate
+[per-course browser ↻] https://www.ecu.edu.au/degrees/undergraduate
+[per-course browser ↻] https://www.ecu.edu.au/degrees/international/ask-a-student
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/all
+[per-course browser ✓] https://www.ecu.edu.au/degrees/postgraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/all — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/degrees/international/ask-a-student — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/degrees/undergraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=309414B rendered=220487B using=rendered text_len=6760
+[GP-DEBUG] text[:500]="Postgraduate Study Postgraduate study can mean different things to different people. For some, it's an opportunity to continue on a path to expertise or research in their chosen field. For others, it offers possible career progression or even a complete change of careers. Whatever your current situation, postgraduate study could shape your future. Why study at ECU? A great student experience As an ECU postgraduate, you can expect the best overall student experience of any public universities in "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.ecu.edu.au/degrees/postgraduate → 0 field(s) (cost=$0.000194, in=2523 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/postgraduate
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/postgraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/postgraduate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=235428B rendered=243599B using=rendered text_len=5023
+[GP-DEBUG] text[:500]="1-10 of 244 results for '' Filter Filter results: Degree type Postgraduate (139) Undergraduate (105) Study mode Full Time (210) Part Time (223) Student type Domestic (244) International (183) Study area Allied Health (11) Aviation (4) Business (61) Computing (7) Creative Humanities (21) Cyber Security (8) Engineering & Technology (23) Entry Pathway (1) Exercise & Sports Science (9) Health Science (5) Law (9) Medical & Biomedical Science (5) Nursing & Midwifery (24) Nutrition & Dietetics (9) Occu"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/all → 0 field(s) (cost=$0.000161, in=2089 out=13)
+[per-course vision img 0/5] https://www.ecu.edu.au/degrees/courses/all
+[per-course vision img 0/5] https://www.ecu.edu.au/degrees/courses/all — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/all (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=198376B rendered=178837B using=rendered text_len=898
+[GP-DEBUG] text[:500]="Ask a student What's it like to be an ECU student? What kind of study destination is Perth? Chat to our current students to find out more. Ask a student The Important Things Things you should know about if you're thinking about studying here. Course Entry There's more than one admission pathway into an ECU course. It depends on what you've studied already, or your work or life experience. Fees & Scholarships Course tuition fees can change, but we can give you an estimate of your costs. If you're"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.ecu.edu.au/degrees/international/ask-a-student → 0 field(s) (cost=$0.000083, in=1061 out=12)
+[per-course vision img 0/5] https://www.ecu.edu.au/degrees/international/ask-a-student
+[per-course vision img 0/5 (cache hits 5)] https://www.ecu.edu.au/degrees/international/ask-a-student — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/international/ask-a-student (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=334948B rendered=322416B using=rendered text_len=9342
+[GP-DEBUG] text[:500]="Undergraduate Study Starting a degree is exciting. It's challenging and enlightening. It's the start of a new you. At ECU, it's also the start of a new way of thinking. Here, you'll learn to challenge things. To see problems as opportunities. And to think creatively about the world around you. It's your new superpower. Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More ab"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/degrees/undergraduate → 0 field(s) (cost=$0.000241, in=3169 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/undergraduate
+[EXTRACT] 5/108: Thinking about a career switch? Study might be a good start
+Fetching 5/108: Thinking about a career switch? Study might be a good start
+[per-course vision img 2/6 (cache hits 3)] https://www.ecu.edu.au/degrees/undergraduate — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/undergraduate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 6/108: Paige turns to crime for a life in the lab
+Fetching 6/108: Paige turns to crime for a life in the lab
+[EXTRACT] 7/108: What's a double degree and why would you study one?
+Fetching 7/108: What's a double degree and why would you study one?
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/b — retrying via browser
+[EXTRACT] 8/108: The ECU Experience
+Fetching 8/108: The ECU Experience
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/thinking-about-a-career-switch-study-might-be-a-good-start
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/thinking-about-a-career-switch-study-might-be-a-good-start — IELTS=— PTE=— TOEFL=— CAE=—
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-f — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/b — retrying via browser
+[GP-DEBUG] static=221492B rendered=214168B using=rendered text_len=3561
+[GP-DEBUG] text[:500]="Every year in Australia, people decide that it's time to pursue a new career or direction. Published: 10 Mar 2026 3 minute read By ECU Extra in Preparing for Employment Remember getting that first degree and thinking it would set you up in a career you'd love? Actually, no degree guarantees that kind of rose-coloured vision! A first degree was a good start though, especially if you went straight from high school to uni. But after a few years in the workforce, you get to know yourself better. You"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000135, in=1752 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/thinking-about-a-career-switch-study-might-be-a-good-start
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/paige-turns-to-crime-for-a-life-in-the-lab
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/paige-turns-to-crime-for-a-life-in-the-lab — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/6 (cache hits 1)] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/thinking-about-a-career-switch-study-might-be-a-good-start — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/thinking-about-a-career-switch-study-might-be-a-good-start (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=213080B rendered=205131B using=rendered text_len=3997
+[GP-DEBUG] text[:500]="A forensic science major offers specialised forensic studies within the physical and biomedical sciences that underpin forensic investigations. Published: 04 Apr 2025 3 minute read By ECU Extra in Preparing for Uni A lot of students come to university not knowing exactly what they want to do in their working life. Especially school leavers. And that's OK. It's a matter of finding yourself as much as it is about finding the right course. That might take some time, but if you're prepared to try th"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000142, in=1851 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/paige-turns-to-crime-for-a-life-in-the-lab
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/paige-turns-to-crime-for-a-life-in-the-lab — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/paige-turns-to-crime-for-a-life-in-the-lab (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=206086B rendered=210393B using=rendered text_len=3528
+[GP-DEBUG] text[:500]='Twin female students sharing music while studying. Published: 17 Nov 2023 3 minute read By ECU Extra in Preparing for Employment On average, only around 1% of university students graduate with double degrees. Most graduate with a single degree. A few come back later to do a second one. While some single degrees, like a Bachelor of Arts, give you a broad education and skills that can open doors to different employment options, others are more specific to a profession, for example an engineering o'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000134, in=1741 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one
+[EXTRACT] 9/108: Preparing for Uni
+Fetching 9/108: Preparing for Uni
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 10/108: The WA Experience
+Fetching 10/108: The WA Experience
+[GP-DEBUG] static=213636B rendered=218512B using=rendered text_len=4912
+[GP-DEBUG] text[:500]='The ECU Experience Hear stories from graduates and current students about their experiences and explore highlighted courses, campus events and facilities, as well as our practical approaches to teaching. Explore articles relating to Explore related article categories ECU Courses ECU Courses articles For many years, Master of Business Administration courses have developed and educated skilled managers and leaders across the world, enabling them to contribute to organisations in a highly effective'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000159, in=2066 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand/whats-a-double-degree-and-why-would-you-study-one: duration_value, duration_unit
+[EXTRACT] 11/108: Choose a flexible MBA for an ever-changing world
+Fetching 11/108: Choose a flexible MBA for an ever-changing world
+[EXTRACT] 12/108: Start your new year in the education fast lane
+Fetching 12/108: Start your new year in the education fast lane
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-wa-experience — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-wa-experience
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-cou — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-cou — retrying via browser
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-wa-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/choose-a-flexible-mba-for-an-ever-changing-world
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane
+[GP-DEBUG] static=196670B rendered=184612B using=rendered text_len=1432
+[GP-DEBUG] static=224060B rendered=206538B using=rendered text_len=5068
+[GP-DEBUG] text[:500]="Preparing for Uni It's a big deal making the change from high school to uni or getting back into study after a break. Learn about entry pathways, courses, scholarships, good study habits and handling the pressure. Explore articles relating to Explore related article categories Course Finder Course Finder articles Growing up, Josh Venters wanted to be everything from a car salesman to an actor to a detective. These weren’t childhood dreams; he took each of these careers seriously. Now, after year"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000161, in=2105 out=12)
+[GP-DEBUG] text[:500]="The WA Experience Considering a move to Western Australia to study? Discover what it's like living in the city or greater Perth, along with the must-do and must-see things across our enormous and exciting state. Explore articles relating to Explore related article categories City Life City Life articles University campuses can have a certain sameness about them, often sprawling across several blocks like a miniature city. But there's a new campus in the heart of Perth city that's like no other i"
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-wa-experienc → 0 field(s) (cost=$0.000094, in=1196 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-wa-experience
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 0/6 (cache hits 1)] https://www.ecu.edu.au/study/extra/articles/the-wa-experience — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-wa-experience (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/choose-a-flexible-mba-for-an-ever-changing-world — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 13/108: How a high school 'dropout' discovered the magic of physics
+Fetching 13/108: How a high school 'dropout' discovered the magic of physics
+[EXTRACT] 14/108: Kaidyn's first taste of engineering leaves first class impressions
+Fetching 14/108: Kaidyn's first taste of engineering leaves first class impressions
+[GP-DEBUG] static=212400B rendered=206416B using=rendered text_len=4391
+[GP-DEBUG] text[:500]="Edith Cowan University's MBA provides students with the ability to respond to challenging situations in complex and modern organisations. Published: 07 Oct 2025 3 minute read By ECU Extra in The ECU Experience In fact, it's a badge of honour to have an MBA on your CV. But in today's rapidly changing, globally competitive environment, it's equally important that MBA programs adapt to the world around them. For example, in the blink of an eye we've witnessed the challenges of the growing dominance"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000150, in=1951 out=13)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/choose-a-flexible-mba-for-an-ever-changing-world
+[GP-DEBUG] static=208894B rendered=204531B using=rendered text_len=4497
+[per-course vision img 0/6 (cache hits 2)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/choose-a-flexible-mba-for-an-ever-changing-world — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] text[:500]="Early childhood education is one of the fastest growing sectors across Australia. Published: 03 Sep 2025 3 minute read By ECU Extra in The ECU Experience It's probably no surprise to you that early childhood is a growing sector. And like any service where there's a demand, it has created a real supply issue. With Kindergarten now positioned in schools, this has led to many primary teachers delivering classes, rather than the qualified early childhood educators that schools need to meet the Natio"
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/choose-a-flexible-mba-for-an-ever-changing-world (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000152, in=1977 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Choose A Flexible MBA for An Ever-changi → Business & Management / MBA
+[EXTRACT] 15/108: Jerry looks back to go forward with a career switch
+Fetching 15/108: Jerry looks back to go forward with a career switch
+[FALLBACK] AI filled 2 field(s) on https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/start-your-new-year-in-the-education-fast-lane: duration_value, duration_unit
+[EXTRACT] 16/108: See all The ECU Experience
+Fetching 16/108: See all The ECU Experience
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-cou — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-cou — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/how-a-high-school-dropout-discovered-the-magic-of-physics
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/how-a-high-school-dropout-discovered-the-magic-of-physics — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/jerry-looks-back-to-go-forward-with-a-career-switch
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses
+[GP-DEBUG] static=227283B rendered=208249B using=rendered text_len=4242
+[GP-DEBUG] text[:500]="Physics is such a broad area of study that it can benefit you in almost any career you choose to go into. Published: 26 Nov 2024 4 minute read By ECU Extra in The ECU Experience Like a lot of high school kids, Nathan enjoyed sports but struggled academically. Especially with maths. After trying and failing he began to believe people who told him that he just wasn’t any good at it. Eventually he gave up, assumed he wasn't very smart and dropped out of high school in Year 11. Blokes with soft hand"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000147, in=1916 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/how-a-high-school-dropout-discovered-the-magic-of-physics
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/how-a-high-school-dropout-discovered-the-magic-of-physics — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses/how-a-high-school-dropout-discovered-the-magic-of-physics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=220070B rendered=219483B using=rendered text_len=3286
+[GP-DEBUG] text[:500]='First year engineering students are given a broad knowledge of all the different paths in engineering at Edith Cowan University. Published: 09 Aug 2024 2 minute read By ECU Extra in The ECU Experience Kaidyn recently started his first year of engineering for a four-year course. Asked about the first year so far, he says, "I\'m very happy with how it’s gone. It\'s been great to get a broad knowledge of all the different paths in engineering. "I have really enjoyed the electrical engineering units, '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000130, in=1680 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions
+[per-course vision img 0/6 (cache hits 1)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/jerry-looks-back-to-go-forward-with-a-career-switch — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/kaidyns-first-taste-of-engineering-leaves-first-class-impressions: duration_value, duration_unit
+[GP-DEBUG] static=210797B rendered=224530B using=rendered text_len=4077
+[GP-DEBUG] text[:500]='Jerry Schweitzer wanted to help preserve the memories of nature and the animals in it – just like the memories of his childhood on his parents\' boat. Published: 06 Aug 2024 3 minute read By ECU Extra in The ECU Experience "I think that it has been the best decision I have made," says Jeremia (Jerry) Schweitzer. "Tough moments, sure. But life is never straight-forward anyway." Jerry is understandably upbeat about his future. Now a university student, he gets to study and work at the same place – '
+[EXTRACT] 17/108: Could a career in OT be your calling?
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000145, in=1874 out=14)
+Fetching 17/108: Could a career in OT be your calling?
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/jerry-looks-back-to-go-forward-with-a-career-switch
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/jerry-looks-back-to-go-forward-with-a-career-switch — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/student-stories/jerry-looks-back-to-go-forward-with-a-career-switch (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] How A High School 'dropout' Discovered t → Science & Mathematics / Physics
+[EXTRACT] 18/108: How to make an impact with your new skills, while still a student
+Fetching 18/108: How to make an impact with your new skills, while still a student
+[GP-DEBUG] static=210767B rendered=205100B using=rendered text_len=15382
+[GP-DEBUG] text[:500]='The ECU Experience Hear stories from graduates and current students about their experiences and explore highlighted courses, campus events and facilities, as well as our practical approaches to teaching. Explore articles relating to Explore related article categories ECU courses articles For many years, Master of Business Administration courses have developed and educated skilled managers and leaders across the world, enabling them to contribute to organisations in a highly effective and respons'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-ecu-experien → 0 field(s) (cost=$0.000354, in=4686 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses
+[per-course vision img 0/6 (cache hits 6)] https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-ecu-experience/ecu-courses (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 19/108: How sound career advice can take you around the world
+Fetching 19/108: How sound career advice can take you around the world
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/l — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/l — retrying via browser
+[EXTRACT] 20/108: See all Preparing for Employment
+Fetching 20/108: See all Preparing for Employment
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/could-a-career-in-ot-be-your-calling
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/c — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/how-to-make-an-impact-with-your-new-skills-while-still-a-student
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/could-a-career-in-ot-be-your-calling — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/how-to-make-an-impact-with-your-new-skills-while-still-a-student — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/career-profiles/how-sound-career-advice-can-take-you-around-the-world
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/b — retrying via browser
+[GP-DEBUG] static=215502B rendered=205588B using=rendered text_len=4639
+[GP-DEBUG] text[:500]="Occupational Therapists are professionals who work in private practices, consultancies, large hospitals and more. Published: 18 Sep 2025 4 minute read By ECU Extra in Preparing for Employment Occupational Therapy, or OT, is a popular study choice for anyone contemplating a career where caring for people is a top priority. Where you're supporting them to participate fully in their lives and engage in meaningful activities. OTs are professionals who work in a range of settings – from private pract"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000155, in=2014 out=13)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/could-a-career-in-ot-be-your-calling
+[GP-DEBUG] static=220880B rendered=207724B using=rendered text_len=4827
+[GP-DEBUG] text[:500]='Staff and the marketing students from ECU join Telethon staff at the end of the project. Published: 14 Jul 2025 4 minute read By ECU Extra in Preparing for Employment Universities like to promise you that after you graduate, you’ll go out into the world and make an impact. And it does happen. It’s the power of education. But nothing beats seeing a preview of that potential impact while you’re still studying. It confirms that you’re on the right path and it doesn’t hurt your developing CV either.'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000159, in=2068 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/how-to-make-an-impact-with-your-new-skills-while-still-a-student
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/could-a-career-in-ot-be-your-calling — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/could-a-career-in-ot-be-your-calling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 0/6 (cache hits 1)] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/how-to-make-an-impact-with-your-new-skills-while-still-a-student — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/learning-in-practice/how-to-make-an-impact-with-your-new-skills-while-still-a-student (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/career-profiles/how-sound-career-advice-can-take-you-around-the-world — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand
+[EXTRACT] 21/108: How to find your way into early childhood education
+Fetching 21/108: How to find your way into early childhood education
+[GP-DEBUG] static=216790B rendered=219470B using=rendered text_len=6190
+[GP-DEBUG] text[:500]="World-famous Cirque du Soleil's production Corteo in full flight. Published: 12 Jun 2025 5 minute read By ECU Extra in Preparing for Employment This is the story of three talented people. Three people who didn't know each other growing up, but who had plenty in common. They all loved music – listening to music, learning to play an instrument and even performing. They all wondered what they could do with this love. And they all landed on the same career direction through a fantastic university co"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000183, in=2404 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/career-profiles/how-sound-career-advice-can-take-you-around-the-world
+[EXTRACT] 22/108: Janice wins big for academic excellence and study-life balance
+Fetching 22/108: Janice wins big for academic excellence and study-life balance
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/career-profiles/how-sound-career-advice-can-take-you-around-the-world — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/career-profiles/how-sound-career-advice-can-take-you-around-the-world (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 23/108: Look beyond the lectures when choosing uni courses
+Fetching 23/108: Look beyond the lectures when choosing uni courses
+[GP-DEBUG] static=194495B rendered=203070B using=rendered text_len=1766
+[GP-DEBUG] text[:500]="Preparing for Employment Studying for a degree isn't the only thing you'll do as an ECU student. We also give you advice, experience and tools to make you more employable when you graduate. Explore articles relating to Explore related article categories Building your personal brand articles Every year in Australia, people decide that it's time for a career change. There are many reasons for this and equally many options to make it happen, including going back to study. Your career should grow wi"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-em → 0 field(s) (cost=$0.000101, in=1288 out=14)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand
+[per-course vision img 0/6 (cache hits 4)] https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-employment/building-your-personal-brand (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pa — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-lif — retrying via browser
+[EXTRACT] 24/108: See all Preparing for Uni
+Fetching 24/108: See all Preparing for Uni
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-f — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pathways/how-to-find-your-way-into-early-childhood-education
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-life-balance/janice-wins-big-for-academic-excellence-and-study-life-balance
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pathways/how-to-find-your-way-into-early-childhood-education — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/look-beyond-the-lectures-when-choosing-uni-courses
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-f — retrying via browser
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-life-balance/janice-wins-big-for-academic-excellence-and-study-life-balance — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/look-beyond-the-lectures-when-choosing-uni-courses — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=220588B rendered=215497B using=rendered text_len=2733
+[GP-DEBUG] static=213453B rendered=206166B using=rendered text_len=2564
+[GP-DEBUG] text[:500]='Teacher Education graduate Janice Simons maintained high results in Primary Education while adjusting to motherhood. Published: 10 May 2024 3 minute read By ECU Extra in Preparing for Uni Teacher Education graduate Janice is proud of the fact she only had to extend her degree by one year and managed to maintain high results while adjusting to motherhood. Now a mother of two kids under five, Janice was awarded no less than five academic excellence awards at a recent Edith Cowan University School '
+[GP-DEBUG] text[:500]="Early childhood educators help to shape the lives of children from ages zero to eight. Published: 12 Jun 2024 4 minute read By ECU Extra in Preparing for Uni Early childhood teachers are responsible for the care and development of children from ages zero to eight. That's quite a range. And it requires quite a skillset to work with such a diverse and unpredictable group of little humans. If this is an area that you’re interested in, but you haven’t looked at where to study, keep reading. A new pa"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000119, in=1541 out=13)
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000117, in=1495 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-life-balance/janice-wins-big-for-academic-excellence-and-study-life-balance
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pathways/how-to-find-your-way-into-early-childhood-education
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-life-balance/janice-wins-big-for-academic-excellence-and-study-life-balance — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/work-life-balance/janice-wins-big-for-academic-excellence-and-study-life-balance (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 0/6 (cache hits 2)] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pathways/how-to-find-your-way-into-early-childhood-education — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/entry-pathways/how-to-find-your-way-into-early-childhood-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=209630B rendered=203726B using=rendered text_len=3319
+[GP-DEBUG] text[:500]="It's worth doing some research to see what else a university course offers. Published: 17 Nov 2023 3 minute read By ECU Extra in Preparing for Uni Walking out of university with a degree once gave people a distinct advantage over other job applicants in the marketplace. But today, loads of people have university degrees and this isn't necessarily the thing that a recruiter will use to decide if you're a better candidate. You need to be job ready. And the best universities will invest in helping "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000130, in=1684 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/look-beyond-the-lectures-when-choosing-uni-courses
+[per-course vision img 0/6 (cache hits 4)] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/look-beyond-the-lectures-when-choosing-uni-courses — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder/look-beyond-the-lectures-when-choosing-uni-courses (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder — IELTS=— PTE=— TOEFL=— CAE=—
+[CATEGORY det] How to Find Your Way Into Early Childhoo → Education & Social Work / Early Childhood
+[EXTRACT] 25/108: University like you've never imagined
+Fetching 25/108: University like you've never imagined
+[EXTRACT] 26/108: Where on earth can you live in Perth?
+Fetching 26/108: Where on earth can you live in Perth?
+[EXTRACT] 27/108: What on earth can you do in Perth?
+Fetching 27/108: What on earth can you do in Perth?
+[GP-DEBUG] static=191838B rendered=201492B using=rendered text_len=1570
+[GP-DEBUG] text[:500]="Preparing for Uni It's a big deal making the change from high school to uni or getting back into study after a break. Learn about entry pathways, courses, scholarships, good study habits and handling the pressure. Explore articles relating to Explore related article categories Course finder articles Growing up, Josh Venters wanted to be everything from a car salesman to an actor to a detective. These weren’t childhood dreams; he took each of these careers seriously. Now, after years of trying di"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/preparing-for-un → 0 field(s) (cost=$0.000096, in=1234 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder
+[per-course vision img 0/6 (cache hits 6)] https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/preparing-for-uni/course-finder (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 28/108: How one international student discovered the beauty of Western Australia
+Fetching 28/108: How one international student discovered the beauty of Western Australia
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-lif — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-i — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-lif — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-in-perth/where-on-earth-can-you-live-in-perth
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommen — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/what-on-earth-can-you-do-in-perth
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/university-like-youve-never-imagined
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-in-perth/where-on-earth-can-you-live-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommended-activities/how-one-international-student-discovered-the-beauty-of-western-australia
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/what-on-earth-can-you-do-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/university-like-youve-never-imagined — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommended-activities/how-one-international-student-discovered-the-beauty-of-western-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=215570B rendered=217979B using=rendered text_len=2865
+[GP-DEBUG] text[:500]="Central Fremantle street scene, south-west of Perth city. Published: 17 Nov 2023 3 minute read By ECU Extra in The WA Experience Moving to a new city – especially if you're coming from overseas – is both exciting and a little scary. If that city happens to be Perth, the capital of Western Australia, there's nothing to be scared of. People will make you feel welcome here. And it's one of the most liveable and safer cities in the world, according to the Economist's annual global survey. Before you"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-wa-experienc → 0 field(s) (cost=$0.000121, in=1567 out=13)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-in-perth/where-on-earth-can-you-live-in-perth
+[GP-DEBUG] static=206414B rendered=200348B using=rendered text_len=3190
+[GP-DEBUG] text[:500]="Aerial view of Perth city and Kings Park. Published: 17 Nov 2023 3 minute read By ECU Extra in The WA Experience So where do we start? Let's go on a free guided walk in Kings Park, one of the world's largest inner-city parks, with spectacular city and river views. Kings Park has an enormous collection of Australian native plants and trees. And food. And an art gallery. From Kings Park you can look across the Swan River to the South Perth foreshore, a perfect place to get on your bicycle and ride"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-wa-experienc → 0 field(s) (cost=$0.000128, in=1646 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/what-on-earth-can-you-do-in-perth
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/what-on-earth-can-you-do-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/what-on-earth-can-you-do-in-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=204775B rendered=210941B using=rendered text_len=4611
+[GP-DEBUG] text[:500]="ECU City features a cutting-edge LED façade and immersive digital foyer screen, bringing the CBD to life in a vibrant display of art and culture. Published: 19 Sep 2025 3 minute read By ECU Extra in The WA Experience We're speaking of course about Edith Cowan University's new campus, ECU City, that opens to students in February 2026. The university's vision for the campus is this: a place where technology, industry and creativity meet to deliver the creative thinkers, adaptive learners and globa"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-wa-experienc → 0 field(s) (cost=$0.000153, in=2002 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/university-like-youve-never-imagined
+[per-course vision img 0/6 (cache hits 4)] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/university-like-youve-never-imagined — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-wa-experience/city-life/university-like-youve-never-imagined (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 1/6 (cache hits 4)] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-in-perth/where-on-earth-can-you-live-in-perth — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-wa-experience/living-in-perth/where-on-earth-can-you-live-in-perth (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=203565B rendered=196275B using=rendered text_len=982
+[GP-DEBUG] text[:500]='Western Australian coastline near Kalbarri north of Perth. Published: 16 Aug 2022 2 minute read By ECU Extra in The WA Experience "Perth is perfect for a study abroad semester since you have the amenities of a big city while you can travel to more remote areas like the Ningaloo Reef, Rottnest Island or the Margaret River wine region," says Mario. "I already studied mechanical engineering for seven semesters at my home university before studying abroad at ECU. I worked in the School of Engineerin'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.ecu.edu.au/study/extra/articles/the-wa-experienc → 0 field(s) (cost=$0.000087, in=1107 out=12)
+[per-course vision img 0/6] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommended-activities/how-one-international-student-discovered-the-beauty-of-western-australia
+[per-course vision img 0/6 (cache hits 5)] https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommended-activities/how-one-international-student-discovered-the-beauty-of-western-australia — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/study/extra/articles/the-wa-experience/recommended-activities/how-one-international-student-discovered-the-beauty-of-western-australia (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 29/108: Graduate Certificate course
+Fetching 29/108: Graduate Certificate course
+[EXTRACT] 30/108: Doctor of Philosophy
+Fetching 30/108: Doctor of Philosophy
+[EXTRACT] 31/108: Doctor of Philosophy (Integrated)
+Fetching 31/108: Doctor of Philosophy (Integrated)
+[EXTRACT] 32/108: supporting document requirements
+Fetching 32/108: supporting document requirements
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/schools/arts-and-humanities/courses/professiona — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/schools/arts-and-humanities/courses/professional-placement/essential-documents/social-work
+[GP-DEBUG] static=375317B rendered=0B using=static text_len=29368
+[GP-DEBUG] text[:500]="Doctor of Philosophy Course code L61 Why study at ECU? A great student experience As an ECU postgraduate, you can expect the best overall student experience of any public universities in Western Australia. More about QILT. A 5-star postgrad experience Our postgraduate students have rated us 5 stars for their overall experience in the latest Good Universities Guide. More 5-star ratings included: skills development, student support and teaching quality. One of the world's young guns We're ranked o"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42450,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy → 1 field(s) (cost=$0.000616, in=8179 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=241358B rendered=267499B using=rendered text_len=5023
+[GP-DEBUG] text[:500]="1-10 of 244 results for '' Filter Filter results: Degree type Postgraduate (139) Undergraduate (105) Study mode Full Time (210) Part Time (223) Student type Domestic (244) International (183) Study area Allied Health (11) Aviation (4) Business (61) Computing (7) Creative Humanities (21) Cyber Security (8) Engineering & Technology (23) Entry Pathway (1) Exercise & Sports Science (9) Health Science (5) Law (9) Medical & Biomedical Science (5) Nursing & Midwifery (24) Nutrition & Dietetics (9) Occu"
+[GP-DEBUG] raw_response='Category:* "Arts & Humanities" (fits WAAPA/Performing Arts).'
+[GEMINI] https://www.ecu.edu.au/degrees/courses → 0 field(s) (cost=$0.000161, in=2088 out=15)
+[per-course vision img 0/5] https://www.ecu.edu.au/degrees/courses
+[per-course vision img 0/5 (cache hits 5)] https://www.ecu.edu.au/degrees/courses — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/schools/arts-and-humanities/courses/professional-placement/essential-documents/social-work — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=406499B rendered=0B using=static text_len=34287
+[GP-DEBUG] text[:500]="Doctor of Philosophy (Integrated) Course code J42 Why study at ECU? A great student experience As an ECU postgraduate, you can expect the best overall student experience of any public universities in Western Australia. More about QILT. A 5-star postgrad experience Our postgraduate students have rated us 5 stars for their overall experience in the latest Good Universities Guide. More 5-star ratings included: skills development, student support and teaching quality. One of the world's young guns W"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42450'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy- → 1 field(s) (cost=$0.000709, in=9412 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy: fee_currency, duration_value, duration_unit
+[EXTRACT] 33/108: Bachelor of Arts
+Fetching 33/108: Bachelor of Arts
+[GP-DEBUG] static=99971B rendered=99892B using=rendered text_len=2629
+[GP-DEBUG] text[:500]='You are here: Main Content Related Contents Media See Also Downloads Social Work Field Placement for Social Work comprises two placements each which combines\xad a supervised Social Work practice placement and integrative academic study. Students are placed in organisational settings, where they practice and learn social work under the supervision of a qualified social worker. Field Placement enables the student to build an understanding of a particular field of practice through a structured framew'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.ecu.edu.au/schools/arts-and-humanities/courses/p → 0 field(s) (cost=$0.000117, in=1508 out=14)
+[per-course vision img 0/3] https://www.ecu.edu.au/schools/arts-and-humanities/courses/professional-placement/essential-documents/social-work
+[per-course vision img 0/3] https://www.ecu.edu.au/schools/arts-and-humanities/courses/professional-placement/essential-documents/social-work — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/schools/arts-and-humanities/courses/professional-placement/essential-documents/social-work (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated: fee_currency, duration_value, duration_unit
+[EXTRACT] 34/108: Bachelor of Aviation
+Fetching 34/108: Bachelor of Aviation
+[EXTRACT] 35/108: Bachelor of Biomedical Science
+Fetching 35/108: Bachelor of Biomedical Science
+[EXTRACT] 36/108: Bachelor of Biomedical Science (Bioscience)
+Fetching 36/108: Bachelor of Biomedical Science (Bioscience)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-arts — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-aviation — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science- — retrying via browser
+[GP-DEBUG] static=307993B rendered=0B using=static text_len=24280
+[GP-DEBUG] text[:500]="Bachelor of Arts Course code U00 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old, and "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39300'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-arts → 1 field(s) (cost=$0.000521, in=6906 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-arts: fee_currency, duration_value, duration_unit
+[GP-DEBUG] static=349957B rendered=0B using=static text_len=27133
+[EXTRACT] 37/108: Bachelor of Business Analytics
+[GP-DEBUG] text[:500]="Bachelor of Aviation Course code K99 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old, "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42950'
+Fetching 37/108: Bachelor of Business Analytics
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-aviation → 1 field(s) (cost=$0.000574, in=7620 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-aviation (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=367642B rendered=0B using=static text_len=33562
+[GP-DEBUG] text[:500]="Bachelor of Biomedical Science Course code K05 Boost your CV with a unique study experience Study Biomedical Science in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 4 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More ab"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41750,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedica → 1 field(s) (cost=$0.000695, in=9230 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-aviation: fee_currency, intake_months, duration_value, duration_unit
+[GP-DEBUG] static=371625B rendered=0B using=static text_len=33183
+[GP-DEBUG] text[:500]="Bachelor of Biomedical Science (Bioscience) Course code T89 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universiti"
+[EXTRACT] 38/108: Bachelor of Commerce
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41750'
+Fetching 38/108: Bachelor of Commerce
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedica → 1 field(s) (cost=$0.000688, in=9138 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science-bioscience (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 39/108: Bachelor of Commerce/Bachelor of Psychology
+Fetching 39/108: Bachelor of Commerce/Bachelor of Psychology
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-biomedical-science-bioscience: fee_currency, duration_value, duration_unit
+[EXTRACT] 40/108: Bachelor of Communication
+Fetching 40/108: Bachelor of Communication
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-business-analytics — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce-bachelor-o — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-communication — retrying via browser
+[GP-DEBUG] static=333654B rendered=0B using=static text_len=25247
+[GP-DEBUG] text[:500]="Bachelor of Business Analytics Course code Y00 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 y"
+[GP-DEBUG] raw_response='FT PT", "Joondalup", "South West", "Sri Lanka", "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-business- → 0 field(s) (cost=$0.000540, in=7151 out=12)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-business-analytics (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-business-analytics: fee_currency, duration_value, duration_unit
+[GP-DEBUG] static=351597B rendered=0B using=static text_len=35378
+[GP-DEBUG] text[:500]="Bachelor of Commerce Course code W23 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universi"
+[CATEGORY det] Bachelor of Business Analytics → Business & Management / Business Analytics
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38600,'
+[EXTRACT] 41/108: Bachelor of Community and Human Services
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce → 1 field(s) (cost=$0.000729, in=9682 out=9)
+Fetching 41/108: Bachelor of Community and Human Services
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=388449B rendered=0B using=static text_len=32905
+[GP-DEBUG] text[:500]="Bachelor of Communication Course code F35 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best uni"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-communica → 1 field(s) (cost=$0.000683, in=9065 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-communication (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=358901B rendered=0B using=static text_len=28594
+[GP-DEBUG] text[:500]="Bachelor of Commerce/Bachelor of Psychology Course code W75 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of th"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40600,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce- → 1 field(s) (cost=$0.000602, in=7991 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce-bachelor-of-psychology (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 42/108: Bachelor of Computer Science
+Fetching 42/108: Bachelor of Computer Science
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-communication: fee_currency, duration_value, duration_unit
+[EXTRACT] 43/108: Bachelor of Counselling
+Fetching 43/108: Bachelor of Counselling
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-commerce-bachelor-of-psychology: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Commerce/bachelor of Psychol → Medicine & Health / Psychology
+[EXTRACT] 44/108: Bachelor of Counter Terrorism Security and Intelligence
+Fetching 44/108: Bachelor of Counter Terrorism Security and Intelligence
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-community-and-human — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-computer-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-counselling — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-counter-terrorism-s — retrying via browser
+[GP-DEBUG] static=415488B rendered=0B using=static text_len=28421
+[GP-DEBUG] text[:500]="Bachelor of Community and Human Services Course code O13 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the w"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39050,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-community → 1 field(s) (cost=$0.000599, in=7947 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-community-and-human-services (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=348972B rendered=0B using=static text_len=27239
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-community-and-human-services: fee_currency, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Computer Science Course code U65 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best "
+[EXTRACT] 45/108: Bachelor of Creative Writing
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42500,'
+Fetching 45/108: Bachelor of Creative Writing
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-computer- → 1 field(s) (cost=$0.000576, in=7649 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-computer-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=367499B rendered=0B using=static text_len=25929
+[GP-DEBUG] text[:500]="Bachelor of Counter Terrorism Security and Intelligence Course code Y14 Boost your CV with a unique study experience Considering Cybercrime or related studies but want an international experience? Study Cybercrime, Security & Intelligence in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 pub"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 4370'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-counter-t → 1 field(s) (cost=$0.000552, in=7328 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-counter-terrorism-security-and-intelligence (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-computer-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 46/108: Bachelor of Criminology and Justice
+Fetching 46/108: Bachelor of Criminology and Justice
+[GP-DEBUG] static=341171B rendered=0B using=static text_len=24718
+[GP-DEBUG] text[:500]="Bachelor of Counselling Course code C56 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years ol"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39000,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-counselli → 1 field(s) (cost=$0.000529, in=7017 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-counselling (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-counter-terrorism-security-and-intelligence: fee_currency, duration_value, duration_unit
+[EXTRACT] 47/108: Bachelor of Design
+Fetching 47/108: Bachelor of Design
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-counselling: fee_currency, duration_value, duration_unit
+[EXTRACT] 48/108: Bachelor of Education (Early Childhood Studies)
+Fetching 48/108: Bachelor of Education (Early Childhood Studies)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-creative-writing — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-criminology-and-jus — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-design — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-chi — retrying via browser
+[GP-DEBUG] static=366534B rendered=0B using=static text_len=30328
+[GP-DEBUG] text[:500]="Bachelor of Creative Writing Course code F92 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 yea"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-creative- → 1 field(s) (cost=$0.000634, in=8421 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-creative-writing (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies
+[GP-DEBUG] static=377129B rendered=0B using=static text_len=32351
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-creative-writing: fee_currency, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Criminology and Justice Course code G81 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under"
+[EXTRACT] 49/108: Bachelor of Education (Primary)
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39450,'
+Fetching 49/108: Bachelor of Education (Primary)
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-criminolo → 1 field(s) (cost=$0.000672, in=8929 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-criminology-and-justice (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=378631B rendered=0B using=static text_len=32578
+[GP-DEBUG] text[:500]="Bachelor of Design Course code P79 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old, an"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-design → 1 field(s) (cost=$0.000676, in=8981 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-criminology-and-justice: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Criminology and Justice → Law & Legal Studies / Criminal Justice
+[EXTRACT] 50/108: Bachelor of Education (Primary, 1-10)
+Fetching 50/108: Bachelor of Education (Primary, 1-10)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-design: fee_currency, duration_value, duration_unit
+[EXTRACT] 51/108: Bachelor of Education (Secondary)
+Fetching 51/108: Bachelor of Education (Secondary)
+[GP-DEBUG] static=401464B rendered=407507B using=rendered text_len=39573
+[GP-DEBUG] text[:500]="Bachelor of Education (Early Childhood Studies) Course code Y42 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one o"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-education → 1 field(s) (cost=$0.000808, in=10737 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies
+[per-course vision img 0/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-education-early-childhood-studies: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Education (Early Childhood S → Education & Social Work / Early Childhood
+[EXTRACT] 52/108: Bachelor of Engineering (Chemical) Honours
+Fetching 52/108: Bachelor of Engineering (Chemical) Honours
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1 — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary — retrying via browser
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-chemica — retrying via browser
+[GP-DEBUG] static=389570B rendered=385180B using=rendered text_len=37407
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10
+[GP-DEBUG] text[:500]="Bachelor of Education (Primary) Course code Y41 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's be"
+[GP-DEBUG] raw_response="-> 'Primary Education'.\n * `category`: Primary Education falls under 'Education'."
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-education → 0 field(s) (cost=$0.000771, in=10191 out=21)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary
+[per-course vision img 1/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=400531B rendered=367184B using=rendered text_len=34911
+[GP-DEBUG] text[:500]="Bachelor of Education (Secondary) Course code Y68 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40200,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-education → 1 field(s) (cost=$0.000720, in=9568 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary
+[GP-DEBUG] static=386132B rendered=423150B using=rendered text_len=30514
+[GP-DEBUG] text[:500]="Bachelor of Education (Primary, 1-10) Course code C99 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the worl"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-education → 1 field(s) (cost=$0.000638, in=8469 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary: fee_currency, duration_value, duration_unit
+[EXTRACT] 53/108: Bachelor of Engineering (Civil and Environmental) Honours
+Fetching 53/108: Bachelor of Engineering (Civil and Environmental) Honours
+[GP-DEBUG] static=424610B rendered=0B using=static text_len=34527
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Chemical) Honours Course code Y50 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 4290'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000713, in=9474 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-chemical-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-chemical-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 54/108: Bachelor of Engineering (Civil) Honours
+Fetching 54/108: Bachelor of Engineering (Civil) Honours
+[per-course vision img 2/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 2/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-a — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-education-primary-1-10: fee_currency, duration_value, duration_unit
+[EXTRACT] 55/108: Bachelor of Engineering (Computer Systems) Honours
+Fetching 55/108: Bachelor of Engineering (Computer Systems) Honours
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-education-secondary: fee_currency, duration_value, duration_unit
+[EXTRACT] 56/108: Bachelor of Engineering (Computer Systems) Honours/Bachelor of Computer Science
+Fetching 56/108: Bachelor of Engineering (Computer Systems) Honours/Bachelor of Computer Science
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-h — retrying via browser
+[GP-DEBUG] static=424546B rendered=0B using=static text_len=34802
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Civil and Environmental) Honours Course code Y28 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ra"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000719, in=9546 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-and-environmental-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-compute — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-compute — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-and-environmental-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 57/108: Bachelor of Engineering (Electrical and Renewable Energy) Honours
+Fetching 57/108: Bachelor of Engineering (Electrical and Renewable Energy) Honours
+[GP-DEBUG] static=426546B rendered=0B using=static text_len=35796
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Civil) Honours Course code Y13 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the wo"
+[GP-DEBUG] raw_response='category:* Civil Engineering.\n * *Category:* Engineering.\n *'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 0 field(s) (cost=$0.000739, in=9790 out=17)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-civil-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 58/108: Bachelor of Engineering (Electrical Power) Honours
+Fetching 58/108: Bachelor of Engineering (Electrical Power) Honours
+[GP-DEBUG] static=419830B rendered=0B using=static text_len=31622
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Computer Systems) Honours/Bachelor of Computer Science Course code Y64 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 4260'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000659, in=8757 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-computer-systems-honours-bachelor-of-computer-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=473833B rendered=0B using=static text_len=38303
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Computer Systems) Honours Course code Y47 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked on"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000784, in=10420 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-computer-systems-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electri — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-computer-systems-honours-bachelor-of-computer-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 59/108: Bachelor of Engineering (Electronics and Communications) Honours
+Fetching 59/108: Bachelor of Engineering (Electronics and Communications) Honours
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-computer-systems-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 60/108: Bachelor of Engineering (Energy) Honours
+Fetching 60/108: Bachelor of Engineering (Energy) Honours
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electri — retrying via browser
+[GP-DEBUG] static=414827B rendered=0B using=static text_len=34324
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Electrical and Renewable Energy) Honours Course code W21 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000710, in=9429 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electrical-and-renewable-energy-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electro — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-energy- — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electrical-and-renewable-energy-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 61/108: Bachelor of Engineering (Instrumentation Control and Automation) Honours
+Fetching 61/108: Bachelor of Engineering (Instrumentation Control and Automation) Honours
+[GP-DEBUG] static=410806B rendered=0B using=static text_len=33366
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Electrical Power) Honours Course code Y49 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked on"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000692, in=9186 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electrical-power-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electrical-power-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 62/108: Bachelor of Engineering (Mechanical) Honours
+Fetching 62/108: Bachelor of Engineering (Mechanical) Honours
+[GP-DEBUG] static=318964B rendered=0B using=static text_len=16801
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Energy) Honours Course code V32 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 0 field(s) (cost=$0.000382, in=5042 out=13)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-energy-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=431553B rendered=0B using=static text_len=33684
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Electronics and Communications) Honours Course code Y51 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns W"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000698, in=9269 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electronics-and-communications-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-instrum — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-electronics-and-communications-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 63/108: Bachelor of Engineering (Mechatronics) Honours
+Fetching 63/108: Bachelor of Engineering (Mechatronics) Honours
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechani — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-energy-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 64/108: Bachelor of Engineering (Mechatronics) Honours/Bachelor of Technology (Motorsports)
+Fetching 64/108: Bachelor of Engineering (Mechatronics) Honours/Bachelor of Technology (Motorsports)
+[GP-DEBUG] static=415935B rendered=0B using=static text_len=35184
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Instrumentation Control and Automation) Honours Course code Y46 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's youn"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000726, in=9646 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-instrumentation-control-and-automation-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatr — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-instrumentation-control-and-automation-honours: fee_currency, duration_value, duration_unit
+[EXTRACT] 65/108: Bachelor of Engineering Honours/Bachelor of Commerce
+Fetching 65/108: Bachelor of Engineering Honours/Bachelor of Commerce
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatr — retrying via browser
+[GP-DEBUG] static=416788B rendered=0B using=static text_len=36634
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Mechanical) Honours Course code Y45 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of t"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000753, in=10001 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechanical-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechanical-honours: fee_currency, duration_value, duration_unit
+[GP-DEBUG] static=480497B rendered=0B using=static text_len=34576
+[EXTRACT] 66/108: Bachelor of Engineering Honours/Bachelor of Science
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Mechatronics) Honours Course code Y44 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of"
+Fetching 66/108: Bachelor of Engineering Honours/Bachelor of Science
+[GP-DEBUG] raw_response='Sri Lanka". Let\'s verify: "City Campus Joondalup", "South West", "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 0 field(s) (cost=$0.000716, in=9487 out=16)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatronics-honours (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours — retrying via browser
+[GP-DEBUG] static=451860B rendered=0B using=static text_len=34836
+[GP-DEBUG] text[:500]="Bachelor of Engineering (Mechatronics) Honours/Bachelor of Technology (Motorsports) Course code Y75 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the w"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000720, in=9561 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatronics-honours-bachelor-of-technology-motorsports (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatronics-honours: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 67/108: Bachelor of Environmental Science
+Fetching 67/108: Bachelor of Environmental Science
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-mechatronics-honours-bachelor-of-technology-motorsports: fee_currency, duration_value, duration_unit
+[EXTRACT] 68/108: Bachelor of Global Media and Communication
+Fetching 68/108: Bachelor of Global Media and Communication
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours — retrying via browser
+[GP-DEBUG] static=408851B rendered=0B using=static text_len=36142
+[GP-DEBUG] text[:500]="Bachelor of Engineering Honours/Bachelor of Commerce Course code W26 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40750,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000744, in=9881 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours-bachelor-of-commerce (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-environmental-scien — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours-bachelor-of-commerce: fee_currency, duration_value, duration_unit
+[EXTRACT] 69/108: Bachelor of Global Sport Business Management
+Fetching 69/108: Bachelor of Global Sport Business Management
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-global-media-and-co — retrying via browser
+[GP-DEBUG] static=396755B rendered=0B using=static text_len=34218
+[GP-DEBUG] text[:500]="Bachelor of Engineering Honours/Bachelor of Science Course code W32 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked o"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42600'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-engineeri → 1 field(s) (cost=$0.000708, in=9399 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours-bachelor-of-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=359323B rendered=0B using=static text_len=26270
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-engineering-honours-bachelor-of-science: fee_currency, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Environmental Science Course code W89 Boost your CV with a unique study experience Study Environmental Science in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 3.5 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia."
+[EXTRACT] 70/108: Bachelor of Global Sport Business Management (International)
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 4330'
+Fetching 70/108: Bachelor of Global Sport Business Management (International)
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-environme → 1 field(s) (cost=$0.000558, in=7408 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-environmental-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-busine — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-environmental-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 71/108: Bachelor of Health Science
+Fetching 71/108: Bachelor of Health Science
+[GP-DEBUG] static=379074B rendered=0B using=static text_len=33007
+[GP-DEBUG] text[:500]="Bachelor of Global Media and Communication Course code T58 Boost your CV with a unique study experience Study Global Media and Communication in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 3.5 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universi"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-global-me → 1 field(s) (cost=$0.000685, in=9094 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-global-media-and-communication (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-global-media-and-communication: fee_currency, duration_value, duration_unit
+[EXTRACT] 72/108: Bachelor of Hospitality and Tourism Management
+Fetching 72/108: Bachelor of Hospitality and Tourism Management
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-busine — retrying via browser
+[GP-DEBUG] static=352866B rendered=0B using=static text_len=35642
+[GP-DEBUG] text[:500]="Bachelor of Global Sport Business Management Course code Y53 Professional Recognition Boost your CV with a unique study experience Study Global Sport Business in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 4 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38600,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sp → 1 field(s) (cost=$0.000735, in=9754 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-business-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-health-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-hospitality-and-tou — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-business-management: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Global Sport Business Manage → Business & Management / Management
+[EXTRACT] 73/108: Bachelor of Information Technology
+Fetching 73/108: Bachelor of Information Technology
+[DOMESTIC ONLY] https://www.ecu.edu.au/degrees/courses/bachelor-of-health-science — course page states domestic-students-only; skipping
+[EXTRACT] 74/108: Bachelor of Journalism and Broadcast Media
+Fetching 74/108: Bachelor of Journalism and Broadcast Media
+[GP-DEBUG] static=360193B rendered=0B using=static text_len=39472
+[GP-DEBUG] text[:500]="Bachelor of Global Sport Business Management (International) Course code T90 Professional Recognition Boost your CV with a unique study experience Study Global Sport Business in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 4 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 3860'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sp → 1 field(s) (cost=$0.000806, in=10715 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-business-management-international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-global-sport-business-management-international: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Global Sport Business Manage → Business & Management / Management
+[EXTRACT] 75/108: Bachelor of Laws
+Fetching 75/108: Bachelor of Laws
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-information-technol — retrying via browser
+[GP-DEBUG] static=373865B rendered=0B using=static text_len=33108
+[GP-DEBUG] text[:500]="Bachelor of Hospitality and Tourism Management Course code K93 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! Hospitality & Tourism ranked 41st in the world EC"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38600'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-hospitali → 1 field(s) (cost=$0.000687, in=9121 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-hospitality-and-tourism-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-journalism-and-broa — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-hospitality-and-tourism-management: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Hospitality and Tourism Mana → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT] 76/108: Bachelor of Laws/Bachelor of Commerce
+Fetching 76/108: Bachelor of Laws/Bachelor of Commerce
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-laws — retrying via browser
+[GP-DEBUG] static=345924B rendered=0B using=static text_len=26487
+[GP-DEBUG] text[:500]="Bachelor of Information Technology Course code U67 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42500,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-informati → 1 field(s) (cost=$0.000562, in=7462 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-information-technology (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=361534B rendered=0B using=static text_len=32213
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-information-technology: fee_currency, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Journalism and Broadcast Media Course code H31 Boost your CV with a unique study experience Study Global Media and Communication in Perth and in the UK with ECU's and the University of Portsmouth's unique dual degree. Get two qualifications in only 3.5 years full-time and a fantastic international experience. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universi"
+[CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700'
+[EXTRACT] 77/108: Bachelor of Laws/Bachelor of Criminology and Justice
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-journalis → 1 field(s) (cost=$0.000670, in=8896 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-journalism-and-broadcast-media (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 77/108: Bachelor of Laws/Bachelor of Criminology and Justice
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-co — retrying via browser
+[GP-DEBUG] static=396853B rendered=0B using=static text_len=34925
+[GP-DEBUG] text[:500]="Bachelor of Laws Course code V72 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38600,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-laws → 1 field(s) (cost=$0.000721, in=9567 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-laws (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-journalism-and-broadcast-media: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Journalism and Broadcast Med → Media & Communications / Journalism
+[EXTRACT] 78/108: Bachelor of Laws/Bachelor of Psychology
+Fetching 78/108: Bachelor of Laws/Bachelor of Psychology
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-laws: fee_currency, duration_value, duration_unit
+[EXTRACT] 79/108: Bachelor of Marketing, Advertising and Public Relations
+Fetching 79/108: Bachelor of Marketing, Advertising and Public Relations
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-cr — retrying via browser
+[GP-DEBUG] static=415832B rendered=0B using=static text_len=37218
+[GP-DEBUG] text[:500]="Bachelor of Laws/Bachelor of Commerce Course code W28 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the worl"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 43400,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bach → 1 field(s) (cost=$0.000764, in=10146 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-commerce (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-ps — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-commerce: fee_currency, duration_value, duration_unit
+[EXTRACT] 80/108: Bachelor of Music
+Fetching 80/108: Bachelor of Music
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-marketing-advertisi — retrying via browser
+[GP-DEBUG] static=330052B rendered=0B using=static text_len=20667
+[GP-DEBUG] text[:500]="Bachelor of Laws/Bachelor of Criminology and Justice Course code K30 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bach → 0 field(s) (cost=$0.000455, in=6012 out=14)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-criminology-and-justice (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=417541B rendered=0B using=static text_len=36141
+[GP-DEBUG] text[:500]="Bachelor of Laws/Bachelor of Psychology Course code W83 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the wo"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 50750,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bach → 1 field(s) (cost=$0.000743, in=9877 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-psychology (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-music — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-psychology: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Laws/bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT] 81/108: Bachelor of Preclinical Foundations of Imaging Science
+Fetching 81/108: Bachelor of Preclinical Foundations of Imaging Science
+[GP-DEBUG] static=346533B rendered=0B using=static text_len=28872
+[GP-DEBUG] text[:500]="Bachelor of Marketing, Advertising and Public Relations Course code Y99 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're rank"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38150,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-marketing → 1 field(s) (cost=$0.000607, in=8064 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-marketing-advertising-and-public-relations (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-laws-bachelor-of-criminology-and-justice: duration_value, duration_unit
+[CATEGORY det] Bachelor of Laws/bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[EXTRACT] 82/108: Bachelor of Psychological Science
+Fetching 82/108: Bachelor of Psychological Science
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-marketing-advertising-and-public-relations: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Marketing, Advertising and P → Business & Management / Marketing
+[EXTRACT] 83/108: Bachelor of Psychology
+Fetching 83/108: Bachelor of Psychology
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundat — retrying via browser
+[GP-DEBUG] static=396871B rendered=0B using=static text_len=33857
+[GP-DEBUG] text[:500]="Bachelor of Music Course code W76 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old, and"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40650,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-music → 1 field(s) (cost=$0.000700, in=9301 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-music (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-psychological-scien — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-music: fee_currency, duration_value, duration_unit
+[EXTRACT] 84/108: Bachelor of Psychology and Counselling
+Fetching 84/108: Bachelor of Psychology and Counselling
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=394279B rendered=0B using=static text_len=31279
+[GP-DEBUG] text[:500]="Bachelor of Psychological Science Course code C98 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 5"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41150,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-psycholog → 1 field(s) (cost=$0.000652, in=8660 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-psychological-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-and-coun — retrying via browser
+[GP-DEBUG] static=375496B rendered=0B using=static text_len=24986
+[GP-DEBUG] text[:500]="Bachelor of Psychology Course code W74 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best univer"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40850'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-psycholog → 1 field(s) (cost=$0.000534, in=7084 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=350833B rendered=362818B using=rendered text_len=28523
+[GP-DEBUG] text[:500]="Bachelor of Preclinical Foundations of Imaging Science Course code T78 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranke"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 41300,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinic → 1 field(s) (cost=$0.000601, in=7976 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-psychological-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 85/108: Bachelor of Psychology, Criminology and Justice
+Fetching 85/108: Bachelor of Psychology, Criminology and Justice
+[per-course vision img 1/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Psychology → Medicine & Health / Psychology
+[EXTRACT] 86/108: Bachelor of Science
+Fetching 86/108: Bachelor of Science
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-preclinical-foundations-of-imaging-science: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 87/108: Bachelor of Science (Cyber Security)
+Fetching 87/108: Bachelor of Science (Cyber Security)
+[GP-DEBUG] static=341498B rendered=0B using=static text_len=23132
+[GP-DEBUG] text[:500]="Bachelor of Psychology and Counselling Course code W65 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the wor"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40850'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-psycholog → 1 field(s) (cost=$0.000500, in=6625 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-and-counselling (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-criminol — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-and-counselling: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Psychology and Counselling → Medicine & Health / Psychology
+[EXTRACT] 88/108: Bachelor of Science (Cybercrime, Security and Intelligence)
+Fetching 88/108: Bachelor of Science (Cybercrime, Security and Intelligence)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cyber-secur — retrying via browser
+[GP-DEBUG] static=350812B rendered=0B using=static text_len=25254
+[GP-DEBUG] text[:500]="Bachelor of Psychology, Criminology and Justice Course code W73 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one o"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40850,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-psycholog → 1 field(s) (cost=$0.000539, in=7157 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-criminology-and-justice (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cybercrime- — retrying via browser
+[GP-DEBUG] static=343760B rendered=0B using=static text_len=30976
+[GP-DEBUG] text[:500]="Bachelor of Science Course code M04 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old, a"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42750,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science → 1 field(s) (cost=$0.000646, in=8581 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-psychology-criminology-and-justice: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Psychology, Criminology and → Medicine & Health / Psychology
+[EXTRACT] 89/108: Bachelor of Science (Exercise and Sports Science)
+Fetching 89/108: Bachelor of Science (Exercise and Sports Science)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 90/108: Bachelor of Science (Exercise and Sports Science)/Bachelor of Commerce (Sport Business)
+Fetching 90/108: Bachelor of Science (Exercise and Sports Science)/Bachelor of Commerce (Sport Business)
+[GP-DEBUG] static=381073B rendered=0B using=static text_len=28138
+[GP-DEBUG] text[:500]="Bachelor of Science (Cyber Security) Course code Y89 Professional Recognition Boost your CV with a unique study experience Considering Cybercrime or related studies but want an international experience? Study Cybercrime, Security & Intelligence in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42500,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-c → 1 field(s) (cost=$0.000593, in=7875 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cyber-security (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=338931B rendered=0B using=static text_len=29440
+[GP-DEBUG] text[:500]="Bachelor of Science (Cybercrime, Security and Intelligence) Course code W87 Boost your CV with a unique study experience Considering Cybercrime or related studies but want an international experience? Study Cybercrime, Security & Intelligence in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 43700,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-c → 1 field(s) (cost=$0.000618, in=8206 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cybercrime-security-and-intelligence (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cyber-security: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Science (Cyber Security) → Computer Science & IT / Cyber Security
+[EXTRACT] 91/108: Bachelor of Science (Exercise Science and Rehabilitation)
+Fetching 91/108: Bachelor of Science (Exercise Science and Rehabilitation)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-an — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-cybercrime-security-and-intelligence: fee_currency, duration_value, duration_unit
+[EXTRACT] 92/108: Bachelor of Science (International Exercise and Sports Science)
+Fetching 92/108: Bachelor of Science (International Exercise and Sports Science)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-an — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-sc — retrying via browser
+[GP-DEBUG] static=401157B rendered=0B using=static text_len=34706
+[GP-DEBUG] text[:500]="Bachelor of Science (Exercise and Sports Science) Course code M89 Boost your CV with a unique study experience Considering Sports Science or related studies but want an international experience? Study International Exercise & Sports Science in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 p"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42300'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-e → 1 field(s) (cost=$0.000717, in=9520 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-and-sports-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-internation — retrying via browser
+[GP-DEBUG] static=379731B rendered=0B using=static text_len=31147
+[GP-DEBUG] text[:500]="Bachelor of Science (Exercise and Sports Science)/Bachelor of Commerce (Sport Business) Course code W31 Boost your CV with a unique study experience Considering Sports Science or related studies but want an international experience? Study International Exercise & Sports Science in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40700,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-e → 1 field(s) (cost=$0.000651, in=8640 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-and-sports-science-bachelor-of-commerce-sport-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-and-sports-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 93/108: Bachelor of Science (Nursing)
+Fetching 93/108: Bachelor of Science (Nursing)
+[GP-DEBUG] static=364059B rendered=0B using=static text_len=32079
+[GP-DEBUG] text[:500]="Bachelor of Science (Exercise Science and Rehabilitation) Course code M90 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's b"
+[GP-DEBUG] raw_response='Location Semester 1 Semester 2"\n * Semester 1 starts "last week'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-e → 0 field(s) (cost=$0.000670, in=8866 out=18)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-science-and-rehabilitation (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-and-sports-science-bachelor-of-commerce-sport-business: fee_currency, duration_value, duration_unit
+[EXTRACT] 94/108: Bachelor of Science (Nursing)/Bachelor of Science (Midwifery)
+Fetching 94/108: Bachelor of Science (Nursing)/Bachelor of Science (Midwifery)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-exercise-science-and-rehabilitation: fee_currency, duration_value, duration_unit
+[EXTRACT] 95/108: Bachelor of Science (Occupational Therapy)
+Fetching 95/108: Bachelor of Science (Occupational Therapy)
+[GP-DEBUG] static=387257B rendered=0B using=static text_len=36319
+[GP-DEBUG] text[:500]="Bachelor of Science (International Exercise and Sports Science) Course code W97 Boost your CV with a unique study experience Considering Sports Science or related studies but want an international experience? Study International Exercise & Sports Science in Perth and in the UK with ECU's and the University of Portsmouth's unique 4-year dual degree. More about dual degrees Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of a"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42300,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-i → 1 field(s) (cost=$0.000747, in=9927 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-international-exercise-and-sports-science (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-international-exercise-and-sports-science: fee_currency, duration_value, duration_unit
+[EXTRACT] 96/108: Bachelor of Science (Paramedical Science)
+Fetching 96/108: Bachelor of Science (Paramedical Science)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bac — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupationa — retrying via browser
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing — IELTS=— PTE=— TOEFL=— CAE=—
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery
+[GP-DEBUG] static=355821B rendered=355821B using=rendered text_len=30438
+[GP-DEBUG] text[:500]="Bachelor of Science (Nursing) Course code C33 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 44000'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-n → 1 field(s) (cost=$0.000636, in=8448 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy
+[per-course vision img 1/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=394366B rendered=388143B using=rendered text_len=32525
+[GP-DEBUG] text[:500]="Bachelor of Science (Nursing)/Bachelor of Science (Midwifery) Course code Y76 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We'r"
+[GP-DEBUG] raw_response='-time at Joondalup, South West".\n * "Sri Lanka Online"'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-n → 0 field(s) (cost=$0.000678, in=8978 out=15)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery
+[per-course vision img 0/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science
+[GP-DEBUG] static=362515B rendered=368975B using=rendered text_len=31269
+[GP-DEBUG] text[:500]="Bachelor of Science (Occupational Therapy) Course code H96 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 43700,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-o → 1 field(s) (cost=$0.000652, in=8659 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing: fee_currency, intake_months, duration_value, duration_unit
+[CATEGORY det] Bachelor of Science (Nursing) → Medicine & Health / Nursing
+[EXTRACT] 97/108: Bachelor of Science/Bachelor of Commerce
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy — IELTS=— PTE=— TOEFL=— CAE=—
+Fetching 97/108: Bachelor of Science/Bachelor of Commerce
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-bachelor-of-science-midwifery: fee_currency, intake_months, duration_value, duration_unit
+[CATEGORY det] Bachelor of Science (Nursing)/bachelor o → Medicine & Health / Nursing
+[EXTRACT] 98/108: Bachelor of Screen Production
+Fetching 98/108: Bachelor of Screen Production
+[GP-DEBUG] static=383088B rendered=354277B using=rendered text_len=31684
+[GP-DEBUG] text[:500]="Bachelor of Science (Paramedical Science) Course code K89 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42200,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-p → 1 field(s) (cost=$0.000660, in=8763 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science
+[per-course vision img 0/6 (cache hits 5)] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-occupational-therapy: fee_currency, duration_value, duration_unit
+[EXTRACT] 99/108: Bachelor of Social Work
+Fetching 99/108: Bachelor of Social Work
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-bachelor-of — retrying via browser
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-paramedical-science: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 100/108: Bachelor of Speech Pathology
+Fetching 100/108: Bachelor of Speech Pathology
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-screen-production — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work — retrying via browser
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology — retrying via browser
+[GP-DEBUG] static=349122B rendered=0B using=static text_len=30248
+[GP-DEBUG] text[:500]="Bachelor of Science/Bachelor of Commerce Course code W27 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the w"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 40950,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-b → 1 field(s) (cost=$0.000633, in=8404 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-bachelor-of-commerce (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=368472B rendered=0B using=static text_len=29969
+[GP-DEBUG] text[:500]="Bachelor of Screen Production Course code D53 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 ye"
+[GP-DEBUG] raw_response='_text`: "Availability & Campus Location" lists "Semester 1" and "Semester 2".'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-screen-pr → 0 field(s) (cost=$0.000631, in=8332 out=19)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-screen-production (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-bachelor-of-commerce: fee_currency, duration_value, duration_unit
+[EXTRACT] 101/108: Bachelor of Technology (Aeronautical)
+Fetching 101/108: Bachelor of Technology (Aeronautical)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-screen-production: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Screen Production → Media & Communications / Film & Screen
+[EXTRACT] 102/108: Bachelor of Technology (Engineering)
+Fetching 102/108: Bachelor of Technology (Engineering)
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology
+[GP-DEBUG] static=379905B rendered=355242B using=rendered text_len=25210
+[GP-DEBUG] text[:500]="Bachelor of Social Work Course code K41 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best unive"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39500,\n "'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-social-wo → 1 field(s) (cost=$0.000539, in=7140 out=10)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/6 (cache hits 5)] https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=377283B rendered=360714B using=rendered text_len=29305
+[GP-DEBUG] text[:500]="Bachelor of Speech Pathology Course code Y02 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 43900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pa → 1 field(s) (cost=$0.000615, in=8165 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-aeronaut — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-engineer — retrying via browser
+[per-course vision img 1/6 (cache hits 4)] https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-social-work: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[EXTRACT] 103/108: Bachelor of Technology (Motorsports)
+Fetching 103/108: Bachelor of Technology (Motorsports)
+[GP-DEBUG] static=398734B rendered=0B using=static text_len=28859
+[FALLBACK] AI filled 4 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-speech-pathology: fee_currency, intake_months, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Technology (Aeronautical) Course code Y73 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities und"
+[EXTRACT] 104/108: Bachelor of Visual Arts
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42600,'
+Fetching 104/108: Bachelor of Visual Arts
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-technolog → 1 field(s) (cost=$0.000607, in=8056 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-aeronautical (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-motorspo — retrying via browser
+[GP-DEBUG] static=384595B rendered=0B using=static text_len=33081
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-aeronautical: fee_currency, duration_value, duration_unit
+[GP-DEBUG] text[:500]="Bachelor of Technology (Engineering) Course code Y62 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities unde"
+[EXTRACT] 105/108: Bachelor of Youth Work
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42650,\n "'
+Fetching 105/108: Bachelor of Youth Work
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-technolog → 1 field(s) (cost=$0.000686, in=9111 out=10)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-engineering (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-engineering: fee_currency, duration_value, duration_unit
+[EXTRACT] 106/108: Bachelor of Arts (Arts and Cultural Management)
+Fetching 106/108: Bachelor of Arts (Arts and Cultural Management)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-visual-arts — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-youth-work — retrying via browser
+[GP-DEBUG] static=443231B rendered=0B using=static text_len=31498
+[GP-DEBUG] text[:500]="Bachelor of Technology (Motorsports) Course code G68 Professional Recognition Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42900,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-technolog → 1 field(s) (cost=$0.000656, in=8715 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-motorsports (missing: domestic_fee, duration_text, intake_text, location_text)
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-arts-arts-and-cultu — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-technology-motorsports: fee_currency, duration_value, duration_unit
+[EXTRACT] 107/108: Bachelor of Science (Exercise & Sport Science)
+Fetching 107/108: Bachelor of Science (Exercise & Sport Science)
+[GP-DEBUG] static=358699B rendered=0B using=static text_len=29347
+[GP-DEBUG] text[:500]="Bachelor of Visual Arts Course code F23 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years ol"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 37700,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-visual-ar → 1 field(s) (cost=$0.000616, in=8175 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-visual-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-visual-arts: fee_currency, duration_value, duration_unit
+[GP-DEBUG] static=364013B rendered=0B using=static text_len=31264
+[EXTRACT] 108/108: Bachelor of Science (Nursing Studies)
+[GP-DEBUG] text[:500]="Bachelor of Youth Work Course code C57 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities under 50 years old"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 39350,'
+Fetching 108/108: Bachelor of Science (Nursing Studies)
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-youth-wor → 1 field(s) (cost=$0.000652, in=8654 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-youth-work (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=362740B rendered=0B using=static text_len=26815
+[GP-DEBUG] text[:500]="Bachelor of Arts (Arts and Cultural Management) Course code T74 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best univer"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 3960'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-arts-arts → 1 field(s) (cost=$0.000569, in=7547 out=9)
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-arts-arts-and-cultural-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-youth-work: fee_currency, duration_value, duration_unit
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/handbook/course — retrying via browser
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-arts-arts-and-cultural-management: fee_currency, duration_value, duration_unit
+[per-course browser ↻] https://www.ecu.edu.au/handbook/course
+[BROWSER↑] HTTP blocked for https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-stu — retrying via browser
+[per-course browser ✓] https://www.ecu.edu.au/handbook/course — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=12755B rendered=12755B using=rendered text_len=294
+[GP-DEBUG] text[:500]='ECU | Online Handbook for Current Students Skip to main content | Skip to supplemental navigation Top of page Menu marker Main Content Unable to display the requested Course information. Error: No Course code specified. Please use the Handbook search to find another Course. Skip to top of page'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": null,\n "duration_value": null,\n "duration_unit": null,\n "duration_text": null,\n "iel'
+[GEMINI] https://www.ecu.edu.au/handbook/course → 0 field(s) (cost=$0.000080, in=905 out=41)
+[FALLBACK] AI enriching https://www.ecu.edu.au/handbook/course (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies
+[per-course browser ✓] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=290597B rendered=282276B using=rendered text_len=12382
+[GP-DEBUG] text[:500]="Bachelor of Science (Nursing Studies) Course code Y61 Why study at ECU? A great student experience As an ECU undergraduate, you can expect the best overall student experience of any of the 38 public universities in Australia. More about QILT. The highest quality teaching ECU is one of the best unis in Australia for teaching. We've had 19 straight years of 5-star ratings in the Good Universities Guide to prove it! One of the world's young guns We're ranked one of the world's best universities und"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 42800,'
+[GEMINI] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-n → 1 field(s) (cost=$0.000298, in=3936 out=9)
+[per-course vision img 0/6] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies
+[per-course vision img 0/6 (cache hits 3)] https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.ecu.edu.au/degrees/courses/bachelor-of-science-nursing-studies: fee_currency, duration_value, duration_unit
+[CATEGORY det] Bachelor of Science (Nursing Studies) → Medicine & Health / Nursing
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 8 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 2 slot(s) filled across siblings
+[STAGE] skipped Courses Search Results: rejected: category_landing_page
+[STAGE] skipped Undergraduate Study: rejected: category_landing_page
+[STAGE] skipped Postgraduate Study: rejected: category_landing_page
+[STAGE] skipped Ask A Student: rejected: category_landing_page
+[STAGE] skipped Thinking About A Career Switch? Study Might Be A Good Start: rejected: category_landing_page
+[STAGE] skipped Paige Turns to Crime for A Life in the Lab: rejected: category_landing_page
+[STAGE] skipped What's A Double Degree and Why Would You Study One?: rejected: category_landing_page
+[STAGE] skipped The Ecu Experience: rejected: category_landing_page
+[STAGE] skipped Preparing for Uni: rejected: category_landing_page
+[STAGE] skipped The Wa Experience: rejected: category_landing_page
+[STAGE] skipped Choose A Flexible MBA for An Ever-changing World: rejected: category_landing_page
+[STAGE] skipped Start Your New Year in the Education Fast Lane: rejected: category_landing_page
+[STAGE] skipped How A High School 'dropout' Discovered the Magic of Physics: rejected: category_landing_page
+[STAGE] skipped Kaidyn's First Taste of Engineering Leaves First Class Impressions: rejected: category_landing_page
+[STAGE] skipped Jerry Looks Back to Go Forward with A Career Switch: rejected: category_landing_page
+[STAGE] skipped The Ecu Experience: rejected: category_landing_page
+[STAGE] skipped Could A Career in Ot Be Your Calling?: rejected: category_landing_page
+[STAGE] skipped How to Make An Impact with Your New Skills, While Still A Student: rejected: category_landing_page
+[STAGE] skipped How Sound Career Advice Can Take You Around the World: rejected: category_landing_page
+[STAGE] skipped Preparing for Employment: rejected: category_landing_page
+[STAGE] skipped How to Find Your Way Into Early Childhood Education: rejected: category_landing_page
+[STAGE] skipped Janice Wins Big for Academic Excellence and Study-life Balance: rejected: category_landing_page
+[STAGE] skipped Look Beyond the Lectures When Choosing Uni Courses: rejected: category_landing_page
+[STAGE] skipped Preparing for Uni: rejected: category_landing_page
+[STAGE] skipped University Like You've Never Imagined: rejected: category_landing_page
+[STAGE] skipped Where on Earth Can You Live in Perth?: rejected: category_landing_page
+[STAGE] skipped What on Earth Can You Do in Perth?: rejected: category_landing_page
+[STAGE] skipped How One International Student Discovered the Beauty of Western Australia: rejected: category_landing_page
+[STAGE] skipped Courses Search Results: rejected: category_landing_page
+[STAGE] saved: Doctor of Philosophy
+[STAGE] saved: Doctor of Philosophy (Integrated)
+[STAGE] skipped School of Arts and Humanities: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts
+[STAGE] skipped Bachelor of Aviation: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Biomedical Science
+[STAGE] saved: Bachelor of Biomedical Science (Bioscience)
+[STAGE] saved: Bachelor of Business Analytics
+[STAGE] skipped Bachelor of Commerce: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Commerce/bachelor of Psychology
+[STAGE] saved: Bachelor of Communication
+[STAGE] saved: Bachelor of Community and Human Services
+[STAGE] saved: Bachelor of Computer Science
+[STAGE] saved: Bachelor of Counselling
+[STAGE] saved: Bachelor of Counter Terrorism Security and Intelligence
+[STAGE] saved: Bachelor of Creative Writing
+[STAGE] saved: Bachelor of Criminology and Justice
+[STAGE] saved: Bachelor of Design
+[STAGE] saved: Bachelor of Education (Early Childhood Studies)
+[STAGE] saved: Bachelor of Education (Primary)
+[STAGE] saved: Bachelor of Education (Primary, 1-10)
+[STAGE] saved: Bachelor of Education (Secondary)
+[STAGE] saved: Bachelor of Engineering (Chemical) Honours
+[STAGE] saved: Bachelor of Engineering (Civil and Environmental) Honours
+[STAGE] saved: Bachelor of Engineering (Civil) Honours
+[STAGE] saved: Bachelor of Engineering (Computer Systems) Honours
+[STAGE] saved: Bachelor of Engineering (Computer Systems) Honours/bachelor of Computer Science
+[STAGE] saved: Bachelor of Engineering (Electrical and Renewable Energy) Honours
+[STAGE] saved: Bachelor of Engineering (Electrical Power) Honours
+[STAGE] saved: Bachelor of Engineering (Electronics and Communications) Honours
+[STAGE] saved: Bachelor of Engineering (Energy) Honours
+[STAGE] saved: Bachelor of Engineering (Instrumentation Control and Automation) Honours
+[STAGE] saved: Bachelor of Engineering (Mechanical) Honours
+[STAGE] skipped Bachelor of Engineering (Mechatronics) Honours: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Engineering (Mechatronics) Honours/bachelor of Technology (Motorsports)
+[STAGE] saved: Bachelor of Engineering Honours/bachelor of Commerce
+[STAGE] saved: Bachelor of Engineering Honours/bachelor of Science
+[STAGE] saved: Bachelor of Environmental Science
+[STAGE] saved: Bachelor of Global Media and Communication
+[STAGE] saved: Bachelor of Global Sport Business Management
+[STAGE] saved: Bachelor of Global Sport Business Management (International)
+[STAGE] skipped Bachelor of Health Science: rejected: domestic_only
+[STAGE] saved: Bachelor of Hospitality and Tourism Management
+[STAGE] saved: Bachelor of Information Technology
+[STAGE] saved: Bachelor of Journalism and Broadcast Media
+[STAGE] saved: Bachelor of Laws
+[STAGE] saved: Bachelor of Laws/bachelor of Commerce
+[STAGE] saved: Bachelor of Laws/bachelor of Criminology and Justice
+[STAGE] saved: Bachelor of Laws/bachelor of Psychology
+[STAGE] saved: Bachelor of Marketing, Advertising and Public Relations
+[STAGE] saved: Bachelor of Music
+[STAGE] skipped Bachelor of Preclinical Foundations of Imaging Science: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Psychological Science
+[STAGE] saved: Bachelor of Psychology
+[STAGE] saved: Bachelor of Psychology and Counselling
+[STAGE] saved: Bachelor of Psychology, Criminology and Justice
+[STAGE] saved: Bachelor of Science
+[STAGE] saved: Bachelor of Science (Cyber Security)
+[STAGE] saved: Bachelor of Science (Cybercrime, Security and Intelligence)
+[STAGE] saved: Bachelor of Science (Exercise and Sports Science)
+[STAGE] saved: Bachelor of Science (Exercise and Sports Science)/bachelor of Commerce (Sport Business)
+[STAGE] saved: Bachelor of Science (Exercise Science and Rehabilitation)
+[STAGE] saved: Bachelor of Science (International Exercise and Sports Science)
+[STAGE] skipped Bachelor of Science (Nursing): extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Bachelor of Science (Nursing)/Bachelor of Science (Midwifery): extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Science (Occupational Therapy)
+[STAGE] skipped Bachelor of Science (Paramedical Science): extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Science/bachelor of Commerce
+[STAGE] saved: Bachelor of Screen Production
+[STAGE] saved: Bachelor of Social Work
+[STAGE] skipped Bachelor of Speech Pathology: extract: sequence item 0: expected str instance, int found
+[STAGE] saved: Bachelor of Technology (Aeronautical)
+[STAGE] saved: Bachelor of Technology (Engineering)
+[STAGE] saved: Bachelor of Technology (Motorsports)
+[STAGE] saved: Bachelor of Visual Arts
+[STAGE] saved: Bachelor of Youth Work
+[STAGE] saved: Bachelor of Arts (Arts and Cultural Management)
+[STAGE] skipped Handbook: rejected: category_landing_page
+[STAGE] saved: Bachelor of Science (Nursing Studies)
+[GEMINI] Total cost: $0.0486 USD across 68 course(s) (~$0.00071/course)
+[TIMING] Total: 15m 5s | Courses: 68 | Avg: 13.3s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:108 | Staged:68 | Skipped:32 | Errors:8
+Staged 68 courses, 32 skipped, 0 fetch errors
