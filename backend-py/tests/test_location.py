@@ -85,3 +85,68 @@ def test_strong_location_does_not_misfire_on_unrelated_strong_tags():
     assert out and out[0].value == "Brisbane"
     # Should fall through to the dl path (NOT the strong walker).
     assert out[0].method == "location.dl"
+
+
+# ---------------------------------------------------------------------------
+# Campus code expansion tests (APIC College fix)
+# ---------------------------------------------------------------------------
+
+class TestCampusCodeExpansion:
+    """_expand_campus_codes must convert 3-letter airport-style campus
+    codes to full city names and handle various separator styles."""
+
+    def _expand(self, text: str) -> str:
+        return location._expand_campus_codes(text)
+
+    def test_pipe_separated_three_codes(self):
+        assert self._expand("SYD | MEL | BNE") == "Sydney, Melbourne, Brisbane"
+
+    def test_slash_separated_two_codes(self):
+        assert self._expand("PER / ADL") == "Perth, Adelaide"
+
+    def test_comma_separated_codes(self):
+        assert self._expand("CBR, SYD") == "Canberra, Sydney"
+
+    def test_gold_coast_ool(self):
+        assert self._expand("OOL | SYD") == "Gold Coast, Sydney"
+
+    def test_gold_coast_gc_code(self):
+        assert self._expand("GC") == "Gold Coast"
+
+    def test_single_known_code(self):
+        assert self._expand("MEL") == "Melbourne"
+
+    def test_already_city_names_unchanged(self):
+        result = self._expand("Sydney, Melbourne")
+        assert result == "Sydney, Melbourne"
+
+    def test_mixed_codes_and_cities_all_known(self):
+        result = self._expand("SYD | Melbourne")
+        assert "Sydney" in result
+        assert "Melbourne" in result
+
+    def test_unknown_tokens_left_unchanged(self):
+        result = self._expand("SYD | UNKNOWN_CAMPUS")
+        assert result == "SYD | UNKNOWN_CAMPUS"
+
+    def test_deduplication_same_code_twice(self):
+        result = self._expand("SYD | SYD | MEL")
+        assert result == "Sydney, Melbourne"
+
+    def test_normalise_pipeline_expands_codes(self):
+        """_normalise() must invoke _expand_campus_codes so that raw
+        code strings like 'SYD | MEL | BNE' are stored as city names."""
+        result = location._normalise("SYD | MEL | BNE")
+        assert result == "Sydney, Melbourne, Brisbane", (
+            f"_normalise must expand campus codes; got {result!r}"
+        )
+
+    def test_end_to_end_dl_with_codes(self):
+        """Full extraction pipeline: location field containing codes
+        must come out as full city names."""
+        html = "<dl><dt>Campus Location</dt><dd>SYD | MEL | BNE</dd></dl>"
+        out = _run(location.extract(html, "https://apicollege.edu.au/courses/test/"))
+        assert out, "Location must be extracted from dl"
+        assert out[0].value == "Sydney, Melbourne, Brisbane", (
+            f"Campus codes must be expanded to city names; got {out[0].value!r}"
+        )
