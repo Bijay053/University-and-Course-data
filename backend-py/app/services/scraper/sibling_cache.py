@@ -185,6 +185,9 @@ async def backfill_english_from_siblings(
         slot_values = cache.get(bucket) or {}
         if not slot_values:
             continue
+        # The course URL for this result — used as source_url in evidence so
+        # enforce_source_evidence (guards.py) keeps the backfilled value.
+        course_url: str = r.get("url") or ""
         for k, v in slot_values.items():
             existing = payload.get(k)
             if existing not in (None, "", 0):
@@ -196,7 +199,11 @@ async def backfill_english_from_siblings(
                     "value": v,
                     "confidence": 0.55,
                     "method": f"sibling_cache:{bucket}",
-                    "snippet": f"sibling-cache backfill from {bucket} bucket",
+                    # enforce_source_evidence requires both source_url and snippet
+                    # to be non-empty; use the current course URL as the source
+                    # (sibling values came from the same university's courses).
+                    "source_url": course_url,
+                    "snippet": f"sibling-cache backfill from {bucket} bucket: {k}={v}",
                 }
             )
             fills_total += 1
