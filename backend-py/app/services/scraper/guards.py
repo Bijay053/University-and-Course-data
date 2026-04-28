@@ -254,9 +254,31 @@ _DEGREE_QUALIFIER_RE = re.compile(
 )
 
 
+# Australian / UK national qualification codes that sometimes prefix a
+# course title, e.g. "ICT50220 Diploma of Information Technology" or
+# "BSB40120 Certificate IV in Business". The code is NOT a degree
+# qualifier but the text after it is — strip the code before matching.
+# Pattern: 2-6 uppercase letters followed by 4-6 digits (e.g. ICT50220,
+# BSB40120, CHC33015). Case-insensitive so mixed-case entries like
+# "Ict50220" also match.
+_QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
+
+
 def _name_has_degree_qualifier(name: str) -> bool:
-    """True when *name* starts with a recognised degree-level prefix."""
-    return bool(_DEGREE_QUALIFIER_RE.match((name or "").strip()))
+    """True when *name* (or *name* stripped of a leading qualification code)
+    starts with a recognised degree-level prefix.
+
+    Handles entries like "ICT50220 Diploma of Information Technology" where
+    an Australian/UK national qualification code precedes the degree title.
+    """
+    raw = (name or "").strip()
+    if _DEGREE_QUALIFIER_RE.match(raw):
+        return True
+    # Try stripping a leading qualification code and re-matching.
+    stripped = _QUAL_CODE_PREFIX_RE.sub("", raw)
+    if stripped != raw and _DEGREE_QUALIFIER_RE.match(stripped):
+        return True
+    return False
 
 
 # URL path suffixes that always indicate a category listing page rather than

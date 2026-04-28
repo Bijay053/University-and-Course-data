@@ -268,3 +268,76 @@ class TestShouldStageCourseOnlineOnly:
         ok, reason = should_stage_course("Master of Networking Systems Administration", payload)
         assert ok is False
         assert reason == "online_only"
+
+
+class TestQualificationCodePrefix:
+    """AIT fix: course names prefixed with an Australian national qualification
+    code (e.g. "ICT50220 Diploma of Information Technology") must NOT be
+    rejected as category_landing_page just because the name doesn't start
+    with a bare degree keyword."""
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "ICT50220 Diploma of Information Technology",
+            "Ict50220 Diploma of Information Technology (Vocational)",
+            "BSB40120 Certificate IV in Business",
+            "CHC33015 Certificate III in Individual Support",
+            "CPC30220 Certificate III in Carpentry",
+            "SIT50422 Diploma of Hospitality Management",
+        ],
+    )
+    def test_qual_code_prefix_passes_staging(self, name: str) -> None:
+        """Courses with a leading qualification code should pass the degree-
+        qualifier check in should_stage_course (Bug A gate)."""
+        payload = {
+            "course_name": name,
+            "international_fee": 12000,
+            "study_mode": "On Campus",
+        }
+        ok, reason = should_stage_course(name, payload)
+        assert ok is True, (
+            f"should_stage_course rejected {name!r} as {reason!r} — "
+            "qualification code prefix should be stripped before qualifier check"
+        )
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            # Regular degree titles must still pass
+            "Diploma of Information Technology",
+            "Certificate IV in Business",
+            "Bachelor of Computer Science",
+            "Master of Data Analytics",
+        ],
+    )
+    def test_plain_degree_title_still_passes(self, name: str) -> None:
+        payload = {
+            "course_name": name,
+            "international_fee": 15000,
+            "study_mode": "On Campus",
+        }
+        ok, reason = should_stage_course(name, payload)
+        assert ok is True, f"{name!r} rejected as {reason!r} — plain degree titles must pass"
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            # Bare category names must still be rejected even if they look
+            # like they could start with letters + digits
+            "3D Animation",
+            "2D Animation",
+            "Information Technology",
+            "Game Design",
+        ],
+    )
+    def test_bare_category_names_still_rejected(self, name: str) -> None:
+        payload = {
+            "course_name": name,
+            "international_fee": 15000,
+            "study_mode": "On Campus",
+        }
+        ok, reason = should_stage_course(name, payload)
+        assert ok is False, (
+            f"{name!r} accepted — bare category names must still be rejected"
+        )

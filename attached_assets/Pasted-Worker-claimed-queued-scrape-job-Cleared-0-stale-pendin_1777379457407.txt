@@ -1,0 +1,220 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 30
+Fetching https://apicollege.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://apicollege.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://apicollege.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] Page 1/25: +27 candidates (total 27) — https://apicollege.edu.au/courses
+[DISCOVER] blocked key_dates_page: https://apicollege.edu.au/future-students/academic-calendar/
+[DISCOVER] classified https://apicollege.edu.au/academic-awards/: unknown (no course links or degree content detected)
+[DISCOVER] Page 3/25: +0 candidates (total 27) — https://apicollege.edu.au/academic-awards/
+[DISCOVER] classified https://apicollege.edu.au/academic-team/: unknown (no course links or degree content detected)
+[DISCOVER] Page 4/25: +0 candidates (total 27) — https://apicollege.edu.au/academic-team/
+[DISCOVER] classified https://apicollege.edu.au/course-category/information-technology/?tutor-course-filter-category=121: listing (27 course links found)
+[DISCOVER] Page 5/25: +0 candidates (total 27) — https://apicollege.edu.au/course-category/information-technology/?tutor-course-filter-category=121
+[DISCOVER] classified https://apicollege.edu.au/course-category/business-information-systems/?tutor-course-filter-category=122: listing (27 course links found)
+[DISCOVER] Page 6/25: +0 candidates (total 27) — https://apicollege.edu.au/course-category/business-information-systems/?tutor-course-filter-category=122
+[DISCOVER] classified https://apicollege.edu.au/course-category/project-management/?tutor-course-filter-category=123: listing (27 course links found)
+[DISCOVER] Page 7/25: +0 candidates (total 27) — https://apicollege.edu.au/course-category/project-management/?tutor-course-filter-category=123
+[DISCOVER] classified https://apicollege.edu.au/course-category/business-administration/?tutor-course-filter-category=124: listing (25 course links found)
+[DISCOVER] Page 8/25: +0 candidates (total 27) — https://apicollege.edu.au/course-category/business-administration/?tutor-course-filter-category=124
+Discovered 27 candidate course links
+[CENTRAL] auto-discovered fee page: https://apicollege.edu.au/fees/
+[CENTRAL] fee page parsed → 39 program record(s) from https://apicollege.edu.au/fees/
+Extracting course details (27 pages)...
+[EXTRACT] 1/27: Diploma of Business Information Systems
+[EXTRACT] 2/27: Bachelor of Business Information Systems
+[EXTRACT] 3/27: Bachelor of Information Technology
+[EXTRACT] 4/27: Bachelor of Information Technology Specialisation in Computer Networks and Security
+Fetching 2/27: Bachelor of Business Information Systems
+Fetching 3/27: Bachelor of Information Technology
+Fetching 1/27: Diploma of Business Information Systems
+Fetching 4/27: Bachelor of Information Technology Specialisation in Computer Networks and Security
+[GEMINI] https://apicollege.edu.au/courses/diploma-of-business-inform → 0 field(s) (cost=$0.000000, in=1414 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-information-te → 0 field(s) (cost=$0.000000, in=1409 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-information-te → 0 field(s) (cost=$0.000000, in=1434 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-business-infor → 0 field(s) (cost=$0.000000, in=1414 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/diploma-of-business-information-systems/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-business-information-systems/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-information-technology/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-information-technology-specialisation-in-computer-networks-and-security/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-business-information-systems/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-information-technology-specialisation-in-computer-networks-and-security/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-information-technology/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/diploma-of-business-information-systems/
+[CATEGORY det] Bachelor of Business Information Systems → Computer Science & IT / Information Systems
+[CATEGORY det] Bachelor of Information Technology Speci → Computer Science & IT / Networking
+[CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[CATEGORY det] Diploma of Business Information Systems → Computer Science & IT / Information Systems
+[EXTRACT] 5/27: Diploma of Business
+[EXTRACT] 6/27: Bachelor of Business
+[EXTRACT] 7/27: Bachelor of Business Specialisation in Accounting
+Fetching 6/27: Bachelor of Business
+Fetching 7/27: Bachelor of Business Specialisation in Accounting
+[EXTRACT] 8/27: Bachelor of Business Specialisation in Analytics and AI
+Fetching 5/27: Diploma of Business
+Fetching 8/27: Bachelor of Business Specialisation in Analytics and AI
+[GEMINI] https://apicollege.edu.au/courses/diploma-of-business/ → 0 field(s) (cost=$0.000000, in=1404 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-business/ → 0 field(s) (cost=$0.000000, in=1404 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-business-bbus- → 0 field(s) (cost=$0.000000, in=1423 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-business-bbus- → 0 field(s) (cost=$0.000000, in=1420 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/diploma-of-business/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-business/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-analytics-and-ai/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-accounting/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/diploma-of-business/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-accounting/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-business/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-analytics-and-ai/
+[EXTRACT] 9/27: Bachelor of Business Specialisation in Project Management
+[EXTRACT] 10/27: Graduate Certificate in Information Technology
+[CATEGORY det] Bachelor of Business (Bbus) Specialisati → Business & Management / Accounting
+[EXTRACT] 11/27: Master of Information Technology
+Fetching 10/27: Graduate Certificate in Information Technology
+Fetching 9/27: Bachelor of Business Specialisation in Project Management
+[EXTRACT] 12/27: Master of Information Technology Specialisation in Artificial Intelligence
+Fetching 11/27: Master of Information Technology
+Fetching 12/27: Master of Information Technology Specialisation in Artificial Intelligence
+[GEMINI] https://apicollege.edu.au/courses/graduate-certificate-in-in → 0 field(s) (cost=$0.000000, in=1421 out=0)
+[GEMINI] https://apicollege.edu.au/courses/bachelor-of-business-bbus- → 0 field(s) (cost=$0.000000, in=1424 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-information-tech → 0 field(s) (cost=$0.000000, in=1408 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-information-tech → 0 field(s) (cost=$0.000000, in=1429 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/graduate-certificate-in-information-technology-gradcertit/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-information-technology/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-project-management/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-artificial-intelligence/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/graduate-certificate-in-information-technology-gradcertit/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-information-technology/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-artificial-intelligence/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/bachelor-of-business-bbus-specialisation-in-project-management/
+[CATEGORY det] Master of Information Technology Special → Computer Science & IT / Artificial Intelligence
+[CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+[CATEGORY det] Bachelor of Business (Bbus) Specialisati → Business & Management / Project Management
+[CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT] 13/27: Master of Information Technology Specialisation in Enterprise Networks
+[EXTRACT] 14/27: Master of Information Technology Specialisation in Cyber Security
+[EXTRACT] 15/27: Graduate Certificate in Project Management
+[EXTRACT] 16/27: Graduate Diploma of Project Management
+Fetching 13/27: Master of Information Technology Specialisation in Enterprise Networks
+Fetching 14/27: Master of Information Technology Specialisation in Cyber Security
+Fetching 15/27: Graduate Certificate in Project Management
+Fetching 16/27: Graduate Diploma of Project Management
+[GEMINI] https://apicollege.edu.au/courses/graduate-diploma-in-projec → 0 field(s) (cost=$0.000000, in=1417 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-information-tech → 0 field(s) (cost=$0.000000, in=1425 out=0)
+[GEMINI] https://apicollege.edu.au/courses/graduate-certificate-in-pr → 0 field(s) (cost=$0.000000, in=1419 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-information-tech → 0 field(s) (cost=$0.000000, in=1427 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/graduate-diploma-in-project-management-graddippm/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/graduate-certificate-in-project-management-gradcertpm/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-cyber-security/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-enterprise-networks/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/graduate-diploma-in-project-management-graddippm/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/graduate-certificate-in-project-management-gradcertpm/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-cyber-security/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-information-technology-specialisation-in-enterprise-networks/
+[CATEGORY det] Graduate Diploma of Project Management ( → Business & Management / Project Management
+[CATEGORY det] Graduate Certificate in Project Manageme → Business & Management / Project Management
+[CATEGORY det] Master of Information Technology Special → Computer Science & IT / Cyber Security
+[CATEGORY det] Master of Information Technology Special → Computer Science & IT / Information Systems
+[EXTRACT] 17/27: Master of Project Management and Business
+[EXTRACT] 18/27: Master of Project Management and Business (MPMB) Specialisation in ICT Project Management
+[EXTRACT] 19/27: Master of Project Management and Business (MPMB) Specialisation in Health Management
+[EXTRACT] 20/27: Graduate Certificate in Business Management
+Fetching 17/27: Master of Project Management and Business
+Fetching 19/27: Master of Project Management and Business (MPMB) Specialisation in Health Management
+Fetching 18/27: Master of Project Management and Business (MPMB) Specialisation in ICT Project Management
+Fetching 20/27: Graduate Certificate in Business Management
+[GEMINI] https://apicollege.edu.au/courses/master-of-project-manageme → 0 field(s) (cost=$0.000000, in=1414 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-project-manageme → 0 field(s) (cost=$0.000000, in=1436 out=0)
+[GEMINI] https://apicollege.edu.au/courses/graduate-certificate-in-bu → 0 field(s) (cost=$0.000000, in=1420 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-project-manageme → 0 field(s) (cost=$0.000000, in=1434 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-project-management-and-business/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-project-management-and-business-mpmb-specialisation-in-ict-project-management/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/graduate-certificate-in-business-management-gradcertbus/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-project-management-and-business-mpmb-specialisation-in-health-management/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-project-management-and-business/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-project-management-and-business-mpmb-specialisation-in-ict-project-management/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/graduate-certificate-in-business-management-gradcertbus/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-project-management-and-business-mpmb-specialisation-in-health-management/
+[CATEGORY det] Master of Project Management and Busines → Business & Management / Project Management
+[CATEGORY det] Graduate Certificate in Business Managem → Business & Management / Management
+[CATEGORY det] Master of Project Management and Busines → Business & Management / Project Management
+[CATEGORY det] Master of Project Management and Busines → Business & Management / Project Management
+[EXTRACT] 21/27: Graduate Diploma of Business Management
+[EXTRACT] 22/27: Master of Business Administration (MBA)
+[EXTRACT] 23/27: Master of Business Administration Specialisation in Health Management
+[EXTRACT] 24/27: Master of Business Administration Specialisation in Project Management
+Fetching 21/27: Graduate Diploma of Business Management
+Fetching 22/27: Master of Business Administration (MBA)
+Fetching 23/27: Master of Business Administration Specialisation in Health Management
+Fetching 24/27: Master of Business Administration Specialisation in Project Management
+[GEMINI] https://apicollege.edu.au/courses/master-of-business-adminis → 0 field(s) (cost=$0.000000, in=1410 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-business-adminis → 0 field(s) (cost=$0.000000, in=1427 out=0)
+[GEMINI] https://apicollege.edu.au/courses/graduate-diploma-of-busine → 0 field(s) (cost=$0.000000, in=1418 out=0)
+[GEMINI] https://apicollege.edu.au/courses/master-of-business-adminis → 0 field(s) (cost=$0.000000, in=1427 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-project-management/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/graduate-diploma-of-business-management-graddipbus/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-health-management/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-business-administration/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/graduate-diploma-of-business-management-graddipbus/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-project-management/
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-health-management/
+[CATEGORY det] Master of Business Administration (MBA) → Business & Management / MBA
+[CATEGORY det] Graduate Diploma of Business Management → Business & Management / Management
+[CATEGORY det] Master of Business Administration Specia → Business & Management / MBA
+[CATEGORY det] Master of Business Administration Specia → Business & Management / MBA
+[EXTRACT] 25/27: Master of Business Administration Specialisation in Information Technology
+[EXTRACT] 26/27: Postgraduate (15)
+[EXTRACT] 27/27: Undergraduate (9)
+Fetching 25/27: Master of Business Administration Specialisation in Information Technology
+Fetching 26/27: Postgraduate (15)
+Fetching 27/27: Undergraduate (9)
+[per-course browser ↻] https://apicollege.edu.au/course-category/postgraduate/?tutor-course-filter-category=119
+[per-course browser ↻] https://apicollege.edu.au/course-category/undergraduate/?tutor-course-filter-category=120
+[GEMINI] https://apicollege.edu.au/courses/master-of-business-adminis → 0 field(s) (cost=$0.000000, in=1429 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-information-technology/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='SYD | MEL | BNE' method=study_mode:rule url=https://apicollege.edu.au/courses/master-of-business-administration-specialisation-in-information-technology/
+[CATEGORY det] Master of Business Administration Specia → Business & Management / MBA
+timeout: per-course browser exceeded 60s on https://apicollege.edu.au/course-category/postgraduate/?tutor-course-filter-category=119 — moving on
+timeout: per-course browser exceeded 60s on https://apicollege.edu.au/course-category/undergraduate/?tutor-course-filter-category=120 — moving on
+[GEMINI] https://apicollege.edu.au/course-category/undergraduate/?tut → 0 field(s) (cost=$0.000000, in=1409 out=0)
+[GEMINI] https://apicollege.edu.au/course-category/postgraduate/?tuto → 0 field(s) (cost=$0.000000, in=1408 out=0)
+[FALLBACK] AI enriching https://apicollege.edu.au/course-category/undergraduate/?tutor-course-filter-category=120 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://apicollege.edu.au/course-category/postgraduate/?tutor-course-filter-category=119 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Canberra, Gold Coast, Newcastle, Ballarat, Wellington, Christchurch' method=study_mode:rule url=https://apicollege.edu.au/course-category/undergraduate/?tutor-course-filter-category=120
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Canberra, Gold Coast, Newcastle, Ballarat, Wellington, Christchurch' method=study_mode:rule url=https://apicollege.edu.au/course-category/postgraduate/?tutor-course-filter-category=119
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=65.0
+[EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=180.0 ielts_overall=6.5 pte_overall=58.0 toefl_overall=79.0
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 4 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 4 slot(s) filled across siblings
+[STAGE] saved: Diploma of Business Information Systems (Dipbis)
+[STAGE] saved: Bachelor of Business Information Systems (Bbis)
+[STAGE] saved: Bachelor of Information Technology
+[STAGE] saved: Bachelor of Information Technology Specialisation in Computer Networks and Security
+[STAGE] saved: Diploma of Business (Dipbus)
+[STAGE] saved: Bachelor of Business (Bbus)
+[STAGE] saved: Bachelor of Business (Bbus) Specialisation in Accounting
+[STAGE] saved: Bachelor of Business (Bbus) Specialisation in Analytics and AI
+[STAGE] saved: Bachelor of Business (Bbus) Specialisation in Project Management
+[STAGE] saved: Graduate Certificate in Information Technology (Gradcertit)
+[STAGE] saved: Master of Information Technology
+[STAGE] saved: Master of Information Technology Specialisation in Artificial Intelligence
+[STAGE] saved: Master of Information Technology Specialisation in Enterprise Networks
+[STAGE] saved: Master of Information Technology Specialisation in Cyber Security
+[STAGE] saved: Graduate Certificate in Project Management (Gradcertpm)
+[STAGE] saved: Graduate Diploma of Project Management (Graddippm)
+[STAGE] saved: Master of Project Management and Business (Mpmb)
+[STAGE] saved: Master of Project Management and Business (Mpmb) Specialisation in ICT Project Management
+[STAGE] saved: Master of Project Management and Business (Mpmb) Specialisation in Health Management
+[STAGE] saved: Graduate Certificate in Business Management (Gradcertbus)
+[STAGE] saved: Graduate Diploma of Business Management (Graddipbus)
+[STAGE] saved: Master of Business Administration (MBA)
+[STAGE] saved: Master of Business Administration Specialisation in Health Management
+[STAGE] saved: Master of Business Administration Specialisation in Project Management
+[STAGE] saved: Master of Business Administration Specialisation in Information Technology
+[STAGE] skipped Postgraduate Courses: rejected: category_landing_page
+[STAGE] skipped Undergraduate Courses: rejected: category_landing_page
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 2m 49s | Courses: 25 | Avg: 6.8s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:27 | Staged:25 | Skipped:2 | Errors:0
+Staged 25 courses, 2 skipped, 0 fetch errors

@@ -1,0 +1,226 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Master of Business Administration Specialisation in Information Technology
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Business Administration Specialisation in Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Business Administration Specialisation in Health Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Business Administration (MBA)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Graduate Diploma of Business Management (Graddipbus)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Graduate Certificate in Business Management (Gradcertbus)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	2 Trimester	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Project Management and Business (Mpmb) Specialisation in Health Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Project Management and Business (Mpmb) Specialisation in ICT Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Project Management and Business (Mpmb)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Graduate Diploma of Project Management (Graddippm)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Graduate Certificate in Project Management (Gradcertpm)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	2 Trimester	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Information Technology Specialisation in Cyber Security
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Information Technology Specialisation in Enterprise Networks
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Information Technology Specialisation in Artificial Intelligence
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Master of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$93,000/Annual	6.5	58	79	180	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Graduate Certificate in Information Technology (Gradcertit)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	6 Month	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus) Specialisation in Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus) Specialisation in Analytics and AI
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus) Specialisation in Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Diploma of Business (Dipbus)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$93,000/Annual	5.5	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Information Technology Specialisation in Computer Networks and Security
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Bachelor of Business Information Systems (Bbis)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$93,000/Annual	6	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
+	
+Diploma of Business Information Systems (Dipbis)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$93,000/Annual	5.5	50	65	169	-	Feb, Jun, Sep	SYD | MEL | BNE	On Campus	
+
+
+
