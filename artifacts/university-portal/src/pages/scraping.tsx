@@ -374,6 +374,9 @@ export default function Scraping() {
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  // Refs so callbacks can read current review state without stale closure issues
+  const showReviewRef = useRef(false);
+  const reviewJobIdRef = useRef<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
   const [reviewDetail, setReviewDetail] = useState<CourseReviewPayload | null>(null);
   const [rejectingIds, setRejectingIds] = useState<number[] | null>(null);
@@ -574,7 +577,14 @@ export default function Scraping() {
     } catch {}
   }, []);
 
+  // Keep refs in sync so auto-complete handler can read current review state.
+  useEffect(() => { showReviewRef.current = showReview; }, [showReview]);
+  useEffect(() => { reviewJobIdRef.current = reviewJobId; }, [reviewJobId]);
+
   const handleReviewReady = useCallback((jobId: string) => {
+    // Don't replace a review the user is actively looking at with a different
+    // job's results. Only auto-open the review panel when no review is visible.
+    if (showReviewRef.current && reviewJobIdRef.current && reviewJobIdRef.current !== jobId) return;
     loadStagedCourses(jobId);
   }, [loadStagedCourses]);
 
