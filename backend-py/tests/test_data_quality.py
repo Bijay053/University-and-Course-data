@@ -6,6 +6,7 @@ import pytest
 from app.services.scraper.data_quality import (
     QualityIssue,
     _check_course,
+    _check_duplicate_fees,
     _check_duplicates,
     run_quality_checks,
 )
@@ -233,6 +234,64 @@ class TestDuplicateDetection:
             ({"course_name": "Bachelor of Laws"}, "https://example.edu/llb"),
         ]
         issues = _check_duplicates(payloads)
+        assert not issues
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7b. Duplicate fee detection
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDuplicateFeeDetection:
+    """_check_duplicate_fees fires when ≥ 75% of fee-bearing courses share
+    the same fee value AND there are at least 5 courses with a fee."""
+
+    def _make_payloads(self, fees: list) -> list:
+        return [
+            ({"course_name": f"Course {i}", "international_fee": f}, "https://e/x")
+            for i, f in enumerate(fees)
+        ]
+
+    def test_all_same_fee_triggers_critical_issue(self):
+        payloads = self._make_payloads([35000, 35000, 35000, 35000, 35000])
+        issues = _check_duplicate_fees(payloads)
+        assert any(i.code == "duplicate_fee_detected" for i in issues)
+        assert any(i.severity == "critical" for i in issues)
+
+    def test_different_fees_no_issue(self):
+        payloads = self._make_payloads([30000, 35000, 40000, 45000, 50000])
+        issues = _check_duplicate_fees(payloads)
+        assert not issues
+
+    def test_fewer_than_5_courses_no_issue(self):
+        """Even if all fees are identical, below the minimum threshold should pass."""
+        payloads = self._make_payloads([35000, 35000, 35000, 35000])
+        issues = _check_duplicate_fees(payloads)
+        assert not issues
+
+    def test_75_pct_threshold_triggers(self):
+        """80% sharing the same fee should trigger."""
+        payloads = self._make_payloads([35000, 35000, 35000, 35000, 40000])
+        issues = _check_duplicate_fees(payloads)
+        # 4/5 = 80% → should trigger
+        assert any(i.code == "duplicate_fee_detected" for i in issues)
+
+    def test_below_75_pct_does_not_trigger(self):
+        """If only 3/6 (50%) share same fee, no trigger."""
+        payloads = self._make_payloads([35000, 35000, 35000, 40000, 45000, 50000])
+        issues = _check_duplicate_fees(payloads)
+        assert not any(i.code == "duplicate_fee_detected" for i in issues)
+
+    def test_none_fees_ignored(self):
+        """Payloads with no fee should not count toward the total."""
+        payloads = self._make_payloads([None, None, None, 35000, 35000, 35000])
+        # Only 3 courses have a fee → below minimum threshold of 5
+        issues = _check_duplicate_fees(payloads)
+        assert not issues
+
+    def test_zero_fees_ignored(self):
+        """Fee values of 0 must not count as valid fees."""
+        payloads = self._make_payloads([0, 0, 0, 0, 0])
+        issues = _check_duplicate_fees(payloads)
         assert not issues
 
 
