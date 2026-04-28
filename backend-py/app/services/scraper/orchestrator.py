@@ -802,6 +802,53 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             log.warning("central_pages prefetch failed: %s", exc)
             central_data = None
 
+        # Phase A.5 — pre-extraction gate.  Drop candidates whose URL or
+        # link text matches the central blocklist BEFORE we spend any
+        # network/extraction budget on them.  Discovery already filters,
+        # but it can only see anchor text + URL — once we have the
+        # finalised candidate list we run one more strict pass with the
+        # canonical ``is_blocked_page`` rules so user-reported leaks
+        # like "Pathways to uni", "Saved courses", "Study online",
+        # "Year 12 entry" never reach extraction or the staging table.
+        try:
+            from app.services.scraper.guards import is_blocked_page
+        except Exception:  # noqa: BLE001 — never abort the run on import failure
+            is_blocked_page = None  # type: ignore[assignment]
+        if is_blocked_page is not None and links:
+            kept: list[dict] = []
+            block_counts: dict[str, int] = {}
+            for _lk in links:
+                _u = (_lk.get("url") or "").strip()
+                _n = (_lk.get("name") or "").strip()
+                try:
+                    _b, _r = is_blocked_page(_u, _n)
+                except Exception:  # noqa: BLE001
+                    _b, _r = (False, "")
+                if _b:
+                    block_counts[_r] = block_counts.get(_r, 0) + 1
+                    await emit(
+                        "status",
+                        f"[EXTRACT] gate dropped ({_r}): {_n or _u}",
+                        phase="extract",
+                        kind="extract_gate_drop",
+                        reason=_r,
+                        url=_u,
+                    )
+                    continue
+                kept.append(_lk)
+            if block_counts:
+                _summary = ", ".join(f"{k}={v}" for k, v in sorted(block_counts.items()))
+                await emit(
+                    "status",
+                    f"[EXTRACT] gate dropped {len(links) - len(kept)} non-course candidate(s) — {_summary}",
+                    phase="extract",
+                    kind="extract_gate_summary",
+                    dropped=len(links) - len(kept),
+                    kept=len(kept),
+                    counts=block_counts,
+                )
+            links = kept
+
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
         # 1) Extraction phase — parallel network calls, no DB shared state.

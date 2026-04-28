@@ -1,0 +1,96 @@
+discovery is still collecting non course pages.
+Extraction is still trying to extract pages like Study online, Pathways to uni, Undergraduate study, Postgraduate study, Career finder pages, Saved courses, Webinars, Year 12 entry and TAFE/VET pathway pages.
+UOW location is showing “Delivery method”, which is not a real campus.
+
+Please add one more Phase A patch before starting Phase B.
+
+Required patch:
+
+Block these URL patterns before extraction:
+career-finder
+online-study
+pathway-programs
+undergraduate-study
+postgraduate-study
+short-courses
+english-language-programs
+saved-courses
+favourites
+events-key-dates
+webinars
+livestream
+postgrad
+pathways
+year-12-entry
+tafevet-to-uni
+stat
+indigenous-admission-scheme
+military-veterans
+foundation-studies
+compare
+addCourse
+Do not send blocked pages to AI enrichment.
+
+If a page is blocked or classified as non course page, skip it completely. Do not call Gemini. Do not call browser fallback. Do not save row.
+
+Add stricter course detail gate.
+
+Only extract if:
+URL contains /study/courses/ and a real course slug after it
+AND title starts with qualification words like Bachelor, Master, Diploma, Associate Degree, Graduate Certificate, Graduate Diploma, Doctor, PhD
+AND title does not start with Save, View, Clear, Study, Pathway, Postgraduate students, Future student
+
+Fix location cleaner.
+
+Reject location value if it is:
+Delivery method
+View dates
+Start
+Apply
+External
+Online
+Domestic
+International
+
+If no real campus is found, keep location blank and needs_manual_review true.
+
+For UOW specifically, ignore URLs with:
+?addCourse=
+/favourites/
+index.php
+
+These are action or saved course pages, not course detail pages.
+
+For Flinders specifically, ignore:
+study/postgrad
+study/pathways
+study/events-key-dates
+study/courses/saved-courses
+Add tests for these exact examples from production logs:
+UniSQ:
+Study online
+Pathways to uni
+Undergraduate study
+Postgraduate study
+career-finder/accountant
+
+UOW:
+Save Bachelor of Arts to Course Favourites
+0 My favourites
+Clear all
+/study/courses/?addCourse=
+/study/courses/favourites/
+
+Flinders:
+a future postgraduate student
+View all saved courses
+Livestream Information Sessions
+Postgraduate information sessions
+Year 12 entry
+TAFE/VET to uni
+STAT
+
+Expected result:
+All these should be rejected before extraction and should never call AI enrichment.
+
+After this patch, please run tests and push. Then I will re scrape UniSQ and UOW again.

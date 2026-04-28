@@ -1,0 +1,956 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 1
+Fetching https://www.unisq.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.unisq.edu.au/study/degrees-and-courses (high-priority probe)
+[DISCOVER] Crawling from https://www.unisq.edu.au/study/degrees-and-courses (max 60 pages, max 200 candidates)
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses: listing (14 course links found)
+[DISCOVER] Page 1/60: +15 candidates (total 15) — https://www.unisq.edu.au/study/degrees-and-courses
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses?studentType=international: listing (14 course links found)
+[DISCOVER] Page 2/60: +0 candidates (total 15) — https://www.unisq.edu.au/study/degrees-and-courses?studentType=international
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international: listing (15 course links found)
+[DISCOVER] Page 3/60: +1 candidates (total 16) — https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study?studentType=international: listing (16 course links found)
+[DISCOVER] Page 4/60: +2 candidates (total 18) — https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study?studentType=international
+[DISCOVER] classified https://www.unisq.edu.au/study: listing (14 course links found)
+[DISCOVER] Page 5/60: +1 candidates (total 19) — https://www.unisq.edu.au/study
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/mature-age-students: listing (7 course links found)
+[DISCOVER] Page 6/60: +1 candidates (total 20) — https://www.unisq.edu.au/study/information-for/mature-age-students
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder: listing (5 course links found)
+[DISCOVER] Page 7/60: +0 candidates (total 20) — https://www.unisq.edu.au/study/career-finder
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/high-school-students: listing (17 course links found)
+[DISCOVER] Page 8/60: +1 candidates (total 21) — https://www.unisq.edu.au/study/information-for/high-school-students
+[DISCOVER] blocked key_dates_page: https://www.unisq.edu.au/study/key-dates
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/parents-and-guardians: listing (9 course links found)
+[DISCOVER] Page 10/60: +2 candidates (total 23) — https://www.unisq.edu.au/study/information-for/parents-and-guardians
+[DISCOVER] classified https://www.unisq.edu.au/study/information-for/schools: listing (6 course links found)
+[DISCOVER] Page 11/60: +0 candidates (total 23) — https://www.unisq.edu.au/study/information-for/schools
+[DISCOVER] blocked fee_page: https://www.unisq.edu.au/study/fees-and-scholarships
+[DISCOVER] blocked marketing_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories
+[DISCOVER] blocked apply_page: https://www.unisq.edu.au/study/apply
+[DISCOVER] blocked key_dates_page: https://www.unisq.edu.au/current-students/your-study/academic-calendar-dates
+[DISCOVER] classified https://www.unisq.edu.au/about-unisq/schools: listing (6 course links found)
+[DISCOVER] Page 16/60: +0 candidates (total 23) — https://www.unisq.edu.au/about-unisq/schools
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/short-courses: listing (19 course links found)
+[DISCOVER] Page 17/60: +14 candidates (total 37) — https://www.unisq.edu.au/study/degrees-and-courses/short-courses
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/double-degrees: listing (5 course links found)
+[DISCOVER] Page 18/60: +0 candidates (total 37) — https://www.unisq.edu.au/study/degrees-and-courses/double-degrees
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/new-degrees: listing (5 course links found)
+[DISCOVER] Page 19/60: +0 candidates (total 37) — https://www.unisq.edu.au/study/degrees-and-courses/new-degrees
+[DISCOVER] blocked marketing_page: https://www.unisq.edu.au/study/why-unisq/ways-to-study
+[DISCOVER] blocked apply_page: https://www.unisq.edu.au/study/apply/entry-requirements
+[DISCOVER] blocked contact_page: https://www.unisq.edu.au/study/contact
+[DISCOVER] classified https://www.unisq.edu.au/current-students/your-study/program-information-resources: listing (6 course links found)
+[DISCOVER] Page 23/60: +0 candidates (total 37) — https://www.unisq.edu.au/current-students/your-study/program-information-resources
+[DISCOVER] blocked apply_page: https://www.unisq.edu.au/study/apply/postgraduate-study
+[DISCOVER] blocked blog_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/blogs/graduate-certificate-vs-graduate-diploma-whats-the-difference
+[DISCOVER] blocked blog_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/blogs/four-reasons-for-postgraduate-study
+[DISCOVER] blocked apply_page: https://www.unisq.edu.au/study/apply/recognition-of-prior-learning
+[DISCOVER] classified https://www.unisq.edu.au/study/degrees-and-courses/english-language-programs: listing (71 course links found)
+[DISCOVER] Page 28/60: +60 candidates (total 97) — https://www.unisq.edu.au/study/degrees-and-courses/english-language-programs
+[DISCOVER] blocked marketing_page: https://www.unisq.edu.au/study/why-unisq
+[DISCOVER] blocked testimonials_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/fraser
+[DISCOVER] blocked testimonials_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/lisa-hopkins
+[DISCOVER] blocked testimonials_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/joshua-de-grussa
+[DISCOVER] blocked testimonials_page: https://www.unisq.edu.au/study/why-unisq/unisq-stories/testimonials/melanie-oliver
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/accountant: listing (7 course links found)
+[DISCOVER] Page 34/60: +2 candidates (total 99) — https://www.unisq.edu.au/study/career-finder/accountant
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/actor: listing (6 course links found)
+[DISCOVER] Page 35/60: +1 candidates (total 100) — https://www.unisq.edu.au/study/career-finder/actor
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/advertising-manager: listing (7 course links found)
+[DISCOVER] Page 36/60: +2 candidates (total 102) — https://www.unisq.edu.au/study/career-finder/advertising-manager
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/aged-care-nurse: listing (8 course links found)
+[DISCOVER] Page 37/60: +3 candidates (total 105) — https://www.unisq.edu.au/study/career-finder/aged-care-nurse
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/agricultural-consultant: listing (6 course links found)
+[DISCOVER] Page 38/60: +1 candidates (total 106) — https://www.unisq.edu.au/study/career-finder/agricultural-consultant
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/agricultural-engineer: listing (6 course links found)
+[DISCOVER] Page 39/60: +1 candidates (total 107) — https://www.unisq.edu.au/study/career-finder/agricultural-engineer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/air-traffic-controller: listing (6 course links found)
+[DISCOVER] Page 40/60: +0 candidates (total 107) — https://www.unisq.edu.au/study/career-finder/air-traffic-controller
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/animator: listing (6 course links found)
+[DISCOVER] Page 41/60: +1 candidates (total 108) — https://www.unisq.edu.au/study/career-finder/animator
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/anthropologist: listing (6 course links found)
+[DISCOVER] Page 42/60: +1 candidates (total 109) — https://www.unisq.edu.au/study/career-finder/anthropologist
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/archaeologist: listing (6 course links found)
+[DISCOVER] Page 43/60: +0 candidates (total 109) — https://www.unisq.edu.au/study/career-finder/archaeologist
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/art-teacher: listing (7 course links found)
+[DISCOVER] Page 44/60: +0 candidates (total 109) — https://www.unisq.edu.au/study/career-finder/art-teacher
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/astronomer: listing (7 course links found)
+[DISCOVER] Page 45/60: +1 candidates (total 110) — https://www.unisq.edu.au/study/career-finder/astronomer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/auditor: listing (6 course links found)
+[DISCOVER] Page 46/60: +0 candidates (total 110) — https://www.unisq.edu.au/study/career-finder/auditor
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/aviation-manager: listing (10 course links found)
+[DISCOVER] Page 47/60: +4 candidates (total 114) — https://www.unisq.edu.au/study/career-finder/aviation-manager
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/barrister: listing (6 course links found)
+[DISCOVER] Page 48/60: +0 candidates (total 114) — https://www.unisq.edu.au/study/career-finder/barrister
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/biologist: listing (7 course links found)
+[DISCOVER] Page 49/60: +2 candidates (total 116) — https://www.unisq.edu.au/study/career-finder/biologist
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/biomedical-scientist: listing (7 course links found)
+[DISCOVER] Page 50/60: +1 candidates (total 117) — https://www.unisq.edu.au/study/career-finder/biomedical-scientist
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/brand-manager: listing (8 course links found)
+[DISCOVER] Page 51/60: +1 candidates (total 118) — https://www.unisq.edu.au/study/career-finder/brand-manager
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/business-analyst: listing (8 course links found)
+[DISCOVER] Page 52/60: +1 candidates (total 119) — https://www.unisq.edu.au/study/career-finder/business-analyst
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/career-counsellor: listing (9 course links found)
+[DISCOVER] Page 53/60: +4 candidates (total 123) — https://www.unisq.edu.au/study/career-finder/career-counsellor
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/ceo: listing (7 course links found)
+[DISCOVER] Page 54/60: +1 candidates (total 124) — https://www.unisq.edu.au/study/career-finder/ceo
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/civil-engineer: listing (7 course links found)
+[DISCOVER] Page 55/60: +0 candidates (total 124) — https://www.unisq.edu.au/study/career-finder/civil-engineer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/community-worker: listing (9 course links found)
+[DISCOVER] Page 56/60: +1 candidates (total 125) — https://www.unisq.edu.au/study/career-finder/community-worker
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/computer-engineer: listing (6 course links found)
+[DISCOVER] Page 57/60: +0 candidates (total 125) — https://www.unisq.edu.au/study/career-finder/computer-engineer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/computer-programmer: listing (12 course links found)
+[DISCOVER] Page 58/60: +4 candidates (total 129) — https://www.unisq.edu.au/study/career-finder/computer-programmer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/computer-systems-engineer: listing (6 course links found)
+[DISCOVER] Page 59/60: +0 candidates (total 129) — https://www.unisq.edu.au/study/career-finder/computer-systems-engineer
+[DISCOVER] classified https://www.unisq.edu.au/study/career-finder/copywriter: listing (6 course links found)
+[DISCOVER] Page 60/60: +0 candidates (total 129) — https://www.unisq.edu.au/study/career-finder/copywriter
+Discovered 129 candidate course links
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.unisq.edu.au/fees
+[CACHE] english_requirements hit → ielts_overall=6.5 (cached, skipping fetch of https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements)
+Extracting course details (129 pages)...
+[EXTRACT] 1/129: Pathways to uni
+[EXTRACT] 2/129: Undergraduate study
+[EXTRACT] 3/129: Study online
+[EXTRACT] 4/129: Postgraduate study
+Fetching 2/129: Undergraduate study
+Fetching 3/129: Study online
+Fetching 1/129: Pathways to uni
+Fetching 4/129: Postgraduate study
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/online-study?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/online-study?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/online-st → 0 field(s) (cost=$0.000000, in=2381 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/online-study?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Online Study — english from central page: ielts=6.5
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 5/129: Research degrees and PhD
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/postgradu → 0 field(s) (cost=$0.000000, in=3440 out=0)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+Fetching 5/129: Research degrees and PhD
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/pathway-p → 0 field(s) (cost=$0.000000, in=3513 out=0)
+[CENTRAL ✓] Postgraduate Study — english from central page: ielts=6.5
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/pathway-programs?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 6/129: Saved Degrees (#)
+[CENTRAL ✓] Pathways to University — english from central page: ielts=6.5
+Fetching 6/129: Saved Degrees (#)
+[EXTRACT] 7/129: Arts and Communication
+Fetching 7/129: Arts and Communication
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/compare?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication?studentType=international
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/research- → 0 field(s) (cost=$0.000000, in=3546 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/research-study?studentType=international (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 8/129: Aviation
+Fetching 8/129: Aviation
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/aviation?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/undergrad → 0 field(s) (cost=$0.000000, in=6795 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Undergraduate Study — english from central page: ielts=6.5
+[EXTRACT] 9/129: Business
+Fetching 9/129: Business
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/business?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/compare?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/compare?s → 0 field(s) (cost=$0.000000, in=1464 out=0)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/arts-and- → 0 field(s) (cost=$0.000000, in=9039 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/compare?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Compare Degrees — english from central page: ielts=6.5
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 10/129: Education and Teaching
+[CENTRAL ✓] Arts and Communication Degrees — english from central page: ielts=6.5
+Fetching 10/129: Education and Teaching
+[EXTRACT] 11/129: Engineering and Surveying
+Fetching 11/129: Engineering and Surveying
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/aviation?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/aviation? → 0 field(s) (cost=$0.000000, in=9036 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/aviation?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Aviation Degrees — english from central page: ielts=6.5
+[EXTRACT] 12/129: Health
+Fetching 12/129: Health
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/health?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/engineeri → 0 field(s) (cost=$0.000000, in=9040 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/education → 0 field(s) (cost=$0.000000, in=9039 out=0)
+[CENTRAL ✓] Engineering and Surveying Degrees — english from central page: ielts=6.5
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 13/129: Information Technology
+[CENTRAL ✓] Education and Teaching Degrees — english from central page: ielts=6.5
+Fetching 13/129: Information Technology
+[CATEGORY det] Education and Teaching Degrees → Education & Social Work / Teaching
+[EXTRACT] 14/129: Sciences and Agriculture
+Fetching 14/129: Sciences and Agriculture
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/health?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/information-technology?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture?studentType=international
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/health?st → 0 field(s) (cost=$0.000000, in=9035 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/health?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Health Degrees — english from central page: ielts=6.5
+[EXTRACT] 15/129: Law
+Fetching 15/129: Law
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/law?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/information-technology?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/informati → 0 field(s) (cost=$0.000000, in=9039 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/information-technology?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Information Technology Degrees — english from central page: ielts=6.5
+[CATEGORY det] Information Technology Degrees → Computer Science & IT / Information Systems
+[EXTRACT] 16/129: Download now
+Fetching 16/129: Download now
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/law?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/law?stude → 0 field(s) (cost=$0.000000, in=9034 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/law?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Law Degrees — english from central page: ielts=6.5
+[EXTRACT] 17/129: Download now
+Fetching 17/129: Download now
+[per-course browser ↻] https://www.unisq.edu.au/-/media/usq/study/degrees/postgraduate/unisq-postgrad-guide-2026-final.ashx?rev=6f66c88bfc484b7a91d03a7deb616b2f
+[per-course browser ✗] https://www.unisq.edu.au/study/degrees-and-courses/business?studentType=international: empty response
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/business? → 0 field(s) (cost=$0.000000, in=9036 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/business?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Business Degrees — english from central page: ielts=6.5
+[EXTRACT] 18/129: Postgraduate Commonwealth supported places
+Fetching 18/129: Postgraduate Commonwealth supported places
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study/postgraduate-csp?studentType=international
+[per-course browser ✗] https://www.unisq.edu.au/-/media/usq/study/degrees/postgraduate/unisq-postgrad-guide-2026-final.ashx?rev=6f66c88bfc484b7a91d03a7deb616b2f: empty response
+[GEMINI] https://www.unisq.edu.au/-/media/usq/study/degrees/postgradu → 0 field(s) (cost=$0.000000, in=13908 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/-/media/usq/study/degrees/postgraduate/unisq-postgrad-guide-2026-final.ashx?rev=6f66c88bfc484b7a91d03a7deb616b2f (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] https://www.unisq.edu.au/-/media/usq/stu — english from central page: ielts=6.5
+[EXTRACT] 19/129: + New degrees
+Fetching 19/129: + New degrees
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26&studentType=international
+[per-course browser ✗] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture?studentType=international: empty response
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/sciences- → 0 field(s) (cost=$0.000000, in=9040 out=0)
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study/postgraduate-csp?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/postgradu → 0 field(s) (cost=$0.000000, in=2894 out=0)
+[CENTRAL ✓] Sciences and Agriculture Degrees — english from central page: ielts=6.5
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study/postgraduate-csp?studentType=international (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Sciences and Agriculture Degrees → Agriculture & Environmental Science / Agriculture
+[CENTRAL ✓] Reduced Fees for Postgraduate Study — english from central page: ielts=6.5
+[EXTRACT] 20/129: UniSQ Ready
+[EXTRACT] 21/129: UniPrep
+Fetching 21/129: UniPrep
+Fetching 20/129: UniSQ Ready
+[per-course browser ✗] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26&studentType=international: empty response
+[GEMINI] https://www.unisq.edu.au/-/media/unisq/study/degrees-and-cou → 0 field(s) (cost=$0.000000, in=13920 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/-/media/unisq/study/degrees-and-courses/undergraduate-study/unisq-undergrad-study-guide-2027.ashx?rev=48effbecd81b4a5daabc6c84bad19f26&studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] https://www.unisq.edu.au/-/media/unisq/s — english from central page: ielts=6.5
+[EXTRACT] 22/129: University terms explained
+Fetching 22/129: University terms explained
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/new-degrees?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/new-degre → 0 field(s) (cost=$0.000000, in=2672 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/new-degrees?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] New Degrees At Unisq — english from central page: ielts=6.5
+[EXTRACT] 23/129: Browse our undergrad guide
+Fetching 23/129: Browse our undergrad guide
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/undergrad → 0 field(s) (cost=$0.000000, in=4655 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study/uni-terminology?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Understanding University Terminology — english from central page: ielts=6.5
+[EXTRACT] 24/129: Digital badges
+Fetching 24/129: Digital badges
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1683 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/digital-badges?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Digital Badges — english from central page: ielts=6.5
+[EXTRACT] 25/129: Adaptive Educational Leadership 100% online | 1 year
+Fetching 25/129: Adaptive Educational Leadership 100% online | 1 year
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership?studentType=international
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/unisqready?studentT — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/uniprep?studentType — retrying via browser
+[EXTRACT] 26/129: Science iSTEM 100% online | 1 year
+Fetching 26/129: Science iSTEM 100% online | 1 year
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem?studentType=international
+[EXTRACT] 27/129: Supporting Students with Intellectual Disability 100% online | 6 weeks
+Fetching 27/129: Supporting Students with Intellectual Disability 100% online | 6 weeks
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2649 out=0)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability?studentType=international
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/adaptive-educational-leadership?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Adaptive Educational Leadership — english from central page: ielts=6.5
+[EXTRACT] 28/129: Professional Conversations - Coaching 100% online | 4 weeks
+Fetching 28/129: Professional Conversations - Coaching 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2477 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/science-istem?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Science Istem — english from central page: ielts=6.5
+[EXTRACT] 29/129: Professional Conversations - Feedback 100% online | 4 weeks
+Fetching 29/129: Professional Conversations - Feedback 100% online | 4 weeks
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2288 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/supporting-students-with-intellectual-disability?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Supporting Students with Intellectual Di — english from central page: ielts=6.5
+[EXTRACT] 30/129: Professional Conversations - Mentoring 100% online | 4 weeks
+Fetching 30/129: Professional Conversations - Mentoring 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback?studentType=international
+[per-course browser ✗] https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd: empty response
+[GEMINI] https://www.unisq.edu.au/-/media/usq/study/degrees/undergrad → 0 field(s) (cost=$0.000000, in=13908 out=0)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring?studentType=international
+[FALLBACK] AI enriching https://www.unisq.edu.au/-/media/usq/study/degrees/undergraduate/unisq-undergrad-study-guide-2026.ashx?rev=5a59eb0a51564000b279fbc1721158dd (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] https://www.unisq.edu.au/-/media/usq/stu — english from central page: ielts=6.5
+[EXTRACT] 31/129: Campaigning for Change 100% online | 4 weeks
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+Fetching 31/129: Campaigning for Change 100% online | 4 weeks
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1920 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-coaching?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Professional Conversations - Coaching — english from central page: ielts=6.5
+[EXTRACT] 32/129: Connecting with Audience 100% online | 4 weeks
+Fetching 32/129: Connecting with Audience 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1982 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-mentoring?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Professional Conversations - Mentoring — english from central page: ielts=6.5
+[EXTRACT] 33/129: Crafting Professional Publications 100% online | 4 weeks
+Fetching 33/129: Crafting Professional Publications 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2143 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/campaigning-for-change?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Campaigning for Change — english from central page: ielts=6.5
+[EXTRACT] 34/129: Creating Credible Content 100% online | 4 weeks
+Fetching 34/129: Creating Credible Content 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2411 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/crafting-professional-publication?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Crafting Professional Publications — english from central page: ielts=6.5
+[EXTRACT] 35/129: Generating Social Media 100% online | 4 weeks
+Fetching 35/129: Generating Social Media 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2382 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/generating-social-media?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Generating Social Media — english from central page: ielts=6.5
+[EXTRACT] 36/129: PR Tools for Making Sense of Chaos 100% online | 4 weeks
+Fetching 36/129: PR Tools for Making Sense of Chaos 100% online | 4 weeks
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2127 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/pr-tools-for-making-sense-of-chaos?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Pr Tools for Making Sense of Chaos — english from central page: ielts=6.5
+[EXTRACT] 37/129: Starting a Sustainability-Focused Business 100% online | On demand
+Fetching 37/129: Starting a Sustainability-Focused Business 100% online | On demand
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1991 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/sustainability-focused-business?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Starting A Sustainability-focused Busine — english from central page: ielts=6.5
+[CATEGORY det] Starting A Sustainability-focused Busine → Agriculture & Environmental Science / Sustainability
+[EXTRACT] 38/129: UniSQ Brochure
+Fetching 38/129: UniSQ Brochure
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/brochure?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/brochure?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/brochure? → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/brochure?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Unisq Brochure | University of Southern — english from central page: ielts=6.5
+[EXTRACT] 39/129: Diploma of Agriculture and Environmental Science Studies
+Fetching 39/129: Diploma of Agriculture and Environmental Science Studies
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience?studentType=international
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-agricult — retrying via browser
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=2417 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/connecting-with-audience?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Connecting with Audience — english from central page: ielts=6.5
+[EXTRACT] 40/129: Diploma of Business and Management Studies
+Fetching 40/129: Diploma of Business and Management Studies
+[EXTRACT] 41/129: Diploma of Education and Teaching Studies
+Fetching 41/129: Diploma of Education and Teaching Studies
+timeout: per-course browser exceeded 60s on https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback?studentType=international — moving on
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1930 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/professional-conversations-feedback?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Professional Conversations - Feedback — english from central page: ielts=6.5
+[EXTRACT] 42/129: Diploma of Engineering and Technologies
+Fetching 42/129: Diploma of Engineering and Technologies
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-business — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-educatio — retrying via browser
+[EXTRACT] 43/129: Diploma of Law and Justice Studies
+Fetching 43/129: Diploma of Law and Justice Studies
+[EXTRACT] 44/129: Find a degree
+Fetching 44/129: Find a degree
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/find-a-de → 0 field(s) (cost=$0.000000, in=3802 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/find-a-degree?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Unisq Degrees — english from central page: ielts=6.5
+[EXTRACT] 45/129: Associate Degree of Allied Health
+Fetching 45/129: Associate Degree of Allied Health
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-engineer — retrying via browser
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000000, in=1472 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-allied-health?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 46/129: Associate Degree of Criminology and Criminal Justice
+[EXTRACT] 47/129: Associate Degree of Medical Laboratory Science
+Fetching 46/129: Associate Degree of Criminology and Criminal Justice
+Fetching 47/129: Associate Degree of Medical Laboratory Science
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/short-cou → 0 field(s) (cost=$0.000000, in=1401 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/short-courses/creating-credible-content?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Creating Credible Content — english from central page: ielts=6.5
+[EXTRACT] 48/129: Bachelor of Agricultural Technology
+Fetching 48/129: Bachelor of Agricultural Technology
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000000, in=1480 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1484 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/associate → 0 field(s) (cost=$0.000000, in=1487 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-criminology-and-criminal-justice?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-agricultural-technology?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/associate-degree-of-medical-laboratory-science?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 49/129: Bachelor of Arts
+[EXTRACT] 50/129: Bachelor of Arts and Bachelor of Business
+[CATEGORY det] Associate Degree of Criminology and Crim → Law & Legal Studies / Criminal Justice
+Fetching 49/129: Bachelor of Arts
+Fetching 50/129: Bachelor of Arts and Bachelor of Business
+[EXTRACT] 51/129: Bachelor of Arts and Bachelor of Laws
+Fetching 51/129: Bachelor of Arts and Bachelor of Laws
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-law-and- — retrying via browser
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1507 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1516 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1495 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-business?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-laws?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 52/129: Bachelor of Arts and Bachelor of Science
+[EXTRACT] 53/129: Bachelor of Arts (Honours)
+Fetching 52/129: Bachelor of Arts and Bachelor of Science
+Fetching 53/129: Bachelor of Arts (Honours)
+Fetching 54/129: Bachelor of Clinical Exercise Physiology (Honours)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1466 out=0)
+[DOMESTIC ONLY] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-and-bachelor-of-science?studentType=international — course page states domestic-students-only; skipping
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1499 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 55/129: Bachelor of Communication and Creative Industries
+[EXTRACT] 56/129: Bachelor of Creative Arts and Community Wellbeing
+[EXTRACT] 57/129: Bachelor of Creative Arts (Honours)
+Fetching 56/129: Bachelor of Creative Arts and Community Wellbeing
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-clinical-exercise-physiology-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 55/129: Bachelor of Communication and Creative Industries
+Fetching 57/129: Bachelor of Creative Arts (Honours)
+[EXTRACT] 58/129: Bachelor of Digital Design
+Fetching 58/129: Bachelor of Digital Design
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1499 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1537 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-and-community-wellbeing?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-communication-and-creative-industries?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 59/129: Bachelor of Environmental Science
+[EXTRACT] 60/129: Bachelor of Film and Screen Production
+Fetching 59/129: Bachelor of Environmental Science
+Fetching 60/129: Bachelor of Film and Screen Production
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1483 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1479 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1477 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-environmental-science?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-digital-design?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-film-and-screen-production?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 61/129: Bachelor of Laws
+[EXTRACT] 62/129: Bachelor of Laws (Honours)
+[CATEGORY det] Bachelor of Film and Screen Production → Media & Communications / Film & Screen
+Fetching 61/129: Bachelor of Laws
+Fetching 62/129: Bachelor of Laws (Honours)
+[EXTRACT] 63/129: Bachelor of Medical Laboratory Science
+Fetching 63/129: Bachelor of Medical Laboratory Science
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1483 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1495 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1468 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-medical-laboratory-science?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-laws-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 64/129: Bachelor of Music
+[EXTRACT] 65/129: Bachelor of Nursing
+[EXTRACT] 66/129: Bachelor of Occupational Therapy (Honours)
+Fetching 64/129: Bachelor of Music
+Fetching 65/129: Bachelor of Nursing
+Fetching 66/129: Bachelor of Occupational Therapy (Honours)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1488 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-creative-arts-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 67/129: Bachelor of Paramedicine
+Fetching 67/129: Bachelor of Paramedicine
+[DOMESTIC ONLY] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-nursing?studentType=international — course page states domestic-students-only; skipping
+[EXTRACT] 68/129: Bachelor of Physiotherapy (Honours)
+Fetching 68/129: Bachelor of Physiotherapy (Honours)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1491 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1481 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1497 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-music?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-occupational-therapy-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-paramedicine?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 69/129: Bachelor of Psychology (Honours)
+[EXTRACT] 70/129: Bachelor of Science
+[EXTRACT] 71/129: Bachelor of Science (Psychology)
+Fetching 69/129: Bachelor of Psychology (Honours)
+Fetching 70/129: Bachelor of Science
+Fetching 71/129: Bachelor of Science (Psychology)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1478 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1500 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1506 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1566 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-physiotherapy-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science-psychology?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-science?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-psychology-honours?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Physiotherapy (Honours) → Medicine & Health / Physiotherapy
+[CATEGORY det] Bachelor of Science (Psychology) → Medicine & Health / Psychology
+[EXTRACT] 72/129: Bachelor of Social Work
+[CATEGORY det] Bachelor of Psychology (Honours) → Medicine & Health / Psychology
+[EXTRACT] 73/129: Bachelor of Social Work (Honours)
+[EXTRACT] 74/129: Bachelor of Speech Pathology (Honours)
+Fetching 72/129: Bachelor of Social Work
+[EXTRACT] 75/129: Bachelor of Sport and Exercise Science
+Fetching 73/129: Bachelor of Social Work (Honours)
+Fetching 74/129: Bachelor of Speech Pathology (Honours)
+Fetching 75/129: Bachelor of Sport and Exercise Science
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours?studentType=international
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1496 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-sport-and-exercise-science?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 76/129: Bachelor of Theatre
+Fetching 76/129: Bachelor of Theatre
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1466 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-theatre?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 77/129: Bachelor of Visual Art
+Fetching 77/129: Bachelor of Visual Art
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1474 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-visual-art?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 78/129: Diploma of Arts
+Fetching 78/129: Diploma of Arts
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1476 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-speech-pathology-honours?studentType=international (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Bachelor of Speech Pathology (Honours) — english from central page: ielts=6.5
+[EXTRACT] 79/129: Diploma of Professional Communication
+Fetching 79/129: Diploma of Professional Communication
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000000, in=1477 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-communication?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 80/129: Diploma of Professional Photography
+Fetching 80/129: Diploma of Professional Photography
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000000, in=1473 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-professional-photography?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 81/129: Graduate Certificate of Counselling
+Fetching 81/129: Graduate Certificate of Counselling
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/diploma-o → 0 field(s) (cost=$0.000000, in=1469 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-arts?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 82/129: Graduate Certificate of Nursing
+Fetching 82/129: Graduate Certificate of Nursing
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1469 out=0)
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social- — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-social- — retrying via browser
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1467 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-counselling?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-nursing?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Graduate Certificate of Nursing → Medicine & Health / Nursing
+[EXTRACT] 83/129: Graduate Certificate of Public Health
+Fetching 83/129: Graduate Certificate of Public Health
+[EXTRACT] 84/129: Graduate Diploma of Counselling
+Fetching 84/129: Graduate Diploma of Counselling
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1472 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1475 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-counselling?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-public-health?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 85/129: Graduate Diploma of Midwifery
+[CATEGORY det] Graduate Certificate of Public Health → Medicine & Health / Public Health
+Fetching 85/129: Graduate Diploma of Midwifery
+[EXTRACT] 86/129: Graduate Diploma of Nursing
+[EXTRACT] 87/129: Graduate Diploma of Public Health
+[EXTRACT] 88/129: Juris Doctor
+Fetching 86/129: Graduate Diploma of Nursing
+Fetching 87/129: Graduate Diploma of Public Health
+Fetching 88/129: Juris Doctor
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1466 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/juris-doc → 0 field(s) (cost=$0.000000, in=1462 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1472 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-nursing?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/juris-doctor?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-public-health?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Juris Doctor → Law & Legal Studies / Juris Doctor
+[CATEGORY det] Graduate Diploma of Public Health → Medicine & Health / Public Health
+[CATEGORY det] Graduate Diploma of Nursing → Medicine & Health / Nursing
+[EXTRACT] 89/129: Master of Clinical Psychology
+[EXTRACT] 90/129: Master of Clinical Psychology - Advanced Entry
+[EXTRACT] 91/129: Master of Counselling
+Fetching 89/129: Master of Clinical Psychology
+Fetching 90/129: Master of Clinical Psychology - Advanced Entry
+Fetching 91/129: Master of Counselling
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1511 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1468 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical-psychology?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-counselling?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 92/129: Master of Laws
+[CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+Fetching 92/129: Master of Laws
+[EXTRACT] 93/129: Master of Nursing
+Fetching 93/129: Master of Nursing
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1463 out=0)
+[DOMESTIC ONLY] https://www.unisq.edu.au/study/degrees-and-courses/master-of-nursing?studentType=international — course page states domestic-students-only; skipping
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-laws?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 94/129: Master of Public Health
+[EXTRACT] 95/129: Undergraduate Certificate of Psychology Fundamentals
+Fetching 94/129: Master of Public Health
+Fetching 95/129: Undergraduate Certificate of Psychology Fundamentals
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1473 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-public-health?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Master of Public Health → Medicine & Health / Public Health
+[EXTRACT] 96/129: English Language Preparatory Courses for Domestic Students
+Fetching 96/129: English Language Preparatory Courses for Domestic Students
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of — retrying via browser
+[EXTRACT] 97/129: English for Academic Purposes
+Fetching 97/129: English for Academic Purposes
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/master-of-clinical- — retrying via browser
+[EXTRACT] 98/129: View UniSQ's Accounting and Finance degrees.
+Fetching 98/129: View UniSQ's Accounting and Finance degrees.
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/business/accounting-and-finance?studentType=international
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-certi — retrying via browser
+[EXTRACT] 99/129: Bachelor of Accounting
+Fetching 99/129: Bachelor of Accounting
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/english-language-pr — retrying via browser
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/business/accounting-and-finance?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/business/ → 0 field(s) (cost=$0.000000, in=9041 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/business/accounting-and-finance?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Accounting and Finance Degrees — english from central page: ielts=6.5
+[CATEGORY det] Accounting and Finance Degrees → Business & Management / Accounting
+[EXTRACT] 100/129: View UniSQ's Creative Arts degrees.
+Fetching 100/129: View UniSQ's Creative Arts degrees.
+[EXTRACT] 101/129: Bachelor of Communication and Creative Industries (Professional Communication and Advertising).
+Fetching 101/129: Bachelor of Communication and Creative Industries (Professional Communication and Advertising).
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/professional-communication-advertising-bachelor-communication-creative-industries?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/creative-arts?studentType=international
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/english-for-academi — retrying via browser
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/professional-communication-advertising-bachelor-communication-creative-industries?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/pro → 0 field(s) (cost=$0.000000, in=1413 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/professional-communication-advertising-bachelor-communication-creative-industries?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Professional Communication and Advertisi — english from central page: ielts=6.5
+[EXTRACT] 102/129: UniSQ's Marketing degrees
+Fetching 102/129: UniSQ's Marketing degrees
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/business/marketing?studentType=international
+[EXTRACT] 103/129: View UniSQ's Nursing and Midwifery degrees.
+Fetching 103/129: View UniSQ's Nursing and Midwifery degrees.
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/health/nursing-and-midwifery?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/creative-arts?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/arts-and- → 0 field(s) (cost=$0.000000, in=9043 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/creative-arts?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Creative Arts Degrees — english from central page: ielts=6.5
+[EXTRACT] 104/129: Graduate Certificate of Nursing (Gerontology)
+Fetching 104/129: Graduate Certificate of Nursing (Gerontology)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology-graduate-certificate-nursing?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/health/nursing-and-midwifery?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/health/nu → 0 field(s) (cost=$0.000000, in=9041 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/health/nursing-and-midwifery?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Nursing and Midwifery Degrees — english from central page: ielts=6.5
+[CATEGORY det] Nursing and Midwifery Degrees → Medicine & Health / Nursing
+[EXTRACT] 105/129: Graduate Diploma of Nursing (Gerontology)
+Fetching 105/129: Graduate Diploma of Nursing (Gerontology)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology-graduate-certificate-nursing?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/specialis → 0 field(s) (cost=$0.000000, in=1405 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology-graduate-certificate-nursing?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Graduate Certificate in Gerontology | Un — english from central page: ielts=6.5
+[EXTRACT] 106/129: View UniSQ's Agriculture and Environment degrees.
+Fetching 106/129: View UniSQ's Agriculture and Environment degrees.
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/agriculture-and-environment?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/specialis → 0 field(s) (cost=$0.000000, in=1398 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/specialisation/gerontology?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Gerontology — english from central page: ielts=6.5
+[EXTRACT] 107/129: View UniSQ's Engineering degrees.
+Fetching 107/129: View UniSQ's Engineering degrees.
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/agriculture-and-environment?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/sciences- → 0 field(s) (cost=$0.000000, in=9047 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/agriculture-and-environment?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Agriculture and Environment Degrees — english from central page: ielts=6.5
+[CATEGORY det] Agriculture and Environment Degrees → Agriculture & Environmental Science / Agriculture
+[EXTRACT] 108/129: Bachelor of Digital Design (Animation)
+Fetching 108/129: Bachelor of Digital Design (Animation)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/animation-bachelor-digital-design?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/engineeri → 0 field(s) (cost=$0.000000, in=9043 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying/engineering?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Engineering Degrees — english from central page: ielts=6.5
+[EXTRACT] 109/129: View UniSQ's Humanities degrees.
+Fetching 109/129: View UniSQ's Humanities degrees.
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/animation-bachelor-digital-design?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/ani → 0 field(s) (cost=$0.000000, in=1401 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/animation-bachelor-digital-design?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/humanities?studentType=international
+[CENTRAL ✓] Animation — english from central page: ielts=6.5
+[EXTRACT] 110/129: View UniSQ's Astronomy degrees.
+Fetching 110/129: View UniSQ's Astronomy degrees.
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/humanities?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/arts-and- → 0 field(s) (cost=$0.000000, in=9042 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/humanities?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Humanities Degrees — english from central page: ielts=6.5
+[EXTRACT] 111/129: Bachelor of Aviation (Aviation Management)
+Fetching 111/129: Bachelor of Aviation (Aviation Management)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/aviation-management-bachelor-aviation?studentType=international
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/bachelor- → 0 field(s) (cost=$0.000000, in=1522 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-accounting?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[EXTRACT] 112/129: Graduate Certificate of Aviation
+Fetching 112/129: Graduate Certificate of Aviation
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/aviation-management-bachelor-aviation?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/avi → 0 field(s) (cost=$0.000000, in=1424 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/aviation-management-bachelor-aviation?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Aviation Management — english from central page: ielts=6.5
+[EXTRACT] 113/129: Graduate Diploma of Aviation
+Fetching 113/129: Graduate Diploma of Aviation
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1467 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1470 out=0)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/astronomy?studentType=international
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-aviation?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-aviation?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 114/129: Master of Business Administration Aviation
+[EXTRACT] 115/129: Diploma of Science
+Fetching 114/129: Master of Business Administration Aviation
+Fetching 115/129: Diploma of Science
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1475 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-business-administration-aviation?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Master of Business Administration Aviati → Business & Management / MBA
+[EXTRACT] 116/129: Bachelor of Science (Biology).
+Fetching 116/129: Bachelor of Science (Biology).
+[per-course browser ✗] https://www.unisq.edu.au/study/degrees-and-courses/business/marketing?studentType=international: empty response
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/business/ → 0 field(s) (cost=$0.000000, in=9038 out=0)
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/biology?studentType=international
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/business/marketing?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Marketing Degrees — english from central page: ielts=6.5
+[CATEGORY det] Marketing Degrees → Business & Management / Marketing
+[EXTRACT] 117/129: Biomedical Science
+Fetching 117/129: Biomedical Science
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/astronomy?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/sciences- → 0 field(s) (cost=$0.000000, in=9042 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/sciences-and-agriculture/astronomy?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Astronomy Degrees — english from central page: ielts=6.5
+[EXTRACT] 118/129: Communication
+Fetching 118/129: Communication
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/health/medical-sciences?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/communication?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/biology?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/bio → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/biology?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Biology — english from central page: ielts=6.5
+[EXTRACT] 119/129: Data Science
+Fetching 119/129: Data Science
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/information-technology/data-science?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/health/medical-sciences?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/health/me → 0 field(s) (cost=$0.000000, in=9039 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/health/medical-sciences?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Medical Sciences Degrees — english from central page: ielts=6.5
+[EXTRACT] 120/129: View UniSQ's Counselling and Career Guidance in Education degrees.
+Fetching 120/129: View UniSQ's Counselling and Career Guidance in Education degrees.
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching/counselling-and-career-guidance-in-education?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/communication?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/arts-and- → 0 field(s) (cost=$0.000000, in=9043 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/communication?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Communication Degrees — english from central page: ielts=6.5
+[EXTRACT] 121/129: Graduate Certificate of Education
+Fetching 121/129: Graduate Certificate of Education
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1475 out=0)
+[BROWSER↑] HTTP blocked for https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-science? — retrying via browser
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-certificate-of-education-studies?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 122/129: Graduate Diploma of Education
+Fetching 122/129: Graduate Diploma of Education
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/information-technology/data-science?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/informati → 0 field(s) (cost=$0.000000, in=9042 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/information-technology/data-science?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Data Science Degrees — english from central page: ielts=6.5
+[CATEGORY det] Data Science Degrees → Computer Science & IT / Data Science
+[EXTRACT] 123/129: Master of Education
+Fetching 123/129: Master of Education
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/graduate- → 0 field(s) (cost=$0.000000, in=1470 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/master-of → 0 field(s) (cost=$0.000000, in=1464 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/graduate-diploma-of-education?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/master-of-education?studentType=international (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 124/129: Management and Leadership
+[EXTRACT] 125/129: View UniSQ's Social Work degrees
+[EXTRACT] 126/129: Cyber Security
+Fetching 125/129: View UniSQ's Social Work degrees
+Fetching 124/129: Management and Leadership
+Fetching 126/129: Cyber Security
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching/counselling-and-career-guidance-in-education?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/education → 0 field(s) (cost=$0.000000, in=9050 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/education-and-teaching/counselling-and-career-guidance-in-education?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Counselling and Career Guidance in Educa — english from central page: ielts=6.5
+[EXTRACT] 127/129: Design and Interactive Technologies
+Fetching 127/129: Design and Interactive Technologies
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/health/social-work?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/business/management-and-leadership?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/information-technology/cyber-security?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/interaction-design-bachelor-digital-design?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/information-technology/cyber-security?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/informati → 0 field(s) (cost=$0.000000, in=9043 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/information-technology/cyber-security?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Cyber Security Degrees — english from central page: ielts=6.5
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/business/management-and-leadership?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/health/social-work?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[CATEGORY det] Cyber Security Degrees → Computer Science & IT / Cyber Security
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/business/ → 0 field(s) (cost=$0.000000, in=9042 out=0)
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/health/so → 0 field(s) (cost=$0.000000, in=9038 out=0)
+[EXTRACT] 128/129: Software Application Development
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/business/management-and-leadership?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/health/social-work?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 128/129: Software Application Development
+[CENTRAL ✓] Management and Leadership Degrees — english from central page: ielts=6.5
+[CENTRAL ✓] Social Work Degrees — english from central page: ielts=6.5
+[EXTRACT] 129/129: double degree
+[CATEGORY det] Social Work Degrees → Education & Social Work / Social Work
+Fetching 129/129: double degree
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/major/software-application-development?studentType=international
+[per-course browser ↻] https://www.unisq.edu.au/study/degrees-and-courses/double-degrees?studentType=international
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/interaction-design-bachelor-digital-design?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/int → 0 field(s) (cost=$0.000000, in=1404 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/interaction-design-bachelor-digital-design?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Interaction Design — english from central page: ielts=6.5
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/double-degrees?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/double-de → 0 field(s) (cost=$0.000000, in=3265 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/double-degrees?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Double Degrees — english from central page: ielts=6.5
+[per-course browser ✓] https://www.unisq.edu.au/study/degrees-and-courses/major/software-application-development?studentType=international — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.unisq.edu.au/study/degrees-and-courses/major/sof → 0 field(s) (cost=$0.000000, in=1429 out=0)
+[FALLBACK] AI enriching https://www.unisq.edu.au/study/degrees-and-courses/major/software-application-development?studentType=international (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CENTRAL ✓] Software Application Development — english from central page: ielts=6.5
+[CATEGORY det] Software Application Development → Computer Science & IT / Software Engineering
+[EXTRACT] [sibling cache ↻ build unknown] ielts_overall=6.5
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5
+[EXTRACT] [sibling cache ↻ backfill unknown] 18 slot(s) filled across siblings
+[STAGE] skipped Pathways to University: rejected: category_landing_page
+[STAGE] skipped Undergraduate Study: rejected: category_landing_page
+[STAGE] skipped Online Study: rejected: category_landing_page
+[STAGE] skipped Postgraduate Study: rejected: category_landing_page
+[STAGE] skipped Research Degrees: rejected: category_landing_page
+[STAGE] skipped Compare Degrees: rejected: category_landing_page
+[STAGE] skipped Arts and Communication Degrees: rejected: category_landing_page
+[STAGE] skipped Aviation Degrees: rejected: category_landing_page
+[STAGE] skipped Business Degrees: rejected: category_landing_page
+[STAGE] skipped Education and Teaching Degrees: rejected: category_landing_page
+[STAGE] skipped Engineering and Surveying Degrees: rejected: category_landing_page
+[STAGE] skipped Health Degrees: rejected: category_landing_page
+[STAGE] skipped Information Technology Degrees: rejected: category_landing_page
+[STAGE] skipped Sciences and Agriculture Degrees: rejected: category_landing_page
+[STAGE] skipped Law Degrees: rejected: category_landing_page
+[STAGE] skipped Download now: rejected: category_landing_page
+[STAGE] skipped Download now: rejected: category_landing_page
+[STAGE] skipped Reduced Fees for Postgraduate Study: rejected: category_landing_page
+[STAGE] skipped New Degrees At Unisq: rejected: category_landing_page
+[STAGE] skipped UniSQ Ready: fetch_failed
+[STAGE] skipped UniPrep: fetch_failed
+[STAGE] skipped Understanding University Terminology: rejected: category_landing_page
+[STAGE] skipped Browse our undergrad guide: rejected: category_landing_page
+[STAGE] skipped Digital Badges: rejected: generic category page
+[STAGE] skipped Adaptive Educational Leadership: rejected: category_landing_page
+[STAGE] skipped Science Istem: rejected: category_landing_page
+[STAGE] skipped Supporting Students with Intellectual Disability to Be Successful Learners: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Coaching: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Feedback: rejected: category_landing_page
+[STAGE] skipped Professional Conversations - Mentoring: rejected: category_landing_page
+[STAGE] skipped Campaigning for Change: rejected: category_landing_page
+[STAGE] skipped Connecting with Audience: rejected: category_landing_page
+[STAGE] skipped Crafting Professional Publications: rejected: category_landing_page
+[STAGE] skipped Creating Credible Content: rejected: category_landing_page
+[STAGE] skipped Generating Social Media: rejected: category_landing_page
+[STAGE] skipped Pr Tools for Making Sense of Chaos: rejected: category_landing_page
+[STAGE] skipped Starting A Sustainability-focused Business: rejected: category_landing_page
+[STAGE] skipped Unisq Brochure | University of Southern Queensland: rejected: category_landing_page
+[STAGE] skipped Diploma of Agriculture and Environmental Science Studies: fetch_failed
+[STAGE] skipped Diploma of Business and Management Studies: fetch_failed
+[STAGE] skipped Diploma of Education and Teaching Studies: fetch_failed
+[STAGE] skipped Diploma of Engineering and Technologies: fetch_failed
+[STAGE] skipped Diploma of Law and Justice Studies: fetch_failed
+[STAGE] skipped Unisq Degrees: rejected: category_landing_page
+[STAGE] saved: Associate Degree of Allied Health
+[STAGE] skipped Associate Degree of Criminology and Criminal Justice: rejected: online_only
+[STAGE] skipped Associate Degree of Medical Laboratory Science: rejected: online_only
+[STAGE] skipped Bachelor of Agricultural Technology: rejected: online_only
+[STAGE] saved: Bachelor of Arts
+[STAGE] saved: Bachelor of Arts and Bachelor of Business
+[STAGE] saved: Bachelor of Arts and Bachelor of Laws
+[STAGE] skipped Bachelor of Arts and Bachelor of Science: rejected: domestic_only
+[STAGE] saved: Bachelor of Arts (Honours)
+[STAGE] saved: Bachelor of Clinical Exercise Physiology (Honours)
+[STAGE] saved: Bachelor of Communication and Creative Industries
+[STAGE] skipped Bachelor of Creative Arts and Community Wellbeing: rejected: online_only
+[STAGE] saved: Bachelor of Creative Arts (Honours)
+[STAGE] saved: Bachelor of Digital Design
+[STAGE] saved: Bachelor of Environmental Science
+[STAGE] saved: Bachelor of Film and Screen Production
+[STAGE] saved: Bachelor of Laws
+[STAGE] skipped Bachelor of Laws (Honours): rejected: online_only
+[STAGE] saved: Bachelor of Medical Laboratory Science
+[STAGE] skipped Bachelor of Music: rejected: online_only
+[STAGE] skipped Bachelor of Nursing: rejected: domestic_only
+[STAGE] saved: Bachelor of Occupational Therapy (Honours)
+[STAGE] skipped Bachelor of Paramedicine: rejected: online_only
+[STAGE] saved: Bachelor of Physiotherapy (Honours)
+[STAGE] skipped Bachelor of Psychology (Honours): rejected: online_only
+[STAGE] skipped Bachelor of Science: rejected: online_only
+[STAGE] saved: Bachelor of Science (Psychology)
+[STAGE] skipped Bachelor of Social Work: fetch_failed
+[STAGE] skipped Bachelor of Social Work (Honours): fetch_failed
+[STAGE] saved: Bachelor of Speech Pathology (Honours)
+[STAGE] saved: Bachelor of Sport and Exercise Science
+[STAGE] saved: Bachelor of Theatre
+[STAGE] saved: Bachelor of Visual Art
+[STAGE] saved: Diploma of Arts
+[STAGE] skipped Diploma of Professional Communication: rejected: online_only
+[STAGE] skipped Diploma of Professional Photography: rejected: online_only
+[STAGE] skipped Graduate Certificate of Counselling: rejected: online_only
+[STAGE] skipped Graduate Certificate of Nursing: rejected: online_only
+[STAGE] saved: Graduate Certificate of Public Health
+[STAGE] skipped Graduate Diploma of Counselling: rejected: online_only
+[STAGE] skipped Graduate Diploma of Midwifery: fetch_failed
+[STAGE] skipped Graduate Diploma of Nursing: rejected: online_only
+[STAGE] skipped Graduate Diploma of Public Health: rejected: online_only
+[STAGE] skipped Juris Doctor: rejected: category_landing_page
+[STAGE] saved: Master of Clinical Psychology
+[STAGE] skipped Master of Clinical Psychology - Advanced Entry: fetch_failed
+[STAGE] saved: Master of Counselling
+[STAGE] skipped Master of Laws: rejected: online_only
+[STAGE] skipped Master of Nursing: rejected: domestic_only
+[STAGE] saved: Master of Public Health
+[STAGE] skipped Undergraduate Certificate of Psychology Fundamentals: fetch_failed
+[STAGE] skipped English Language Preparatory Courses for Domestic Students: fetch_failed
+[STAGE] skipped English for Academic Purposes: fetch_failed
+[STAGE] skipped Accounting and Finance Degrees: rejected: category_landing_page
+[STAGE] saved: Bachelor of Accounting
+[STAGE] skipped Creative Arts Degrees: rejected: category_landing_page
+[STAGE] skipped Professional Communication and Advertising: rejected: category_landing_page
+[STAGE] skipped Marketing Degrees: rejected: category_landing_page
+[STAGE] skipped Nursing and Midwifery Degrees: rejected: category_landing_page
+[STAGE] saved: Graduate Certificate in Gerontology | University of Southern Queensland
+[STAGE] skipped Gerontology: rejected: category_landing_page
+[STAGE] skipped Agriculture and Environment Degrees: rejected: category_landing_page
+[STAGE] skipped Engineering Degrees: rejected: category_landing_page
+[STAGE] skipped Animation: rejected: category_landing_page
+[STAGE] skipped Humanities Degrees: rejected: category_landing_page
+[STAGE] skipped Astronomy Degrees: rejected: category_landing_page
+[STAGE] skipped Aviation Management: rejected: category_landing_page
+[STAGE] skipped Graduate Certificate of Aviation: rejected: online_only
+[STAGE] skipped Graduate Diploma of Aviation: rejected: online_only
+[STAGE] skipped Master of Business Administration Aviation: rejected: online_only
+[STAGE] skipped Diploma of Science: fetch_failed
+[STAGE] skipped Biology: rejected: category_landing_page
+[STAGE] skipped Medical Sciences Degrees: rejected: category_landing_page
+[STAGE] skipped Communication Degrees: rejected: category_landing_page
+[STAGE] skipped Data Science Degrees: rejected: category_landing_page
+[STAGE] skipped Counselling and Career Guidance in Education Degrees: rejected: category_landing_page
+[STAGE] skipped Graduate Certificate of Education Studies: rejected: online_only
+[STAGE] skipped Graduate Diploma of Education: rejected: online_only
+[STAGE] skipped Master of Education: rejected: online_only
+[STAGE] skipped Management and Leadership Degrees: rejected: category_landing_page
+[STAGE] skipped Social Work Degrees: rejected: category_landing_page
+[STAGE] skipped Cyber Security Degrees: rejected: category_landing_page
+[STAGE] skipped Interaction Design: rejected: category_landing_page
+[STAGE] skipped Software Application Development: rejected: category_landing_page
+[STAGE] skipped Double Degrees: rejected: category_landing_page
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 7m 7s | Courses: 27 | Avg: 15.8s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:129 | Staged:27 | Skipped:87 | Errors:0
+Staged 27 courses, 87 skipped, 15 fetch errors
