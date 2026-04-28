@@ -61,14 +61,15 @@ export default function UniversitiesBulkImport() {
     setErrorMsg(null);
     try {
       const fd = new FormData();
-      fd.append("csv", file);
+      fd.append("file", file);
       const res = await fetch(`${BASE}/api/universities/bulk-import`, {
         method: "POST",
+        credentials: "include",
         body: fd,
       });
       const body = await res.json();
       if (!res.ok) {
-        setErrorMsg(body?.error ?? `Upload failed (${res.status})`);
+        setErrorMsg(body?.detail ?? body?.error ?? `Upload failed (${res.status})`);
         return;
       }
       setResult(body as ImportResult);

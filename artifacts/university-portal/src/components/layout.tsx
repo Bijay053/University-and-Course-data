@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import brandLogo from "@assets/image_1776917782083.png";
+import { useAuth } from "@/context/auth";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -49,6 +50,11 @@ function NavLinks({ onNav }: { onNav?: () => void }) {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
+
+  const initials = user?.name
+    ? user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    : "AD";
 
   return (
     <div className="min-h-[100dvh] flex w-full bg-muted/40">
@@ -61,6 +67,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 py-4 overflow-y-auto">
           <NavLinks />
         </div>
+        {user && (
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+            <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
+              <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile Drawer Overlay */}
@@ -93,6 +117,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 py-4 overflow-y-auto">
           <NavLinks onNav={() => setMobileOpen(false)} />
         </div>
+        {user && (
+          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2">
+            <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main content */}
@@ -111,9 +152,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="font-semibold text-sm text-muted-foreground">Study Info Centre</div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-sm text-muted-foreground hidden sm:inline">{user.name}</span>
+            )}
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
-              AD
+              {initials}
             </div>
           </div>
         </header>
