@@ -474,3 +474,89 @@ def test_asa_full_bachelor_fixture_classifies_as_on_campus():
         f"Got study_mode={out!r} (snippet={snippet!r})."
     )
     assert conf == 0.7
+
+
+# ── UOW span#delivery regression tests ───────────────────────────────────────
+# UOW embeds the delivery mode as <span id="delivery">On Campus</span> in
+# static HTML. Previous extractor only handled <strong>/<dt>/<th> tags, so
+# UOW courses with browser timeouts always got blank mode.
+
+
+def test_uow_span_id_delivery_on_campus():
+    """<span id="delivery">On Campus</span> → 'On Campus' at confidence 0.9."""
+    html = '<span>Delivery</span><span id="delivery">On Campus</span>'
+    out, snippet, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", f"Expected On Campus, got {out!r}"
+    assert conf == 0.9, f"Expected confidence 0.9 (id-span path), got {conf}"
+    assert snippet is not None and "delivery" in snippet.lower()
+
+
+def test_uow_span_id_delivery_flexible_maps_to_blended():
+    """UOW 'Flexible' delivery → 'Blended' per AU university convention."""
+    html = '<span id="delivery">Flexible</span>'
+    out, snippet, conf = study_mode.classify_study_mode(html)
+    assert out == "Blended", (
+        f"Flexible should map to Blended (AU: students switch campus/online). "
+        f"Got {out!r}"
+    )
+    assert conf == 0.9
+
+
+def test_uow_span_id_delivery_online():
+    """<span id="delivery">Online</span> → 'Online'."""
+    html = '<span id="delivery">Online</span>'
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Online"
+
+
+def test_uow_span_id_delivery_distance_maps_to_online():
+    """'Distance' in span#delivery → 'Online' (distance = fully remote)."""
+    html = '<span id="delivery">Distance</span>'
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Online"
+
+
+def test_uow_span_id_takes_priority_over_marketing_copy():
+    """span#delivery=On Campus must win even when marketing text says 'online'.
+
+    UOW pages often contain 'study online' in footers; span#delivery is the
+    authoritative source.
+    """
+    html = (
+        '<p>You can study online at your own pace.</p>'
+        '<span id="delivery">On Campus</span>'
+        '<footer>Online resources available.</footer>'
+    )
+    out, _, conf = study_mode.classify_study_mode(html)
+    assert out == "On Campus", (
+        f"span#delivery=On Campus must override marketing 'online' text. Got {out!r}"
+    )
+    assert conf == 0.9
+
+
+def test_flexible_value_in_label_regex_maps_to_blended():
+    """'Delivery mode: Flexible' in plain text → Blended."""
+    html = "<p>Delivery mode: Flexible</p>"
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Blended", f"Expected Blended for 'Delivery mode: Flexible', got {out!r}"
+
+
+def test_distance_value_in_label_regex_maps_to_online():
+    """'Delivery mode: Distance' in plain text → Online."""
+    html = "<p>Delivery mode: Distance</p>"
+    out, _, _ = study_mode.classify_study_mode(html)
+    assert out == "Online", f"Expected Online for 'Delivery mode: Distance', got {out!r}"
+
+
+def test_uow_wollongong_location_with_blank_mode_derives_on_campus():
+    """Regression: UOW courses at Wollongong with blank mode → On Campus.
+
+    When the browser times out, mode can be blank while location is filled.
+    The post-AI location-derived path must fill in 'On Campus'.
+    The derive_mode_from_location helper is tested here directly.
+    """
+    from app.services.scraper.extractors.study_mode import derive_mode_from_location
+    assert derive_mode_from_location("Wollongong") == "On Campus"
+    assert derive_mode_from_location("Sydney, Wollongong") == "On Campus"
+    assert derive_mode_from_location("") is None
+    assert derive_mode_from_location(None) is None
