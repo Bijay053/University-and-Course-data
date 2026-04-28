@@ -110,7 +110,7 @@ _NOISE_BLOCK_RE = re.compile(
 # capture greedily grabs the next paragraph and triggers Blended via
 # "online and on campus" appearing in unrelated marketing copy.
 _MODE_TOKEN = (
-    r"on[\s\-]?campus|online|blended|hybrid|mixed[\s\-]?mode|"
+    r"on[\s\-]?campus|online|blended|hybrid|mixed[\s\-]?mode|flexible|"
     r"distance(?:\s+(?:learning|education))?|in[\s\-]?person|"
     r"face[\s\-]?to[\s\-]?face|onshore|remote"
 )
@@ -135,9 +135,13 @@ _LABEL_RE = re.compile(
 # "On Campus and Online" goes to Blended (the multi-mode case) rather
 # than the first-keyword winner.
 _VALUE_TO_LABEL: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"blended|hybrid|mixed", re.I), "Blended"),
+    # Blended first — catches multi-mode combos and all Blended keywords.
+    # "Flexible" is an AU-specific term that means students can switch
+    # between on-campus and online — semantically identical to Blended.
+    (re.compile(r"blended|hybrid|mixed|flexible", re.I), "Blended"),
     (re.compile(r"on[\s\-]?campus\s*(?:and|or|&|/|,)\s*online|online\s*(?:and|or|&|/|,)\s*on[\s\-]?campus", re.I), "Blended"),
     (re.compile(r"on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face|onshore", re.I), "On Campus"),
+    # Distance → Online per user spec: "distance learning" is fully remote.
     (re.compile(r"online|distance|remote", re.I), "Online"),
 )
 
@@ -145,6 +149,42 @@ _VALUE_TO_LABEL: tuple[tuple[re.Pattern[str], str], ...] = (
 def _strip_tags(html: str) -> str:
     cleaned = _NOISE_BLOCK_RE.sub(" ", html or "")
     return _WS_RE.sub(" ", _TAG_RE.sub(" ", cleaned))
+
+
+# UOW (and Webflow-based sites) publish delivery mode as
+# ``<span id="delivery">On Campus</span>`` in their static HTML.
+# This is the most reliable signal on those pages because it is a
+# machine-readable data attribute — not prose that might contain the
+# word "online" in unrelated marketing copy.
+#
+# Pattern also covers id="study-mode" and id="mode" for other
+# universities that follow the same id-keyed idiom.
+_SPAN_ID_DELIVERY_RE = re.compile(
+    r'<span[^>]+\bid=["\'](?:delivery|study[-_]?mode|mode)["\'][^>]*>([^<]{1,120})</span>',
+    re.IGNORECASE,
+)
+
+
+def _extract_span_id_delivery(html: str) -> tuple[str | None, str | None]:
+    """Return ``(canonical_mode, snippet)`` when the page contains a
+    ``<span id="delivery">VALUE</span>`` (or id="study-mode" / id="mode").
+
+    This targets UOW's static HTML structure, which puts the delivery
+    mode into a named ``<span>`` element rather than a ``<dt>`` or
+    ``<strong>`` label.  The regex is applied directly to the raw HTML
+    so it works even on pages where the surrounding context would
+    confuse a tag-stripped pass.
+    """
+    if not html:
+        return None, None
+    m = _SPAN_ID_DELIVERY_RE.search(html)
+    if not m:
+        return None, None
+    value = m.group(1).strip().lstrip(":-– ")
+    canonical = _classify_label_value(value)
+    if canonical:
+        return canonical, f'<span id="delivery">{value}</span>'
+    return None, None
 
 
 # PR-6 Bug 2: ASA / VIT publish delivery as `<strong>Delivery</strong>`
@@ -303,32 +343,35 @@ def classify_study_mode(
 
     Order of operations:
 
-    1. **Label detection first.** Scan for ``Mode of study:`` / ``Study
-       mode:`` / ``Delivery mode:`` etc. and use the value next to the
-       label as authoritative. This beats the broad keyword scan because
-       course pages often mention "online" in unrelated copy (footer
-       links, marketing) — without label-priority that bled into 7 of 9
-       prod ASA rows showing as "Online".
-    2. If the page text contains both an on-campus signal AND a "% online"
-       phrase (e.g. "Onshore — required to attend on campus, allowed up to
-       33% online") classify as Blended even when the literal word
-       "blended" is absent. Mirrors Node's
-       `review-engine.ts` heuristic — without it, courses with mixed
-       delivery rules show as plain "On Campus" and the operator can't
-       tell them apart from purely in-person courses.
-    3. Fall through to the labelled pattern set (Blended → Online →
-       On Campus → bare "Online").
+    0. **id="delivery" span** — UOW and similar sites embed the mode as a
+       machine-readable ``<span id="delivery">On Campus</span>`` in static
+       HTML.  This is the highest-confidence signal because it is a data
+       attribute, not prose.  Checked first so it wins over all text-based
+       patterns.
+    1. **Strong-label DOM pre-pass** — ``<strong>Delivery</strong>`` /
+       ``<dt>Mode of study</dt>`` / ``<th>Delivery</th>`` structural idioms
+       read the value directly from the DOM, immune to tag-stripping
+       boundary collisions (ASA's "Online Delivery" false-positive).
+    2. **Label-regex pass** — ``Mode of study: On Campus`` in tag-stripped
+       plain text.
+    3. **Percent-online + on-campus** — classify as Blended when the page
+       reports both a campus and a percentage-online figure.
+    4. **Keyword fallback** — Blended → Online → On Campus → bare "online".
 
     The third return is the confidence the extractor should attach to
-    the result. Authoritative paths (label, percent-online + on-campus,
-    explicit multi-keyword pattern) return 0.7. The bare-``\\bonline\\b``
-    fallback (last entry of :data:`_MODE_PATTERNS`) returns 0.5 because
-    it routinely fires on footer / marketing copy that mentions
-    "online" in passing — keeping it low lets a more confident location
-    or PDF signal override downstream. Returns
-    ``(None, None, None)`` when no pattern matches.
+    the result. Authoritative paths (id-span, label, percent-online +
+    on-campus, explicit multi-keyword pattern) return 0.7–0.9. The
+    bare-``\\bonline\\b`` fallback returns 0.5 because it routinely fires
+    on footer / marketing copy.  Returns ``(None, None, None)`` when no
+    pattern matches.
     """
-    # PR-6 Bug 2 — structural pre-pass FIRST. The DOM-aware
+    # ── Step 0: id="delivery" span (UOW / Webflow) ───────────────────────
+    # Highest confidence: the value is in a named data attribute, not prose.
+    span_label, span_snippet = _extract_span_id_delivery(page_text)
+    if span_label:
+        return span_label, span_snippet, 0.9
+
+    # PR-6 Bug 2 — structural pre-pass SECOND. The DOM-aware
     # `<strong>Delivery</strong>` / sibling-div detector reads value
     # text out of the DOM directly, so it can't be fooled by
     # tag-stripping boundary collisions like ASA's
