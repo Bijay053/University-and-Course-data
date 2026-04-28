@@ -76,6 +76,7 @@ class ScrapedCourse(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_method: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    scrape_warnings: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
