@@ -457,3 +457,146 @@ class TestProviderNameStrip:
         """'- Chemistry' is not an institution name — must NOT be stripped."""
         result = _course_name_clean("Bachelor of Science - Chemistry")
         assert result == "Bachelor of Science - Chemistry"
+
+
+# ---------------------------------------------------------------------------
+# ACU scraper fix tests (Issue 1-4)
+# ---------------------------------------------------------------------------
+
+class TestAcuTitleSuffixStripping:
+    """ACU Issue 1 — page-title suffix '| Acu Online Courses' must be stripped."""
+
+    def test_strips_acu_online_courses_pipe(self) -> None:
+        raw = "Graduate Certificate in Business Administration | Acu Online Courses"
+        assert _course_name_clean(raw) == "Graduate Certificate in Business Administration"
+
+    def test_strips_acu_online_courses_all_caps(self) -> None:
+        raw = "Master of Business Administration | ACU Online Courses"
+        assert _course_name_clean(raw) == "Master of Business Administration"
+
+    def test_strips_bare_online_courses_no_institution(self) -> None:
+        """'| Online Courses' (no institution prefix) also stripped."""
+        raw = "Bachelor of Nursing | Online Courses"
+        assert _course_name_clean(raw) == "Bachelor of Nursing"
+
+    def test_strips_acu_alone(self) -> None:
+        """'| ACU' (bare acronym) is stripped."""
+        assert _course_name_clean("Master of Teaching | ACU") == "Master of Teaching"
+
+    def test_no_strip_on_bare_online_suffix_without_separator(self) -> None:
+        """'Online' inside the name (no pipe/dash separator) must NOT be stripped."""
+        result = _course_name_clean("Graduate Certificate in Business Administration Online")
+        assert "Graduate Certificate in Business Administration" in result
+
+
+class TestAcuDiplomaPrograms:
+    """ACU Issue 2 — 'Diploma Programs' is a category header, not a real course."""
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Diploma Programs",
+            "Diploma Programme",
+            "Bachelor Degrees",
+            "Bachelor Degree",
+            "Master Programs",
+            "Masters Programs",
+            "Graduate Pathways",
+            "Graduate Courses",
+            "Postgraduate Programs",
+            "Certificate Programs",
+            "Admission Pathways",
+            "Pathway Programs",
+        ],
+    )
+    def test_category_names_rejected(self, name: str) -> None:
+        assert is_generic_course_category_name(name) is True
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Diploma of Business Administration",
+            "Bachelor of Laws (Graduate Entry)",
+            "Graduate Certificate in Education",
+            "Master of Business Administration (MBA)",
+        ],
+    )
+    def test_real_courses_not_rejected(self, name: str) -> None:
+        """Real course names containing degree-level keywords must NOT be rejected."""
+        assert is_generic_course_category_name(name) is False
+
+
+class TestAcuOnlineUrlSlug:
+    """ACU Issue 3 — URL slug ending in '-online' must trigger online_only rejection."""
+
+    _BASE_PAYLOAD: dict = {
+        "international_fee": 12000,
+        "study_mode": "On Campus",
+        "course_name": "Graduate Certificate in Business Administration",
+        "location": "Sydney, Melbourne, Brisbane, Canberra",
+    }
+
+    def test_rejects_online_url_slug(self) -> None:
+        ok, reason = should_stage_course(
+            "Graduate Certificate in Business Administration",
+            self._BASE_PAYLOAD,
+            source_url="https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online",
+        )
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_rejects_online_url_slug_trailing_slash(self) -> None:
+        ok, reason = should_stage_course(
+            "Graduate Certificate in Business Administration",
+            self._BASE_PAYLOAD,
+            source_url="https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online/",
+        )
+        assert ok is False
+        assert reason == "online_only"
+
+    def test_does_not_reject_non_online_slug(self) -> None:
+        """Normal URL slug must NOT trigger online_only rejection."""
+        ok, reason = should_stage_course(
+            "Graduate Certificate in Business Administration",
+            self._BASE_PAYLOAD,
+            source_url="https://www.acu.edu.au/course/graduate-certificate-in-business-administration",
+        )
+        assert ok is True, f"Unexpected rejection: {reason}"
+
+    def test_does_not_reject_slug_containing_online_internally(self) -> None:
+        """Slug with 'online' in the middle (e.g. 'online-business') must NOT reject."""
+        ok, reason = should_stage_course(
+            "Graduate Certificate in Business Administration",
+            self._BASE_PAYLOAD,
+            source_url="https://www.acu.edu.au/course/online-business-administration",
+        )
+        assert ok is True, f"Unexpected rejection: {reason}"
+
+
+class TestAcuDiscoveryUrlFilters:
+    """ACU Issue 4 — Research / pathway hub URLs must be filtered out by
+    discovery._NON_COURSE_URL_PATTERNS and _JUNK_LAST_SEG_RE."""
+
+    def test_non_course_patterns_include_research_and_enterprise(self) -> None:
+        from app.services.scraper.discovery import _NON_COURSE_URL_PATTERNS
+        assert any("/research-and-enterprise/" in p for p in _NON_COURSE_URL_PATTERNS)
+
+    def test_non_course_patterns_include_admission_pathways(self) -> None:
+        from app.services.scraper.discovery import _NON_COURSE_URL_PATTERNS
+        assert any("/admission-pathways/" in p for p in _NON_COURSE_URL_PATTERNS)
+
+    def test_non_course_patterns_include_english_and_pathway_programs(self) -> None:
+        from app.services.scraper.discovery import _NON_COURSE_URL_PATTERNS
+        assert any("/english-and-pathway-programs/" in p for p in _NON_COURSE_URL_PATTERNS)
+
+    def test_junk_seg_includes_supervisors(self) -> None:
+        from app.services.scraper.discovery import _JUNK_LAST_SEG_RE
+        assert _JUNK_LAST_SEG_RE.match("supervisors")
+
+    def test_junk_seg_includes_projects(self) -> None:
+        from app.services.scraper.discovery import _JUNK_LAST_SEG_RE
+        assert _JUNK_LAST_SEG_RE.match("projects")
+
+    def test_junk_seg_includes_engagement(self) -> None:
+        from app.services.scraper.discovery import _JUNK_LAST_SEG_RE
+        assert _JUNK_LAST_SEG_RE.match("engagement")
