@@ -467,6 +467,22 @@ async def discover_course_links(
         if _pg_seed not in visited:
             queue.append((_pg_seed, 0))
 
+    # UniSQ: pre-seed category listing pages for all major disciplines so the
+    # BFS reaches individual course pages across the full catalogue.  Without
+    # these seeds the BFS picks up mostly listing/hub pages (online, pathway,
+    # short-courses) and misses the on-campus international course detail pages.
+    _unisq_hosts = ("www.unisq.edu.au", "unisq.edu.au")
+    if parsed.netloc in _unisq_hosts:
+        _unisq_base = f"{parsed.scheme}://{parsed.netloc}/study/degrees-and-courses"
+        for _cat in (
+            "?studentType=international",
+            "undergraduate-study?studentType=international",
+            "postgraduate-study?studentType=international",
+        ):
+            _seed = f"{_unisq_base}/{_cat}" if not _cat.startswith("?") else f"{_unisq_base}{_cat}"
+            if _seed not in visited:
+                queue.append((_seed, 0))
+
     if emit:
         await emit(
             "status",

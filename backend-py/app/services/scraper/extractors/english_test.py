@@ -201,7 +201,7 @@ def _pte(text: str) -> dict[str, float] | None:
     #   skill below 50" (VIT-style prose where "score" sits between
     #   "overall" and the digit; same regression class as IELTS pattern 1).
     m = re.search(
-        r"pte(?:\s+academic)?[^a-z0-9]{0,20}"
+        r"\bpte\b(?:\s+academic)?[^a-z0-9]{0,20}"
         r"(?:overall\s*(?:score\s+|band\s+|score\s+of\s+|of\s+)?)?"
         r"([0-9]+(?:\.[0-9]+)?)\s*"
         r"(?:with\s*)?(?:no\s+(?:communicative\s+)?skill\s+below|minimum\s+of|"
@@ -226,7 +226,7 @@ def _pte(text: str) -> dict[str, float] | None:
     # second `pte` mention between the captured numbers narrows the
     # match to a single row.
     m = re.search(
-        r"pte(?:\s+academic)?(?:(?!\bpte\b)[^\n0-9]){1,60}?([1-9][0-9])\b"
+        r"\bpte\b(?:\s+academic)?(?:(?!\bpte\b)[^\n0-9]){1,60}?([1-9][0-9])\b"
         r"(?:(?!\bpte\b)[^\n0-9]){1,40}?([1-9][0-9])\b",
         text,
         re.I,
@@ -265,7 +265,7 @@ def _pte(text: str) -> dict[str, float] | None:
     # "PTE (Academic): 58" — bridge uses [^\n0-9] so it can cross lowercase
     # words like "(Academic): " that [^a-z0-9] would stop at.
     m = re.search(
-        r"pte[^\n0-9]{0,60}?([1-9][0-9])\b", text, re.I
+        r"\bpte\b[^\n0-9]{0,60}?([1-9][0-9])\b", text, re.I
     )
     if m:
         ov = float(m.group(1))
