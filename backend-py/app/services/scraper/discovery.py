@@ -11,6 +11,7 @@ orchestrator yet.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from html.parser import HTMLParser
@@ -586,6 +587,14 @@ async def discover_course_links(
             continue
 
         html = await fetch_html(url)
+        if not html:
+            # First attempt failed — wait 3 s and try once more.  Category
+            # listing pages (e.g. /nursing-and-midwifery) sometimes return
+            # a transient 5xx or timeout on the first hit; a brief pause
+            # usually resolves it and avoids losing an entire category of
+            # course candidates.
+            await asyncio.sleep(3)
+            html = await fetch_html(url)
         if not html:
             if emit:
                 await emit(

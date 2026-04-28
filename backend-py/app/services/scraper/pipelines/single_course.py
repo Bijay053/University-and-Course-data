@@ -624,37 +624,31 @@ async def extract_course(
     _study_mode_evidence = [e for e in evidence if e["field_key"] == "study_mode"]
     _was_online = payload.get("study_mode") == "Online"
     _has_physical_location = bool((payload.get("course_location") or "").strip())
+    # Low-confidence online: extractor rule fired at ≤50% confidence — try to
+    # derive the real mode from the physical campus list instead.
+    # We do NOT upgrade a confident "Online" to "Blended" just because the
+    # location list mentions a city.  Many universities (e.g. UniSQ) list the
+    # campus name in location_text even for purely online courses.
+    # "Online" mode is authoritative when confidently detected — those courses
+    # are filtered by the online_only guard later.
     _low_conf_online = _was_online and any(
         e.get("confidence", 1.0) <= 0.5 and e.get("method") == "study_mode:rule"
         for e in _study_mode_evidence
     )
-    # Physical-location override: if the location extractor confirmed real
-    # campus(es) and the mode is "Online", the course is Blended regardless
-    # of the online-mode extractor's confidence. Only applies when a concrete
-    # location was actually found — avoids false upgrades on courses that
-    # genuinely are online-only but happen to list a PO box or virtual address.
-    _location_overrides_online = _was_online and _has_physical_location
-    if _low_conf_online or _location_overrides_online:
+    if _low_conf_online:
         from app.services.scraper.extractors.study_mode import derive_mode_from_location
 
         _derived_mode = derive_mode_from_location(payload.get("course_location"))
         if _derived_mode:
-            # When the page said "Online" but we know a physical campus exists,
-            # the correct canonical mode is "Blended" — not just "On Campus" —
-            # because both delivery options are available.
-            _final_mode = "Blended" if _was_online and _has_physical_location else _derived_mode
-            payload["study_mode"] = _final_mode
+            payload["study_mode"] = _derived_mode
             evidence.append(
                 {
                     "field_key": "study_mode",
-                    "value": _final_mode,
+                    "value": _derived_mode,
                     "confidence": 0.65,
                     "method": "study_mode:location_derived",
                     "snippet": (
-                        f"Upgraded Online→{_final_mode} — physical campus confirmed: "
-                        f"{(payload.get('course_location') or '')[:80]}"
-                        if _location_overrides_online
-                        else f"Derived from course_location: "
+                        f"Low-confidence online overridden by location: "
                         f"{(payload.get('course_location') or '')[:80]}"
                     ),
                 }
