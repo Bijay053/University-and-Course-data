@@ -1,0 +1,1732 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 22
+Fetching https://bond.edu.au/program-list...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://bond.edu.au/program-list (max 25 pages, max 200 candidates)
+[DISCOVER] Page 1/25: fetch failed — https://bond.edu.au/program-list
+[DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://bond.edu.au
+[DISCOVER] sitemap index https://bond.edu.au/sitemap.xml: 12 sub-sitemap(s)
+[DISCOVER] sub-sitemap https://bond.edu.au/sitemap.xml?page=1: +14 candidates (total 14)
+[DISCOVER] sub-sitemap https://bond.edu.au/sitemap.xml?page=2: +167 candidates (total 181)
+[DISCOVER] sub-sitemap https://bond.edu.au/sitemap.xml?page=3: +28 candidates (total 209)
+[DISCOVER] sub-sitemap https://bond.edu.au/sitemap.xml?page=4: +6 candidates (total 215)
+[DISCOVER] sitemap: done — 215 unique candidates
+[DISCOVER] Bond post-filter: kept 174 /program/ URLs (dropped 26 non-program candidates)
+Discovered 174 candidate course links
+[CENTRAL] auto-discovered fee page: https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional/fees
+[CENTRAL] fee page parsed → 0 program record(s) from https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional/fees
+Extracting course details (174 pages)...
+[EXTRACT] 1/174: Master Of Enterprise Artificial Intelligence Professional
+[EXTRACT] 2/174: Master Of Enterprise Artificial Intelligence
+[EXTRACT] 3/174: Bachelor Of Enterprise Artificial Intelligence
+[EXTRACT] 4/174: Graduate Diploma Project Management
+Fetching 2/174: Master Of Enterprise Artificial Intelligence
+Fetching 3/174: Bachelor Of Enterprise Artificial Intelligence
+Fetching 1/174: Master Of Enterprise Artificial Intelligence Professional
+Fetching 4/174: Graduate Diploma Project Management
+[BOND ✓] bachelor-of-enterprise-artificial-intell — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-enterprise-artificial-intellig — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-enterprise-artificial-intellig — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] graduate-diploma-project-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Enterprise Artificial Intelligence Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Enterprise Artificial Intelligence Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['February', 'July', 'October'" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Graduate Diploma in Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Enterprise Artificial Intelligence (Prof Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '5.0' [regex conf=0.75] Intake: ✅ "['February', 'July', 'October'" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-enterprise-artificial-intelligence
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-project-management
+[per-course browser ↻] https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional
+[per-course browser ↻] https://bond.edu.au/program/master-of-enterprise-artificial-intelligence
+[per-course browser ✓] https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-enterprise-artificial- → 0 field(s) (cost=$0.000000, in=4075 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-enterprise-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-enterprise-artificial-intelligence-professional
+[GEMINI] https://bond.edu.au/program/bachelor-of-enterprise-artificia → 0 field(s) (cost=$0.000000, in=3256 out=0)
+[CATEGORY det] Master of Enterprise Artificial Intellig → Computer Science & IT / Artificial Intelligence
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-enterprise-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 65/100] Master of Enterprise Artificial Intelligence (Prof — missing: english, mode | master-of-enterprise-artificial-intellig
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-enterprise-artificial-intelligence
+[per-course browser ✓] https://bond.edu.au/program/master-of-enterprise-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Bachelor of Enterprise Artificial Intell → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 5/174: Master Of Legal Administration
+[GEMINI] https://bond.edu.au/program/master-of-enterprise-artificial- → 0 field(s) (cost=$0.000000, in=3738 out=0)
+[GEMINI] https://bond.edu.au/program/graduate-diploma-project-managem → 0 field(s) (cost=$0.000000, in=3189 out=0)
+❌ [LOW 25/100] Bachelor of Enterprise Artificial Intelligence — missing: english, duration, intake, mode | bachelor-of-enterprise-artificial-intell
+Fetching 5/174: Master Of Legal Administration
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-enterprise-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 6/174: Master Of Construction Practicemaster Of Project Management
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-enterprise-artificial-intelligence
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/graduate-diploma-project-management
+Fetching 6/174: Master Of Construction Practicemaster Of Project Management
+[CATEGORY det] Graduate Diploma in Project Management → Business & Management / Project Management
+[CATEGORY det] Master of Enterprise Artificial Intellig → Computer Science & IT / Artificial Intelligence
+❌ [LOW 35/100] Graduate Diploma in Project Management — missing: english, duration, intake | graduate-diploma-project-management
+⚠️ [WARN 65/100] Master of Enterprise Artificial Intelligence — missing: english, mode | master-of-enterprise-artificial-intellig
+[BOND ✓] master-of-legal-administration — intakes=May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[EXTRACT] 7/174: Graduate Certificate Business
+[FIELD SUMMARY] Master of Legal Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ❌ not found
+[EXTRACT] 8/174: Graduate Diploma Business
+Fetching 7/174: Graduate Certificate Business
+[per-course browser ↻] https://bond.edu.au/program/master-of-legal-administration
+Fetching 8/174: Graduate Diploma Business
+[BOND ✓] master-of-construction-practicemaster-of — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Construction Practice/ Master of Project Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-construction-practicemaster-of-project-management
+[BOND ✓] graduate-certificate-business — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] graduate-diploma-business — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Graduate Diploma in Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-business
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-business
+[per-course browser ✓] https://bond.edu.au/program/master-of-legal-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-legal-administration → 0 field(s) (cost=$0.000000, in=2437 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-legal-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-legal-administration
+⚠️ [WARN 65/100] Master of Legal Administration — missing: english, mode | master-of-legal-administration
+[EXTRACT] 9/174: Juris Doctor
+Fetching 9/174: Juris Doctor
+[BOND ✓] juris-doctor — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Juris Doctor Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/juris-doctor
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/master-of-construction-practicemaster-of-project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-diploma-business → 0 field(s) (cost=$0.000000, in=2862 out=0)
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-construction-practicem → 0 field(s) (cost=$0.000000, in=4567 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/graduate-certificate-business → 0 field(s) (cost=$0.000000, in=2574 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-construction-practicemaster-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-business
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-construction-practicemaster-of-project-management
+⚠️ [WARN 65/100] Graduate Diploma in Business — missing: english, mode | graduate-diploma-business
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-business
+[EXTRACT] 10/174: Master Of Architecture
+[CATEGORY det] Master of Construction Practice/ Master → Business & Management / Project Management
+Fetching 10/174: Master Of Architecture
+⚠️ [WARN 65/100] Graduate Certificate in Business — missing: english, mode | graduate-certificate-business
+[EXTRACT] 11/174: Master Of Valuation And Property Development Professional
+⚠️ [WARN 75/100] Master of Construction Practice/ Master of Project — missing: english | master-of-construction-practicemaster-of
+Fetching 11/174: Master Of Valuation And Property Development Professional
+[EXTRACT] 12/174: Diploma Preparation Program
+Fetching 12/174: Diploma Preparation Program
+[BOND ✓] master-of-architecture — intakes=May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-valuation-and-property-develop — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Architecture Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Valuation and Property Development (Prof Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['October']" [regex conf=0.40] StudyMode: ❌ not found
+[BOND ✓] diploma-preparation-program — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-of-architecture
+[per-course browser ↻] https://bond.edu.au/program/master-of-valuation-and-property-development-professional
+[FIELD SUMMARY] Diploma Preparation Program Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/diploma-preparation-program
+[per-course browser ✓] https://bond.edu.au/program/juris-doctor — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/juris-doctor → 0 field(s) (cost=$0.000000, in=4050 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/juris-doctor (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/juris-doctor
+[CATEGORY det] Juris Doctor → Law & Legal Studies / Juris Doctor
+❌ [LOW 55/100] Juris Doctor — missing: english, intake | juris-doctor
+[EXTRACT] 13/174: Master Of Architecture Professional
+Fetching 13/174: Master Of Architecture Professional
+[BOND ✓] master-of-architecture-professional — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Architecture (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-architecture-professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-valuation-and-property-development-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-valuation-and-property → 0 field(s) (cost=$0.000000, in=3923 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-valuation-and-property-development-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-valuation-and-property-development-professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-architecture — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+⚠️ [WARN 65/100] Master of Valuation and Property Development (Prof — missing: english, mode | master-of-valuation-and-property-develop
+[EXTRACT] 14/174: Bachelor Of Project Management
+[GEMINI] https://bond.edu.au/program/master-of-architecture → 0 field(s) (cost=$0.000000, in=5364 out=0)
+[per-course browser ✓] https://bond.edu.au/program/diploma-preparation-program — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+Fetching 14/174: Bachelor Of Project Management
+[GEMINI] https://bond.edu.au/program/diploma-preparation-program → 0 field(s) (cost=$0.000000, in=3707 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-architecture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-preparation-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-architecture
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-preparation-program
+[CATEGORY det] Master of Architecture → Architecture, Building & Design / Architecture
+❌ [LOW 35/100] Diploma Preparation Program — missing: english, duration, intake | diploma-preparation-program
+⚠️ [WARN 65/100] Master of Architecture — missing: english, mode | master-of-architecture
+[BOND ✓] bachelor-of-project-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[EXTRACT] 15/174: Master Of Laws Enterprise Governance
+[EXTRACT] 16/174: Master Of International Hotel And Tourism Management Professional
+[FIELD SUMMARY] Bachelor of Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+Fetching 15/174: Master Of Laws Enterprise Governance
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-project-management
+Fetching 16/174: Master Of International Hotel And Tourism Management Professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-architecture-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[BOND ✓] master-of-laws-enterprise-governance — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Laws in Enterprise Governance Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[BOND ✓] master-of-international-hotel-and-touris — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[GEMINI] https://bond.edu.au/program/master-of-architecture-professio → 0 field(s) (cost=$0.000000, in=5065 out=0)
+[per-course browser ↻] https://bond.edu.au/program/master-of-laws-enterprise-governance
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-architecture-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD SUMMARY] Master of International Hotel and Tourism Manageme Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-architecture-professional
+[per-course browser ↻] https://bond.edu.au/program/master-of-international-hotel-and-tourism-management-professional
+[CATEGORY det] Master of Architecture (Professional) → Architecture, Building & Design / Architecture
+⚠️ [WARN 65/100] Master of Architecture (Professional) — missing: english, mode | master-of-architecture-professional
+[EXTRACT] 17/174: Graduate Certificate Of Valuation And Property Development
+Fetching 17/174: Graduate Certificate Of Valuation And Property Development
+[BOND ✓] graduate-certificate-of-valuation-and-pr — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate of Valuation and Property Dev Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-of-valuation-and-property-development
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-project-management → 0 field(s) (cost=$0.000000, in=3792 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-project-management
+[CATEGORY det] Bachelor of Project Management → Business & Management / Project Management
+❌ [LOW 45/100] Bachelor of Project Management — missing: english, intake, mode | bachelor-of-project-management
+[EXTRACT] 18/174: Master Of International Hotel And Tourism Management
+Fetching 18/174: Master Of International Hotel And Tourism Management
+[BOND ✓] master-of-international-hotel-and-touris — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of International Hotel and Tourism Manageme Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-international-hotel-and-tourism-management
+[per-course browser ✓] https://bond.edu.au/program/master-of-laws-enterprise-governance — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/master-of-international-hotel-and-tourism-management-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-laws-enterprise-govern → 0 field(s) (cost=$0.000000, in=3259 out=0)
+[GEMINI] https://bond.edu.au/program/master-of-international-hotel-an → 0 field(s) (cost=$0.000000, in=3916 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-laws-enterprise-governance (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-international-hotel-and-tourism-management-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-laws-enterprise-governance
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-international-hotel-and-tourism-management-professional
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-of-valuation-and-property-development — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+❌ [LOW 55/100] Master of Laws in Enterprise Governance — missing: english, intake | master-of-laws-enterprise-governance
+[GEMINI] https://bond.edu.au/program/graduate-certificate-of-valuatio → 0 field(s) (cost=$0.000000, in=3406 out=0)
+[CATEGORY det] Master of International Hotel and Touris → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT] 19/174: Graduate Diploma Architecture
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-of-valuation-and-property-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 65/100] Master of International Hotel and Tourism Manageme — missing: english, mode | master-of-international-hotel-and-touris
+Fetching 19/174: Graduate Diploma Architecture
+[EXTRACT] 20/174: Master Of Laws
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-of-valuation-and-property-development
+Fetching 20/174: Master Of Laws
+❌ [LOW 45/100] Graduate Certificate of Valuation and Property Dev — missing: english, duration, mode | graduate-certificate-of-valuation-and-pr
+[EXTRACT] 21/174: Bachelor Of Design Architecture
+Fetching 21/174: Bachelor Of Design Architecture
+[BOND ✓] master-of-laws — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] graduate-diploma-architecture — intakes=January,May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Graduate Diploma in Architecture Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['January', 'May']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-laws
+[BOND ✓] bachelor-of-design-architecture — intakes=January,May,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-architecture
+[FIELD SUMMARY] Bachelor of Design in Architecture Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '40.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-design-architecture
+[per-course browser ✓] https://bond.edu.au/program/master-of-international-hotel-and-tourism-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-international-hotel-an → 0 field(s) (cost=$0.000000, in=3940 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-international-hotel-and-tourism-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-international-hotel-and-tourism-management
+[CATEGORY det] Master of International Hotel and Touris → Hospitality, Tourism & Events / Tourism Management
+⚠️ [WARN 65/100] Master of International Hotel and Tourism Manageme — missing: english, mode | master-of-international-hotel-and-touris
+[EXTRACT] 22/174: Graduate Diploma Psychology Bridging
+Fetching 22/174: Graduate Diploma Psychology Bridging
+[BOND ✓] graduate-diploma-psychology-bridging — intakes=January,May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Diploma in Psychology (Bridging) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['January', 'May']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-psychology-bridging
+[per-course browser ✓] https://bond.edu.au/program/master-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-design-architecture — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-architecture — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-laws → 0 field(s) (cost=$0.000000, in=2601 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-design-architecture → 0 field(s) (cost=$0.000000, in=5739 out=0)
+[GEMINI] https://bond.edu.au/program/graduate-diploma-architecture → 0 field(s) (cost=$0.000000, in=4621 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-architecture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-design-architecture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-architecture
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-design-architecture
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-laws
+⚠️ [WARN 65/100] Master of Laws — missing: english, mode | master-of-laws
+[CATEGORY det] Graduate Diploma in Architecture → Architecture, Building & Design / Architecture
+[CATEGORY det] Bachelor of Design in Architecture → Architecture, Building & Design / Architecture
+[EXTRACT] 23/174: Diploma Of Built Environment
+⚠️ [WARN 65/100] Graduate Diploma in Architecture — missing: english, mode | graduate-diploma-architecture
+⚠️ [WARN 65/100] Bachelor of Design in Architecture — missing: english, mode | bachelor-of-design-architecture
+Fetching 23/174: Diploma Of Built Environment
+[EXTRACT] 24/174: Diploma Of Health Sciences
+[EXTRACT] 25/174: Bond Bbt Graduate Certificate Global Leadership
+Fetching 25/174: Bond Bbt Graduate Certificate Global Leadership
+Fetching 24/174: Diploma Of Health Sciences
+[BOND ✓] diploma-of-built-environment — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Diploma of Built Environment Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[DOMESTIC ONLY] https://bond.edu.au/program/bond-bbt-graduate-certificate-global-leadership — course page states domestic-students-only; skipping
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-built-environment
+[EXTRACT] 26/174: Bond University Bbt Global Leadership Mba
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-psychology-bridging — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+Fetching 26/174: Bond University Bbt Global Leadership Mba
+[GEMINI] https://bond.edu.au/program/graduate-diploma-psychology-brid → 0 field(s) (cost=$0.000000, in=3482 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-psychology-bridging (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-psychology-bridging
+[CATEGORY det] Graduate Diploma in Psychology (Bridging → Medicine & Health / Psychology
+⚠️ [WARN 65/100] Graduate Diploma in Psychology (Bridging) — missing: english, mode | graduate-diploma-psychology-bridging
+[EXTRACT] 27/174: Master Of Laws Family Dispute Resolution
+Fetching 27/174: Master Of Laws Family Dispute Resolution
+[DOMESTIC ONLY] https://bond.edu.au/program/master-of-laws-family-dispute-resolution — course page states domestic-students-only; skipping
+[EXTRACT] 28/174: Diploma Of Creative Design
+Fetching 28/174: Diploma Of Creative Design
+[per-course browser ✓] https://bond.edu.au/program/diploma-of-built-environment — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/diploma-of-built-environment → 0 field(s) (cost=$0.000000, in=3383 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-built-environment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-built-environment
+❌ [LOW 55/100] Diploma of Built Environment — missing: english, duration | diploma-of-built-environment
+[EXTRACT] 29/174: Graduate Certificate Data Analytics
+Fetching 29/174: Graduate Certificate Data Analytics
+[BOND ✓] graduate-certificate-data-analytics — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Data Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-data-analytics
+[BOND ✓] diploma-of-creative-design — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Diploma of Creative Design Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[BOND ✓] diploma-of-health-sciences — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-creative-design
+[FIELD SUMMARY] Diploma of Health Sciences Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-health-sciences
+[BOND ✓] bond-university-bbt-global-leadership-mb — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bond University - Bbt Global Leadership MBA Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/bond-university-bbt-global-leadership-mba
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-data-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-data-analyt → 0 field(s) (cost=$0.000000, in=2206 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-data-analytics
+[CATEGORY det] Graduate Certificate in Data Analytics → Computer Science & IT / Data Science
+⚠️ [WARN 65/100] Graduate Certificate in Data Analytics — missing: english, mode | graduate-certificate-data-analytics
+[EXTRACT] 30/174: Bachelor Of Psychological Science
+Fetching 30/174: Bachelor Of Psychological Science
+[BOND ✓] bachelor-of-psychological-science — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Psychological Science Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '56.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-psychological-science
+[per-course browser ✓] https://bond.edu.au/program/diploma-of-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/diploma-of-creative-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/diploma-of-health-sciences → 0 field(s) (cost=$0.000000, in=4138 out=0)
+[GEMINI] https://bond.edu.au/program/diploma-of-creative-design → 0 field(s) (cost=$0.000000, in=3421 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-creative-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-health-sciences
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-creative-design
+❌ [LOW 35/100] Diploma of Health Sciences — missing: english, duration, intake | diploma-of-health-sciences
+❌ [LOW 35/100] Diploma of Creative Design — missing: english, duration, intake | diploma-of-creative-design
+[EXTRACT] 31/174: Bachelor Of Actuarial Science Honours
+[EXTRACT] 32/174: Bachelor Of Sport Management
+Fetching 31/174: Bachelor Of Actuarial Science Honours
+Fetching 32/174: Bachelor Of Sport Management
+[BOND ✓] bachelor-of-sport-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-actuarial-science-honours — intakes=May, loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Sport Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[FIELD SUMMARY] Bachelor of Actuarial Science (Honours) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-sport-management
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-actuarial-science-honours
+[per-course browser ✓] https://bond.edu.au/program/bond-university-bbt-global-leadership-mba — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-psychological-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bond-university-bbt-global-leade → 0 field(s) (cost=$0.000000, in=3107 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-psychological-scienc → 0 field(s) (cost=$0.000000, in=3584 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bond-university-bbt-global-leadership-mba (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bond-university-bbt-global-leadership-mba
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-psychological-science
+[CATEGORY det] Bond University - Bbt Global Leadership → Business & Management / MBA
+⚠️ [WARN 65/100] Bachelor of Psychological Science — missing: english, mode | bachelor-of-psychological-science
+❌ [LOW 55/100] Bond University - Bbt Global Leadership MBA — missing: english, intake | bond-university-bbt-global-leadership-mb
+[EXTRACT] 33/174: Bachelor Of Film And Television
+[EXTRACT] 34/174: Bachelor Of Film And Television 3 Year Program
+Fetching 33/174: Bachelor Of Film And Television
+Fetching 34/174: Bachelor Of Film And Television 3 Year Program
+[BOND ✓] bachelor-of-film-and-television — intakes=January,May,September, loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-film-and-television-3-year-p — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Film and Television Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[FIELD SUMMARY] Bachelor of Film and Television (3 Year Program) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-film-and-television
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-film-and-television-3-year-program
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-sport-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-actuarial-science-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-actuarial-science-ho → 0 field(s) (cost=$0.000000, in=4686 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-sport-management → 0 field(s) (cost=$0.000000, in=4016 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-actuarial-science-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-sport-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-sport-management
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-actuarial-science-honours
+⚠️ [WARN 65/100] Bachelor of Sport Management — missing: english, mode | bachelor-of-sport-management
+[CATEGORY det] Bachelor of Actuarial Science (Honours) → Business & Management / Finance
+[EXTRACT] 35/174: Master Of Communication
+⚠️ [WARN 75/100] Bachelor of Actuarial Science (Honours) — missing: english | bachelor-of-actuarial-science-honours
+Fetching 35/174: Master Of Communication
+[EXTRACT] 36/174: Bachelor Of Communication
+Fetching 36/174: Bachelor Of Communication
+[BOND ✓] master-of-communication — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-communication — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Communication Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['February', 'July', 'October'" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Communication Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/master-of-communication
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-communication
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-film-and-television — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-film-and-television-3-year-program — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-film-and-television → 0 field(s) (cost=$0.000000, in=5261 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-film-and-television- → 0 field(s) (cost=$0.000000, in=4257 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-film-and-television (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-film-and-television-3-year-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-film-and-television
+[CATEGORY det] Bachelor of Film and Television → Media & Communications / Film & Screen
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-film-and-television-3-year-program
+⚠️ [WARN 75/100] Bachelor of Film and Television — missing: english | bachelor-of-film-and-television
+[CATEGORY det] Bachelor of Film and Television (3 Year → Media & Communications / Film & Screen
+[EXTRACT] 37/174: Bachelor Of Communication Business
+❌ [LOW 55/100] Bachelor of Film and Television (3 Year Program) — missing: english, intake | bachelor-of-film-and-television-3-year-p
+Fetching 37/174: Bachelor Of Communication Business
+[EXTRACT] 38/174: Bachelor Of International Relations 3 Year Program
+Fetching 38/174: Bachelor Of International Relations 3 Year Program
+[BOND ✓] bachelor-of-communication-business — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Communication (Business) Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-communication-business
+[BOND ✓] bachelor-of-international-relations-3-ye — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of International Relations (3 Year Progra Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-international-relations-3-year-program
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-communication — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-communication → 0 field(s) (cost=$0.000000, in=4024 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-communication
+❌ [LOW 55/100] Bachelor of Communication — missing: english, duration | bachelor-of-communication
+[EXTRACT] 39/174: Master Of Professional Psychology
+Fetching 39/174: Master Of Professional Psychology
+[per-course browser ✓] https://bond.edu.au/program/master-of-communication — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-communication → 0 field(s) (cost=$0.000000, in=3676 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-communication
+[BOND ✓] master-of-professional-psychology — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+⚠️ [WARN 75/100] Master of Communication — missing: english | master-of-communication
+[FIELD SUMMARY] Master of Professional Psychology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-professional-psychology
+[EXTRACT] 40/174: Bachelor Of Biomedical Sciencebachelor Of Laws
+Fetching 40/174: Bachelor Of Biomedical Sciencebachelor Of Laws
+[BOND ✓] bachelor-of-biomedical-sciencebachelor-o — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Biomedical Science/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-communication-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-biomedical-sciencebachelor-of-laws
+[GEMINI] https://bond.edu.au/program/bachelor-of-communication-busine → 0 field(s) (cost=$0.000000, in=4156 out=0)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-international-relations-3-year-program — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-international-relati → 0 field(s) (cost=$0.000000, in=3905 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-communication-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-international-relations-3-year-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-communication-business
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-international-relations-3-year-program
+❌ [LOW 55/100] Bachelor of Communication (Business) — missing: english, duration | bachelor-of-communication-business
+⚠️ [WARN 65/100] Bachelor of International Relations (3 Year Progra — missing: english, mode | bachelor-of-international-relations-3-ye
+[EXTRACT] 41/174: Bachelor Of Construction Management And Quantity Surveying
+[EXTRACT] 42/174: Bachelor Of Creative Arts
+Fetching 41/174: Bachelor Of Construction Management And Quantity Surveying
+Fetching 42/174: Bachelor Of Creative Arts
+[BOND ✓] bachelor-of-construction-management-and- — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-creative-arts — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Creative Arts Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Bachelor of Construction Management and Quantity S Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-construction-management-and-quantity-surveying
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-creative-arts
+[per-course browser ✓] https://bond.edu.au/program/master-of-professional-psychology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-professional-psycholog → 0 field(s) (cost=$0.000000, in=3078 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-professional-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-biomedical-sciencebachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-professional-psychology
+[GEMINI] https://bond.edu.au/program/bachelor-of-biomedical-scienceba → 0 field(s) (cost=$0.000000, in=3346 out=0)
+[CATEGORY det] Master of Professional Psychology → Medicine & Health / Psychology
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-biomedical-sciencebachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 75/100] Master of Professional Psychology — missing: english | master-of-professional-psychology
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-biomedical-sciencebachelor-of-laws
+[EXTRACT] 43/174: Bachelor Of Journalism
+Fetching 43/174: Bachelor Of Journalism
+⚠️ [WARN 65/100] Bachelor of Biomedical Science/ Bachelor of Laws — missing: english, mode | bachelor-of-biomedical-sciencebachelor-o
+[EXTRACT] 44/174: Bachelor Of Journalismbachelor Of Laws
+Fetching 44/174: Bachelor Of Journalismbachelor Of Laws
+[BOND ✓] bachelor-of-journalism — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Journalism Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-journalism
+[BOND ✓] bachelor-of-journalismbachelor-of-laws — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Journalism/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '40.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-journalismbachelor-of-laws
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-construction-management-and-quantity-surveying — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-construction-managem → 0 field(s) (cost=$0.000000, in=4462 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-construction-management-and-quantity-surveying (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-construction-management-and-quantity-surveying
+[CATEGORY det] Bachelor of Construction Management and → Architecture, Building & Design / Construction
+❌ [LOW 45/100] Bachelor of Construction Management and Quantity S — missing: english, intake, mode | bachelor-of-construction-management-and-
+[EXTRACT] 45/174: Bachelor Of Property
+Fetching 45/174: Bachelor Of Property
+[BOND ✓] bachelor-of-property — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Property Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-property
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-creative-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-creative-arts → 0 field(s) (cost=$0.000000, in=3562 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-creative-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-creative-arts
+⚠️ [WARN 65/100] Bachelor of Creative Arts — missing: english, mode | bachelor-of-creative-arts
+[EXTRACT] 46/174: Bachelor Of Psychological Science Honours
+Fetching 46/174: Bachelor Of Psychological Science Honours
+[BOND ✓] bachelor-of-psychological-science-honour — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Psychological Science (Honours) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '56.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-psychological-science-honours
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-journalism — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-journalismbachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-journalism → 0 field(s) (cost=$0.000000, in=4482 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-journalismbachelor-o → 0 field(s) (cost=$0.000000, in=4518 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-journalism (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-journalismbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-journalism
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-journalismbachelor-of-laws
+[CATEGORY det] Bachelor of Journalism → Media & Communications / Journalism
+[CATEGORY det] Bachelor of Journalism/ Bachelor of Laws → Media & Communications / Journalism
+⚠️ [WARN 65/100] Bachelor of Journalism/ Bachelor of Laws — missing: english, mode | bachelor-of-journalismbachelor-of-laws
+⚠️ [WARN 75/100] Bachelor of Journalism — missing: english | bachelor-of-journalism
+[EXTRACT] 47/174: Bachelor Of Psychological Sciencebachelor Of Laws
+[EXTRACT] 48/174: Graduate Certificate Building Surveying
+Fetching 47/174: Bachelor Of Psychological Sciencebachelor Of Laws
+Fetching 48/174: Graduate Certificate Building Surveying
+[BOND ✓] graduate-certificate-building-surveying — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-psychological-sciencebachelo — intakes=January,May,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Building Surveying Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-building-surveying
+[FIELD SUMMARY] Bachelor of Psychological Science/ Bachelor of Law Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '40.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-psychological-sciencebachelor-of-laws
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-property — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-property → 0 field(s) (cost=$0.000000, in=3760 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-property (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-psychological-science-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-property
+[GEMINI] https://bond.edu.au/program/bachelor-of-psychological-scienc → 0 field(s) (cost=$0.000000, in=3945 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-psychological-science-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+❌ [LOW 55/100] Bachelor of Property — missing: english, duration | bachelor-of-property
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-psychological-science-honours
+[EXTRACT] 49/174: Graduate Certificate Construction Practice
+Fetching 49/174: Graduate Certificate Construction Practice
+⚠️ [WARN 65/100] Bachelor of Psychological Science (Honours) — missing: english, mode | bachelor-of-psychological-science-honour
+[EXTRACT] 50/174: Graduate Diploma Building Surveying
+Fetching 50/174: Graduate Diploma Building Surveying
+[BOND ✓] graduate-certificate-construction-practi — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Construction Practice Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['February']" [regex conf=0.40] StudyMode: ❌ not found
+[BOND ✓] graduate-diploma-building-surveying — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Diploma in Building Surveying Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-building-surveying
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-building-surveying — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-psychological-sciencebachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-building-su → 0 field(s) (cost=$0.000000, in=3213 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-psychological-scienc → 0 field(s) (cost=$0.000000, in=4154 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-building-surveying (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-psychological-sciencebachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-building-surveying
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-psychological-sciencebachelor-of-laws
+⚠️ [WARN 65/100] Bachelor of Psychological Science/ Bachelor of Law — missing: english, mode | bachelor-of-psychological-sciencebachelo
+❌ [LOW 25/100] Graduate Certificate in Building Surveying — missing: english, duration, intake, mode | graduate-certificate-building-surveying
+[EXTRACT] 51/174: Graduate Diploma Construction Practice
+[EXTRACT] 52/174: Graduate Diploma Of Psychological Science
+Fetching 51/174: Graduate Diploma Construction Practice
+Fetching 52/174: Graduate Diploma Of Psychological Science
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-construction-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-constructio → 0 field(s) (cost=$0.000000, in=2946 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-construction-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-construction-practice
+[CATEGORY det] Graduate Certificate in Construction Pra → Architecture, Building & Design / Construction
+⚠️ [WARN 65/100] Graduate Certificate in Construction Practice — missing: english, mode | graduate-certificate-construction-practi
+[EXTRACT] 53/174: Master Of Building Surveying
+Fetching 53/174: Master Of Building Surveying
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-building-surveying — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-diploma-building-survey → 0 field(s) (cost=$0.000000, in=3387 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-building-surveying (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-building-surveying
+❌ [LOW 45/100] Graduate Diploma in Building Surveying — missing: english, intake, mode | graduate-diploma-building-surveying
+[EXTRACT] 54/174: Master Of Communication Professional
+Fetching 54/174: Master Of Communication Professional
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-diploma-of-psychological-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-diploma-construction-practice — retrying via browser
+[EXTRACT] 55/174: Master Of Communicationmaster Of Project Management
+[EXTRACT] 56/174: Master Of Construction Practice
+Fetching 55/174: Master Of Communicationmaster Of Project Management
+Fetching 56/174: Master Of Construction Practice
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-building-surveying — retrying via browser
+[EXTRACT] 57/174: Master Of Construction Practice Professional
+Fetching 57/174: Master Of Construction Practice Professional
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-communication-professional — retrying via browser
+[EXTRACT] 58/174: Master Of Project Innovation
+Fetching 58/174: Master Of Project Innovation
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-communicationmaster-of-project-m — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-construction-practice — retrying via browser
+[EXTRACT] 59/174: Master Of Project Innovationmaster Of Project Management
+Fetching 59/174: Master Of Project Innovationmaster Of Project Management
+[EXTRACT] 60/174: Master Of Project Management Professional
+Fetching 60/174: Master Of Project Management Professional
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-construction-practice-profession — retrying via browser
+[EXTRACT] 61/174: Master Of Valuation And Property Developmentmaster Of Project Management
+Fetching 61/174: Master Of Valuation And Property Developmentmaster Of Project Management
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-project-innovation — retrying via browser
+[EXTRACT] 62/174: Bachelor Of Health Transformationbachelor Of Health Sciences
+Fetching 62/174: Bachelor Of Health Transformationbachelor Of Health Sciences
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-project-management-professional — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-project-innovationmaster-of-proj — retrying via browser
+[EXTRACT] 63/174: Bachelor Of Business
+Fetching 63/174: Bachelor Of Business
+[EXTRACT] 64/174: Bachelor Of Business 3 Year Program
+Fetching 64/174: Bachelor Of Business 3 Year Program
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-valuation-and-property-developme — retrying via browser
+[EXTRACT] 65/174: Bachelor Of Commerce 3 Year Program
+Fetching 65/174: Bachelor Of Commerce 3 Year Program
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-health-transformationbachelor- — retrying via browser
+[EXTRACT] 66/174: Bachelor Of Businessbachelor Of Social Science
+Fetching 66/174: Bachelor Of Businessbachelor Of Social Science
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-business-3-year-program — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-business — retrying via browser
+[EXTRACT] 67/174: Bachelor Of Actuarial Science
+[EXTRACT] 68/174: Bachelor Of Actuarial Science 3 Year Program
+Fetching 67/174: Bachelor Of Actuarial Science
+Fetching 68/174: Bachelor Of Actuarial Science 3 Year Program
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-commerce-3-year-program — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-businessbachelor-of-social-sci — retrying via browser
+[EXTRACT] 69/174: Bachelor Of International Hotel And Tourism Management
+Fetching 69/174: Bachelor Of International Hotel And Tourism Management
+[EXTRACT] 70/174: Bachelor Of International Hotel And Tourism Management 3 Year Program
+Fetching 70/174: Bachelor Of International Hotel And Tourism Management 3 Year Program
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-actuarial-science-3-year-progr — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-actuarial-science — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-international-hotel-and-touris — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-international-hotel-and-touris — retrying via browser
+[EXTRACT] 71/174: Master Of Financemaster Of Business Administration
+Fetching 71/174: Master Of Financemaster Of Business Administration
+[EXTRACT] 72/174: Master Of Sport Management Master Of Project Management
+Fetching 72/174: Master Of Sport Management Master Of Project Management
+[BOND ✓] bachelor-of-actuarial-science-3-year-pro — intakes=January,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Actuarial Science (3 Year Program) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['January', 'September']" [bond_static conf=0.85] StudyMode: ❌ not found
+[BOND ✓] bachelor-of-actuarial-science — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-actuarial-science-3-year-program
+[FIELD SUMMARY] Bachelor of Actuarial Science Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-actuarial-science
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-actuarial-science-3-year-program: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-actuarial-science-3- → 0 field(s) (cost=$0.000000, in=3876 out=0)
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-actuarial-science: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-actuarial-science → 0 field(s) (cost=$0.000000, in=3942 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-actuarial-science-3-year-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-actuarial-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-actuarial-science-3-year-program
+[CATEGORY det] Bachelor of Actuarial Science (3 Year Pr → Business & Management / Finance
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-actuarial-science
+⚠️ [WARN 65/100] Bachelor of Actuarial Science (3 Year Program) — missing: english, mode | bachelor-of-actuarial-science-3-year-pro
+[CATEGORY det] Bachelor of Actuarial Science → Business & Management / Finance
+[EXTRACT] 73/174: Graduate Diploma Business Administration
+⚠️ [WARN 65/100] Bachelor of Actuarial Science — missing: english, mode | bachelor-of-actuarial-science
+Fetching 73/174: Graduate Diploma Business Administration
+[EXTRACT] 74/174: Master Of Finance
+Fetching 74/174: Master Of Finance
+[BOND ✓] master-of-financemaster-of-business-admi — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Finance/ Master of Business Administrati Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May', 'January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-financemaster-of-business-administration
+[BOND ✓] graduate-diploma-business-administration — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-finance — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Diploma in Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Finance Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-business-administration
+[per-course browser ↻] https://bond.edu.au/program/master-of-finance
+[per-course browser ✗] https://bond.edu.au/program/graduate-diploma-business-administration: empty response
+[GEMINI] https://bond.edu.au/program/graduate-diploma-business-admini → 0 field(s) (cost=$0.000000, in=2896 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-business-administration
+[per-course browser ✗] https://bond.edu.au/program/master-of-finance: empty response
+⚠️ [WARN 65/100] Graduate Diploma in Business Administration — missing: english, mode | graduate-diploma-business-administration
+[GEMINI] https://bond.edu.au/program/master-of-finance → 0 field(s) (cost=$0.000000, in=3704 out=0)
+[EXTRACT] 75/174: Master Of Accounting
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-finance (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 75/174: Master Of Accounting
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-finance
+[CATEGORY det] Master of Finance → Business & Management / Finance
+⚠️ [WARN 65/100] Master of Finance — missing: english, mode | master-of-finance
+[EXTRACT] 76/174: Master Of Business Administration Professional
+Fetching 76/174: Master Of Business Administration Professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-financemaster-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-financemaster-of-busin → 0 field(s) (cost=$0.000000, in=4153 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-financemaster-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-financemaster-of-business-administration
+[CATEGORY det] Master of Finance/ Master of Business Ad → Business & Management / MBA
+⚠️ [WARN 75/100] Master of Finance/ Master of Business Administrati — missing: english | master-of-financemaster-of-business-admi
+[EXTRACT] 77/174: Graduate Certificate Business Administration
+Fetching 77/174: Graduate Certificate Business Administration
+[BOND ✓] graduate-certificate-business-administra — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-business-administration
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-sport-management-master-of-proje — retrying via browser
+[EXTRACT] 78/174: Master Of Sport Management
+Fetching 78/174: Master Of Sport Management
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-business-ad → 0 field(s) (cost=$0.000000, in=2901 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-business-administration
+⚠️ [WARN 65/100] Graduate Certificate in Business Administration — missing: english, mode | graduate-certificate-business-administra
+[EXTRACT] 79/174: Master Of Sport Management Professional
+Fetching 79/174: Master Of Sport Management Professional
+[BOND ✓] master-of-sport-management-professional — intakes=January,May,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Sport Management (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-sport-management-professional
+[BOND ✓] master-of-sport-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Sport Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-sport-management
+[per-course browser ✗] https://bond.edu.au/program/master-of-sport-management: empty response
+[GEMINI] https://bond.edu.au/program/master-of-sport-management → 0 field(s) (cost=$0.000000, in=4194 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-sport-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-sport-management
+⚠️ [WARN 75/100] Master of Sport Management — missing: english | master-of-sport-management
+[EXTRACT] 80/174: Graduate Certificate Sport Management
+Fetching 80/174: Graduate Certificate Sport Management
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-accounting — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-business-administration-professi — retrying via browser
+[per-course browser ✓] https://bond.edu.au/program/master-of-sport-management-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 81/174: Graduate Diploma Sport Management
+[EXTRACT] 82/174: Master Of Business Data Analytics
+[GEMINI] https://bond.edu.au/program/master-of-sport-management-profe → 0 field(s) (cost=$0.000000, in=3834 out=0)
+Fetching 81/174: Graduate Diploma Sport Management
+Fetching 82/174: Master Of Business Data Analytics
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-sport-management-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-sport-management-professional
+⚠️ [WARN 75/100] Master of Sport Management (Professional) — missing: english | master-of-sport-management-professional
+[EXTRACT] 83/174: Master Of Business Data Analytics Professional
+Fetching 83/174: Master Of Business Data Analytics Professional
+[BOND ✓] graduate-certificate-sport-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Sport Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-sport-management
+[BOND ✓] master-of-business-data-analytics-profes — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-business-data-analytics — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] graduate-diploma-sport-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Business Data Analytics (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May', 'January']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Business Data Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[FIELD SUMMARY] Graduate Diploma in Sport Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-business-data-analytics-professional
+[per-course browser ↻] https://bond.edu.au/program/master-of-business-data-analytics
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-sport-management
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-sport-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-sport-manag → 0 field(s) (cost=$0.000000, in=2940 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-sport-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-sport-management
+❌ [LOW 45/100] Graduate Certificate in Sport Management — missing: english, intake, mode | graduate-certificate-sport-management
+[EXTRACT] 84/174: Master Of Business Administrationmaster Of Project Management
+Fetching 84/174: Master Of Business Administrationmaster Of Project Management
+[per-course browser ✗] https://bond.edu.au/program/master-of-business-data-analytics: empty response
+[GEMINI] https://bond.edu.au/program/master-of-business-data-analytic → 0 field(s) (cost=$0.000000, in=3526 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-business-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-business-data-analytics
+[CATEGORY det] Master of Business Data Analytics → Computer Science & IT / Data Science
+⚠️ [WARN 65/100] Master of Business Data Analytics — missing: english, mode | master-of-business-data-analytics
+[EXTRACT] 85/174: Bachelor Of Policy Philosophy And Economicsbachelor Of Laws
+Fetching 85/174: Bachelor Of Policy Philosophy And Economicsbachelor Of Laws
+[per-course browser ✓] https://bond.edu.au/program/master-of-business-data-analytics-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-business-data-analytic → 0 field(s) (cost=$0.000000, in=3720 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-business-data-analytics-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-business-data-analytics-professional
+[CATEGORY det] Master of Business Data Analytics (Profe → Computer Science & IT / Data Science
+⚠️ [WARN 65/100] Master of Business Data Analytics (Professional) — missing: english, mode | master-of-business-data-analytics-profes
+[EXTRACT] 86/174: Bachelor Of Laws
+Fetching 86/174: Bachelor Of Laws
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-sport-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-diploma-sport-managemen → 0 field(s) (cost=$0.000000, in=2963 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-sport-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-sport-management
+⚠️ [WARN 65/100] Graduate Diploma in Sport Management — missing: english, mode | graduate-diploma-sport-management
+[EXTRACT] 87/174: Master Of Finance Professional
+Fetching 87/174: Master Of Finance Professional
+[BOND ✓] bachelor-of-laws — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['June']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-laws
+[BOND ✓] master-of-finance-professional — intakes=May,January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Finance (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May', 'January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-finance-professional
+[per-course browser ✗] https://bond.edu.au/program/master-of-finance-professional: empty response
+[GEMINI] https://bond.edu.au/program/master-of-finance-professional → 0 field(s) (cost=$0.000000, in=3703 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-finance-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-finance-professional
+[CATEGORY det] Master of Finance (Professional) → Business & Management / Finance
+⚠️ [WARN 65/100] Master of Finance (Professional) — missing: english, mode | master-of-finance-professional
+[EXTRACT] 88/174: Bachelor Of Communicationbachelor Of Laws
+Fetching 88/174: Bachelor Of Communicationbachelor Of Laws
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-business-administrationmaster-of — retrying via browser
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-laws → 0 field(s) (cost=$0.000000, in=3911 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-laws
+[EXTRACT] 89/174: Bachelor Of Communication Businessbachelor Of Laws
+⚠️ [WARN 75/100] Bachelor of Laws — missing: english | bachelor-of-laws
+Fetching 89/174: Bachelor Of Communication Businessbachelor Of Laws
+[EXTRACT] 90/174: Bachelor Of Actuarial Sciencebachelor Of Laws
+Fetching 90/174: Bachelor Of Actuarial Sciencebachelor Of Laws
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-policy-philosophy-and-economic — retrying via browser
+[EXTRACT] 91/174: Diploma Of Arts
+Fetching 91/174: Diploma Of Arts
+[BOND ✓] bachelor-of-actuarial-sciencebachelor-of — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-communication-businessbachel — intakes=May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Actuarial Science/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Communication (Business)/ Bachelor of Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '11.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-actuarial-sciencebachelor-of-laws
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-communication-businessbachelor-of-laws
+[BOND ✓] diploma-of-arts — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Diploma of Arts Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[BOND ✓] bachelor-of-communicationbachelor-of-law — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-arts
+[FIELD SUMMARY] Bachelor of Communication/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '10.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-communicationbachelor-of-laws
+[per-course browser ✗] https://bond.edu.au/program/diploma-of-arts: empty response
+[GEMINI] https://bond.edu.au/program/diploma-of-arts → 0 field(s) (cost=$0.000000, in=3350 out=0)
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-communicationbachelor-of-laws: empty response
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/bachelor-of-communicationbachelo → 0 field(s) (cost=$0.000000, in=4603 out=0)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-arts
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-communicationbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+❌ [LOW 35/100] Diploma of Arts — missing: english, duration, intake | diploma-of-arts
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-communicationbachelor-of-laws
+[EXTRACT] 92/174: Diploma Of Legal Studies
+⚠️ [WARN 75/100] Bachelor of Communication/ Bachelor of Laws — missing: english | bachelor-of-communicationbachelor-of-law
+Fetching 92/174: Diploma Of Legal Studies
+[EXTRACT] 93/174: Bachelor Of Criminal Justice And Criminology
+Fetching 93/174: Bachelor Of Criminal Justice And Criminology
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-actuarial-sciencebachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-actuarial-sciencebac → 0 field(s) (cost=$0.000000, in=4188 out=0)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-communication-businessbachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-actuarial-sciencebachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/bachelor-of-communication-busine → 0 field(s) (cost=$0.000000, in=4319 out=0)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-actuarial-sciencebachelor-of-laws
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-communication-businessbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Actuarial Science/ Bachelor → Business & Management / Finance
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-communication-businessbachelor-of-laws
+❌ [LOW 55/100] Bachelor of Actuarial Science/ Bachelor of Laws — missing: english, intake | bachelor-of-actuarial-sciencebachelor-of
+⚠️ [WARN 75/100] Bachelor of Communication (Business)/ Bachelor of — missing: english | bachelor-of-communication-businessbachel
+[EXTRACT] 94/174: Graduate Certificate Criminology
+[EXTRACT] 95/174: Master Of Criminology
+Fetching 95/174: Master Of Criminology
+Fetching 94/174: Graduate Certificate Criminology
+[BOND ✓] graduate-certificate-criminology — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-criminology — intakes=January,May,September, loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Criminology Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Criminology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-criminology
+[per-course browser ↻] https://bond.edu.au/program/master-of-criminology
+[BOND ✓] diploma-of-legal-studies — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-criminal-justice-and-crimino — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Diploma of Legal Studies Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Criminal Justice and Criminology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-legal-studies
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-criminal-justice-and-criminology
+[per-course browser ✗] https://bond.edu.au/program/master-of-criminology: empty response
+[GEMINI] https://bond.edu.au/program/master-of-criminology → 0 field(s) (cost=$0.000000, in=4277 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-criminology
+[per-course browser ✗] https://bond.edu.au/program/diploma-of-legal-studies: empty response
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-criminal-justice-and-criminology: empty response
+[CATEGORY det] Master of Criminology → Law & Legal Studies / Criminal Justice
+[GEMINI] https://bond.edu.au/program/diploma-of-legal-studies → 0 field(s) (cost=$0.000000, in=3756 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-criminal-justice-and → 0 field(s) (cost=$0.000000, in=3836 out=0)
+⚠️ [WARN 75/100] Master of Criminology — missing: english | master-of-criminology
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-legal-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-criminal-justice-and-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-legal-studies
+[EXTRACT] 96/174: Master Of Criminology Professional
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-criminal-justice-and-criminology
+Fetching 96/174: Master Of Criminology Professional
+⚠️ [WARN 75/100] Diploma of Legal Studies — missing: english | diploma-of-legal-studies
+[CATEGORY det] Bachelor of Criminal Justice and Crimino → Law & Legal Studies / Criminal Justice
+[EXTRACT] 97/174: Master Of Criminologymaster Of Project Management
+⚠️ [WARN 65/100] Bachelor of Criminal Justice and Criminology — missing: english, mode | bachelor-of-criminal-justice-and-crimino
+Fetching 97/174: Master Of Criminologymaster Of Project Management
+[EXTRACT] 98/174: Bachelor Of Social Science
+Fetching 98/174: Bachelor Of Social Science
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-criminology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-criminology → 0 field(s) (cost=$0.000000, in=2845 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-certificate-criminology
+[CATEGORY det] Graduate Certificate in Criminology → Law & Legal Studies / Criminal Justice
+❌ [LOW 45/100] Graduate Certificate in Criminology — missing: english, duration, mode | graduate-certificate-criminology
+[EXTRACT] 99/174: Bachelor Of Global Studies Sustainability
+Fetching 99/174: Bachelor Of Global Studies Sustainability
+[BOND ✓] bachelor-of-global-studies-sustainabilit — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Global Studies (Sustainability) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-global-studies-sustainability
+[BOND ✓] master-of-criminologymaster-of-project-m — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-criminology-professional — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-social-science — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Criminology (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Criminology/ Master of Project Managemen Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Bachelor of Social Science Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-social-science
+[per-course browser ↻] https://bond.edu.au/program/master-of-criminologymaster-of-project-management
+[per-course browser ↻] https://bond.edu.au/program/master-of-criminology-professional
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-social-science: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-social-science → 0 field(s) (cost=$0.000000, in=3875 out=0)
+[per-course browser ✗] https://bond.edu.au/program/master-of-criminologymaster-of-project-management: empty response
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-social-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-social-science
+[GEMINI] https://bond.edu.au/program/master-of-criminologymaster-of-p → 0 field(s) (cost=$0.000000, in=4190 out=0)
+❌ [LOW 25/100] Bachelor of Social Science — missing: english, duration, intake, mode | bachelor-of-social-science
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-criminologymaster-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 100/174: Bachelor Of Arts
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-criminologymaster-of-project-management
+Fetching 100/174: Bachelor Of Arts
+[CATEGORY det] Master of Criminology/ Master of Project → Business & Management / Project Management
+⚠️ [WARN 65/100] Master of Criminology/ Master of Project Managemen — missing: english, mode | master-of-criminologymaster-of-project-m
+[EXTRACT] 101/174: Bachelor Of International Relationsbachelor Of Business
+[BOND ✓] bachelor-of-arts — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ✓] https://bond.edu.au/program/master-of-criminology-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+Fetching 101/174: Bachelor Of International Relationsbachelor Of Business
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-global-studies-sustainability — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-criminology-profession → 0 field(s) (cost=$0.000000, in=3258 out=0)
+[FIELD SUMMARY] Bachelor of Arts Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[GEMINI] https://bond.edu.au/program/bachelor-of-global-studies-susta → 0 field(s) (cost=$0.000000, in=3454 out=0)
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-arts
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-criminology-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-global-studies-sustainability (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-criminology-professional
+[BOND ✓] bachelor-of-international-relationsbache — intakes=January,May,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-global-studies-sustainability
+[CATEGORY det] Master of Criminology (Professional) → Law & Legal Studies / Criminal Justice
+[FIELD SUMMARY] Bachelor of International Relations/ Bachelor of B Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ❌ not found
+[CATEGORY det] Bachelor of Global Studies (Sustainabili → Agriculture & Environmental Science / Sustainability
+❌ [LOW 45/100] Master of Criminology (Professional) — missing: english, intake, mode | master-of-criminology-professional
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-business
+⚠️ [WARN 65/100] Bachelor of Global Studies (Sustainability) — missing: english, mode | bachelor-of-global-studies-sustainabilit
+[EXTRACT] 102/174: Master Of International Relationsmaster Of Project Management
+Fetching 102/174: Master Of International Relationsmaster Of Project Management
+[EXTRACT] 103/174: Bachelor Of Artsbachelor Of Laws
+Fetching 103/174: Bachelor Of Artsbachelor Of Laws
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-business: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-international-relati → 0 field(s) (cost=$0.000000, in=4516 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-business
+⚠️ [WARN 65/100] Bachelor of International Relations/ Bachelor of B — missing: english, mode | bachelor-of-international-relationsbache
+[EXTRACT] 104/174: Bachelor Of International Relationsbachelor Of Laws
+Fetching 104/174: Bachelor Of International Relationsbachelor Of Laws
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-arts → 0 field(s) (cost=$0.000000, in=3172 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[BOND ✓] bachelor-of-international-relationsbache — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-arts
+[FIELD SUMMARY] Bachelor of International Relations/ Bachelor of L Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ✅ "['June']" [regex conf=0.40] StudyMode: ❌ not found
+❌ [LOW 45/100] Bachelor of Arts — missing: english, intake, mode | bachelor-of-arts
+[EXTRACT] 105/174: Bachelor Of Policy Philosophy And Economics
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-laws
+Fetching 105/174: Bachelor Of Policy Philosophy And Economics
+[BOND ✓] master-of-international-relationsmaster- — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-artsbachelor-of-laws — intakes=May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of International Relations/ Master of Proje Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Arts/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '40.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ❌ not found
+[BOND ✓] bachelor-of-policy-philosophy-and-econom — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-of-international-relationsmaster-of-project-management
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-artsbachelor-of-laws
+[FIELD SUMMARY] Bachelor of Policy, Philosophy and Economics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '40.0' [regex conf=0.75] Intake: ✅ "['June']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-policy-philosophy-and-economics
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-policy-philosophy-and-economics: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-policy-philosophy-an → 0 field(s) (cost=$0.000000, in=3686 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-policy-philosophy-and-economics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-policy-philosophy-and-economics
+⚠️ [WARN 65/100] Bachelor of Policy, Philosophy and Economics — missing: english, mode | bachelor-of-policy-philosophy-and-econom
+[EXTRACT] 106/174: Master Of International Relations Professional
+Fetching 106/174: Master Of International Relations Professional
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-international-relati → 0 field(s) (cost=$0.000000, in=3988 out=0)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-artsbachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/master-of-international-relationsmaster-of-project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-artsbachelor-of-laws → 0 field(s) (cost=$0.000000, in=4077 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/master-of-international-relation → 0 field(s) (cost=$0.000000, in=3885 out=0)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-international-relationsbachelor-of-laws
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-artsbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-international-relationsmaster-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 65/100] Bachelor of International Relations/ Bachelor of L — missing: english, mode | bachelor-of-international-relationsbache
+[EXTRACT] 107/174: Master Of Arts Tesol
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-international-relationsmaster-of-project-management
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-artsbachelor-of-laws
+⚠️ [WARN 65/100] Bachelor of Arts/ Bachelor of Laws — missing: english, mode | bachelor-of-artsbachelor-of-laws
+Fetching 107/174: Master Of Arts Tesol
+[CATEGORY det] Master of International Relations/ Maste → Business & Management / Project Management
+[EXTRACT] 108/174: Master Of Arts Coursework
+Fetching 108/174: Master Of Arts Coursework
+❌ [LOW 55/100] Master of International Relations/ Master of Proje — missing: english, intake | master-of-international-relationsmaster-
+[EXTRACT] 109/174: Master Of International Relations
+Fetching 109/174: Master Of International Relations
+[BOND ✓] master-of-arts-coursework — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-international-relations — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Arts (Coursework) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['May', 'September']" [regex conf=0.70] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of International Relations Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-arts-coursework
+[BOND ✓] master-of-international-relations-profes — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-of-arts-tesol — intakes=January,May,September, loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-of-international-relations
+[FIELD SUMMARY] Master of International Relations (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Arts (Tesol) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['January', 'May', 'September'" [bond_static conf=0.85] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/master-of-international-relations-professional
+[per-course browser ↻] https://bond.edu.au/program/master-of-arts-tesol
+[per-course browser ✗] https://bond.edu.au/program/master-of-arts-coursework: empty response
+[GEMINI] https://bond.edu.au/program/master-of-arts-coursework → 0 field(s) (cost=$0.000000, in=3357 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-arts-coursework (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✗] https://bond.edu.au/program/master-of-international-relations-professional: empty response
+[per-course browser ✗] https://bond.edu.au/program/master-of-arts-tesol: empty response
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-arts-coursework
+[GEMINI] https://bond.edu.au/program/master-of-international-relation → 0 field(s) (cost=$0.000000, in=3476 out=0)
+[GEMINI] https://bond.edu.au/program/master-of-arts-tesol → 0 field(s) (cost=$0.000000, in=4322 out=0)
+⚠️ [WARN 65/100] Master of Arts (Coursework) — missing: english, mode | master-of-arts-coursework
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-international-relations-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-arts-tesol (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 110/174: Medical Program Frequently Asked Questions
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-arts-tesol
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-international-relations-professional
+Fetching 110/174: Medical Program Frequently Asked Questions
+❌ [LOW 45/100] Master of International Relations (Professional) — missing: english, intake, mode | master-of-international-relations-profes
+[CATEGORY det] Master of Arts (Tesol) → Education & Social Work / TESOL
+⚠️ [WARN 75/100] Master of Arts (Tesol) — missing: english | master-of-arts-tesol
+[EXTRACT] 111/174: Medical Program Entry Assessment Table
+[EXTRACT] 112/174: Master Of Accounting Professional
+Fetching 111/174: Medical Program Entry Assessment Table
+Fetching 112/174: Master Of Accounting Professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-international-relations — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-international-relation → 0 field(s) (cost=$0.000000, in=3266 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-international-relations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-international-relations
+❌ [LOW 45/100] Master of International Relations — missing: english, intake, mode | master-of-international-relations
+[EXTRACT] 113/174: Bachelor Of Commercebachelor Of Laws
+Fetching 113/174: Bachelor Of Commercebachelor Of Laws
+[BOND ✓] master-of-accounting-professional — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Accounting (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[BOND ✓] medical-program-frequently-asked-questio — intakes=May,September, loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-of-accounting-professional
+[FIELD SUMMARY] Medical Program* Frequently Asked Questions Fee: ✅ '182172' [regex conf=0.80] IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May', 'September']" [bond_static conf=0.85] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[BOND ✓] medical-program-entry-assessment-table — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/medical-program/medical-program-frequently-asked-questions
+[BOND ✓] bachelor-of-commercebachelor-of-laws — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Medical Program* Entry Assessment Table Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Bachelor of Commerce/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/medical-program/medical-program-entry-assessment-table
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-commercebachelor-of-laws
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-commercebachelor-of-laws: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-commercebachelor-of- → 0 field(s) (cost=$0.000000, in=3233 out=0)
+[per-course browser ✗] https://bond.edu.au/program/medical-program/medical-program-entry-assessment-table: empty response
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-commercebachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/medical-program/medical-program- → 0 field(s) (cost=$0.000000, in=3285 out=0)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-commercebachelor-of-laws
+[FALLBACK] AI enriching https://bond.edu.au/program/medical-program/medical-program-entry-assessment-table (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 65/100] Bachelor of Commerce/ Bachelor of Laws — missing: english, mode | bachelor-of-commercebachelor-of-laws
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/medical-program/medical-program-entry-assessment-table
+[EXTRACT] 114/174: Bachelor Of Commerce
+⚠️ [WARN 65/100] Medical Program* Entry Assessment Table — missing: english, mode | medical-program-entry-assessment-table
+[EXTRACT] 115/174: Bond University College Foundation Program Academic Entry
+Fetching 114/174: Bachelor Of Commerce
+Fetching 115/174: Bond University College Foundation Program Academic Entry
+[per-course browser ✓] https://bond.edu.au/program/master-of-accounting-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-accounting-professiona → 0 field(s) (cost=$0.000000, in=4073 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-accounting-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-accounting-professional
+[CATEGORY det] Master of Accounting (Professional) → Business & Management / Accounting
+⚠️ [WARN 65/100] Master of Accounting (Professional) — missing: english, mode | master-of-accounting-professional
+[EXTRACT] 116/174: Bachelor Of Businessbachelor Of Commerce
+Fetching 116/174: Bachelor Of Businessbachelor Of Commerce
+[BOND ✓] bachelor-of-businessbachelor-of-commerce — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Business/ Bachelor of Commerce Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ✓] https://bond.edu.au/program/medical-program/medical-program-frequently-asked-questions — IELTS=— PTE=— TOEFL=— CAE=— fee=182172 filled=[]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-businessbachelor-of-commerce
+[GEMINI] https://bond.edu.au/program/medical-program/medical-program- → 0 field(s) (cost=$0.000000, in=10528 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/medical-program/medical-program-frequently-asked-questions (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/medical-program/medical-program-frequently-asked-questions
+[BOND ✓] bachelor-of-commerce — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+❌ [LOW 55/100] Medical Program* Frequently Asked Questions — missing: english, duration | medical-program-frequently-asked-questio
+[FIELD SUMMARY] Bachelor of Commerce Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[EXTRACT] 117/174: Medical Program Important Dates Deadlines
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-commerce
+Fetching 117/174: Medical Program Important Dates Deadlines
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-commerce: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-commerce → 0 field(s) (cost=$0.000000, in=3695 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-commerce
+⚠️ [WARN 65/100] Bachelor of Commerce — missing: english, mode | bachelor-of-commerce
+[EXTRACT] 118/174: Doctor Physiotherapy Prerequisites
+Fetching 118/174: Doctor Physiotherapy Prerequisites
+[BOND ✓] bond-university-college-foundation-progr — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bond University College Foundation Program Academi Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bond-college-foundation-program/bond-university-college-foundation-program-academic-entry
+[per-course browser ✗] https://bond.edu.au/program/bond-college-foundation-program/bond-university-college-foundation-program-academic-entry: empty response
+[GEMINI] https://bond.edu.au/program/bond-college-foundation-program/ → 0 field(s) (cost=$0.000000, in=2637 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bond-college-foundation-program/bond-university-college-foundation-program-academic-entry (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bond-college-foundation-program/bond-university-college-foundation-program-academic-entry
+❌ [LOW 45/100] Bond University College Foundation Program Academi — missing: english, intake, mode | bond-university-college-foundation-progr
+[EXTRACT] 119/174: Bachelor Of Biomedical Science
+Fetching 119/174: Bachelor Of Biomedical Science
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-businessbachelor-of-commerce — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-businessbachelor-of- → 0 field(s) (cost=$0.000000, in=3954 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-businessbachelor-of-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-businessbachelor-of-commerce
+⚠️ [WARN 65/100] Bachelor of Business/ Bachelor of Commerce — missing: english, mode | bachelor-of-businessbachelor-of-commerce
+[EXTRACT] 120/174: Bachelor Of Exercise And Sports Science
+Fetching 120/174: Bachelor Of Exercise And Sports Science
+[BOND ✓] bachelor-of-biomedical-science — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Biomedical Science Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May', 'January']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-biomedical-science
+[BOND ✓] bachelor-of-exercise-and-sports-science — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Exercise and Sports Science Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['February', 'July', 'October'" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-exercise-and-sports-science
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/medical-program/medical-program-important- — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/doctor-physiotherapy/doctor-physiotherapy- — retrying via browser
+[EXTRACT] 121/174: Bachelor Of Exercise And Sports Performance
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-exercise-and-sports-science: empty response
+Fetching 121/174: Bachelor Of Exercise And Sports Performance
+[EXTRACT] 122/174: Doctor Of Physiotherapy
+[GEMINI] https://bond.edu.au/program/bachelor-of-exercise-and-sports- → 0 field(s) (cost=$0.000000, in=4830 out=0)
+Fetching 122/174: Doctor Of Physiotherapy
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-exercise-and-sports-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[BOND ✓] bachelor-of-exercise-and-sports-performa — intakes=May, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-exercise-and-sports-science
+[FIELD SUMMARY] Bachelor of Exercise and Sports Performance Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['May']" [bond_static conf=0.85] StudyMode: ❌ not found
+❌ [LOW 45/100] Bachelor of Exercise and Sports Science — missing: english, duration, mode | bachelor-of-exercise-and-sports-science
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-exercise-and-sports-performance
+[EXTRACT] 123/174: Master Of Occupational Therapy
+Fetching 123/174: Master Of Occupational Therapy
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-biomedical-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-biomedical-science → 0 field(s) (cost=$0.000000, in=4477 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-biomedical-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-biomedical-science
+[BOND ✓] master-of-occupational-therapy — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+⚠️ [WARN 65/100] Bachelor of Biomedical Science — missing: english, mode | bachelor-of-biomedical-science
+[FIELD SUMMARY] Master of Occupational Therapy Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '6.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-occupational-therapy
+[EXTRACT] 124/174: Graduate Diploma Occupation And Health
+Fetching 124/174: Graduate Diploma Occupation And Health
+[BOND ✓] doctor-of-physiotherapy — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Doctor of Physiotherapy Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/doctor-of-physiotherapy
+[BOND ✓] graduate-diploma-occupation-and-health — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Diploma in Occupation and Health Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-occupation-and-health
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-exercise-and-sports-performance — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-exercise-and-sports- → 0 field(s) (cost=$0.000000, in=4081 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-exercise-and-sports-performance (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-exercise-and-sports-performance
+⚠️ [WARN 65/100] Bachelor of Exercise and Sports Performance — missing: english, mode | bachelor-of-exercise-and-sports-performa
+[EXTRACT] 125/174: Master Of Healthcare Innovations
+Fetching 125/174: Master Of Healthcare Innovations
+[per-course browser ✗] https://bond.edu.au/program/doctor-of-physiotherapy: empty response
+[per-course browser ✗] https://bond.edu.au/program/graduate-diploma-occupation-and-health: empty response
+[GEMINI] https://bond.edu.au/program/doctor-of-physiotherapy → 0 field(s) (cost=$0.000000, in=4035 out=0)
+[GEMINI] https://bond.edu.au/program/graduate-diploma-occupation-and- → 0 field(s) (cost=$0.000000, in=2508 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/doctor-of-physiotherapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-occupation-and-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/doctor-of-physiotherapy
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-occupation-and-health
+[CATEGORY det] Doctor of Physiotherapy → Medicine & Health / Physiotherapy
+❌ [LOW 45/100] Graduate Diploma in Occupation and Health — missing: english, duration, mode | graduate-diploma-occupation-and-health
+❌ [LOW 45/100] Doctor of Physiotherapy — missing: english, duration, mode | doctor-of-physiotherapy
+[EXTRACT] 126/174: Bachelor Of Business Law
+[EXTRACT] 127/174: Master Occupational Therapy Prerequisites
+Fetching 126/174: Bachelor Of Business Law
+Fetching 127/174: Master Occupational Therapy Prerequisites
+[per-course browser ✓] https://bond.edu.au/program/master-of-occupational-therapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-occupational-therapy → 0 field(s) (cost=$0.000000, in=5194 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-occupational-therapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-occupational-therapy
+❌ [LOW 45/100] Master of Occupational Therapy — missing: english, intake, mode | master-of-occupational-therapy
+[EXTRACT] 128/174: Bachelor Of Jurisprudence
+Fetching 128/174: Bachelor Of Jurisprudence
+[BOND ✓] master-of-healthcare-innovations — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Healthcare Innovations Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[BOND ✓] bachelor-of-business-law — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] master-occupational-therapy-prerequisite — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-of-healthcare-innovations
+[FIELD SUMMARY] Bachelor of Business Law Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Master of Occupational Therapy Prerequisites Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-business-law
+[BOND ✓] bachelor-of-jurisprudence — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites
+[FIELD SUMMARY] Bachelor of Jurisprudence Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-jurisprudence
+[per-course browser ✗] https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites: empty response
+[GEMINI] https://bond.edu.au/program/master-occupational-therapy/mast → 0 field(s) (cost=$0.000000, in=3708 out=0)
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-jurisprudence: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-jurisprudence → 0 field(s) (cost=$0.000000, in=2566 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-jurisprudence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-jurisprudence
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-occupational-therapy/master-occupational-therapy-prerequisites
+❌ [LOW 45/100] Bachelor of Jurisprudence — missing: english, intake, mode | bachelor-of-jurisprudence
+❌ [LOW 25/100] Master of Occupational Therapy Prerequisites — missing: english, duration, intake, mode | master-occupational-therapy-prerequisite
+[EXTRACT] 129/174: Graduate Diploma Legal Practice
+[EXTRACT] 130/174: Master Of Business Administration
+Fetching 129/174: Graduate Diploma Legal Practice
+Fetching 130/174: Master Of Business Administration
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-business-law — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/master-of-healthcare-innovations — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-business-law → 0 field(s) (cost=$0.000000, in=2641 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-business-law (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://bond.edu.au/program/master-of-healthcare-innovations → 0 field(s) (cost=$0.000000, in=4416 out=0)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-business-law
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-healthcare-innovations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+⚠️ [WARN 65/100] Bachelor of Business Law — missing: english, mode | bachelor-of-business-law
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-healthcare-innovations
+[EXTRACT] 131/174: Master Of Management
+⚠️ [WARN 75/100] Master of Healthcare Innovations — missing: english | master-of-healthcare-innovations
+Fetching 131/174: Master Of Management
+[EXTRACT] 132/174: Master Of Actuarial Science
+Fetching 132/174: Master Of Actuarial Science
+[BOND ✓] master-of-business-administration — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[DOMESTIC ONLY] https://bond.edu.au/program/graduate-diploma-legal-practice — course page states domestic-students-only; skipping
+[FIELD SUMMARY] Master of Business Administration Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[EXTRACT] 133/174: Bachelor Of Health Sciences Honours Intensive
+[per-course browser ↻] https://bond.edu.au/program/master-of-business-administration
+Fetching 133/174: Bachelor Of Health Sciences Honours Intensive
+[BOND ✓] bachelor-of-health-sciences-honours-inte — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Health Sciences (Honours, Intensive) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-health-sciences-honours-intensive
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-health-sciences-honours-intensive: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-health-sciences-hono → 0 field(s) (cost=$0.000000, in=2736 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-health-sciences-honours-intensive (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-health-sciences-honours-intensive
+⚠️ [WARN 65/100] Bachelor of Health Sciences (Honours, Intensive) — missing: english, mode | bachelor-of-health-sciences-honours-inte
+[EXTRACT] 134/174: Doctor Of Legal Science Research
+Fetching 134/174: Doctor Of Legal Science Research
+[per-course browser ✓] https://bond.edu.au/program/master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-business-administratio → 0 field(s) (cost=$0.000000, in=3892 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-business-administration
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+⚠️ [WARN 75/100] Master of Business Administration — missing: english | master-of-business-administration
+[EXTRACT] 135/174: Graduate Diploma Healthcare Innovations
+Fetching 135/174: Graduate Diploma Healthcare Innovations
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-management — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-actuarial-science — retrying via browser
+[BOND ✓] master-of-actuarial-science — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Actuarial Science Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.70] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-actuarial-science
+[BOND ✓] master-of-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May', 'January']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-management
+[per-course browser ✗] https://bond.edu.au/program/master-of-actuarial-science: empty response
+[GEMINI] https://bond.edu.au/program/master-of-actuarial-science → 0 field(s) (cost=$0.000000, in=3628 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-actuarial-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-actuarial-science
+[CATEGORY det] Master of Actuarial Science → Business & Management / Finance
+[per-course browser ✗] https://bond.edu.au/program/master-of-management: empty response
+⚠️ [WARN 65/100] Master of Actuarial Science — missing: english, mode | master-of-actuarial-science
+[EXTRACT] 136/174: Graduate Certificate Health Systems
+[GEMINI] https://bond.edu.au/program/master-of-management → 0 field(s) (cost=$0.000000, in=3281 out=0)
+Fetching 136/174: Graduate Certificate Health Systems
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-management
+[CATEGORY det] Master of Management → Business & Management / Management
+⚠️ [WARN 65/100] Master of Management — missing: english, mode | master-of-management
+[EXTRACT] 137/174: Graduate Certificate Evidence Based Practice
+Fetching 137/174: Graduate Certificate Evidence Based Practice
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/doctor-of-legal-science-research — retrying via browser
+[EXTRACT] 138/174: Master Of Business Professional
+Fetching 138/174: Master Of Business Professional
+[DOMESTIC ONLY] https://bond.edu.au/program/graduate-certificate-health-systems — course page states domestic-students-only; skipping
+[EXTRACT] 139/174: Master Of Business
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-diploma-healthcare-innovations — retrying via browser
+Fetching 139/174: Master Of Business
+[EXTRACT] 140/174: Bachelor Of Business Data Analytics
+Fetching 140/174: Bachelor Of Business Data Analytics
+[BOND ✓] master-of-business-professional — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Business (Professional) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['February', 'July', 'October'" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-business-professional
+[per-course browser ✓] https://bond.edu.au/program/master-of-business-professional — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-business-professional → 0 field(s) (cost=$0.000000, in=3786 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-business-professional (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-business-professional
+⚠️ [WARN 65/100] Master of Business (Professional) — missing: english, mode | master-of-business-professional
+[EXTRACT] 141/174: Diploma Of Business
+Fetching 141/174: Diploma Of Business
+[BOND ✓] diploma-of-business — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Diploma of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-certificate-evidence-based-practi — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-business-data-analytics — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-business — retrying via browser
+[per-course browser ↻] https://bond.edu.au/program/diploma-of-business
+[per-course browser ✓] https://bond.edu.au/program/diploma-of-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/diploma-of-business → 0 field(s) (cost=$0.000000, in=4023 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/diploma-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/diploma-of-business
+[BOND ✓] master-of-business — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[DOMESTIC ONLY] https://bond.edu.au/program/graduate-certificate-evidence-based-practice — course page states domestic-students-only; skipping
+[BOND ✓] bachelor-of-business-data-analytics — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+⚠️ [WARN 75/100] Diploma of Business — missing: english | diploma-of-business
+[FIELD SUMMARY] Bachelor of Business Data Analytics Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[EXTRACT] 142/174: Bond University College Foundation Program
+[EXTRACT] 143/174: Master Of Laws By Research
+[FIELD SUMMARY] Master of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+Fetching 142/174: Bond University College Foundation Program
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-business-data-analytics
+Fetching 143/174: Master Of Laws By Research
+[per-course browser ↻] https://bond.edu.au/program/master-of-business
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-business-data-analytics: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-business-data-analyt → 0 field(s) (cost=$0.000000, in=3023 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-business-data-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✗] https://bond.edu.au/program/master-of-business: empty response
+[GEMINI] https://bond.edu.au/program/master-of-business → 0 field(s) (cost=$0.000000, in=3278 out=0)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-business-data-analytics
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business Data Analytics → Computer Science & IT / Data Science
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-business
+⚠️ [WARN 65/100] Bachelor of Business Data Analytics — missing: english, mode | bachelor-of-business-data-analytics
+⚠️ [WARN 65/100] Master of Business — missing: english, mode | master-of-business
+[EXTRACT] 144/174: Master Of Psychology Clinical
+[EXTRACT] 145/174: Bachelor Of Businessbachelor Of Laws
+Fetching 145/174: Bachelor Of Businessbachelor Of Laws
+Fetching 144/174: Master Of Psychology Clinical
+[BOND ✓] master-of-psychology-clinical — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Psychology (Clinical) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '56.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-psychology-clinical
+[BOND ✓] bachelor-of-businessbachelor-of-laws — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Business/ Bachelor of Laws Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-businessbachelor-of-laws
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-businessbachelor-of-laws: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-businessbachelor-of- → 0 field(s) (cost=$0.000000, in=3925 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-businessbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bachelor-of-businessbachelor-of-laws
+❌ [LOW 55/100] Bachelor of Business/ Bachelor of Laws — missing: english, intake | bachelor-of-businessbachelor-of-laws
+[EXTRACT] 146/174: Bachelor Of Health Sciences
+Fetching 146/174: Bachelor Of Health Sciences
+[per-course browser ✓] https://bond.edu.au/program/master-of-psychology-clinical — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-psychology-clinical → 0 field(s) (cost=$0.000000, in=3782 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-psychology-clinical (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-psychology-clinical
+[CATEGORY det] Master of Psychology (Clinical) → Medicine & Health / Psychology
+⚠️ [WARN 75/100] Master of Psychology (Clinical) — missing: english | master-of-psychology-clinical
+[EXTRACT] 147/174: Bachelor Of Health Sciences Honours
+Fetching 147/174: Bachelor Of Health Sciences Honours
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bond-university-college-foundation-program — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-laws-by-research — retrying via browser
+[BOND ✓] master-of-laws-by-research — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Laws (by Research) Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/master-of-laws-by-research
+[BOND ✓] bond-university-college-foundation-progr — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bond University College Foundation Program Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/bond-university-college-foundation-program
+[per-course browser ✗] https://bond.edu.au/program/bond-university-college-foundation-program: empty response
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-health-sciences — retrying via browser
+[GEMINI] https://bond.edu.au/program/bond-university-college-foundati → 0 field(s) (cost=$0.000000, in=4056 out=0)
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-health-sciences-honours — retrying via browser
+[FALLBACK] AI enriching https://bond.edu.au/program/bond-university-college-foundation-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/bond-university-college-foundation-program
+[WARN] Bond University College Foundation Progr — English section detected in HTML but all scores blank
+⚠️ [WARN 75/100] Bond University College Foundation Program — missing: english | bond-university-college-foundation-progr
+[EXTRACT] 148/174: Bachelor Of International Relations
+Fetching 148/174: Bachelor Of International Relations
+[EXTRACT] 149/174: Master Of Actuarial Practice
+[EXTRACT] 150/174: Bachelor Of Health Transformation
+Fetching 150/174: Bachelor Of Health Transformation
+Fetching 149/174: Master Of Actuarial Practice
+[per-course browser ✓] https://bond.edu.au/program/master-of-laws-by-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-laws-by-research → 0 field(s) (cost=$0.000000, in=3517 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-laws-by-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-laws-by-research
+❌ [LOW 25/100] Master of Laws (by Research) — missing: english, duration, intake, mode | master-of-laws-by-research
+[EXTRACT] 151/174: Bachelor Of Digital Transformation
+Fetching 151/174: Bachelor Of Digital Transformation
+[BOND ✓] bachelor-of-digital-transformation — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Digital Transformation Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-digital-transformation
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-digital-transformation — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-digital-transformati → 0 field(s) (cost=$0.000000, in=4594 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-digital-transformation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-digital-transformation
+❌ [LOW 45/100] Bachelor of Digital Transformation — missing: english, duration, mode | bachelor-of-digital-transformation
+[EXTRACT] 152/174: Bachelor Of Entrepreneurial Transformation
+Fetching 152/174: Bachelor Of Entrepreneurial Transformation
+[BOND ✓] bachelor-of-entrepreneurial-transformati — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Entrepreneurial Transformation Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/master-of-actuarial-practice — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-health-transformation — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-international-relations — retrying via browser
+[EXTRACT] 153/174: Graduate Diploma Building Information Modelling And Integrated Project Delivery
+Fetching 153/174: Graduate Diploma Building Information Modelling And Integrated Project Delivery
+[EXTRACT] 154/174: Graduate Certificate Building Information Modelling And Integrated Project Delivery
+[EXTRACT] 155/174: Master Of Building Information Modelling And Integrated Project Delivery
+Fetching 154/174: Graduate Certificate Building Information Modelling And Integrated Project Delivery
+Fetching 155/174: Master Of Building Information Modelling And Integrated Project Delivery
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-entrepreneurial-tran → 0 field(s) (cost=$0.000000, in=4488 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation
+[BOND ✓] graduate-diploma-building-information-mo — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+❌ [LOW 45/100] Bachelor of Entrepreneurial Transformation — missing: english, duration, mode | bachelor-of-entrepreneurial-transformati
+[FIELD SUMMARY] Graduate Diploma in Building Information Modelling Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[EXTRACT] 156/174: Bachelor Of Business Data Analytics 3 Year Program
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-building-information-modelling-and-integrated-project-delivery
+[BOND ✓] graduate-certificate-building-informatio — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[BOND ✓] master-of-building-information-modelling — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+Fetching 156/174: Bachelor Of Business Data Analytics 3 Year Program
+[FIELD SUMMARY] Graduate Certificate in Building Information Model Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[FIELD SUMMARY] Master of Building Information Modelling and Integ Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-building-information-modelling-and-integrated-project-delivery
+[per-course browser ↻] https://bond.edu.au/program/master-of-building-information-modelling-and-integrated-project-delivery
+[per-course browser ✗] https://bond.edu.au/program/graduate-certificate-building-information-modelling-and-integrated-project-delivery: empty response
+[GEMINI] https://bond.edu.au/program/graduate-certificate-building-in → 0 field(s) (cost=$0.000000, in=3534 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-building-information-modelling-and-integrated-project-delivery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/graduate-certificate-building-information-modelling-and-integrated-project-delivery
+❌ [LOW 55/100] Graduate Certificate in Building Information Model — missing: english, duration | graduate-certificate-building-informatio
+[EXTRACT] 157/174: Master Of Nutrition And Dietetic Practice
+Fetching 157/174: Master Of Nutrition And Dietetic Practice
+[BOND ✓] master-of-nutrition-and-dietetic-practic — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Nutrition and Dietetic Practice Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February']" [regex conf=0.40] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[per-course browser ↻] https://bond.edu.au/program/master-of-nutrition-and-dietetic-practice
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-building-information-modelling-and-integrated-project-delivery — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/master-of-building-information-modelling-and-integrated-project-delivery — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-diploma-building-inform → 0 field(s) (cost=$0.000000, in=3841 out=0)
+[GEMINI] https://bond.edu.au/program/master-of-building-information-m → 0 field(s) (cost=$0.000000, in=4517 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-building-information-modelling-and-integrated-project-delivery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-building-information-modelling-and-integrated-project-delivery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-building-information-modelling-and-integrated-project-delivery
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/graduate-diploma-building-information-modelling-and-integrated-project-delivery
+⚠️ [WARN 75/100] Master of Building Information Modelling and Integ — missing: english | master-of-building-information-modelling
+❌ [LOW 55/100] Graduate Diploma in Building Information Modelling — missing: english, duration | graduate-diploma-building-information-mo
+[EXTRACT] 158/174: Graduate Diploma Nutrition
+[EXTRACT] 159/174: Graduate Certificate Nutrition
+Fetching 158/174: Graduate Diploma Nutrition
+Fetching 159/174: Graduate Certificate Nutrition
+[BOND ✓] bachelor-of-business-data-analytics-3-ye — intakes=January,September, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Business Data Analytics (3 Year Progra Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['January', 'September']" [bond_static conf=0.85] StudyMode: ❌ not found
+[per-course browser ✓] https://bond.edu.au/program/master-of-nutrition-and-dietetic-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-business-data-analytics-3-year-program
+[GEMINI] https://bond.edu.au/program/master-of-nutrition-and-dietetic → 0 field(s) (cost=$0.000000, in=5021 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-nutrition-and-dietetic-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-nutrition-and-dietetic-practice
+⚠️ [WARN 75/100] Master of Nutrition and Dietetic Practice — missing: english | master-of-nutrition-and-dietetic-practic
+[EXTRACT] 160/174: Master Of Project Management
+Fetching 160/174: Master Of Project Management
+[BOND ✓] master-of-project-management — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-project-management
+[per-course browser ✗] https://bond.edu.au/program/master-of-project-management: empty response
+[GEMINI] https://bond.edu.au/program/master-of-project-management → 0 field(s) (cost=$0.000000, in=3604 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-project-management
+[CATEGORY det] Master of Project Management → Business & Management / Project Management
+⚠️ [WARN 75/100] Master of Project Management — missing: english | master-of-project-management
+[EXTRACT] 161/174: Graduate Certificate Family Dispute Resolution
+Fetching 161/174: Graduate Certificate Family Dispute Resolution
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-business-data-analytics-3-year-program — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-business-data-analyt → 0 field(s) (cost=$0.000000, in=3220 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-business-data-analytics-3-year-program (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-business-data-analytics-3-year-program
+[CATEGORY det] Bachelor of Business Data Analytics (3 Y → Computer Science & IT / Data Science
+⚠️ [WARN 65/100] Bachelor of Business Data Analytics (3 Year Progra — missing: english, mode | bachelor-of-business-data-analytics-3-ye
+[EXTRACT] 162/174: Master Of Valuation And Property Development
+Fetching 162/174: Master Of Valuation And Property Development
+[BOND ✓] graduate-certificate-family-dispute-reso — loc=Gold Coast, Queensland, mode=Blended, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Certificate in Family Dispute Resolution Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ✅ "['February', 'July']" [regex conf=0.70] StudyMode: ✅ 'Blended' [bond_static conf=0.85]
+[BOND ✓] master-of-valuation-and-property-develop — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Valuation and Property Development Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '16.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-family-dispute-resolution
+[per-course browser ↻] https://bond.edu.au/program/master-of-valuation-and-property-development
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-certificate-nutrition — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-diploma-nutrition — retrying via browser
+[EXTRACT] 163/174: Graduate Certificate Project Management
+Fetching 163/174: Graduate Certificate Project Management
+[EXTRACT] 164/174: Graduate Diploma Of Valuation And Property Development
+Fetching 164/174: Graduate Diploma Of Valuation And Property Development
+[per-course browser ✓] https://bond.edu.au/program/master-of-valuation-and-property-development — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-valuation-and-property → 0 field(s) (cost=$0.000000, in=3128 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-valuation-and-property-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/master-of-valuation-and-property-development
+❌ [LOW 45/100] Master of Valuation and Property Development — missing: english, intake, mode | master-of-valuation-and-property-develop
+[EXTRACT] 165/174: Medical Program Bachelor Of Medical Studies Doctor Of Medicine
+Fetching 165/174: Medical Program Bachelor Of Medical Studies Doctor Of Medicine
+[per-course browser ✓] https://bond.edu.au/program/graduate-certificate-family-dispute-resolution — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-certificate-family-disp → 0 field(s) (cost=$0.000000, in=2746 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-family-dispute-resolution (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/graduate-certificate-family-dispute-resolution
+⚠️ [WARN 75/100] Graduate Certificate in Family Dispute Resolution — missing: english | graduate-certificate-family-dispute-reso
+[EXTRACT] 166/174: Bachelor Of Health Sciences Master Of Occupational Therapy
+Fetching 166/174: Bachelor Of Health Sciences Master Of Occupational Therapy
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-certificate-project-management — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/graduate-diploma-of-valuation-and-property — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/medical-program-bachelor-of-medical-studie — retrying via browser
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-health-sciences-master-of-occu — retrying via browser
+[EXTRACT] 167/174: Bachelor Of Biomedical Science Master Of Nutrition And Dietetic Practice
+Fetching 167/174: Bachelor Of Biomedical Science Master Of Nutrition And Dietetic Practice
+[BOND ✓] graduate-diploma-of-valuation-and-proper — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Graduate Diploma of Valuation and Property Develop Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/graduate-diploma-of-valuation-and-property-development
+[BOND ✓] graduate-certificate-project-management — intakes=January, loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[DOMESTIC ONLY] https://bond.edu.au/program/medical-program-bachelor-of-medical-studies-doctor-of-medicine — course page states domestic-students-only; skipping
+[FIELD SUMMARY] Graduate Certificate in Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [bond_static conf=0.85] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[EXTRACT] 168/174: Bachelor Of Exercise And Sports Science Doctor Of Physiotherapy
+[per-course browser ↻] https://bond.edu.au/program/graduate-certificate-project-management
+Fetching 168/174: Bachelor Of Exercise And Sports Science Doctor Of Physiotherapy
+[per-course browser ✗] https://bond.edu.au/program/graduate-certificate-project-management: empty response
+[GEMINI] https://bond.edu.au/program/graduate-certificate-project-man → 0 field(s) (cost=$0.000000, in=2900 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-certificate-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/graduate-certificate-project-management
+[CATEGORY det] Graduate Certificate in Project Manageme → Business & Management / Project Management
+❌ [LOW 55/100] Graduate Certificate in Project Management — missing: english, duration | graduate-certificate-project-management
+[EXTRACT] 169/174: Bachelor Of Health Science And Master Of Nutrition And Dietetic Practice
+Fetching 169/174: Bachelor Of Health Science And Master Of Nutrition And Dietetic Practice
+[per-course browser ✓] https://bond.edu.au/program/graduate-diploma-of-valuation-and-property-development — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/graduate-diploma-of-valuation-an → 0 field(s) (cost=$0.000000, in=3293 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/graduate-diploma-of-valuation-and-property-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/graduate-diploma-of-valuation-and-property-development
+❌ [LOW 25/100] Graduate Diploma of Valuation and Property Develop — missing: english, duration, intake, mode | graduate-diploma-of-valuation-and-proper
+[EXTRACT] 170/174: Professional Doctorate Of Occupational Therapy
+Fetching 170/174: Professional Doctorate Of Occupational Therapy
+[BOND ✓] professional-doctorate-of-occupational-t — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Professional Doctorate of Occupational Therapy Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '6.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[BROWSER↑] HTTP blocked for https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-n — retrying via browser
+[BOND ✓] bachelor-of-exercise-and-sports-science- — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-health-science-and-master-of — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Exercise and Sports Science / Doctor o Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/professional-doctorate-of-occupational-therapy
+[FIELD SUMMARY] Bachelor of Health Science and Master of Nutrition Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-exercise-and-sports-science-doctor-of-physiotherapy
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-health-science-and-master-of-nutrition-and-dietetic-practice
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-health-science-and-master-of-nutrition-and-dietetic-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-health-science-and-m → 0 field(s) (cost=$0.000000, in=4441 out=0)
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-exercise-and-sports-science-doctor-of-physiotherapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://bond.edu.au/program/professional-doctorate-of-occupational-therapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-exercise-and-sports- → 0 field(s) (cost=$0.000000, in=4464 out=0)
+[GEMINI] https://bond.edu.au/program/professional-doctorate-of-occupa → 0 field(s) (cost=$0.000000, in=4237 out=0)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-health-science-and-master-of-nutrition-and-dietetic-practice
+[FALLBACK] AI enriching https://bond.edu.au/program/professional-doctorate-of-occupational-therapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-exercise-and-sports-science-doctor-of-physiotherapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/professional-doctorate-of-occupational-therapy
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-exercise-and-sports-science-doctor-of-physiotherapy
+⚠️ [WARN 65/100] Bachelor of Health Science and Master of Nutrition — missing: english, mode | bachelor-of-health-science-and-master-of
+❌ [LOW 45/100] Professional Doctorate of Occupational Therapy — missing: english, intake, mode | professional-doctorate-of-occupational-t
+[EXTRACT] 171/174: Bachelor Of Entrepreneurial Transformation Bachelor Of Global Studies Sustainability
+[CATEGORY det] Bachelor of Exercise and Sports Science → Medicine & Health / Physiotherapy
+[EXTRACT] 172/174: Bachelor Of Digital Transformationbachelor Of Laws
+⚠️ [WARN 65/100] Bachelor of Exercise and Sports Science / Doctor o — missing: english, mode | bachelor-of-exercise-and-sports-science-
+Fetching 171/174: Bachelor Of Entrepreneurial Transformation Bachelor Of Global Studies Sustainability
+Fetching 172/174: Bachelor Of Digital Transformationbachelor Of Laws
+[EXTRACT] 173/174: Bachelor Of Entrepreneurial Transformationbachelor Of Laws
+Fetching 173/174: Bachelor Of Entrepreneurial Transformationbachelor Of Laws
+[BOND ✓] bachelor-of-biomedical-science-master-of — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Biomedical Science / Master of Nutriti Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-nutrition-and-dietetic-practice
+[BOND ✓] bachelor-of-entrepreneurial-transformati — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Bachelor of Entrepreneurial Transformation/ Bachel Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[BOND ✓] bachelor-of-digital-transformationbachel — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[BOND ✓] bachelor-of-entrepreneurial-transformati — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformationbachelor-of-laws
+[FIELD SUMMARY] Bachelor of Digital Transformation/ Bachelor of La Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '32.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[FIELD SUMMARY] Bachelor of Entrepreneurial Transformation / Bache Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '44.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ❌ not found
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-nutrition-and-dietetic-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-digital-transformationbachelor-of-laws
+[per-course browser ↻] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation-bachelor-of-global-studies-sustainability
+[GEMINI] https://bond.edu.au/program/bachelor-of-biomedical-science-m → 0 field(s) (cost=$0.000000, in=4485 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-nutrition-and-dietetic-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-biomedical-science-master-of-nutrition-and-dietetic-practice
+⚠️ [WARN 65/100] Bachelor of Biomedical Science / Master of Nutriti — missing: english, mode | bachelor-of-biomedical-science-master-of
+[EXTRACT] 174/174: Master Of Philosophy
+Fetching 174/174: Master Of Philosophy
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-digital-transformationbachelor-of-laws: empty response
+[per-course browser ✗] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation-bachelor-of-global-studies-sustainability: empty response
+[GEMINI] https://bond.edu.au/program/bachelor-of-digital-transformati → 0 field(s) (cost=$0.000000, in=4560 out=0)
+[GEMINI] https://bond.edu.au/program/bachelor-of-entrepreneurial-tran → 0 field(s) (cost=$0.000000, in=4260 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-digital-transformationbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation-bachelor-of-global-studies-sustainability (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-digital-transformationbachelor-of-laws
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-entrepreneurial-transformation-bachelor-of-global-studies-sustainability
+[CATEGORY det] Bachelor of Entrepreneurial Transformati → Agriculture & Environmental Science / Sustainability
+❌ [LOW 45/100] Bachelor of Digital Transformation/ Bachelor of La — missing: english, intake, mode | bachelor-of-digital-transformationbachel
+❌ [LOW 45/100] Bachelor of Entrepreneurial Transformation / Bache — missing: english, intake, mode | bachelor-of-entrepreneurial-transformati
+[per-course browser ✓] https://bond.edu.au/program/bachelor-of-entrepreneurial-transformationbachelor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/bachelor-of-entrepreneurial-tran → 0 field(s) (cost=$0.000000, in=4864 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/bachelor-of-entrepreneurial-transformationbachelor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location='Gold Coast, Queensland' method=none url=https://bond.edu.au/program/bachelor-of-entrepreneurial-transformationbachelor-of-laws
+❌ [LOW 45/100] Bachelor of Entrepreneurial Transformation/ Bachel — missing: english, intake, mode | bachelor-of-entrepreneurial-transformati
+[BOND ✓] master-of-philosophy — loc=Gold Coast, Queensland, warn=bond_fee_js_rendered
+[FIELD SUMMARY] Master of Philosophy Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://bond.edu.au/program/master-of-philosophy
+[per-course browser ✓] https://bond.edu.au/program/master-of-philosophy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://bond.edu.au/program/master-of-philosophy → 0 field(s) (cost=$0.000000, in=3168 out=0)
+[FALLBACK] AI enriching https://bond.edu.au/program/master-of-philosophy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Gold Coast, Queensland' method=study_mode:rule url=https://bond.edu.au/program/master-of-philosophy
+❌ [LOW 55/100] Master of Philosophy — missing: english, duration | master-of-philosophy
+[STAGE] saved: Master of Enterprise Artificial Intelligence (Professional)
+[STAGE] saved: Master of Enterprise Artificial Intelligence
+[STAGE] saved: Bachelor of Enterprise Artificial Intelligence
+[STAGE] saved: Graduate Diploma in Project Management
+[STAGE] saved: Master of Legal Administration
+[STAGE] saved: Master of Construction Practice/ Master of Project Management
+[STAGE] saved: Graduate Certificate in Business
+[STAGE] saved: Graduate Diploma in Business
+[STAGE] skipped Juris Doctor: rejected: category_landing_page
+[STAGE] saved: Master of Architecture
+[STAGE] saved: Master of Valuation and Property Development (Professional)
+[STAGE] saved: Diploma Preparation Program
+[STAGE] saved: Master of Architecture (Professional)
+[STAGE] saved: Bachelor of Project Management
+[STAGE] saved: Master of Laws in Enterprise Governance
+[STAGE] saved: Master of International Hotel and Tourism Management (Professional)
+[STAGE] saved: Graduate Certificate of Valuation and Property Development
+[STAGE] saved: Master of International Hotel and Tourism Management
+[STAGE] saved: Graduate Diploma in Architecture
+[STAGE] saved: Master of Laws
+[STAGE] saved: Bachelor of Design in Architecture
+[STAGE] saved: Graduate Diploma in Psychology (Bridging)
+[STAGE] saved: Diploma of Built Environment
+[STAGE] saved: Diploma of Health Sciences
+[STAGE] skipped Bond Bbt Graduate Certificate Global Leadership: rejected: category_landing_page
+[STAGE] skipped Bond University - Bbt Global Leadership MBA: rejected: category_landing_page
+[STAGE] skipped Master Of Laws Family Dispute Resolution: rejected: domestic_only
+[STAGE] saved: Diploma of Creative Design
+[STAGE] saved: Graduate Certificate in Data Analytics
+[STAGE] saved: Bachelor of Psychological Science
+[STAGE] saved: Bachelor of Actuarial Science (Honours)
+[STAGE] saved: Bachelor of Sport Management
+[STAGE] saved: Bachelor of Film and Television
+[STAGE] saved: Bachelor of Film and Television (3 Year Program)
+[STAGE] saved: Master of Communication
+[STAGE] saved: Bachelor of Communication
+[STAGE] saved: Bachelor of Communication (Business)
+[STAGE] saved: Bachelor of International Relations (3 Year Program)
+[STAGE] saved: Master of Professional Psychology
+[STAGE] saved: Bachelor of Biomedical Science/ Bachelor of Laws
+[STAGE] saved: Bachelor of Construction Management and Quantity Surveying
+[STAGE] saved: Bachelor of Creative Arts
+[STAGE] saved: Bachelor of Journalism
+[STAGE] saved: Bachelor of Journalism/ Bachelor of Laws
+[STAGE] saved: Bachelor of Property
+[STAGE] saved: Bachelor of Psychological Science (Honours)
+[STAGE] saved: Bachelor of Psychological Science/ Bachelor of Laws
+[STAGE] saved: Graduate Certificate in Building Surveying
+[STAGE] saved: Graduate Certificate in Construction Practice
+[STAGE] saved: Graduate Diploma in Building Surveying
+[STAGE] skipped Graduate Diploma Construction Practice: fetch_failed
+[STAGE] skipped Graduate Diploma Of Psychological Science: fetch_failed
+[STAGE] skipped Master Of Building Surveying: fetch_failed
+[STAGE] skipped Master Of Communication Professional: fetch_failed
+[STAGE] skipped Master Of Communicationmaster Of Project Management: fetch_failed
+[STAGE] skipped Master Of Construction Practice: fetch_failed
+[STAGE] skipped Master Of Construction Practice Professional: fetch_failed
+[STAGE] skipped Master Of Project Innovation: fetch_failed
+[STAGE] skipped Master Of Project Innovationmaster Of Project Management: fetch_failed
+[STAGE] skipped Master Of Project Management Professional: fetch_failed
+[STAGE] skipped Master Of Valuation And Property Developmentmaster Of Project Management: fetch_failed
+[STAGE] skipped Bachelor Of Health Transformationbachelor Of Health Sciences: fetch_failed
+[STAGE] skipped Bachelor Of Business: fetch_failed
+[STAGE] skipped Bachelor Of Business 3 Year Program: fetch_failed
+[STAGE] skipped Bachelor Of Commerce 3 Year Program: fetch_failed
+[STAGE] skipped Bachelor Of Businessbachelor Of Social Science: fetch_failed
+[STAGE] saved: Bachelor of Actuarial Science
+[STAGE] saved: Bachelor of Actuarial Science (3 Year Program)
+[STAGE] skipped Bachelor Of International Hotel And Tourism Management: fetch_failed
+[STAGE] skipped Bachelor Of International Hotel And Tourism Management 3 Year Program: fetch_failed
+[STAGE] saved: Master of Finance/ Master of Business Administration
+[STAGE] skipped Master Of Sport Management Master Of Project Management: fetch_failed
+[STAGE] saved: Graduate Diploma in Business Administration
+[STAGE] saved: Master of Finance
+[STAGE] skipped Master Of Accounting: fetch_failed
+[STAGE] skipped Master Of Business Administration Professional: fetch_failed
+[STAGE] saved: Graduate Certificate in Business Administration
+[STAGE] saved: Master of Sport Management
+[STAGE] saved: Master of Sport Management (Professional)
+[STAGE] saved: Graduate Certificate in Sport Management
+[STAGE] saved: Graduate Diploma in Sport Management
+[STAGE] saved: Master of Business Data Analytics
+[STAGE] saved: Master of Business Data Analytics (Professional)
+[STAGE] skipped Master Of Business Administrationmaster Of Project Management: fetch_failed
+[STAGE] skipped Bachelor Of Policy Philosophy And Economicsbachelor Of Laws: fetch_failed
+[STAGE] saved: Bachelor of Laws
+[STAGE] saved: Master of Finance (Professional)
+[STAGE] saved: Bachelor of Communication/ Bachelor of Laws
+[STAGE] saved: Bachelor of Communication (Business)/ Bachelor of Laws
+[STAGE] saved: Bachelor of Actuarial Science/ Bachelor of Laws
+[STAGE] saved: Diploma of Arts
+[STAGE] saved: Diploma of Legal Studies
+[STAGE] saved: Bachelor of Criminal Justice and Criminology
+[STAGE] saved: Graduate Certificate in Criminology
+[STAGE] saved: Master of Criminology
+[STAGE] saved: Master of Criminology (Professional)
+[STAGE] saved: Master of Criminology/ Master of Project Management
+[STAGE] saved: Bachelor of Social Science
+[STAGE] saved: Bachelor of Global Studies (Sustainability)
+[STAGE] saved: Bachelor of Arts
+[STAGE] saved: Bachelor of International Relations/ Bachelor of Business
+[STAGE] saved: Master of International Relations/ Master of Project Management
+[STAGE] saved: Bachelor of Arts/ Bachelor of Laws
+[STAGE] saved: Bachelor of International Relations/ Bachelor of Laws
+[STAGE] saved: Bachelor of Policy, Philosophy and Economics
+[STAGE] saved: Master of International Relations (Professional)
+[STAGE] saved: Master of Arts (Tesol)
+[STAGE] saved: Master of Arts (Coursework)
+[STAGE] saved: Master of International Relations
+[STAGE] skipped Medical Program* Frequently Asked Questions: rejected: category_landing_page
+[STAGE] skipped Medical Program* Entry Assessment Table: rejected: category_landing_page
+[STAGE] saved: Master of Accounting (Professional)
+[STAGE] saved: Bachelor of Commerce/ Bachelor of Laws
+[STAGE] saved: Bachelor of Commerce
+[STAGE] skipped Bond University College Foundation Program Academic Entry Requirements: rejected: category_landing_page
+[STAGE] saved: Bachelor of Business/ Bachelor of Commerce
+[STAGE] skipped Medical Program Important Dates Deadlines: fetch_failed
+[STAGE] skipped Doctor Physiotherapy Prerequisites: fetch_failed
+[STAGE] saved: Bachelor of Biomedical Science
+[STAGE] saved: Bachelor of Exercise and Sports Science
+[STAGE] saved: Bachelor of Exercise and Sports Performance
+[STAGE] saved: Doctor of Physiotherapy
+[STAGE] saved: Master of Occupational Therapy
+[STAGE] saved: Graduate Diploma in Occupation and Health
+[STAGE] saved: Master of Healthcare Innovations
+[STAGE] saved: Bachelor of Business Law
+[STAGE] saved: Master of Occupational Therapy Prerequisites
+[STAGE] saved: Bachelor of Jurisprudence
+[STAGE] skipped Graduate Diploma Legal Practice: rejected: domestic_only
+[STAGE] saved: Master of Business Administration
+[STAGE] saved: Master of Management
+[STAGE] saved: Master of Actuarial Science
+[STAGE] saved: Bachelor of Health Sciences (Honours, Intensive)
+[STAGE] skipped Doctor Of Legal Science Research: fetch_failed
+[STAGE] skipped Graduate Diploma Healthcare Innovations: fetch_failed
+[STAGE] skipped Graduate Certificate Health Systems: rejected: domestic_only
+[STAGE] skipped Graduate Certificate Evidence Based Practice: rejected: domestic_only
+[STAGE] saved: Master of Business (Professional)
+[STAGE] saved: Master of Business
+[STAGE] saved: Bachelor of Business Data Analytics
+[STAGE] saved: Diploma of Business
+[STAGE] skipped Bond University College Foundation Program: rejected: category_landing_page
+[STAGE] saved: Master of Laws (by Research)
+[STAGE] saved: Master of Psychology (Clinical)
+[STAGE] saved: Bachelor of Business/ Bachelor of Laws
+[STAGE] skipped Bachelor Of Health Sciences: fetch_failed
+[STAGE] skipped Bachelor Of Health Sciences Honours: fetch_failed
+[STAGE] skipped Bachelor Of International Relations: fetch_failed
+[STAGE] skipped Master Of Actuarial Practice: fetch_failed
+[STAGE] skipped Bachelor Of Health Transformation: fetch_failed
+[STAGE] saved: Bachelor of Digital Transformation
+[STAGE] saved: Bachelor of Entrepreneurial Transformation
+[STAGE] saved: Graduate Diploma in Building Information Modelling and Integrated Project Delivery
+[STAGE] saved: Graduate Certificate in Building Information Modelling and Integrated Project Delivery
+[STAGE] saved: Master of Building Information Modelling and Integrated Project Delivery
+[STAGE] saved: Bachelor of Business Data Analytics (3 Year Program)
+[STAGE] saved: Master of Nutrition and Dietetic Practice
+[STAGE] skipped Graduate Diploma Nutrition: fetch_failed
+[STAGE] skipped Graduate Certificate Nutrition: fetch_failed
+[STAGE] saved: Master of Project Management
+[STAGE] saved: Graduate Certificate in Family Dispute Resolution
+[STAGE] saved: Master of Valuation and Property Development
+[STAGE] saved: Graduate Certificate in Project Management
+[STAGE] saved: Graduate Diploma of Valuation and Property Development
+[STAGE] skipped Medical Program Bachelor Of Medical Studies Doctor Of Medicine: rejected: category_landing_page
+[STAGE] skipped Bachelor Of Health Sciences Master Of Occupational Therapy: fetch_failed
+[STAGE] saved: Bachelor of Biomedical Science / Master of Nutrition and Dietetic Practice
+[STAGE] saved: Bachelor of Exercise and Sports Science / Doctor of Physiotherapy
+[STAGE] saved: Bachelor of Health Science and Master of Nutrition and Dietetic Practice
+[STAGE] skipped Professional Doctorate of Occupational Therapy: rejected: category_landing_page
+[STAGE] saved: Bachelor of Entrepreneurial Transformation / Bachelor of Global Studies (Sustainability)
+[STAGE] saved: Bachelor of Digital Transformation/ Bachelor of Laws
+[STAGE] saved: Bachelor of Entrepreneurial Transformation/ Bachelor of Laws
+[STAGE] saved: Master of Philosophy
+[DATA QUALITY] 139 course(s) checked — 12 critical / 314 warning / 140 info
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/bond-bbt-graduate-certificate-global-leadership
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/graduate-certificate-evidence-based-practice
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/graduate-certificate-health-systems
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/graduate-diploma-legal-practice
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/master-of-laws-family-dispute-resolution
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://bond.edu.au/program/medical-program-bachelor-of-medical-studies-doctor-of-medicine
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/bond-bbt-graduate-certificate-global-leadership
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/graduate-certificate-evidence-based-practice
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/graduate-certificate-health-systems
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/graduate-diploma-legal-practice
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/master-of-laws-family-dispute-resolution
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://bond.edu.au/program/medical-program-bachelor-of-medical-studies-doctor-of-medicine
+[DATA QUALITY][WARN] missing_degree_level × 9: Degree level not extracted. (and 8 more)
+[DATA QUALITY][WARN] missing_duration × 33: Duration not extracted. (and 32 more)
+[DATA QUALITY][WARN] missing_english_requirement × 139: No English language test score found (IELTS / PTE / TOEFL / CAE). (and 138 more)
+[DATA QUALITY][WARN] missing_international_fee_central_page × 132: International fee absent — marked for central fee page review. (and 131 more)
+[DATA QUALITY][WARN] suspicious_duration × 1: Duration 12.0 year(s) is outside the expected range (0 < duration ≤ 10.0).
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 6m 30s | Courses: 126 | Avg: 3.1s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:174 | Staged:126 | Skipped:13 (rejected:_category_landing_page=9, rejected:_domestic_only=4) | Errors:0
+Staged 126 courses, 13 skipped, 35 fetch errors

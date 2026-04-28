@@ -1,0 +1,85 @@
+Since all required data (IELTS, fee, duration, intake, mode) is already present on the course pages and OCR is also implemented, the issue is clearly in the extraction + validation pipeline, not data availability.
+
+Current Issues Observed
+IELTS missing even when clearly visible
+Fee incorrect or same across all courses
+Duration incorrect (e.g. 2 years → 8 years)
+Intake mismatch (page vs system)
+Mode missing even though all courses show “On Campus”
+All master courses affected (systematic issue)
+
+This confirms the system is extracting incorrectly and still saving bad data.
+
+Root Problem
+
+System is doing:
+
+Extract → Save
+
+Instead of:
+
+Extract → Validate → Repair → Then Save
+Required Fix (Critical)
+1. Add Field-Level Validation Rules
+
+Before saving:
+
+Duration check
+If > 6 years → reject / reprocess
+Intake check
+Must match page values (Feb, May, Jun etc.)
+IELTS check
+If empty → trigger fallback
+Fee check
+If same for all courses → flag as incorrect
+2. Force Fallback (HTML → OCR → Text Matching)
+
+If any required field is missing or invalid:
+
+Try HTML extraction
+→ If failed or invalid
+→ Try DOM visible text extraction
+→ If still missing
+→ Trigger Vision OCR
+→ Parse result
+→ Validate
+→ Save
+3. DO NOT SAVE LOW CONFIDENCE DATA
+
+Right now system is saving garbage.
+
+Add strict rule:
+
+If confidence < threshold
+→ DO NOT SAVE
+→ mark as "needs review"
+4. Add Source Tracking (Very Important)
+
+Every field must store source:
+
+IELTS: 6.5
+source: html | dom | ocr
+confidence: 0.92
+
+This will immediately show where things are breaking.
+
+5. Fix Systematic Mapping Issues
+
+These are not random errors:
+
+Duration → wrong parser or unit conversion bug
+Intake → wrong selector or fallback mapping
+Fee → static fallback overriding real value
+Mode → selector missing or not looping all courses
+Final Point
+
+This is not a scraping issue anymore —
+this is a pipeline integrity issue.
+
+System is detecting wrong data but still allowing it to pass.
+
+We need to:
+
+Block bad data
+Repair missing data
+Only save validated data
