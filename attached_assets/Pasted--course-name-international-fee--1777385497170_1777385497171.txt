@@ -1,0 +1,40 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                      course_name                      | international_fee | ielts_overall | duration |         intake_months         |               course_location               
+-------------------------------------------------------+-------------------+---------------+----------+-------------------------------+---------------------------------------------
+ Master of Business Data Analytics                     |             32640 |             6 |        2 | ["March", "July", "November"] | Melbourne, Sydney
+ Master of Arts (Theological Studies)                  |             24560 |             6 |      1.5 | ["March", "July", "November"] | United Theological College, Canberra Campus
+ Master of Applied Business (with Specialisations)     |             34640 |             6 |        2 | ["March", "July"]             | Economic and Finance Institute
+ Master of Agriculture (with Specialisations)          |             37040 |             6 |      1.5 | ["March", "July"]             | Wagga Wagga
+ Master of Agricultural Science (with Specialisations) |             37040 |             6 |        2 | ["March", "July"]             | Wagga Wagga
+ Graduate Diploma of Theological Studies               |             24560 |             6 |        1 | ["March", "July", "November"] | Canberra Campus, United Theological College
+ Graduate Diploma of Project Management and Leadership |             33920 |             6 |        1 | ["March", "July", "November"] | Melbourne, Sydney
+ Graduate Diploma of Business Data Analytics           |             32640 |             6 |        1 | ["March", "July", "November"] | Melbourne, Sydney
+ Graduate Diploma of Ageing and Pastoral Studies       |                   |             6 |        2 | ["March", "July"]             | Canberra Campus
+ Graduate Certificate in Theological Studies           |             12280 |             6 |      0.5 | ["March", "July", "November"] | United Theological College, Canberra Campus
+(10 rows)
+
+(END)
