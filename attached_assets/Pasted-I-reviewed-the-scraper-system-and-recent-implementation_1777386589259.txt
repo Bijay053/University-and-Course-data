@@ -1,0 +1,163 @@
+I reviewed the scraper system and recent implementation work. There has been progress, but this also confirms that the core issue is architectural, not just extraction bugs.
+
+We now have partial fixes in place, including:
+
+Confidence scoring per course
+Field-level extraction logging
+Duplicate fee detection
+Health dashboard endpoints
+Improved location normalization
+Study mode extraction using data attributes
+
+However, the live results clearly show that data quality is still failing at scale.
+
+🔴 Current System Evidence
+
+From the health API and logs:
+
+Some universities have 80 to 97 percent missing fee data
+Duplicate fee detection is triggering (same fee across many courses)
+English requirements are still missing in many cases
+Duration and intake mismatches still exist
+Course coverage is inconsistent
+
+Example issue already detected:
+
+Torrens University → same fee repeated across multiple courses
+KBS and MIT → majority of courses missing fee
+
+This confirms selector scope issues + weak fallback logic.
+
+🔍 What This Means
+
+Even with logging and scoring added, the system still:
+
+Extracts incorrect DOM elements
+Fails when structure changes
+Saves incomplete or low-confidence data
+Does not enforce strict validation before saving
+
+So the current system is still behaving like:
+
+Scrape → Save → Detect Problem Later
+
+But we need:
+
+Scrape → Validate → Score → Block Bad Data → Save
+⚠️ Critical Gaps Still Remaining
+1. Extraction Layer is Still Weak
+Still relying too much on CSS selectors
+Label-based and text-based extraction not strong enough
+No structured fallback hierarchy per field
+2. Validation is Not Enforced
+Low-confidence data is still being saved
+Missing fee or IELTS should not pass silently
+No hard blocking rules applied
+3. Confidence Score Not Used as Gatekeeper
+
+Currently:
+
+Score is calculated
+But not used to control saving
+
+Required:
+
+< 60 → Do not save  
+60–80 → Save as needs_review  
+80+ → Accept
+4. No Selector Scope Protection
+
+Duplicate fee issue proves:
+
+Extractor is reading global page element instead of course-specific element
+No DOM scoping per course container
+
+This is a major root cause.
+
+5. AI Extraction Not Integrated Yet
+
+For difficult pages:
+
+No fallback AI extraction layer in production
+Many universities require text-based understanding, not selectors
+✅ What Must Be Done Next (Non-Negotiable)
+1. Enforce Save Blocking Rules
+if confidence < 60:
+    do_not_save()
+
+if missing_fee AND fee_exists_on_page:
+    flag_error()
+
+if duplicate_fee_detected:
+    block_batch()
+2. Fix Selector Scope Issue
+
+Every extraction must be scoped:
+
+course_container.find(...)
+
+NOT:
+
+page.find(...)
+3. Upgrade Extraction Strategy
+
+Each field must follow:
+
+CSS selector  
+→ Scoped selector  
+→ Label-based extraction  
+→ Regex  
+→ AI fallback
+4. Add AI Extraction Layer (Fallback Only)
+
+Use AI only when:
+
+Selector fails
+Data exists in messy text
+
+Output must be:
+
+{
+  "fee": "",
+  "duration": "",
+  "ielts": "",
+  "intake": ""
+}
+
+Then still pass through parser + validation.
+
+5. Make Health Dashboard Blocking
+
+Current dashboard is passive.
+
+Required:
+
+If missing fee > 40% → FAIL
+If duplicate fee detected → FAIL
+If course count drops → FAIL
+
+Do not allow publish when status = FAIL
+
+6. Strict Data Integrity Rules
+Never overwrite valid old data with empty new data
+Always compare old vs new before saving
+Maintain change logs for every field
+📌 Final Summary
+
+The system improvements (logging, confidence, health API) are good, but they are observability tools, not fixes.
+
+Right now:
+
+We can detect problems
+But we are still saving bad data
+
+We need to move to:
+
+Prevent bad data from entering the system
+🔥 Final Requirement
+
+This must now be treated as:
+
+Full scraper pipeline enforcement phase
+
+Not debugging.
