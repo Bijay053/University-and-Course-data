@@ -40,6 +40,18 @@ _INTL_CTX = re.compile(
 )
 _TUITION_CTX = re.compile(r"\b(tuition|fee|fees|cost\s+of\s+study)\b", re.IGNORECASE)
 _PER_YEAR_CTX = re.compile(r"\b(per\s+year|per\s+annum|p\.?a\.?|annual|annually|yearly)\b", re.IGNORECASE)
+# Full-course-total context — strongly prefer over annual / per-year amounts
+# (Murdoch shows "Full course fee: $125,970" alongside "First year fee: $41,990").
+_FULL_COURSE_LABEL_CTX = re.compile(
+    r"\b(?:full\s+course|total\s+course|complete\s+course|total\s+program(?:me)?)\s+fee",
+    re.IGNORECASE,
+)
+# First-year fee context — penalise: picking the first-year sticker as the
+# representative international fee always under-reports the total programme cost.
+_FIRST_YEAR_FEE_CTX = re.compile(
+    r"\b(?:first\s+year|1st\s+year|year\s+1)\s+fee",
+    re.IGNORECASE,
+)
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
 _COUNTRY_CURRENCY = {
@@ -357,10 +369,20 @@ def _score(amount: int, ctx: str) -> int:
         s += 5
     if _TUITION_CTX.search(ctx):
         s += 3
-    if _PER_YEAR_CTX.search(ctx):
+    # "Full course fee" / "Total course fee" label — strongly prefer over
+    # per-year or first-year amounts (e.g. Murdoch $125,970 full-course total
+    # vs $41,990 first-year fee).
+    if _FULL_COURSE_LABEL_CTX.search(ctx):
+        s += 4
+    # "First year fee" / "1st year fee" — penalise: this is the per-year
+    # sticker, not the total programme cost we want to surface.
+    elif _FIRST_YEAR_FEE_CTX.search(ctx):
+        s -= 3
+    elif _PER_YEAR_CTX.search(ctx):
         s += 2
     # Prefer amounts in the realistic international tuition band.
-    if 12_000 <= amount <= 80_000:
+    # Extend upper bound to 400k so full-course totals also receive the bonus.
+    if 12_000 <= amount <= 400_000:
         s += 1
     return s
 

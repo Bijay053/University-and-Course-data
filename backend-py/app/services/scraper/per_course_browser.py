@@ -28,7 +28,13 @@ from app.services.scraper.extractors.base import ExtractionResult
 # T005: hosts where the per-course browser pass should also click the
 # "International students" toggle to surface the international fees /
 # admissions panel. Add new hosts here as we encounter them.
-_INTERNATIONAL_TOGGLE_HOSTS = ("vit.edu.au",)
+_INTERNATIONAL_TOGGLE_HOSTS = (
+    "vit.edu.au",
+    # Murdoch: "What type of student are you?" Domestic | International toggle.
+    # Without clicking International the rendered HTML shows domestic fees only
+    # (hides Full course fee, IELTS requirements, intake dates).
+    "murdoch.edu.au",
+)
 
 
 def _needs_international_toggle(url: str) -> bool:
@@ -96,6 +102,10 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # VIT: SPA that requires JS rendering + 3s settle to surface the
     # International tab's fee and english-requirements sections.
     "vit.edu.au",
+    # Murdoch: heavy React SPA (450KB static → 1MB rendered). Must wait for
+    # networkidle before the International toggle click fires correctly, otherwise
+    # the toggle target element hasn't mounted yet.
+    "murdoch.edu.au",
 )
 
 # Hosts that need the full 60s / networkidle treatment.

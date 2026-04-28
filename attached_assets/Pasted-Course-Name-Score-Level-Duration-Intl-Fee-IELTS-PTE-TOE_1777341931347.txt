@@ -1,0 +1,391 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Psychological Studies (Graduate Entry)
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$37,200/Annual	6	58	79	176	-	Mar, Jul	Bedford Park City	On Campus	
+
+
+
+	
+Bachelor of Sport, Health and Physical Activity (Honours) 1 Year
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$36,200/yr	6	58	79	176	-	Aug	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Science (Honours)
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$43,500/Annual	6	58	79	176	-		Bedford Park	On Campus	
+
+
+
+	
+Bachelor of Medical Science (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$9,537/Annual	6	58	79	176	-		Adelaide	On Campus	
+
+
+
+	
+Bachelor of Sport and Active Recreation
+Publish: review
+Eligibility: review
+69%	Bachelor	4 Year	A$34,300/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$43,500/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$40,500/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Psychological Science
+Science & Mathematics
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$37,200/Annual	6.5	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Medical Science (Honours)
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 Year	A$43,500/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Medical Science
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Bachelor	6 Year	A$43,500/Annual	6	58	79	176	-	Mar	Adelaide, Wollongong	On Campus	
+
+
+
+	
+Bachelor of Laws - Legal Practice Entry
+Law & Legal Studies
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$40,600/Annual	7	58	79	176	-	Mar, Jul	Adelaide, Hamilton	On Campus	
+
+
+
+	
+Bachelor of Laws (Honours) - Legal Practice Entry
+Law & Legal Studies
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$42,200/Annual	7	58	79	176	-	Mar, Jul	Adelaide, Hamilton	On Campus	
+
+
+
+	
+Bachelor of International Relations and Political Science
+Arts, Humanities & Social Sciences
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4.5 Year	A$3,260/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$3,850/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Human Nutrition
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$38,100/Annual	6.5	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Health Sciences / Master of Physiotherapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$46,700/Annual	7	-	-	-	-	Mar	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Health Sciences / Master of Occupational Therapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$43,500/Annual	7	-	-	-	-	Mar	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Health Sciences (Vision Science) / Master of Optometry
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$46,700/Annual	7	-	-	-	-	Mar	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor	3 Year	A$47,300/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Mechanical) (Honours)/ Master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$41,200/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Maritime) (Honours)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor	4 Year	A$47,300/Annual	6	58	79	176	-	Mar, Jul	Adelaide, Launceston	On Campus	
+
+
+
+	
+Bachelor of Engineering (Environmental) (Honours), Master of Engineering (Civil)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Environmental) (Honours)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$47,300/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Electrical and Electronic) (Honours)/master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Electrical and Electronic) (Honours), Master of Engineering (Mechanical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5.5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Civil) (Honours)/ Master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Disability and Community Inclusion
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$46,700/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Criminology
+Law & Legal Studies
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$36,300/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Computing and Mathematical Sciences (Honours)
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$43,500/Annual	6	58	79	176	-		Adelaide	On Campus	
+
+
+
+	
+Bachelor of Commerce
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Sports Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$37,200/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Small Business Leadership
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Marketing
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Melbourne, Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Leading Change
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in International Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Melbourne, Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Human Resource Management
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Melbourne, Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business Majoring in Event Management and Tourism
+Hospitality, Tourism & Events
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
+	
+Bachelor of Archaeology
+Publish: review
+Eligibility: review
+69%	Bachelor	5 Year	A$35,500/Annual	6	58	79	176	-	Mar, Jul	Sydney, Adelaide	On Campus	
+
+
+
+	
+Bachelor of Accounting
+Business & Management
+Publish: ready
+Eligibility: ready
+77%	Bachelor	5 Year	A$39,000/Annual	6	58	79	176	-	Mar, Jul	Adelaide	On Campus	
+
+
+
