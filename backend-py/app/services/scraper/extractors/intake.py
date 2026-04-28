@@ -307,7 +307,22 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
     return out
 
 
+_UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
+
+# Labels that indicate a nearby month is a real intake/session, not a
+# deadline or key-date.  Used by the UOW-specific session guard below.
+_SESSION_LABEL_RE = re.compile(
+    r"(?:intake|session|commenc(?:ing|ement)|start\s+date|course\s+start"
+    r"|starts?|study\s+period)",
+    re.I,
+)
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    from urllib.parse import urlparse as _up
+    _host = (_up(url).netloc or "").lower()
+    _is_uow = _host in _UOW_HOSTS
+
     # Campus-pivot pass: handles UNE "Start dates and campus" table where
     # months appear in column headers (e.g. "Trimester 1 – February 2026")
     # and availability is indicated by checkmarks in data rows.  Only
@@ -351,6 +366,57 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     text = compact(html_to_text(html))
     if not text:
         return []
+
+    # ── UOW-specific: session-name extraction takes priority ──────────────
+    # UOW uses "Autumn session" (→ March) and "Spring session" (→ July)
+    # instead of explicit month dates. The keyword-window passes (Passes 1-2
+    # below) are too greedy on UOW pages: they pick up months from
+    # application-deadline paragraphs, key-dates tables, and previous-year
+    # admission notices, producing spurious 5-6 month lists. For UOW we run
+    # the session-name scan FIRST and return immediately when it fires — the
+    # raw-month passes are skipped entirely to avoid deadline contamination.
+    if _is_uow:
+        session_months: list[str] = []
+        for m in _SESSION_RE.finditer(text):
+            mapped = _SESSION_MONTH_MAP.get(m.group(1).lower())
+            if mapped and mapped not in session_months:
+                session_months.append(mapped)
+        if session_months:
+            # Preserve calendar order (March before July, etc.)
+            ordered = [mo for mo in _MONTHS if mo in session_months]
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=ordered,
+                    normalized={"intake_months": ordered, "intake_days": None},
+                    confidence=0.85,
+                    snippet=f"UOW session: {', '.join(ordered)}",
+                    method="intake.session_names",
+                )
+            ]
+        # No session names found — fall through to semester mapping only.
+        # Skip Passes 1-2 (raw month scan) to avoid picking up deadline
+        # months and key-date entries that are not course intakes.
+        uow_months: list[str] = []
+        for m in _SEMESTER_RE.finditer(text):
+            mapped = _SEMESTER_MONTH_MAP.get(m.group(1))
+            if mapped and mapped not in uow_months:
+                uow_months.append(mapped)
+        if uow_months:
+            ordered = [mo for mo in _MONTHS if mo in set(uow_months)]
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=ordered,
+                    normalized={"intake_months": ordered, "intake_days": None},
+                    confidence=0.75,
+                    snippet=f"UOW semester: {', '.join(ordered)}",
+                    method="intake.semester",
+                )
+            ]
+        # Nothing found for UOW — return empty rather than wrong months.
+        return []
+
     chunks = _scoped_chunks(text)
     search = " | ".join(chunks) if chunks else text[:12000]
 

@@ -261,9 +261,10 @@ def _is_category_landing(url: str) -> bool:
     has no degree qualifier — i.e. category index pages like
     /courses/design, /programs/business, /degrees/health.
 
-    These match the `/courses/` URL hint and would otherwise be treated
-    as real courses by :func:`_looks_like_course`. The BFS uses this to
-    (a) reject them from the candidate set and (b) enqueue them for
+    Also handles 3-segment paths like /study/degrees-and-courses/arts
+    (UniSQ discipline pages) where the first segment is a catalog root
+    and the last segment carries no degree qualifier. The BFS uses this
+    to (a) reject them from the candidate set and (b) enqueue them for
     drill-in so their listed courses are harvested. Mirrors Node's
     ``isShallowCatalogPath`` (routes/scrape.ts:5535-5544).
     """
@@ -272,12 +273,21 @@ def _is_category_landing(url: str) -> bool:
     except Exception:
         return False
     parts = [p for p in path.split("/") if p]
-    if len(parts) != 2:
-        return False
-    if parts[0] not in _CATEGORY_BASE_SEGMENTS:
-        return False
-    last = parts[1].replace("-", " ").replace("_", " ")
-    return not _COURSE_TEXT.search(last)
+    if len(parts) == 2:
+        if parts[0] not in _CATEGORY_BASE_SEGMENTS:
+            return False
+        last = parts[1].replace("-", " ").replace("_", " ")
+        return not _COURSE_TEXT.search(last)
+    # 3-segment paths: e.g. /study/degrees-and-courses/arts-and-communication
+    # (UniSQ discipline landing pages). First segment must be a catalog root;
+    # last segment must carry no degree qualifier for it to be a drill-in
+    # category rather than a real course detail page.
+    if len(parts) == 3:
+        if parts[0] not in _CATEGORY_BASE_SEGMENTS:
+            return False
+        last = parts[2].replace("-", " ").replace("_", " ")
+        return not _COURSE_TEXT.search(last)
+    return False
 
 
 class _LinkExtractor(HTMLParser):
@@ -467,19 +477,39 @@ async def discover_course_links(
         if _pg_seed not in visited:
             queue.append((_pg_seed, 0))
 
-    # UniSQ: pre-seed category listing pages for all major disciplines so the
-    # BFS reaches individual course pages across the full catalogue.  Without
-    # these seeds the BFS picks up mostly listing/hub pages (online, pathway,
-    # short-courses) and misses the on-campus international course detail pages.
+    # UniSQ: pre-seed the main listing page AND each known discipline
+    # landing page so the BFS drills directly into discipline containers and
+    # harvests the real individual course URLs inside them.  Without these
+    # seeds the BFS only reaches the top-level listing page, which links to
+    # discipline-category pages; those discipline pages are correctly
+    # identified as category landings (3-segment path, no degree keyword)
+    # and enqueued for drill-in, but the `max_pages` budget can be exhausted
+    # before they are all visited unless they are pre-seeded at depth 0.
+    # NOTE: /study/degrees-and-courses/undergraduate-study and
+    # /study/degrees-and-courses/postgraduate-study are NOT seeded here
+    # because guards.py blocks them (they are hub/navigation pages, not
+    # discipline containers that list real course URLs).
     _unisq_hosts = ("www.unisq.edu.au", "unisq.edu.au")
     if parsed.netloc in _unisq_hosts:
         _unisq_base = f"{parsed.scheme}://{parsed.netloc}/study/degrees-and-courses"
-        for _cat in (
-            "?studentType=international",
-            "undergraduate-study?studentType=international",
-            "postgraduate-study?studentType=international",
-        ):
-            _seed = f"{_unisq_base}/{_cat}" if not _cat.startswith("?") else f"{_unisq_base}{_cat}"
+        _unisq_disciplines = (
+            "",  # root listing (?studentType=international added below)
+            "arts-and-communication",
+            "aviation",
+            "business",
+            "education-and-teaching",
+            "engineering-and-surveying",
+            "health",
+            "information-technology",
+            "law",
+            "nursing-and-midwifery",
+            "psychology-and-counselling",
+            "sciences-and-agriculture",
+            "uniprep",
+        )
+        for _disc in _unisq_disciplines:
+            _path = f"{_unisq_base}/{_disc}" if _disc else _unisq_base
+            _seed = f"{_path}?studentType=international"
             if _seed not in visited:
                 queue.append((_seed, 0))
 
@@ -562,6 +592,16 @@ async def discover_course_links(
             u = link.get("url")
             n = link.get("name") or ""
             if not u or u in found:
+                continue
+            # If the page classifier returned a 3-segment discipline/category
+            # page as a "course link" (e.g. UniSQ /study/degrees-and-courses/
+            # business), enqueue it for drill-in rather than adding to the
+            # candidate set. Without this check these pages end up in `found`
+            # and are later STAGE-rejected as category_landing_page — the BFS
+            # never drills into them to harvest the real course URLs inside.
+            if _is_category_landing(u):
+                if depth < 2 and u not in visited:
+                    queue.append((u, depth + 1))
                 continue
             found[u] = n
             if len(found) >= max_courses:

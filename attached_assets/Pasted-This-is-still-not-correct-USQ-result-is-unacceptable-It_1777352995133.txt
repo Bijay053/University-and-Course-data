@@ -1,0 +1,124 @@
+This is still not correct.
+
+USQ result is unacceptable. It saved only 1 course. The scraper is rejecting category pages like Business, Health, Law, Engineering and Arts, but those pages are needed to discover real course cards. Do not save category pages as courses, but do crawl them to extract real course detail URLs.
+
+UOW result is also not acceptable. IELTS and fee are missing even though the website clearly shows them. Intakes are wrong. It is saving random months like Sep, Dec, Jan, May, Jul, Nov. UOW normally has limited intakes, not this many for most courses.
+
+Please stop Phase B and fix this as an urgent accuracy patch.
+
+Required fixes:
+
+1. Separate category page behaviour
+
+Category pages should be:
+allowed for discovery
+not allowed for staging
+
+Example:
+USQ /study/degrees-and-courses/business
+USQ /study/degrees-and-courses/health
+USQ /study/degrees-and-courses/law
+USQ /study/degrees-and-courses/engineering-and-surveying
+
+These pages should be crawled to collect real course detail links. They should never be saved as courses.
+
+2. For USQ, discover real course URLs from category pages
+
+Use category pages as containers. Extract links that point to real courses only.
+
+Accept USQ course URLs only when:
+URL starts with /study/degrees-and-courses/
+URL is deeper than a category page
+Title starts with Bachelor, Master, Diploma, Associate Degree, Graduate Certificate, Graduate Diploma, Doctor, PhD
+Page has course specific data
+
+Reject saving:
+Business Degrees
+Health Degrees
+Law Degrees
+Engineering and Surveying Degrees
+Arts and Communication Degrees
+Research Degrees
+Information Technology Degrees
+
+3. Fix UOW field extraction
+
+UOW course pages clearly contain fee, IELTS and intake. Current extractor is missing them. Add a UOW specific parser before AI.
+
+For UOW, parse directly from rendered HTML or embedded JSON. Do not rely on AI first.
+
+Extract:
+international fee
+IELTS
+TOEFL
+PTE if available
+duration
+campus
+delivery mode
+intake or session
+
+4. Fix UOW intake extraction
+
+Do not collect every month from the page.
+
+Reject these as intake values:
+Dec
+May
+Jul
+Nov
+random application deadline months
+calendar months from key dates
+general date picker months
+
+Only save intake/session if it appears near labels like:
+Intake
+Commencing session
+Start session
+Session
+Starts
+Course starts
+
+For UOW, normalise sessions:
+Autumn = Feb or Mar
+Spring = Jul
+Summer = Nov or Dec only if the course clearly lists Summer
+
+Do not save 5 or 6 months for every course.
+
+5. Fix source proof logic
+
+If website has fee and IELTS but parser fails, that is parser bug. Do not just leave blank.
+
+Each critical field should store:
+value
+source_url
+source_text
+confidence
+
+For UOW, source_text must be from the course page section where fee or English requirement is shown.
+
+6. Stop AI fallback from hiding parser failure
+
+If parser returns missing fee or IELTS for UOW, log:
+[UOW PARSER MISSING] field_name url reason
+
+Do not just call Gemini and continue silently.
+
+7. Add tests using current failed examples
+
+USQ:
+Business category page should discover Bachelor of Accounting and other real courses
+Health category page should discover Master of Public Health and real health courses
+Category pages should not be staged
+
+UOW:
+Bachelor of Arts should extract correct fee, IELTS, duration, campus and intake
+Bachelor of Business should extract correct fee, IELTS, duration, campus and intake
+Intake should not include random months
+Location should not be “Delivery method”
+Mode should not be blank if delivery method is shown
+
+Expected result:
+USQ should stage many real courses, not only 1.
+UOW should stage courses with fee, IELTS, correct intake, campus and mode.
+Do not start any new feature until this patch is tested.
