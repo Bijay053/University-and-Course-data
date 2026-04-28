@@ -1,0 +1,113 @@
+No, this is still not fixed.
+
+Latest scrape shows no real change in final staged data.
+
+Problems still visible:
+
+1. Fee is still blank for all staged courses.
+2. IELTS is still blank for all staged courses.
+3. Master of Research still shows duration 8 Year.
+4. Master of Research still shows intake Jan, May, Aug.
+5. Some durations are now worse, like 3 Month, 6 Month, 12 Month.
+6. Browser log previously showed fee and IELTS were extracted, but final review table still does not show them.
+
+This means the bug is definitely after extraction, inside staging, payload mapping, serializer, or frontend table mapping.
+
+Please stop changing the scraper discovery or browser render logic.
+
+Do this now:
+
+1. Pick only one course and debug end to end:
+   https://www.unisq.edu.au/study/degrees-and-courses/master-of-research?studentType=international
+
+2. Run single course extraction only.
+
+3. Print the exact object at each step:
+
+After browser extraction:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+Before AI fallback:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+After AI fallback:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+Before stage_course:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+After database save:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+API response for review table:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+Frontend table row:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+Use log prefix:
+[MASTER_RESEARCH_TRACE]
+
+4. Do not proceed until this exact final row becomes:
+
+Course Name: Master of Research
+Duration: 2 years
+Intake: Feb, May, Jun
+IELTS: 6.5
+Fee: 36160 or official visible value
+
+5. Fix overwrite problem.
+
+If correct value exists at browser extraction, nothing later can replace it with blank, wrong old value, central value, sibling cache, AI fallback, or manual backup.
+
+Add field locking:
+international_fee locked after rendered course page extraction
+ielts_overall locked after rendered course page extraction
+duration_text locked after rendered course page extraction
+intake_text locked after rendered course page extraction
+
+6. Fix duration parser.
+
+Never use:
+8 Year
+3 Month
+6 Month
+12 Month
+
+unless it is exactly shown beside the main course Duration label.
+
+For Master of Research, duration must be:
+2 years
+
+7. Fix intake parser.
+
+Never use Jan, May, Aug for Master of Research.
+Only use value beside main course Start / Intake section.
+
+For Master of Research, intake must be:
+Feb, May, Jun
+
+8. After fixing, scrape only this one course and send the trace log.
+
+Do not scrape all 165 courses again until this one course is correct from extraction to final UI.

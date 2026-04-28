@@ -256,6 +256,11 @@ _EXTENDED_SLOTS: tuple[str, ...] = (
     "toefl_overall",
     "cambridge_overall",
     "intake_months",
+    # duration extractor outputs "duration" (float) + "duration_term" (str),
+    # not "duration_text" — include both so the override path can replace
+    # wrong static values (e.g. "8 Year" from max-candidature sentences).
+    "duration",
+    "duration_term",
     "duration_text",
     "location_text",
     "study_mode",
@@ -311,21 +316,27 @@ async def _extended_extract(
     rendered: str,
     url: str,
     existing_payload: dict[str, Any],
+    override: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Run ALL field extractors against rendered HTML and return only the
-    slots that are still missing from ``existing_payload``.
+    """Run ALL field extractors against rendered HTML and return extracted slots.
 
     This is called for hosts in :data:`_EXTENDED_EXTRACT_HOSTS` (UOW, UniSQ)
-    after the browser has obtained a fully JS-rendered page. The function never
-    overwrites a slot that already has a truthy value in ``existing_payload``
-    so that a correct static extraction always wins over a lower-confidence
-    browser extraction.
+    after the browser has obtained a fully JS-rendered page.
+
+    When ``override=False`` (default): never overwrites a slot that already has
+    a truthy value in ``existing_payload`` — correct static extraction wins.
+
+    When ``override=True`` (force-browser hosts like UniSQ/UOW): ALL extractors
+    run regardless of existing values, and ALL extracted slots are returned so
+    that the caller's ``payload[k] = v`` (direct assignment) can replace any
+    wrong static value with the authoritative browser-rendered value.
     """
     extractors = [
         (fee, ["international_fee", "fee_currency", "fee_term", "fee_year"]),
         (english_test, list(_ENGLISH_SLOTS)),
         (intake, ["intake_months"]),
-        (duration, ["duration_text"]),
+        # duration extractor outputs "duration" + "duration_term", not "duration_text"
+        (duration, ["duration", "duration_term"]),
         (location, ["location_text"]),
         (study_mode, ["study_mode"]),
     ]
@@ -333,8 +344,11 @@ async def _extended_extract(
     evidence: list[dict[str, Any]] = []
 
     for extractor_mod, slot_keys in extractors:
-        # Skip if ALL slots for this extractor are already populated
-        if all(
+        # When override=True (force-browser host), always run every extractor
+        # so the rendered DOM can correct any wrong static value.
+        # When override=False, skip if ALL slots for this extractor are already
+        # populated (existing behavior for non-forced hosts).
+        if not override and all(
             existing_payload.get(k) not in (None, "", 0, [])
             for k in slot_keys
         ):
@@ -353,8 +367,10 @@ async def _extended_extract(
                     continue
                 if k not in _EXTENDED_SLOTS:
                     continue
-                # Only fill slots that are still empty in existing_payload
-                if existing_payload.get(k) not in (None, "", 0, []):
+                # When override=False: only fill slots that are still empty.
+                # When override=True: always take the browser value so the
+                # caller's direct-assignment can replace wrong static values.
+                if not override and existing_payload.get(k) not in (None, "", 0, []):
                     continue
                 if k in filled:
                     continue
@@ -502,7 +518,9 @@ async def maybe_browser_refetch(
         # UOW / UniSQ: run the FULL extractor suite (fee + IELTS + intake +
         # duration + location + study_mode) against the rendered HTML.  The
         # plain english_test-only path below never sees fee at all.
-        filled, evidence = await _extended_extract(rendered, url, payload)
+        # Pass override=force so that force-browser hosts (UniSQ, UOW) let
+        # browser-rendered values replace any wrong static-HTML values.
+        filled, evidence = await _extended_extract(rendered, url, payload, override=force)
 
         # ── Rendered-DOM debug for still-missing critical fields ────────
         # When fee or IELTS are still empty after the full render pass, emit
@@ -564,7 +582,10 @@ async def maybe_browser_refetch(
                         "field_key": k,
                         "value": v,
                         "source_url": url,
-                        "source_text": (r.snippet or "")[:240],
+                        # Must be "snippet" (not "source_text") — enforce_source_evidence
+                        # in guards.py checks ev.get("snippet"); a "source_text" key
+                        # is silently ignored and the field is dropped before staging.
+                        "snippet": (r.snippet or f"browser-rendered: {k}={v}")[:240],
                         "confidence": min(1.0, (r.confidence or 0.5) + 0.05),
                         "method": "per_course_browser",
                     }

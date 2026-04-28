@@ -401,6 +401,10 @@ async def extract_course(
                     "value": r.value,
                     "confidence": r.confidence,
                     "method": r.method,
+                    # source_url is required by enforce_source_evidence so that
+                    # regex-extracted critical fields (ielts_overall, etc.) are not
+                    # silently dropped before the DB insert.
+                    "source_url": url,
                     "snippet": r.snippet,
                 }
             )
@@ -675,7 +679,10 @@ async def extract_course(
                     "value": _gp_v,
                     "confidence": 0.75,
                     "method": "gemini_primary",
-                    "snippet": None,
+                    # enforce_source_evidence requires both source_url and snippet
+                    # to keep a critical field; without them, fee/IELTS are dropped.
+                    "source_url": url,
+                    "snippet": f"gemini_primary: {_gp_k}={_gp_v}",
                 })
 
             # Always emit so every course has a [GEMINI] line in the live log
@@ -941,7 +948,10 @@ async def extract_course(
                     "value": v,
                     "confidence": 0.5,
                     "method": "ai_fallback",
-                    "snippet": None,
+                    # enforce_source_evidence requires both source_url and snippet
+                    # to preserve a critical field before staging.
+                    "source_url": url,
+                    "snippet": f"ai_fallback: {k}={v}",
                 }
             )
 
