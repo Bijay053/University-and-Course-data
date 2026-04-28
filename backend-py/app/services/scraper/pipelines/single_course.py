@@ -422,34 +422,49 @@ async def extract_course(
     # that have NO structural mode label.  It is assigned confidence=0.5
     # (deliberately low) but still wins when there's no competing signal.
     #
-    # If course_location has content (location extractor already strips
-    # virtual/online keywords), the course has a physical campus.  A bare
-    # `\bonline\b` hit at confidence ≤ 0.5 must NOT override that evidence.
-    # Similarly, if mode wasn't determined at all but we have a location,
-    # derive "On Campus" rather than leaving the field blank.
+    # Stronger case (ACAP): even a high-confidence "Online" classification
+    # (confidence=0.7) can be wrong when the university offers the same
+    # course both online AND on-campus. The location extractor already strips
+    # virtual/online keywords, so a non-empty course_location = confirmed
+    # physical campus exists. When the page says "Online" but the location
+    # extractor found real cities/campuses, the true mode is "Blended".
     _study_mode_evidence = [e for e in evidence if e["field_key"] == "study_mode"]
-    _low_conf_online = (
-        payload.get("study_mode") == "Online"
-        and any(
-            e.get("confidence", 1.0) <= 0.5 and e.get("method") == "study_mode:rule"
-            for e in _study_mode_evidence
-        )
+    _was_online = payload.get("study_mode") == "Online"
+    _has_physical_location = bool((payload.get("course_location") or "").strip())
+    _low_conf_online = _was_online and any(
+        e.get("confidence", 1.0) <= 0.5 and e.get("method") == "study_mode:rule"
+        for e in _study_mode_evidence
     )
+    # Physical-location override: if the location extractor confirmed real
+    # campus(es) and the mode is "Online", the course is Blended regardless
+    # of the online-mode extractor's confidence. Only applies when a concrete
+    # location was actually found — avoids false upgrades on courses that
+    # genuinely are online-only but happen to list a PO box or virtual address.
+    _location_overrides_online = _was_online and _has_physical_location
     _mode_absent = not payload.get("study_mode")
-    if _mode_absent or _low_conf_online:
+    if _mode_absent or _low_conf_online or _location_overrides_online:
         from app.services.scraper.extractors.study_mode import derive_mode_from_location
 
         _derived_mode = derive_mode_from_location(payload.get("course_location"))
         if _derived_mode:
-            payload["study_mode"] = _derived_mode
+            # When the page said "Online" but we know a physical campus exists,
+            # the correct canonical mode is "Blended" — not just "On Campus" —
+            # because both delivery options are available. Only use Blended when
+            # _was_online so the derivation path (absent mode → On Campus) is
+            # unchanged for courses whose mode was simply never detected.
+            _final_mode = "Blended" if _was_online and _has_physical_location else _derived_mode
+            payload["study_mode"] = _final_mode
             evidence.append(
                 {
                     "field_key": "study_mode",
-                    "value": _derived_mode,
-                    "confidence": 0.6,
+                    "value": _final_mode,
+                    "confidence": 0.65,
                     "method": "study_mode:location_derived",
                     "snippet": (
-                        f"Derived from course_location: "
+                        f"Upgraded Online→{_final_mode} — physical campus confirmed: "
+                        f"{(payload.get('course_location') or '')[:80]}"
+                        if _location_overrides_online
+                        else f"Derived from course_location: "
                         f"{(payload.get('course_location') or '')[:80]}"
                     ),
                 }
