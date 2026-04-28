@@ -394,13 +394,15 @@ def should_stage_course(
     if payload.get("domestic_only"):
         return (False, "domestic_only")
 
-    # Bug C: online-only courses with no real physical campus are rejected.
-    # The study_mode field is the authoritative signal — location strings like
-    # "United Theological College" or "Wagga Wagga Campus" are partner/delivery
-    # names and do NOT imply an on-campus offering if the mode is purely Online.
-    # Rule: reject when study_mode has "online" but NO campus/blended keyword.
-    # Courses that are genuinely blended (study_mode="On Campus, Online") pass.
-    # Marked transient so the course re-stages if a campus option is added later.
+    # Online-only filter: study_mode is the authoritative signal.
+    # Rule: if study_mode contains "online" but NO campus/blended keyword →
+    # reject regardless of whether a city/campus name appears in
+    # course_location.  Many universities (e.g. UniSQ) list their physical
+    # campus name in the location field even for courses that are delivered
+    # entirely online — that location text does NOT mean the course is
+    # available on campus.
+    # Courses that are genuinely mixed-mode have study_mode = "Blended" or
+    # "On Campus, Online" and pass through because they contain campus keywords.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
     _has_campus_component = any(
         kw in _study_mode
@@ -410,36 +412,19 @@ def should_stage_course(
         )
     )
 
-    # Detect all physical-location evidence for logging and override logic.
-    # The location extractor already strips virtual/online keywords, so a
-    # non-empty course_location confirms at least one physical campus exists.
     _physical_location = (
         payload.get("course_location") or payload.get("location_text") or ""
     ).strip()
 
     if "online" in _study_mode and not _has_campus_component:
-        # Safety net: if the location extractor confirmed physical campus(es),
-        # do NOT reject as online_only even if the study_mode string reads
-        # "Online". ACAP (and similar universities) offer the same course both
-        # online and on-campus — the study_mode extractor picked up the first
-        # keyword it saw. A real physical location overrides that classification.
-        if _physical_location:
-            log.info(
-                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
-                "decision=stage (online_only overridden by physical location)",
-                effective_name,
-                payload.get("study_mode", "Online"),
-                _physical_location,
-            )
-            # Fall through — do not return (False, "online_only")
-        else:
-            log.info(
-                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[] "
-                "decision=reject (online_only, no physical campus found)",
-                effective_name,
-                payload.get("study_mode", "Online"),
-            )
-            return (False, "online_only")
+        log.info(
+            "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
+            "decision=reject (online_only — study_mode is authoritative)",
+            effective_name,
+            payload.get("study_mode", "Online"),
+            _physical_location or "none",
+        )
+        return (False, "online_only")
 
     # Secondary check: mode is exactly "Blended" but no physical campus
     # was found by any extractor (location_text is null/empty). Courses
