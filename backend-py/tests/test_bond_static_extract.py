@@ -71,12 +71,29 @@ class TestApplyBondExtractionAlwaysPresent:
         result = self._run()
         assert result["course_location"] == "Gold Coast, Queensland"
 
-    def test_study_mode_defaults_to_on_campus(self) -> None:
-        assert self._run()["study_mode"] == "On Campus"
+    def test_study_mode_not_set_when_no_delivery_keywords(self) -> None:
+        """When page has no delivery keywords, study_mode must NOT be set.
 
-    def test_intake_months_defaults_to_tri_semester(self) -> None:
+        Defaulting to "On Campus" without evidence produces misleading data.
+        The standard extractor chain should determine mode instead.
+        """
         result = self._run()
-        assert result["intake_months"] == ["January", "May", "September"]
+        assert "study_mode" not in result, (
+            "Bond pre-seed must not set study_mode='On Campus' as a default "
+            "— mode should only be set when delivery keywords appear on the page."
+        )
+
+    def test_intake_months_not_set_when_not_on_page(self) -> None:
+        """When no intake context found, intake_months must NOT be set.
+
+        The old tri-semester fallback (Jan/May/Sep) produced inaccurate data
+        for courses that don't run in all three semesters.
+        """
+        result = self._run()
+        assert "intake_months" not in result, (
+            "Bond pre-seed must not set intake_months with a hard-coded fallback "
+            "— only set it when real intake months are found on the page."
+        )
 
     def test_scrape_warning_added_when_no_fee_in_html(self) -> None:
         result = self._run()
@@ -90,10 +107,16 @@ class TestApplyBondExtractionAlwaysPresent:
 class TestApplyBondExtractionStudyMode:
     _URL = "https://bond.edu.au/program/master-of-business-administration"
 
-    def test_on_campus_when_no_online_keywords(self) -> None:
+    def test_no_mode_set_when_no_delivery_keywords(self) -> None:
+        """No delivery keyword on page → study_mode must be absent from result.
+
+        The standard extractor chain handles this; Bond must not fabricate a value.
+        """
         html = "<h1>MBA</h1><p>Study at Gold Coast campus.</p>"
         result = apply_bond_extraction(self._URL, html)
-        assert result["study_mode"] == "On Campus"
+        # "campus" is a location keyword, not a delivery-mode keyword.
+        # Bond's _derive_study_mode only sets mode when ONLINE keywords are found.
+        assert "study_mode" not in result
 
     def test_blended_when_online_and_campus_both_mentioned(self) -> None:
         html = (
@@ -101,18 +124,17 @@ class TestApplyBondExtractionStudyMode:
             "<p>Available via online delivery or on campus at Gold Coast.</p>"
         )
         result = apply_bond_extraction(self._URL, html)
-        assert result["study_mode"] == "Blended"
+        assert result.get("study_mode") == "Blended"
 
     def test_online_when_only_online_keyword_and_no_campus(self) -> None:
         html = "<h1>MBA Online</h1><p>Fully online delivery.</p>"
         result = apply_bond_extraction(self._URL, html)
-        assert result["study_mode"] == "Online"
+        assert result.get("study_mode") == "Online"
 
     def test_study_online_keyword_triggers_online_detection(self) -> None:
         html = "<p>Study online from anywhere in Australia.</p>"
         result = apply_bond_extraction(self._URL, html)
-        # "Study online" + no campus mention → Online
-        assert result["study_mode"] in ("Online", "Blended")
+        assert result.get("study_mode") in ("Online", "Blended")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -172,9 +194,13 @@ class TestApplyBondExtractionIntake:
         assert "May" in months
         assert "September" in months
 
-    def test_falls_back_to_default_tri_semester_when_no_intake_text(self) -> None:
+    def test_intake_months_absent_when_no_intake_text(self) -> None:
+        """Empty page → intake_months must not be set (no hard-coded fallback)."""
         result = apply_bond_extraction(self._URL, "")
-        assert result["intake_months"] == ["January", "May", "September"]
+        assert "intake_months" not in result, (
+            "Bond must not set intake_months with a hard-coded fallback. "
+            "Leave the field absent when no intake months appear on the page."
+        )
 
     def test_deduplicates_months(self) -> None:
         html = "<p>Semester start: January, January, May</p>"
