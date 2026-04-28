@@ -740,6 +740,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
             effective_config = dict(uni_scrape_config or {})
 
+            # ── Priority 0: host-based defaults (injected before UI overrides
+            # so the UI can still override them if needed) ───────────────────
+            # UOW does not persist its english-requirements URL in scrape_config
+            # but publishes a stable central page that we can hard-code here.
+            # Absence of this injection means every UOW scrape stages courses
+            # with no IELTS/PTE values despite the information being publicly
+            # available.
+            _scrape_host_eff = (_scrape_host or "").lower()
+            if _scrape_host_eff in ("www.uow.edu.au", "uow.edu.au"):
+                _uow_pages = effective_config.setdefault("uniPages", {})
+                if not _uow_pages.get("entryPage") and not _uow_pages.get("requirementsPage"):
+                    _uow_pages["entryPage"] = (
+                        "https://www.uow.edu.au/study/apply/english-requirements/"
+                    )
+
             # ── Priority 1: request-body overrides (UI Advanced fields) ─────
             # The router stores these in job.request_payload so the orchestrator
             # can apply them without touching the persistent scrape_config.
