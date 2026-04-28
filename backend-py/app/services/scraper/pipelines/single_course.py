@@ -909,9 +909,14 @@ async def extract_course(
             for _gp_k, _gp_v in _gp_filled.items():
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above
-                # PRIMARY: always overwrite — replace any prior evidence entry
+                # PRIMARY: always overwrite payload value.
+                # Keep prior evidence rows so Evidence Review can show every
+                # source that found a value — mark them "superseded" so the UI
+                # can distinguish them from the winning entry.
                 payload[_gp_k] = _gp_v
-                evidence[:] = [e for e in evidence if e.get("field_key") != _gp_k]
+                for _prior_ev in evidence:
+                    if _prior_ev.get("field_key") == _gp_k:
+                        _prior_ev["decision_status"] = "superseded"
                 evidence.append({
                     "field_key": _gp_k,
                     "value": _gp_v,
@@ -921,6 +926,7 @@ async def extract_course(
                     # to keep a critical field; without them, fee/IELTS are dropped.
                     "source_url": url,
                     "snippet": f"gemini_primary: {_gp_k}={_gp_v}",
+                    "decision_status": "selected",
                 })
 
             # Always emit so every course has a [GEMINI] line in the live log
@@ -975,33 +981,27 @@ async def extract_course(
                     continue
                 if _delta <= _max_delta:
                     continue
-                # Revert payload to the central-page value
-                payload[_slot] = _c_val
-                # Drop stale vision evidence for this slot
-                evidence[:] = [
-                    ev for ev in evidence
-                    if not (
-                        ev.get("field_key") == _slot
-                        and ev.get("method", "") in _PER_COURSE_VISION_METHODS
-                    )
-                ]
-                # Record the correction
+                # Course page always wins: do NOT revert to central-page value
+                # even when vision and central diverge.  Instead, store the
+                # central-page value as a superseded evidence row so the reviewer
+                # can see both readings side-by-side in Evidence Review.
                 evidence.append({
                     "field_key": _slot,
                     "value": _c_val,
                     "confidence": 0.50,
                     "method": "central_page:english",
                     "source_url": _central_eng_url or url,
-                    "snippet": f"central_page:english {_slot}={_c_val} (vision override)",
+                    "snippet": f"central_page:english {_slot}={_c_val} (diverges from course vision by {_delta:.1f}; course page value kept)",
+                    "decision_status": "superseded",
                 })
                 if emit:
                     await emit(
                         "status",
-                        f"[VISION SANITY ✗] {payload.get('course_name', url)[:40]} — "
+                        f"[VISION vs CENTRAL] {payload.get('course_name', url)[:40]} — "
                         f"{_slot}: vision={_v_val} vs central={_c_val} "
-                        f"(delta={_delta:.1f} > {_max_delta}) → reverted to central",
+                        f"(delta={_delta:.1f} > {_max_delta}) — course page value kept",
                         phase="extract",
-                        kind="vision_sanity_override",
+                        kind="vision_sanity_note",
                         url=url,
                         slot=_slot,
                         vision_val=_v_val,
