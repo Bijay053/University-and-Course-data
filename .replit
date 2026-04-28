@@ -44,12 +44,12 @@ waitForPort = 8080
 name = "backend-py: Celery worker"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend-py && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=2 --loglevel=info -Q scrape"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape"
 
 [[workflows.workflow]]
 name = "Redis"
