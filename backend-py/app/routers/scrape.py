@@ -1884,10 +1884,47 @@ async def staged_approve(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # ── Data-integrity gate ────────────────────────────────────────────────
+    # Block approval when the course is clearly incomplete: no fee AND no
+    # english test AND no central-fee-page flag.  Courses missing only one
+    # field (score 60-79) are still approvable — the operator has decided
+    # the partial data is acceptable.  Courses missing two or more critical
+    # fields (score < 60) should not have been staged; if they slipped
+    # through (e.g. staged before this gate was added), block here too.
+    from app.services.scraper.confidence import score_payload as _sp
+    _payload_snap = {
+        "international_fee":  sc.international_fee,
+        "has_central_fee_page": getattr(sc, "has_central_fee_page", None),
+        "ielts_overall":      sc.ielts_overall,
+        "pte_overall":        sc.pte_overall,
+        "toefl_overall":      sc.toefl_overall,
+        "cambridge_overall":  getattr(sc, "cambridge_overall", None),
+        "duolingo_overall":   getattr(sc, "duolingo_overall", None),
+        "duration":           sc.duration,
+        "intake_months":      sc.intake_months,
+        "study_mode":         sc.study_mode,
+    }
+    _cg = _sp(_payload_snap)
+    if _cg["score"] < 60:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "confidence_too_low",
+                "message": (
+                    f"Cannot approve: confidence score {_cg['score']}/100 is below the 60-point "
+                    f"minimum. Missing fields: {', '.join(_cg.get('missing', []))}. "
+                    "Fix the missing data in the edit panel before approving."
+                ),
+                "score": _cg["score"],
+                "missing": _cg.get("missing", []),
+            },
+        )
+
     sc.status = "approved"
     sc.reviewed_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"ok": True, "id": sc_id, "status": "approved"}
+    return {"ok": True, "id": sc_id, "status": "approved", "confidence": _cg["score"]}
 
 
 class _RejectBody(BaseModel):

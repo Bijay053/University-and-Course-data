@@ -170,6 +170,69 @@ async def stage_course(
             dropped_fields, name, university_id,
         )
 
+    # ── Confidence gate ───────────────────────────────────────────────────
+    # Courses with confidence < 60 (two or more critical fields missing) are
+    # not staged.  A missing row is better than a row with misleading data —
+    # operators cannot easily spot wrong values but will notice a missing row.
+    # Exceptions:
+    #   • has_central_fee_page=True already earns the 25 fee points, so
+    #     universities like Bond/ECU are not unfairly penalised for JS fees.
+    #   • domestic_only courses are blocked earlier; this gate never fires on them.
+    from app.services.scraper.confidence import (  # noqa: PLC0415 — local to avoid circular import
+        CONFIDENCE_WARN as _CONF_GATE,
+        score_payload as _score_payload,
+    )
+    _cg = _score_payload(payload)
+    if _cg["score"] < _CONF_GATE:
+        log.info(
+            "stage_course: confidence %d/100 < %d — skipping %r (missing: %s)",
+            _cg["score"], _CONF_GATE, name, ", ".join(_cg.get("missing", [])),
+        )
+        return StageResult(
+            False,
+            f"rejected: confidence_{_cg['score']}_missing_{'_'.join(_cg.get('missing', []))}",
+        )
+
+    # ── Preserve existing valid data ──────────────────────────────────────
+    # When a re-scrape cannot extract a field that was successfully captured
+    # in a previous approved/published row, keep the old value rather than
+    # writing NULL.  This prevents a temporary website change or extractor
+    # regression from degrading already-reviewed data.
+    _PRESERVE_FIELDS = (
+        "international_fee", "domestic_fee", "fee_term",
+        "ielts_overall", "pte_overall", "toefl_overall",
+        "cambridge_overall", "duolingo_overall",
+        "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking",
+        "duration", "duration_term",
+        "intake_months",
+        "study_mode", "course_location",
+    )
+    try:
+        _exist_q = await db.execute(
+            select(ScrapedCourse)
+            .where(
+                ScrapedCourse.university_id == university_id,
+                ScrapedCourse.course_name == name,
+                ScrapedCourse.status.in_(["approved", "published"]),
+            )
+            .order_by(ScrapedCourse.created_at.desc())
+            .limit(1)
+        )
+        _exist = _exist_q.scalar_one_or_none()
+        if _exist:
+            preserved: list[str] = []
+            for _fld in _PRESERVE_FIELDS:
+                if payload.get(_fld) is None and getattr(_exist, _fld, None) is not None:
+                    payload[_fld] = getattr(_exist, _fld)
+                    preserved.append(_fld)
+            if preserved:
+                log.info(
+                    "stage_course: preserved %d field(s) from existing approved row for %r: %s",
+                    len(preserved), name, preserved,
+                )
+    except Exception as _pex:  # noqa: BLE001 — never abort staging on preservation failure
+        log.warning("stage_course: existing-data preservation query failed for %r: %s", name, _pex)
+
     # Diff item R (MIGRATION_AUDIT.md §6): category safety net. The
     # single_course pipeline runs map_course_to_category before staging,
     # but courses that arrive via other code paths (or future paths) can
