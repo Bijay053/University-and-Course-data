@@ -78,6 +78,21 @@ _ENGLISH_SLOTS: Final = _ENGLISH_OVERALL_SLOTS
 _MAX_IMAGES: Final = 6
 _IMG_TAG_RE = re.compile(r"<img\b[^>]*?>", re.IGNORECASE)
 _SRC_RE = re.compile(r"\bsrc\s*=\s*\"([^\"]+)\"|\bsrc\s*=\s*'([^']+)'", re.IGNORECASE)
+# Lazy-loading attributes used by modern sites — tried in order after src.
+# data-src is most common (Intersection Observer pattern); others are
+# plugin-specific (lazysizes → data-srcset, WP lazy → data-lazy,
+# Cloudflare/Shopify → data-original, generic → data-lazy-src).
+_LAZY_SRC_ATTRS: Final = (
+    "data-src",
+    "data-lazy-src",
+    "data-lazy",
+    "data-original",
+)
+_LAZY_SRC_RE: Final = re.compile(
+    r'\b(?:' + '|'.join(re.escape(a) for a in _LAZY_SRC_ATTRS) + r')\s*=\s*"([^"]+)"|'
+    r'\b(?:' + '|'.join(re.escape(a) for a in _LAZY_SRC_ATTRS) + r")\s*=\s*'([^']+)'",
+    re.IGNORECASE,
+)
 _ALT_RE = re.compile(r"\balt\s*=\s*\"([^\"]*)\"|\balt\s*=\s*'([^']*)'", re.IGNORECASE)
 
 # Words that flag an image as decorative — same allow-list as Node's
@@ -137,13 +152,23 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
     The raw HTML-order list is first built (up to 2× ``_MAX_IMAGES``), then
     split into a high-priority and low-priority tier, and the final list is
     capped at ``_MAX_IMAGES``.
+
+    Lazy-loading support: modern sites use ``data-src`` / ``data-lazy-src``
+    / ``data-lazy`` / ``data-original`` instead of ``src`` (Intersection
+    Observer pattern).  The ``src`` attribute on those tags is either absent
+    or a 1×1 transparent GIF placeholder — useless for OCR.  We now try
+    ``src`` first; if it is missing or a data-URI we fall back to the lazy
+    attributes in ``_LAZY_SRC_RE`` order so the real image URL is found.
     """
     raw: list[tuple[str, str]] = []
     for tag in _IMG_TAG_RE.findall(html or ""):
         m_src = _SRC_RE.search(tag)
-        if not m_src:
-            continue
-        src = (m_src.group(1) or m_src.group(2) or "").strip()
+        src = (m_src.group(1) or m_src.group(2) or "").strip() if m_src else ""
+        # Lazy-load fallback: data-src / data-lazy-src / data-lazy / data-original
+        if not src or src.startswith("data:"):
+            m_lazy = _LAZY_SRC_RE.search(tag)
+            if m_lazy:
+                src = (m_lazy.group(1) or m_lazy.group(2) or "").strip()
         if not src or src.startswith("data:"):
             continue
         m_alt = _ALT_RE.search(tag)
