@@ -1,0 +1,858 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 13
+Fetching https://www.uow.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.uow.edu.au/study/courses/ (high-priority probe)
+[DISCOVER] Crawling from https://www.uow.edu.au/study/courses/ (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.uow.edu.au/study/courses/: listing (18 course links found)
+[DISCOVER] Page 1/25: +18 candidates (total 18) — https://www.uow.edu.au/study/courses/
+[DISCOVER] classified https://www.uow.edu.au/study/apply/: listing (3 course links found)
+[DISCOVER] Page 2/25: +1 candidates (total 19) — https://www.uow.edu.au/study/apply/
+[DISCOVER] classified https://www.uow.edu.au/study/admission-info/pathways/: listing (4 course links found)
+[DISCOVER] Page 3/25: +2 candidates (total 21) — https://www.uow.edu.au/study/admission-info/pathways/
+[DISCOVER] classified https://www.uow.edu.au/study/scholarships/: detail (course content present, only 2 outbound links)
+[DISCOVER] Page 4/25: +0 candidates (total 21) — https://www.uow.edu.au/study/scholarships/
+[DISCOVER] classified https://www.uow.edu.au/study/accommodation/: listing (3 course links found)
+[DISCOVER] Page 5/25: +1 candidates (total 22) — https://www.uow.edu.au/study/accommodation/
+[DISCOVER] classified https://www.uow.edu.au/study/move/: listing (7 course links found)
+[DISCOVER] Page 6/25: +4 candidates (total 26) — https://www.uow.edu.au/study/move/
+[DISCOVER] classified https://www.uow.edu.au/study/study-abroad-exchange/: listing (3 course links + listing title)
+[DISCOVER] Page 7/25: +1 candidates (total 27) — https://www.uow.edu.au/study/study-abroad-exchange/
+[DISCOVER] classified https://www.uow.edu.au/study/high-school/: listing (5 course links found)
+[DISCOVER] Page 8/25: +3 candidates (total 30) — https://www.uow.edu.au/study/high-school/
+[DISCOVER] classified https://www.uow.edu.au/study/non-school-leaver/: listing (4 course links found)
+[DISCOVER] Page 9/25: +3 candidates (total 33) — https://www.uow.edu.au/study/non-school-leaver/
+[DISCOVER] classified https://www.uow.edu.au/study/international/: listing (13 course links found)
+[DISCOVER] Page 10/25: +11 candidates (total 44) — https://www.uow.edu.au/study/international/
+[DISCOVER] classified https://www.uow.edu.au/engage/schools-parents/: listing (2 course links found)
+[DISCOVER] Page 11/25: +0 candidates (total 44) — https://www.uow.edu.au/engage/schools-parents/
+[DISCOVER] classified https://www.uow.edu.au/study/sport/: detail (course content present, only 2 outbound links)
+[DISCOVER] Page 12/25: +0 candidates (total 44) — https://www.uow.edu.au/study/sport/
+[DISCOVER] classified https://www.uow.edu.au/study/visit/: detail (course content present, only 2 outbound links)
+[DISCOVER] Page 13/25: +0 candidates (total 44) — https://www.uow.edu.au/study/visit/
+[DISCOVER] classified https://www.uow.edu.au/about/faculties/: listing (2 course links found)
+[DISCOVER] Page 14/25: +0 candidates (total 44) — https://www.uow.edu.au/about/faculties/
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?addCourse=361537: listing (19 course links found)
+[DISCOVER] Page 15/25: +1 candidates (total 45) — https://www.uow.edu.au/study/courses/?addCourse=361537
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?addCourse=361215: listing (19 course links found)
+[DISCOVER] Page 16/25: +0 candidates (total 45) — https://www.uow.edu.au/study/courses/?addCourse=361215
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?addCourse=361890: listing (19 course links found)
+[DISCOVER] Page 17/25: +0 candidates (total 45) — https://www.uow.edu.au/study/courses/?addCourse=361890
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?addCourse=410671: listing (19 course links found)
+[DISCOVER] Page 18/25: +0 candidates (total 45) — https://www.uow.edu.au/study/courses/?addCourse=410671
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?addCourse=361332: listing (19 course links found)
+[DISCOVER] Page 19/25: +0 candidates (total 45) — https://www.uow.edu.au/study/courses/?addCourse=361332
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=2: listing (16 course links found)
+[DISCOVER] Page 20/25: +12 candidates (total 57) — https://www.uow.edu.au/study/courses/?page=2
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=3: listing (18 course links found)
+[DISCOVER] Page 21/25: +14 candidates (total 71) — https://www.uow.edu.au/study/courses/?page=3
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=62: listing (8 course links found)
+[DISCOVER] Page 22/25: +4 candidates (total 75) — https://www.uow.edu.au/study/courses/?page=62
+[DISCOVER] classified https://www.uow.edu.au/study/apply/faq/: listing (4 course links found)
+[DISCOVER] Page 23/25: +0 candidates (total 75) — https://www.uow.edu.au/study/apply/faq/
+[DISCOVER] classified https://www.uow.edu.au/study/admission-info/: listing (6 course links found)
+[DISCOVER] Page 24/25: +2 candidates (total 77) — https://www.uow.edu.au/study/admission-info/
+[DISCOVER] classified https://www.uow.edu.au/study/international/apply/agent-list/: listing (2 course links found)
+[DISCOVER] Page 25/25: +0 candidates (total 77) — https://www.uow.edu.au/study/international/apply/agent-list/
+Discovered 77 candidate course links
+Extracting course details (77 pages)...
+[EXTRACT] 1/77: Study at UOW
+[EXTRACT] 2/77: Postgraduate students
+[EXTRACT] 3/77: Bachelor of Arts
+[EXTRACT] 4/77: Save Bachelor of Arts to Course Favourites
+Fetching 2/77: Postgraduate students
+Fetching 3/77: Bachelor of Arts
+Fetching 1/77: Study at UOW
+Fetching 4/77: Save Bachelor of Arts to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/
+[per-course browser ↻] https://www.uow.edu.au/study/postgraduates/
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410100
+[per-course browser ✓] https://www.uow.edu.au/study/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/postgraduates/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=112947B rendered=0B using=static text_len=13098
+[GP-DEBUG] text[:500]="Bachelor of Arts Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 3218 (overseas) Email: future-students"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/ → 1 field(s) (cost=$0.000327, in=4324 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410100 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=55225B rendered=78582B using=rendered text_len=1411
+[GP-DEBUG] text[:500]='The University of Wollongong (UOW) is more than a university. We unlock opportunities, encourage curiosity, and provide the support and tools to turn your passions into a career. Your future starts at UOW. Explore more than 300 courses taught in state-of-the-art facilities by leading industry professionals. Accounting, Finance & Economics Business, Marketing & Management Communications & Media Computer Science & Information Technology Creative & Performing Arts Education Engineering Environmenta'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/ → 0 field(s) (cost=$0.000109, in=1396 out=15)
+[per-course vision img 0/6] https://www.uow.edu.au/study/
+[GP-DEBUG] static=91644B rendered=114145B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410100 → 0 field(s) (cost=$0.000083, in=1053 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410100 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=82238B rendered=105062B using=rendered text_len=5508
+[GP-DEBUG] text[:500]='Postgraduate study Subsidised course fees available when you commence in 2026 Save up to 75% off your course fees The University of Wollongong is making postgraduate study more accessible. Eligible domestic students commencing in 2026 will benefit from up to 75% off course fees through either a Commonwealth supported place (CSP) or a UOW subsidised fee reduction, supporting students to upskill and advance their careers. These changes reflect UOW’s commitment to supporting students to upskill, sp'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/postgraduates/ → 0 field(s) (cost=$0.000186, in=2424 out=13)
+[per-course vision img 0/6] https://www.uow.edu.au/study/postgraduates/
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/: fee_currency, duration_value, duration_unit
+[EXTRACT] 5/77: Bachelor of Arts - Bachelor of Business
+Fetching 5/77: Bachelor of Arts - Bachelor of Business
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410100: duration_value, duration_unit
+[EXTRACT] 6/77: Save Bachelor of Arts - Bachelor of Business to Course Favourites
+Fetching 6/77: Save Bachelor of Arts - Bachelor of Business to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410180
+[GP-DEBUG] static=93271B rendered=0B using=static text_len=12230
+[GP-DEBUG] text[:500]="Bachelor of Arts - Bachelor of Business Learn to communicate effectively. Master the art of negotiation and critical thinking. Make strong professional connections. Save Bachelor of Arts - Bachelor of Business to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Austra"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 38976,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 1 field(s) (cost=$0.000311, in=4113 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-business/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 1/6 (cache hits 5)] https://www.uow.edu.au/study/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 6/6] https://www.uow.edu.au/study/postgraduates/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/postgraduates/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-business/: fee_currency, duration_value, duration_unit
+[EXTRACT] 7/77: Bachelor of Arts - Bachelor of Communication and Media
+Fetching 7/77: Bachelor of Arts - Bachelor of Communication and Media
+[EXTRACT] 8/77: Save Bachelor of Arts - Bachelor of Communication and Media to Course Favourites
+Fetching 8/77: Save Bachelor of Arts - Bachelor of Communication and Media to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410134
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410180 — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 9/77: Bachelor of Arts - Bachelor of International Studies
+Fetching 9/77: Bachelor of Arts - Bachelor of International Studies
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410134 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=92409B rendered=0B using=static text_len=11553
+[GP-DEBUG] text[:500]="Bachelor of Arts - Bachelor of Communication and Media Hone your skills of analysis. Synthesize complex ideas. Become an effective global communicator. Save Bachelor of Arts - Bachelor of Communication and Media to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Aust"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36288,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 1 field(s) (cost=$0.000299, in=3947 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-communication-and-media/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=91644B rendered=114275B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 36288,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410180 → 1 field(s) (cost=$0.000082, in=1053 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410180 (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=91644B rendered=114154B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410134 → 0 field(s) (cost=$0.000083, in=1053 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410134 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=87707B rendered=0B using=static text_len=9863
+[GP-DEBUG] text[:500]="Bachelor of Arts - Bachelor of International Studies Stand out from the crowd. Understand the forces that shape our world. Unlock global career opportunities. Save Bachelor of Arts - Bachelor of International Studies to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 1 field(s) (cost=$0.000267, in=3524 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-international-studies/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410180: duration_value, duration_unit
+[EXTRACT] 10/77: Save Bachelor of Arts - Bachelor of International Studies to Course Favourites
+Fetching 10/77: Save Bachelor of Arts - Bachelor of International Studies to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410197
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-communication-and-media/: fee_currency, duration_value, duration_unit
+[EXTRACT] 11/77: Bachelor of Arts - Bachelor of Laws
+Fetching 11/77: Bachelor of Arts - Bachelor of Laws
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410197 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=92415B rendered=0B using=static text_len=12073
+[GP-DEBUG] text[:500]="Bachelor of Arts - Bachelor of Laws Gain practical legal training. Sharpen your critical thinking skills. Advocate for social justice. Save Bachelor of Arts - Bachelor of Laws to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 3218 (overseas)"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 44064,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 1 field(s) (cost=$0.000308, in=4072 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-laws/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410134: duration_value, duration_unit
+[GP-DEBUG] static=91644B rendered=114251B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[EXTRACT] 12/77: Save Bachelor of Arts - Bachelor of Laws to Course Favourites
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+Fetching 12/77: Save Bachelor of Arts - Bachelor of Laws to Course Favourites
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410197 → 0 field(s) (cost=$0.000083, in=1053 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410197 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-international-studies/: fee_currency, duration_value, duration_unit
+[EXTRACT] 13/77: Bachelor of Arts (Community, Culture and Environment)
+Fetching 13/77: Bachelor of Arts (Community, Culture and Environment)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410286
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-laws/: fee_currency, duration_value, duration_unit
+[EXTRACT] 14/77: Bachelor of Arts (English Literatures)
+Fetching 14/77: Bachelor of Arts (English Literatures)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410197: duration_value, duration_unit
+[EXTRACT] 15/77: Bachelor of Arts (Geography)
+Fetching 15/77: Bachelor of Arts (Geography)
+[GP-DEBUG] static=110516B rendered=0B using=static text_len=13828
+[GP-DEBUG] text[:500]="Bachelor of Arts (Community, Culture and Environment) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Community, Culture and Environment) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 8"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000342, in=4509 out=12)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44093 (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410286 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=91644B rendered=114264B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410286 → 0 field(s) (cost=$0.000083, in=1053 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410286 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=113203B rendered=0B using=static text_len=13876
+[GP-DEBUG] text[:500]="Bachelor of Arts (Geography) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Geography) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 3218 (overseas"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 1 field(s) (cost=$0.000342, in=4521 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45340 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=114197B rendered=0B using=static text_len=14193
+[GP-DEBUG] text[:500]="Bachelor of Arts (English Literatures) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (English Literatures) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2"
+[GP-DEBUG] raw_response='time, or part-time equivalent"\n * Value: 3.'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000349, in=4601 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44036 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44093: duration_value, duration_unit
+[EXTRACT] 16/77: Bachelor of Arts (Global Communications)
+Fetching 16/77: Bachelor of Arts (Global Communications)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45340: fee_currency, duration_value, duration_unit
+[EXTRACT] 17/77: Bachelor of Arts (History)
+Fetching 17/77: Bachelor of Arts (History)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410286: duration_value, duration_unit
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44036: fee_currency, duration_value, duration_unit
+[EXTRACT] 18/77: 0 My favourites
+[EXTRACT] 19/77: English Language
+Fetching 19/77: English Language
+Fetching 18/77: 0 My favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/favourites/
+[GP-DEBUG] static=113320B rendered=0B using=static text_len=13922
+[GP-DEBUG] text[:500]="Bachelor of Arts (Global Communications) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Global Communications) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +"
+[GP-DEBUG] raw_response='time, or part-time equivalent". (Wait, looking at the raw text: "3'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000345, in=4533 out=16)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45527 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=114654B rendered=0B using=static text_len=14445
+[GP-DEBUG] text[:500]="Bachelor of Arts (History) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (History) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 3218 (overseas) Em"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 1 field(s) (cost=$0.000353, in=4664 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44138 (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/favourites/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=81923B rendered=0B using=static text_len=20801
+[GP-DEBUG] text[:500]='English language requirements At the University of Wollongong (UOW), all courses are taught and assessed in English. When you apply for admission, you must meet UOW’s English language requirements. This means you may need to provide evidence that your English skills are strong enough to meet the demands of university-level lectures, tutorials, assignments, and exams. Student visa requirements If you are an international student applying for a student visa, you may also need to meet additional En'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/international/requirements/engl → 0 field(s) (cost=$0.000473, in=6252 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/requirements/english/ (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45527: fee_currency, duration_value, duration_unit
+[EXTRACT] 20/77: Bridging courses
+Fetching 20/77: Bridging courses
+[GP-DEBUG] static=38741B rendered=62220B using=rendered text_len=394
+[GP-DEBUG] text[:500]="My favourites Add courses to your favourites to compare them. You have 0 saved courses. Sort courses Course A to Z Course Z to A Student International Domestic You haven't selected any courses available to international students. Please select some courses to compare. You haven't selected any courses available to international students. Please select some courses to compare. Add More Courses"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/courses/favourites/ → 0 field(s) (cost=$0.000090, in=1146 out=12)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/favourites/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.uow.edu.au/study/admission-info/pathways/bridging-courses/
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44138: fee_currency, duration_value, duration_unit
+[EXTRACT] 21/77: TAFE credit for prior learning page
+Fetching 21/77: TAFE credit for prior learning page
+[per-course browser ↻] https://www.uow.edu.au/study/credit-for-prior-learning/australia/tafe/
+[EXTRACT] 22/77: Cost of living
+Fetching 22/77: Cost of living
+[per-course browser ↻] https://www.uow.edu.au/study/move/costofliving/
+[per-course browser ✓] https://www.uow.edu.au/study/credit-for-prior-learning/australia/tafe/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/move/costofliving/ — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 23/77: A university city
+Fetching 23/77: A university city
+[per-course browser ↻] https://www.uow.edu.au/study/move/university-city/
+[per-course browser ✓] https://www.uow.edu.au/study/move/university-city/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=41263B rendered=64308B using=rendered text_len=1719
+[GP-DEBUG] text[:500]='Wollongong enjoys a very reasonable cost of living, which means you can focus your efforts on your study, not your finances. Median rental figures for a two-bedroom apartment The below table compares weekly rental costs across several cities based on government data. CITY WEEKLY MONTHLY Wollongong* $550 $2,383 Liverpool* $520 $2,253 Sydney CBD* $750 $3,250 Inner Melbourne ** $529 $2,292 *NSW Department of Family & Community Services Rent and Sales, March 2023 **Housing Victorian Rental Report, M'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/move/costofliving/ → 0 field(s) (cost=$0.000114, in=1477 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/move/costofliving/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=45484B rendered=68609B using=rendered text_len=2301
+[GP-DEBUG] text[:500]='There’s always something happening in Wollongong – so if you want to make it your home, here’s why it is the perfect place to be a student. Wollongong: a university city In a prime location between the mountains and the Tasman Sea, the Illawarra region is an adventurers dream filled with trails that lead to waterfalls, wildlife and breathtaking lookout points. Whether you run, walk or cycle, do it with a view along the spectacular coastline overlooking scenic rock pools and 17 patrolled beaches.'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/move/university-city/ → 0 field(s) (cost=$0.000126, in=1624 out=14)
+[per-course vision img 0/5] https://www.uow.edu.au/study/move/university-city/
+[GP-DEBUG] static=65105B rendered=90523B using=rendered text_len=11127
+[GP-DEBUG] text[:500]='TAFE Credit for prior learning The following TAFE courses have credit for prior learning available. Please select the course for further details. Expand All Collapse All Diploma in Nursing Course details for a Credit Transfer for the Bachelor of Nursing at the University of Wollongong are as follows: Program Year Cohorts Prior to 2021 (HLT54115) 2021 onwards (HLT54121) Completion of Institution Course Required: HLT54115 Diploma of Nursing OR HLT54121 Diploma of Nursing Minimum Grade Required: De'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/credit-for-prior-learning/austr → 0 field(s) (cost=$0.000292, in=3835 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/credit-for-prior-learning/australia/tafe/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 24/77: Visit Wollongong
+Fetching 24/77: Visit Wollongong
+[per-course browser ↻] https://www.uow.edu.au/study/move/visit/
+[per-course browser ✓] https://www.uow.edu.au/study/move/visit/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/credit-for-prior-learning/australia/tafe/: duration_value, duration_unit
+[EXTRACT] 25/77: Moving with family
+Fetching 25/77: Moving with family
+[per-course browser ↻] https://www.uow.edu.au/study/move/family/
+[GP-DEBUG] static=41649B rendered=64872B using=rendered text_len=2308
+[GP-DEBUG] text[:500]='With 17 beautiful beaches, a spectacular escarpment, a bustling city centre and your choice of restaurant and entertainment zones, Wollongong is here waiting for you to explore. There really is something for everyone in Wollongong and the greater Illawarra region. Here are a few suggestions to help you get started. Thrills Go hang gliding from Bald Hill. Join 19,000 people who jump from planes with Skydive Beach every year, the only place in New South Wales where you can land on the beach. Zipli'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/move/visit/ → 0 field(s) (cost=$0.000126, in=1623 out=14)
+[per-course vision img 0/2] https://www.uow.edu.au/study/move/visit/
+[per-course browser ✓] https://www.uow.edu.au/study/move/family/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/admission-info/pathways/bridging-courses/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=35767B rendered=59256B using=rendered text_len=1197
+[GP-DEBUG] text[:500]='Chemistry Skills for Success Monday 9 - Friday 20 February 9.30am - 12.30pm each day* Building 14, room G01 (14-G01) Physics Skills for Success Monday 9 - Friday 20 February 1.30am - 4.30pm each day* Building 6, room 210 (6-210) Biology Skills for Success Monday 16 - Friday 20 February 1.30am - 5pm each day* Building 35, room G19 (35-G19) Below you’ll find important information to help you prepare for your first day. Further details have been emailed to registered participants, including what to'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/admission-info/pathways/bridgin → 0 field(s) (cost=$0.000105, in=1353 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/admission-info/pathways/bridging-courses/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=40868B rendered=65078B using=rendered text_len=2233
+[GP-DEBUG] text[:500]='If your move to Wollongong for study also means a move with family, here are a few tips that will help everyone settle in. Schools Wollongong is home to many excellent public schools. Use the NSW Department of Education School Finder tool to find a school near you. Childcare services Childcare facilities are available for children aged six weeks to six years. For more information, please visit the Kids’ Uni website. To apply to the waitlist, please submit this form. Please not that waiting lists'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/move/family/ → 0 field(s) (cost=$0.000123, in=1604 out=10)
+[per-course vision img 0/1] https://www.uow.edu.au/study/move/family/
+[per-course vision img 2/2] https://www.uow.edu.au/study/move/visit/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/move/visit/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 5/5] https://www.uow.edu.au/study/move/university-city/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/move/university-city/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 26/77: Working in Wollongong
+Fetching 26/77: Working in Wollongong
+[per-course browser ↻] https://www.uow.edu.au/study/move/working-in-wollongong/
+[EXTRACT] 27/77: Study Abroad to UOW
+Fetching 27/77: Study Abroad to UOW
+[per-course browser ↻] https://www.uow.edu.au/study/study-abroad-exchange/studyabroad/
+[per-course browser ✓] https://www.uow.edu.au/study/move/working-in-wollongong/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/1] https://www.uow.edu.au/study/move/family/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/move/family/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/study-abroad-exchange/studyabroad/ — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 28/77: Entry pathways
+Fetching 28/77: Entry pathways
+[per-course browser ↻] https://www.uow.edu.au/study/high-school/other-entry/
+[GP-DEBUG] static=41851B rendered=65016B using=rendered text_len=2635
+[GP-DEBUG] text[:500]="If you’re planning to find work in Wollongong, UOW Careers & Employability (formerly Careers Central) is available to help you connect with potential employers and learn the skills you need to successfully navigate the job market. JobBoard The UOW JobBoard lists a range of opportunities for students looking for work. From ongoing or casual jobs, to internships, graduate recruitment programs and international postings, it's a one-stop-shop for work opportunities. You can also find information on "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/move/working-in-wollongong/ → 0 field(s) (cost=$0.000131, in=1709 out=10)
+[per-course vision img 0/2] https://www.uow.edu.au/study/move/working-in-wollongong/
+[EXTRACT] 29/77: First-year student FAQs
+Fetching 29/77: First-year student FAQs
+[per-course browser ↻] https://www.uow.edu.au/study/high-school/first-year-student-faqs/
+[GP-DEBUG] static=53350B rendered=76874B using=rendered text_len=1504
+[GP-DEBUG] text[:500]='What UOW has to offer Our courses have been developed by teachers who are leading their fields. Our student-focused approach to teaching and learning means you will have the guidance and support you need. And this all takes place in a city on one of Australia’s most beautiful coastlines. Experience the best of the Australian lifestyle - sun, sport, and outdoor living, all while earning credit towards your degree. Why choose Wollongong Choosing your program Study Abroad Program Study abroad progr'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/study-abroad-exchange/studyabro → 0 field(s) (cost=$0.000110, in=1428 out=10)
+[per-course vision img 0/6] https://www.uow.edu.au/study/study-abroad-exchange/studyabroad/
+[per-course browser ✓] https://www.uow.edu.au/study/high-school/other-entry/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/high-school/first-year-student-faqs/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=48125B rendered=72298B using=rendered text_len=6601
+[GP-DEBUG] text[:500]='Skip to: Non-ATAR entry options Pathways to UOW and bridging courses UOW Early Admission Non-ATAR entry options UOW offers alternative and supplementary programs for students who wish to pursue study at university. This may include students who: Didn’t quite get the high school results they hoped for Might be eligible for alternative entry programs May need additional study to prepare them for their university degree UEP at UOW What is it? The University Entrance Program (UEP) is fee free* for A'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/high-school/other-entry/ → 0 field(s) (cost=$0.000206, in=2699 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/high-school/other-entry/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 2/2] https://www.uow.edu.au/study/move/working-in-wollongong/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/move/working-in-wollongong/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=69945B rendered=103334B using=rendered text_len=15360
+[GP-DEBUG] text[:500]="As you head into your first year at UOW, we know you'll have plenty of questions about getting started. To answer these, we've put together a list of FAQs below. Expand All Collapse All Can I apply directly to UOW? High school school students must apply via the Universities Admissions Centre (UAC). Non-school leavers or mature age applicants have the choice to apply directly to UOW or via UAC for the majority of UOW courses. Those wishing to apply for Bachelor of Nursing, Bachelor of Pre-Medicin"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/high-school/first-year-student- → 0 field(s) (cost=$0.000371, in=4892 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/high-school/first-year-student-faqs/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 30/77: Info for Year 10 students
+Fetching 30/77: Info for Year 10 students
+[per-course browser ↻] https://www.uow.edu.au/study/high-school/preparing/
+[EXTRACT] 31/77: Early Years
+Fetching 31/77: Early Years
+[per-course browser ↻] https://www.uow.edu.au/study/education/early-years-accelerated/
+[FALLBACK] AI filled 1 field(s) on https://www.uow.edu.au/study/high-school/first-year-student-faqs/: course_location
+[EXTRACT] 32/77: Postgraduate degrees
+Fetching 32/77: Postgraduate degrees
+[per-course browser ↻] https://www.uow.edu.au/study/postgraduates/subsidised-postgrad/
+[per-course browser ✓] https://www.uow.edu.au/study/education/early-years-accelerated/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/postgraduates/subsidised-postgrad/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=67382B rendered=110709B using=rendered text_len=8541
+[GP-DEBUG] text[:500]='Create opportunities with a UOW postgraduate degree Choosing to study a postgraduate degree is a big decision. At the University of Wollongong, it’s one that comes with all the support you need to earn a recognised qualification that will help you accelerate your current career or start a new one. Eligible domestic students commencing in 2026 could save up to 75% on course fees through either a Commonwealth supported place (CSP) or a UOW subsidised fee reduction. Featured courses Postgraduate He'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/postgraduates/subsidised-postgr → 0 field(s) (cost=$0.000243, in=3187 out=14)
+[per-course vision img 0/6] https://www.uow.edu.au/study/postgraduates/subsidised-postgrad/
+[GP-DEBUG] static=58504B rendered=93253B using=rendered text_len=9890
+[GP-DEBUG] text[:500]='Pathway program for the Bachelor of Education Early Years Accelerated Apply now Register for webinar 26 May The Bachelor of Education – The Early Years (Accelerated Pathway Program) has been specifically designed to support diploma qualified early childhood educators while they study to take their career to the next level. Turn your Diploma into a degree in just two years This exciting online program was developed by UOW in partnership with Early Learning and Care Council of Australia (ELACCA) a'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/education/early-years-accelerat → 0 field(s) (cost=$0.000268, in=3524 out=12)
+[per-course vision img 0/6] https://www.uow.edu.au/study/education/early-years-accelerated/
+[per-course vision img 6/6] https://www.uow.edu.au/study/study-abroad-exchange/studyabroad/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/study-abroad-exchange/studyabroad/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✗] https://www.uow.edu.au/study/high-school/preparing/: empty response
+[EXTRACT] 33/77: FAQ
+Fetching 33/77: FAQ
+[per-course browser ↻] https://www.uow.edu.au/study/non-school-leaver/advice/
+[per-course browser ✓] https://www.uow.edu.au/study/non-school-leaver/advice/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=38035B rendered=61457B using=rendered text_len=2692
+[GP-DEBUG] text[:500]="Who is a non-school leaver student? UOW considers non-school leaver students (also known as 'mature age students') to be: over the age of 18 and not currently completing the HSC or IB; and an Australian citizen; or holder of a permanent humanitarian visa residing in Australia for the completion of their studies; or a New Zealand citizen; or holder of other permanent visas. What if I don't have an ATAR or it isn't high enough? There are many options for mature age/non-school leaver students who d"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/non-school-leaver/advice/ → 0 field(s) (cost=$0.000133, in=1722 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/non-school-leaver/advice/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=43210B rendered=0B using=static text_len=2246
+[GP-DEBUG] text[:500]="When you're a Year 10 student, it's time to start getting prepared for uni. Choosing subjects for Year 12 It is important to start thinking about university when you're in Year 10, so you can make the right subject choices for Years 11 and 12. Some UOW degrees ask for prior knowledge, or what we call 'assumed knowledge' so by picking the right subjects for your study area, your options will remain wide open. It is also important to choose subjects that you are good at and interested in. Choosing"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/high-school/preparing/ → 0 field(s) (cost=$0.000125, in=1610 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/high-school/preparing/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 34/77: Course types
+Fetching 34/77: Course types
+[per-course browser ↻] https://www.uow.edu.au/study/international/courses/
+[per-course vision img 6/6] https://www.uow.edu.au/study/education/early-years-accelerated/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/education/early-years-accelerated/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/international/courses/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/education/early-years-accelerated/: duration_value, duration_unit
+[EXTRACT] 35/77: Entry requirements
+Fetching 35/77: Entry requirements
+[EXTRACT] 36/77: Post-study work options
+Fetching 36/77: Post-study work options
+[per-course browser ↻] https://www.uow.edu.au/study/international/post-study-work/
+[per-course vision img 6/6] https://www.uow.edu.au/study/postgraduates/subsidised-postgrad/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/postgraduates/subsidised-postgrad/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.uow.edu.au/study/international/requirements/
+[GP-DEBUG] static=45677B rendered=68953B using=rendered text_len=5040
+[GP-DEBUG] text[:500]='A globally recognised degree from UOW is your passport to a world of opportunity. As a comprehensive teaching and research university, we offer more than 340 courses across a range of study levels and disciplines. The types of courses we offer are listed below. English Language Courses Many international students need to study English before they start their UOW courses. UOW College Australia offers English Preparation courses that will help you reach the English requirements for your UOW course'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/international/courses/ → 0 field(s) (cost=$0.000176, in=2309 out=10)
+[per-course vision img 0/2] https://www.uow.edu.au/study/international/courses/
+[per-course browser ✓] https://www.uow.edu.au/study/international/post-study-work/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/international/requirements/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=43929B rendered=68052B using=rendered text_len=7420
+[GP-DEBUG] text[:500]='As an international student you may be able to continue to live and work in Australia temporarily, following completion of your UOW degree. Graduating students are not guaranteed a post-study work visa, and must meet strict conditions to be granted a visa. You can apply for a post-study work visa if: you are under 50 years of age you hold an eligible visa you have recently completed an eligible qualification, and you meet the study requirements outlined by the Australian government. For full det'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/international/post-study-work/ → 0 field(s) (cost=$0.000222, in=2906 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/post-study-work/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 37/77: Transfer to UOW
+Fetching 37/77: Transfer to UOW
+[per-course browser ↻] https://www.uow.edu.au/study/international/transfer-to-uow/
+[GP-DEBUG] static=41828B rendered=65069B using=rendered text_len=1718
+[GP-DEBUG] text[:500]='Entry requirements to study at UOW Each UOW course has a set of entry requirements that you must meet before you can enrol. This includes both academic requirements and skills in English. The entry requirements for each UOW course may be found each course information page on Course Finder – look for the ‘International students’ tab under the ‘Admission, Key dates, and Fees’ heading. English requirements You must be able to demonstrate skills in English to satisfy course entry requirements. UOW a'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_'
+[GEMINI] https://www.uow.edu.au/study/international/requirements/ → 0 field(s) (cost=$0.000115, in=1479 out=12)
+[per-course vision img 0/4] https://www.uow.edu.au/study/international/requirements/
+[EXTRACT] 38/77: Understanding your offer
+Fetching 38/77: Understanding your offer
+[per-course browser ↻] https://www.uow.edu.au/study/international/offer/
+[per-course browser ✓] https://www.uow.edu.au/study/international/transfer-to-uow/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 2/2] https://www.uow.edu.au/study/international/courses/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/courses/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/international/offer/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=70730B rendered=93745B using=rendered text_len=2772
+[GP-DEBUG] text[:500]='If you’re studying with UOW Dubai, UOW Malaysia, or UOW College Hong Kong, you are eligible to transfer to a UOW campus in Australia. As a student of our global network of campuses, you’re eligible for an offshore transfer discount that will reduce your tuition fees by 30%, so you can focus on your studies, and not on your finances. Credit transfer When you transfer to a UOW campus in Australia, the study you’ve successfully completed at your UOW campus in Dubai, Malaysia or Hong Kong will be re'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/international/transfer-to-uow/ → 0 field(s) (cost=$0.000135, in=1744 out=15)
+[per-course vision img 0/6] https://www.uow.edu.au/study/international/transfer-to-uow/
+[GP-DEBUG] static=47175B rendered=70975B using=rendered text_len=5128
+[GP-DEBUG] text[:500]='Understanding Your Offer This page will help you understand the important information on your Offer of Admission. You should check the details on your offer letter carefully. If you have any questions or concerns about your offer, you should contact UOW Future Students. Student Number Your 7-digit Student Number is shown at the top of your offer letter. Please quote this number in all correspondence. Course Details Course: the name of the qualification you will be awarded providing you enrol in '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/international/offer/ → 0 field(s) (cost=$0.000178, in=2330 out=12)
+[per-course vision img 0/4] https://www.uow.edu.au/study/international/offer/
+[EXTRACT] 39/77: Accept your offer
+Fetching 39/77: Accept your offer
+[per-course browser ↻] https://www.uow.edu.au/study/international/accept/
+[per-course vision img 2/4 (cache hits 2)] https://www.uow.edu.au/study/international/offer/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/offer/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 3/4 (cache hits 1)] https://www.uow.edu.au/study/international/requirements/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/requirements/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/international/accept/ — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 40/77: Student visa
+Fetching 40/77: Student visa
+[per-course browser ↻] https://www.uow.edu.au/study/international/visa/
+[EXTRACT] 41/77: Agent partners & representatives
+Fetching 41/77: Agent partners & representatives
+[per-course browser ↻] https://www.uow.edu.au/study/international/representatives/
+[GP-DEBUG] static=52892B rendered=77774B using=rendered text_len=8048
+[GP-DEBUG] text[:500]='Congratulations on receiving an offer to study with UOW. There are a few steps you need to take to secure your Confirmation of Enrolment (CoE). Step 1: Clear Offer Conditions Step 2: Acceptance Agreement Step 3: UOW Confirmation Step 4: Pay Fees Step 5: Confirmation of Enrolment (COE) Your offer may have conditions that you need to meet before you can accept. These may include: finishing your current study, meeting the English language requirements for your course, providing official copies of y'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/international/accept/ → 0 field(s) (cost=$0.000234, in=3060 out=14)
+[per-course vision img 0/5] https://www.uow.edu.au/study/international/accept/
+[per-course browser ✓] https://www.uow.edu.au/study/international/visa/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/international/representatives/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=45379B rendered=68670B using=rendered text_len=2762
+[GP-DEBUG] text[:500]="All international students require a student visa to study at the University of Wollongong (UOW). This must be obtained before travelling to Australia. UOW is an eligible institution as part of the Australian Government's Streamlined Visa Processing (SVP) system. Visa application process To apply for a student visa, you will need: A valid passport Your electronic Confirmation of Enrolment (eCOE) Any other documentation required by the Australian Diplomatic Post Your nearest Australian Embassy, C"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/international/visa/ → 0 field(s) (cost=$0.000135, in=1738 out=15)
+[per-course vision img 0/4] https://www.uow.edu.au/study/international/visa/
+[GP-DEBUG] static=53881B rendered=78497B using=rendered text_len=1971
+[GP-DEBUG] text[:500]='UOW’s agent partners play an integral role in assisting international students to realise their aspirations of studying at the University of Wollongong. Here, agents will find resources to assist in counselling future UOW students. Expand All Collapse All Admissions information Simplified Student Visa Framework (SSVF) and Genuine Student (GS) screening International entry requirements English language requirements Recognition of English language studies Document requirements International studen'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/international/representatives/ → 0 field(s) (cost=$0.000119, in=1543 out=10)
+[per-course vision img 0/2] https://www.uow.edu.au/study/international/representatives/
+[per-course vision img 1/4 (cache hits 3)] https://www.uow.edu.au/study/international/visa/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 1/5 (cache hits 4)] https://www.uow.edu.au/study/international/accept/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/visa/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/accept/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 42/77: Pre-arrival checklist
+Fetching 42/77: Pre-arrival checklist
+[EXTRACT] 43/77: Airport pick-up
+Fetching 43/77: Airport pick-up
+[per-course browser ↻] https://www.uow.edu.au/study/international/pickup/
+[per-course browser ↻] https://www.uow.edu.au/study/international/prearrival/
+[per-course browser ✓] https://www.uow.edu.au/study/international/pickup/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/international/prearrival/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course vision img 2/2] https://www.uow.edu.au/study/international/representatives/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/representatives/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=48105B rendered=72357B using=rendered text_len=5117
+[GP-DEBUG] text[:500]='Preparing for your arrival to UOW Follow the links on this site to find practical information to help you prepare for your time in Wollongong. Documents Clothing & Weather Electrical goods Time zone Flights Arrival Information for students planning to bring their families is in the Pre-Arrival Booklet that you can download above. Documents You should prepare a folder of documents to bring with you, including: Valid passport with student visa Offer of Admission letter electronic Confirmation of E'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/international/prearrival/ → 0 field(s) (cost=$0.000179, in=2329 out=13)
+[per-course vision img 0/4] https://www.uow.edu.au/study/international/prearrival/
+[per-course vision img 0/4 (cache hits 4)] https://www.uow.edu.au/study/international/prearrival/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/prearrival/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=43453B rendered=66921B using=rendered text_len=2148
+[GP-DEBUG] text[:500]='Wollongong Campus pickup requests The University of Wollongong offers a complimentary Airport Pickup service for all newly enrolling international UOW students, as well as newly enrolling UOW College students with a progressive offer for a UOW course*, who are arriving in Australia for the first time. Students will be collected from Sydney Airport (Sydney Kingsford Smith Airport) at the International or Domestic terminal and transported directly to their accommodation destination in Wollongong. '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/international/pickup/ → 0 field(s) (cost=$0.000123, in=1585 out=14)
+[per-course vision img 0/3] https://www.uow.edu.au/study/international/pickup/
+[EXTRACT] 44/77: Ask a Student
+Fetching 44/77: Ask a Student
+[per-course browser ↻] https://www.uow.edu.au/study/international/ask-a-student/
+[EXTRACT] 45/77: Clear all
+Fetching 45/77: Clear all
+[per-course vision img 6/6] https://www.uow.edu.au/study/international/transfer-to-uow/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/transfer-to-uow/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/international/ask-a-student/ — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.uow.edu.au/study/courses/index.php
+[GP-DEBUG] static=34253B rendered=58029B using=rendered text_len=28
+[GP-DEBUG] text[:500]='Ask an international student'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/international/ask-a-student/ → 0 field(s) (cost=$0.000082, in=1057 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/ask-a-student/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course vision img 1/3 (cache hits 2)] https://www.uow.edu.au/study/international/pickup/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/international/pickup/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 46/77: Bachelor of Arts (Honours)
+Fetching 46/77: Bachelor of Arts (Honours)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/index.php — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 47/77: Save Bachelor of Arts (Honours) to Course Favourites
+Fetching 47/77: Save Bachelor of Arts (Honours) to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410235&page=2
+[GP-DEBUG] static=91147B rendered=113517B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/courses/index.php → 0 field(s) (cost=$0.000083, in=1051 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/index.php (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 48/77: Bachelor of Arts (Honours) (English Literatures)
+Fetching 48/77: Bachelor of Arts (Honours) (English Literatures)
+[GP-DEBUG] static=94489B rendered=0B using=static text_len=11555
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 3218 (overseas) Em"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000298, in=3940 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/index.php: duration_value, duration_unit
+[EXTRACT] 49/77: Bachelor of Arts (Honours) (History)
+Fetching 49/77: Bachelor of Arts (Honours) (History)
+[GP-DEBUG] static=96878B rendered=0B using=static text_len=12804
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (English Literatures) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (English Literatures) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000322, in=4255 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44036 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=96932B rendered=0B using=static text_len=12942
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (History) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (History) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 422"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000324, in=4290 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44138 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/: fee_currency, duration_value, duration_unit
+[EXTRACT] 50/77: Bachelor of Arts (Honours) (Indigenous Studies)
+Fetching 50/77: Bachelor of Arts (Honours) (Indigenous Studies)
+[GP-DEBUG] static=96755B rendered=0B using=static text_len=12688
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (Indigenous Studies) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (Indigenous Studies) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within A"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000320, in=4226 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44098 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 51/77: Bachelor of Arts (Honours) (Philosophy)
+Fetching 51/77: Bachelor of Arts (Honours) (Philosophy)
+[GP-DEBUG] static=96319B rendered=0B using=static text_len=12314
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (Philosophy) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (Philosophy) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000313, in=4133 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44046 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44138: fee_currency, duration_value, duration_unit
+[EXTRACT] 52/77: Bachelor of Arts (Honours) (Politics)
+Fetching 52/77: Bachelor of Arts (Honours) (Politics)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44098: fee_currency, duration_value, duration_unit
+[EXTRACT] 53/77: Bachelor of Arts (Honours) (Sociology)
+Fetching 53/77: Bachelor of Arts (Honours) (Sociology)
+[GP-DEBUG] static=96300B rendered=0B using=static text_len=12309
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (Politics) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (Politics) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000313, in=4132 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44048 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=96468B rendered=0B using=static text_len=12471
+[GP-DEBUG] text[:500]="Bachelor of Arts (Honours) (Sociology) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Honours) (Sociology) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 1 field(s) (cost=$0.000316, in=4172 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44041 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44046: fee_currency, duration_value, duration_unit
+[EXTRACT] 54/77: Bachelor of Arts (Indigenous Studies)
+Fetching 54/77: Bachelor of Arts (Indigenous Studies)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44048: fee_currency, duration_value, duration_unit
+[EXTRACT] 55/77: Bachelor of Arts (International Relations)
+Fetching 55/77: Bachelor of Arts (International Relations)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44041: fee_currency, duration_value, duration_unit
+[EXTRACT] 56/77: Bachelor of Arts in Western Civilisation
+Fetching 56/77: Bachelor of Arts in Western Civilisation
+[GP-DEBUG] static=113800B rendered=0B using=static text_len=14412
+[GP-DEBUG] text[:500]="Bachelor of Arts (International Relations) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (International Relations) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 1 field(s) (cost=$0.000352, in=4655 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44142 (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410235&page=2 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=114513B rendered=0B using=static text_len=14233
+[GP-DEBUG] text[:500]="Bachelor of Arts (Indigenous Studies) Become a critical thinker. Develop analytical and communications skills. Join a global dialogue on human culture. Save Bachelor of Arts (Indigenous Studies) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 3427'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 1 field(s) (cost=$0.000349, in=4611 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44098 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=95021B rendered=0B using=static text_len=9729
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Australia) or +61 2 4221 32"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000265, in=3491 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-double-majors/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44142: fee_currency, duration_value, duration_unit
+[EXTRACT] 57/77: Save Bachelor of Arts in Western Civilisation to Course Favourites
+Fetching 57/77: Save Bachelor of Arts in Western Civilisation to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410566&page=2
+[GP-DEBUG] static=88681B rendered=98435B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410235&page= → 0 field(s) (cost=$0.000084, in=1055 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410235&page=2 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-double-majors/: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 58/77: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+Fetching 58/77: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44098: fee_currency, duration_value, duration_unit
+[EXTRACT] 59/77: Save Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts to Course Favourites
+Fetching 59/77: Save Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts to Course Favourites
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410566&page=2 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=411029&page=3
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=411029&page=3 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=88681B rendered=111354B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410566&page= → 0 field(s) (cost=$0.000083, in=1055 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410566&page=2 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=82249B rendered=0B using=static text_len=8347
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts Develop your creativity. Broaden your global perspective. Engage with influential works. Save Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: +61 2"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 35280,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000239, in=3149 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-creative-arts/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410235&page=2: duration_value, duration_unit
+[EXTRACT] 60/77: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+Fetching 60/77: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+[GP-DEBUG] static=89108B rendered=111739B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=411029&page= → 0 field(s) (cost=$0.000083, in=1055 out=12)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=411029&page=3 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=93346B rendered=0B using=static text_len=9377
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation - Bachelor of International Studies Understand today’s global issues. Become a free thinker. Develop international language skills. Save Bachelor of Arts in Western Civilisation - Bachelor of International Studies to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Stud"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000258, in=3406 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-int-studies/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410566&page=2: duration_value, duration_unit
+[EXTRACT] 61/77: Save Bachelor of Arts in Western Civilisation - Bachelor of International Studies to Course Favourites
+Fetching 61/77: Save Bachelor of Arts in Western Civilisation - Bachelor of International Studies to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=411028&page=3
+[FALLBACK] AI filled 1 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-creative-arts/: fee_currency
+[EXTRACT] 62/77: Bachelor of Arts in Western Civilisation - Bachelor of Laws
+Fetching 62/77: Bachelor of Arts in Western Civilisation - Bachelor of Laws
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-int-studies/: fee_currency, duration_value, duration_unit
+[EXTRACT] 63/77: Save Bachelor of Arts in Western Civilisation - Bachelor of Laws to Course Favourites
+Fetching 63/77: Save Bachelor of Arts in Western Civilisation - Bachelor of Laws to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=411027&page=3
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=411028&page=3 — IELTS=— PTE=— TOEFL=— CAE=—
+[EXTRACT] 64/77: Bachelor of Arts in Western Civilisation (Honours)
+Fetching 64/77: Bachelor of Arts in Western Civilisation (Honours)
+[GP-DEBUG] static=86939B rendered=0B using=static text_len=9732
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation - Bachelor of Laws Gain real-world experience. Become a socially responsible leader. Broaden your perspective of the world. Save Bachelor of Arts in Western Civilisation - Bachelor of Laws to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 36"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 4632'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000265, in=3493 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-laws/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=411027&page=3 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=89108B rendered=111786B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=411028&page= → 0 field(s) (cost=$0.000082, in=1055 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=411028&page=3 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=91441B rendered=0B using=static text_len=9533
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367 869 (within Austral"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000261, in=3441 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 4 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-laws/: fee_currency, intake_months, duration_value, duration_unit
+[EXTRACT] 65/77: Save Bachelor of Arts in Western Civilisation (Honours) to Course Favourites
+Fetching 65/77: Save Bachelor of Arts in Western Civilisation (Honours) to Course Favourites
+[per-course browser ↻] https://www.uow.edu.au/study/courses/?addCourse=410141&page=3
+[per-course browser ✓] https://www.uow.edu.au/study/courses/?addCourse=410141&page=3 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=89108B rendered=111815B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=411027&page= → 0 field(s) (cost=$0.000084, in=1055 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=411027&page=3 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=411028&page=3: duration_value, duration_unit
+[EXTRACT] 66/77: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+Fetching 66/77: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+[GP-DEBUG] static=89108B rendered=111763B using=rendered text_len=14
+[GP-DEBUG] text[:500]='Search Courses'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/?addCourse=410141&page= → 0 field(s) (cost=$0.000084, in=1055 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/?addCourse=410141&page=3 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/: fee_currency, duration_value, duration_unit
+[EXTRACT] 67/77: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+Fetching 67/77: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=411027&page=3: duration_value, duration_unit
+[EXTRACT] 68/77: Bachelor of Arts in Western Civilisation (Honours) (History)
+Fetching 68/77: Bachelor of Arts in Western Civilisation (Honours) (History)
+[GP-DEBUG] static=93858B rendered=0B using=static text_len=10780
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (English Literatures) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (English Literatures) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Studen"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000284, in=3755 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44036 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/?addCourse=410141&page=3: duration_value, duration_unit
+[EXTRACT] 69/77: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+Fetching 69/77: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+[GP-DEBUG] static=93538B rendered=0B using=static text_len=10396
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach ou"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000277, in=3659 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44143 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=93908B rendered=0B using=static text_len=10920
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (History) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (History) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 1300 367"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000287, in=3790 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44138 (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=93731B rendered=0B using=static text_len=10666
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000282, in=3727 out=9)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44098 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44036: fee_currency, duration_value, duration_unit
+[EXTRACT] 70/77: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+Fetching 70/77: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44143: fee_currency, duration_value, duration_unit
+[EXTRACT] 71/77: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+Fetching 71/77: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44138: fee_currency, duration_value, duration_unit
+[EXTRACT] 72/77: University Entrance Program
+Fetching 72/77: University Entrance Program
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44098: fee_currency, duration_value, duration_unit
+[EXTRACT] 73/77: University Entrance Program (Stream 1: Business and the Humanities)
+Fetching 73/77: University Entrance Program (Stream 1: Business and the Humanities)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44354
+[GP-DEBUG] static=93295B rendered=0B using=static text_len=10292
+[GP-DEBUG] static=93986B rendered=0B using=static text_len=10893
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (Philosophy) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (Philosophy) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Future Students Team: Phone: 13"
+[GP-DEBUG] text[:500]="Bachelor of Arts in Western Civilisation (Honours) (International Relations) Broaden your global perspective. Become a socially responsible leader. Engage with influential works. Save Bachelor of Arts in Western Civilisation (Honours) (International Relations) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply For personalised assistance with UOW courses, please reach out to our Futur"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 3427'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 34272,\n "'
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000275, in=3633 out=9)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 1 field(s) (cost=$0.000287, in=3784 out=10)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44046 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44142 (missing: domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/university-entrance-program/
+[per-course browser ✓] https://www.uow.edu.au/study/courses/university-entrance-program/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=91434B rendered=121232B using=rendered text_len=8819
+[GP-DEBUG] text[:500]="University Entrance Program Gain the skills to succeed at university and secure guaranteed* entry into UOW. Save University Entrance Program to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply To enquire about this course, please call the Future Students team on +61 2 4239 2330 or submit an online enquiry form. To apply for this course, please visit the UOW College Application page. Ne"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/university-entrance-pro → 0 field(s) (cost=$0.000249, in=3257 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/university-entrance-program/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44046: fee_currency, duration_value, duration_unit
+[EXTRACT] 74/77: University Entrance Program (Stream 2: Science and Information Technology)
+Fetching 74/77: University Entrance Program (Stream 2: Science and Information Technology)
+[FALLBACK] AI filled 3 field(s) on https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44142: fee_currency, duration_value, duration_unit
+[EXTRACT] 75/77: University Entrance Program (Stream 3: Engineering)
+Fetching 75/77: University Entrance Program (Stream 3: Engineering)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44727
+[per-course browser ↻] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44360
+[per-course browser ✓] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44360 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44727 — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=90551B rendered=120278B using=rendered text_len=8453
+[GP-DEBUG] text[:500]="University Entrance Program (Stream 2: Science and Information Technology) Gain the skills to succeed at university and secure guaranteed* entry into UOW. Save University Entrance Program (Stream 2: Science and Information Technology) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply To enquire about this course, please call the Future Students team on +61 2 4239 2330 or submit an on"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/courses/university-entrance-pro → 0 field(s) (cost=$0.000241, in=3168 out=12)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/university-entrance-program/?major=44727 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/university-entrance-program/: duration_value, duration_unit
+[EXTRACT] 76/77: Admissions procedures
+Fetching 76/77: Admissions procedures
+[per-course browser ↻] https://www.uow.edu.au/study/admission-info/admissions-procedures/
+[per-course browser ✓] https://www.uow.edu.au/study/admission-info/admissions-procedures/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=90092B rendered=119634B using=rendered text_len=8182
+[GP-DEBUG] text[:500]="University Entrance Program (Stream 3: Engineering) Gain the skills to succeed at university and secure guaranteed* entry into UOW. Save University Entrance Program (Stream 3: Engineering) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply To enquire about this course, please call the Future Students team on +61 2 4239 2330 or submit an online enquiry form. To apply for this course, p"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null'
+[GEMINI] https://www.uow.edu.au/study/courses/university-entrance-pro → 0 field(s) (cost=$0.000237, in=3101 out=15)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/university-entrance-program/?major=44360 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=34799B rendered=58349B using=rendered text_len=497
+[GP-DEBUG] text[:500]='Admissions Procedures (Coursework) The Admission Procedures (Coursework) support the admission provisions in the Coursework Rules. These Procedures are designed to ensure that admission decisions and processes are applied fairly and consistently, and are designed to ensure that admitted students have the academic preparation and proficiency in English needed to participate in their intended study, and have no known limitations that would be expected to impede their progression and completion.'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee'
+[GEMINI] https://www.uow.edu.au/study/admission-info/admissions-proce → 0 field(s) (cost=$0.000092, in=1177 out=13)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/admission-info/admissions-procedures/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 77/77: Application closing dates
+Fetching 77/77: Application closing dates
+[per-course browser ✗] https://www.uow.edu.au/study/courses/university-entrance-program/?major=44354: empty response
+[per-course browser ↻] https://www.uow.edu.au/study/admission-info/closing-dates/
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/university-entrance-program/?major=44727: duration_value, duration_unit
+[CATEGORY det] University Entrance Program (Stream 2: S → Computer Science & IT / Information Systems
+[per-course browser ✓] https://www.uow.edu.au/study/admission-info/closing-dates/ — IELTS=— PTE=— TOEFL=— CAE=—
+[GP-DEBUG] static=91123B rendered=0B using=static text_len=8213
+[GP-DEBUG] text[:500]="University Entrance Program (Stream 1: Business and the Humanities) Gain the skills to succeed at university and secure guaranteed* entry into UOW. Save University Entrance Program (Stream 1: Business and the Humanities) to Course Favourites Save as PDF Phone Apply or Enquire It looks like you're interested in courses for: Domestic studentsInternational students Close Enquire Apply To enquire about this course, please call the Future Students team on +61 2 4239 2330 or submit an online enquiry f"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic'
+[GEMINI] https://www.uow.edu.au/study/courses/university-entrance-pro → 0 field(s) (cost=$0.000237, in=3108 out=12)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/university-entrance-program/?major=44354 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GP-DEBUG] static=35473B rendered=58820B using=rendered text_len=552
+[GP-DEBUG] text[:500]="Applying directly to UOW From the Course Finder page for your chosen degree, select the 'Key Dates' button for information on when to apply. Applications received by the due date will receive an outcome prior to the start of session. Unless explicitly stated for a particular course, late applications will generally continue to be considered for as long as possible, so even if the dates shown have passed, you are encouraged to submit your application. Apply now UAC applications Key dates for UAC "
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee":'
+[GEMINI] https://www.uow.edu.au/study/admission-info/closing-dates/ → 0 field(s) (cost=$0.000093, in=1188 out=14)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/admission-info/closing-dates/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/university-entrance-program/?major=44360: duration_value, duration_unit
+[FALLBACK] AI filled 2 field(s) on https://www.uow.edu.au/study/courses/university-entrance-program/?major=44354: duration_value, duration_unit
+[EXTRACT] [sibling cache ↻ build unknown] cambridge_overall=185.0 ielts_overall=5.5 pte_overall=76.0 toefl_overall=106.0
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.5 pte_overall=11.0 toefl_overall=86.0
+[EXTRACT] [sibling cache ↻ backfill unknown] 184 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 30 slot(s) filled across siblings
+[STAGE] skipped Study At the University of Wollongong: rejected: category_landing_page
+[STAGE] skipped Postgraduate Study: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts - Bachelor of Business
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts - Bachelor of Communication and Media
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts - Bachelor of International Studies
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts - Bachelor of Laws
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] skipped Bachelor of Arts (Community, Culture and Environment): rejected: no_international_fee
+[STAGE] saved: Bachelor of Arts (English Literatures)
+[STAGE] saved: Bachelor of Arts (Geography)
+[STAGE] saved: Bachelor of Arts (Global Communications)
+[STAGE] saved: Bachelor of Arts (History)
+[STAGE] skipped My Favourites: rejected: category_landing_page
+[STAGE] skipped English Language Requirements: rejected: category_landing_page
+[STAGE] skipped Bridging Courses: rejected: category_landing_page
+[STAGE] skipped Tafe: rejected: category_landing_page
+[STAGE] skipped Cost of Living: rejected: category_landing_page
+[STAGE] skipped A University City: rejected: category_landing_page
+[STAGE] skipped Visit Wollongong: rejected: category_landing_page
+[STAGE] skipped Moving with Family: rejected: category_landing_page
+[STAGE] skipped Working in Wollongong: rejected: category_landing_page
+[STAGE] skipped Study Abroad At Uow: rejected: category_landing_page
+[STAGE] skipped Other Entry Options: rejected: category_landing_page
+[STAGE] skipped First Year Student Faqs: rejected: category_landing_page
+[STAGE] skipped Year 10 Students: rejected: category_landing_page
+[STAGE] skipped Early Years Accelerated: rejected: category_landing_page
+[STAGE] skipped Career Growth Starts Here: rejected: category_landing_page
+[STAGE] skipped Faqs: rejected: category_landing_page
+[STAGE] skipped Course Types: rejected: category_landing_page
+[STAGE] skipped Entry Requirements: rejected: category_landing_page
+[STAGE] skipped Post-study Work Options: rejected: category_landing_page
+[STAGE] skipped Transfer to Uow Australia: rejected: category_landing_page
+[STAGE] skipped Understanding Your Offer: rejected: category_landing_page
+[STAGE] skipped Accept Your Offer: rejected: category_landing_page
+[STAGE] skipped Student Visa: rejected: category_landing_page
+[STAGE] skipped Agent Partners & Representatives: rejected: category_landing_page
+[STAGE] skipped Pre-arrival Checklist: rejected: category_landing_page
+[STAGE] skipped Airport Pick-up: rejected: category_landing_page
+[STAGE] skipped Ask An International Student: rejected: category_landing_page
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts (Honours)
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts (Honours) (English Literatures)
+[STAGE] saved: Bachelor of Arts (Honours) (History)
+[STAGE] saved: Bachelor of Arts (Honours) (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts (Honours) (Philosophy)
+[STAGE] saved: Bachelor of Arts (Honours) (Politics)
+[STAGE] saved: Bachelor of Arts (Honours) (Sociology)
+[STAGE] saved: Bachelor of Arts (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts (International Relations)
+[STAGE] skipped Bachelor of Arts in Western Civilisation: extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] skipped Bachelor of Arts in Western Civilisation - Bachelor of Laws: extract: sequence item 0: expected str instance, int found
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours)
+[STAGE] skipped Search Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (History)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+[STAGE] skipped University Entrance Program: rejected: category_landing_page
+[STAGE] skipped University Entrance Program (Stream 1: Business and the Humanities): rejected: category_landing_page
+[STAGE] skipped University Entrance Program (Stream 2: Science and Information Technology): rejected: category_landing_page
+[STAGE] skipped University Entrance Program (Stream 3: Engineering): rejected: category_landing_page
+[STAGE] skipped Admissions Procedures: rejected: category_landing_page
+[STAGE] skipped Application Closing Dates: rejected: category_landing_page
+[GEMINI] Total cost: $0.0158 USD across 27 course(s) (~$0.00058/course)
+[TIMING] Total: 7m 32s | Courses: 27 | Avg: 16.7s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:77 | Staged:27 | Skipped:48 | Errors:2
+Staged 27 courses, 48 skipped, 0 fetch errors

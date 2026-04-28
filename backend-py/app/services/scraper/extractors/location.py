@@ -21,7 +21,10 @@ from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
 
 LOCATION_LABEL = re.compile(
-    r"^\s*(?:campus(?:\s*locations?)?|location|locations|where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location)\s*:?\s*$",
+    r"^\s*(?:campus(?:\s*locations?)?|location|locations|"
+    r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
+    r"availability\s+(?:&|and)\s+campus(?:es)?|"
+    r"where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location)\s*:?\s*$",
     re.I,
 )
 _MARKETING_HINTS = re.compile(
@@ -54,9 +57,41 @@ _COMMON_CITIES = (
 )
 
 _PERIOD_LABEL_RE = re.compile(
-    r"^(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+$",
+    r"^(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+"
+    r"(?:\s*[-–—]\s*.{0,50})?$",
     re.I,
 )
+
+
+_CHECKMARK_CHARS = frozenset("✓✔✅√☑")
+_CROSS_CHARS = frozenset("✗✘✕✖❌")
+_AVAIL_KEYWORDS = frozenset(("available", "yes", "tick", "check", "offered", "offered here"))
+_UNAVAIL_KEYWORDS = frozenset(("not available", "no", "cross", "unavailable"))
+_AVAIL_CLASS_FRAGMENTS = ("check", "tick", "yes", "available", "success", "positive", "offered")
+_UNAVAIL_CLASS_FRAGMENTS = ("cross", "no-", "unavailable", "not-available", "negative")
+
+
+def _cell_availability(td) -> str:
+    """Return 'yes', 'no', or 'unknown' based on icon/aria-label/text in a table cell."""
+    text = td.get_text(strip=True)
+    if any(c in text for c in _CHECKMARK_CHARS):
+        return "yes"
+    if any(c in text for c in _CROSS_CHARS):
+        return "no"
+    for el in td.find_all(True):
+        label = (el.get("aria-label") or el.get("title") or "").lower().strip()
+        # Check unavailable FIRST — "not available" contains "available" as
+        # a substring so we must reject the negative case before the positive.
+        if any(k in label for k in _UNAVAIL_KEYWORDS):
+            return "no"
+        if any(k in label for k in _AVAIL_KEYWORDS):
+            return "yes"
+        cls_str = " ".join(el.get("class") or []).lower()
+        if any(f in cls_str for f in _UNAVAIL_CLASS_FRAGMENTS):
+            return "no"
+        if any(f in cls_str for f in _AVAIL_CLASS_FRAGMENTS):
+            return "yes"
+    return "unknown"
 
 
 def _looks_marketing(text: str) -> bool:
@@ -214,34 +249,59 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
             continue
         c1_text = cells[1].get_text(strip=True)
 
-        # ECU-style pivot table: "Location | Semester 1 | Semester 2"
-        # The header row has period labels as column headers.  Real campus
-        # names live in the first column of subsequent data rows — rows
-        # with FT/PT values in column 2+ and no colspan spanning the row.
+        # ECU / UNE-style pivot table:
+        #   ECU: "Location | Semester 1 | Semester 2"
+        #   UNE: "Start dates and campus | Trimester 1 – Feb 2026 | …"
+        # The header row's second+ cells are period/date labels.  Real campus
+        # names live in the first column of subsequent data rows.  We use
+        # _cell_availability() to detect checkmarks (unicode, aria-label, or
+        # CSS class) so that only campuses with at least one available
+        # trimester/semester are included.  When no availability signal is
+        # detected (icons totally opaque) we include ALL non-Online rows to
+        # avoid returning null and falling through to the city-text extractor.
         if _PERIOD_LABEL_RE.match(c1_text):
             parent_table = tr.find_parent("table")
             if not parent_table:
                 continue
+            header_col_count = len(cells)
             locations: list[str] = []
             seen_locs: set[str] = set()
             for data_tr in parent_table.find_all("tr"):
                 dcells = data_tr.find_all(["th", "td"])
-                # Skip header row and single-cell group-header rows
-                if len(dcells) < 2:
+                # Skip the header row itself
+                if not dcells:
                     continue
                 if LOCATION_LABEL.match(dcells[0].get_text(strip=True)):
                     continue
-                # Skip group-header rows whose first cell spans all columns
+                # Skip group-header rows spanning multiple columns
                 try:
                     if int(dcells[0].get("colspan") or 1) > 1:
                         continue
                 except (ValueError, TypeError):
                     pass
-                # Only accept rows that have a non-empty value column (FT/PT…)
-                c2 = dcells[1].get_text(strip=True) if len(dcells) > 1 else ""
-                if not c2:
+                # Accept only rows that span the full table width
+                # (data rows vs single-cell sub-section headers)
+                if len(dcells) < max(2, header_col_count - 1):
+                    continue
+                # Detect availability: at least one value cell must be
+                # available (or availability is unknown — icon not parseable).
+                statuses = [
+                    _cell_availability(dcells[i])
+                    for i in range(1, len(dcells))
+                ]
+                has_yes = any(s == "yes" for s in statuses)
+                all_no = all(s == "no" for s in statuses)
+                all_unknown = all(s == "unknown" for s in statuses)
+                # Skip rows where we can confirm all periods are unavailable
+                if all_no:
+                    continue
+                # Include if available, or if detection is fully opaque
+                if not (has_yes or all_unknown):
                     continue
                 loc_text = dcells[0].get_text(strip=True)
+                # Exclude "Online *" / "Online only" rows from physical campus list
+                if _REMOVE_VIRTUAL.search(loc_text):
+                    continue
                 if loc_text and loc_text.lower() not in seen_locs:
                     seen_locs.add(loc_text.lower())
                     locations.append(loc_text)

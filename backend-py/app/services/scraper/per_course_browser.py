@@ -127,6 +127,7 @@ _SLOW_HOSTS: tuple[str, ...] = (
 # can require 7.0 or higher.
 _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     "federation.edu.au",
+    "une.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000

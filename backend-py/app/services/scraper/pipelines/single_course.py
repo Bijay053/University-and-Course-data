@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 if TYPE_CHECKING:
     # Type-checking-only import to avoid pulling per_course_vision (and
@@ -211,6 +212,16 @@ async def extract_course(
     the *absolute last-resort* fallback (lower confidence than ``uni_pdf_data``)
     for universities that publish fees/IELTS only on central pages (Bug 2).
     """
+    # UNE: international student info (IELTS, PTE, fees, campus availability)
+    # is only visible on the ?international=true variant of each course page.
+    # Rewrite the URL before fetching so extractors always see the right tab.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.une.edu.au", "une.edu.au") and "/study/courses/" in _parsed_url.path:
+        _qs = parse_qs(_parsed_url.query)
+        if "international" not in _qs:
+            _qs["international"] = ["true"]
+            url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
+
     if html is None:
         html = await fetch_html(url)
     if not html:

@@ -66,12 +66,22 @@ _HOST_EXTRA_SEEDS: dict[str, list[str]] = {
         "https://www.ecu.edu.au/degrees/courses/all",
         "https://www.ecu.edu.au/degrees/postgraduate",
     ],
+    "www.une.edu.au": [
+        "https://www.une.edu.au/study/courses",
+        "https://www.une.edu.au/study/postgraduate-study",
+        "https://www.une.edu.au/study/find-a-course",
+    ],
+    "une.edu.au": [
+        "https://www.une.edu.au/study/courses",
+        "https://www.une.edu.au/study/postgraduate-study",
+        "https://www.une.edu.au/study/find-a-course",
+    ],
 }
 
 _LISTING_URL_RE = re.compile(
-    r"/(?:degrees|courses?|programs?)"
+    r"/(?:degrees|study|courses?|programs?)"
     r"(?:/courses?)?"
-    r"/(?:all|search|list|postgrad(?:uate)?|undergrad(?:uate)?)",
+    r"/(?:all|search|list|find(?:-a-course)?|postgrad(?:uate)?(?:-study)?|undergrad(?:uate)?)",
     re.I,
 )
 

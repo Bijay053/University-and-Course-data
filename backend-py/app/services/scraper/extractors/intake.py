@@ -196,6 +196,90 @@ def _extract_strong_label_value(
     return None, None
 
 
+_CAMPUS_TABLE_LABEL_RE = re.compile(
+    r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
+    r"availability\s+(?:&|and)\s+campus(?:es)?",
+    re.I,
+)
+_CAMPUS_PERIOD_COL_RE = re.compile(
+    r"(?:Semester|Trimester|Term|Quarter)\s+\d+"
+    r"(?:\s*[-–—]\s*(?P<month>"
+    + "|".join(_MONTHS) +
+    r"))?",
+    re.I,
+)
+_ONLINE_RE = re.compile(r"^online\b", re.I)
+
+
+def _extract_campus_table_intake(html: str) -> list[str] | None:
+    """Parse a 'Start dates and campus' pivot table (as used by UNE) and
+    return only months where at least one physical (non-Online) campus row
+    has a detectable checkmark.  Returns None when no such table found."""
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return None
+    from app.services.scraper.extractors.location import _cell_availability
+
+    soup = BeautifulSoup(html, "html.parser")
+    for th in soup.find_all(["th", "td"]):
+        if not _CAMPUS_TABLE_LABEL_RE.search(th.get_text(strip=True)):
+            continue
+        parent_table = th.find_parent("table")
+        if not parent_table:
+            continue
+        header_row = th.find_parent("tr")
+        if not header_row:
+            continue
+        header_cells = header_row.find_all(["th", "td"])
+        if len(header_cells) < 2:
+            continue
+        # Build a mapping: col_index → month extracted from header text
+        col_month: dict[int, str] = {}
+        for i, hcell in enumerate(header_cells[1:], start=1):
+            htext = hcell.get_text(strip=True)
+            m = _CAMPUS_PERIOD_COL_RE.search(htext)
+            if m:
+                mo_str = m.group("month")
+                if mo_str:
+                    mo = _normalise_month(mo_str)
+                    if mo:
+                        col_month[i] = mo
+                else:
+                    # No explicit month in header — extract from column text anyway
+                    for raw in _MONTH_RE.findall(htext):
+                        mo = _normalise_month(raw)
+                        if mo:
+                            col_month[i] = mo
+                            break
+        if not col_month:
+            return None
+        # Walk data rows and collect months with at least one physical campus ✓
+        confirmed: set[str] = set()
+        for row in parent_table.find_all("tr"):
+            cells = row.find_all(["th", "td"])
+            if not cells or len(cells) < 2:
+                continue
+            row_label = cells[0].get_text(strip=True)
+            if not row_label or _CAMPUS_TABLE_LABEL_RE.search(row_label):
+                continue
+            if _ONLINE_RE.search(row_label):
+                continue  # skip Online rows
+            for col_idx, month in col_month.items():
+                if col_idx >= len(cells):
+                    continue
+                avail = _cell_availability(cells[col_idx])
+                if avail == "yes":
+                    confirmed.add(month)
+        if confirmed:
+            # Preserve calendar order
+            return [m for m in _MONTHS if m in confirmed]
+        # Availability opaque (all icons undetectable) — fall through
+        return None
+
+
 def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
     out: list[str] = []
     for hit in _KEYWORD_WINDOW.finditer(text):
@@ -210,6 +294,23 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
 
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    # Campus-pivot pass: handles UNE "Start dates and campus" table where
+    # months appear in column headers (e.g. "Trimester 1 – February 2026")
+    # and availability is indicated by checkmarks in data rows.  Only
+    # physical (non-Online) campus rows contribute months.
+    pivot_months = _extract_campus_table_intake(html)
+    if pivot_months:
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=pivot_months,
+                normalized={"intake_months": pivot_months, "intake_days": None},
+                confidence=0.85,
+                snippet="campus-pivot-table",
+                method="intake.campus_pivot",
+            )
+        ]
+
     # Structural pre-pass FIRST — see _extract_strong_label_value for
     # the rationale. When the page publishes intake months as a
     # `<strong>Intake</strong>` / `<dt>/<dd>` / `<th>/<td>` pair, read
