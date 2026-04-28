@@ -498,6 +498,30 @@ async def discover_course_links(
             continue
         visited.add(url)
 
+        # Phase A safety net (SCRAPING_ACCURACY_PLAN.md §A.3): drop URLs
+        # that match the explicit page blocklist (apply / fees / news /
+        # faculty / etc.) BEFORE we spend a fetch on them.  This is an
+        # additional layer on top of the existing _is_known_non_course_url
+        # / _JUNK_LAST_SEG_RE checks; both must say "ok" for the URL to
+        # be fetched.  Cheaper than a network round-trip and surfaces a
+        # clean reason in the discovery log.
+        try:
+            from app.services.scraper.guards import is_blocked_page
+
+            _blocked, _block_reason = is_blocked_page(url, None)
+        except Exception:  # noqa: BLE001 — never let the safety net abort discovery
+            _blocked, _block_reason = (False, "")
+        if _blocked:
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] blocked {_block_reason}: {url}",
+                    phase="discover",
+                    kind="page_blocked",
+                    reason=_block_reason,
+                )
+            continue
+
         html = await fetch_html(url)
         if not html:
             if emit:

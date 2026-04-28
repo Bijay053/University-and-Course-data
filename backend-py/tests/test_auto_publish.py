@@ -9,7 +9,10 @@ from app.services.auto_publish import should_auto_publish
 def _make(**overrides):
     sc = ScrapedCourse(scrape_job_id="t", university_id=1, course_name="Bachelor of Engineering")
     sc.degree_level = "Bachelor"
-    sc.completeness = 80
+    # Bumped 80 → 90 to clear the Phase A floor of 85 (auto_publish.py).
+    # The intent of these tests is to verify English-test handling, NOT
+    # the completeness threshold (covered separately by test_phase_a_safety.py).
+    sc.completeness = 90
     sc.decision_score = 0.9
     sc.ielts_overall = 6.5
     for k, v in overrides.items():
