@@ -1,0 +1,102 @@
+Fee and IELTS are still missing even though they are clearly shown on the course page.
+
+This is not a discovery issue now. This is a field extraction issue.
+
+The log proves the UOW parser is only checking static HTML and failing:
+[UOW PARSER MISSING] international_fee: not found in static HTML
+[UOW PARSER MISSING] ielts_overall: not found in static HTML
+
+Please fix this properly.
+
+Required fix:
+
+1. For UOW and UniSQ, extract fields from rendered Playwright HTML, not only static HTML.
+
+If static HTML does not contain fee or IELTS:
+use Playwright rendered page content
+wait for network idle
+wait for course detail sections to load
+then parse from rendered DOM.
+
+2. Do not use Gemini as fallback for visible website fields.
+
+For fee, IELTS, duration, intake, campus and mode:
+parser must extract from source HTML or rendered DOM.
+AI should not be used to guess these fields.
+
+3. Add rendered DOM debug when parser fails.
+
+When UOW parser fails fee or IELTS, save debug:
+provider
+course_url
+field_name
+static_text_found false
+rendered_text_found true or false
+nearby text around keywords:
+fee
+tuition
+international
+IELTS
+English
+requirements
+ATAR
+duration
+campus
+session
+
+4. Add direct label based extraction.
+
+Parse values near labels like:
+
+Annual tuition fee
+Indicative annual fee
+International fee
+Tuition fee
+English requirements
+IELTS Academic
+Overall score
+Course duration
+Duration
+Campus
+Location
+Delivery
+Study mode
+Session
+Intake
+Commencement
+
+5. Fix source evidence.
+
+If the value is visible on the course page, source evidence should be:
+source_url = course page url
+source_text = exact nearby text from rendered page
+confidence = 90 plus
+
+Do not blank the field after extraction because evidence is missing. Create evidence at the same time as extraction.
+
+6. Stop saving rows when parser fails critical visible fields.
+
+For UOW:
+If course page has visible fee or IELTS but parser fails, mark parser_error true and do not stage as normal review row.
+
+7. Add tests with real course pages.
+
+Use these URLs:
+https://www.uow.edu.au/study/courses/bachelor-of-arts/?students=international&year=2026
+https://www.uow.edu.au/study/courses/bachelor-of-business/?students=international&year=2026
+https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-accounting?studentType=international
+https://www.unisq.edu.au/study/degrees-and-courses/master-of-public-health?studentType=international
+
+Expected:
+Fee must be extracted if visible
+IELTS must be extracted if visible
+Duration must be extracted
+Campus must be extracted
+Mode must be extracted if shown
+Intakes must come only from course detail intake/session section
+
+8. Important:
+   Do not say “may require JS render” and continue saving blank.
+   Actually render the page and parse the rendered HTML.
+
+Please fix this before doing anything else.

@@ -1037,6 +1037,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if not _cur_mode or _cur_mode.lower() == "online":
                     payload["study_mode"] = _default_mode
 
+            # ── parser_error guard (UOW / UniSQ) ─────────────────────────────
+            # When the per-course browser pass rendered the page but critical
+            # fields (fee, IELTS) remained empty after the full extractor suite,
+            # single_course.py sets payload["parser_error"] = True. We skip
+            # staging entirely so the review queue is never polluted with
+            # obviously-incomplete rows. The URL and missing fields are logged
+            # so the problem is visible without the row appearing in the UI.
+            if payload.get("parser_error"):
+                _pe_fields = payload.get("parser_error_fields") or []
+                summary["skipped"] += 1
+                log.warning(
+                    "[PARSER ERROR] %s — skipped staging; critical fields missing "
+                    "after browser render: %s",
+                    r.get("url"),
+                    ", ".join(_pe_fields) if _pe_fields else "unknown",
+                )
+                await emit(
+                    "status",
+                    f"[PARSER ERROR] skipped: {r.get('name','?')} — "
+                    f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
+                    phase="stage",
+                    kind="parser_error_skip",
+                    url=r.get("url"),
+                    fields=_pe_fields,
+                )
+                continue
+
             try:
                 async with AsyncSessionLocal() as stage_db:
                     res = await stage_course(

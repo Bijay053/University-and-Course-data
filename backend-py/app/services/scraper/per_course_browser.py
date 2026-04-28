@@ -22,8 +22,16 @@ from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 
 from app.services.scraper.browser_pool import pool as browser_pool
-from app.services.scraper.extractors import english_test
+from app.services.scraper.extractors import (
+    duration,
+    english_test,
+    fee,
+    intake,
+    location,
+    study_mode,
+)
 from app.services.scraper.extractors.base import ExtractionResult
+from app.services.scraper.extractors._text import compact, html_to_text
 
 # T005: hosts where the per-course browser pass should also click the
 # "International students" toggle to surface the international fees /
@@ -106,6 +114,13 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # networkidle before the International toggle click fires correctly, otherwise
     # the toggle target element hasn't mounted yet.
     "murdoch.edu.au",
+    # UOW: course details (fee, IELTS, intakes, campus) are loaded via XHR
+    # into accordion panels after initial page load. domcontentloaded misses
+    # all of it; networkidle + 3s settle is required.
+    "uow.edu.au",
+    # UniSQ: course detail panels (fees, entry requirements, study modes) are
+    # React-rendered after page load. Need networkidle to catch the XHR content.
+    "unisq.edu.au",
 )
 
 # Hosts that need the full 60s / networkidle treatment.
@@ -138,6 +153,14 @@ _SLOW_HOSTS: tuple[str, ...] = (
 _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     "federation.edu.au",
     "une.edu.au",
+    # UOW and UniSQ: fee + IELTS data is served via JS-rendered components
+    # (accordion panels, dynamic tab content). Static HTML contains only a
+    # skeleton and a few meta tags. We ALWAYS render these hosts via Playwright
+    # so that fee.extract / english_test.extract / intake.extract etc. see the
+    # fully hydrated DOM. The "override" flag lets rendered values overwrite any
+    # misleading fragment the static fetcher may have picked up.
+    "uow.edu.au",
+    "unisq.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
@@ -211,6 +234,141 @@ _ENGLISH_SLOTS = (
 def _all_english_empty(payload: dict[str, Any]) -> bool:
     """Return True when no english-test value has been extracted yet."""
     return all(payload.get(k) in (None, "", 0) for k in _ENGLISH_SLOTS)
+
+
+# Hosts for which the browser pass should run the FULL extractor suite
+# (fee + intake + duration + location + study_mode + english_test) on the
+# rendered HTML, not just english_test.  Without this, fee.extract never
+# sees the JS-rendered accordion content and always returns empty for UOW/UniSQ.
+_EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
+    "uow.edu.au",
+    "www.uow.edu.au",
+    "unisq.edu.au",
+    "www.unisq.edu.au",
+})
+
+# Field slots that each extended extractor fills — used to guard against
+# overwriting a previously-populated value from the static pass.
+_EXTENDED_SLOTS: tuple[str, ...] = (
+    "international_fee",
+    "ielts_overall",
+    "pte_overall",
+    "toefl_overall",
+    "cambridge_overall",
+    "intake_months",
+    "duration_text",
+    "location_text",
+    "study_mode",
+)
+
+# Keywords used by the rendered-DOM debug sampler.  When a critical field is
+# still missing after the full browser extraction we log the 300-char window
+# around each keyword so devs can verify the data is/isn't in the rendered DOM.
+_DEBUG_KEYWORDS: tuple[str, ...] = (
+    "fee",
+    "tuition",
+    "international",
+    "IELTS",
+    "English",
+    "requirements",
+    "ATAR",
+    "duration",
+    "campus",
+    "session",
+)
+
+
+def _rendered_dom_debug(
+    rendered: str, url: str, field: str, host: str
+) -> dict[str, Any]:
+    """Return a structured debug record with 300-char windows around each
+    ``_DEBUG_KEYWORDS`` keyword in the rendered text.  Used when a critical
+    field is still empty after the full browser extraction pass so that devs
+    can distinguish "data not in DOM" from "extractor regex miss"."""
+    text = compact(html_to_text(rendered)) if rendered else ""
+    snippets: dict[str, str] = {}
+    text_lc = text.lower()
+    for kw in _DEBUG_KEYWORDS:
+        idx = text_lc.find(kw.lower())
+        if idx == -1:
+            snippets[kw] = "[not found in rendered text]"
+        else:
+            start = max(0, idx - 120)
+            end = min(len(text), idx + 180)
+            snippets[kw] = text[start:end].replace("\n", " ")
+    return {
+        "provider": host,
+        "course_url": url,
+        "field_name": field,
+        "static_text_found": False,
+        "rendered_text_found": any(v != "[not found in rendered text]" for v in snippets.values()),
+        "rendered_size_chars": len(text),
+        "keyword_windows": snippets,
+    }
+
+
+async def _extended_extract(
+    rendered: str,
+    url: str,
+    existing_payload: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Run ALL field extractors against rendered HTML and return only the
+    slots that are still missing from ``existing_payload``.
+
+    This is called for hosts in :data:`_EXTENDED_EXTRACT_HOSTS` (UOW, UniSQ)
+    after the browser has obtained a fully JS-rendered page. The function never
+    overwrites a slot that already has a truthy value in ``existing_payload``
+    so that a correct static extraction always wins over a lower-confidence
+    browser extraction.
+    """
+    extractors = [
+        (fee, ["international_fee", "fee_currency", "fee_term", "fee_year"]),
+        (english_test, list(_ENGLISH_SLOTS)),
+        (intake, ["intake_months"]),
+        (duration, ["duration_text"]),
+        (location, ["location_text"]),
+        (study_mode, ["study_mode"]),
+    ]
+    filled: dict[str, Any] = {}
+    evidence: list[dict[str, Any]] = []
+
+    for extractor_mod, slot_keys in extractors:
+        # Skip if ALL slots for this extractor are already populated
+        if all(
+            existing_payload.get(k) not in (None, "", 0, [])
+            for k in slot_keys
+        ):
+            continue
+        try:
+            results: list[ExtractionResult] = await extractor_mod.extract(rendered, url)
+        except Exception as exc:  # noqa: BLE001 — never abort on extractor failure
+            log.warning("extended_extract: %s failed on rendered %s: %s",
+                        extractor_mod.__name__, url, exc)
+            continue
+        for r in results:
+            if not r.normalized:
+                continue
+            for k, v in r.normalized.items():
+                if v in (None, "", 0, []):
+                    continue
+                if k not in _EXTENDED_SLOTS:
+                    continue
+                # Only fill slots that are still empty in existing_payload
+                if existing_payload.get(k) not in (None, "", 0, []):
+                    continue
+                if k in filled:
+                    continue
+                filled[k] = v
+                evidence.append({
+                    "field_key": k,
+                    "value": v,
+                    "source_url": url,
+                    "source_text": (r.snippet or "")[:240],
+                    "confidence": min(1.0, (r.confidence or 0.6) + 0.05),
+                    "method": "per_course_browser_extended",
+                })
+
+    return filled, evidence
 
 
 def _force_browser_for_url(url: str) -> bool:
@@ -334,63 +492,100 @@ async def maybe_browser_refetch(
             )
         return {}, [], None, False
 
-    try:
+    host = (urlparse(url).hostname or "").lower()
+    _is_extended = host in _EXTENDED_EXTRACT_HOSTS
+
+    if _is_extended:
+        # UOW / UniSQ: run the FULL extractor suite (fee + IELTS + intake +
+        # duration + location + study_mode) against the rendered HTML.  The
+        # plain english_test-only path below never sees fee at all.
+        filled, evidence = await _extended_extract(rendered, url, payload)
+
+        # ── Rendered-DOM debug for still-missing critical fields ────────
+        # When fee or IELTS are still empty after the full render pass, emit
+        # structured debug so devs can see what keywords are (or aren't)
+        # present in the rendered DOM — distinguishes regex miss from data
+        # genuinely absent from the page.
+        _critical_missing = {
+            k for k in ("international_fee", "ielts_overall")
+            if payload.get(k) in (None, "", 0)
+            and filled.get(k) in (None, "", 0, [])
+        }
+        for _cm in _critical_missing:
+            _dbg = _rendered_dom_debug(rendered, url, _cm, host)
+            log.warning(
+                "[RENDERED DOM DEBUG] %s still empty after browser render — "
+                "rendered_size=%d chars, %s found in DOM: %s",
+                _cm,
+                _dbg["rendered_size_chars"],
+                "keywords" if _dbg["rendered_text_found"] else "NO keywords",
+                url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[RENDERED DOM DEBUG] {_cm}: rendered_size={_dbg['rendered_size_chars']}c "
+                    f"keywords_found={_dbg['rendered_text_found']} — {url}",
+                    phase="fallback",
+                    kind="rendered_dom_debug",
+                    url=url,
+                    field=_cm,
+                    debug=_dbg,
+                )
+    else:
+        # Standard path: english_test only.
         # NOTE: english_test.extract is `async def` but contains no await
         # points — it's a pure-CPU regex pipeline. asyncio.wait_for cannot
-        # preempt CPU-bound code without yield points, so wrapping this
-        # call in wait_for would be dead code (the timer never fires until
-        # the function returns on its own). If the extractor is ever
-        # rewritten to do async I/O (HTML streaming, etc.) re-add the
-        # wait_for then. Today, runaway-regex protection has to live
-        # INSIDE the extractor itself (length caps, non-backtracking
-        # patterns) — see extractors/english_test.py.
-        results: list[ExtractionResult] = await english_test.extract(rendered, url)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("english_test re-extract failed on rendered %s: %s", url, exc)
-        return {}, [], rendered, force
+        # preempt CPU-bound code without yield points. See comment above.
+        try:
+            results: list[ExtractionResult] = await english_test.extract(rendered, url)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("english_test re-extract failed on rendered %s: %s", url, exc)
+            return {}, [], rendered, force
 
-    filled: dict[str, Any] = {}
-    evidence: list[dict[str, Any]] = []
-    for r in results:
-        if not r.normalized:
-            continue
-        for k, v in r.normalized.items():
-            if v in (None, "", 0):
+        filled = {}
+        evidence = []
+        for r in results:
+            if not r.normalized:
                 continue
-            if k not in _ENGLISH_SLOTS:
-                continue
-            if k in filled:
-                continue
-            filled[k] = v
-            evidence.append(
-                {
-                    "field_key": k,
-                    "value": v,
-                    "confidence": min(1.0, (r.confidence or 0.5) + 0.05),
-                    "method": "per_course_browser",
-                    "snippet": (r.snippet or "")[:240],
-                }
-            )
+            for k, v in r.normalized.items():
+                if v in (None, "", 0):
+                    continue
+                if k not in _ENGLISH_SLOTS:
+                    continue
+                if k in filled:
+                    continue
+                filled[k] = v
+                evidence.append(
+                    {
+                        "field_key": k,
+                        "value": v,
+                        "source_url": url,
+                        "source_text": (r.snippet or "")[:240],
+                        "confidence": min(1.0, (r.confidence or 0.5) + 0.05),
+                        "method": "per_course_browser",
+                    }
+                )
 
     if emit:
-        # Compose the IELTS=N PTE=N TOEFL=N CAE=N summary the spec asks
-        # for. Use "—" for slots we still couldn't fill so the line is
-        # readable in the live log.
         def _fmt(k: str) -> str:
-            v = filled.get(k)
-            return str(v) if v not in (None, "", 0) else "—"
+            v = filled.get(k) or payload.get(k)
+            return str(v) if v not in (None, "", 0, []) else "—"
 
+        _all_filled = sorted(filled.keys())
         await emit(
             "status",
             f"[per-course browser ✓] {url} — "
             f"IELTS={_fmt('ielts_overall')} "
             f"PTE={_fmt('pte_overall')} "
             f"TOEFL={_fmt('toefl_overall')} "
-            f"CAE={_fmt('cambridge_overall')}",
+            f"CAE={_fmt('cambridge_overall')} "
+            f"fee={_fmt('international_fee')} "
+            f"filled={_all_filled}",
             phase="fallback",
             kind="per_course_browser_done",
             url=url,
-            filled=list(filled.keys()),
+            filled=_all_filled,
         )
 
     return filled, evidence, rendered, force
