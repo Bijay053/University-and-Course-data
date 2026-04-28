@@ -1874,63 +1874,149 @@ export default function Scraping() {
       </Dialog>
 
       <Dialog open={!!reviewDetail} onOpenChange={(o) => { if (!o) setReviewDetail(null); }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Evidence Review</DialogTitle>
           </DialogHeader>
-          {reviewDetail && (
-            <div className="space-y-4 text-sm">
-              <div>
-                <div className="font-medium text-base">{reviewDetail.course.courseName}</div>
-                <div className="text-muted-foreground">
-                  Eligibility: {reviewDetail.course.eligibilityStatus || "unknown"}
-                  {reviewDetail.course.eligibilityReason ? ` - ${reviewDetail.course.eligibilityReason}` : ""}
-                </div>
-              </div>
-              {reviewDetail.conflicts.length > 0 && (
-                <div className="rounded border border-amber-200 bg-amber-50 p-3">
-                  <div className="font-medium text-amber-800 mb-2">Conflicts</div>
-                  <div className="space-y-2">
-                    {reviewDetail.conflicts.map((conflict) => (
-                      <div key={conflict.id} className="text-xs text-amber-900">
-                        <span className="font-medium">{conflict.fieldKey}</span>: {conflict.valueA || "-"} vs {conflict.valueB || "-"}
-                        {conflict.reason ? ` - ${conflict.reason}` : ""}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="space-y-3">
-                {Array.from(new Set(reviewDetail.evidence.map((item) => item.fieldKey))).map((fieldKey) => {
-                  const items = reviewDetail.evidence.filter((item) => item.fieldKey === fieldKey);
-                  return (
-                    <div key={fieldKey} className="rounded border p-3">
-                      <div className="font-medium mb-2">{fieldKey}</div>
-                      <div className="space-y-2">
-                        {items.map((item) => (
-                          <div key={item.id} className="rounded bg-slate-50 p-2 text-xs">
-                            <div className="flex flex-wrap gap-2 mb-1">
-                              <Badge variant="outline" className="text-[10px]">{item.decisionStatus}</Badge>
-                              {item.selected && <Badge variant="outline" className="text-[10px] border-green-200 text-green-700">selected</Badge>}
-                              <span className="text-muted-foreground">{item.pageType} / {item.extractionMethod}</span>
-                              {typeof item.confidence === "number" && <span className="text-muted-foreground">confidence {Math.round(item.confidence * 100)}%</span>}
-                            </div>
-                            <div className="font-medium">{item.candidateValue || "-"}</div>
-                            {item.snippet && <div className="text-muted-foreground mt-1">{item.snippet}</div>}
-                            {item.sourceUrl && (
-                              <a className="text-blue-600 hover:underline break-all" href={item.sourceUrl} target="_blank" rel="noreferrer">
-                                {item.sourceUrl}
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+          {reviewDetail && (() => {
+            const fieldKeys = Array.from(new Set(reviewDetail.evidence.map((item) => item.fieldKey)));
+            return (
+              <div className="space-y-5 text-sm">
+                {/* Course header */}
+                <div className="flex flex-wrap gap-4 items-start justify-between">
+                  <div>
+                    <div className="font-semibold text-base">{reviewDetail.course.courseName}</div>
+                    <div className="text-muted-foreground text-xs mt-0.5">
+                      Eligibility: <span className="font-medium">{reviewDetail.course.eligibilityStatus || "unknown"}</span>
+                      {reviewDetail.course.eligibilityReason ? ` — ${reviewDetail.course.eligibilityReason}` : ""}
                     </div>
-                  );
-                })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{fieldKeys.length} field{fieldKeys.length !== 1 ? "s" : ""} with evidence</div>
+                </div>
+
+                {/* Conflicts */}
+                {reviewDetail.conflicts.length > 0 && (
+                  <div className="rounded border border-amber-200 bg-amber-50 p-3">
+                    <div className="font-medium text-amber-800 mb-2 text-xs uppercase tracking-wide">Conflicts</div>
+                    <div className="space-y-1">
+                      {reviewDetail.conflicts.map((conflict) => (
+                        <div key={conflict.id} className="text-xs text-amber-900">
+                          <span className="font-medium">{conflict.fieldKey}</span>: {conflict.valueA || "—"} vs {conflict.valueB || "—"}
+                          {conflict.reason ? ` — ${conflict.reason}` : ""}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-field evidence cards */}
+                <div className="space-y-3">
+                  {fieldKeys.map((fieldKey) => {
+                    const items = reviewDetail.evidence.filter((item) => item.fieldKey === fieldKey);
+                    // Sort: selected first, then by confidence desc
+                    const sorted = [...items].sort((a, b) => {
+                      if (a.selected && !b.selected) return -1;
+                      if (!a.selected && b.selected) return 1;
+                      if (a.decisionStatus === "selected" && b.decisionStatus !== "selected") return -1;
+                      if (a.decisionStatus !== "selected" && b.decisionStatus === "selected") return 1;
+                      return (b.confidence ?? 0) - (a.confidence ?? 0);
+                    });
+                    const winner = sorted.find(i => i.selected || i.decisionStatus === "selected") ?? sorted[0];
+                    const hasManySources = sorted.length > 1;
+
+                    return (
+                      <div key={fieldKey} className="rounded border overflow-hidden">
+                        {/* Field header with final value */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b">
+                          <span className="font-mono text-xs font-semibold text-slate-700">{fieldKey}</span>
+                          <div className="flex items-center gap-2">
+                            {hasManySources && (
+                              <span className="text-[10px] text-muted-foreground">{sorted.length} sources</span>
+                            )}
+                            <span className="font-semibold text-sm text-slate-900">
+                              {winner?.candidateValue ?? "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Source rows */}
+                        <div className="divide-y">
+                          {sorted.map((item) => {
+                            const isWinner = item.selected || item.decisionStatus === "selected";
+                            const isSuperseded = item.decisionStatus === "superseded";
+                            const confPct = typeof item.confidence === "number" ? Math.round(item.confidence * 100) : null;
+                            const methodLabel = (item.extractionMethod || "unknown").replace(/_/g, " ");
+                            const sourceLabel = item.pageType ?? "";
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`px-3 py-2 text-xs ${isWinner ? "bg-green-50" : isSuperseded ? "bg-slate-50 opacity-60" : "bg-white"}`}
+                              >
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                  {/* Win/supersede badge */}
+                                  {isWinner ? (
+                                    <Badge className="text-[10px] bg-green-600 text-white border-0">✓ used</Badge>
+                                  ) : isSuperseded ? (
+                                    <Badge variant="outline" className="text-[10px] text-slate-400 border-slate-300">superseded</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px]">{item.decisionStatus || "review"}</Badge>
+                                  )}
+
+                                  {/* Method */}
+                                  <span className={`font-medium ${isSuperseded ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                                    {methodLabel}
+                                  </span>
+                                  {sourceLabel && <span className="text-muted-foreground">{sourceLabel}</span>}
+
+                                  {/* Confidence bar */}
+                                  {confPct !== null && (
+                                    <div className="flex items-center gap-1 ml-auto">
+                                      <div className="w-16 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${confPct >= 80 ? "bg-green-500" : confPct >= 60 ? "bg-yellow-400" : "bg-red-400"}`}
+                                          style={{ width: `${confPct}%` }}
+                                        />
+                                      </div>
+                                      <span className={`text-[10px] font-mono ${confPct >= 80 ? "text-green-700" : confPct >= 60 ? "text-yellow-700" : "text-red-600"}`}>
+                                        {confPct}%
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Value */}
+                                <div className={`font-semibold ${isSuperseded ? "text-slate-400 line-through" : isWinner ? "text-green-900" : "text-slate-800"}`}>
+                                  {item.candidateValue ?? "—"}
+                                </div>
+
+                                {/* Snippet */}
+                                {item.snippet && (
+                                  <div className="text-muted-foreground mt-0.5 text-[11px] leading-snug">{item.snippet}</div>
+                                )}
+
+                                {/* Source URL */}
+                                {item.sourceUrl && (
+                                  <a
+                                    className="text-blue-500 hover:underline break-all text-[11px] mt-0.5 block"
+                                    href={item.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {item.sourceUrl}
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
