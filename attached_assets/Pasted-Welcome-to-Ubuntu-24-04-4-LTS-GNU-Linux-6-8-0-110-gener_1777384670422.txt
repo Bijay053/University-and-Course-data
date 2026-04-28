@@ -1,0 +1,135 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 13:43:09 UTC 2026
+
+  System load:           0.19
+  Usage of /:            3.4% of 231.44GB
+  Memory usage:          29%
+  Swap usage:            0%
+  Processes:             228
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 12:07:30 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /path/to/University-and-Course-data
+git pull origin main
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+root@university-and-course-data:~# cd backend-py
+pip install -r requirements.txt  # if any new packages
+sudo systemctl restart uvicorn   # or whatever service name you use
+sudo systemctl restart celery
+-bash: cd: backend-py: No such file or directory
+error: externally-managed-environment
+
+× This environment is externally managed
+╰─> To install Python packages system-wide, try apt install
+    python3-xyz, where xyz is the package you are trying to
+    install.
+    
+    If you wish to install a non-Debian-packaged Python package,
+    create a virtual environment using python3 -m venv path/to/venv.
+    Then use path/to/venv/bin/python and path/to/venv/bin/pip. Make
+    sure you have python3-full installed.
+    
+    If you wish to install a non-Debian packaged Python application,
+    it may be easiest to use pipx install xyz, which will manage a
+    virtual environment for you. Make sure you have pipx installed.
+    
+    See /usr/share/doc/python3.12/README.venv for more information.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+Failed to restart uvicorn.service: Unit uvicorn.service not found.
+Failed to restart celery.service: Unit celery.service not found.
+root@university-and-course-data:~# sudo systemctl list-units | grep -E "uvicorn|celery|fastapi"
+  uni-celery.service                                                             loaded active running   University Portal Celery Worker (scraper)
+root@university-and-course-data:~# # Find where the project lives
+systemctl cat uni-celery.service | grep WorkingDirectory
+
+# Then cd to that path and pull (replace with the actual path shown above)
+cd /root/University-and-Course-data   # or wherever it shows
+git pull origin main
+
+# Restart both services
+systemctl restart uni-celery.service
+
+# Also find and restart the FastAPI/uvicorn service
+systemctl list-units | grep -E "uni|uvicorn|fastapi|portal"
+WorkingDirectory=/root/University-and-Course-data/backend-py
+remote: Enumerating objects: 368, done.
+remote: Counting objects: 100% (21/21), done.
+remote: Compressing objects: 100% (13/13), done.
+remote: Total 368 (delta 20), reused 8 (delta 8), pack-reused 347 (from 1)
+Receiving objects: 100% (368/368), 221.84 KiB | 3.31 MiB/s, done.
+Resolving deltas: 100% (292/292), completed with 4 local objects.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   25327c6..ed333ac  main       -> origin/main
+Updating 25327c6..ed333ac
+Fast-forward
+ artifacts/university-portal/src/components/review-scraped-courses-table.tsx |  27 ++++
+ artifacts/university-portal/src/pages/scraping.tsx                          |  10 ++
+ backend-py/alembic/versions/006_add_scrape_warnings.py                      |  33 +++++
+ backend-py/app/main.py                                                      |   2 +
+ backend-py/app/models/scraped_course.py                                     |   1 +
+ backend-py/app/routers/scrape_health.py                                     | 329 ++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/ai/gemini_client.py                                 |  85 ++++++-------
+ backend-py/app/services/scraper/bond_static_extract.py                      | 273 ++++++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/central_pages.py                            | 121 ++++++++++++------
+ backend-py/app/services/scraper/confidence.py                               | 180 ++++++++++++++++++++++++++
+ backend-py/app/services/scraper/data_quality.py                             | 437 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/discovery.py                                | 162 +++++++++++++++++++++++-
+ backend-py/app/services/scraper/ecu_static_extract.py                       | 252 +++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/extractors/course_name.py                   |  19 ++-
+ backend-py/app/services/scraper/extractors/location.py                      | 158 +++++++++++++++++++++++
+ backend-py/app/services/scraper/extractors/study_mode.py                    |  41 +++++-
+ backend-py/app/services/scraper/guards.py                                   | 120 +++++++++++++++++-
+ backend-py/app/services/scraper/orchestrator.py                             | 119 +++++++++++++++++-
+ backend-py/app/services/scraper/pipelines/single_course.py                  | 561 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------
+ backend-py/app/services/scraper/sibling_cache.py                            |  46 ++++++-
+ backend-py/tests/test_bond_static_extract.py                                | 295 +++++++++++++++++++++++++++++++++++++++++++
+ backend-py/tests/test_confidence.py                                         | 183 +++++++++++++++++++++++++++
+ backend-py/tests/test_data_quality.py                                       | 346 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/tests/test_discovery_regression.py                               | 112 +++++++++++++++++
+ backend-py/tests/test_ecu_static_extract.py                                 | 188 ++++++++++++++++++++++++++++
+ backend-py/tests/test_guards.py                                             | 332 ++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/tests/test_location.py                                           |  75 ++++++++++-
+ backend-py/tests/test_phase_a_safety.py                                     | 132 ++++++++++++++++++++
+ 28 files changed, 4453 insertions(+), 186 deletions(-)
+ create mode 100644 backend-py/alembic/versions/006_add_scrape_warnings.py
+ create mode 100644 backend-py/app/routers/scrape_health.py
+ create mode 100644 backend-py/app/services/scraper/bond_static_extract.py
+ create mode 100644 backend-py/app/services/scraper/confidence.py
+ create mode 100644 backend-py/app/services/scraper/data_quality.py
+ create mode 100644 backend-py/app/services/scraper/ecu_static_extract.py
+ create mode 100644 backend-py/tests/test_bond_static_extract.py
+ create mode 100644 backend-py/tests/test_confidence.py
+ create mode 100644 backend-py/tests/test_data_quality.py
+ create mode 100644 backend-py/tests/test_ecu_static_extract.py
+  uni-api-py.service                                                             loaded active running   University Portal Python API (FastAPI + Uvicorn)
+  uni-celery.service                                                             loaded active running   University Portal Celery Worker (scraper)
+  systemd-fsckd.socket                                                           loaded active listening fsck to fsckd communication Socket
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+199 loaded units listed. Pass --all to see loaded but inactive units, too.
+To show all installed unit files use 'systemctl list-unit-files'.
+root@university-and-course-data:~/University-and-Course-data# 
