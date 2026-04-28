@@ -1655,6 +1655,121 @@ async def bulk_stop(
     return {"sessionId": session_id, "stopped": True, "ok": True}
 
 
+@router.post("/bulk/resume/{session_id}")
+async def bulk_resume(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Re-queue every stopped/pending university from a stopped session as a
+    new session.  Returns ``{sessionId, queued}`` — the caller should redirect
+    to the new session like a fresh ``/bulk/start``.
+
+    Only universities whose job ended in a non-terminal state (stopped, queued,
+    or never started) are retried.  Universities that already ``done``/``error``
+    are skipped so the user doesn't lose imported courses.
+    """
+    from datetime import datetime, timezone
+
+    from app.models import BulkSession
+
+    sess = await db.get(BulkSession, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Bulk session not found")
+
+    # Collect job rows for the session.
+    orig_job_ids = [u.get("jobId") for u in (sess.unis or []) if u.get("jobId")]
+    jobs_by_id: dict[str, ScrapeRuntimeJob] = {}
+    if orig_job_ids:
+        rows = (
+            await db.execute(
+                select(ScrapeRuntimeJob).where(
+                    ScrapeRuntimeJob.runtime_job_id.in_(orig_job_ids)
+                )
+            )
+        ).scalars().all()
+        jobs_by_id = {r.runtime_job_id: r for r in rows}
+
+    new_session_id = f"bulk_{uuid.uuid4().hex[:12]}"
+    unis_payload: list[dict] = []
+    queued_jobs: list[str] = []
+
+    for u in sess.unis or []:
+        job_id = u.get("jobId")
+        job = jobs_by_id.get(job_id) if job_id else None
+        derived = _job_status_to_uni_status(
+            job.status if job else None,
+            bool(job.stop_requested) if job else False,
+        )
+        # Only retry universities that didn't complete successfully.
+        if derived in {"done", "completed"}:
+            continue
+        # Look up the university row for its current scrape URL.
+        uni_id = u.get("uniId") or (job.university_id if job else None)
+        if not uni_id:
+            continue
+        uni = await db.get(University, uni_id)
+        if not uni:
+            continue
+        new_job_id = f"job_{uuid.uuid4().hex[:12]}"
+        db.add(
+            ScrapeRuntimeJob(
+                runtime_job_id=new_job_id,
+                university_id=uni.id,
+                university_name=uni.name,
+                url=uni.scrape_url,
+                job_type="bulk",
+                status="queued",
+                fast_mode=sess.fast_mode,
+                request_payload={
+                    "url": uni.scrape_url,
+                    "universityId": uni.id,
+                    "universityName": uni.name,
+                    "universityCountry": uni.country,
+                    "fastMode": sess.fast_mode,
+                    "bulkMode": True,
+                    "session_id": new_session_id,
+                    "university_id": uni.id,
+                    "fast_mode": sess.fast_mode,
+                },
+            )
+        )
+        queued_jobs.append(new_job_id)
+        unis_payload.append(
+            {
+                "uniId": uni.id,
+                "name": uni.name,
+                "jobId": new_job_id,
+                "status": "pending",
+            }
+        )
+
+    if not queued_jobs:
+        raise HTTPException(
+            status_code=400, detail="no stopped universities to retry"
+        )
+
+    db.add(
+        BulkSession(
+            session_id=new_session_id,
+            status="running",
+            current_index=-1,
+            fast_mode=sess.fast_mode,
+            unis=unis_payload,
+        )
+    )
+    await db.commit()
+
+    try:
+        from app.tasks.scrape_tasks import scrape_university
+
+        for jid in queued_jobs:
+            scrape_university.delay(jid)
+    except Exception:
+        pass
+
+    return {"sessionId": new_session_id, "queued": len(queued_jobs)}
+
+
 @router.get("/bulk/active")
 async def bulk_active(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
     from app.models import BulkSession

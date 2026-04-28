@@ -203,6 +203,7 @@ export default function Bulk() {
   const [reconnecting, setReconnecting] = useState(false);
   const [sessionNotFound, setSessionNotFound] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [retryingStopped, setRetryingStopped] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollActiveRef = useRef(false);
 
@@ -326,7 +327,7 @@ export default function Bulk() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        unis: selected.map((u) => ({ id: u.id, name: u.name, scrapeUrl: u.scrapeUrl })),
+        unis: selected.map((u) => ({ id: u.id, name: u.name, scrapeUrl: u.scrape_url })),
       }),
     });
     if (!res.ok) return;
@@ -343,10 +344,32 @@ export default function Bulk() {
   // ── Stop bulk session ─────────────────────────────────────────────────────
   const stopQueue = useCallback(async () => {
     if (!sessionId) return;
+    const confirmed = window.confirm(
+      "Stop all queued and running university scrapes? Universities that are still queued will not be scraped. You can retry them afterwards."
+    );
+    if (!confirmed) return;
     await fetch(`/api/scrape/bulk/stop/${sessionId}`, { method: "POST" });
     stopPolling();
     localStorage.removeItem(STORAGE_KEY);
   }, [sessionId, stopPolling]);
+
+  // ── Retry stopped universities from a stopped session ────────────────────
+  const retryStoppedJobs = useCallback(async () => {
+    if (!sessionId || retryingStopped) return;
+    setRetryingStopped(true);
+    try {
+      const res = await fetch(`/api/scrape/bulk/resume/${sessionId}`, { method: "POST" });
+      const data = await readResponseJson<{ sessionId: string }>(res);
+      if (!data?.sessionId) return;
+      localStorage.setItem(STORAGE_KEY, data.sessionId);
+      setSessionId(data.sessionId);
+      setSessionData(null);
+      setSessionNotFound(false);
+      startPolling(data.sessionId);
+    } finally {
+      setRetryingStopped(false);
+    }
+  }, [sessionId, retryingStopped, startPolling]);
 
   // ── Reset (clear session, go back to selection) ───────────────────────────
   const resetQueue = useCallback(() => {
@@ -363,6 +386,7 @@ export default function Bulk() {
   const isStopped = sessionData?.status === "stopped";
   const doneCount = sessionData?.unis.filter((u) => u.status === "done").length ?? 0;
   const errorCount = sessionData?.unis.filter((u) => u.status === "error").length ?? 0;
+  const stoppedCount = sessionData?.unis.filter((u) => u.status === "stopped" || u.status === "pending").length ?? 0;
   const total = sessionData?.total ?? 0;
 
   const downloadRaw = (uniId: number, format: "json" | "csv") => {
@@ -475,7 +499,11 @@ export default function Bulk() {
                 <><CheckCheck className="w-4 h-4 shrink-0" />
                 All universities scraped successfully</>
               ) : (
-                <><Square className="w-4 h-4 shrink-0" />Scrape queue stopped</>
+                <><Square className="w-4 h-4 shrink-0" />
+                Scrape queue stopped
+                {stoppedCount > 0 && (
+                  <span className="ml-1">— {stoppedCount} university{stoppedCount !== 1 ? "ies" : ""} didn't finish. Use <strong>Retry Stopped</strong> below to re-queue them.</span>
+                )}</>
               )}
             </div>
           )}
@@ -497,10 +525,24 @@ export default function Bulk() {
                 Stop Queue
               </Button>
             ) : (
-              <Button onClick={resetQueue} variant="outline">
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Start New Queue
-              </Button>
+              <>
+                {isStopped && stoppedCount > 0 && (
+                  <Button
+                    onClick={retryStoppedJobs}
+                    disabled={retryingStopped}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    {retryingStopped
+                      ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      : <RotateCcw className="w-4 h-4 mr-2" />}
+                    Retry Stopped ({stoppedCount})
+                  </Button>
+                )}
+                <Button onClick={resetQueue} variant="outline">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Start New Queue
+                </Button>
+              </>
             )}
 
             {!isRunning && !sessionId && (
@@ -584,8 +626,8 @@ export default function Bulk() {
                           <span className="font-medium text-sm text-gray-900 truncate">{entry.name}</span>
                           <StatusBadge status={entry.status} />
                         </div>
-                        {uni?.scrapeUrl && (
-                          <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrapeUrl}</p>
+                        {uni?.scrape_url && (
+                          <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrape_url}</p>
                         )}
                         {isDone && entry.staged > 0 && (
                           <p className="text-xs text-green-600 mt-0.5">{entry.staged} courses staged for review</p>
@@ -758,6 +800,27 @@ export default function Bulk() {
                               </div>
                             </div>
                           ))}
+                          {h.status === "stopped" && stoppedN > 0 && (
+                            <div className="pt-2 pb-1">
+                              <button
+                                className="text-xs text-amber-700 font-medium hover:underline flex items-center gap-1"
+                                onClick={async () => {
+                                  const res = await fetch(`/api/scrape/bulk/resume/${h.sessionId}`, { method: "POST" });
+                                  const data = await readResponseJson<{ sessionId: string }>(res);
+                                  if (!data?.sessionId) return;
+                                  localStorage.setItem(STORAGE_KEY, data.sessionId);
+                                  setSessionId(data.sessionId);
+                                  setSessionData(null);
+                                  setSessionNotFound(false);
+                                  setExpandedHistoryId(null);
+                                  startPolling(data.sessionId);
+                                }}
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Retry {stoppedN} stopped universit{stoppedN === 1 ? "y" : "ies"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
