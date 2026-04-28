@@ -844,17 +844,27 @@ async def extract_course(
         # point the browser pass has run the full extractor suite against the
         # JS-rendered DOM, so a still-empty slot indicates a genuine extractor
         # miss or a page that hides data behind a login wall.
-        # When rendered HTML WAS obtained: mark parser_error so the row is not
-        # staged as a normal review-ready row. When rendered HTML was NOT
-        # obtained (browser timeout): log a warning but do NOT suppress staging
-        # (we don't want to silently drop courses due to browser infra issues).
+        #
+        # UOW rule (per-spec): if the browser timed out AND any field in the
+        # "must-not-be-guessed" set is still blank (would be AI-filled), mark
+        # parser_error so the row is not staged as review-ready.  This prevents
+        # rows with AI-hallucinated duration / intake / fee from polluting the
+        # review queue.  For UniSQ only the render-success path applies.
         _ext_critical = {"international_fee", "ielts_overall"}
+        # Fields that require rendered HTML for UOW — if these are still
+        # missing after static-HTML extraction and browser timed out, the
+        # values would be AI-guessed and must NOT be trusted.
+        _uow_render_required: set[str] = {
+            "duration_text", "intake_text", "study_mode",
+        }
         _parsed_host = (urlparse(url).netloc or "").lower()
-        if _parsed_host in ("www.uow.edu.au", "uow.edu.au",
-                            "www.unisq.edu.au", "unisq.edu.au"):
+        _is_uow_host = _parsed_host in ("www.uow.edu.au", "uow.edu.au")
+        if _is_uow_host or _parsed_host in ("www.unisq.edu.au", "unisq.edu.au"):
+            _had_render = rendered_html is not None  # type: ignore[possibly-undefined]
+
+            # ── Critical-field check (both UOW and UniSQ) ─────────────────
             _still_missing = [f for f in _ext_critical if f in missing]
             if _still_missing:
-                _had_render = rendered_html is not None  # type: ignore[possibly-undefined]
                 _reason = (
                     "not found in static HTML OR rendered DOM — data may be behind login"
                     if _had_render
@@ -879,6 +889,43 @@ async def extract_course(
                 if _had_render:
                     payload["parser_error"] = True
                     payload["parser_error_fields"] = _still_missing
+
+            # ── UOW browser-timeout guard ──────────────────────────────────
+            # UOW requires rendered HTML to fill duration / intake / mode.
+            # When the browser timed out, fields in _uow_render_required that
+            # are still blank will be filled by the AI fallback below — those
+            # values cannot be trusted.  Mark parser_error so the staging gate
+            # withholds the row from the review queue rather than showing
+            # incorrect data.
+            if _is_uow_host and not _had_render:
+                # duration_text and intake_text are in _ai_target_keys so they
+                # appear in `missing` when blank.  study_mode is NOT in that
+                # list, so we check it directly against the payload.
+                _uow_guessed = [
+                    f for f in ("duration_text", "intake_text")
+                    if f in missing
+                ] + (
+                    ["study_mode"] if not payload.get("study_mode") else []
+                )
+                if _uow_guessed:
+                    payload["parser_error"] = True
+                    payload["parser_error_fields"] = (
+                        payload.get("parser_error_fields") or []
+                    ) + _uow_guessed
+                    _uow_reason = (
+                        f"browser timed out — {', '.join(_uow_guessed)} "
+                        f"would be AI-guessed; row withheld from review queue"
+                    )
+                    log.warning("[UOW TIMEOUT GUARD] %s — %s", url, _uow_reason)
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[UOW TIMEOUT GUARD] {_uow_reason}",
+                            phase="extract",
+                            kind="uow_timeout_parser_error",
+                            url=url,
+                            guessed_fields=_uow_guessed,
+                        )
 
         if emit:
             await emit(
@@ -954,6 +1001,56 @@ async def extract_course(
                     "snippet": f"ai_fallback: {k}={v}",
                 }
             )
+
+    # ── Post-AI mode derivation ───────────────────────────────────────────────
+    # AI fallback may have filled course_location (e.g. "Wollongong") while
+    # study_mode is still blank. Re-run the location-to-mode derivation so we
+    # don't leave mode empty just because the browser timed out and mode wasn't
+    # visible in static HTML. Only fires when mode is genuinely absent — does
+    # not overwrite a value that was extracted from the page (confidence ≥ 0.7).
+    if not payload.get("study_mode"):
+        _loc_for_mode = payload.get("course_location") or payload.get("location_text")
+        if _loc_for_mode:
+            from app.services.scraper.extractors.study_mode import derive_mode_from_location
+            _post_ai_mode = derive_mode_from_location(str(_loc_for_mode))
+            if _post_ai_mode:
+                payload["study_mode"] = _post_ai_mode
+                evidence.append({
+                    "field_key": "study_mode",
+                    "value": _post_ai_mode,
+                    "confidence": 0.55,
+                    "method": "study_mode:post_ai_location_derived",
+                    "source_url": url,
+                    "snippet": f"Post-AI location-derived mode from: {str(_loc_for_mode)[:80]}",
+                })
+                if emit:
+                    await emit(
+                        "status",
+                        f"[MODE] post-AI location-derived: {_post_ai_mode} "
+                        f"(location={str(_loc_for_mode)[:40]})",
+                        phase="extract",
+                        kind="study_mode_location_derived",
+                        url=url,
+                    )
+
+    # ── Study-mode field trace ────────────────────────────────────────────────
+    # Emits a single diagnostic event so operators can follow the mode value
+    # through the full pipeline without trawling the evidence table.
+    if emit:
+        _mode_ev = [e for e in evidence if e.get("field_key") == "study_mode"]
+        _mode_method = _mode_ev[-1].get("method", "none") if _mode_ev else "none"
+        await emit(
+            "status",
+            f"[FIELD TRACE] study_mode={payload.get('study_mode')!r} "
+            f"location={payload.get('course_location')!r} "
+            f"method={_mode_method} url={url}",
+            phase="extract",
+            kind="field_trace_study_mode",
+            url=url,
+            extracted_study_mode=payload.get("study_mode"),
+            payload_study_mode=payload.get("study_mode"),
+            method=_mode_method,
+        )
 
     # Last-resort: backfill from university-level PDFs (fee schedule,
     # admissions/IELTS policy). Only fills keys still missing after
