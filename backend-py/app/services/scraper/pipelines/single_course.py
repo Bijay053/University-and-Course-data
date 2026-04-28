@@ -831,6 +831,28 @@ async def extract_course(
             "duration_text", "intake_text", "location_text",
         )
         missing = [k for k in _ai_target_keys if k not in payload or payload.get(k) is None]
+
+        # UOW-specific: explicit parser-failure logging so we can distinguish
+        # "data not on page" from "data on page but extractor missed it".
+        # UOW publishes fee and IELTS on every course page, so any miss here
+        # is a parser bug, not a data-absence.
+        _uow_critical = {"international_fee", "ielts_overall"}
+        _parsed_host = (urlparse(url).netloc or "").lower()
+        if _parsed_host in ("www.uow.edu.au", "uow.edu.au"):
+            for _fld in _uow_critical:
+                if _fld in missing:
+                    _reason = "not found in static HTML (may require JS render)"
+                    log.warning("[UOW PARSER MISSING] %s — %s — %s", _fld, url, _reason)
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[UOW PARSER MISSING] {_fld}: {_reason}",
+                            phase="extract",
+                            kind="parser_missing",
+                            field=_fld,
+                            url=url,
+                        )
+
         if emit:
             await emit(
                 "status",
