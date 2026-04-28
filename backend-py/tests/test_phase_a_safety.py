@@ -920,3 +920,160 @@ def test_non_uow_intake_still_uses_month_scan():
     assert "February" in months or "July" in months, (
         f"Generic intake must include at least one table month, got {months}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Regression: Phase A.7c bug-fix tests
+# ---------------------------------------------------------------------------
+
+def test_enforce_source_evidence_requires_snippet_key():
+    """enforce_source_evidence must drop fields whose evidence rows use
+    'source_text' instead of 'snippet' — the fix is in _extended_extract
+    which now emits 'snippet'.  This test verifies the guard behaviour for
+    the old (broken) key name so we can confirm the guard is the gatekeeper.
+
+    The fee extractor uses field_key="international_fee" (not annual_tuition_fee).
+    """
+    payload = {"international_fee": 36160, "ielts_overall": 6.5}
+    # Old (broken) evidence: uses 'source_text' instead of 'snippet'
+    bad_evidence = [
+        {
+            "field_key": "international_fee",
+            "source_url": "https://www.unisq.edu.au/study/degrees/master-of-research",
+            "source_text": "Tuition fee: A$36,160 per year",  # wrong key
+        },
+        {
+            "field_key": "ielts_overall",
+            "source_url": "https://www.unisq.edu.au/study/degrees/master-of-research",
+            "source_text": "IELTS 6.5",  # wrong key
+        },
+    ]
+    cleaned, dropped = enforce_source_evidence(payload, bad_evidence)
+    assert "international_fee" in dropped, (
+        "international_fee must be dropped when evidence uses 'source_text' not 'snippet'"
+    )
+    assert "ielts_overall" in dropped, (
+        "ielts must be dropped when evidence uses 'source_text' not 'snippet'"
+    )
+    assert cleaned["international_fee"] is None
+    assert cleaned["ielts_overall"] is None
+
+
+def test_enforce_source_evidence_accepts_snippet_key():
+    """enforce_source_evidence must KEEP fields whose evidence rows use the
+    correct 'snippet' key — confirming the fixed _extended_extract output
+    passes the guard."""
+    payload = {"international_fee": 36160, "ielts_overall": 6.5}
+    good_evidence = [
+        {
+            "field_key": "international_fee",
+            "source_url": "https://www.unisq.edu.au/study/degrees/master-of-research",
+            "snippet": "Tuition fee: A$36,160 per year",  # correct key
+        },
+        {
+            "field_key": "ielts_overall",
+            "source_url": "https://www.unisq.edu.au/study/degrees/master-of-research",
+            "snippet": "IELTS 6.5",  # correct key
+        },
+    ]
+    cleaned, dropped = enforce_source_evidence(payload, good_evidence)
+    assert "international_fee" not in dropped, (
+        "international_fee must NOT be dropped when evidence has valid source_url + snippet"
+    )
+    assert "ielts_overall" not in dropped, (
+        "ielts must NOT be dropped when evidence has valid source_url + snippet"
+    )
+    assert cleaned["international_fee"] == 36160
+    assert cleaned["ielts_overall"] == 6.5
+
+
+def test_duration_rejects_maximum_candidature_sentence():
+    """Duration extractor must NOT extract '8 years' from a sentence about
+    maximum candidature — that's an HDR completion cap, not the program length.
+    The real duration (e.g. 2 years) from a 'Duration: 2 years' label must win."""
+    import asyncio as _asyncio2
+    from app.services.scraper.extractors.duration import extract as _dur_extract
+
+    # Simulates a UniSQ Master of Research page: real duration in a labeled
+    # cell, candidature cap in a paragraph.
+    _html = """
+    <html><body>
+    <h1>Master of Research</h1>
+    <table>
+      <tr><th>Duration</th><td>2 years</td></tr>
+    </table>
+    <p>Maximum candidature: 8 years (or 4 years part time equivalent).</p>
+    </body></html>
+    """
+    results = _asyncio2.get_event_loop().run_until_complete(
+        _dur_extract(_html, "https://www.unisq.edu.au/study/degrees/master-of-research")
+    )
+    assert results, "Duration must be extracted from the labeled cell"
+    assert results[0].value == 2.0, (
+        f"Duration must be 2 (from Duration label), got {results[0].value}; "
+        "the '8 years' from maximum candidature must be rejected"
+    )
+
+
+def test_duration_rejects_research_period_only_page():
+    """When a page has NO explicit duration label and only research-period
+    sentences, the extractor must return nothing rather than a wrong value."""
+    import asyncio as _asyncio2
+    from app.services.scraper.extractors.duration import extract as _dur_extract
+
+    _html = """
+    <html><body>
+    <h1>Master of Research</h1>
+    <p>Maximum candidature: 8 years.  Part time equivalent: 8 years.</p>
+    <p>Research period: up to 4 years for part-time students.</p>
+    <p>Thesis submission required by maximum completion time.</p>
+    </body></html>
+    """
+    results = _asyncio2.get_event_loop().run_until_complete(
+        _dur_extract(_html, "https://www.unisq.edu.au/study/degrees/master-of-research")
+    )
+    if results:
+        assert results[0].value != 8.0, (
+            "Duration must NOT be 8 (maximum candidature cap); "
+            "prefer no result over a wrong candidature duration"
+        )
+        assert results[0].value != 4.0, (
+            "Duration must NOT be 4 (part-time research period); "
+            "prefer no result over a wrong research period duration"
+        )
+
+
+def test_intake_rejects_research_candidature_months():
+    """Intake extractor must NOT collect months from research candidature /
+    HDR enrollment sentences on a UniSQ Master of Research page."""
+    from app.services.scraper.extractors.intake import extract as _intake_extract
+
+    # Page shows research enrollment months near candidature language AND
+    # real coursework intakes in a table — only the table months should win.
+    _html = """
+    <html><body>
+    <h1>Master of Research</h1>
+    <p>Research candidature commencing January, May or August.</p>
+    <table>
+      <tr><th>Intake</th><td>February, May, June</td></tr>
+    </table>
+    </body></html>
+    """
+    results = _asyncio.get_event_loop().run_until_complete(
+        _intake_extract(
+            _html,
+            "https://www.unisq.edu.au/study/degrees/master-of-research",
+        )
+    )
+    assert results, "Intake must be extracted from the table row"
+    months = results[0].value
+    assert "January" not in months, (
+        f"'January' from research candidature must be rejected; got {months}"
+    )
+    assert "August" not in months, (
+        f"'August' from research candidature must be rejected; got {months}"
+    )
+    # Table months (Feb, May, Jun) must be present
+    assert "February" in months or "May" in months or "June" in months, (
+        f"Real intake months from the table must be preserved; got {months}"
+    )

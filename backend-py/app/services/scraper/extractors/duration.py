@@ -77,6 +77,24 @@ _DURATION_ANTI_CONTEXT = re.compile(
     r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry)\b",
     re.I,
 )
+
+# Research-degree completion caps and part-time equivalents must NEVER be
+# used as the program duration.  These appear on HDR (Higher Degree by
+# Research) pages alongside the real "Duration: 2 years" label and have
+# much larger numbers (e.g. "maximum candidature: 8 years").  Without
+# this filter the loose pattern-3 fallback picks "8 years" and wins the
+# weight tournament over "2 years" because "course" / "completion" words
+# are nearby.
+_DURATION_RESEARCH_CAP_RE = re.compile(
+    r"\b(?:maximum\s+(?:candidature|completion(?:\s+time)?|time|period)|"
+    r"max(?:\.|imum)?\s+(?:candidature|completion|time)|"
+    r"part[- ]?time\s+equivalent|"
+    r"research\s+period|"
+    r"thesis\s+(?:submission|completion)|"
+    r"minimum\s+(?:candidature|time)|"
+    r"maximum\s+enrolment)\b",
+    re.I,
+)
 # Bug 3 (KBS / Torrens): compound durations like "1 year, 8 months" or
 # "1 year and 8 months".  The single-unit patterns above only capture the
 # first numeric token ("1 Year") and discard the month component.
@@ -301,6 +319,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     parsed: list[tuple[float, float, str, str]] = []  # (weight, amount, unit, snippet)
     for s in sentences:
         if _ACCELERATED.search(s):
+            continue
+        # Skip sentences about research degree candidature caps, part-time
+        # equivalents, and research periods.  These appear on HDR (Higher
+        # Degree by Research) pages alongside the real study duration and have
+        # much larger numbers (e.g. "maximum candidature: 8 years",
+        # "part-time equivalent: 8 years").  Without this filter the loose
+        # pattern-3 fallback picks "8 years" and wins the weight tournament.
+        if _DURATION_RESEARCH_CAP_RE.search(s):
             continue
         # Skip sentences that are talking about credit-point structure rather
         # than program duration — see _CREDIT_POINT_CONTEXT comment.

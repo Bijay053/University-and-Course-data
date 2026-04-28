@@ -1065,6 +1065,34 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 continue
 
             try:
+                # [FIELD TRACE] — log key fields just before staging so we can
+                # diagnose drop-off between extraction and the DB row.  This
+                # runs BEFORE stage_course (which internally calls
+                # enforce_source_evidence). Any field that appears non-None
+                # here but is NULL in the staged row was dropped by the
+                # source-evidence guard (missing snippet or source_url).
+                _trace_fields = {
+                    k: payload.get(k)
+                    for k in (
+                        "annual_tuition_fee", "ielts_overall",
+                        "duration", "duration_term",
+                        "intake_months", "location",
+                        "study_mode", "english_test_name",
+                    )
+                }
+                log.info(
+                    "[FIELD TRACE] %s → fee=%s ielts=%s dur=%s%s intake=%s "
+                    "loc=%s mode=%s",
+                    r.get("name", "?"),
+                    _trace_fields["annual_tuition_fee"],
+                    _trace_fields["ielts_overall"],
+                    _trace_fields["duration"],
+                    _trace_fields["duration_term"] or "",
+                    _trace_fields["intake_months"],
+                    _trace_fields["location"],
+                    _trace_fields["study_mode"],
+                )
+
                 async with AsyncSessionLocal() as stage_db:
                     res = await stage_course(
                         stage_db,

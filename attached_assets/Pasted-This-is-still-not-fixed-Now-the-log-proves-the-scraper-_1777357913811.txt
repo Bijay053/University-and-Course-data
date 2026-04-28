@@ -1,0 +1,169 @@
+This is still not fixed.
+
+Now the log proves the scraper is extracting some values correctly, but the final staged table is still wrong.
+
+Example:
+Master of Research URL:
+https://www.unisq.edu.au/study/degrees-and-courses/master-of-research?studentType=international
+
+Website clearly shows:
+Duration: 2 years
+Start/intake: Feb, May, Jun
+
+But final table shows:
+Duration: 8 Year
+Intake: Jan, May, Aug
+Fee: blank
+IELTS: blank
+
+The log also shows:
+per-course browser ✓ master-of-research — IELTS=6.5 fee=36160
+
+So this is not only extraction issue now. This is a mapping/staging overwrite issue.
+
+Required urgent fix:
+
+1. Trace the value lifecycle for each field
+
+For every course, log this in one line before staging:
+
+course_name
+url
+extracted_fee
+extracted_ielts
+extracted_duration
+extracted_intake
+payload_fee
+payload_ielts
+payload_duration
+payload_intake
+staged_fee
+staged_ielts
+staged_duration
+staged_intake
+
+Use log prefix:
+[FIELD TRACE]
+
+2. Fix staging mapper
+
+If browser extraction returns:
+fee=36160
+IELTS=6.5
+duration=2 years
+intake=Feb, May, Jun
+
+then the final staged row must use those exact values.
+
+Do not allow later fallback, AI enrichment, central cache, sibling cache, or old data mapper to overwrite correct page values.
+
+Priority order must be:
+
+1. Course page rendered DOM value
+2. Course page static HTML value
+3. Official exact course matched API value
+4. Central university page value
+5. Existing manual backup value
+6. Blank
+
+Never allow generic central value or old cached value to overwrite course page value.
+
+3. Fix Master of Research duration
+
+Current value 8 Year is wrong.
+
+It is probably taking “maximum candidature” or “part time equivalent” incorrectly.
+
+For duration:
+Only extract value near labels:
+Duration
+Course duration
+Full time duration
+
+Reject values near:
+maximum time
+maximum candidature
+part time equivalent only
+research period
+thesis submission
+maximum completion time
+
+For Master of Research, expected:
+2 years
+
+4. Fix Master of Research intake
+
+Current value Jan, May, Aug is wrong.
+
+It is probably taking research period dates or general research admission months.
+
+Only extract intake near labels:
+Start
+Start date
+Intake
+Commencing
+Entry
+When can I start
+
+For UniSQ, value should come from the course overview card, not academic calendar or research dates.
+
+For Master of Research expected:
+Feb, May, Jun
+
+5. Stop fallback overwrite
+
+After browser extractor fills fee or IELTS, do not call fallback that overwrites or blanks those values.
+
+Add rule:
+if payload.international_fee exists from rendered_course_page, lock it.
+if payload.ielts_overall exists from rendered_course_page, lock it.
+if payload.duration_text exists from rendered_course_page, lock it.
+if payload.intake_text exists from rendered_course_page, lock it.
+
+Add source priority:
+rendered_course_page = 100
+static_course_page = 90
+official_api_exact_match = 85
+central_page_exact_match = 75
+manual_backup = 60
+ai_guess = 20
+
+Higher priority always wins.
+
+6. Fix UI or API response mapping
+
+Check if backend stores fee and IELTS but frontend is showing blank.
+
+Verify database row after staging:
+international_fee
+ielts_overall
+duration_text
+intake_text
+
+If database has values but UI blank, fix API serializer or frontend column mapping.
+
+7. Add tests for this exact course
+
+Use:
+https://www.unisq.edu.au/study/degrees-and-courses/master-of-research?studentType=international
+
+Expected final staged row:
+Course Name: Master of Research
+Duration: 2 years
+Intake: Feb, May, Jun
+IELTS: 6.5
+International fee: 36160 or visible official fee value from page
+Location: Toowoomba, Ipswich, Springfield if visible
+Mode: on campus or available study mode if visible
+
+8. Add regression test
+
+The final staged row must not contain:
+Duration: 8 Year
+Intake: Jan, May, Aug
+blank IELTS when browser extracted IELTS
+blank fee when browser extracted fee
+
+9. Do not start dashboard or new feature until this is fixed.
+
+This is a core data accuracy bug.

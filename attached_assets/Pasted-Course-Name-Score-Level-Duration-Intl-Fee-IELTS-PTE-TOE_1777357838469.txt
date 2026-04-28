@@ -1,0 +1,516 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Graduate Diploma of Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	1 Year			-	-	-	-	Feb, May, Jun	Toowoomba, Ipswich	-	
+
+
+
+	
+Bachelor of Environmental Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Bachelor of Laws
+Publish: review
+Eligibility: review
+46%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun	Toowoomba, Ipswich	-	
+
+
+
+	
+Master of Data Science
+Computer Science & IT
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Master of Cyber Security
+Computer Science & IT
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Graduate Diploma of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	1.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Graduate Diploma of Information Systems
+Computer Science & IT
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	1 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Master of Social Work (Qualifying)
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Feb, May, Jun	Ipswich	-	
+
+
+
+	
+Master of Public Health
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Feb, Sep	Ipswich	-	
+
+
+
+	
+Master of Professional Psychology
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Master	1 Year			-	-	-	-	Jul, Aug, Sep, Oct, Jan	Ipswich	-	
+
+
+
+	
+Master of Counselling
+Education & Social Work
+Publish: review
+Eligibility: review
+46%	Master	2 Year			-	-	-	-	Aug, Jan, Apr, Dec, Sep, Feb, Jun	-	-	
+
+
+
+	
+Master of Clinical Psychology
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Jul, Aug, Sep, Oct, Jan	Ipswich	-	
+
+
+
+	
+Graduate Certificate of Public Health
+Medicine & Health
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, Sep	-	-	
+
+
+
+	
+Bachelor of Sport and Exercise Science
+Science & Mathematics
+Publish: review
+Eligibility: review
+46%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun	-	-	
+
+
+
+	
+Bachelor of Science (Psychology)
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Ipswich	-	
+
+
+
+	
+Bachelor of Science (Honours)
+Science & Mathematics
+Publish: review
+Eligibility: review
+54%	Bachelor	1 Year			-	-	-	-	Feb, May, Jun, Sep, Aug, Oct, Nov, Mar	Toowoomba, Ipswich	-	
+
+
+
+	
+Bachelor of Physiotherapy (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb	Toowoomba, Ipswich	-	
+
+
+
+	
+Bachelor of Medical Laboratory Science
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Bachelor	3.5 Year			-	-	-	-	Feb, May, Jun	Toowoomba	-	
+
+
+
+	
+Bachelor of Clinical Exercise Physiology (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+46%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun	-	-	
+
+
+
+	
+Bachelor of Biomedical Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Associate Degree of Allied Health
+Publish: review
+Eligibility: review
+46%	Associate Degree	2 Year			-	-	-	-	Feb	Ipswich	-	
+
+
+
+	
+Bachelor of Occupational Therapy (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb	Toowoomba, Ipswich	-	
+
+
+
+	
+Graduate Diploma of Professional Engineering
+Engineering & Technology
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	1 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Graduate Certificate of Professional Engineering
+Engineering & Technology
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Bachelor of Surveying (Honours)
+Publish: review
+Eligibility: review
+46%	Bachelor	4 Year			-	-	-	-	Feb, Sep	Springfield	-	
+
+
+
+	
+Bachelor of Engineering Technology
+Engineering & Technology
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Associate Degree of Surveying
+Publish: review
+Eligibility: review
+46%	Associate Degree	2 Year			-	-	-	-	Feb, Sep	Springfield	-	
+
+
+
+	
+Associate Degree of Engineering
+Engineering & Technology
+Publish: review
+Eligibility: review
+54%	Associate Degree	2 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Education (Primary)
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Education (Early Childhood)
+Education & Social Work
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun	Toowoomba, Springfield	-	
+
+
+
+	
+Master of Organisational Project Management
+Business & Management
+Publish: review
+Eligibility: review
+46%	Master	1.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Master of Business
+Business & Management
+Publish: review
+Eligibility: review
+54%	Master	2 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Graduate Diploma of Business
+Business & Management
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	1 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Graduate Certificate of Project Management (Leading Business Innovation)
+Business & Management
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Graduate Certificate of Project Management (Enhancing Business Performance)
+Business & Management
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Graduate Certificate of Project Management (Delivering Business Strategy)
+Business & Management
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Graduate Certificate of Business Administration
+Business & Management
+Publish: review
+Eligibility: review
+46%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Graduate Certificate of Business
+Business & Management
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	0.5 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Business and Bachelor of Science (Psychology)
+Medicine & Health
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba	-	
+
+
+
+	
+Bachelor of Business and Bachelor of Science
+Business & Management
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Business and Bachelor of Laws
+Business & Management
+Publish: review
+Eligibility: review
+54%	Bachelor	5 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Accounting and Bachelor of Laws
+Business & Management
+Publish: review
+Eligibility: review
+46%	Bachelor	5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Bachelor of Accounting
+Business & Management
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Associate Degree of Business
+Business & Management
+Publish: review
+Eligibility: review
+54%	Associate Degree	2 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Doctor of Philosophy (Phd)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+54%	Doctorate	4 Year			-	-	-	-	Nov, Jan, Feb, Apr, May, Jun, Aug, Sep	Toowoomba, Ipswich, Springfield	-	
+
+
+
+	
+Master of Research
+Publish: review
+Eligibility: review
+46%	Master	8 Year			-	-	-	-	Jan, May, Aug	Toowoomba, Ipswich, Springfield	-	
+
+
+
+	
+Diploma of Arts
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Diploma	1 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Bachelor of Visual Art
+Publish: review
+Eligibility: review
+46%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun	Toowoomba	-	
+
+
+
+	
+Bachelor of Theatre
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb	Toowoomba	-	
+
+
+
+	
+Bachelor of Film and Screen Production
+Media & Communications
+Publish: review
+Eligibility: review
+46%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun	-	-	
+
+
+
+	
+Bachelor of Digital Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun	Springfield	-	
+
+
+
+	
+Bachelor of Creative Arts (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+54%	Bachelor	1 Year			-	-	-	-	Feb, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Communication and Creative Industries
+Media & Communications
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Arts and Bachelor of Laws
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor	5 Year			-	-	-	-	Feb, May, Jun, Sep	-	-	
+
+
+
+	
+Bachelor of Arts and Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: review
+54%	Bachelor	4 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
+	
+Bachelor of Arts (Honours)
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+46%	Bachelor	1 Year			-	-	-	-	Feb, May, Jun	-	-	
+
+
+
+	
+Bachelor of Arts
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+54%	Bachelor	3 Year			-	-	-	-	Feb, May, Jun, Sep	Toowoomba, Springfield	-	
+
+
+
