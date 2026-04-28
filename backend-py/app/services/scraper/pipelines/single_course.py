@@ -512,6 +512,12 @@ async def extract_course(
     # virtual/online keywords, so a non-empty course_location = confirmed
     # physical campus exists. When the page says "Online" but the location
     # extractor found real cities/campuses, the true mode is "Blended".
+    #
+    # NOTE: We deliberately do NOT derive "On Campus" when study_mode is
+    # absent. A missing mode means no evidence was found — not that the course
+    # is on-campus. Defaulting to "On Campus" from a location value produces
+    # misleading data and causes the guard to reject legitimate courses as
+    # Blended (when Blended+no-location fires the online_only guard).
     _study_mode_evidence = [e for e in evidence if e["field_key"] == "study_mode"]
     _was_online = payload.get("study_mode") == "Online"
     _has_physical_location = bool((payload.get("course_location") or "").strip())
@@ -525,17 +531,14 @@ async def extract_course(
     # location was actually found — avoids false upgrades on courses that
     # genuinely are online-only but happen to list a PO box or virtual address.
     _location_overrides_online = _was_online and _has_physical_location
-    _mode_absent = not payload.get("study_mode")
-    if _mode_absent or _low_conf_online or _location_overrides_online:
+    if _low_conf_online or _location_overrides_online:
         from app.services.scraper.extractors.study_mode import derive_mode_from_location
 
         _derived_mode = derive_mode_from_location(payload.get("course_location"))
         if _derived_mode:
             # When the page said "Online" but we know a physical campus exists,
             # the correct canonical mode is "Blended" — not just "On Campus" —
-            # because both delivery options are available. Only use Blended when
-            # _was_online so the derivation path (absent mode → On Campus) is
-            # unchanged for courses whose mode was simply never detected.
+            # because both delivery options are available.
             _final_mode = "Blended" if _was_online and _has_physical_location else _derived_mode
             payload["study_mode"] = _final_mode
             evidence.append(
@@ -1101,36 +1104,12 @@ async def extract_course(
                 }
             )
 
-    # ── Post-AI mode derivation ───────────────────────────────────────────────
-    # AI fallback may have filled course_location (e.g. "Wollongong") while
-    # study_mode is still blank. Re-run the location-to-mode derivation so we
-    # don't leave mode empty just because the browser timed out and mode wasn't
-    # visible in static HTML. Only fires when mode is genuinely absent — does
-    # not overwrite a value that was extracted from the page (confidence ≥ 0.7).
-    if not payload.get("study_mode"):
-        _loc_for_mode = payload.get("course_location") or payload.get("location_text")
-        if _loc_for_mode:
-            from app.services.scraper.extractors.study_mode import derive_mode_from_location
-            _post_ai_mode = derive_mode_from_location(str(_loc_for_mode))
-            if _post_ai_mode:
-                payload["study_mode"] = _post_ai_mode
-                evidence.append({
-                    "field_key": "study_mode",
-                    "value": _post_ai_mode,
-                    "confidence": 0.55,
-                    "method": "study_mode:post_ai_location_derived",
-                    "source_url": url,
-                    "snippet": f"Post-AI location-derived mode from: {str(_loc_for_mode)[:80]}",
-                })
-                if emit:
-                    await emit(
-                        "status",
-                        f"[MODE] post-AI location-derived: {_post_ai_mode} "
-                        f"(location={str(_loc_for_mode)[:40]})",
-                        phase="extract",
-                        kind="study_mode_location_derived",
-                        url=url,
-                    )
+    # Post-AI mode derivation deliberately removed.
+    # Inferring "On Campus" from course_location alone produces misleading data:
+    # a location field is evidence of WHERE the course runs, not HOW it is
+    # delivered. Pages that never mention a delivery mode should stage with an
+    # empty study_mode rather than a fabricated "On Campus" value.
+    # The Review UI will surface these as a completeness gap for human review.
 
     # ── Study-mode field trace ────────────────────────────────────────────────
     # Emits a single diagnostic event so operators can follow the mode value
