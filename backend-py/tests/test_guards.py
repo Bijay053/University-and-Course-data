@@ -269,6 +269,52 @@ class TestShouldStageCourseOnlineOnly:
         assert ok is False
         assert reason == "online_only"
 
+    def test_acap_mba_online_with_physical_campus_stages(self) -> None:
+        """ACAP MBA fix: study_mode='Online' must NOT reject when course_location
+        contains real physical campus cities. The location extractor strips virtual
+        keywords, so a non-empty course_location = confirmed physical campus → Blended.
+
+        Real case: https://www.acap.edu.au/courses/master-of-business-administration/
+        The study_mode extractor returns 'Online' but the page shows delivery in
+        Sydney, Melbourne, Brisbane, Adelaide, and Perth — clearly not online-only.
+        """
+        payload = {
+            "course_name": "Master of Business Administration",
+            "international_fee": 35000,
+            "study_mode": "Online",
+            "course_location": "Sydney, Melbourne, Brisbane, Adelaide, Perth",
+        }
+        ok, reason = should_stage_course("Master of Business Administration", payload)
+        assert ok is True, (
+            f"ACAP MBA with physical campus cities should stage, got reason={reason!r}"
+        )
+
+    def test_online_with_location_text_stages(self) -> None:
+        """location_text (alias for course_location in some payloads) also overrides."""
+        payload = {
+            "course_name": "Graduate Diploma of Business Administration",
+            "international_fee": 28000,
+            "study_mode": "Online",
+            "location_text": "Sydney, Melbourne",
+        }
+        ok, reason = should_stage_course("Graduate Diploma of Business Administration", payload)
+        assert ok is True, (
+            f"Online with location_text='Sydney, Melbourne' should stage, got reason={reason!r}"
+        )
+
+    def test_online_no_location_still_rejects(self) -> None:
+        """Courses genuinely online-only (no course_location, no location_text) still rejected."""
+        payload = {
+            "course_name": "Master of Data Science",
+            "international_fee": 32000,
+            "study_mode": "Online",
+            "course_location": None,
+            "location_text": None,
+        }
+        ok, reason = should_stage_course("Master of Data Science", payload)
+        assert ok is False
+        assert reason == "online_only"
+
 
 class TestQualificationCodePrefix:
     """AIT fix: course names prefixed with an Australian national qualification
