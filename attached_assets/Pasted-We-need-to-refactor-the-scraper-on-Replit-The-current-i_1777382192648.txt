@@ -1,0 +1,137 @@
+We need to refactor the scraper on Replit. The current implementation is not production ready and is failing across extraction, parsing, and validation layers.
+
+Core Issues
+Fees duplicated or missing
+IELTS and other English requirements not extracted
+Duration incorrectly parsed (e.g. 2 years → 8 years)
+Intake values mismatched from source
+Mode (On Campus) inconsistently missing
+Location not normalized (short forms stored)
+Incomplete scraping (pagination / dynamic content not handled)
+Master level courses missing
+Required Architecture (Technical Fix)
+1. Multi Strategy Extraction (Critical)
+
+Instead of single selector:
+
+function extractField(page, config) {
+  for (strategy of config.strategies) {
+    let value = strategy(page)
+    if (value) return value
+  }
+  return null
+}
+
+Strategies:
+
+CSS selector
+XPath fallback
+Label based text search
+Regex from full page text
+2. Field Parsing Layer
+
+Example:
+
+function parseDuration(text) {
+  if (!text) return null
+  
+  if (text.match(/(\d+)\s*year/)) return `${RegExp.$1} Year`
+  if (text.match(/(\d+)\s*month/)) return `${Math.ceil(RegExp.$1/12)} Year`
+  
+  return null
+}
+function parseFee(text) {
+  let match = text.match(/A?\$?[\d,]+/)
+  return match ? match[0].replace(',', '') : null
+}
+function parseIELTS(text) {
+  let match = text.match(/IELTS.*?(\d\.\d)/i)
+  return match ? match[1] : null
+}
+3. Normalization Layer
+const locationMap = {
+  "SYD": "Sydney, Australia",
+  "MEL": "Melbourne, Australia"
+}
+4. Validation Layer (Block Bad Data)
+function validateCourse(course) {
+  let errors = []
+
+  if (!course.fee) errors.push("Missing fee")
+  if (!course.ielts) errors.push("Missing IELTS")
+  if (course.duration > 6) errors.push("Invalid duration")
+
+  return errors
+}
+🔥 Actichater Sample (Scraper Observability + Logs)
+
+This is what we need implemented:
+
+1. Field Level Log Output
+[SCRAPER] University: USQ
+[COURSE] Master of Research
+
+[FIELD] Fee
+  Selector1: FAIL
+  Selector2: SUCCESS
+  Raw: "A$30,000 per year"
+  Parsed: 30000
+
+[FIELD] IELTS
+  Text Search: SUCCESS
+  Raw: "IELTS 6.5 overall"
+  Parsed: 6.5
+
+[FIELD] Duration
+  Raw: "2 years (or part-time equivalent)"
+  Parsed: 2 Year
+2. Error Log Sample
+[ERROR] Course Extraction Failed
+University: UOW
+Course: Master of IT
+
+Reason:
+- Fee missing
+- IELTS missing
+- Intake mismatch
+
+Action: Flagged for review
+3. Health Dashboard Metrics (Actichater Style)
+University: USQ
+
+Total Courses Scraped: 120
+Courses with Fee Missing: 35 (29%)
+Courses with IELTS Missing: 52 (43%)
+Duplicate Fee Detected: YES
+Duration Anomaly (>6 years): 18
+
+STATUS: FAIL
+4. Data Confidence Score
+function calculateConfidence(course) {
+  let score = 0
+
+  if (course.fee) score += 25
+  if (course.ielts) score += 25
+  if (course.duration) score += 20
+  if (course.intake) score += 20
+  if (course.mode) score += 10
+
+  return score
+}
+
+Reject if:
+
+if (confidence < 60) → DO NOT SAVE
+5. Pipeline Flow
+SCRAPE → EXTRACT → PARSE → NORMALIZE → VALIDATE → SCORE → SAVE
+                                      ↓
+                                   LOG / FLAG
+Final Note
+
+This requires a full pipeline redesign, not small fixes.
+
+No more static scraping
+No saving incomplete data
+Full observability required
+
+Current output is not usable in production. Please implement this as a structured system upgrade.

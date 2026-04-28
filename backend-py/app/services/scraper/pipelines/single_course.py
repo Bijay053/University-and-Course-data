@@ -376,6 +376,90 @@ async def extract_course(
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
 
+    # ── Bond pre-seed: runs BEFORE _EXTRACTORS ───────────────────────────────
+    # Bond University (bond.edu.au/program/*) renders all dynamic fields
+    # (fees, English scores, intake calendar) via client-side JavaScript.
+    # Playwright returns filled=[] even with a real browser because the fee/
+    # English XHR round-trips complete after the settle window.  The Bond
+    # pre-seed:
+    #   1. Sets has_central_fee_page=True  → bypasses no_international_fee
+    #      rejection; courses stage for human review instead of being dropped.
+    #   2. Sets course_location="Gold Coast, Queensland" directly → prevents
+    #      the footer-derived garbage location (e.g. "University Club (Building
+    #      6), Bond University") from winning via setdefault.
+    #   3. Sets study_mode="On Campus" (default; switches to Blended/Online
+    #      when the static HTML has explicit online-delivery keywords).
+    #   4. Injects Bond's tri-semester intake calendar (January/May/September)
+    #      as the fallback when no real intake months are found.
+    # Unlike CSU, we do NOT disable use_ai_fallback — Gemini can still help
+    # with course_name, duration, description, and English scores.
+    _is_bond_page: bool = False
+    try:
+        from app.services.scraper.bond_static_extract import (
+            apply_bond_extraction as _bond_apply,
+            is_bond_program_url as _is_bond,
+        )
+        if _is_bond(url):
+            _bond_pre = _bond_apply(url, html)
+            # Direct-write keys must block generic extractor mis-fires.
+            # Only the keys explicitly listed here use direct write; all
+            # other keys (e.g. international_fee when found in static HTML)
+            # use setdefault so the standard extractors can override when
+            # they actually find a value on the page.
+            _BOND_DIRECT_KEYS = {"has_central_fee_page", "course_location", "study_mode"}
+            for _k, _v in _bond_pre.items():
+                if _k == "scrape_warnings":
+                    # Merge into any existing warnings already set.
+                    _existing_w = list(payload.get("scrape_warnings") or [])
+                    for _w in (_v or []):
+                        if _w not in _existing_w:
+                            _existing_w.append(_w)
+                    payload["scrape_warnings"] = _existing_w
+                    continue
+                if _k in _BOND_DIRECT_KEYS:
+                    payload[_k] = _v
+                else:
+                    payload.setdefault(_k, _v)
+                if _v not in (None, "", 0, []):
+                    evidence.append(
+                        {
+                            "field_key": _k,
+                            "value": _v,
+                            "confidence": 0.85,
+                            "method": "bond_static",
+                            "source_url": url,
+                            "snippet": f"Bond pre-seed: {_k}={_v}",
+                        }
+                    )
+            _is_bond_page = True
+            if emit:
+                _bond_parts: list[str] = []
+                if _bond_pre.get("international_fee"):
+                    _bond_parts.append(f"fee={_bond_pre['international_fee']:.0f}")
+                if _bond_pre.get("intake_months"):
+                    _bond_parts.append(f"intakes={','.join(_bond_pre['intake_months'])}")
+                if _bond_pre.get("course_location"):
+                    _bond_parts.append(f"loc={_bond_pre['course_location'][:30]}")
+                if _bond_pre.get("study_mode"):
+                    _bond_parts.append(f"mode={_bond_pre['study_mode']}")
+                _bond_warns = _bond_pre.get("scrape_warnings") or []
+                if _bond_warns:
+                    _bond_parts.append(f"warn={','.join(_bond_warns)}")
+                await emit(
+                    "status",
+                    f"[BOND ✓] {url.split('/')[-1][:40]} — "
+                    + (", ".join(_bond_parts) if _bond_parts else "pre-seed applied"),
+                    phase="extract",
+                    kind="bond_static_preseed",
+                    url=url,
+                    filled=[
+                        k for k, v in _bond_pre.items()
+                        if v not in (None, "", 0, []) and k != "scrape_warnings"
+                    ],
+                )
+    except Exception as _bond_exc:  # noqa: BLE001
+        log.warning("bond_static_extract pre-seed failed on %s: %s", url, _bond_exc)
+
     for module, extra_keys in _EXTRACTORS:
         kwargs: dict[str, Any] = {}
         for k in extra_keys:

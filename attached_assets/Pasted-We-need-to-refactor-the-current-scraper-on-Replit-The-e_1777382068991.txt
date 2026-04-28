@@ -1,0 +1,106 @@
+We need to refactor the current scraper on Replit. The existing implementation is not production ready and is failing at multiple levels of extraction, parsing, and validation.
+
+Current Issues (Observed Across Multiple Universities)
+Fees
+Same value repeated across courses or completely missing
+Indicates selector mismatch or incorrect DOM scope reuse
+English Requirements
+IELTS, PTE, TOEFL not extracted despite being clearly present
+Likely due to unstructured text parsing not implemented
+Duration
+Incorrect parsing (e.g. 2 years → 8 years)
+Regex or unit normalization is broken
+Intakes
+Wrong mapping (e.g. Feb, May, Jun → Jan, May, Aug)
+Static mapping instead of source driven extraction
+Mode
+“On Campus” missing for most courses
+Field exists but extraction logic not consistently applied
+Course Location
+Stored as short codes instead of normalized full names
+No mapping layer implemented
+Coverage
+Only partial course lists scraped (e.g. USQ showing 1 course)
+Pagination or dynamic loading not handled
+Master courses missing entirely in many cases
+Root Cause
+
+This is not a data availability issue. Problems are due to:
+
+Fragile CSS selectors tied to specific DOM structures
+No fallback strategy when selectors fail
+No structured parsing layer for semi structured content
+No validation layer before saving data
+No logging or observability to detect failures
+Required Architecture Fix
+1. Extraction Layer
+Move from static selectors → multi strategy extraction
+Primary selector
+Secondary fallback selector
+Text search fallback (label based extraction)
+
+Example:
+
+Instead of targeting one class for IELTS
+Search for keyword “IELTS” in DOM and extract adjacent value
+2. Parsing Layer
+
+Implement robust parsers per field:
+
+Duration Parser
+Normalize formats: “2 years”, “24 months”, “Full time 2 years”
+Convert to standardized unit
+Fee Parser
+Extract numeric + currency
+Handle formats like “A$30,000 per year”
+Intake Parser
+Extract actual months from text
+Avoid hardcoded mappings
+English Requirement Parser
+Pattern match scores (e.g. IELTS 6.5 overall)
+3. Normalization Layer
+Location mapping (Sydney → Sydney, Australia)
+Mode normalization (On campus, Online, Hybrid)
+Intake standard format (Feb, May, Jun)
+4. Validation Layer (Critical)
+
+Before saving:
+
+Reject or flag if:
+Fee is empty or identical across all courses
+Duration is unrealistic (e.g. > 6 years for master)
+Intake mismatch with source
+English requirement missing when present on page
+5. Scraper Health Dashboard
+
+Build monitoring system:
+
+% of courses missing fees
+% missing IELTS
+Duplicate fee detection
+Duration anomaly detection
+Course count per university vs expected baseline
+6. Logging and Debugging
+Field level logs:
+selector used
+raw extracted value
+parsed value
+Store failed extraction cases for review
+7. Dynamic Content Handling
+Ensure support for:
+Pagination
+Lazy loading
+JS rendered content (use headless browser if needed)
+8. Data Integrity Strategy
+Do not overwrite existing correct data with empty values
+Maintain backup of previous data
+Only update fields when confidence is high
+Expected Outcome
+Accurate field level extraction
+No missing critical data when present on source
+Consistent normalized dataset across universities
+Early detection of scraping failures
+
+Current system is not usable in production. This needs a proper redesign of the scraping pipeline, not just small fixes.
+
+Please review and implement this as a structured upgrade, not patch fixes.
