@@ -456,6 +456,17 @@ async def discover_course_links(
             if _seed not in visited:
                 queue.append((_seed, 0))
 
+    # Flinders: the general listing (/study/courses) puts 334 unique URLs on
+    # one page but orders pure Master courses after position 255, beyond the
+    # default max_courses=200 cap.  Pre-seed the postgraduate international
+    # filter page so the BFS harvests all ~54 pure Master courses regardless
+    # of the cap on the general listing.
+    _flinders_hosts = ("www.flinders.edu.au", "flinders.edu.au")
+    if parsed.netloc in _flinders_hosts:
+        _pg_seed = f"{parsed.scheme}://{parsed.netloc}/study/courses?level=postgraduate&student=international"
+        if _pg_seed not in visited:
+            queue.append((_pg_seed, 0))
+
     if emit:
         await emit(
             "status",
