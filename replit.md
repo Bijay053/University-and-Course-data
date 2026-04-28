@@ -60,10 +60,15 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 
 ### Deployment Architecture
 
-- **Production Server**: DigitalOcean droplet running Ubuntu 24.04.
-- **Process Management**: PM2 or systemd for Python FastAPI (uvicorn). Node.js API server has been deleted — Nginx must proxy /api to Python FastAPI on port 8080. Stop the old Node PM2 process and update Nginx config on the droplet.
-- **Database**: Local PostgreSQL instance.
-- **Environment Management**: `.env.backup` file on the server storing sensitive credentials.
+- **Production Server**: DigitalOcean droplet at `159.65.152.72`, Ubuntu 24.04.
+- **Process Management**: systemd. Services: `uni-api-py.service` (FastAPI/uvicorn, port 8000) and `uni-celery.service` (Celery worker). Nginx proxies `/api` → `127.0.0.1:8000`.
+- **Git repo on server**: `/root/University-and-Course-data`. Deploy = `git pull origin main` + `systemctl restart uni-api-py uni-celery`.
+- **Database**: Local PostgreSQL. Database: `university_portal`, owner: `uniportal`. Access via `sudo -u postgres psql -d university_portal`. Schema changes via direct psql (alembic cannot be used on production — asyncpg fails to connect via TCP to `localhost` due to SSL hostname DNS issue).
+- **CRITICAL — DB URL**: Must use `127.0.0.1` not `localhost` in the asyncpg connection string. asyncpg attempts SSL hostname verification using `getaddrinfo("localhost")` which fails on this server (`[Errno -3] Temporary failure in name resolution`). Using the IP literal bypasses the DNS lookup.  Hardcoded default in `backend-py/app/config.py` is already set to `127.0.0.1`.
+- **alembic**: Do NOT run `alembic upgrade head` on production — it will fail with the same DNS error. Apply all schema changes via `sudo -u postgres psql -d university_portal -c "ALTER TABLE ..."` directly.
+- **alembic_version table**: Contains fake version IDs (`001_initial` … `006_add_scrape_warnings`) inserted manually. The actual migration filenames are `001_add_rejection_reason`, `002_add_extraction_method`, etc. — these do NOT match. Ignore alembic version tracking on production entirely.
+- **Environment Management**: DB credentials hardcoded in `app/config.py` default. No `.env` file needed on production.
+- **journalctl**: The service does NOT log uvicorn application output to journalctl — only systemd lifecycle events appear. To see application errors, check `/tmp/dashboard_stats_error.log` (written by the try/except in dashboard.py) or run uvicorn in the foreground temporarily.
 
 ## External Dependencies
 
