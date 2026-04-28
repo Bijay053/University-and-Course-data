@@ -128,6 +128,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const pollInFlightRef = useRef(false);
   const pollFailRef = useRef(0);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
   const submittingRef = useRef(false);
 
   // Restore any in-progress job after navigation
@@ -151,9 +152,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     return () => clearInterval(id);
   }, [scraping]);
 
-  // Scroll logs to bottom
+  // Scroll logs to bottom — use direct container scrollTop to avoid
+  // scrollIntoView pulling the whole page up when the user is reading below.
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
   }, [logs]);
 
   const resetToIdle = useCallback(() => {
@@ -491,7 +495,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             })() : null}
 
             {/* Compact log stream */}
-            <div className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
+            <div ref={logContainerRef} className="flex-1 min-h-[160px] max-h-[420px] overflow-y-auto bg-gray-950 rounded-lg p-2 font-mono text-[10px] leading-relaxed">
               {logs.length === 0 ? (
                 jobStatus === "queued" ? (
                   <div className="flex flex-col gap-1.5 pt-2">
