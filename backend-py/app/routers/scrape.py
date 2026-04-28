@@ -1091,6 +1091,8 @@ async def last_runs(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dict]:
             "imported": int(r.imported or 0),
             "total_found": int(r.total_found or 0),
             "runtime_job_id": r.runtime_job_id,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
         }
     return list(seen.values())
 

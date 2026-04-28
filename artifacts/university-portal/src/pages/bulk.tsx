@@ -38,6 +38,8 @@ type LastRun = {
   imported: number;
   total_found: number;
   runtime_job_id: string;
+  completed_at: string | null;
+  started_at: string | null;
 };
 
 type BulkUniStatus = "pending" | "running" | "done" | "error" | "skipped" | "stopped";
@@ -699,10 +701,21 @@ export default function Bulk() {
                             <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrape_url}</p>
                           )}
                           {lr && (
-                            <p className="text-xs mt-0.5 flex items-center gap-2">
+                            <p className="text-xs mt-0.5 flex items-center gap-2 flex-wrap">
                               <span className={lr.status === "completed" ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
                                 {lr.status === "completed" ? "✓ Last scraped" : "⚠ Last stopped"}
                               </span>
+                              {(lr.completed_at || lr.started_at) && (
+                                <>
+                                  <span className="text-gray-400">·</span>
+                                  <span className="text-gray-400">
+                                    {new Date(lr.completed_at ?? lr.started_at!).toLocaleString(undefined, {
+                                      day: "2-digit", month: "short", year: "numeric",
+                                      hour: "2-digit", minute: "2-digit",
+                                    })}
+                                  </span>
+                                </>
+                              )}
                               <span className="text-gray-400">·</span>
                               <span className="text-gray-500">{lr.imported} imported / {lr.total_found} found</span>
                             </p>
