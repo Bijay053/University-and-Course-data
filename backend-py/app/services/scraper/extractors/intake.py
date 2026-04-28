@@ -46,6 +46,24 @@ _KEYWORD_WINDOW = re.compile(
     r"entry\s*point|intake(?:s)?)",
     re.I,
 )
+
+# Months appearing near research-candidature language are NOT course
+# intake months — they're HDR enrollment windows, research-period
+# admission dates, or thesis submission deadlines.  Chunks containing
+# any of these phrases are excluded from Passes 1 & 2 so that, e.g.,
+# "Research candidature commencing January, May or August" on a Master
+# of Research page doesn't produce intake_months=[Jan, May, Aug] when
+# the real coursework intakes are February / May / June.
+_INTAKE_RESEARCH_REJECT_RE = re.compile(
+    r"\b(?:candidature|research\s+(?:period|enrollment|enrolment|"
+    r"commencement|training|degree|program(?:me)?)|"
+    r"hdr\b|higher\s+degree\s+by\s+research|"
+    r"thesis\s+(?:submission|completion|milestone)|"
+    r"maximum\s+(?:candidature|completion|time)|"
+    r"doctoral\s+(?:candidature|program(?:me)?)|"
+    r"research\s+candidacy|graduate\s+research)\b",
+    re.I,
+)
 _FULL_DATE = re.compile(
     rf"\b(\d{{1,2}})(?:\s+|-|/)+({_MONTH_ANY})(?:(?:\s+|-|/)\d{{2,4}})?\b", re.I
 )
@@ -300,8 +318,15 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
         start = max(0, hit.start() - 24)
         end = min(len(text), hit.end() + 260)
         chunk = text[start:end].strip()
-        if chunk and chunk not in out:
-            out.append(chunk)
+        if not chunk or chunk in out:
+            continue
+        # Reject chunks that describe HDR research-period enrollment windows,
+        # thesis submission dates, or candidature commencements — these are NOT
+        # coursework intake months (e.g. "Research candidature commencing Jan,
+        # May or Aug" on a UniSQ Master of Research page).
+        if _INTAKE_RESEARCH_REJECT_RE.search(chunk):
+            continue
+        out.append(chunk)
         if len(out) >= max_chunks:
             break
     return out
