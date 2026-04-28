@@ -42,7 +42,13 @@ _TITLE_SUFFIX = re.compile(
     # "Aibi" (title-case) and "AIBI" (all-caps) uniformly.
     # Orchestrator._strip_provider_name_from_title() is the second layer that
     # catches any short names not in this list using the actual uni_name.
-    r"USQ|CSU|UTS|ANU|UNSW|RMIT|MIT|KBS|AIBI|ACAP|AIT|ASA|VIT|QIBT|SAIBT|PIBT"
+    r"USQ|CSU|UTS|ANU|UNSW|RMIT|MIT|KBS|AIBI|ACAP|AIT|ASA|VIT|QIBT|SAIBT|PIBT|ACU|"
+    # Page-type qualifiers: "Online Courses", "ACU Online Courses", etc.
+    # These appear as browser <title> suffixes on aggregator / online-study
+    # portal pages and must be stripped to recover the bare course name.
+    # Pattern: optional institution short-name (1-6 uppercase letters) followed
+    # by "Online Courses" (singular or plural, with or without institution prefix).
+    r"(?:[A-Z]{1,6}\s+)?Online\s+Courses?"
     r")\s*$",
     re.IGNORECASE,
 )
