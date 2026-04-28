@@ -46,7 +46,7 @@ class Settings(BaseSettings):
         default_factory=lambda: _normalise_db_url(
             os.environ.get(
                 "DATABASE_URL",
-                "postgresql+asyncpg://uniportal:Bij%40y12345@localhost:5432/university_portal",
+                "postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal",
             )
         )
     )
