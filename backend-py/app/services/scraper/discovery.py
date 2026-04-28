@@ -444,6 +444,18 @@ async def discover_course_links(
     visited: set[str] = set()
     found: dict[str, str] = {}
 
+    # UOW: course listing paginates across ~62 pages (?page=N).  The BFS
+    # cap of 25 nav pages only sees pages 1–3 and the "last" link (page 62),
+    # leaving pages 4–61 unvisited.  Pre-seed all pagination pages so the
+    # crawler fetches every listing page within its budget.
+    _uow_hosts = ("www.uow.edu.au", "uow.edu.au")
+    if parsed.netloc in _uow_hosts and "/study/courses" in (parsed.path or ""):
+        _uow_base = f"{parsed.scheme}://{parsed.netloc}/study/courses/"
+        for _pg in range(2, 71):
+            _seed = f"{_uow_base}?page={_pg}"
+            if _seed not in visited:
+                queue.append((_seed, 0))
+
     if emit:
         await emit(
             "status",

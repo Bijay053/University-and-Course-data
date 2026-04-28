@@ -36,7 +36,7 @@ _JUNK = re.compile(
     re.I,
 )
 _TRAILING_KEYS = re.compile(
-    r"\b(?:delivery\s*mode|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?)\b",
+    r"\b(?:delivery\s*mode|delivery\s*method|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?)\b",
     re.I,
 )
 _REMOVE_VIRTUAL = re.compile(

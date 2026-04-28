@@ -66,6 +66,20 @@ _SEMESTER_MONTH_MAP: dict[str, str] = {
 }
 _SEMESTER_RE = re.compile(r"\bSemester\s+([1-3])\b", re.I)
 
+# Australian university session names → canonical start month.
+# UOW (and similar institutions) use "Autumn Session" / "Spring Session"
+# instead of Semester 1/2.  Maps case-insensitively; only fires as a
+# last-resort fallback (Pass 4) when passes 1-3 found nothing.
+_SESSION_MONTH_MAP: dict[str, str] = {
+    "autumn": "March",
+    "spring": "July",
+    "summer": "November",
+    "winter": "June",
+}
+_SESSION_RE = re.compile(
+    r"\b(autumn|spring|summer|winter)\s+session\b", re.I
+)
+
 _INTAKE_LABEL_RE = re.compile(
     r"(?:intakes?|intake\s+(?:dates?|months?|periods?)|"
     r"next\s+(?:available\s+)?intakes?|available\s+intakes?|"
@@ -368,6 +382,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     if not months:
         for m in _SEMESTER_RE.finditer(text):
             mapped = _SEMESTER_MONTH_MAP.get(m.group(1))
+            if mapped and mapped not in months:
+                months.append(mapped)
+
+    # Pass 4: named-session → month mapping (UOW-style "Autumn Session" /
+    # "Spring Session").  Fires only when passes 1-3 found nothing.
+    if not months:
+        for m in _SESSION_RE.finditer(text):
+            mapped = _SESSION_MONTH_MAP.get(m.group(1).lower())
             if mapped and mapped not in months:
                 months.append(mapped)
 

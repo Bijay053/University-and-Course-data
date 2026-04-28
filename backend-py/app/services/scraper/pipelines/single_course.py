@@ -222,6 +222,23 @@ async def extract_course(
             _qs["international"] = ["true"]
             url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
 
+    # UOW: international-student fees, IELTS, intakes, and campus are only
+    # visible with ?students=international on each course detail page.
+    # Also pass the current year so UOW returns the correct session dates.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.uow.edu.au", "uow.edu.au") and "/courses/" in _parsed_url.path:
+        from datetime import datetime as _dt
+        _qs = parse_qs(_parsed_url.query)
+        changed = False
+        if "students" not in _qs:
+            _qs["students"] = ["international"]
+            changed = True
+        if "year" not in _qs:
+            _qs["year"] = [str(_dt.now().year)]
+            changed = True
+        if changed:
+            url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
+
     if html is None:
         html = await fetch_html(url)
     if not html:
