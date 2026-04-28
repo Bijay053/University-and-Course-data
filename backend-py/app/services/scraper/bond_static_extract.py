@@ -106,13 +106,18 @@ _CAMPUS_MENTION_RE = re.compile(
 )
 
 
-def _derive_study_mode(html_text: str) -> str:
+def _derive_study_mode(html_text: str) -> str | None:
     """Return the most appropriate study_mode for a Bond program page.
 
+    Only returns a value when there is explicit delivery evidence in the HTML.
+    Returns None when no delivery keywords are detected — this allows the
+    standard study_mode extractor chain to attempt classification rather
+    than hard-coding a default.
+
     Priority:
-    1. Explicit "online" keyword found AND campus mention found → "Blended"
-    2. Explicit "online" keyword found but NO campus mention → "Online"
-    3. Default → "On Campus"
+    1. "online" keyword found AND campus mention found → "Blended"
+    2. "online" keyword found but NO campus mention → "Online"
+    3. No delivery keywords → None  (do not default to "On Campus")
     """
     has_online = bool(_ONLINE_MODE_RE.search(html_text))
     has_campus = bool(_CAMPUS_MENTION_RE.search(html_text))
@@ -120,7 +125,7 @@ def _derive_study_mode(html_text: str) -> str:
         return "Blended"
     if has_online:
         return "Online"
-    return "On Campus"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -232,14 +237,23 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     result["has_central_fee_page"] = True
     result["course_location"] = _BOND_LOCATION
 
-    # Study mode — parse from static HTML then fall back to On Campus default.
+    # Study mode — parse from static HTML only. If no delivery keywords are
+    # detected we return nothing; the standard extractor chain will handle it.
+    # NEVER default to "On Campus" without evidence from the page.
     plain_text = re.sub(r"<[^>]+>", " ", html or "")
     plain_text = re.sub(r"\s+", " ", plain_text)
-    result["study_mode"] = _derive_study_mode(plain_text)
+    _mode = _derive_study_mode(plain_text)
+    if _mode is not None:
+        result["study_mode"] = _mode
 
     # ── Intake months ─────────────────────────────────────────────────────
+    # Only include when explicitly found on the page. Never use the
+    # tri-semester fallback — Bond publishes real intake dates on each course
+    # page and a hard-coded fallback produces inaccurate data for courses
+    # that don't actually start in all three semesters.
     found_months = _extract_intake_months(html or "")
-    result["intake_months"] = found_months if found_months else _BOND_DEFAULT_INTAKES[:]
+    if found_months:
+        result["intake_months"] = found_months
 
     # ── Best-effort fee extraction from static HTML ──────────────────────
     intl_fee = _extract_international_fee(html or "")
