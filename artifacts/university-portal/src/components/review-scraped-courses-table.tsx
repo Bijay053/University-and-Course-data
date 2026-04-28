@@ -42,6 +42,7 @@ export type ReviewStagedCourse = {
   eligibilityStatus: string | null;
   notes: string | null;
   completeness: number | null;
+  scrapeWarnings?: string[] | null;
   evidence?: ReviewEvidenceItem[];
 };
 
@@ -73,6 +74,29 @@ function MissingBadge({ title }: { title: string }) {
   return (
     <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title={title}>
       <AlertTriangle className="w-3 h-3" />
+    </span>
+  );
+}
+
+const _WARNING_LABELS: Record<string, string> = {
+  english_section_detected_scores_blank: "English section found but scores blank — likely image-only page requiring AI vision",
+  fee_section_detected_fee_blank: "Fee section found but fee is blank — may require manual entry",
+  suspicious_duration: "Duration value looks wrong — please verify on course page",
+  no_intake_months: "Intake section found but no months extracted — please verify",
+};
+
+function ScrapeWarningsBadge({ warnings }: { warnings: string[] }) {
+  if (!warnings.length) return null;
+  const tooltipLines = warnings
+    .map((w) => _WARNING_LABELS[w] ?? w.replace(/_/g, " "))
+    .join("\n");
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-medium cursor-help"
+      title={tooltipLines}
+    >
+      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+      {warnings.length === 1 ? "1 scrape warning" : `${warnings.length} scrape warnings`}
     </span>
   );
 }
@@ -335,6 +359,9 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                           }`}>
                             Eligibility: {course.eligibilityStatus}
                           </Badge>
+                        )}
+                        {course.scrapeWarnings && course.scrapeWarnings.length > 0 && (
+                          <ScrapeWarningsBadge warnings={course.scrapeWarnings} />
                         )}
                       </div>
                       {course.notes && (
