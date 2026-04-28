@@ -958,7 +958,8 @@ async def extract_course(
                     "value": _c_val,
                     "confidence": 0.50,
                     "method": "central_page:english",
-                    "snippet": _central_eng_url,
+                    "source_url": _central_eng_url or url,
+                    "snippet": f"central_page:english {_slot}={_c_val} (vision override)",
                 })
                 if emit:
                     await emit(
@@ -1361,10 +1362,12 @@ async def extract_course(
                         "value": v,
                         "confidence": 0.7,
                         "method": fee_method,
-                        # source_url is required by enforce_source_evidence;
-                        # snippet holds a human-readable excerpt or the PDF URL.
-                        "source_url": fees_pdf_url or "",
-                        "snippet": fees_pdf_url or f"uni_pdf fee: {k}={v}",
+                        # source_url: PDF URL when known; course-page URL as
+                        # provenance fallback so enforce_source_evidence never
+                        # drops a proven field just because the PDF URL wasn't
+                        # recorded (Bug: snippet was the URL → double-URL in UI).
+                        "source_url": fees_pdf_url or url,
+                        "snippet": f"uni_pdf fee: {k}={v}",
                     }
                 )
         # Course-page-wins: only fill empty english slots from the
@@ -1386,9 +1389,14 @@ async def extract_course(
                     "value": v,
                     "confidence": 0.7,
                     "method": "uni_pdf:requirements",
-                    # source_url required by enforce_source_evidence
-                    "source_url": reqs_pdf_url or "",
-                    "snippet": reqs_pdf_url or f"uni_pdf english: {k}={v}",
+                    # source_url: PDF URL when known; course-page URL as
+                    # provenance fallback so enforce_source_evidence never
+                    # drops english fields just because reqs_pdf_url is
+                    # absent (fixes MIT SW missing-english bug).
+                    # snippet is always descriptive text — never the URL —
+                    # so it doesn't duplicate the source link in Evidence Review.
+                    "source_url": reqs_pdf_url or url,
+                    "snippet": f"uni_pdf english: {k}={v}",
                 }
             )
 
@@ -1465,8 +1473,8 @@ async def extract_course(
                                 "value": _v,
                                 "confidence": _confidence_numeric,
                                 "method": f"central_page:fees:{_fee_confidence}",
-                                "source_url": _central_fee_url or "",
-                                "snippet": _central_fee_url or f"central_page fee: {_k}={_v}",
+                                "source_url": _central_fee_url or url,
+                                "snippet": f"central_page fee: {_k}={_v}",
                             })
                             _filled_fee_keys.append(_k)
                         if emit and _filled_fee_keys:
@@ -1521,9 +1529,8 @@ async def extract_course(
                         "value": _v,
                         "confidence": 0.55,
                         "method": "central_page:english_level",
-                        # source_url required by enforce_source_evidence
-                        "source_url": _central_eng_url or "",
-                        "snippet": _central_eng_url or f"central_page english_level: {_k}={_v}",
+                        "source_url": _central_eng_url or url,
+                        "snippet": f"central_page english_level ({_level_bucket}): {_k}={_v}",
                     })
                     _eng_filled.append(_k)
                 if emit and _eng_filled:
@@ -1563,9 +1570,8 @@ async def extract_course(
                             "value": _v,
                             "confidence": 0.50,
                             "method": "central_page:english",
-                            # source_url required by enforce_source_evidence
-                            "source_url": _central_eng_url or "",
-                            "snippet": _central_eng_url or f"central_page english: {_k}={_v}",
+                            "source_url": _central_eng_url or url,
+                            "snippet": f"central_page english: {_k}={_v}",
                         })
                         _eng_filled.append(_k)
                     if emit and _eng_filled:

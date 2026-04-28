@@ -1,0 +1,157 @@
+Evidence Review
+Master of Information Technology (Artificial Intelligence)
+Eligibility: ready - ok
+cambridge_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+169.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+category
+needs_review
+/ category:det
+confidence 70%
+Computer Science & IT
+Master of Information Technology (Artificial Intelligence)
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+course_location
+needs_review
+/ location.strong
+confidence 90%
+Sydney, Australia
+Sydney
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+course_name
+needs_review
+/ course_name.h1
+confidence 90%
+Master of Information Technology (Artificial Intelligence)
+Master of Information Technology (Artificial Intelligence)
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+currency
+needs_review
+/ uni_pdf:fees:per_course
+confidence 70%
+AUD
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+degree_level
+needs_review
+/ degree_level:name
+confidence 90%
+Master's
+Master of Information Technology (Artificial Intelligence)
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+description
+needs_review
+/ description.meta
+confidence 95%
+ASA Institute of Higher Education is a Sydney-based provider offering undergraduate and postgraduate programs in IT and Business.
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+duolingo_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+100.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+duration
+needs_review
+/ duration.structural
+confidence 85%
+2.0
+<strong>Course Duration</strong> -> Course Duration 2 years Full Time
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+fee_term
+needs_review
+/ uni_pdf:fees:per_course
+confidence 70%
+Full Course
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+fee_year
+needs_review
+/ uni_pdf:fees:per_course
+confidence 70%
+2026
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+ielts_listening
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+ielts_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+ielts_reading
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+ielts_speaking
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+ielts_writing
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+5.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+intake_months
+needs_review
+/ regex
+confidence 70%
+["January", "April", "July", "October"]
+ation 2 years Full Time Intake Options‍ January, April, July, October See Key Dates ‍ AQF Level AQF Level 9 delivered by ASA Institute of Higher Education Download course brochure Course Overview Entry Requirements Fees and Scholarships Cou
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+international_fee
+needs_review
+/ uni_pdf:fees:per_course
+confidence 70%
+52800
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+pte_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+50.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+study_mode
+needs_review
+/ study_mode:rule
+confidence 70%
+On Campus
+<strong>Delivery</strong> -> Delivery Face to Face on campus
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+sub_category
+needs_review
+/ category:det
+confidence 70%
+Artificial Intelligence
+Master of Information Technology (Artificial Intelligence)
+https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+toefl_overall
+needs_review
+/ uni_pdf:requirements
+confidence 70%
+60.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69af540baceac672ce4d06db_Student%20Admissions%20Policy%202025.2.pdf
