@@ -453,6 +453,71 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     ("/parents-and-guardians",  "info_page"),
     # Standalone test-info pages
     ("/stat-test",              "info_page"),
+    # Phase A.6 — additional production-confirmed leak URLs.
+    # Each pattern was observed in user-reported scrape logs from UniSQ,
+    # UOW, or Flinders.  All have leading slashes so they cannot match
+    # inside a real course slug.
+    ("/career-finder",          "info_page"),       # UniSQ "career-finder/accountant"
+    ("/online-study",           "category_landing_page"),
+    ("/pathway-programs",       "pathway_page"),
+    ("/pathway-program/",       "pathway_page"),
+    ("/short-courses",          "category_landing_page"),
+    ("/short-course/",          "category_landing_page"),
+    ("/english-language-programs", "pathway_page"),
+    ("/english-language-program",  "pathway_page"),
+    ("/events-key-dates",       "events_page"),
+    ("/key-dates",              "events_page"),
+    ("/webinars",               "marketing_page"),
+    ("/livestream",             "marketing_page"),
+    ("/info-session",           "marketing_page"),
+    # Specific Flinders nav paths.  IMPORTANT: each entry uses a path
+    # boundary so it cannot accidentally match a real degree slug.
+    # `/study/postgrad/` matches Flinders' postgrad landing page and
+    # any nested category pages, but NEVER matches
+    # `/study/postgraduate-diploma-of-counselling` (that would have
+    # been the bug had we used bare `/study/postgrad`).
+    ("/study/postgrad/",        "category_landing_page"),
+    ("/study/pathways/",        "pathway_page"),
+    ("/study/pathways-to-",     "pathway_page"),
+    ("/study/events-key-dates", "events_page"),
+    ("/study/courses/saved-courses", "ui_page"),
+    # Indigenous / veterans / equity admission landing pages — these
+    # describe an alternate-entry pathway, not a single course.
+    ("/indigenous-admission-scheme", "info_page"),
+    ("/indigenous-pathway",     "info_page"),
+    ("/military-veterans",      "info_page"),
+    ("/veterans-pathway",       "info_page"),
+    # Foundation studies / preparation landing pages
+    ("/foundation-studies",     "pathway_page"),
+    ("/foundation-program",     "pathway_page"),
+    # User UI surfaces — compare / favourites action pages.  The bare
+    # "/compare" was already captured via _BLOCK_URL_LAST_SEGMENTS but
+    # adding it here too means it also catches "/compare-courses/..."
+    # style sub-pages used by some sites.
+    ("/compare-courses",        "ui_page"),
+    ("/compare/",               "ui_page"),
+    # UOW uses a legacy "/study/index.php" router for category /
+    # action pages.  Anchoring on "/study/index.php" avoids over-blocking
+    # other providers that may legitimately use index.php for course
+    # detail routes elsewhere in their site (e.g. WordPress-routed
+    # /courses/index.php?id=NNN style URLs that we have NOT confirmed
+    # as leaks).
+    ("/study/index.php",        "category_landing_page"),
+)
+
+# URL query-string substring matches.  Real course-detail pages do not
+# rely on query parameters to identify the course (they use a path
+# segment) so any URL whose query string contains one of these
+# patterns is a UI/action page, not a course detail.
+#
+# Compared against ``urlparse(url).query.lower()``.
+_BLOCK_URL_QUERY_SUBSTRINGS: tuple[tuple[str, str], ...] = (
+    # UOW "Save this course" action: /study/courses/?addCourse=<id>
+    ("addcourse=",              "ui_page"),
+    ("removecourse=",           "ui_page"),
+    ("favourite=",              "ui_page"),
+    ("favorite=",               "ui_page"),
+    ("compare=",                "ui_page"),
 )
 
 # URL last-segment exact matches.  Used in addition to the substring list
@@ -547,6 +612,39 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("open day",                        "marketing_page"),
     ("info night",                      "marketing_page"),
     ("information session",             "marketing_page"),
+    # Phase A.6 — UI action verbs as title prefixes.  Real degree titles
+    # always start with a qualification word (Bachelor, Master, Diploma,
+    # ...).  No legitimate course can start with "Save"/"View"/"Clear".
+    ("save bachelor",                   "ui_page"),  # "Save Bachelor of Arts to Course Favourites"
+    ("save master",                     "ui_page"),
+    ("save diploma",                    "ui_page"),
+    ("save graduate",                   "ui_page"),
+    ("save certificate",                "ui_page"),
+    ("save doctor",                     "ui_page"),
+    ("save course",                     "ui_page"),
+    ("save this",                       "ui_page"),
+    ("view all saved",                  "ui_page"),  # "View all saved courses"
+    ("view saved",                      "ui_page"),
+    ("clear all",                       "ui_page"),  # "Clear all"
+    ("clear saved",                     "ui_page"),
+    ("my favourites",                   "ui_page"),  # "0 My favourites"
+    ("my favorites",                    "ui_page"),
+    ("my saved",                        "ui_page"),
+    ("0 my ",                           "ui_page"),  # "0 My favourites"
+    # Audience hub copy that always runs as nav text in the side menu.
+    # Each is a UI/info page, never a course detail.
+    ("a future ",                       "info_page"),  # "a future postgraduate student"
+    ("future student",                  "info_page"),
+    ("future postgraduate",             "info_page"),
+    ("future undergraduate",            "info_page"),
+    ("postgraduate students",           "info_page"),  # "Postgraduate students"
+    ("undergraduate students",          "info_page"),
+    ("postgraduate information",        "marketing_page"),  # "Postgraduate information sessions"
+    ("undergraduate information",       "marketing_page"),
+    ("livestream",                      "marketing_page"),  # "Livestream Information Sessions"
+    ("tafe/vet to uni",                 "pathway_page"),    # "TAFE/VET to uni"
+    ("tafe to uni",                     "pathway_page"),
+    ("vet to uni",                      "pathway_page"),
 )
 
 # Title exact matches (full-string equals).  Use sparingly — only for
@@ -623,9 +721,12 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
     """
     if url:
         try:
-            path = urlparse(url).path.lower()
+            parsed = urlparse(url)
+            path = parsed.path.lower()
+            query = parsed.query.lower()
         except Exception:  # noqa: BLE001 — malformed URL → no URL signal
             path = ""
+            query = ""
         if path:
             # Pass 1: substring match
             for pat, reason in _BLOCK_URL_SUBSTRINGS:
@@ -635,6 +736,11 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
             last = _last_path_segment(path)
             if last and last in _BLOCK_URL_LAST_SEGMENTS:
                 return (True, _BLOCK_URL_LAST_SEGMENTS[last])
+        if query:
+            # Pass 2b: query-string substring match (e.g. ?addCourse=)
+            for pat, reason in _BLOCK_URL_QUERY_SUBSTRINGS:
+                if pat in query:
+                    return (True, reason)
 
     if title:
         norm_title = re.sub(r"\s+", " ", title).strip().lower()

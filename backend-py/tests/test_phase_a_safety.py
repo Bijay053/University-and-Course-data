@@ -525,3 +525,255 @@ def test_phase_a_allows_when_confidence_is_none():
     """When extractors don't provide a confidence, completeness alone gates."""
     d = should_auto_publish(_make(completeness=92, eligibility_confidence=None))
     assert d.auto_publish is True
+
+
+# ---------------------------------------------------------------------------
+# Phase A.6 — exact production-log examples must be blocked, real
+# courses preserved.  Every example below was supplied by the user from
+# real UniSQ / UOW / Flinders scrape logs.
+# ---------------------------------------------------------------------------
+
+def test_phase_a6_unisq_production_examples_blocked():
+    """Exact UniSQ leak titles & URLs from the production logs."""
+    # Title-driven leaks
+    for title in [
+        "Study online",
+        "Pathways to uni",
+        "Undergraduate study",
+        "Postgraduate study",
+    ]:
+        b, r = is_blocked_page(
+            "https://www.unisq.edu.au/study/some-page",
+            title=title,
+        )
+        assert b is True, f"UniSQ title {title!r} must be blocked"
+
+    # URL-driven leak: career-finder/<role>
+    for url in [
+        "https://www.unisq.edu.au/study/career-finder/accountant",
+        "https://www.unisq.edu.au/study/career-finder",
+        "https://www.unisq.edu.au/study/career-finder/data-scientist",
+    ]:
+        b, r = is_blocked_page(url, title="Accountant career")
+        assert b is True, f"UniSQ url {url!r} must be blocked"
+        assert r == "info_page"
+
+
+def test_phase_a6_uow_production_examples_blocked():
+    """Exact UOW leak titles & URLs from the production logs."""
+    # Title leaks (Save / 0 My / Clear)
+    for title in [
+        "Save Bachelor of Arts to Course Favourites",
+        "0 My favourites",
+        "Clear all",
+    ]:
+        b, r = is_blocked_page(
+            "https://www.uow.edu.au/study/some-action",
+            title=title,
+        )
+        assert b is True, f"UOW title {title!r} must be blocked"
+        assert r == "ui_page"
+
+    # URL with ?addCourse= query string — must be blocked even though
+    # the path /study/courses/ is a legitimate course-list root.
+    for url in [
+        "https://www.uow.edu.au/study/courses/?addCourse=BACHELORARTS",
+        "https://www.uow.edu.au/study/courses/?addCourse=12345",
+        "https://www.uow.edu.au/study/courses/?addcourse=foo&page=2",
+    ]:
+        b, r = is_blocked_page(url)
+        assert b is True, f"UOW addCourse URL {url!r} must be blocked"
+        assert r == "ui_page"
+
+    # Path /favourites/ must be blocked
+    b, r = is_blocked_page("https://www.uow.edu.au/study/courses/favourites/")
+    assert b is True
+    assert r == "ui_page"
+
+    # Legacy index.php router must be blocked
+    b, r = is_blocked_page("https://www.uow.edu.au/study/index.php?id=42")
+    assert b is True
+    assert r == "category_landing_page"
+
+
+def test_phase_a6_flinders_production_examples_blocked():
+    """Exact Flinders leak titles & URLs from the production logs."""
+    for title in [
+        "a future postgraduate student",
+        "View all saved courses",
+        "Livestream Information Sessions",
+        "Postgraduate information sessions",
+        "Year 12 entry",
+        "TAFE/VET to uni",
+        "STAT",
+    ]:
+        b, r = is_blocked_page(
+            "https://www.flinders.edu.au/study/some-page",
+            title=title,
+        )
+        assert b is True, f"Flinders title {title!r} must be blocked"
+
+    # Flinders nav URLs.  Each entry uses a path-boundary so it cannot
+    # accidentally match a real degree slug (see also
+    # test_phase_a6_postgrad_path_does_not_block_postgraduate_slug).
+    for url, expect_reason in [
+        ("https://www.flinders.edu.au/study/postgrad/",
+         "category_landing_page"),
+        ("https://www.flinders.edu.au/study/postgrad/master-of-x",
+         "category_landing_page"),
+        ("https://www.flinders.edu.au/study/pathways/",
+         "pathway_page"),
+        ("https://www.flinders.edu.au/study/pathways-to-medicine",
+         "pathway_page"),
+        ("https://www.flinders.edu.au/study/events-key-dates",
+         "events_page"),
+        ("https://www.flinders.edu.au/study/courses/saved-courses",
+         "ui_page"),
+    ]:
+        b, r = is_blocked_page(url)
+        assert b is True, f"Flinders url {url!r} must be blocked"
+        assert r == expect_reason, (
+            f"Flinders url {url!r} expected {expect_reason} got {r}"
+        )
+
+
+def test_phase_a6_postgrad_path_does_not_block_postgraduate_slug():
+    """REGRESSION GUARD (architect-flagged): the `/study/postgrad/`
+    block must use a path boundary so that course slugs starting with
+    'postgraduate-' are NOT blocked.  Real Flinders / UniSQ degrees
+    use these URLs:
+      - /study/postgraduate-diploma-of-counselling
+      - /study/postgraduate-certificate-of-public-health
+      - /study/courses/postgraduate-diploma-...
+    """
+    for url in [
+        "https://www.flinders.edu.au/study/postgraduate-diploma-of-counselling",
+        "https://www.flinders.edu.au/study/postgraduate-certificate-of-public-health",
+        "https://www.unisq.edu.au/study/courses/postgraduate-diploma-of-education",
+        "https://www.flinders.edu.au/study/postgraduate-degree-x",
+    ]:
+        b, r = is_blocked_page(url, title="Postgraduate Diploma of X")
+        assert b is False, (
+            f"degree URL {url!r} wrongly blocked as {r!r}; "
+            "the /study/postgrad/ rule must use path-boundary semantics"
+        )
+
+
+def test_phase_a6_index_php_block_scoped_to_uow_router():
+    """REGRESSION GUARD (architect-flagged): only UOW-style
+    `/study/index.php` is blocked globally.  A hypothetical
+    PHP-routed course detail page elsewhere on the site (e.g.
+    `/courses/index.php?id=42`) must NOT be blocked because we have
+    not confirmed that pattern as a leak."""
+    # Blocked: UOW category-router pattern
+    b, r = is_blocked_page("https://www.uow.edu.au/study/index.php?id=42")
+    assert b is True
+    assert r == "category_landing_page"
+    # NOT blocked: an arbitrary index.php under /courses/ — until we
+    # confirm it as a leak, we leave it allowed.
+    b, _ = is_blocked_page("https://www.uni.edu.au/courses/index.php?id=99")
+    assert b is False, (
+        "global /index.php block was over-broad; only /study/index.php "
+        "(UOW router) should be blocked"
+    )
+
+
+def test_phase_a6_query_param_on_real_course_url_not_blocked():
+    """REGRESSION GUARD: benign query params (utm_source, page,
+    intake) on a real course page must NOT be blocked — only the
+    action-keys (addCourse, removeCourse, favourite, compare) are."""
+    benign = [
+        "https://www.uow.edu.au/study/courses/bachelor-of-arts/?utm_source=google",
+        "https://www.uow.edu.au/study/courses/bachelor-of-arts/?intake=2026",
+        "https://www.uow.edu.au/study/courses/bachelor-of-arts/?page=2",
+    ]
+    for url in benign:
+        b, r = is_blocked_page(url, title="Bachelor of Arts")
+        assert b is False, (
+            f"benign query URL {url!r} wrongly blocked as {r!r}"
+        )
+
+
+def test_phase_a6_real_courses_still_pass():
+    """REGRESSION GUARD: Phase A.6 must NOT block legitimate degree
+    titles or course URLs.  Sample of real courses from UniSQ, UOW,
+    Flinders, CSU.
+    """
+    real = [
+        ("https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts",
+         "Bachelor of Arts"),
+        ("https://www.uow.edu.au/study/courses/bachelor-of-engineering/",
+         "Bachelor of Engineering (Honours)"),
+        ("https://www.flinders.edu.au/study/courses/master-of-public-health",
+         "Master of Public Health"),
+        ("https://www.flinders.edu.au/study/courses/graduate-diploma-in-counselling",
+         "Graduate Diploma in Counselling"),
+        ("https://study.csu.edu.au/courses/bachelor-of-business",
+         "Bachelor of Business"),
+        ("https://www.uni.edu.au/courses/postgraduate-diploma-of-counselling",
+         "Postgraduate Diploma of Counselling"),
+        ("https://www.uni.edu.au/courses/undergraduate-certificate-of-data-analytics",
+         "Undergraduate Certificate of Data Analytics"),
+        # Course title containing the word "Save" but not as an action verb
+        ("https://www.uni.edu.au/courses/master-of-statistics",
+         "Master of Statistics"),
+    ]
+    for url, title in real:
+        b, r = is_blocked_page(url, title=title)
+        assert b is False, (
+            f"real course wrongly blocked: url={url} title={title!r} reason={r}"
+        )
+
+
+def test_phase_a6_location_rejects_delivery_method_and_action_phrases():
+    """The location cleaner must drop UI / mode / audience-label values
+    that have leaked through earlier extractor passes.
+    """
+    from app.services.scraper.extractors.location import _normalise
+    for raw in [
+        "Delivery method",
+        "Delivery Mode",
+        "Study mode",
+        "View dates",
+        "View date",
+        "Start",
+        "Start date",
+        "Apply",
+        "Apply Now",
+        "Domestic",
+        "International",
+        "Domestic students",
+        "International students",
+    ]:
+        out = _normalise(raw)
+        assert out is None, (
+            f"location {raw!r} must be rejected, got {out!r}"
+        )
+
+
+def test_phase_a6_location_keeps_real_campus_with_colon():
+    """A campus value must not be rejected just because it has a
+    trailing colon ('Sydney:') from sloppy DOM walks — that's a real
+    location, just punctuation noise."""
+    from app.services.scraper.extractors.location import _normalise
+    # Pure 'Sydney' is fine
+    assert _normalise("Sydney") == "Sydney"
+    # 'Wollongong, Sydney' is fine
+    assert _normalise("Wollongong, Sydney") == "Wollongong, Sydney"
+
+
+def test_phase_a6_query_only_blocked_url_keeps_path_clean():
+    """A URL whose PATH is /study/courses/ but whose QUERY contains
+    addCourse= must be blocked.  The path alone is a legitimate course
+    list, so this exercises the new query-string pass."""
+    # Path without addCourse — still allowed (it's a category page,
+    # not a leak).  We DO NOT want to over-block /study/courses/ root.
+    b_clean, _ = is_blocked_page("https://www.uow.edu.au/study/courses/")
+    assert b_clean is False, "bare /study/courses/ must NOT be blocked"
+
+    # Same path WITH addCourse= → must be blocked
+    b_dirty, r = is_blocked_page(
+        "https://www.uow.edu.au/study/courses/?addCourse=BACHELORARTS"
+    )
+    assert b_dirty is True
+    assert r == "ui_page"
