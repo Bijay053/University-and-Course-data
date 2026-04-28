@@ -39,9 +39,12 @@ agree on every edge case while both still write to the shared production
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from urllib.parse import urlparse
+
+log = logging.getLogger(__name__)
 
 # Pre-compiled regexes — these run on every staged row in the orchestrator
 # loop, so compile-once is worth the few extra lines.
@@ -353,14 +356,48 @@ def should_stage_course(
             "face-to-face", "blended", "in-person", "in person",
         )
     )
+
+    # Detect all physical-location evidence for logging and override logic.
+    # The location extractor already strips virtual/online keywords, so a
+    # non-empty course_location confirms at least one physical campus exists.
+    _physical_location = (
+        payload.get("course_location") or payload.get("location_text") or ""
+    ).strip()
+
     if "online" in _study_mode and not _has_campus_component:
-        return (False, "online_only")
+        # Safety net: if the location extractor confirmed physical campus(es),
+        # do NOT reject as online_only even if the study_mode string reads
+        # "Online". ACAP (and similar universities) offer the same course both
+        # online and on-campus — the study_mode extractor picked up the first
+        # keyword it saw. A real physical location overrides that classification.
+        if _physical_location:
+            log.info(
+                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
+                "decision=stage (online_only overridden by physical location)",
+                effective_name,
+                payload.get("study_mode", "Online"),
+                _physical_location,
+            )
+            # Fall through — do not return (False, "online_only")
+        else:
+            log.info(
+                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[] "
+                "decision=reject (online_only, no physical campus found)",
+                effective_name,
+                payload.get("study_mode", "Online"),
+            )
+            return (False, "online_only")
 
     # Secondary check: mode is exactly "Blended" but no physical campus
     # was found by any extractor (location_text is null/empty). Courses
     # like "MBA Online" where Gemini still returns "Blended" instead of
     # "Online" are effectively online-only — reject them too.
-    if _study_mode == "blended" and not (payload.get("location_text") or "").strip():
+    if _study_mode == "blended" and not _physical_location:
+        log.info(
+            "[REJECT CHECK] course=%r detected_modes=[Blended] detected_locations=[] "
+            "decision=reject (blended with no physical campus)",
+            effective_name,
+        )
         return (False, "online_only")
 
     # Bug B: no international fee after all extraction is done.
