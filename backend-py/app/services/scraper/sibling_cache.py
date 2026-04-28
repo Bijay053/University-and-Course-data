@@ -101,6 +101,8 @@ def _is_cross_level_method(method: str) -> bool:
 
 def _build_bucket_cache(
     results: list[dict[str, Any]],
+    *,
+    min_quorum: int = 1,
 ) -> dict[str, dict[str, Any]]:
     """Build ``{bucket: {slot: most_common_value}}``.
 
@@ -115,6 +117,17 @@ def _build_bucket_cache(
     contamination), and the latter would create circular reinforcement.
     Only values extracted directly from per-course pages (HTML, PDF,
     browser, AI, vision) are eligible to seed the cache.
+
+    Parameters
+    ----------
+    min_quorum
+        Minimum number of distinct courses in a bucket that must agree on
+        a value before it is promoted to the cache.  Default is 1 (original
+        behaviour: any single value wins).  Set to 2 or higher for
+        universities where accidental extraction on a non-course page could
+        otherwise seed the entire bucket with a wrong value (e.g. Bond, where
+        marketing pages can mention IELTS 6.5 in text that the extractor
+        misreads).
     """
     buckets: dict[str, dict[str, Counter]] = {}
     for r in results:
@@ -148,7 +161,13 @@ def _build_bucket_cache(
         for k, counter in counters.items():
             if not counter:
                 continue
-            most_common = counter.most_common(1)[0][0]
+            most_common, count = counter.most_common(1)[0]
+            # Require at least min_quorum courses to agree before promoting.
+            # When min_quorum=2 and only 1 course in the bucket extracted an
+            # English score (e.g. a footer-mention on a non-course page),
+            # the value is not backfilled to all 50+ siblings.
+            if count < min_quorum:
+                continue
             slot_values[k] = most_common
         if slot_values:
             cache[bucket] = slot_values
@@ -159,6 +178,7 @@ async def backfill_english_from_siblings(
     results: list[dict[str, Any]],
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
+    min_quorum: int = 1,
 ) -> int:
     """Mutate ``results`` in place, filling empty english slots from
     same-bucket siblings.
@@ -168,8 +188,17 @@ async def backfill_english_from_siblings(
     log lines are emitted as
     ``[EXTRACT] [sibling cache ↻ backfill <bucket>] ielts_overall=6.5
     pte_overall=58 ...``.
+
+    Parameters
+    ----------
+    min_quorum
+        Passed through to :func:`_build_bucket_cache`. A value of 2 prevents
+        a single page (e.g. a marketing page that mentions "IELTS 6.5" in
+        text) from seeding the cache and backfilling every sibling in the run.
+        Defaults to 1 to preserve the original behaviour for all universities
+        that didn't exhibit this false-positive; pass 2 for Bond and similar.
     """
-    cache = _build_bucket_cache(results)
+    cache = _build_bucket_cache(results, min_quorum=min_quorum)
     if not cache:
         return 0
 
