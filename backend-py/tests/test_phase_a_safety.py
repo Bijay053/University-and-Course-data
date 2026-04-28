@@ -777,3 +777,146 @@ def test_phase_a6_query_only_blocked_url_keeps_path_clean():
     )
     assert b_dirty is True
     assert r == "ui_page"
+
+
+# ---------------------------------------------------------------------------
+# Phase A.7 — UniSQ 3-segment category page discovery fix
+# ---------------------------------------------------------------------------
+
+def test_unisq_discipline_page_is_category_landing_3seg():
+    """UniSQ discipline pages have 3-segment paths such as
+    /study/degrees-and-courses/arts-and-communication.
+    They must be recognised as category landings (not real courses) so
+    the BFS enqueues them for drill-in rather than adding them to the
+    candidate set where they would be STAGE-rejected."""
+    from app.services.scraper.discovery import _is_category_landing
+    assert _is_category_landing(
+        "https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication"
+    ), "3-segment arts discipline page must be a category landing"
+    assert _is_category_landing(
+        "https://www.unisq.edu.au/study/degrees-and-courses/business"
+    ), "3-segment business discipline page must be a category landing"
+    assert _is_category_landing(
+        "https://www.unisq.edu.au/study/degrees-and-courses/health"
+    ), "3-segment health discipline page must be a category landing"
+    assert _is_category_landing(
+        "https://www.unisq.edu.au/study/degrees-and-courses/engineering-and-surveying"
+    ), "3-segment engineering discipline page must be a category landing"
+
+
+def test_unisq_real_course_not_category_landing():
+    """A real UniSQ course URL (4-segment path, has a degree keyword) must
+    NOT be treated as a category landing — it must enter the candidate set."""
+    from app.services.scraper.discovery import _is_category_landing
+    # Real courses have a 4th segment that is the course slug
+    assert not _is_category_landing(
+        "https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication/bachelor-of-creative-arts"
+    ), "4-segment real course URL must NOT be a category landing"
+    # 2-segment real course (other patterns) must still pass through
+    assert not _is_category_landing(
+        "https://www.unisq.edu.au/courses/bachelor-of-it"
+    ), "2-segment course URL with degree keyword must NOT be a category landing"
+
+
+def test_unisq_category_landing_2seg_still_works():
+    """The original 2-segment check must still function correctly after the
+    3-segment extension."""
+    from app.services.scraper.discovery import _is_category_landing
+    assert _is_category_landing(
+        "https://www.example.edu.au/courses/business"
+    ), "2-segment category page must still be detected"
+    assert not _is_category_landing(
+        "https://www.example.edu.au/courses/bachelor-of-arts"
+    ), "2-segment URL with degree keyword must NOT be detected as category"
+
+
+# ---------------------------------------------------------------------------
+# Phase A.7 — UOW intake session-name extraction fix
+# ---------------------------------------------------------------------------
+
+import asyncio as _asyncio
+
+
+def test_uow_intake_autumn_spring_sessions():
+    """For UOW, 'Autumn session' must map to March and 'Spring session' to
+    July, and NO other months must appear in the result (no deadline months
+    such as September, December, January, May, November)."""
+    from app.services.scraper.extractors.intake import extract as _intake_extract
+
+    # Simulate a UOW course detail page that mentions both sessions plus
+    # some application deadline dates that are known to contaminate the
+    # generic month scanner.
+    _uow_html = """
+    <html><body>
+    <h1>Bachelor of Computer Science</h1>
+    <p>This course is offered in the Autumn session and Spring session.</p>
+    <p>You can apply for the Autumn session commencing in February/March.</p>
+    <p>Applications for Spring session close in July.</p>
+    <p>Key dates: Applications close 30 November for Autumn, 31 May for Spring.</p>
+    <p>Scholarship deadline: September 15. Early bird: December 1.</p>
+    <p>Annual fee: $34,560. IELTS: 6.5 overall, 6.0 each band.</p>
+    </body></html>
+    """
+    results = _asyncio.get_event_loop().run_until_complete(
+        _intake_extract(_uow_html, "https://www.uow.edu.au/courses/bachelor-cs/")
+    )
+    assert results, "UOW intake extraction must return a result"
+    months = results[0].value
+    assert isinstance(months, list), "intake value must be a list of months"
+    # Must contain session-derived months
+    assert "March" in months, f"Autumn session must yield March, got {months}"
+    assert "July" in months, f"Spring session must yield July, got {months}"
+    # Must NOT contain deadline/noise months
+    _bad = {"September", "November", "December", "May", "January", "October"}
+    overlap = _bad & set(months)
+    assert not overlap, (
+        f"UOW intake must not contain deadline months; got unexpected: {overlap} "
+        f"(full list: {months})"
+    )
+    # Method must be session_names, not regex (ensures the session-first path fired)
+    assert results[0].method == "intake.session_names", (
+        f"UOW session-name path must fire; got method={results[0].method!r}"
+    )
+
+
+def test_uow_intake_no_session_names_returns_empty():
+    """When a UOW page has no Autumn/Spring session language, the extractor
+    must return empty rather than scraping random months from the page."""
+    from app.services.scraper.extractors.intake import extract as _intake_extract
+
+    _uow_html = """
+    <html><body>
+    <h1>Bachelor of Nursing</h1>
+    <p>Contact the international office for intake dates.</p>
+    <p>Fee: $38,400 per year. Last updated January 2024.</p>
+    </body></html>
+    """
+    results = _asyncio.get_event_loop().run_until_complete(
+        _intake_extract(_uow_html, "https://www.uow.edu.au/courses/bachelor-nursing/")
+    )
+    # 'January' from "Last updated January 2024" must NOT appear —
+    # returning empty is far better than returning a wrong intake month.
+    assert not results or results[0].value == [], (
+        f"UOW page with no session info must return empty, got {results}"
+    )
+
+
+def test_non_uow_intake_still_uses_month_scan():
+    """The generic (non-UOW) intake path must still work normally — months
+    from scoped chunks must be collected as before."""
+    from app.services.scraper.extractors.intake import extract as _intake_extract
+
+    _html = """
+    <html><body>
+    <h1>Bachelor of Commerce</h1>
+    <table><tr><th>Intake</th><td>February, July</td></tr></table>
+    </body></html>
+    """
+    results = _asyncio.get_event_loop().run_until_complete(
+        _intake_extract(_html, "https://www.someuni.edu.au/courses/bcom/")
+    )
+    assert results, "Generic university intake must still be extracted"
+    months = results[0].value
+    assert "February" in months or "July" in months, (
+        f"Generic intake must include at least one table month, got {months}"
+    )
