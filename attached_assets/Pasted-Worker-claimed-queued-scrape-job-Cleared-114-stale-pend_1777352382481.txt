@@ -1,0 +1,942 @@
+Worker claimed queued scrape job
+Cleared 114 stale pending/rejected scraped_courses rows (>10m old) for university 13
+Fetching https://www.uow.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.uow.edu.au/study/courses/ (high-priority probe)
+[DISCOVER] Crawling from https://www.uow.edu.au/study/courses/ (max 80 pages, max 200 candidates)
+[DISCOVER] classified https://www.uow.edu.au/study/courses/: listing (18 course links found)
+[DISCOVER] Page 1/80: +18 candidates (total 18) — https://www.uow.edu.au/study/courses/
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=2: listing (16 course links found)
+[DISCOVER] Page 2/80: +13 candidates (total 31) — https://www.uow.edu.au/study/courses/?page=2
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=3: listing (18 course links found)
+[DISCOVER] Page 3/80: +14 candidates (total 45) — https://www.uow.edu.au/study/courses/?page=3
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=4: listing (17 course links found)
+[DISCOVER] Page 4/80: +13 candidates (total 58) — https://www.uow.edu.au/study/courses/?page=4
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=5: listing (18 course links found)
+[DISCOVER] Page 5/80: +14 candidates (total 72) — https://www.uow.edu.au/study/courses/?page=5
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=6: listing (15 course links found)
+[DISCOVER] Page 6/80: +11 candidates (total 83) — https://www.uow.edu.au/study/courses/?page=6
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=7: listing (15 course links found)
+[DISCOVER] Page 7/80: +11 candidates (total 94) — https://www.uow.edu.au/study/courses/?page=7
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=8: listing (15 course links found)
+[DISCOVER] Page 8/80: +11 candidates (total 105) — https://www.uow.edu.au/study/courses/?page=8
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=9: listing (19 course links found)
+[DISCOVER] Page 9/80: +15 candidates (total 120) — https://www.uow.edu.au/study/courses/?page=9
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=10: listing (18 course links found)
+[DISCOVER] Page 10/80: +14 candidates (total 134) — https://www.uow.edu.au/study/courses/?page=10
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=11: listing (16 course links found)
+[DISCOVER] Page 11/80: +12 candidates (total 146) — https://www.uow.edu.au/study/courses/?page=11
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=12: listing (20 course links found)
+[DISCOVER] Page 12/80: +16 candidates (total 162) — https://www.uow.edu.au/study/courses/?page=12
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=13: listing (19 course links found)
+[DISCOVER] Page 13/80: +15 candidates (total 177) — https://www.uow.edu.au/study/courses/?page=13
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=14: listing (23 course links found)
+[DISCOVER] Page 14/80: +19 candidates (total 196) — https://www.uow.edu.au/study/courses/?page=14
+[DISCOVER] classified https://www.uow.edu.au/study/courses/?page=15: listing (15 course links found)
+[DISCOVER] Page 15/80: +4 candidates (total 200) — https://www.uow.edu.au/study/courses/?page=15
+Discovered 200 candidate course links
+[EXTRACT] gate dropped (marketing_page): Study at UOW
+[EXTRACT] gate dropped (info_page): Postgraduate students
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts - Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts - Bachelor of Communication and Media to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts - Bachelor of International Studies to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): 0 My favourites
+[EXTRACT] gate dropped (ui_page): Clear all
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts in Western Civilisation to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts in Western Civilisation - Bachelor of International Studies to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts in Western Civilisation - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts in Western Civilisation (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts (Psychology) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts (Psychology) - Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Arts (Psychology) - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business Analytics to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business Information Systems to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business - TAFE Diploma of Event Management to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business - TAFE Diploma of Hospitality Management to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Business - TAFE Diploma of Travel and Tourism Management to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Communication and Media to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Communication and Media - Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Communication and Media - Bachelor of International Studies to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Communication and Media - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Communication and Media (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computational Technology to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computer Science to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computer Science - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computer Science - Bachelor of Science (SMAH) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computer Science (Dean's Scholar) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Computer Science (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts - Bachelor of Arts to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts - Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts - Bachelor of Communication and Media to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Creative Arts (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Criminology to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Criminology - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Economics and Finance to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Economics and Finance - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Education - The Early Years to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Education - The Early Years (Honours) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Arts to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Business to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Computer Science to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Laws to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Mathematics to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Science (Physics) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) - Bachelor of Science (SMAH) to Course Favourites
+[EXTRACT] gate dropped (ui_page): Save Bachelor of Engineering (Honours) (Double Major) to Course Favourites
+[EXTRACT] gate dropped 56 non-course candidate(s) — info_page=1, marketing_page=1, ui_page=54
+Extracting course details (144 pages)...
+[EXTRACT] 1/144: Bachelor of Arts
+[EXTRACT] 2/144: Bachelor of Arts - Bachelor of Business
+[EXTRACT] 3/144: Bachelor of Arts - Bachelor of Communication and Media
+[EXTRACT] 4/144: Bachelor of Arts - Bachelor of International Studies
+Fetching 3/144: Bachelor of Arts - Bachelor of Communication and Media
+Fetching 2/144: Bachelor of Arts - Bachelor of Business
+Fetching 1/144: Bachelor of Arts
+Fetching 4/144: Bachelor of Arts - Bachelor of International Studies
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 0 field(s) (cost=$0.000000, in=4295 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?stude → 0 field(s) (cost=$0.000000, in=4672 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 0 field(s) (cost=$0.000000, in=3872 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-communication-and-media/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-international-studies/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 5/144: Bachelor of Arts - Bachelor of Laws
+[EXTRACT] 6/144: Bachelor of Arts (Community, Culture and Environment)
+[EXTRACT] 7/144: Bachelor of Arts (English Literatures)
+Fetching 6/144: Bachelor of Arts (Community, Culture and Environment)
+Fetching 5/144: Bachelor of Arts - Bachelor of Laws
+Fetching 7/144: Bachelor of Arts (English Literatures)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4854 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 0 field(s) (cost=$0.000000, in=4421 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4945 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts---bach → 0 field(s) (cost=$0.000000, in=4461 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44093&students=international&year=2026 (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44036&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 8/144: Bachelor of Arts (Geography)
+[EXTRACT] 9/144: Bachelor of Arts (Global Communications)
+[EXTRACT] 10/144: Bachelor of Arts (History)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts---bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 8/144: Bachelor of Arts (Geography)
+Fetching 10/144: Bachelor of Arts (History)
+Fetching 9/144: Bachelor of Arts (Global Communications)
+[EXTRACT] 11/144: Bachelor of Arts (Honours)
+Fetching 11/144: Bachelor of Arts (Honours)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4878 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=5008 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4288 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4866 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45527&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45340&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44138&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 12/144: Bachelor of Arts (Honours) (English Literatures)
+[EXTRACT] 13/144: Bachelor of Arts (Honours) (History)
+[EXTRACT] 14/144: Bachelor of Arts (Honours) (Indigenous Studies)
+[EXTRACT] 15/144: Bachelor of Arts (Honours) (Philosophy)
+Fetching 12/144: Bachelor of Arts (Honours) (English Literatures)
+Fetching 13/144: Bachelor of Arts (Honours) (History)
+Fetching 14/144: Bachelor of Arts (Honours) (Indigenous Studies)
+Fetching 15/144: Bachelor of Arts (Honours) (Philosophy)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4571 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4635 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4600 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4478 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44098&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44138&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44036&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44046&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 16/144: Bachelor of Arts (Honours) (Politics)
+[EXTRACT] 17/144: Bachelor of Arts (Honours) (Sociology)
+[EXTRACT] 18/144: Bachelor of Arts (Indigenous Studies)
+[EXTRACT] 19/144: Bachelor of Arts (International Relations)
+Fetching 17/144: Bachelor of Arts (Honours) (Sociology)
+Fetching 16/144: Bachelor of Arts (Honours) (Politics)
+Fetching 18/144: Bachelor of Arts (Indigenous Studies)
+Fetching 19/144: Bachelor of Arts (International Relations)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4517 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-honour → 0 field(s) (cost=$0.000000, in=4476 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=5000 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44041&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-honours/?major=44048&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44142&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 20/144: Bachelor of Arts in Western Civilisation
+[EXTRACT] 21/144: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+[EXTRACT] 22/144: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+Fetching 20/144: Bachelor of Arts in Western Civilisation
+Fetching 21/144: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+Fetching 22/144: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4955 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3497 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3839 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3754 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-creative-arts/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-double-majors/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44098&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-int-studies/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 23/144: Bachelor of Arts in Western Civilisation - Bachelor of Laws
+[EXTRACT] 24/144: Bachelor of Arts in Western Civilisation (Honours)
+[EXTRACT] 25/144: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+[EXTRACT] 26/144: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+Fetching 26/144: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+Fetching 23/144: Bachelor of Arts in Western Civilisation - Bachelor of Laws
+Fetching 25/144: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+Fetching 24/144: Bachelor of Arts in Western Civilisation (Honours)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3789 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3841 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4004 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4100 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44143&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44036&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 27/144: Bachelor of Arts in Western Civilisation (Honours) (History)
+[EXTRACT] 28/144: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+[EXTRACT] 29/144: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+[EXTRACT] 30/144: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+Fetching 28/144: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+Fetching 29/144: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+Fetching 30/144: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+Fetching 27/144: Bachelor of Arts in Western Civilisation (Honours) (History)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3978 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4128 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4072 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4135 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44046&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44098&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44138&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44142&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 31/144: Bachelor of Arts in Western Civilisation (Honours) (Politics)
+[EXTRACT] 32/144: Bachelor of Arts in Western Civilisation (Honours) (Sociology)
+[EXTRACT] 33/144: Bachelor of Arts in Western Civilisation (Liberal Arts)
+[EXTRACT] 34/144: Bachelor of Arts (Legal Studies)
+Fetching 31/144: Bachelor of Arts in Western Civilisation (Honours) (Politics)
+Fetching 32/144: Bachelor of Arts in Western Civilisation (Honours) (Sociology)
+Fetching 34/144: Bachelor of Arts (Legal Studies)
+Fetching 33/144: Bachelor of Arts in Western Civilisation (Liberal Arts)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4017 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=3977 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-in-wes → 0 field(s) (cost=$0.000000, in=4038 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44041&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-honours/?major=44048&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-in-western-civilisation-double-majors/?major=45497&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 35/144: Bachelor of Arts (Performance and Theatre)
+[EXTRACT] 36/144: Bachelor of Arts (Philosophy)
+[EXTRACT] 37/144: Bachelor of Arts (Politics)
+Fetching 35/144: Bachelor of Arts (Performance and Theatre)
+Fetching 36/144: Bachelor of Arts (Philosophy)
+Fetching 37/144: Bachelor of Arts (Politics)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4850 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4848 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4944 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4930 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44046&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=45830&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44161&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44048&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 38/144: Bachelor of Arts (Psychology)
+[EXTRACT] 39/144: Bachelor of Arts (Psychology) - Bachelor of Business
+[EXTRACT] 40/144: Bachelor of Arts (Psychology) - Bachelor of Laws
+[EXTRACT] 41/144: Bachelor of Arts (Sociology)
+Fetching 38/144: Bachelor of Arts (Psychology)
+Fetching 39/144: Bachelor of Arts (Psychology) - Bachelor of Business
+Fetching 40/144: Bachelor of Arts (Psychology) - Bachelor of Laws
+Fetching 41/144: Bachelor of Arts (Sociology)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-psycho → 0 field(s) (cost=$0.000000, in=4491 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts/?major → 0 field(s) (cost=$0.000000, in=4901 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-psycho → 0 field(s) (cost=$0.000000, in=4485 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-arts-psycho → 0 field(s) (cost=$0.000000, in=4619 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-psychology---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-psychology/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts/?major=44041&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-arts-psychology---bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Arts (Psychology) - Bachelor → Medicine & Health / Psychology
+[CATEGORY det] Bachelor of Arts (Psychology) → Medicine & Health / Psychology
+[CATEGORY det] Bachelor of Arts (Psychology) - Bachelor → Medicine & Health / Psychology
+[EXTRACT] 42/144: Bachelor of Business
+[EXTRACT] 43/144: Bachelor of Business (Accountancy)
+[EXTRACT] 44/144: Bachelor of Business Analytics
+Fetching 43/144: Bachelor of Business (Accountancy)
+Fetching 42/144: Bachelor of Business
+[EXTRACT] 45/144: Bachelor of Business - Bachelor of Laws
+Fetching 44/144: Bachelor of Business Analytics
+Fetching 45/144: Bachelor of Business - Bachelor of Laws
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=4997 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business-an → 0 field(s) (cost=$0.000000, in=4228 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4217 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?s → 0 field(s) (cost=$0.000000, in=4830 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44099&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business-analytics/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business (Accountancy) → Business & Management / Accounting
+[CATEGORY det] Bachelor of Business Analytics → Business & Management / Business Analytics
+[EXTRACT] 46/144: Bachelor of Business (Business Analytics)
+[EXTRACT] 47/144: Bachelor of Business (Economics)
+[EXTRACT] 48/144: Bachelor of Business (Finance)
+[EXTRACT] 49/144: Bachelor of Business (Human Resource Management)
+Fetching 46/144: Bachelor of Business (Business Analytics)
+Fetching 47/144: Bachelor of Business (Economics)
+Fetching 48/144: Bachelor of Business (Finance)
+Fetching 49/144: Bachelor of Business (Human Resource Management)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5042 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5342 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5024 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5076 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44090&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44084&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44164&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44139&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 50/144: Bachelor of Business Information Systems
+[CATEGORY det] Bachelor of Business (Business Analytics → Business & Management / Business Analytics
+[CATEGORY det] Bachelor of Business (Finance) → Business & Management / Finance
+[CATEGORY det] Bachelor of Business (Human Resource Man → Business & Management / Human Resources
+Fetching 50/144: Bachelor of Business Information Systems
+[EXTRACT] 51/144: Bachelor of Business (International Business)
+[EXTRACT] 52/144: Bachelor of Business (Management)
+Fetching 51/144: Bachelor of Business (International Business)
+[EXTRACT] 53/144: Bachelor of Business (Marketing)
+Fetching 52/144: Bachelor of Business (Management)
+Fetching 53/144: Bachelor of Business (Marketing)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5074 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5086 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business-in → 0 field(s) (cost=$0.000000, in=4336 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5306 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44054&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44035&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business-information-systems/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44056&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 54/144: Bachelor of Business (Public Relations)
+[CATEGORY det] Bachelor of Business Information Systems → Computer Science & IT / Information Systems
+[CATEGORY det] Bachelor of Business (International Busi → Business & Management / International Business
+[CATEGORY det] Bachelor of Business (Marketing) → Business & Management / Marketing
+Fetching 54/144: Bachelor of Business (Public Relations)
+[EXTRACT] 55/144: Bachelor of Business (Sport Marketing and Management)
+[EXTRACT] 56/144: Bachelor of Business (Supply Chain Management)
+[EXTRACT] 57/144: Bachelor of Business (Sustainable Business)
+Fetching 55/144: Bachelor of Business (Sport Marketing and Management)
+Fetching 56/144: Bachelor of Business (Supply Chain Management)
+Fetching 57/144: Bachelor of Business (Sustainable Business)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5317 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5173 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5284 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business/?m → 0 field(s) (cost=$0.000000, in=5163 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=45016&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44079&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44129&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business/?major=44126&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business (Public Relations) → Media & Communications / Public Relations
+[CATEGORY det] Bachelor of Business (Sport Marketing an → Business & Management / Marketing
+[EXTRACT] 58/144: Bachelor of Business - TAFE Diploma of Event Management
+[CATEGORY det] Bachelor of Business (Supply Chain Manag → Business & Management / Supply Chain & Logistics
+[EXTRACT] 59/144: Bachelor of Business - TAFE Diploma of Event Management (Human Resource Management)
+[EXTRACT] 60/144: Bachelor of Business - TAFE Diploma of Event Management (International Business)
+[EXTRACT] 61/144: Bachelor of Business - TAFE Diploma of Event Management (Management)
+Fetching 58/144: Bachelor of Business - TAFE Diploma of Event Management
+Fetching 59/144: Bachelor of Business - TAFE Diploma of Event Management (Human Resource Management)
+Fetching 60/144: Bachelor of Business - TAFE Diploma of Event Management (International Business)
+Fetching 61/144: Bachelor of Business - TAFE Diploma of Event Management (Management)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44035&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44139&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44054&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4641 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44054&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44139&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4885 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4888 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44035&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Hospitality, Tourism & Events / Event Management
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44054&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44139&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4904 out=0)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Hospitality, Tourism & Events / Event Management
+[EXTRACT] 62/144: Bachelor of Business - TAFE Diploma of Event Management (Marketing)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Business & Management / Human Resources
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44035&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 62/144: Bachelor of Business - TAFE Diploma of Event Management (Marketing)
+[EXTRACT] 63/144: Bachelor of Business - TAFE Diploma of Event Management (Public Relations)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Business & Management / International Business
+[EXTRACT] 64/144: Bachelor of Business - TAFE Diploma of Event Management (Sport Marketing and Management)
+Fetching 63/144: Bachelor of Business - TAFE Diploma of Event Management (Public Relations)
+[EXTRACT] 65/144: Bachelor of Business - TAFE Diploma of Event Management (Sustainable Business)
+Fetching 64/144: Bachelor of Business - TAFE Diploma of Event Management (Sport Marketing and Management)
+Fetching 65/144: Bachelor of Business - TAFE Diploma of Event Management (Sustainable Business)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44056&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44126&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44129&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=45016&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44126&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44129&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4847 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44126&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4973 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44056&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=45016&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44129&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Business & Management / Marketing
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4925 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4991 out=0)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Media & Communications / Public Relations
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=44056&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-event-management/?major=45016&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 66/144: Bachelor of Business - TAFE Diploma of Hospitality Management
+[EXTRACT] 67/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Human Resource Management)
+Fetching 66/144: Bachelor of Business - TAFE Diploma of Hospitality Management
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Business & Management / Marketing
+[CATEGORY det] Bachelor of Business - Tafe Diploma of E → Hospitality, Tourism & Events / Event Management
+Fetching 67/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Human Resource Management)
+[EXTRACT] 68/144: Bachelor of Business - TAFE Diploma of Hospitality Management (International Business)
+[EXTRACT] 69/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Management)
+Fetching 69/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Management)
+Fetching 68/144: Bachelor of Business - TAFE Diploma of Hospitality Management (International Business)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44054&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44139&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44035&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=3929 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44035&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44139&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4192 out=0)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Hospitality, Tourism & Events / Hospitality Management
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4175 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44035&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44139&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 70/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Marketing)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Business & Management / International Business
+Fetching 70/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Marketing)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Business & Management / Human Resources
+[EXTRACT] 71/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Public Relations)
+[EXTRACT] 72/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Sport Marketing and Management)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44054&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+Fetching 71/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Public Relations)
+Fetching 72/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Sport Marketing and Management)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4173 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44054&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT] 73/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Sustainable Business)
+Fetching 73/144: Bachelor of Business - TAFE Diploma of Hospitality Management (Sustainable Business)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44056&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44126&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=45016&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44129&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44129&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4260 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44056&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44129&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44126&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4213 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=45016&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Media & Communications / Public Relations
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4134 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44056&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4278 out=0)
+[EXTRACT] 74/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=44126&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Business & Management / Marketing
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-hospitality-management/?major=45016&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 74/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Business & Management / Marketing
+[EXTRACT] 75/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Human Resource Management)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of H → Hospitality, Tourism & Events / Hospitality Management
+Fetching 75/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Human Resource Management)
+[EXTRACT] 76/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (International Business)
+[EXTRACT] 77/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Management)
+Fetching 76/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (International Business)
+Fetching 77/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Management)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44139&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44035&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44054&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44139&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44054&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4182 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4180 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44139&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Business & Management / Human Resources
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44054&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 78/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Marketing)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Hospitality, Tourism & Events / Tourism Management
+Fetching 78/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Marketing)
+[EXTRACT] 79/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Public Relations)
+Fetching 79/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Public Relations)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44035&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4199 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44035&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Business & Management / International Business
+[EXTRACT] 80/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Sport Marketing and Management)
+Fetching 80/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Sport Marketing and Management)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44056&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44129&students=international&year=2026
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44126&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44056&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4220 out=0)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44129&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44056&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4267 out=0)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Business & Management / Marketing
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44129&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 81/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Sustainable Business)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Media & Communications / Public Relations
+Fetching 81/144: Bachelor of Business - TAFE Diploma of Travel and Tourism Management (Sustainable Business)
+[EXTRACT] 82/144: Bachelor of Communication and Media
+Fetching 82/144: Bachelor of Communication and Media
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=45016&students=international&year=2026
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4806 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 83/144: Bachelor of Communication and Media - Bachelor of Business
+Fetching 83/144: Bachelor of Communication and Media - Bachelor of Business
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44126&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4141 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=44126&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Business & Management / Marketing
+[EXTRACT] 84/144: Bachelor of Communication and Media - Bachelor of International Studies
+Fetching 84/144: Bachelor of Communication and Media - Bachelor of International Studies
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4207 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4374 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media---bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media----bachelor-of-international-studies/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 85/144: Bachelor of Communication and Media - Bachelor of Laws
+[EXTRACT] 86/144: Bachelor of Communication and Media (Digital and Social Media)
+Fetching 86/144: Bachelor of Communication and Media (Digital and Social Media)
+Fetching 85/144: Bachelor of Communication and Media - Bachelor of Laws
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=5189 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4732 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?major=44159&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 87/144: Bachelor of Communication and Media (Honours)
+[EXTRACT] 88/144: Bachelor of Communication and Media (Journalism)
+Fetching 87/144: Bachelor of Communication and Media (Honours)
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=45016&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+Fetching 88/144: Bachelor of Communication and Media (Journalism)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=4285 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?major=45016&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Hospitality, Tourism & Events / Tourism Management
+[EXTRACT] 89/144: Bachelor of Communication and Media (Marketing Communication and Advertising)
+Fetching 89/144: Bachelor of Communication and Media (Marketing Communication and Advertising)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4962 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=3932 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=4965 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?major=44158&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?major=44135&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Communication and Media (Jou → Media & Communications / Journalism
+[EXTRACT] 90/144: Bachelor of Communication and Media (Screen Media Production)
+[CATEGORY det] Bachelor of Communication and Media (Mar → Business & Management / Marketing
+[EXTRACT] 91/144: Bachelor of Communication and Media (Visual Communication Design)
+[EXTRACT] 92/144: Bachelor of Computational Technology
+Fetching 90/144: Bachelor of Communication and Media (Screen Media Production)
+Fetching 92/144: Bachelor of Computational Technology
+Fetching 91/144: Bachelor of Communication and Media (Visual Communication Design)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=5076 out=0)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?students=international&year=2026
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?major=44121&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Communication and Media (Scr → Media & Communications / Film & Screen
+[EXTRACT] 93/144: Bachelor of Computational Technology (Computational Physics)
+Fetching 93/144: Bachelor of Computational Technology (Computational Physics)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45873&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computation → 0 field(s) (cost=$0.000000, in=4797 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 94/144: Bachelor of Computational Technology (Computing)
+Fetching 94/144: Bachelor of Computational Technology (Computing)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45883&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45873&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computation → 0 field(s) (cost=$0.000000, in=4980 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45873&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computational Technology (Co → Science & Mathematics / Physics
+[EXTRACT] 95/144: Bachelor of Computational Technology (Cyber Network Security)
+Fetching 95/144: Bachelor of Computational Technology (Cyber Network Security)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45868&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45883&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computation → 0 field(s) (cost=$0.000000, in=4983 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45883&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 96/144: Bachelor of Computational Technology (Principles of Data Science)
+Fetching 96/144: Bachelor of Computational Technology (Principles of Data Science)
+[per-course browser ↻] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45878&students=international&year=2026
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45868&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computation → 0 field(s) (cost=$0.000000, in=5052 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45868&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computational Technology (Cy → Computer Science & IT / Cyber Security
+[EXTRACT] 97/144: Bachelor of Computer Science
+Fetching 97/144: Bachelor of Computer Science
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4364 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 98/144: Bachelor of Computer Science (Artificial Intelligence and Big Data)
+Fetching 98/144: Bachelor of Computer Science (Artificial Intelligence and Big Data)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4577 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?major=44659&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computer Science (Artificial → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 99/144: Bachelor of Computer Science - Bachelor of Laws
+Fetching 99/144: Bachelor of Computer Science - Bachelor of Laws
+[per-course browser ✓] https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45878&students=international&year=2026 — IELTS=— PTE=— TOEFL=— CAE=—
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computation → 0 field(s) (cost=$0.000000, in=4997 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computational-technology/?major=45878&students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computational Technology (Pr → Computer Science & IT / Data Science
+[EXTRACT] 100/144: Bachelor of Computer Science - Bachelor of Science (SMAH)
+Fetching 100/144: Bachelor of Computer Science - Bachelor of Science (SMAH)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4828 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4451 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science---bachelor-of-science-smah/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 101/144: Bachelor of Computer Science (Cyber Security)
+[EXTRACT] 102/144: Bachelor of Computer Science (Dean's Scholar)
+Fetching 101/144: Bachelor of Computer Science (Cyber Security)
+Fetching 102/144: Bachelor of Computer Science (Dean's Scholar)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4528 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4335 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?major=44149&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computer Science (Cyber Secu → Computer Science & IT / Cyber Security
+[EXTRACT] 103/144: Bachelor of Computer Science (Dean's Scholar) (Artificial Intelligence and Big Data)
+[EXTRACT] 104/144: Bachelor of Computer Science (Dean's Scholar) (Cyber Security)
+Fetching 104/144: Bachelor of Computer Science (Dean's Scholar) (Cyber Security)
+Fetching 103/144: Bachelor of Computer Science (Dean's Scholar) (Artificial Intelligence and Big Data)
+[per-course browser ✗] https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?students=international&year=2026: empty response
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-business--- → 0 field(s) (cost=$0.000000, in=3936 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4543 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4304 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-business---tafe-diploma-of-travel-and-tourism-management/?students=international&year=2026 (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?major=44149&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?major=44659&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business - Tafe Diploma of T → Hospitality, Tourism & Events / Tourism Management
+[CATEGORY det] Bachelor of Computer Science (Dean's Sch → Computer Science & IT / Cyber Security
+[CATEGORY det] Bachelor of Computer Science (Dean's Sch → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 105/144: Bachelor of Computer Science (Dean's Scholar) (Digital Systems Security)
+[EXTRACT] 106/144: Bachelor of Computer Science (Dean's Scholar) (Game and Mobile Development)
+[EXTRACT] 107/144: Bachelor of Computer Science (Dean's Scholar) (Software Engineering)
+Fetching 105/144: Bachelor of Computer Science (Dean's Scholar) (Digital Systems Security)
+Fetching 107/144: Bachelor of Computer Science (Dean's Scholar) (Software Engineering)
+Fetching 106/144: Bachelor of Computer Science (Dean's Scholar) (Game and Mobile Development)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4564 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4619 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4522 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?major=44078&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?major=44140&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-deans-scholar/?major=44154&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 108/144: Bachelor of Computer Science (Digital Systems Security)
+[CATEGORY det] Bachelor of Computer Science (Dean's Sch → Computer Science & IT / Software Engineering
+[EXTRACT] 109/144: Bachelor of Computer Science (Game and Mobile Development)
+Fetching 108/144: Bachelor of Computer Science (Digital Systems Security)
+[EXTRACT] 110/144: Bachelor of Computer Science (Honours)
+Fetching 109/144: Bachelor of Computer Science (Game and Mobile Development)
+Fetching 110/144: Bachelor of Computer Science (Honours)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-communicati → 0 field(s) (cost=$0.000000, in=5161 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4591 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4646 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=3962 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-communication-and-media/?major=44069&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?major=44154&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?major=44078&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 111/144: Bachelor of Computer Science (Software Engineering)
+[EXTRACT] 112/144: Bachelor of Creative Arts
+[EXTRACT] 113/144: Bachelor of Creative Arts - Bachelor of Arts
+[EXTRACT] 114/144: Bachelor of Creative Arts - Bachelor of Business
+Fetching 111/144: Bachelor of Computer Science (Software Engineering)
+Fetching 112/144: Bachelor of Creative Arts
+Fetching 113/144: Bachelor of Creative Arts - Bachelor of Arts
+Fetching 114/144: Bachelor of Creative Arts - Bachelor of Business
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-computer-sc → 0 field(s) (cost=$0.000000, in=4558 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4140 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=3795 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-computer-science/?major=44140&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts---bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Computer Science (Software E → Computer Science & IT / Software Engineering
+[EXTRACT] 115/144: Bachelor of Creative Arts - Bachelor of Communication and Media
+[EXTRACT] 116/144: Bachelor of Creative Arts - Bachelor of Laws
+[EXTRACT] 117/144: Bachelor of Creative Arts (Creative Writing)
+Fetching 115/144: Bachelor of Creative Arts - Bachelor of Communication and Media
+Fetching 116/144: Bachelor of Creative Arts - Bachelor of Laws
+Fetching 117/144: Bachelor of Creative Arts (Creative Writing)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4167 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4126 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=3786 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts---bachelor-of-communication-and-media/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?major=45835&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 118/144: Bachelor of Creative Arts (Honours)
+[EXTRACT] 119/144: Bachelor of Creative Arts (Music)
+Fetching 118/144: Bachelor of Creative Arts (Honours)
+[EXTRACT] 120/144: Bachelor of Creative Arts (Performance and Theatre)
+Fetching 120/144: Bachelor of Creative Arts (Performance and Theatre)
+Fetching 119/144: Bachelor of Creative Arts (Music)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4098 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4009 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=3949 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?major=45830&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?major=45840&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 121/144: Bachelor of Creative Arts (Visual Arts)
+[EXTRACT] 122/144: Bachelor of Creative Arts (Visual Arts and Design)
+[EXTRACT] 123/144: Bachelor of Criminology
+Fetching 121/144: Bachelor of Creative Arts (Visual Arts)
+Fetching 122/144: Bachelor of Creative Arts (Visual Arts and Design)
+Fetching 123/144: Bachelor of Criminology
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4107 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4018 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=4204 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?major=45850&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts/?major=45845&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-criminology/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 124/144: Bachelor of Criminology - Bachelor of Laws
+[CATEGORY det] Bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[EXTRACT] 125/144: Bachelor of Criminology (Environment and Society)
+Fetching 124/144: Bachelor of Criminology - Bachelor of Laws
+[EXTRACT] 126/144: Bachelor of Criminology (Human Services)
+Fetching 125/144: Bachelor of Criminology (Environment and Society)
+Fetching 126/144: Bachelor of Criminology (Human Services)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=4108 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=4665 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=4341 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-criminology---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-criminology/?major=45521&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-criminology/?major=45441&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Criminology - Bachelor of La → Law & Legal Studies / Criminal Justice
+[CATEGORY det] Bachelor of Criminology (Environment and → Law & Legal Studies / Criminal Justice
+[CATEGORY det] Bachelor of Criminology (Human Services) → Law & Legal Studies / Criminal Justice
+[EXTRACT] 127/144: Bachelor of Criminology (Legal Studies)
+[EXTRACT] 128/144: Bachelor of Economics and Finance
+[EXTRACT] 129/144: Bachelor of Economics and Finance - Bachelor of Laws
+Fetching 127/144: Bachelor of Criminology (Legal Studies)
+Fetching 128/144: Bachelor of Economics and Finance
+Fetching 129/144: Bachelor of Economics and Finance - Bachelor of Laws
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-economics-a → 0 field(s) (cost=$0.000000, in=4727 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-economics-a → 0 field(s) (cost=$0.000000, in=4610 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=4468 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-creative-ar → 0 field(s) (cost=$0.000000, in=4149 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-economics-and-finance/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-economics-and-finance---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-criminology/?major=44161&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-creative-arts---bachelor-of-arts/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Economics and Finance → Business & Management / Finance
+[CATEGORY det] Bachelor of Economics and Finance - Bach → Business & Management / Finance
+[CATEGORY det] Bachelor of Criminology (Legal Studies) → Law & Legal Studies / Criminal Justice
+[EXTRACT] 130/144: Bachelor of Education - The Early Years
+[EXTRACT] 131/144: Bachelor of Education - The Early Years (Honours)
+[EXTRACT] 132/144: Bachelor of Engineering (Honours) - Bachelor of Arts
+Fetching 130/144: Bachelor of Education - The Early Years
+[EXTRACT] 133/144: Bachelor of Engineering (Honours) - Bachelor of Business
+Fetching 132/144: Bachelor of Engineering (Honours) - Bachelor of Arts
+Fetching 131/144: Bachelor of Education - The Early Years (Honours)
+Fetching 133/144: Bachelor of Engineering (Honours) - Bachelor of Business
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-education-- → 0 field(s) (cost=$0.000000, in=4696 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4912 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-education-- → 0 field(s) (cost=$0.000000, in=4699 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4553 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-education---the-early-years/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-business/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-arts/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-education---the-early-years-honours/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 134/144: Bachelor of Engineering (Honours) - Bachelor of Computer Science
+[EXTRACT] 135/144: Bachelor of Engineering (Honours) - Bachelor of Laws
+[EXTRACT] 136/144: Bachelor of Engineering (Honours) - Bachelor of Mathematics
+[EXTRACT] 137/144: Bachelor of Engineering (Honours) - Bachelor of Science (Physics)
+Fetching 134/144: Bachelor of Engineering (Honours) - Bachelor of Computer Science
+Fetching 135/144: Bachelor of Engineering (Honours) - Bachelor of Laws
+Fetching 136/144: Bachelor of Engineering (Honours) - Bachelor of Mathematics
+Fetching 137/144: Bachelor of Engineering (Honours) - Bachelor of Science (Physics)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4480 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4332 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4720 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4854 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-science-physics/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-mathematics/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-laws/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-computer-science/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Engineering (Honours) - Bach → Science & Mathematics / Physics
+[CATEGORY det] Bachelor of Engineering (Honours) - Bach → Science & Mathematics / Mathematics
+[EXTRACT] 138/144: Bachelor of Engineering (Honours) - Bachelor of Science (SMAH)
+[EXTRACT] 139/144: Bachelor of Engineering (Honours) (Double Major)
+[EXTRACT] 140/144: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Environmental Engineering)
+[EXTRACT] 141/144: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Mining Engineering)
+Fetching 138/144: Bachelor of Engineering (Honours) - Bachelor of Science (SMAH)
+Fetching 139/144: Bachelor of Engineering (Honours) (Double Major)
+Fetching 140/144: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Environmental Engineering)
+Fetching 141/144: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Mining Engineering)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=4349 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3920 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3962 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3914 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours---bachelor-of-science-smah/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?major=44095&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?major=44097&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 142/144: Bachelor of Engineering (Honours) (Double Major) (Electrical & Electronics Eng' & Computer & Autonomous Systems Eng')
+[EXTRACT] 143/144: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Materials Engineering)
+[CATEGORY det] Bachelor of Engineering (Honours) (Doubl → Engineering & Technology / Civil Engineering
+[CATEGORY det] Bachelor of Engineering (Honours) (Doubl → Engineering & Technology / Civil Engineering
+Fetching 142/144: Bachelor of Engineering (Honours) (Double Major) (Electrical & Electronics Eng' & Computer & Autonomous Systems Eng')
+Fetching 143/144: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Materials Engineering)
+[EXTRACT] 144/144: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Mining Engineering)
+Fetching 144/144: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Mining Engineering)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3932 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3981 out=0)
+[GEMINI] https://www.uow.edu.au/study/courses/bachelor-of-engineering → 0 field(s) (cost=$0.000000, in=3913 out=0)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?major=44147&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?major=44645&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.uow.edu.au/study/courses/bachelor-of-engineering-honours-double-major/?major=44100&students=international&year=2026 (missing: domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Engineering (Honours) (Doubl → Engineering & Technology / Mechanical Engineering
+[CATEGORY det] Bachelor of Engineering (Honours) (Doubl → Engineering & Technology / Mechanical Engineering
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.5 toefl_overall=86.0
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 58 slot(s) filled across siblings
+[STAGE] saved: Bachelor of Arts
+[STAGE] saved: Bachelor of Arts - Bachelor of Business
+[STAGE] saved: Bachelor of Arts - Bachelor of Communication and Media
+[STAGE] saved: Bachelor of Arts - Bachelor of International Studies
+[STAGE] saved: Bachelor of Arts - Bachelor of Laws
+[STAGE] skipped Bachelor of Arts (Community, Culture and Environment): rejected: no_international_fee
+[STAGE] saved: Bachelor of Arts (English Literatures)
+[STAGE] saved: Bachelor of Arts (Geography)
+[STAGE] saved: Bachelor of Arts (Global Communications)
+[STAGE] saved: Bachelor of Arts (History)
+[STAGE] saved: Bachelor of Arts (Honours)
+[STAGE] saved: Bachelor of Arts (Honours) (English Literatures)
+[STAGE] saved: Bachelor of Arts (Honours) (History)
+[STAGE] saved: Bachelor of Arts (Honours) (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts (Honours) (Philosophy)
+[STAGE] saved: Bachelor of Arts (Honours) (Politics)
+[STAGE] saved: Bachelor of Arts (Honours) (Sociology)
+[STAGE] saved: Bachelor of Arts (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts (International Relations)
+[STAGE] saved: Bachelor of Arts in Western Civilisation
+[STAGE] saved: Bachelor of Arts in Western Civilisation - Bachelor of Creative Arts
+[STAGE] saved: Bachelor of Arts in Western Civilisation - Bachelor of International Studies
+[STAGE] saved: Bachelor of Arts in Western Civilisation - Bachelor of Laws
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (English Literatures)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Global Sustainable Development)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (History)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Indigenous Studies)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (International Relations)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Philosophy)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Politics)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Honours) (Sociology)
+[STAGE] saved: Bachelor of Arts in Western Civilisation (Liberal Arts)
+[STAGE] saved: Bachelor of Arts (Legal Studies)
+[STAGE] saved: Bachelor of Arts (Performance and Theatre)
+[STAGE] saved: Bachelor of Arts (Philosophy)
+[STAGE] saved: Bachelor of Arts (Politics)
+[STAGE] saved: Bachelor of Arts (Psychology)
+[STAGE] saved: Bachelor of Arts (Psychology) - Bachelor of Business
+[STAGE] saved: Bachelor of Arts (Psychology) - Bachelor of Laws
+[STAGE] saved: Bachelor of Arts (Sociology)
+[STAGE] saved: Bachelor of Business
+[STAGE] saved: Bachelor of Business (Accountancy)
+[STAGE] saved: Bachelor of Business Analytics
+[STAGE] saved: Bachelor of Business - Bachelor of Laws
+[STAGE] saved: Bachelor of Business (Business Analytics)
+[STAGE] saved: Bachelor of Business (Economics)
+[STAGE] saved: Bachelor of Business (Finance)
+[STAGE] saved: Bachelor of Business (Human Resource Management)
+[STAGE] saved: Bachelor of Business Information Systems
+[STAGE] saved: Bachelor of Business (International Business)
+[STAGE] saved: Bachelor of Business (Management)
+[STAGE] saved: Bachelor of Business (Marketing)
+[STAGE] saved: Bachelor of Business (Public Relations)
+[STAGE] saved: Bachelor of Business (Sport Marketing and Management)
+[STAGE] saved: Bachelor of Business (Supply Chain Management)
+[STAGE] saved: Bachelor of Business (Sustainable Business)
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management: rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Human Resource Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (International Business): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Marketing): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Public Relations): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Sport Marketing and Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Event Management (Sustainable Business): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management: rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Human Resource Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (International Business): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Marketing): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Public Relations): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Sport Marketing and Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Hospitality Management (Sustainable Business): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management: rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Human Resource Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (International Business): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Marketing): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Public Relations): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Sport Marketing and Management): rejected: no_international_fee
+[STAGE] skipped Bachelor of Business - Tafe Diploma of Travel and Tourism Management (Sustainable Business): rejected: no_international_fee
+[STAGE] saved: Bachelor of Communication and Media
+[STAGE] saved: Bachelor of Communication and Media - Bachelor of Business
+[STAGE] saved: Bachelor of Communication and Media - Bachelor of International Studies
+[STAGE] saved: Bachelor of Communication and Media - Bachelor of Laws
+[STAGE] saved: Bachelor of Communication and Media (Digital and Social Media)
+[STAGE] saved: Bachelor of Communication and Media (Honours)
+[STAGE] saved: Bachelor of Communication and Media (Journalism)
+[STAGE] saved: Bachelor of Communication and Media (Marketing Communication and Advertising)
+[STAGE] saved: Bachelor of Communication and Media (Screen Media Production)
+[STAGE] saved: Bachelor of Communication and Media (Visual Communication Design)
+[STAGE] skipped Bachelor of Computational Technology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Computational Technology (Computational Physics): rejected: no_international_fee
+[STAGE] skipped Bachelor of Computational Technology (Computing): rejected: no_international_fee
+[STAGE] skipped Bachelor of Computational Technology (Cyber Network Security): rejected: no_international_fee
+[STAGE] skipped Bachelor of Computational Technology (Principles of Data Science): rejected: no_international_fee
+[STAGE] saved: Bachelor of Computer Science
+[STAGE] saved: Bachelor of Computer Science (Artificial Intelligence and Big Data)
+[STAGE] saved: Bachelor of Computer Science - Bachelor of Laws
+[STAGE] saved: Bachelor of Computer Science - Bachelor of Science (Smah)
+[STAGE] saved: Bachelor of Computer Science (Cyber Security)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar) (Artificial Intelligence and Big Data)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar) (Cyber Security)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar) (Digital Systems Security)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar) (Game and Mobile Development)
+[STAGE] saved: Bachelor of Computer Science (Dean's Scholar) (Software Engineering)
+[STAGE] saved: Bachelor of Computer Science (Digital Systems Security)
+[STAGE] saved: Bachelor of Computer Science (Game and Mobile Development)
+[STAGE] saved: Bachelor of Computer Science (Honours)
+[STAGE] saved: Bachelor of Computer Science (Software Engineering)
+[STAGE] saved: Bachelor of Creative Arts
+[STAGE] saved: Bachelor of Creative Arts - Bachelor of Arts
+[STAGE] saved: Bachelor of Creative Arts - Bachelor of Business
+[STAGE] saved: Bachelor of Creative Arts - Bachelor of Communication and Media
+[STAGE] saved: Bachelor of Creative Arts - Bachelor of Laws
+[STAGE] saved: Bachelor of Creative Arts (Creative Writing)
+[STAGE] saved: Bachelor of Creative Arts (Honours)
+[STAGE] saved: Bachelor of Creative Arts (Music)
+[STAGE] saved: Bachelor of Creative Arts (Performance and Theatre)
+[STAGE] saved: Bachelor of Creative Arts (Visual Arts)
+[STAGE] saved: Bachelor of Creative Arts (Visual Arts and Design)
+[STAGE] saved: Bachelor of Criminology
+[STAGE] saved: Bachelor of Criminology - Bachelor of Laws
+[STAGE] saved: Bachelor of Criminology (Environment and Society)
+[STAGE] saved: Bachelor of Criminology (Human Services)
+[STAGE] saved: Bachelor of Criminology (Legal Studies)
+[STAGE] saved: Bachelor of Economics and Finance
+[STAGE] saved: Bachelor of Economics and Finance - Bachelor of Laws
+[STAGE] saved: Bachelor of Education - the Early Years
+[STAGE] saved: Bachelor of Education - the Early Years (Honours)
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Arts
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Business
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Computer Science
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Laws
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Mathematics
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Science (Physics)
+[STAGE] saved: Bachelor of Engineering (Honours) - Bachelor of Science (Smah)
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major)
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Environmental Engineering)
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major) (Civil Engineering and Mining Engineering)
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major) (Electrical & Electronics Eng' & Computer & Autonomous Systems Eng')
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Materials Engineering)
+[STAGE] saved: Bachelor of Engineering (Honours) (Double Major) (Mechanical Engineering and Mining Engineering)
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 4m 12s | Courses: 114 | Avg: 2.2s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:200 | Staged:114 | Skipped:30 | Errors:0
+Staged 114 courses, 30 skipped, 0 fetch errors
