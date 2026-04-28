@@ -123,3 +123,35 @@ def test_fee_structural_does_not_misfire_on_random_strong_tags():
     assert out and out[0].normalized["international_fee"] == 42000
     # Came from the keyword fallback, not the structural pre-pass.
     assert not out[0].method.startswith("fee.structural")
+
+
+def test_full_course_fee_preferred_over_first_year_fee():
+    """Murdoch-style pages show both 'First year fee: $41,990' and
+    'Full course fee: $125,970'. The extractor must prefer the full-course
+    total — picking the first-year sticker under-reports the programme cost
+    by 3×."""
+    html = (
+        "<p>What type of student are you? International</p>"
+        "<p>First year fee: A$41,990</p>"
+        "<p>Full course fee: A$125,970</p>"
+    )
+    out = _run(fee.extract(html, "https://www.murdoch.edu.au/course/undergraduate/b1348"))
+    assert out, "fee extractor must return a result"
+    n = out[0].normalized
+    assert n["international_fee"] == 125_970, (
+        f"Expected full-course total $125,970, got {n['international_fee']}. "
+        f"The 'Full course fee' label must outscore the 'First year fee' label."
+    )
+    assert n["fee_term"] == "Full Course"
+
+
+def test_first_year_fee_only_still_extracted():
+    """When ONLY a first-year fee is shown (no full-course total), the
+    extractor should still return it (penalise, not disqualify)."""
+    html = (
+        "<p>International first year fee: A$38,000</p>"
+    )
+    out = _run(fee.extract(html, "https://example.edu/course/x"))
+    assert out, "fee extractor must return a result when only first-year fee is present"
+    n = out[0].normalized
+    assert n["international_fee"] == 38_000

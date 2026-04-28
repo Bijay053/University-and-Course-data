@@ -31,19 +31,24 @@ log = logging.getLogger(__name__)
 
 _HARD_FIELDS: dict[str, str] = {
     "international_fee": (
-        "Annual international tuition fee (number in local currency, e.g. 34500). "
-        "If listed as a total course fee, divide by the duration in years to get annual. "
-        "If stated per-trimester or per-semester, convert to annual equivalent. "
+        "International tuition fee (number in local currency, e.g. 34500 or 125970). "
+        "PRIORITY ORDER — use the first that applies: "
+        "(1) 'Full course fee' or 'Total course fee' label → extract that total amount "
+        "     and set fee_term='Full Course'. "
+        "(2) Annual / per-year fee label → extract the annual amount and set fee_term='Annual'. "
+        "(3) Per-semester/trimester only → multiply to annual equivalent. "
+        "NEVER extract a 'First year fee' or '1st year fee' when a 'Full course fee' is "
+        "also shown on the same page — the full-course total is always preferred. "
         "Null if not explicitly stated on this page."
     ),
     "domestic_fee": (
         "Annual domestic/local tuition fee (number only). Null if not stated."
     ),
     "fee_term": (
-        "Fee payment period. Pick EXACTLY one: "
+        "Fee payment period matching the fee you extracted. Pick EXACTLY one: "
         "'Annual', 'Semester', 'Trimester', 'Full Course', 'Per Unit'. "
-        "Use 'Full Course' only when the page quotes one total price for the "
-        "entire program. Null if ambiguous."
+        "Use 'Full Course' when you extracted a 'Full course fee' or 'Total course fee' label. "
+        "Use 'Annual' for per-year fees. Null if ambiguous."
     ),
     "duration_value": (
         "Total duration from enrolment to graduation — FULL-TIME equivalent — "
