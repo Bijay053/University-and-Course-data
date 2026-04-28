@@ -1,0 +1,34 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 37
+Fetching https://ait.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://ait.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://ait.edu.au/courses: listing (1 course links + listing title)
+[DISCOVER] Page 1/25: +1 candidates (total 1) — https://ait.edu.au/courses
+[DISCOVER] classified https://ait.edu.au/courses/2d-animation: detail (course content present, only 1 outbound links)
+[DISCOVER] Page 2/25: +0 candidates (total 1) — https://ait.edu.au/courses/2d-animation
+[DISCOVER] classified https://ait.edu.au/courses/3d-animation: detail (course content present, only 1 outbound links)
+[DISCOVER] Page 3/25: +0 candidates (total 1) — https://ait.edu.au/courses/3d-animation
+[DISCOVER] classified https://ait.edu.au/courses/game-design: detail (course content present, only 1 outbound links)
+[DISCOVER] Page 4/25: +0 candidates (total 1) — https://ait.edu.au/courses/game-design
+[DISCOVER] classified https://ait.edu.au/courses/information-technology: detail (course content present, only 1 outbound links)
+[DISCOVER] Page 5/25: +0 candidates (total 1) — https://ait.edu.au/courses/information-technology
+[DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 4 URL(s) at https://ait.edu.au
+[DISCOVER] sitemap index https://ait.edu.au/sitemap.xml: 4 sub-sitemap(s)
+[DISCOVER] sitemap: done — 0 unique candidates
+Discovered 1 candidate course links
+Extracting course details (1 pages)...
+[EXTRACT] 1/1: Information Technology
+Fetching 1/1: Information Technology
+[per-course browser ↻] https://ait.edu.au/courses/information-technology/vocational-diploma-of-it
+[per-course browser ✓] https://ait.edu.au/courses/information-technology/vocational-diploma-of-it — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://ait.edu.au/courses/information-technology/vocational → 0 field(s) (cost=$0.000000, in=3319 out=0)
+[FALLBACK] AI enriching https://ait.edu.au/courses/information-technology/vocational-diploma-of-it (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne' method=study_mode:rule url=https://ait.edu.au/courses/information-technology/vocational-diploma-of-it
+[CATEGORY det] Ict50220 Diploma of Information Technolo → Computer Science & IT / Information Systems
+[STAGE] skipped Ict50220 Diploma of Information Technology (Vocational): rejected: category_landing_page
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 0m 12s | Courses: 1 | Avg: 12.0s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:1 | Staged:0 | Skipped:1 | Errors:0
+Staged 0 courses, 1 skipped, 0 fetch errors

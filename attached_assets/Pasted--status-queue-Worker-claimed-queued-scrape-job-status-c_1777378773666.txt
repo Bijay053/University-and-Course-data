@@ -1,0 +1,173 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 41
+[status] [fetch] Fetching https://acap.edu.au/courses...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Crawling from https://acap.edu.au/courses (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] classified https://acap.edu.au/courses: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] Page 1/25: +0 candidates (total 0) — https://acap.edu.au/courses
+[status] [discover] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[status] [discover] [DISCOVER] sitemap: probing 5 URL(s) at https://acap.edu.au
+[status] [discover] [DISCOVER] sitemap index https://acap.edu.au/sitemap.xml: 10 sub-sitemap(s)
+[status] [discover] [DISCOVER] sub-sitemap https://www.acap.edu.au/courses-sitemap.xml: +27 candidates (total 27)
+[status] [discover] [DISCOVER] sitemap: done — 27 unique candidates
+[status] [discover] Discovered 27 candidate course links
+[status] [extract] Extracting course details (27 pages)...
+[status] [extract] [EXTRACT] 1/27: Associate Degree Of Criminal Justice
+[status] [extract] [EXTRACT] 2/27: Bachelor Of Counselling
+[status] [extract] [EXTRACT] 3/27: Bachelor Of Criminology And Justice
+[status] [extract] [EXTRACT] 4/27: Bachelor Of Psychological Science
+[progress] [extract] Fetching 2/27: Bachelor Of Counselling
+[progress] [extract] Fetching 3/27: Bachelor Of Criminology And Justice
+[progress] [extract] Fetching 1/27: Associate Degree Of Criminal Justice
+[progress] [extract] Fetching 4/27: Bachelor Of Psychological Science
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-counselling/ — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 5/27: Bachelor Of Psychological Science Honours
+[progress] [extract] Fetching 5/27: Bachelor Of Psychological Science Honours
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-honours/ — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/associate-degree-of-criminal-justice/ — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-criminology-and-justice/ — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 6/27: Bachelor Of Psychological Science And Counselling
+[status] [extract] [EXTRACT] 7/27: Bachelor Of Psychological Science And Criminology
+[status] [extract] [EXTRACT] 8/27: Bachelor Of Social Work
+[progress] [extract] Fetching 6/27: Bachelor Of Psychological Science And Counselling
+[progress] [extract] Fetching 8/27: Bachelor Of Social Work
+[progress] [extract] Fetching 7/27: Bachelor Of Psychological Science And Criminology
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science/ — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 9/27: Diploma Of Counselling Skills
+[progress] [extract] Fetching 9/27: Diploma Of Counselling Skills
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-counselling/ — course page states domestic-students-only; skipping
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/bachelor-of-social-work/ → 0 field(s) (cost=$0.000000, in=13888 out=0)
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-criminology/ — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/diploma-of-counselling-skills/ — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 10/27: Graduate Certificate In Business Administration
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/bachelor-of-social-work/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 11/27: Graduate Certificate Of Applied Coaching
+[progress] [extract] Fetching 10/27: Graduate Certificate In Business Administration
+[status] [extract] [FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/bachelor-of-social-work/
+[progress] [extract] Fetching 11/27: Graduate Certificate Of Applied Coaching
+[status] [classify] [CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+[status] [extract] [EXTRACT] 12/27: Graduate Certificate Of Counselling
+[progress] [extract] Fetching 12/27: Graduate Certificate Of Counselling
+[status] [extract] [EXTRACT] 13/27: Graduate Certificate Of Human Services
+[progress] [extract] Fetching 13/27: Graduate Certificate Of Human Services
+[status] [fallback] [per-course browser ↻] https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-certificate-in-busi → 0 field(s) (cost=$0.000000, in=5462 out=0)
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-certificate-of-counselling/ — course page states domestic-students-only; skipping
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-huma → 0 field(s) (cost=$0.000000, in=6680 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-human-services/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 14/27: Graduate Certificate Of Professional Accounting
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+[progress] [extract] Fetching 14/27: Graduate Certificate Of Professional Accounting
+[status] [extract] [EXTRACT] 15/27: Graduate Certificate Of Psychological Science
+[status] [extract] [EXTRACT] 16/27: Graduate Diploma Of Business Administration
+[progress] [extract] Fetching 15/27: Graduate Certificate Of Psychological Science
+[progress] [extract] Fetching 16/27: Graduate Diploma Of Business Administration
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-prof → 0 field(s) (cost=$0.000000, in=5123 out=0)
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-certificate-of-psychological-science/ — course page states domestic-students-only; skipping
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-business → 0 field(s) (cost=$0.000000, in=7237 out=0)
+[status] [extract] [EXTRACT] 17/27: Graduate Diploma Of Professional Accounting
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+[progress] [extract] Fetching 17/27: Graduate Diploma Of Professional Accounting
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+[status] [classify] [CATEGORY det] Graduate Certificate of Professional Acc → Business & Management / Accounting
+[status] [extract] [EXTRACT] 18/27: Graduate Diploma Of Psychological Science
+[status] [extract] [EXTRACT] 19/27: Master Of Business Administration
+[progress] [extract] Fetching 18/27: Graduate Diploma Of Psychological Science
+[progress] [extract] Fetching 19/27: Master Of Business Administration
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-professi → 0 field(s) (cost=$0.000000, in=7641 out=0)
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-diploma-of-psychological-science/ — course page states domestic-students-only; skipping
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/master-of-business-administr → 0 field(s) (cost=$0.000000, in=10131 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 20/27: Master Of Counselling And Psychotherapy
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-business-administration/
+[status] [classify] [CATEGORY det] Graduate Diploma of Professional Account → Business & Management / Accounting
+[progress] [extract] Fetching 20/27: Master Of Counselling And Psychotherapy
+[status] [classify] [CATEGORY det] Master of Business Administration (MBA) → Business & Management / MBA
+[status] [extract] [EXTRACT] 21/27: Master Of Professional Psychology
+[status] [fallback] [per-course browser ✓] https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15092 filled=[]
+[status] [extract] [EXTRACT] 22/27: Master Of Psychology Clinical
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-appl → 0 field(s) (cost=$0.000000, in=8504 out=0)
+[progress] [extract] Fetching 22/27: Master Of Psychology Clinical
+[progress] [extract] Fetching 21/27: Master Of Professional Psychology
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+[status] [extract] [EXTRACT] 23/27: Master Of Psychology Practice Clinical
+[progress] [extract] Fetching 23/27: Master Of Psychology Practice Clinical
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/master-of-counselling-and-psychotherapy/ — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 24/27: Master Of Social Work Qualifying
+[progress] [extract] Fetching 24/27: Master Of Social Work Qualifying
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/master-of-psychology-clinica → 0 field(s) (cost=$0.000000, in=11732 out=0)
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/master-of-professional-psych → 0 field(s) (cost=$0.000000, in=8640 out=0)
+[status] [fallback] [per-course browser ↻] https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/master-of-social-work-qualif → 0 field(s) (cost=$0.000000, in=13890 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-psychology-clinical/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-professional-psychology/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-social-work-qualifying/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-psychology-clinical/
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-professional-psychology/
+[status] [classify] [CATEGORY det] Master of Psychology (Clinical) → Medicine & Health / Psychology
+[status] [classify] [CATEGORY det] Master of Social Work (Qualifying) → Education & Social Work / Social Work
+[status] [classify] [CATEGORY det] Master of Professional Psychology → Medicine & Health / Psychology
+[status] [extract] [EXTRACT] 25/27: Undergraduate Certificate Of Psychological Science
+[status] [extract] [EXTRACT] 26/27: Graduate Diploma Of Legal Practice
+[status] [extract] [EXTRACT] 27/27: Graduate Diploma Of Legal Practice Nsw
+[progress] [extract] Fetching 25/27: Undergraduate Certificate Of Psychological Science
+[progress] [extract] Fetching 27/27: Graduate Diploma Of Legal Practice Nsw
+[progress] [extract] Fetching 26/27: Graduate Diploma Of Legal Practice
+[status] [extract] [DOMESTIC ONLY] https://www.acap.edu.au/courses/undergraduate-certificate-of-psychological-science/ — course page states domestic-students-only; skipping
+[status] [fallback] [per-course browser ↻] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+[status] [fallback] [per-course browser ↻] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+[status] [fallback] [per-course browser ✓] https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ — IELTS=— PTE=— TOEFL=— CAE=— fee=44184 filled=[]
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/master-of-psychology-practic → 0 field(s) (cost=$0.000000, in=6574 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+[status] [classify] [CATEGORY det] Master of Psychology Practice (Clinical) → Medicine & Health / Psychology
+[status] [fallback] [per-course browser ✓] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15619 filled=[]
+[status] [fallback] [per-course browser ✓] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15619 filled=[]
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-legal-pr → 0 field(s) (cost=$0.000000, in=7492 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-legal-pr → 0 field(s) (cost=$0.000000, in=6379 out=0)
+[status] [extract] [FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+[status] [extract] [FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=66.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5 pte_overall=66.0
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill postgraduate] 14 slot(s) filled across siblings
+[status] [stage] [STAGE] skipped Associate Degree Of Criminal Justice: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Counselling: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Criminology And Justice: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Psychological Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Psychological Science Honours: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Psychological Science And Counselling: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor Of Psychological Science And Criminology: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Social Work: rejected: online_only
+[status] [stage] [STAGE] skipped Diploma Of Counselling Skills: rejected: domestic_only
+[status] [stage] [STAGE] skipped Graduate Certificate in Business Administration: rejected: online_only
+[status] [stage] [STAGE] skipped Graduate Certificate of Applied Coaching: rejected: online_only
+[status] [stage] [STAGE] skipped Graduate Certificate Of Counselling: rejected: domestic_only
+[status] [stage] [STAGE] saved: Graduate Certificate of Human Services
+[status] [stage] [STAGE] saved: Graduate Certificate of Professional Accounting
+[status] [stage] [STAGE] skipped Graduate Certificate Of Psychological Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Graduate Diploma of Business Administration: rejected: online_only
+[status] [stage] [STAGE] saved: Graduate Diploma of Professional Accounting
+[status] [stage] [STAGE] skipped Graduate Diploma Of Psychological Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Master of Business Administration (MBA): rejected: online_only
+[status] [stage] [STAGE] skipped Master Of Counselling And Psychotherapy: rejected: domestic_only
+[status] [stage] [STAGE] saved: Master of Professional Psychology
+[status] [stage] [STAGE] saved: Master of Psychology (Clinical)
+[status] [stage] [STAGE] skipped Master of Psychology Practice (Clinical): rejected: online_only
+[status] [stage] [STAGE] saved: Master of Social Work (Qualifying)
+[status] [stage] [STAGE] skipped Undergraduate Certificate Of Psychological Science: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Graduate Diploma of Legal Practice: rejected: online_only
+[status] [stage] [STAGE] skipped Graduate Diploma of Legal Practice (Plt): rejected: online_only
+[status] [complete] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[status] [complete] [TIMING] Total: 0m 57s | Courses: 6 | Avg: 9.5s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:27 | Staged:6 | Skipped:21 | Errors:0
+[status] [complete] Staged 6 courses, 21 skipped, 0 fetch errors

@@ -1,0 +1,118 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 47
+[status] [fetch] Fetching https://aibi.edu.au/courses...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Crawling from https://aibi.edu.au/courses (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] Page 1/25: fetch failed — https://aibi.edu.au/courses
+[status] [discover] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[status] [discover] [DISCOVER] sitemap: probing 4 URL(s) at https://aibi.edu.au
+[status] [discover] [DISCOVER] sitemap index https://aibi.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[status] [discover] [DISCOVER] sitemap index https://aibi.edu.au/sitemap_index.xml: 1 sub-sitemap(s)
+[status] [discover] [DISCOVER] sitemap: done — 0 unique candidates
+[status] [discover] [DISCOVER] BFS returned 0 links — trying browser-based discovery (handles Cloudflare / JS-heavy sites)...
+[status] [discover] [DISCOVER] Browser: navigating to https://aibi.edu.au/courses
+[status] [discover] [DISCOVER] Browser: start page → 11 course links, 3 nav candidates to follow
+[status] [discover] [DISCOVER] Browser: discovered 11 course links
+[status] [discover] Discovered 11 candidate course links
+[status] [discover] [CENTRAL] auto-discovered fee page: https://aibi.edu.au/fees-and-payments/
+[status] [discover] [CENTRAL] fee page parsed → 24 program record(s) from https://aibi.edu.au/fees-and-payments/
+[status] [extract] Extracting course details (11 pages)...
+[status] [extract] [EXTRACT] 1/11: Bachelor of Business
+[status] [extract] [EXTRACT] 2/11: Bachelor of Cyber Security
+[status] [extract] [EXTRACT] 3/11: Bachelor of Enterprise Management Systems
+[status] [extract] [EXTRACT] 4/11: Graduate Certificate of Business Administration
+[progress] [extract] Fetching 3/11: Bachelor of Enterprise Management Systems
+[progress] [extract] Fetching 2/11: Bachelor of Cyber Security
+[progress] [extract] Fetching 1/11: Bachelor of Business
+[progress] [extract] Fetching 4/11: Graduate Certificate of Business Administration
+[status] [extract] [GEMINI] https://aibi.edu.au/bachelor-of-business/ → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[status] [extract] [GEMINI] https://aibi.edu.au/bachelor-of-enterprise-management-system → 0 field(s) (cost=$0.000000, in=1400 out=0)
+[status] [extract] [GEMINI] https://aibi.edu.au/bachelor-of-cyber-security/ → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/graduate-certificate-of-business-administration/
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/bachelor-of-business/ (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/bachelor-of-enterprise-management-systems/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/bachelor-of-cyber-security/ (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/bachelor-of-business/
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/bachelor-of-cyber-security/
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne' method=study_mode:rule url=https://aibi.edu.au/bachelor-of-enterprise-management-systems/
+[status] [fallback] [CENTRAL ✓] Bachelor of Business - Aibi — fee from 'Bachelor of Business' row: intl=34270.0 per=None
+[status] [fallback] [CENTRAL ✓] Bachelor of Enterprise Management System — fee from 'Bachelor of Enterprise Management Systems' row: intl=34270.0 per=None
+[status] [fallback] [CENTRAL ✓] Bachelor of Cyber Security - Aibi — fee from 'Bachelor of Cyber Security' row: intl=34270.0 per=None
+[status] [extract] [EXTRACT] 5/11: Graduate Diploma of Business Administration
+[status] [extract] [EXTRACT] 6/11: Master of Business Administration (Digital Transformation)
+[status] [classify] [CATEGORY det] Bachelor of Cyber Security - Aibi → Computer Science & IT / Cyber Security
+[progress] [extract] Fetching 6/11: Master of Business Administration (Digital Transformation)
+[status] [extract] [EXTRACT] 7/11: Online MBA (Digital Transformation)
+[progress] [extract] Fetching 5/11: Graduate Diploma of Business Administration
+[progress] [extract] Fetching 7/11: Online MBA (Digital Transformation)
+[status] [extract] [GEMINI] https://aibi.edu.au/master-of-business-administration-digita → 0 field(s) (cost=$0.000000, in=1408 out=0)
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/diploma-graduate-of-business-administration/
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/master-of-business-administration-digital-transformation/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/master-of-business-administration-digital-transformation/
+[status] [classify] [CATEGORY det] Master of Business Administration (Digit → Business & Management / MBA
+[status] [extract] [EXTRACT] 8/11: Graduate Certificate of Information Technology
+[progress] [extract] Fetching 8/11: Graduate Certificate of Information Technology
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/master-of-business-administration-digital-transformation-online/
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/graduate-certificate-of-information-technology/
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/graduate-certificate-of-business-administration/ — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://aibi.edu.au/graduate-certificate-of-business-adminis → 0 field(s) (cost=$0.000000, in=1403 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/graduate-certificate-of-business-administration/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/graduate-certificate-of-business-administration/
+[status] [fallback] [CENTRAL ✓] Graduate Certificate in Business Adminis — fee from 'Graduate Certificate of Business Administration' row: intl=10750.0 per=None
+[status] [extract] [EXTRACT] 9/11: Graduate Diploma of Information Technology
+[progress] [extract] Fetching 9/11: Graduate Diploma of Information Technology
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/diploma-graduate-of-business-administration/ — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://aibi.edu.au/diploma-graduate-of-business-administrat → 0 field(s) (cost=$0.000000, in=1401 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/diploma-graduate-of-business-administration/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/diploma-graduate-of-business-administration/
+[status] [fallback] [CENTRAL ✓] Graduate Diploma in Business Administrat — fee from 'Graduate Diploma of Business Administration' row: intl=21500.0 per=None
+[status] [extract] [EXTRACT] 10/11: Master of Information Technology (Cyber Security)
+[progress] [extract] Fetching 10/11: Master of Information Technology (Cyber Security)
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/master-of-business-administration-digital-transformation-online/ — IELTS=— PTE=— TOEFL=— CAE=— fee=43000 filled=[]
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/graduate-certificate-of-information-technology/ — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://aibi.edu.au/graduate-certificate-of-information-tech → 0 field(s) (cost=$0.000000, in=1402 out=0)
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/graduate-diploma-of-information-technology/
+[status] [extract] [GEMINI] https://aibi.edu.au/master-of-business-administration-digita → 0 field(s) (cost=$0.000000, in=1412 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/graduate-certificate-of-information-technology/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/master-of-business-administration-digital-transformation-online/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/graduate-certificate-of-information-technology/
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Student Domestic Course' method=study_mode:rule url=https://aibi.edu.au/master-of-business-administration-digital-transformation-online/
+[status] [fallback] [CENTRAL ✓] Graduate Certificate of Information Tech — fee from 'Graduate Certificate of Information Technology' row: intl=10750.0 per=None
+[status] [classify] [CATEGORY det] Master of Business Administration (Digit → Business & Management / MBA
+[status] [classify] [CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[status] [extract] [EXTRACT] 11/11: Domestic Scholarships – Undergraduate
+[progress] [extract] Fetching 11/11: Domestic Scholarships – Undergraduate
+[status] [extract] [GEMINI] https://aibi.edu.au/master-of-information-technology-cyber-s → 0 field(s) (cost=$0.000000, in=1403 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/master-of-information-technology-cyber-security/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/master-of-information-technology-cyber-security/
+[status] [classify] [CATEGORY det] Master of Information Technology (Cyber  → Computer Science & IT / Cyber Security
+[status] [fallback] [per-course browser ↻] https://aibi.edu.au/domestic-scholarships/undergraduate/
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/graduate-diploma-of-information-technology/ — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://aibi.edu.au/graduate-diploma-of-information-technolo → 0 field(s) (cost=$0.000000, in=1400 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/graduate-diploma-of-information-technology/ (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Perth' method=study_mode:rule url=https://aibi.edu.au/graduate-diploma-of-information-technology/
+[status] [fallback] [CENTRAL ✓] Graduate Diploma of Information Technolo — fee from 'Graduate Diploma of Information Technology' row: intl=21500.0 per=None
+[status] [classify] [CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[status] [fallback] [per-course browser ✓] https://aibi.edu.au/domestic-scholarships/undergraduate/ — IELTS=— PTE=— TOEFL=— CAE=— fee=10000 filled=[]
+[status] [extract] [GEMINI] https://aibi.edu.au/domestic-scholarships/undergraduate/ → 0 field(s) (cost=$0.000000, in=1397 out=0)
+[status] [extract] [FALLBACK] AI enriching https://aibi.edu.au/domestic-scholarships/undergraduate/ (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://aibi.edu.au/domestic-scholarships/undergraduate/
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=52.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill undergraduate] 3 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill postgraduate] 5 slot(s) filled across siblings
+[status] [stage] [STAGE] saved: Bachelor of Business - Aibi
+[status] [stage] [STAGE] saved: Bachelor of Cyber Security - Aibi
+[status] [stage] [STAGE] saved: Bachelor of Enterprise Management Systems - Aibi
+[status] [stage] [STAGE] skipped Graduate Certificate in Business Administration - Aibi: rejected: online_only
+[status] [stage] [STAGE] saved: Graduate Diploma in Business Administration - Aibi
+[status] [stage] [STAGE] saved: Master of Business Administration (Digital Transformation) - Aibi
+[status] [stage] [STAGE] skipped Master of Business Administration (Digital Transformation) - Online - Aibi: rejected: online_only
+[status] [stage] [STAGE] saved: Graduate Certificate of Information Technology - Aibi
+[status] [stage] [STAGE] saved: Graduate Diploma of Information Technology - Aibi
+[status] [stage] [STAGE] saved: Master of Information Technology (Cyber Security) - Aibi
+[status] [stage] [STAGE] skipped Domestic Scholarships - Undergraduate - Aibi: rejected: category_landing_page
+[status] [complete] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[status] [complete] [TIMING] Total: 1m 39s | Courses: 8 | Avg: 12.4s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:11 | Staged:8 | Skipped:3 | Errors:0
+[status] [complete] Staged 8 courses, 3 skipped, 0 fetch errors
