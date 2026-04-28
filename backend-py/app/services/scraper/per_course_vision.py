@@ -26,7 +26,7 @@ import asyncio
 import logging
 import re
 from typing import Any, Awaitable, Callable, Final
-from urllib.parse import urljoin
+from urllib.parse import unquote, urljoin
 
 import httpx
 
@@ -88,6 +88,21 @@ _DECORATIVE_HINTS: Final = (
     "spinner", "loader", "placeholder", "thumb", "thumbnail",
     "sponsor", "partner", "facebook", "twitter", "instagram",
     "linkedin", "youtube", "tiktok",
+    # Contact / UI widgets — never contain requirements tables
+    "phone", "email", "map-marker", "map_marker", "marker",
+    # ASA-style square-format logos ("ASA square 32.png")
+    "square",
+)
+
+# URL path-segment keywords that strongly suggest the image contains
+# English language requirement scores.  Images whose URL (lower-cased)
+# contains any of these move to the FRONT of the processing queue so
+# the early-stop condition triggers sooner and avoids paying for OCR on
+# decorative images that slipped through the basic filter above.
+_ENGLISH_IMG_PRIORITY_KEYWORDS: Final = (
+    "english", "master", "bachelor", "undergraduate", "postgraduate",
+    "ielts", "pte", "toefl", "cambridge", "duolingo", "language",
+    "requirement", "admission", "entry",
 )
 
 _VISION_PROMPT: Final = (
@@ -112,11 +127,17 @@ _VISION_PROMPT: Final = (
 def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
     """Return ``[(absolute_url, alt_text)]`` for non-decorative ``<img>``.
 
-    Order is preserved (top-of-document first) and capped at
-    :data:`_MAX_IMAGES` so the caller never accidentally fans out into
-    a 100-image hero gallery.
+    Candidates are sorted so images whose URL contains English-requirement
+    keywords (``_ENGLISH_IMG_PRIORITY_KEYWORDS``) appear first — this lets
+    the early-stop loop in :func:`maybe_vision_refetch` trigger as soon as
+    the requirements table is found without burning Gemini calls on later
+    decorative images.
+
+    The raw HTML-order list is first built (up to 2× ``_MAX_IMAGES``), then
+    split into a high-priority and low-priority tier, and the final list is
+    capped at ``_MAX_IMAGES``.
     """
-    out: list[tuple[str, str]] = []
+    raw: list[tuple[str, str]] = []
     for tag in _IMG_TAG_RE.findall(html or ""):
         m_src = _SRC_RE.search(tag)
         if not m_src:
@@ -126,17 +147,26 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
             continue
         m_alt = _ALT_RE.search(tag)
         alt = (m_alt.group(1) or m_alt.group(2) or "").strip() if m_alt else ""
-        decision_text = f"{src} {alt}".lower()
+        # URL-decode before the word-boundary check so "%20square%20" is
+        # seen as " square " (word boundaries intact).
+        decision_text = f"{unquote(src)} {alt}".lower()
         if any(re.search(rf"\b{re.escape(h)}\b", decision_text) for h in _DECORATIVE_HINTS):
             continue
         try:
             absolute = urljoin(base_url, src)
         except Exception:  # noqa: BLE001 — never fail the scrape on a bad src
             continue
-        out.append((absolute, alt))
-        if len(out) >= _MAX_IMAGES:
+        raw.append((absolute, alt))
+        if len(raw) >= _MAX_IMAGES * 2:
             break
-    return out
+
+    # Promote English-requirement images to the front.
+    def _priority(item: tuple[str, str]) -> int:
+        url_lower = item[0].lower()
+        return 0 if any(kw in url_lower for kw in _ENGLISH_IMG_PRIORITY_KEYWORDS) else 1
+
+    raw.sort(key=_priority)
+    return raw[:_MAX_IMAGES]
 
 
 async def _download(url: str) -> bytes | None:

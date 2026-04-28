@@ -18,6 +18,25 @@ _INPUT_USD_PER_M = 0.075
 _OUTPUT_USD_PER_M = 0.30
 
 
+def _detect_mime_type(img_bytes: bytes) -> str:
+    """Detect image MIME type from leading magic bytes.
+
+    The ``generate_with_images`` caller used to pass a fixed
+    ``mime_type="image/jpeg"`` regardless of actual content. PNG images
+    sent with ``image/jpeg`` cause Gemini to return an empty response
+    with ``finish_reason=1`` (STOP) and no text parts, silently failing
+    all vision-OCR extractions. Auto-detecting the type per image byte
+    stream fixes the MaSTER.png / English-requirements table scenario.
+    """
+    if img_bytes[:4] == b"\x89PNG":
+        return "image/png"
+    if img_bytes[:3] == b"GIF":
+        return "image/gif"
+    if len(img_bytes) >= 12 and img_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"  # default — handles JFIF / EXIF
+
+
 @dataclass
 class GeminiResponse:
     text: str
@@ -85,6 +104,12 @@ async def generate_with_images(
     Google bills) plus the text prompt tokens, so the per-image cost is
     bounded and the daily budget keeps applying.
 
+    ``mime_type`` is now used only as a final fallback; each image's
+    actual type is auto-detected from its magic bytes first.  Sending a
+    PNG as ``image/jpeg`` caused Gemini to return finish_reason=1 with
+    no text parts — a silent failure that left all ASA Master course
+    English slots empty even though the vision pipeline was running.
+
     Returns the same ``GeminiResponse`` shape as :func:`generate`. On any
     error or budget exhaustion, ``text`` is empty and ``skipped`` is True
     so callers can degrade gracefully without try/except gymnastics.
@@ -110,9 +135,13 @@ async def generate_with_images(
     # binary). The vision-capable model is the same as the text one for
     # Gemini 2.0+; older v1 models would need an explicit ``-vision``
     # variant.
+    # Each image's MIME type is auto-detected from its magic bytes.
+    # The ``mime_type`` parameter is kept as a last-resort fallback for
+    # callers that explicitly know the type and pass it in.
     parts: list = [prompt]
     for img in images:
-        parts.append({"mime_type": mime_type, "data": img})
+        detected = _detect_mime_type(img)
+        parts.append({"mime_type": detected, "data": img})
 
     try:
         resp = await m.generate_content_async(
