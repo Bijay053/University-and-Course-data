@@ -88,6 +88,10 @@ async def _persist_evidence(
         field_key = ev.get("field_key")
         if not field_key:
             continue
+        # decision_status comes from the pipeline: "selected" for the winning
+        # entry, "superseded" for entries overridden by a higher-priority source
+        # (e.g. gemini_primary), or "needs_review" by default.
+        _ds = (ev.get("decision_status") or "needs_review")[:50]
         values.append(
             {
                 "scraped_course_id": scraped_course_id,
@@ -103,6 +107,8 @@ async def _persist_evidence(
                     if isinstance(ev.get("confidence"), (int, float))
                     else None
                 ),
+                "decision_status": _ds,
+                "selected": _ds == "selected",
             }
         )
     if not values:
