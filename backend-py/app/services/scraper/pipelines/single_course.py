@@ -1508,6 +1508,136 @@ async def extract_course(
                 }
             )
 
+    # ── Scrape-quality warning detection ─────────────────────────────────────
+    # After ALL extractors have settled, audit the final payload for cases
+    # where the course page clearly contained a data section but the pipeline
+    # failed to extract a value.  These warnings surface in the review UI as
+    # amber badges so operators know why a row needs manual verification.
+    # They are stored in payload["scrape_warnings"] (JSONB list of codes) and
+    # persist to the scraped_courses.scrape_warnings column via stage_course.
+    #
+    # WARNING CODES:
+    #   english_section_detected_scores_blank — "English Language Requirements"
+    #     heading found in page HTML but every IELTS/PTE/TOEFL/CAE/DET slot
+    #     is still NULL after all extractors including vision and AI fallback.
+    #     Most common cause: Gemini not configured on the production host, or
+    #     scores are in an image that vision couldn't decode.
+    #   fee_section_detected_fee_blank — fee-related heading found in HTML but
+    #     international_fee is NULL.  Usually means the page shows fee info in
+    #     a JavaScript-rendered table that the browser pass missed.
+    #   suspicious_duration — duration value looks wrong for the degree level:
+    #     >7 years for Bachelor/Master, or <0.25 years (3 months) for any
+    #     course. Catches semester-to-year misconversions and AI hallucinations.
+    #   no_intake_months — intake_months list is empty after extraction. Flags
+    #     courses where the page shows intake info but none was captured.
+    _scrape_warnings: list[str] = list(payload.get("scrape_warnings") or [])
+
+    _check_html = rendered_html or html or ""
+    _check_lower = _check_html.lower()
+
+    # ── English section detected but no scores ──────────────────────────────
+    _ENGLISH_HEADING_PATTERNS = (
+        "english language requirement",
+        "english requirement",
+        "english proficiency",
+        "ielts requirement",
+        "language requirement",
+        "english language proficiency",
+    )
+    _english_heading_found = any(p in _check_lower for p in _ENGLISH_HEADING_PATTERNS)
+    _english_slots_all_blank = all(
+        payload.get(k) in (None, "", 0)
+        for k in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall")
+    )
+    if _english_heading_found and _english_slots_all_blank:
+        if "english_section_detected_scores_blank" not in _scrape_warnings:
+            _scrape_warnings.append("english_section_detected_scores_blank")
+        if emit:
+            await emit(
+                "status",
+                f"[WARN] {payload.get('course_name','?')[:40]} — English section detected in HTML but all scores blank",
+                phase="extract",
+                kind="scrape_warning",
+                warning="english_section_detected_scores_blank",
+                url=url,
+            )
+
+    # ── Fee section detected but fee is blank ───────────────────────────────
+    _FEE_HEADING_PATTERNS = (
+        "international tuition",
+        "course fee",
+        "fees and scholarship",
+        "tuition fee",
+        "fee summary",
+        "international student fee",
+        "fees schedule",
+    )
+    _fee_heading_found = any(p in _check_lower for p in _FEE_HEADING_PATTERNS)
+    _fee_blank = payload.get("international_fee") in (None, "", 0)
+    if _fee_heading_found and _fee_blank:
+        if "fee_section_detected_fee_blank" not in _scrape_warnings:
+            _scrape_warnings.append("fee_section_detected_fee_blank")
+        if emit:
+            await emit(
+                "status",
+                f"[WARN] {payload.get('course_name','?')[:40]} — Fee section detected but fee is blank",
+                phase="extract",
+                kind="scrape_warning",
+                warning="fee_section_detected_fee_blank",
+                url=url,
+            )
+
+    # ── Suspicious duration ─────────────────────────────────────────────────
+    _dur_val = payload.get("duration")
+    if _dur_val is not None:
+        try:
+            _dur_f = float(_dur_val)
+            _dur_term = (payload.get("duration_term") or "Year").lower()
+            # Normalise to years for the sanity check
+            if "month" in _dur_term:
+                _dur_years = _dur_f / 12
+            elif "semester" in _dur_term:
+                _dur_years = _dur_f / 2
+            elif "trimester" in _dur_term:
+                _dur_years = _dur_f / 3
+            elif "week" in _dur_term:
+                _dur_years = _dur_f / 52
+            else:
+                _dur_years = _dur_f  # assume years
+            _degree_l = (payload.get("degree_level") or "").lower()
+            _is_bachelor_master = any(x in _degree_l for x in ("bachelor", "master", "honours"))
+            _SUSPICIOUS_MAX = 7.0 if _is_bachelor_master else 12.0
+            if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25:
+                if "suspicious_duration" not in _scrape_warnings:
+                    _scrape_warnings.append("suspicious_duration")
+                if emit:
+                    await emit(
+                        "status",
+                        f"[WARN] {payload.get('course_name','?')[:40]} — Suspicious duration: {_dur_val} {_dur_term} ({_dur_years:.1f} yrs)",
+                        phase="extract",
+                        kind="scrape_warning",
+                        warning="suspicious_duration",
+                        url=url,
+                    )
+        except (TypeError, ValueError):
+            pass
+
+    # ── No intake months ────────────────────────────────────────────────────
+    _intake_months = payload.get("intake_months") or []
+    if not _intake_months:
+        # Only warn if page had explicit intake-related text (avoid false
+        # positives for universities that don't publish intake schedules).
+        _INTAKE_HEADING_PATTERNS = (
+            "intake", "start date", "commencement", "enrolment period",
+            "semester start", "trimester start",
+        )
+        if any(p in _check_lower for p in _INTAKE_HEADING_PATTERNS):
+            if "no_intake_months" not in _scrape_warnings:
+                _scrape_warnings.append("no_intake_months")
+
+    if _scrape_warnings:
+        payload["scrape_warnings"] = _scrape_warnings
+
     footer = build_course_page_provenance_footer(payload)
 
     # Build extraction_method: for each filled payload field, record the
