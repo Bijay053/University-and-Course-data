@@ -203,12 +203,26 @@ _PER_UNIT_HINT_RE = re.compile(
 # the keyword fallback (with its salary/intl-context scoring) still
 # handles the ambiguous cases below.
 _FEE_LABEL_RE = re.compile(
+    # ── "international …" labels (original set) ────────────────────────
     r"(?:international\s+(?:tuition\s+)?(?:fees?|cost|tuition)|"
     r"international\s+student\s+(?:tuition\s+)?fees?|"
     r"international\s+tuition|"
     r"tuition\s+fees?\s*\(international\)|"
     r"fees?\s*\(international\)|"
-    r"international\s+annual\s+fees?)",
+    r"international\s+annual\s+fees?|"
+    # ── Generic annual / indicative labels (UOW, UniSQ, etc.) ──────────
+    # These appear when the page is already filtered to the international
+    # view (e.g. ?students=international query param) so "international"
+    # is not repeated in the label text itself.
+    r"annual\s+tuition\s+fee|"
+    r"indicative\s+annual\s+(?:tuition\s+)?fee|"
+    r"annual\s+fee|"
+    r"tuition\s+fee|"
+    r"course\s+fee|"
+    r"program(?:me)?\s+fee|"
+    # ── UOW-specific label variants ─────────────────────────────────────
+    r"fee\s+per\s+(?:year|annum)|"
+    r"annual\s+(?:course\s+)?cost)",
     re.IGNORECASE,
 )
 _STRONG_VALUE_CHAR_CAP = 300
