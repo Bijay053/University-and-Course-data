@@ -1,0 +1,40 @@
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+api/auth/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+index-CKPqJMTt.js:9  POST http://159.65.152.72/api/auth/login 401 (Unauthorized)
+u @ index-CKPqJMTt.js:9
+v @ index-CKPqJMTt.js:86
+eb @ index-CKPqJMTt.js:8
+(anonymous) @ index-CKPqJMTt.js:8
+ki @ index-CKPqJMTt.js:8
+zp @ index-CKPqJMTt.js:8
+Jp @ index-CKPqJMTt.js:9
+HE @ index-CKPqJMTt.js:9
+index-CKPqJMTt.js:9  POST http://159.65.152.72/api/auth/login 401 (Unauthorized)
+u @ index-CKPqJMTt.js:9
+v @ index-CKPqJMTt.js:86
+eb @ index-CKPqJMTt.js:8
+(anonymous) @ index-CKPqJMTt.js:8
+ki @ index-CKPqJMTt.js:8
+zp @ index-CKPqJMTt.js:8
+Jp @ index-CKPqJMTt.js:9
+HE @ index-CKPqJMTt.js:9
+index-CKPqJMTt.js:9  POST http://159.65.152.72/api/auth/login 401 (Unauthorized)
+u @ index-CKPqJMTt.js:9
+v @ index-CKPqJMTt.js:86
+eb @ index-CKPqJMTt.js:8
+(anonymous) @ index-CKPqJMTt.js:8
+ki @ index-CKPqJMTt.js:8
+zp @ index-CKPqJMTt.js:8
+Jp @ index-CKPqJMTt.js:9
+HE @ index-CKPqJMTt.js:9
