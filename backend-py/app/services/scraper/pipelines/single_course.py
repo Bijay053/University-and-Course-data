@@ -460,6 +460,58 @@ async def extract_course(
     except Exception as _bond_exc:  # noqa: BLE001
         log.warning("bond_static_extract pre-seed failed on %s: %s", url, _bond_exc)
 
+    # ── ECU pre-seed: runs BEFORE _EXTRACTORS ─────────────────────────────────
+    # ECU (Edith Cowan University) course pages at /degrees/courses/<slug>.
+    # The pre-seed provides:
+    #   1. has_central_fee_page=True  → bypasses no_international_fee rejection
+    #   2. course_location            → ECU campus names (Joondalup / Mount Lawley /
+    #                                    South West / Perth City) or "Perth, Australia"
+    #                                    Uses direct assignment to block footer-derived
+    #                                    garbage (Sri Lanka etc.) from winning.
+    #   3. scrape_warnings            → "ecu_fee_review" when fee absent from static HTML
+    # study_mode is NOT set here — ECU's defaultStudyMode="On Campus" in scrape_config
+    # overrides any low-confidence "Online" value inside the orchestrator staging loop.
+    _is_ecu_page: bool = False
+    try:
+        from app.services.scraper.ecu_static_extract import (
+            apply_ecu_extraction as _ecu_apply,
+            is_ecu_course_url as _is_ecu,
+        )
+        if _is_ecu(url):
+            _ecu_pre = _ecu_apply(url, html)
+            # Direct-write keys prevent generic extractor noise from winning.
+            _ECU_DIRECT_KEYS = {"has_central_fee_page", "course_location"}
+            for _ek, _ev in _ecu_pre.items():
+                if _ek == "scrape_warnings":
+                    _ew = list(payload.get("scrape_warnings") or [])
+                    for _w in (_ev or []):
+                        if _w not in _ew:
+                            _ew.append(_w)
+                    payload["scrape_warnings"] = _ew
+                    continue
+                if _ek in _ECU_DIRECT_KEYS:
+                    payload[_ek] = _ev
+                else:
+                    payload.setdefault(_ek, _ev)
+                if _ev not in (None, "", 0, []):
+                    evidence.append({
+                        "field_key": _ek,
+                        "value": _ev,
+                        "confidence": 0.85,
+                        "method": "ecu_static",
+                        "source_url": url,
+                        "snippet": f"ECU pre-seed: {_ek}={_ev}",
+                    })
+            _is_ecu_page = True
+            log.info(
+                "[ECU ✓] %s — pre-seed applied: loc=%s fee=%s",
+                url.split("/")[-1][:40],
+                _ecu_pre.get("course_location"),
+                _ecu_pre.get("international_fee"),
+            )
+    except Exception as _ecu_exc:  # noqa: BLE001
+        log.warning("ecu_static_extract pre-seed failed on %s: %s", url, _ecu_exc)
+
     for module, extra_keys in _EXTRACTORS:
         kwargs: dict[str, Any] = {}
         for k in extra_keys:

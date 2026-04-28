@@ -806,6 +806,43 @@ async def discover_course_links(
             if len(found) >= max_courses:
                 break
 
+    # ── ECU: keep only /degrees/courses/<slug> URLs ──────────────────────────
+    # ECU's sitemap and BFS harvest article pages, experience stories, career-
+    # switch blogs, hub pages, and listing pages alongside real course pages.
+    # For ECU specifically the ONLY valid individual course pages are at
+    # /degrees/courses/<single-slug> (not /all, not /postgraduate, not nested).
+    _ecu_hosts = frozenset({"ecu.edu.au", "www.ecu.edu.au"})
+    if parsed.netloc in _ecu_hosts:
+        _pre_ecu = len(found)
+        _ecu_valid: dict[str, str] = {}
+        for _eu, _en in found.items():
+            try:
+                _ep = urlparse(_eu).path.lower().rstrip("/")
+                # Must be /degrees/courses/<slug> with exactly one slug segment.
+                if not _ep.startswith("/degrees/courses/"):
+                    continue
+                _slug = _ep[len("/degrees/courses/"):]
+                if not _slug or _slug in ("all", "search", "postgraduate", "undergraduate"):
+                    continue
+                # Reject nested paths (category hubs or further sub-pages).
+                if "/" in _slug:
+                    continue
+                _ecu_valid[_eu] = _en
+            except Exception:
+                continue
+        _removed_ecu = _pre_ecu - len(_ecu_valid)
+        found = _ecu_valid
+        if emit and _removed_ecu:
+            await emit(
+                "status",
+                f"[DISCOVER] ECU post-filter: kept {len(found)} /degrees/courses/ URLs "
+                f"(dropped {_removed_ecu} non-course candidates)",
+                phase="discover",
+                kind="ecu_course_filter",
+                kept=len(found),
+                dropped=_removed_ecu,
+            )
+
     # ── Bond University: keep only /program/ URLs ────────────────────────────
     # Bond's sitemap includes pages under /study/, /sport/, /experience-bond-
     # for-yourself/ etc. that are never real program detail pages. The

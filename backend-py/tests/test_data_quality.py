@@ -242,9 +242,7 @@ class TestDuplicateDetection:
 
 class TestRunQualityChecks:
     def _run(self, staged_results):
-        return asyncio.get_event_loop().run_until_complete(
-            run_quality_checks(staged_results)
-        )
+        return asyncio.run(run_quality_checks(staged_results))
 
     def test_returns_structured_report(self):
         staged = [

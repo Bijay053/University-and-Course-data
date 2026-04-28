@@ -454,6 +454,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
+    # Track why courses were skipped: {guard_name: count}
+    skip_reasons: dict[str, int] = {}
 
     # Stop signalling: shared list-of-bool (mutable across closures) plus a
     # background poller that watches scrape_runtime_jobs.stop_requested. The
@@ -1141,6 +1143,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             if payload.get("parser_error"):
                 _pe_fields = payload.get("parser_error_fields") or []
                 summary["skipped"] += 1
+                skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
                 log.warning(
                     "[PARSER ERROR] %s — skipped staging; critical fields missing "
                     "after browser render: %s",
@@ -1212,6 +1215,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                 else:
                     summary["skipped"] += 1
+                    _skip_key = (res.reason or "unknown").replace(" ", "_").lower()[:40]
+                    skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
                     await emit(
                         "status",
                         f"[STAGE] skipped {r['name']}: {res.reason}",
@@ -1305,17 +1310,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             avg_seconds_per_course=avg_per_course,
             level="info",
         )
+        # Build human-readable skip breakdown for the log line.
+        _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
+        _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
         await emit(
             "done",
             f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
             f"Staged:{summary.get('staged', 0)} | "
-            f"Skipped:{summary.get('skipped', 0)} | "
+            f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
             f"Errors:{summary.get('errors', 0)}",
             phase="complete",
             totalFound=summary.get("discovered", 0),
             imported=summary.get("staged", 0),
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
+            skip_reasons=skip_reasons,
             level="success",
         )
         # PR-1.5: post-run sanity check on the imported counter.
