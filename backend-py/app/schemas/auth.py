@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class LoginBody(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
 
 

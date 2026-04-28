@@ -43,7 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data?.detail ?? "Login failed");
+      const detail = data?.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+          ? detail.map((e: { msg?: string }) => e.msg ?? "Invalid field").join("; ")
+          : "Login failed";
+      throw new Error(message);
     }
     setUser(data.user);
   }

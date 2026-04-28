@@ -25,6 +25,17 @@ The system is built as a monorepo utilizing `pnpm workspaces`.
 - **API Code Generation**: Orval, generating client code from an OpenAPI specification.
 - **Build System**: esbuild for CommonJS bundles.
 
+### Authentication
+
+The admin portal now requires login. The auth flow:
+- `GET /api/auth/me` is called on startup; redirects to `/login` if no valid session.
+- `POST /api/auth/login` with `{ email, password }` sets an `httponly` JWT cookie named `session` (7-day expiry).
+- `POST /api/auth/logout` clears the cookie and returns to `/login`.
+- Default credentials: email `admin@university-portal.local`, password `Bijay@12345` (overridden by `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars on the production server).
+- Auth state managed by `src/context/auth.tsx` (`AuthProvider` + `useAuth` hook).
+- All protected routes wrapped in `AuthGuard` in `App.tsx`.
+- Logout button visible at the bottom of the sidebar when logged in.
+
 ### Core Features
 
 - **Dashboard**: Provides an overview with statistics, courses by degree level, upcoming intakes, and recent changes.
