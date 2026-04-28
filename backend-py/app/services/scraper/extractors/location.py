@@ -105,14 +105,64 @@ def _looks_marketing(text: str) -> bool:
     return len(t.split()) > 16
 
 
+_NON_LOCATION_PHRASES: frozenset[str] = frozenset({
+    # Delivery / mode / format labels — never a location.
+    "delivery method",
+    "delivery mode",
+    "delivery format",
+    "study mode",
+    "attendance mode",
+    "attendance pattern",
+    "mode of study",
+    "mode of delivery",
+    # Action verbs / button labels picked up by sloppy DOM walks.
+    "view dates",
+    "view date",
+    "view all",
+    "start",
+    "start date",
+    "start dates",
+    "starts",
+    "apply",
+    "apply now",
+    "enquire",
+    "enquire now",
+    "enrol",
+    "enrol now",
+    "save",
+    "saved",
+    "compare",
+    "more info",
+    # Audience / fee-type labels — also not a location.
+    "domestic",
+    "international",
+    "domestic students",
+    "international students",
+    "domestic and international",
+})
+
+
 def _is_only_delivery_method(text: str) -> bool:
     """True when ``text`` reduces to nothing once delivery-method words
     (online / virtual / remote / external / ...) and punctuation are
-    stripped.  Defence in depth so a location field never gets saved as
-    "Online" / "External" / "Online, Distance" / etc.
+    stripped, OR the text exactly matches one of the non-location
+    phrases (Delivery method, View dates, Start, Apply, Domestic,
+    International, ...).
+
+    Defence in depth so a location field never gets saved as
+    "Online" / "External" / "Delivery method" / "View dates" / "Start"
+    / "Apply" / "Domestic" / "International" / etc., regardless of which
+    extractor cascade method produced the value.
     """
     if not text:
         return True
+    # Pass 1 — exact-phrase rejection (case-insensitive, normalised
+    # whitespace).  Catches single-word labels like "Start" / "Apply"
+    # that survive _REMOVE_VIRTUAL stripping below.
+    norm = re.sub(r"\s+", " ", text).strip().lower().rstrip(":")
+    if norm in _NON_LOCATION_PHRASES:
+        return True
+    # Pass 2 — strip delivery-mode tokens and check what's left.
     stripped = _REMOVE_VIRTUAL.sub("", text)
     stripped = re.sub(r"[\s,;/&\-–—]+", "", stripped).strip()
     return not stripped
