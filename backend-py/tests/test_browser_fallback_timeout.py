@@ -54,7 +54,7 @@ async def test_browser_fallback_aborts_on_timeout(monkeypatch, caplog):
     payload: dict = {}  # all english slots empty -> fallback engages
 
     with caplog.at_level("WARNING"):
-        filled, evidence, rendered = await per_course_browser.maybe_browser_refetch(
+        filled, evidence, rendered, override = await per_course_browser.maybe_browser_refetch(
             "https://example.test/course",
             payload,
             emit=_emit,
@@ -89,9 +89,9 @@ async def test_browser_fallback_skipped_when_already_filled(monkeypatch):
     monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _track)
 
     payload = {"ielts_overall": 6.5}
-    filled, evidence, rendered = await per_course_browser.maybe_browser_refetch(
+    filled, evidence, rendered, override = await per_course_browser.maybe_browser_refetch(
         "https://example.test/course",
         payload,
     )
     assert called == []
-    assert filled == {} and evidence == [] and rendered is None
+    assert filled == {} and evidence == [] and rendered is None and override is False

@@ -179,8 +179,8 @@ def test_t207_per_course_browser_skips_when_slots_already_populated() -> None:
     """
     payload = {"ielts_overall": 6.5}
     assert not _all_english_empty(payload)
-    filled, ev, html = _run(maybe_browser_refetch("https://x", payload))
-    assert filled == {} and ev == [] and html is None
+    filled, ev, html, override = _run(maybe_browser_refetch("https://x", payload))
+    assert filled == {} and ev == [] and html is None and override is False
 
 
 # --- T208 — Per-course vision: decorative-image filter ----------------------

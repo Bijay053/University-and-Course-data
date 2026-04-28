@@ -115,6 +115,20 @@ _SLOW_HOSTS: tuple[str, ...] = (
     "study.csu.edu.au",
 )
 
+# Hosts whose static HTML contains misleading site-wide IELTS/English
+# statements that cause the browser pass to be skipped too early (the
+# generic value gets extracted from the static page, marking the slot
+# as "populated", so the per-course Entry Requirements tab — which is
+# JS-rendered — is never fetched).  For these hosts we ALWAYS run the
+# Playwright browser and allow its English-test result to OVERRIDE the
+# static value (higher-specificity course page wins over generic footer
+# text).  Federation is the canonical example: its static HTML contains
+# "minimum IELTS 6.0" in a site-wide section, but course-specific pages
+# can require 7.0 or higher.
+_FORCE_BROWSER_HOSTS: tuple[str, ...] = (
+    "federation.edu.au",
+)
+
 _NETWORKIDLE_SETTLE_MS = 3000
 _DEFAULT_SETTLE_MS = 1500
 # Outer ceilings keep a single hung page from wedging the Celery worker
@@ -188,30 +202,47 @@ def _all_english_empty(payload: dict[str, Any]) -> bool:
     return all(payload.get(k) in (None, "", 0) for k in _ENGLISH_SLOTS)
 
 
+def _force_browser_for_url(url: str) -> bool:
+    """Return True for hosts that always need a browser render, even when
+    english-test slots are already populated from static HTML (the static
+    value is a generic site-wide statement, not course-specific)."""
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        host = ""
+    return any(host == h or host.endswith("." + h) for h in _FORCE_BROWSER_HOSTS)
+
+
 async def maybe_browser_refetch(
     url: str,
     payload: dict[str, Any],
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
-) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
+    force: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]], str | None, bool]:
     """If the english-test slots are empty, re-fetch the page via
     Playwright and re-run :func:`english_test.extract` against the
     rendered HTML.
 
-    Returns a 3-tuple ``(filled_values, evidence_rows, rendered_html)``:
+    Returns a 4-tuple ``(filled_values, evidence_rows, rendered_html, override)``:
     * ``filled_values`` — slot keys & values to merge into the existing
-      payload (caller decides via ``setdefault`` so first-write-wins).
+      payload.  When ``override`` is True the caller should use direct
+      assignment rather than ``setdefault`` so the rendered (course-
+      specific) value wins over the static (generic) value.
     * ``evidence_rows`` — provenance rows tagged ``method=per_course_browser``.
-    * ``rendered_html`` — the Playwright HTML so the vision-OCR fallback
-      (T208) can scan ``<img>`` tags without paying for a second browser
-      hit. ``None`` when the browser fetch returned nothing.
+    * ``rendered_html`` — the Playwright HTML so Gemini-primary and the
+      vision-OCR fallback (T208) can use JS-rendered content.  ``None``
+      when the browser fetch returned nothing.
+    * ``override`` — True when ``force=True`` was passed, meaning the
+      caller should let browser values overwrite existing payload slots
+      (e.g. Federation whose static HTML has a generic IELTS 6.0 but
+      the rendered Entry Requirements tab has the course-specific 7.0).
 
-    All three are empty / ``None`` when the slots were already populated
-    or the browser fetch failed — the caller can treat the no-op case
-    identically to the "browser disabled" case.
+    All four are empty / ``None`` / False when the slots were already
+    populated (and ``force`` is False), or the browser fetch failed.
     """
-    if not _all_english_empty(payload):
-        return {}, [], None
+    if not _all_english_empty(payload) and not force:
+        return {}, [], None, False
 
     # Issue 1: skip browser pass for paths where a static fallback is
     # sufficient and the browser is known to always time out (e.g. VIT
@@ -227,7 +258,7 @@ async def maybe_browser_refetch(
                 kind="per_course_browser_skipped",
                 url=url,
             )
-        return {}, [], None
+        return {}, [], None, False
 
     if emit:
         await emit(
@@ -269,7 +300,7 @@ async def maybe_browser_refetch(
                 timeout_seconds=outer_sec,
                 level="warn",
             )
-        return {}, [], None
+        return {}, [], None, False
     except Exception as exc:  # noqa: BLE001 — never abort on browser failure
         log.warning("per_course_browser fetch %s failed: %s", url, exc)
         if emit:
@@ -280,7 +311,7 @@ async def maybe_browser_refetch(
                 kind="per_course_browser_error",
                 url=url,
             )
-        return {}, [], None
+        return {}, [], None, False
     if not rendered:
         if emit:
             await emit(
@@ -290,7 +321,7 @@ async def maybe_browser_refetch(
                 kind="per_course_browser_empty",
                 url=url,
             )
-        return {}, [], None
+        return {}, [], None, False
 
     try:
         # NOTE: english_test.extract is `async def` but contains no await
@@ -305,7 +336,7 @@ async def maybe_browser_refetch(
         results: list[ExtractionResult] = await english_test.extract(rendered, url)
     except Exception as exc:  # noqa: BLE001
         log.warning("english_test re-extract failed on rendered %s: %s", url, exc)
-        return {}, [], rendered
+        return {}, [], rendered, force
 
     filled: dict[str, Any] = {}
     evidence: list[dict[str, Any]] = []
@@ -351,4 +382,4 @@ async def maybe_browser_refetch(
             filled=list(filled.keys()),
         )
 
-    return filled, evidence, rendered
+    return filled, evidence, rendered, force

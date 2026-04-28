@@ -61,7 +61,11 @@ _HARD_FIELDS: dict[str, str] = {
         "(e.g. '2 years full-time', '18 months'). Null if not found."
     ),
     "ielts_overall": (
-        "Minimum IELTS overall band score required for admission (e.g. 6.5). "
+        "Minimum IELTS *overall* band score required for admission (e.g. 6.5). "
+        "Return the OVERALL (total) score ONLY — NOT a sub-band score for "
+        "listening, reading, writing, or speaking. "
+        "Example: if the page says 'overall score of 7.0, with a minimum of 6.5 "
+        "in writing', return 7.0, not 6.5. "
         "Number only. Null if not stated on this page."
     ),
     "pte_overall": (
@@ -105,7 +109,10 @@ _HARD_FIELDS: dict[str, str] = {
     "intake_text": (
         "Intake months as a comma-separated list of month names "
         "(e.g. 'January, April, July, October'). "
-        "Null if not stated."
+        "Look for 'Start dates', 'Intake', 'Commencement', or 'Application open' sections. "
+        "If specific dates are listed (e.g. '22 June 2026', '20 July 2026', "
+        "'25 January 2027'), extract the month names from them (June, July, January). "
+        "Return unique months only. Null if not stated."
     ),
     "location_text": (
         "Campus location(s) where this course is physically taught "

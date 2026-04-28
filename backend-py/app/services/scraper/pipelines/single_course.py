@@ -61,6 +61,15 @@ _DOMESTIC_ONLY_RE = _re.compile(
     r"|sorry[,.]?\s+this\s+(?:course|program)\s+is\s+not\s+available\s+to\s+international"
     # "Open to domestic applicants only" — rare but unambiguous
     r"|open\s+to\s+domestic\s+applicants\s+only"
+    # Broader unambiguous negatives — no "this course" qualifier needed.
+    # "Not available to international students" is unambiguous on a course
+    # detail page.  We do NOT match just "not available to international"
+    # (without "students") to avoid false-positives on short snippets.
+    r"|not\s+available\s+to\s+international\s+students?"
+    # "International applications are not accepted" / "not accepting
+    # international student applications" — Federation and similar.
+    r"|international\s+(?:student\s+)?applications?\s+(?:are\s+)?not\s+(?:accepted|available|open)"
+    r"|not\s+currently\s+accepting\s+international\s+(?:student\s+)?applications?"
     r")",
     _re.IGNORECASE,
 )
@@ -477,16 +486,39 @@ async def extract_course(
     #      where text extraction (regex+Gemini) still left gaps.
     rendered_html: str | None = None
     try:
-        from app.services.scraper.per_course_browser import maybe_browser_refetch
+        from app.services.scraper.per_course_browser import (
+            _force_browser_for_url,
+            maybe_browser_refetch,
+        )
 
-        browser_filled, browser_evidence, rendered_html = await maybe_browser_refetch(
-            url, payload, emit=emit
+        _force = _force_browser_for_url(url)
+        browser_filled, browser_evidence, rendered_html, _override = (
+            await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )
         for k, v in browser_filled.items():
-            payload.setdefault(k, v)
+            if _override:
+                payload[k] = v
+            else:
+                payload.setdefault(k, v)
         evidence.extend(browser_evidence)
     except Exception as exc:  # noqa: BLE001
         log.warning("per-course browser fallback errored on %s: %s", url, exc)
+
+    # ── Domestic-only re-check on rendered HTML ───────────────────────────────
+    # Some sites (e.g. Federation) show "Not available to international
+    # students" only in JS-rendered content (a disabled tab, a warning
+    # banner loaded via XHR).  The static-HTML check above misses these.
+    # Re-run the same test against the rendered HTML when we have it.
+    if not payload.get("domestic_only") and rendered_html and _is_domestic_only_page(rendered_html):
+        payload["domestic_only"] = True
+        await emit(
+            "status",
+            f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
+            phase="extract",
+            kind="domestic_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
 
     # ── Gemini Flash PRIMARY ─────────────────────────────────────────────────
     # Uses rendered_html when available (JS-rendered SPA pages like KBS),
