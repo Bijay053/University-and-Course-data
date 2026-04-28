@@ -858,14 +858,26 @@ def _equivalence_fallback(
     return extra
 
 
+# Hosts whose course pages do not publish PTE requirements.  Running the
+# broad Pattern-3 regex on these pages produces false positives (e.g. UOW
+# pages reference "Year 11" near a generic "PTE" acronym, yielding PTE=11).
+_NO_PTE_HOSTS: frozenset[str] = frozenset({
+    "www.uow.edu.au",
+    "uow.edu.au",
+})
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
+    from urllib.parse import urlparse as _up
+    _host = (_up(url).netloc or "").lower()
+
     text = compact(html_to_text(html))
     if not text:
         return []
     snippet = text[:500]
     results: list[ExtractionResult] = [
         *_emit("ielts", _ielts(text), snippet),
-        *_emit("pte", _pte(text), snippet),
+        *(_emit("pte", _pte(text), snippet) if _host not in _NO_PTE_HOSTS else []),
         *_emit("toefl", _toefl(text), snippet),
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),
