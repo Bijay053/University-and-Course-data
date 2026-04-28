@@ -74,7 +74,10 @@ _DURATION_CONTEXT = re.compile(
 _DURATION_ANTI_CONTEXT = re.compile(
     r"\b(experience|established|founded|since\s+(?:19|20)\d{2}|"
     r"anniversar(?:y|ies)|celebrat(?:e|ing|ion|ed)|partnership|"
-    r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry)\b",
+    r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry|"
+    # PSYCH/HDR eligibility clauses: "no earlier than 8 years previous to
+    # the year of application" — not a program duration.
+    r"previous\s+to|year\s+of\s+application|year\s+of\s+enrol(?:lment)?)\b",
     re.I,
 )
 
@@ -95,6 +98,13 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
     r"maximum\s+enrolment)\b",
     re.I,
 )
+# Same patterns but ONLY used to gate the loose Pattern-2 fallback — not the
+# labeled Pattern-0 match.  "Duration: 2 years (or part-time equivalent)" is
+# a valid duration sentence where Pattern 0 must still fire; "Part time
+# equivalent: 8 years" is a cap sentence that must be blocked for Pattern 2.
+# By splitting into two uses we avoid filtering the labeled sentence while
+# still blocking fallback matches on candidature/cap copy.
+_DURATION_CAP_FALLBACK_RE = _DURATION_RESEARCH_CAP_RE  # alias, same object
 # Bug 3 (KBS / Torrens): compound durations like "1 year, 8 months" or
 # "1 year and 8 months".  The single-unit patterns above only capture the
 # first numeric token ("1 Year") and discard the month component.
@@ -320,14 +330,16 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     for s in sentences:
         if _ACCELERATED.search(s):
             continue
-        # Skip sentences about research degree candidature caps, part-time
-        # equivalents, and research periods.  These appear on HDR (Higher
-        # Degree by Research) pages alongside the real study duration and have
-        # much larger numbers (e.g. "maximum candidature: 8 years",
-        # "part-time equivalent: 8 years").  Without this filter the loose
-        # pattern-3 fallback picks "8 years" and wins the weight tournament.
-        if _DURATION_RESEARCH_CAP_RE.search(s):
-            continue
+        # Flag sentences about research degree candidature caps, part-time
+        # equivalents, and research periods.  These have large numbers
+        # (e.g. "maximum candidature: 8 years", "part-time equivalent: 8 years")
+        # that must NOT become the program duration.
+        # Previously this was a hard continue — but "Duration: 2 years
+        # (or part-time equivalent)" is a VALID sentence where Pattern 0
+        # (explicit label) should still fire.  We therefore only block the
+        # loose Pattern-2 fallback for cap sentences; Patterns 0/1 are
+        # allowed through so the label match wins the weight tournament.
+        is_cap_sentence = bool(_DURATION_RESEARCH_CAP_RE.search(s))
         # Skip sentences that are talking about credit-point structure rather
         # than program duration — see _CREDIT_POINT_CONTEXT comment.
         credit_context = bool(_CREDIT_POINT_CONTEXT.search(s))
@@ -366,10 +378,11 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 continue
             # Pattern 3 (loose `<num> <unit>` fallback) is the source of
             # false positives like "10 years experience" → duration=10.
+            # Also block it for candidature-cap sentences (see is_cap_sentence).
             # Demand a positive duration-context word in the same
             # sentence AND no anti-context. Patterns 0 and 1 are already
             # context-bound and unaffected.
-            if pat_idx == 2 and (not duration_context or anti_duration_context):
+            if pat_idx == 2 and (is_cap_sentence or not duration_context or anti_duration_context):
                 continue
             try:
                 amount = float(m.group(1))
@@ -388,9 +401,18 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             cap = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}[unit]
             if not (0 < amount <= cap):
                 continue
+            # Pattern-priority boost: explicit duration-label matches
+            # (Pattern 0) must always beat loose fallback matches (Pattern 2)
+            # regardless of the numeric values involved.
+            # Without this boost, "8 years" (pattern-2, weight=41604) would
+            # beat "Duration: 2 years" (pattern-0, weight=10404) in the
+            # weight tournament — exact failure mode on UniSQ MRes page.
+            # Pattern 0 → ×100 (labeled), Pattern 1 → ×10 (full-time),
+            # Pattern 2 → ×1 (fallback).
+            pattern_priority = 100.0 if pat_idx == 0 else (10.0 if pat_idx == 1 else 1.0)
             weeks = amount * _WEEKS[unit]
             parsed.append((
-                (weeks * 100 + _UNIT_RANK[unit]) * weight_mod,
+                (weeks * 100 + _UNIT_RANK[unit]) * weight_mod * pattern_priority,
                 amount,
                 unit,
                 s.strip()[:240],
