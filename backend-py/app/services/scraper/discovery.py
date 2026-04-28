@@ -585,6 +585,32 @@ async def discover_course_links(
 
         before = len(found)
 
+        # ── Self-candidate for confirmed detail pages ────────────────────
+        # When the classifier identifies the CURRENT page as a course
+        # detail (it fetched it, parsed it, found course content), add
+        # the URL itself to the candidate set immediately. Without this,
+        # sites like AIT whose course URLs look like category landings
+        # (/courses/2d-animation, /courses/game-design) are visited,
+        # correctly classified as detail pages, but then silently dropped
+        # because:
+        #   (a) the detail branch returns course_links=[] (no outbound
+        #       course links to harvest), AND
+        #   (b) the legacy link sweep is suppressed for detail pages.
+        # The fix: trust the page-content classifier over the URL-shape
+        # heuristic — if we fetched it and it looks like a course, it IS
+        # a course candidate, regardless of its URL depth.
+        if ptype == "detail" and url not in found:
+            slug_name = url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ").replace("_", " ").title()
+            found[url] = slug_name
+            log.info("[DISCOVER] added self as candidate %s", url)
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] added self as candidate {url}",
+                    phase="discover",
+                    kind="self_candidate",
+                )
+
         # Take the classifier's curated list when it found any — those
         # have already been deduped, junk-filtered, and resolved against
         # the page's origin.
@@ -606,6 +632,41 @@ async def discover_course_links(
             found[u] = n
             if len(found) >= max_courses:
                 break
+
+        # ── Detail page: still enqueue child/sibling course URLs ────────
+        # Even though the current page is a detail, its nav may link to
+        # sibling courses or deeper pages (e.g. AIT /courses/information-
+        # technology links to /courses/information-technology/vocational-
+        # diploma-of-it). Extract those links and enqueue them for BFS
+        # drill-in — but only follow pages that look like courses or
+        # category landings (to avoid crawling the whole nav).
+        if ptype == "detail" and depth < 2 and len(found) < max_courses:
+            _ext = _LinkExtractor()
+            try:
+                _ext.feed(html)
+            except Exception:
+                pass
+            for _href, _text in _ext.links:
+                _full = _resolve(_href, url, origin)
+                if not _full or _full in visited or _full in found:
+                    continue
+                if _looks_like_course(_full, _text):
+                    # Real child course — add directly
+                    if _full not in found and not _JUNK_TEXT.match(_text or ""):
+                        found[_full] = _text or _full.rsplit("/", 1)[-1]
+                        log.info("[DISCOVER] added child course %s", _full)
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[DISCOVER] added child course {_full}",
+                                phase="discover",
+                                kind="child_candidate",
+                            )
+                        if len(found) >= max_courses:
+                            break
+                elif _is_category_landing(_full) or _is_nav(_full):
+                    # Might contain more courses — enqueue for drill-in
+                    queue.append((_full, depth + 1))
 
         # ALWAYS run the legacy link sweep for listing/unknown pages.
         # The classifier curates COURSE links, but real catalogues are
