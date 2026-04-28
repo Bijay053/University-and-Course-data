@@ -178,6 +178,16 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # course detail pages.
     "/industry-engagement/",
     "/industry-opportunities/",
+    # Bond University: experience/marketing hub pages that sit under /study/
+    # and are therefore picked up by the /study/ URL hint even though they
+    # are never real course detail pages.
+    "/experience-bond-for-yourself/",
+    # Bond / generic: sport pages are never course detail pages.
+    "/sport/",
+    # Bond / generic: important-information, key-information pages
+    # (regulatory / disclaimer content, not course catalogues).
+    "/important-information/",
+    "/key-information/",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
@@ -200,7 +210,11 @@ _JUNK_LAST_SEG_RE = re.compile(
     r"enquire|enquiry|enquiries|contact-us|"
     # ACU / generic: research hub pages whose last path segment is a nav
     # keyword rather than a course slug (projects, supervisors, engagement).
-    r"projects?|supervisors?|engagement|opportunities)$",
+    r"projects?|supervisors?|engagement|opportunities|"
+    # Bond / generic: programme-finder / course-finder tool pages.
+    r"program-finder|programme-finder|course-finder|"
+    # Bond: study-area category hub pages (e.g. /study/our-study-areas/X).
+    r"our-study-areas|study-areas?)$",
     re.I,
 )
 
@@ -791,6 +805,35 @@ async def discover_course_links(
             found[u] = n
             if len(found) >= max_courses:
                 break
+
+    # ── Bond University: keep only /program/ URLs ────────────────────────────
+    # Bond's sitemap includes pages under /study/, /sport/, /experience-bond-
+    # for-yourself/ etc. that are never real program detail pages. The
+    # _NON_COURSE_URL_PATTERNS filter above blocks the most egregious ones, but
+    # the sitemap fallback can still yield marketing pages whose URLs don't
+    # match any pattern (they sit two or three segments deep under /study/).
+    # For Bond specifically the ONLY real course detail URLs are at /program/<slug>.
+    # Apply a strict host-level post-filter so all remaining non-program URLs
+    # are dropped here — keeping the extraction phase focused on the ~100
+    # real program pages Bond publishes.
+    _bond_hosts = frozenset({"bond.edu.au", "www.bond.edu.au"})
+    if parsed.netloc in _bond_hosts:
+        _pre_filter_count = len(found)
+        found = {
+            u: n for u, n in found.items()
+            if urlparse(u).path.lower().startswith("/program/")
+        }
+        _removed = _pre_filter_count - len(found)
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] Bond post-filter: kept {len(found)} /program/ URLs "
+                f"(dropped {_removed} non-program candidates)",
+                phase="discover",
+                kind="bond_program_filter",
+                kept=len(found),
+                dropped=_removed,
+            )
 
     raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]
     return _dedup_year_variants(raw)
