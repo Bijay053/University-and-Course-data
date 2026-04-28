@@ -59,6 +59,18 @@ _RE_SHORT_GENERICS = re.compile(
 _RE_LONG_GENERICS = re.compile(
     r"^(single subjects?|digital badges?|on demand short courses?)$"
 )
+# Category page titles that start with a degree-level keyword but are NOT
+# individual courses — e.g. "Diploma Programs", "Bachelor Degrees", etc.
+# Without this check, "Diploma Programs" passes the degree-qualifier guard
+# because "Diploma" is a recognised qualifier, so the name_has_degree_qualifier
+# test returns True even though the full title is clearly a category header.
+_RE_LEVEL_CATEGORY = re.compile(
+    r"^(?:diploma|certificate|bachelor|master(?:s)?|graduate|postgraduate|"
+    r"undergraduate|doctoral?|phd)\s+"
+    r"(?:programs?|degrees?|courses?|pathways?|studies|qualifications?|"
+    r"offerings?|options?)$",
+    re.IGNORECASE,
+)
 _RE_FEE_HELP_NEG = re.compile(
     r"\bfee-help\b|\bhelp loan\b|\bvet student loan\b|\bloan limit\b"
 )
@@ -92,6 +104,26 @@ _GENERIC_CATEGORY_NAMES = frozenset(
         # URL: /courses/mba-master-of-business-administration/two-specialisations
         "two specialisations",
         "two specializations",
+        # ACU / generic: category hub pages that contain a degree keyword but
+        # are programme-listing pages, not individual course detail pages.
+        "diploma programs",
+        "diploma programme",
+        "admission pathways",
+        "admission pathway",
+        "pathway programs",
+        "pathway programme",
+        # Generic research / supervisor hub pages discovered via nav crawl.
+        "join a research project",
+        "meet our supervisors",
+        "meet our supervisor",
+        "research supervisors",
+        "graduate research supervisors",
+        "industry opportunities",
+        "industry engagement",
+        "joint phds",
+        "joint phd",
+        "research degrees",
+        "research degree",
     }
 )
 
@@ -131,6 +163,12 @@ def is_generic_course_category_name(name: str) -> bool:
     if _RE_SHORT_GENERICS.match(lower):
         return True
     if _RE_LONG_GENERICS.match(lower):
+        return True
+    # Catch "Diploma Programs", "Bachelor Degrees", "Graduate Pathways" etc.
+    # These start with a degree-level keyword so they pass _name_has_degree_qualifier
+    # and slip through the should_stage_course name check — this guard catches them
+    # before they reach the staging decision.
+    if _RE_LEVEL_CATEGORY.match(raw):
         return True
     return False
 
@@ -327,6 +365,21 @@ def should_stage_course(
         _url_path = source_url.lower().split("?")[0]  # strip query string
         if any(_url_path.endswith(sfx) for sfx in _CATEGORY_URL_SUFFIXES):
             return (False, "category_landing_page")
+
+        # URL-slug online detection: if the last path segment ends with
+        # "-online" the university explicitly published this as an online-only
+        # course (e.g. /course/graduate-certificate-in-business-administration-online).
+        # This is more reliable than study_mode detection when the page also
+        # shows the university's global campus list in the footer, which can
+        # incorrectly set study_mode to "On Campus" via location-derivation.
+        _slug = _url_path.rstrip("/").rsplit("/", 1)[-1]
+        if _slug.endswith("-online"):
+            log.info(
+                "[REJECT CHECK] course=%r url_slug=%r decision=reject (url_slug_online)",
+                payload.get("course_name") or course_name,
+                _slug,
+            )
+            return (False, "online_only")
 
     # Bug A: reject pages whose extracted title has no degree-level qualifier.
     # Prefer payload["course_name"] (from H1 via course_name extractor) over

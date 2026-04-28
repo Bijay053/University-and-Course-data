@@ -1,0 +1,1696 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 55
+Fetching https://latrobe.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://latrobe.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://latrobe.edu.au/courses: detail (course content present, only 0 outbound links)
+[DISCOVER] Page 1/25: +0 candidates (total 0) — https://latrobe.edu.au/courses
+[DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 6 URL(s) at https://latrobe.edu.au
+[DISCOVER] sitemap index https://latrobe.edu.au/sitemap.xml: 6 sub-sitemap(s)
+[DISCOVER] sitemap https://latrobe.edu.au/sitemap.xml: +378 candidates (total 378)
+[DISCOVER] sitemap: done — 378 unique candidates
+Discovered 200 candidate course links
+Extracting course details (200 pages)...
+[EXTRACT] 1/200: Bachelor Of Business Analytics
+[EXTRACT] 2/200: Bachelor Of Early Childhood Education
+[EXTRACT] 3/200: Bachelor Of Archaeology
+[EXTRACT] 4/200: Bachelor Of Orthoptics Honours
+Fetching 1/200: Bachelor Of Business Analytics
+Fetching 2/200: Bachelor Of Early Childhood Education
+Fetching 3/200: Bachelor Of Archaeology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-business-analytics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-early-childhood-education
+Fetching 4/200: Bachelor Of Orthoptics Honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-archaeology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-orthoptics-honours
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-orthoptics-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-early-childhood-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-orthoptics-ho → 0 field(s) (cost=$0.000000, in=1443 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-business-anal → 0 field(s) (cost=$0.000000, in=1443 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-early-childho → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-archaeology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-orthoptics-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-orthoptics-honours
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-archaeology → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-early-childhood-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-business-analytics
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-early-childhood-education
+[CATEGORY det] Bachelor of Business Analytics → Business & Management / Business Analytics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-archaeology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 5/200: Bachelor Of Podiatry Honours
+[EXTRACT] 6/200: Bachelor Of Prosthetics And Orthotics Honours
+[CATEGORY det] Bachelor of Early Childhood Education → Education & Social Work / Early Childhood
+Fetching 6/200: Bachelor Of Prosthetics And Orthotics Honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-archaeology
+Fetching 5/200: Bachelor Of Podiatry Honours
+[EXTRACT] 7/200: Master Of Professional Psychology
+[EXTRACT] 8/200: Bachelor Of Dental Science Honours
+Fetching 7/200: Master Of Professional Psychology
+Fetching 8/200: Bachelor Of Dental Science Honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-podiatry-honours
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-podiatry-honours: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-podiatry-hono → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-podiatry-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-podiatry-honours
+[EXTRACT] 9/200: Bachelor Of Cybersecurity Bachelor Of Commerce
+Fetching 9/200: Bachelor Of Cybersecurity Bachelor Of Commerce
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-dental-science-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-prosthetics-and-orthotics-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-professional-psychology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-commerce
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-prosthetics-and-orthotics-honours: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-prosthetics-a → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/master-of-professional-psychology: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-dental-science-honours: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-commerce: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-professional-ps → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-dental-scienc → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-prosthetics-and-orthotics-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-dental-science-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-professional-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-prosthetics-and-orthotics-honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-professional-psychology
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-dental-science-honours
+[CATEGORY det] Master of Professional Psychology → Medicine & Health / Psychology
+[EXTRACT] 10/200: Bachelor Of Cybersecurity Bachelor Of Criminology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-commerce
+[CATEGORY det] Bachelor of Dental Science (Honours) → Medicine & Health / Dentistry
+[EXTRACT] 11/200: Bachelor Of Business Bachelor Of Psychological Science
+[EXTRACT] 12/200: Doctor Of Midwifery
+Fetching 10/200: Bachelor Of Cybersecurity Bachelor Of Criminology
+[EXTRACT] 13/200: Diploma Of Elite Sport Business
+Fetching 11/200: Bachelor Of Business Bachelor Of Psychological Science
+Fetching 12/200: Doctor Of Midwifery
+Fetching 13/200: Diploma Of Elite Sport Business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-criminology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-business-bachelor-of-psychological-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-elite-sport-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-midwifery
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-business-bachelor-of-psychological-science: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/diploma-of-elite-sport-business: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-business-bach → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/doctor-of-midwifery: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-elite-sport-bu → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-business-bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-criminology: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-midwifery → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-elite-sport-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-business-bachelor-of-psychological-science
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-midwifery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-elite-sport-business
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-midwifery
+[EXTRACT] 14/200: Doctor Of Philosophy
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-cybersecurity-bachelor-of-criminology
+[CATEGORY det] Doctor of Midwifery → Medicine & Health / Nursing
+Fetching 14/200: Doctor Of Philosophy
+[EXTRACT] 15/200: Master Of Philosophy
+[CATEGORY det] Bachelor of Cybersecurity/bachelor of Cr → Law & Legal Studies / Criminal Justice
+Fetching 15/200: Master Of Philosophy
+[EXTRACT] 16/200: Bachelor Of Commerce Bachelor Of Arts
+[EXTRACT] 17/200: Master Of Digital Health
+Fetching 16/200: Bachelor Of Commerce Bachelor Of Arts
+Fetching 17/200: Master Of Digital Health
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-digital-health
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-philosophy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-arts
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-philosophy
+[per-course browser ✗] https://www.latrobe.edu.au/courses/doctor-of-philosophy: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-philosophy → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/master-of-digital-health: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-arts: empty response
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-philosophy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-digital-health → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/master-of-philosophy: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-philosophy
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-digital-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-philosophy → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 18/200: Bachelor Of Physiotherapy Honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-digital-health
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-philosophy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-arts
+[EXTRACT] 19/200: Bachelor Of Social Work Honours
+Fetching 18/200: Bachelor Of Physiotherapy Honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-philosophy
+[EXTRACT] 20/200: Bachelor Of Speech Pathology Honours
+Fetching 19/200: Bachelor Of Social Work Honours
+[EXTRACT] 21/200: Bachelor Of Occupational Therapy Honours
+Fetching 20/200: Bachelor Of Speech Pathology Honours
+Fetching 21/200: Bachelor Of Occupational Therapy Honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-physiotherapy-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-social-work-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-speech-pathology-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-occupational-therapy-honours
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-physiotherapy-honours: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-physiotherapy → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-physiotherapy-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-physiotherapy-honours
+[CATEGORY det] Bachelor of Physiotherapy (Honours) → Medicine & Health / Physiotherapy
+[EXTRACT] 22/200: Graduate Certificate In Mental Health
+Fetching 22/200: Graduate Certificate In Mental Health
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-social-work-honours: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-speech-pathology-honours: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-occupational-therapy-honours: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-social-work-h → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-speech-pathol → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-occupational- → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-speech-pathology-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-social-work-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-occupational-therapy-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-speech-pathology-honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-social-work-honours
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-occupational-therapy-honours
+[CATEGORY det] Bachelor of Social Work (Honours) → Education & Social Work / Social Work
+[EXTRACT] 23/200: Graduate Certificate In Public Health
+Fetching 23/200: Graduate Certificate In Public Health
+[EXTRACT] 24/200: Graduate Certificate In Information Technology Fundamentals
+[EXTRACT] 25/200: Graduate Diploma In Business Administration
+Fetching 24/200: Graduate Certificate In Information Technology Fundamentals
+Fetching 25/200: Graduate Diploma In Business Administration
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-business-administration
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-information-technology-fundamentals
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-public-health
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-certificate-in-public-health: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-certificate-in-information-technology-fundamentals: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-m → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-p → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-diploma-in-business-administration: empty response
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-public-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-busin → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-i → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-public-health
+[EXTRACT] 26/200: Bachelor Of Biomedicine Honours
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-information-technology-fundamentals (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-business-administration
+[CATEGORY det] Graduate Certificate in Public Health → Medicine & Health / Public Health
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-information-technology-fundamentals
+[EXTRACT] 27/200: Bachelor Of Wildlife And Conservation Biology
+[EXTRACT] 28/200: Diploma Of Information Technology
+Fetching 26/200: Bachelor Of Biomedicine Honours
+[CATEGORY det] Graduate Certificate in Information Tech → Computer Science & IT / Information Systems
+Fetching 28/200: Diploma Of Information Technology
+Fetching 27/200: Bachelor Of Wildlife And Conservation Biology
+[EXTRACT] 29/200: Diploma Of Science
+Fetching 29/200: Diploma Of Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-information-technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-wildlife-and-conservation-biology
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine-honours: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/diploma-of-science: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/diploma-of-information-technology: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine-h → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-science → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-information-te → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-biomedicine-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-biomedicine-honours
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-science
+[EXTRACT] 30/200: Master Of Engineering
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-information-technology
+[EXTRACT] 31/200: Diploma Of Biological Sciences
+Fetching 30/200: Master Of Engineering
+Fetching 31/200: Diploma Of Biological Sciences
+[CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[EXTRACT] 32/200: Graduate Certificate In Artificial Intelligence
+Fetching 32/200: Graduate Certificate In Artificial Intelligence
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-wildlife-and-conservation-biology: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-wildlife-and- → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-wildlife-and-conservation-biology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-wildlife-and-conservation-biology
+[EXTRACT] 33/200: Bachelor Of Laws Honours
+Fetching 33/200: Bachelor Of Laws Honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-artificial-intelligence
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-biological-sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-engineering
+[per-course browser ✗] https://www.latrobe.edu.au/courses/diploma-of-biological-sciences: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-biological-sci → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/master-of-engineering: empty response
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-biological-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-engineering → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-certificate-in-artificial-intelligence: empty response
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-biological-sciences
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-a → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours
+[EXTRACT] 34/200: Bachelor Of Laws Honours Bachelor Of Criminology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-engineering
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 34/200: Bachelor Of Laws Honours Bachelor Of Criminology
+[EXTRACT] 35/200: Bachelor Of Laws Honours Bachelor Of Psychological Science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-artificial-intelligence
+Fetching 35/200: Bachelor Of Laws Honours Bachelor Of Psychological Science
+[CATEGORY det] Graduate Certificate in Artificial Intel → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 36/200: Bachelor Of Outdoor And Sustainability Education
+Fetching 36/200: Bachelor Of Outdoor And Sustainability Education
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours
+[EXTRACT] 37/200: Graduate Certificate In Education
+Fetching 37/200: Graduate Certificate In Education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-psychological-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-outdoor-and-sustainability-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-criminology
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-outdoor-and-sustainability-education: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/graduate-certificate-in-education: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-outdoor-and-s → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-psychological-science: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-e → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-outdoor-and-sustainability-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-outdoor-and-sustainability-education
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Outdoor and Sustainability E → Agriculture & Environmental Science / Sustainability
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-education
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-psychological-science
+[EXTRACT] 38/200: Graduate Diploma In Education
+[EXTRACT] 39/200: Associate Degree Of Teacher Education
+[EXTRACT] 40/200: Bachelor Of Commerce Bachelor Of Global Studies
+Fetching 38/200: Graduate Diploma In Education
+Fetching 39/200: Associate Degree Of Teacher Education
+Fetching 40/200: Bachelor Of Commerce Bachelor Of Global Studies
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-criminology: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-criminology
+[CATEGORY det] Bachelor of Laws (Honours)/bachelor of C → Law & Legal Studies / Criminal Justice
+[EXTRACT] 41/200: Diploma Of Teacher Education
+Fetching 41/200: Diploma Of Teacher Education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/associate-degree-of-teacher-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-global-studies
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-educa → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-education
+[EXTRACT] 42/200: Bachelor Of Global Studies
+Fetching 42/200: Bachelor Of Global Studies
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-teacher-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-global-studies
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-global-studies — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/associate-degree-of-teacher-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/associate-degree-of-teach → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-global-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/associate-degree-of-teacher-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-global-studies
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/associate-degree-of-teacher-education
+[EXTRACT] 43/200: Bachelor Of Laws Honours Bachelor Of Business
+[EXTRACT] 44/200: Bachelor Of Laws Honours Bachelor Of Commerce
+Fetching 43/200: Bachelor Of Laws Honours Bachelor Of Business
+Fetching 44/200: Bachelor Of Laws Honours Bachelor Of Commerce
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-of-teacher-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-teacher-educat → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-teacher-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-teacher-education
+[EXTRACT] 45/200: Bachelor Of Laws Honours Bachelor Of Global Studies
+Fetching 45/200: Bachelor Of Laws Honours Bachelor Of Global Studies
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-global-studies — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-global-studie → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-global-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-global-studies
+[EXTRACT] 46/200: Bachelor Of Laws Honours Bachelor Of Media And Communication
+Fetching 46/200: Bachelor Of Laws Honours Bachelor Of Media And Communication
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-commerce
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-global-studies
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-media-and-communication
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-global-studies — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-commerce — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=10991 out=0)
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-media-and-communication: empty response
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-global-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-commerce
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-global-studies
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-business
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-media-and-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 47/200: Graduate Certificate In Logistics And Supply Chain Management
+[EXTRACT] 48/200: Graduate Certificate In Professional Accounting
+[EXTRACT] 49/200: Graduate Diploma In Logistics And Supply Chain Management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-media-and-communication
+Fetching 47/200: Graduate Certificate In Logistics And Supply Chain Management
+Fetching 49/200: Graduate Diploma In Logistics And Supply Chain Management
+Fetching 48/200: Graduate Certificate In Professional Accounting
+[EXTRACT] 50/200: Master Of Extended Professional Accounting
+Fetching 50/200: Master Of Extended Professional Accounting
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-extended-professional-accounting
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-logistics-and-supply-chain-management
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-professional-accounting
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-logistics-and-supply-chain-management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-extended-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-extended-profes → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-extended-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-extended-professional-accounting
+[CATEGORY det] Master of Extended Professional Accounti → Business & Management / Accounting
+[EXTRACT] 51/200: Master Of Professional Accounting
+Fetching 51/200: Master Of Professional Accounting
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-logistics-and-supply-chain-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-professional-accounting
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-l → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-logistics-and-supply-chain-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-logistics-and-supply-chain-management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-logistics-and-supply-chain-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-logis → 0 field(s) (cost=$0.000000, in=1450 out=0)
+[CATEGORY det] Graduate Certificate in Logistics and Su → Business & Management / Supply Chain & Logistics
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-logistics-and-supply-chain-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 52/200: Bachelor Of Health Information Management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-logistics-and-supply-chain-management
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-p → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[CATEGORY det] Graduate Diploma in Logistics and Supply → Business & Management / Supply Chain & Logistics
+Fetching 52/200: Bachelor Of Health Information Management
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 53/200: Master Of Logistics And Supply Chain Management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-professional-accounting
+Fetching 53/200: Master Of Logistics And Supply Chain Management
+[CATEGORY det] Graduate Certificate in Professional Acc → Business & Management / Accounting
+[EXTRACT] 54/200: Master Of Sports And Exercise Physiotherapy
+Fetching 54/200: Master Of Sports And Exercise Physiotherapy
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-professional-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-health-information-management
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-sports-and-exercise-physiotherapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-logistics-and-supply-chain-management
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-professional-ac → 0 field(s) (cost=$0.000000, in=1444 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-professional-accounting
+[CATEGORY det] Master of Professional Accounting → Business & Management / Accounting
+[EXTRACT] 55/200: Bachelor Of Laws Honours Bachelor Of Science
+Fetching 55/200: Bachelor Of Laws Honours Bachelor Of Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-health-information-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-sports-and-exercise-physiotherapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-health-inform → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-sports-and-exer → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-health-information-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-health-information-management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-logistics-and-supply-chain-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-sports-and-exercise-physiotherapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 56/200: Bachelor Of Laws Honours Bachelor Of Arts
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-logistics-and-s → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-sports-and-exercise-physiotherapy
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-logistics-and-supply-chain-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 56/200: Bachelor Of Laws Honours Bachelor Of Arts
+[CATEGORY det] Master of Sports and Exercise Physiother → Medicine & Health / Physiotherapy
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-logistics-and-supply-chain-management
+[EXTRACT] 57/200: Graduate Diploma Of Archaeology
+[CATEGORY det] Master of Logistics and Supply Chain Man → Business & Management / Supply Chain & Logistics
+Fetching 57/200: Graduate Diploma Of Archaeology
+[EXTRACT] 58/200: Master Of Archaeology
+Fetching 58/200: Master Of Archaeology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1446 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-science
+[EXTRACT] 59/200: Bachelor Of Arts Bachelor Of Science
+Fetching 59/200: Bachelor Of Arts Bachelor Of Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-of-archaeology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-arts
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-archaeology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-archaeology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-of-archaeology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-archaeology → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-of-archa → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-of-archaeology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-of-archaeology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-archaeology
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 60/200: Master Of Strength And Conditioning
+[EXTRACT] 61/200: Graduate Diploma In Rehabilitation Counselling
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-arts
+Fetching 61/200: Graduate Diploma In Rehabilitation Counselling
+Fetching 60/200: Master Of Strength And Conditioning
+[EXTRACT] 62/200: Associate Degree In Engineering Technology
+Fetching 62/200: Associate Degree In Engineering Technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-science
+[EXTRACT] 63/200: Associate Degree In Early Childhood Education
+Fetching 63/200: Associate Degree In Early Childhood Education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/associate-degree-in-engineering-technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-strength-and-conditioning
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-rehabilitation-counselling
+[per-course browser ↻] https://www.latrobe.edu.au/courses/associate-degree-in-early-childhood-education
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-strength-and-conditioning — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/associate-degree-in-engineering-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-strength-and-co → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/associate-degree-in-engin → 0 field(s) (cost=$0.000000, in=1446 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-strength-and-conditioning (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/associate-degree-in-engineering-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-strength-and-conditioning
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/associate-degree-in-engineering-technology
+[EXTRACT] 64/200: Graduate Diploma In Engineering Management
+Fetching 64/200: Graduate Diploma In Engineering Management
+[EXTRACT] 65/200: Graduate Certificate In Business
+Fetching 65/200: Graduate Certificate In Business
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-rehabilitation-counselling — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-rehab → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-rehabilitation-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-rehabilitation-counselling
+[EXTRACT] 66/200: Graduate Certificate In Data Science Fundamentals
+Fetching 66/200: Graduate Certificate In Data Science Fundamentals
+[per-course browser ✓] https://www.latrobe.edu.au/courses/associate-degree-in-early-childhood-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/associate-degree-in-early → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-data-science-fundamentals
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-engineering-management
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/associate-degree-in-early-childhood-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/associate-degree-in-early-childhood-education
+[CATEGORY det] Associate Degree in Early Childhood Educ → Education & Social Work / Early Childhood
+[EXTRACT] 67/200: Graduate Certificate In Cybersecurity
+Fetching 67/200: Graduate Certificate In Cybersecurity
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-cybersecurity
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-engineering-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-engin → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-data-science-fundamentals — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-b → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-engineering-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-engineering-management
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-d → 0 field(s) (cost=$0.000000, in=1443 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-business
+[EXTRACT] 68/200: Master Of Social Work
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-data-science-fundamentals (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 69/200: Diploma Of Rural Health
+Fetching 68/200: Master Of Social Work
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-data-science-fundamentals
+Fetching 69/200: Diploma Of Rural Health
+[CATEGORY det] Graduate Certificate in Data Science Fun → Computer Science & IT / Data Science
+[EXTRACT] 70/200: Bachelor Of Visual Arts
+Fetching 70/200: Bachelor Of Visual Arts
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-social-work
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-cybersecurity — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-c → 0 field(s) (cost=$0.000000, in=1440 out=0)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-rural-health
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-visual-arts
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-cybersecurity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-cybersecurity
+[EXTRACT] 71/200: Bachelor Of Education
+Fetching 71/200: Bachelor Of Education
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-social-work — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-social-work → 0 field(s) (cost=$0.000000, in=1441 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-social-work (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-social-work
+[CATEGORY det] Master of Social Work → Education & Social Work / Social Work
+[EXTRACT] 72/200: Graduate Diploma In Artificial Intelligence
+Fetching 72/200: Graduate Diploma In Artificial Intelligence
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-artificial-intelligence
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-visual-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-of-rural-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-visual-arts → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-rural-health → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-visual-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-visual-arts
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-rural-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 73/200: Graduate Diploma In Cybersecurity
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-rural-health
+[EXTRACT] 74/200: Graduate Diploma In Data Science
+Fetching 73/200: Graduate Diploma In Cybersecurity
+Fetching 74/200: Graduate Diploma In Data Science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-cybersecurity
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-data-science
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-education → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-education
+[EXTRACT] 75/200: Graduate Diploma In Information Technology
+Fetching 75/200: Graduate Diploma In Information Technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-artif → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-artificial-intelligence
+[CATEGORY det] Graduate Diploma in Artificial Intellige → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 76/200: Master Of Midwifery Practice
+Fetching 76/200: Master Of Midwifery Practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-midwifery-practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-information-technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-cybersecurity — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-cyber → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-cybersecurity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-cybersecurity
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-data-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 77/200: Master Of Teaching Primary
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-data- → 0 field(s) (cost=$0.000000, in=1389 out=0)
+Fetching 77/200: Master Of Teaching Primary
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-data-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-data-science
+[CATEGORY det] Graduate Diploma in Data Science → Computer Science & IT / Data Science
+[EXTRACT] 78/200: Master Of Teaching Secondary
+Fetching 78/200: Master Of Teaching Secondary
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-teaching-primary
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-teaching-secondary
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-midwifery-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-midwifery-pract → 0 field(s) (cost=$0.000000, in=1438 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-infor → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-midwifery-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-information-technology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-midwifery-practice
+[CATEGORY det] Graduate Diploma in Information Technolo → Computer Science & IT / Information Systems
+[CATEGORY det] Master of Midwifery Practice → Medicine & Health / Nursing
+[EXTRACT] 79/200: Diploma In Health Sciences
+[EXTRACT] 80/200: Graduate Certificate In Mental Health For Education
+Fetching 79/200: Diploma In Health Sciences
+Fetching 80/200: Graduate Certificate In Mental Health For Education
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-teaching-primary — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-teaching-primar → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-teaching-primary (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-teaching-secondary — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-teaching-primary
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-teaching-second → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[CATEGORY det] Master of Teaching (Primary) → Education & Social Work / Teaching
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-teaching-secondary (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 81/200: Global Master Of Business Administration
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-teaching-secondary
+Fetching 81/200: Global Master Of Business Administration
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health-for-education
+[CATEGORY det] Master of Teaching (Secondary) → Education & Social Work / Teaching
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-in-health-sciences
+[EXTRACT] 82/200: Master Of Physiotherapy Practice
+Fetching 82/200: Master Of Physiotherapy Practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-physiotherapy-practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/global-master-of-business-administration
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-in-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health-for-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-m → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-in-health-science → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health-for-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-in-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/global-master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-mental-health-for-education
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-in-health-sciences
+[GEMINI] https://www.latrobe.edu.au/courses/global-master-of-business → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[EXTRACT] 83/200: Bachelor Of Biomedical Science Honours
+[EXTRACT] 84/200: Bachelor Of Nursing
+Fetching 83/200: Bachelor Of Biomedical Science Honours
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/global-master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 84/200: Bachelor Of Nursing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/global-master-of-business-administration
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-physiotherapy-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Global Master of Business Administration → Business & Management / MBA
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-physiotherapy-p → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[EXTRACT] 85/200: Bachelor Of Nursing Bachelor Of Midwifery
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-physiotherapy-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 85/200: Bachelor Of Nursing Bachelor Of Midwifery
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-physiotherapy-practice
+[CATEGORY det] Master of Physiotherapy Practice → Medicine & Health / Physiotherapy
+[EXTRACT] 86/200: Graduate Diploma In Midwifery
+Fetching 86/200: Graduate Diploma In Midwifery
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-nursing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-midwifery
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-nursing-bachelor-of-midwifery
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-midwifery — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-midwi → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-nursing-bachelor-of-midwifery — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-nursing-bache → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-midwifery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-nursing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-midwifery
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-nursing → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-nursing-bachelor-of-midwifery (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Graduate Diploma in Midwifery → Medicine & Health / Nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-nursing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-sc → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-nursing-bachelor-of-midwifery
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-nursing
+[EXTRACT] 87/200: Master Of Quantum Information Technology
+[CATEGORY det] Bachelor of Nursing/bachelor of Midwifer → Medicine & Health / Nursing
+[CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 87/200: Master Of Quantum Information Technology
+[EXTRACT] 88/200: Master Of Marketing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science-honours
+[EXTRACT] 89/200: Master Of Civil Engineering
+[EXTRACT] 90/200: Master Of Manufacturing Engineering
+Fetching 88/200: Master Of Marketing
+Fetching 89/200: Master Of Civil Engineering
+Fetching 90/200: Master Of Manufacturing Engineering
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-quantum-information-technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-marketing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-manufacturing-engineering
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-civil-engineering
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-marketing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-quantum-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-manufacturing-engineering — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-marketing → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-quantum-informa → 0 field(s) (cost=$0.000000, in=1445 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-manufacturing-e → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-marketing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-quantum-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-marketing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-manufacturing-engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-quantum-information-technology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-manufacturing-engineering
+[CATEGORY det] Master of Marketing → Business & Management / Marketing
+[EXTRACT] 91/200: Master Of Counselling Rehabilitation And Mental Health
+[CATEGORY det] Master of Quantum Information Technology → Computer Science & IT / Information Systems
+[EXTRACT] 92/200: Graduate Certificate In Marketing
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-civil-engineering — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 93/200: Master Of Dietetics
+Fetching 91/200: Master Of Counselling Rehabilitation And Mental Health
+Fetching 92/200: Graduate Certificate In Marketing
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-civil-engineeri → 0 field(s) (cost=$0.000000, in=1388 out=0)
+Fetching 93/200: Master Of Dietetics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-civil-engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-civil-engineering
+[CATEGORY det] Master of Civil Engineering → Engineering & Technology / Civil Engineering
+[EXTRACT] 94/200: Graduate Certificate In Education Language And Literacy
+Fetching 94/200: Graduate Certificate In Education Language And Literacy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-education-language-and-literacy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-marketing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-counselling-rehabilitation-and-mental-health
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-dietetics
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-counselling-rehabilitation-and-mental-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-counselling-reh → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-counselling-rehabilitation-and-mental-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-counselling-rehabilitation-and-mental-health
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-dietetics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-education-language-and-literacy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 95/200: Bachelor Of Sport And Recreation Management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-marketing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-dietetics → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-e → 0 field(s) (cost=$0.000000, in=1395 out=0)
+Fetching 95/200: Bachelor Of Sport And Recreation Management
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-m → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-education-language-and-literacy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-dietetics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-education-language-and-literacy
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-dietetics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-marketing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 96/200: Bachelor Of Agriculture
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-marketing
+[EXTRACT] 97/200: Bachelor Of Biomedicine
+Fetching 96/200: Bachelor Of Agriculture
+[CATEGORY det] Graduate Certificate in Marketing, Cours → Business & Management / Marketing
+Fetching 97/200: Bachelor Of Biomedicine
+[EXTRACT] 98/200: Diploma Of Agricultural Science
+Fetching 98/200: Diploma Of Agricultural Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-recreation-management
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-agricultural-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-agriculture
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-biomedicine → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-agriculture — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-of-agricultural-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-biomedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-recreation-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-rec → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-agriculture → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-agricultural-s → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-biomedicine
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-agricultural-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-sport-and-recreation-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 99/200: Master Of Construction Engineering And Management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-agriculture
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-agricultural-science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-sport-and-recreation-management
+Fetching 99/200: Master Of Construction Engineering And Management
+[CATEGORY det] Bachelor of Agriculture → Agriculture & Environmental Science / Agriculture
+[EXTRACT] 100/200: Bachelor Of Politics Philosophy And Economics
+[EXTRACT] 101/200: Bachelor Of Commerce Bachelor Of Biomedicine
+[EXTRACT] 102/200: Bachelor Of Laws Honours Bachelor Of Politics Philosophy And Economics
+Fetching 100/200: Bachelor Of Politics Philosophy And Economics
+Fetching 101/200: Bachelor Of Commerce Bachelor Of Biomedicine
+Fetching 102/200: Bachelor Of Laws Honours Bachelor Of Politics Philosophy And Economics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-construction-engineering-and-management
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-politics-philosophy-and-economics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-politics-philosophy-and-economics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-biomedicine
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-politics-philosophy-and-economics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-politics-phil → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-politics-philosophy-and-economics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-politics-philosophy-and-economics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1453 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-construction-engineering-and-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-biomedicine — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-politics-philosophy-and-economics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-politics-philosophy-and-economics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-construction-en → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=1446 out=0)
+[EXTRACT] 103/200: Bachelor Of Laws Honours Bachelor Of Biomedicine
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-politics-philosophy-and-economics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-biomedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-construction-engineering-and-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 103/200: Bachelor Of Laws Honours Bachelor Of Biomedicine
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-biomedicine
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-construction-engineering-and-management
+[EXTRACT] 104/200: Graduate Certificate In Family Therapy First Nations
+[CATEGORY det] Master of Construction Engineering and M → Architecture, Building & Design / Construction
+[EXTRACT] 105/200: Diploma Of Teacher Education Nexus
+Fetching 104/200: Graduate Certificate In Family Therapy First Nations
+Fetching 105/200: Diploma Of Teacher Education Nexus
+[EXTRACT] 106/200: Doctor Of Science
+Fetching 106/200: Doctor Of Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-biomedicine
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy-first-nations
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-teacher-education-nexus
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-of-teacher-education-nexus — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-teacher-educat → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-teacher-education-nexus (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-teacher-education-nexus
+[EXTRACT] 107/200: Doctor Of Laws
+Fetching 107/200: Doctor Of Laws
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy-first-nations — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-f → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-biomedicine — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy-first-nations (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-science → 0 field(s) (cost=$0.000000, in=1385 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-laws-honours- → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy-first-nations
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-biomedicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-science
+[EXTRACT] 108/200: Doctor Of Letters
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-laws-honours-bachelor-of-biomedicine
+[EXTRACT] 109/200: Master Of Artificial Intelligence
+Fetching 108/200: Doctor Of Letters
+[EXTRACT] 110/200: Master Of Cybersecurity
+Fetching 109/200: Master Of Artificial Intelligence
+Fetching 110/200: Master Of Cybersecurity
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-laws
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-artificial-intelligence
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-cybersecurity
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-letters
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-cybersecurity — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-cybersecurity → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-letters — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-laws — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-letters → 0 field(s) (cost=$0.000000, in=1385 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-cybersecurity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-laws → 0 field(s) (cost=$0.000000, in=1385 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-cybersecurity
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-letters (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-laws (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-artificial-inte → 0 field(s) (cost=$0.000000, in=1444 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-laws
+[EXTRACT] 111/200: Master Of Nurse Practitioner
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-letters
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 112/200: Master Of Nursing Practice
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-artificial-intelligence
+[EXTRACT] 113/200: Master Of Professional Engineering
+Fetching 111/200: Master Of Nurse Practitioner
+[CATEGORY det] Master of Artificial Intelligence → Computer Science & IT / Artificial Intelligence
+Fetching 113/200: Master Of Professional Engineering
+Fetching 112/200: Master Of Nursing Practice
+[EXTRACT] 114/200: Graduate Certificate In Rural And Remote Nursing Practice
+Fetching 114/200: Graduate Certificate In Rural And Remote Nursing Practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-nurse-practitioner
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-nursing-practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-professional-engineering
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-rural-and-remote-nursing-practice
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-nurse-practitioner — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-nurse-practitio → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-professional-engineering — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-nursing-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-professional-en → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-rural-and-remote-nursing-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-nurse-practitioner (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-nursing-practic → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-professional-engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-r → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-nurse-practitioner
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-nursing-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-professional-engineering
+[EXTRACT] 115/200: Graduate Diploma In Rural And Remote Nursing Practice
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-nursing-practice
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-rural-and-remote-nursing-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 116/200: Doctor Of Education Professional Doctorate
+Fetching 115/200: Graduate Diploma In Rural And Remote Nursing Practice
+[CATEGORY det] Master of Nursing Practice, Courses and → Medicine & Health / Nursing
+Fetching 116/200: Doctor Of Education Professional Doctorate
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-rural-and-remote-nursing-practice
+[EXTRACT] 117/200: Professional Certificate In Cybersecurity
+[CATEGORY det] Graduate Certificate of Rural and Remote → Medicine & Health / Nursing
+Fetching 117/200: Professional Certificate In Cybersecurity
+[EXTRACT] 118/200: Bachelor Of Veterinary Nursing And Technology
+Fetching 118/200: Bachelor Of Veterinary Nursing And Technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-rural-and-remote-nursing-practice
+[per-course browser ↻] https://www.latrobe.edu.au/courses/professional-certificate-in-cybersecurity
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-veterinary-nursing-and-technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-education-professional-doctorate
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-veterinary-nursing-and-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-rural-and-remote-nursing-practice — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-veterinary-nu → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-rural → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-veterinary-nursing-and-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-education-professional-doctorate — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/professional-certificate-in-cybersecurity — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-rural-and-remote-nursing-practice (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-veterinary-nursing-and-technology
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-education-profe → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/professional-certificate- → 0 field(s) (cost=$0.000000, in=1441 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-rural-and-remote-nursing-practice
+[CATEGORY det] Bachelor of Veterinary Nursing and Techn → Medicine & Health / Nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-education-professional-doctorate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/professional-certificate-in-cybersecurity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Graduate Diploma in Rural and Remote Nur → Medicine & Health / Nursing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/professional-certificate-in-cybersecurity
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-education-professional-doctorate
+[EXTRACT] 119/200: Bachelor Of Computer Science
+[EXTRACT] 120/200: Bachelor Of Education Nexus
+[EXTRACT] 121/200: Master Of Teaching Nexus Secondary
+[EXTRACT] 122/200: Master Of Teaching Nexus Primary
+Fetching 119/200: Bachelor Of Computer Science
+Fetching 120/200: Bachelor Of Education Nexus
+Fetching 122/200: Master Of Teaching Nexus Primary
+Fetching 121/200: Master Of Teaching Nexus Secondary
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-teaching-nexus-primary
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-computer-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-education-nexus
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-teaching-nexus-secondary
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-teaching-nexus-primary — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-teaching-nexus- → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-teaching-nexus-primary (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-teaching-nexus-primary
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-education-nexus — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Master of Teaching Nexus (Primary) → Education & Social Work / Teaching
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-teaching-nexus-secondary — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-computer-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-education-nex → 0 field(s) (cost=$0.000000, in=1438 out=0)
+[EXTRACT] 123/200: Master Of Business Analytics
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-teaching-nexus- → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-computer-scie → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-education-nexus (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 123/200: Master Of Business Analytics
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-teaching-nexus-secondary (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-education-nexus
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-computer-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-teaching-nexus-secondary
+[EXTRACT] 124/200: Master Of Business Information Systems
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-computer-science
+[CATEGORY det] Master of Teaching Nexus (Secondary), Co → Education & Social Work / Teaching
+Fetching 124/200: Master Of Business Information Systems
+[EXTRACT] 125/200: Master Of International Business
+[EXTRACT] 126/200: Undergraduate Certificate In Cybersecurity
+Fetching 126/200: Undergraduate Certificate In Cybersecurity
+Fetching 125/200: Master Of International Business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-business-analytics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-business-information-systems
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-international-business
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-cybersecurity
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-business-analyt → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-business-analytics
+[CATEGORY det] Master of Business Analytics → Business & Management / Business Analytics
+[EXTRACT] 127/200: Undergraduate Certificate In Health Sciences
+Fetching 127/200: Undergraduate Certificate In Health Sciences
+[per-course browser ✗] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-cybersecurity: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/undergraduate-certificate → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/undergraduate-certificate-in-cybersecurity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/undergraduate-certificate-in-cybersecurity
+[EXTRACT] 128/200: Undergraduate Certificate In Information Technology
+Fetching 128/200: Undergraduate Certificate In Information Technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-international-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-business-information-systems — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-international-b → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-health-sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-information-technology
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-business-inform → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-international-business
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-business-information-systems (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Master of International Business → Business & Management / International Business
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-business-information-systems
+[CATEGORY det] Master of Business Information Systems → Computer Science & IT / Information Systems
+[EXTRACT] 129/200: Undergraduate Certificate In Psychological Science
+[EXTRACT] 130/200: Graduate Certificate In Sport Analytics
+Fetching 130/200: Graduate Certificate In Sport Analytics
+Fetching 129/200: Undergraduate Certificate In Psychological Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-psychological-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-sport-analytics
+[per-course browser ✓] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/undergraduate-certificate → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/undergraduate-certificate → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/undergraduate-certificate-in-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/undergraduate-certificate-in-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/undergraduate-certificate-in-information-technology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/undergraduate-certificate-in-health-sciences
+[CATEGORY det] Undergraduate Certificate in Information → Computer Science & IT / Information Systems
+[EXTRACT] 131/200: Graduate Certificate In Strength And Conditioning
+[EXTRACT] 132/200: Graduate Diploma In Sport Analytics
+Fetching 131/200: Graduate Certificate In Strength And Conditioning
+Fetching 132/200: Graduate Diploma In Sport Analytics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-sport-analytics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-strength-and-conditioning
+[per-course browser ✓] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-psychological-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/undergraduate-certificate → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/undergraduate-certificate-in-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-sport-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/undergraduate-certificate-in-psychological-science
+[EXTRACT] 133/200: Graduate Diploma In Strength And Conditioning
+Fetching 133/200: Graduate Diploma In Strength And Conditioning
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-s → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-sport-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-sport-analytics
+[EXTRACT] 134/200: Graduate Certificate In International Business
+Fetching 134/200: Graduate Certificate In International Business
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-sport-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-strength-and-conditioning — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-sport → 0 field(s) (cost=$0.000000, in=1444 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-s → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-strength-and-conditioning (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-sport-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-strength-and-conditioning
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-sport-analytics
+[EXTRACT] 135/200: Graduate Diploma In Early Childhood Education
+[EXTRACT] 136/200: Undergraduate Certificate In Agriculture
+Fetching 135/200: Graduate Diploma In Early Childhood Education
+Fetching 136/200: Undergraduate Certificate In Agriculture
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-strength-and-conditioning
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-international-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-diploma-in-early-childhood-education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-agriculture
+[per-course browser ✓] https://www.latrobe.edu.au/courses/undergraduate-certificate-in-agriculture — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-international-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/undergraduate-certificate → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-i → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/undergraduate-certificate-in-agriculture (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-early-childhood-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-international-business
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-diploma-in-strength-and-conditioning — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Graduate Certificate in International Bu → Business & Management / International Business
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/undergraduate-certificate-in-agriculture
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-stren → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-diploma-in-early → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[EXTRACT] 137/200: Graduate Certificate In Registered Nurse Prescribing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-early-childhood-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Undergraduate Certificate in Agriculture → Agriculture & Environmental Science / Agriculture
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-diploma-in-strength-and-conditioning (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 137/200: Graduate Certificate In Registered Nurse Prescribing
+[EXTRACT] 138/200: Master Of Artificial Intelligence Accelerated
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-early-childhood-education
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-diploma-in-strength-and-conditioning
+Fetching 138/200: Master Of Artificial Intelligence Accelerated
+[CATEGORY det] Graduate Diploma in Early Childhood Educ → Education & Social Work / Early Childhood
+[EXTRACT] 139/200: Master Of Data Science Accelerated
+[EXTRACT] 140/200: Master Of Information Technology Accelerated
+Fetching 139/200: Master Of Data Science Accelerated
+Fetching 140/200: Master Of Information Technology Accelerated
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-artificial-intelligence-accelerated
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-data-science-accelerated
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-registered-nurse-prescribing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-information-technology-accelerated
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-registered-nurse-prescribing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-information-technology-accelerated — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-artificial-intelligence-accelerated — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-data-science-accelerated — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-r → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-artificial-inte → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-data-science-ac → 0 field(s) (cost=$0.000000, in=1444 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-information-tec → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-registered-nurse-prescribing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-artificial-intelligence-accelerated (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-information-technology-accelerated (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-data-science-accelerated (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-artificial-intelligence-accelerated
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-registered-nurse-prescribing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-information-technology-accelerated
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-data-science-accelerated
+[CATEGORY det] Master of Artificial Intelligence (Accel → Computer Science & IT / Artificial Intelligence
+[EXTRACT] 141/200: Bachelor Of Accounting
+[CATEGORY det] Master of Data Science (Accelerated) → Computer Science & IT / Data Science
+[CATEGORY det] Master of Information Technology (Accele → Computer Science & IT / Information Systems
+[EXTRACT] 142/200: Bachelor Of Animal And Veterinary Biosciences
+Fetching 141/200: Bachelor Of Accounting
+[EXTRACT] 143/200: Bachelor Of Arts
+Fetching 142/200: Bachelor Of Animal And Veterinary Biosciences
+[EXTRACT] 144/200: Bachelor Of Arts Bachelor Of Health Sciences
+Fetching 143/200: Bachelor Of Arts
+Fetching 144/200: Bachelor Of Arts Bachelor Of Health Sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-animal-and-veterinary-biosciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-accounting
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-arts
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-health-sciences
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-animal-and-veterinary-biosciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-animal-and-ve → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-animal-and-veterinary-biosciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-accounting — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-animal-and-veterinary-biosciences
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-accounting → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-arts → 0 field(s) (cost=$0.000000, in=1385 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[EXTRACT] 145/200: Bachelor Of Biological Sciences
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-accounting
+Fetching 145/200: Bachelor Of Biological Sciences
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-arts-bachelor-of-health-sciences
+[CATEGORY det] Bachelor of Accounting → Business & Management / Accounting
+[FIELD TRACE] study_mode='On Campus' location='Melbourne' method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-arts
+[EXTRACT] 146/200: Bachelor Of Biomedical Science
+[EXTRACT] 147/200: Bachelor Of Business
+[EXTRACT] 148/200: Bachelor Of Civil Engineering Honours
+Fetching 147/200: Bachelor Of Business
+Fetching 146/200: Bachelor Of Biomedical Science
+Fetching 148/200: Bachelor Of Civil Engineering Honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-civil-engineering-honours
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-business → 0 field(s) (cost=$0.000000, in=1440 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-business
+[EXTRACT] 149/200: Bachelor Of Commerce
+Fetching 149/200: Bachelor Of Commerce
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-biological-sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-biological-sciences: empty response
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-commerce: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-biological-sc → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-biological-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-biological-sciences
+[EXTRACT] 150/200: Bachelor Of Commerce Bachelor Of Computer Science
+[EXTRACT] 151/200: Bachelor Of Commerce Bachelor Of Health Sciences
+Fetching 150/200: Bachelor Of Commerce Bachelor Of Computer Science
+Fetching 151/200: Bachelor Of Commerce Bachelor Of Health Sciences
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-civil-engineering-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-civil-enginee → 0 field(s) (cost=$0.000000, in=1445 out=0)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-computer-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-health-sciences
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-civil-engineering-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-civil-engineering-honours
+[CATEGORY det] Bachelor of Civil Engineering (Honours) → Engineering & Technology / Civil Engineering
+[EXTRACT] 152/200: Bachelor Of Commerce Bachelor Of Science
+Fetching 152/200: Bachelor Of Commerce Bachelor Of Science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-biomedical-sc → 0 field(s) (cost=$0.000000, in=1444 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-biomedical-science
+[EXTRACT] 153/200: Bachelor Of Criminology
+Fetching 153/200: Bachelor Of Criminology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-criminology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=1393 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-computer-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=13895 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-health-sciences
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-computer-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-computer-science
+[EXTRACT] 154/200: Bachelor Of Criminology Bachelor Of Psychological Science
+Fetching 154/200: Bachelor Of Criminology Bachelor Of Psychological Science
+[EXTRACT] 155/200: Bachelor Of Food And Nutrition
+Fetching 155/200: Bachelor Of Food And Nutrition
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-criminology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-criminology → 0 field(s) (cost=$0.000000, in=1441 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-criminology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-criminology-bachelor-of-psychological-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-food-and-nutrition
+[CATEGORY det] Bachelor of Criminology → Law & Legal Studies / Criminal Justice
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-commerce-bach → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[EXTRACT] 156/200: Bachelor Of Health Sciences
+Fetching 156/200: Bachelor Of Health Sciences
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-commerce-bachelor-of-science
+[EXTRACT] 157/200: Bachelor Of Information Technology
+Fetching 157/200: Bachelor Of Information Technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-health-sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-information-technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-criminology-bachelor-of-psychological-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-food-and-nutrition — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-criminology-b → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-food-and-nutr → 0 field(s) (cost=$0.000000, in=1443 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-criminology-bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-food-and-nutrition (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-criminology-bachelor-of-psychological-science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-food-and-nutrition
+[CATEGORY det] Bachelor of Criminology and Psychologica → Law & Legal Studies / Criminal Justice
+[EXTRACT] 158/200: Bachelor Of Media And Communication
+[EXTRACT] 159/200: Bachelor Of Oral Health Science
+Fetching 158/200: Bachelor Of Media And Communication
+Fetching 159/200: Bachelor Of Oral Health Science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-media-and-communication
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-oral-health-science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-health-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-health-scienc → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-information-t → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-health-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-information-technology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-health-sciences
+[CATEGORY det] Bachelor of Information Technology (IT) → Computer Science & IT / Information Systems
+[EXTRACT] 160/200: Bachelor Of Paramedic Practice With Honours
+[EXTRACT] 161/200: Bachelor Of Pharmacy Honours
+Fetching 160/200: Bachelor Of Paramedic Practice With Honours
+Fetching 161/200: Bachelor Of Pharmacy Honours
+[per-course browser ✗] https://www.latrobe.edu.au/courses/bachelor-of-media-and-communication: empty response
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-media-and-com → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-media-and-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-media-and-communication
+[EXTRACT] 162/200: Bachelor Of Psychological Science
+Fetching 162/200: Bachelor Of Psychological Science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-oral-health-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-paramedic-practice-with-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-psychological-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-pharmacy-honours
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-oral-health-s → 0 field(s) (cost=$0.000000, in=1443 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-oral-health-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-oral-health-science
+[EXTRACT] 163/200: Bachelor Of Psychology Honours
+Fetching 163/200: Bachelor Of Psychology Honours
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-paramedic-practice-with-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-paramedic-pra → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-paramedic-practice-with-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-pharmacy-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-paramedic-practice-with-honours
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-pharmacy-hono → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[EXTRACT] 164/200: Bachelor Of Science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-psychological-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-pharmacy-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 164/200: Bachelor Of Science
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-psychological → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-pharmacy-honours
+[CATEGORY det] Bachelor of Pharmacy (Honours) → Medicine & Health / Pharmacy
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 165/200: Bachelor Of Sport And Exercise Science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-psychological-science
+Fetching 165/200: Bachelor Of Sport And Exercise Science
+[EXTRACT] 166/200: Diploma In Business
+Fetching 166/200: Diploma In Business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-psychology-honours
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-exercise-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-in-business
+[per-course browser ↻] https://www.latrobe.edu.au/courses/bachelor-of-science
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-psychology-honours — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-psychology-ho → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-psychology-honours (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-psychology-honours
+[CATEGORY det] Bachelor of Psychology (Honours) → Medicine & Health / Psychology
+[EXTRACT] 167/200: Diploma In Languages
+Fetching 167/200: Diploma In Languages
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-science → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-exercise-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-in-business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-science
+[GEMINI] https://www.latrobe.edu.au/courses/bachelor-of-sport-and-exe → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-in-business → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[EXTRACT] 168/200: Diploma Of Arts
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/bachelor-of-sport-and-exercise-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-in-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 168/200: Diploma Of Arts
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/bachelor-of-sport-and-exercise-science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-in-business
+[EXTRACT] 169/200: Doctor Of Clinical Science
+[EXTRACT] 170/200: Doctor Of Nursing Professional Doctorate
+Fetching 169/200: Doctor Of Clinical Science
+Fetching 170/200: Doctor Of Nursing Professional Doctorate
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-of-arts
+[per-course browser ↻] https://www.latrobe.edu.au/courses/diploma-in-languages
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-clinical-science
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-nursing-professional-doctorate
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-clinical-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-in-languages — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-clinical-scienc → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-in-languages → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-clinical-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-in-languages (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-clinical-science
+[EXTRACT] 171/200: Doctor Of Public Health Professional Doctorate
+Fetching 171/200: Doctor Of Public Health Professional Doctorate
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-in-languages
+[EXTRACT] 172/200: Doctor Of Social Work Professional Doctorate
+Fetching 172/200: Doctor Of Social Work Professional Doctorate
+[per-course browser ✓] https://www.latrobe.edu.au/courses/diploma-of-arts — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/diploma-of-arts → 0 field(s) (cost=$0.000000, in=1439 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/diploma-of-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/diploma-of-arts
+[EXTRACT] 173/200: Graduate Certificate In Business Analytics
+Fetching 173/200: Graduate Certificate In Business Analytics
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-nursing-professional-doctorate — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-nursing-profess → 0 field(s) (cost=$0.000000, in=1445 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-nursing-professional-doctorate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-nursing-professional-doctorate
+[CATEGORY det] Doctor of Nursing (Professional Doctorat → Medicine & Health / Nursing
+[EXTRACT] 174/200: Graduate Certificate In Family Therapy
+Fetching 174/200: Graduate Certificate In Family Therapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-social-work-professional-doctorate
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-business-analytics
+[per-course browser ↻] https://www.latrobe.edu.au/courses/doctor-of-public-health-professional-doctorate
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-social-work-professional-doctorate — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-social-work-pro → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-social-work-professional-doctorate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-social-work-professional-doctorate
+[CATEGORY det] Doctor of Social Work (Professional Doct → Education & Social Work / Social Work
+[EXTRACT] 175/200: Graduate Certificate Of Archaeology
+Fetching 175/200: Graduate Certificate Of Archaeology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-in-business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-b → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-in-f → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/doctor-of-public-health-professional-doctorate — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/doctor-of-public-health-p → 0 field(s) (cost=$0.000000, in=1447 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-business-analytics
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-in-family-therapy
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/doctor-of-public-health-professional-doctorate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Graduate Certificate in Business Analyti → Business & Management / Business Analytics
+[EXTRACT] 176/200: Juris Doctor
+[EXTRACT] 177/200: Master Of Arts Humanities And Social Sciences
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/doctor-of-public-health-professional-doctorate
+Fetching 176/200: Juris Doctor
+[CATEGORY det] Doctor of Public Health (Professional Do → Medicine & Health / Public Health
+Fetching 177/200: Master Of Arts Humanities And Social Sciences
+[EXTRACT] 178/200: Master Of Art Therapy
+Fetching 178/200: Master Of Art Therapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/graduate-certificate-of-archaeology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-arts-humanities-and-social-sciences
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-art-therapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/juris-doctor
+[per-course browser ✓] https://www.latrobe.edu.au/courses/graduate-certificate-of-archaeology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/graduate-certificate-of-a → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/graduate-certificate-of-archaeology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/graduate-certificate-of-archaeology
+[EXTRACT] 179/200: Master Of Biotechnology And Bioinformatics
+Fetching 179/200: Master Of Biotechnology And Bioinformatics
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-art-therapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/juris-doctor — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-biotechnology-and-bioinformatics
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-art-therapy → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/juris-doctor → 0 field(s) (cost=$0.000000, in=1437 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-art-therapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/juris-doctor (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-art-therapy
+[FIELD TRACE] study_mode='On Campus' location='Melbourne' method=study_mode:rule url=https://www.latrobe.edu.au/courses/juris-doctor
+[EXTRACT] 180/200: Master Of Biotechnology Management
+Fetching 180/200: Master Of Biotechnology Management
+[CATEGORY det] Juris Doctor | JD in Melbourne → Law & Legal Studies / Juris Doctor
+[EXTRACT] 181/200: Master Of Business Administration
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-arts-humanities-and-social-sciences — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+Fetching 181/200: Master Of Business Administration
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-arts-humanities → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-arts-humanities-and-social-sciences (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-arts-humanities-and-social-sciences
+[EXTRACT] 182/200: Master Of Business Research
+Fetching 182/200: Master Of Business Research
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-biotechnology-and-bioinformatics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-business-administration
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-biotechnology-management
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-biotechnology-a → 0 field(s) (cost=$0.000000, in=1446 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-biotechnology-and-bioinformatics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-biotechnology-and-bioinformatics
+[CATEGORY det] Master of Biotechnology and Bioinformati → Science & Mathematics / Biotechnology
+[EXTRACT] 183/200: Master Of Clinical Audiology
+Fetching 183/200: Master Of Clinical Audiology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-biotechnology-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-business-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-biotechnology-m → 0 field(s) (cost=$0.000000, in=1390 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-business-admini → 0 field(s) (cost=$0.000000, in=1439 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-biotechnology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-business-research
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-clinical-audiology
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-business-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-biotechnology-management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-business-administration
+[CATEGORY det] Master of Biotechnology Management → Science & Mathematics / Biotechnology
+[CATEGORY det] Master of Business Administration | MBA → Business & Management / MBA
+[EXTRACT] 184/200: Master Of Clinical Family Therapy
+[EXTRACT] 185/200: Master Of Clinical Psychology
+Fetching 184/200: Master Of Clinical Family Therapy
+Fetching 185/200: Master Of Clinical Psychology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-clinical-psychology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-clinical-family-therapy
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-clinical-audiology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-business-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-business-resear → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-clinical-audiol → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-clinical-audiology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-business-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-clinical-audiology
+[EXTRACT] 186/200: Master Of Data Science
+Fetching 186/200: Master Of Data Science
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-business-research
+[EXTRACT] 187/200: Master Of Education
+Fetching 187/200: Master Of Education
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-education
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-clinical-family-therapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-data-science
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-clinical-family → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-clinical-family-therapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-clinical-family-therapy
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-clinical-psychology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 188/200: Master Of Education Research
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-clinical-psycho → 0 field(s) (cost=$0.000000, in=1388 out=0)
+Fetching 188/200: Master Of Education Research
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-clinical-psychology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-clinical-psychology
+[CATEGORY det] Master of Clinical Psychology → Medicine & Health / Psychology
+[EXTRACT] 189/200: Master Of Engineering Research
+Fetching 189/200: Master Of Engineering Research
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-data-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-education → 0 field(s) (cost=$0.000000, in=1386 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-data-science → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-education
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-data-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-data-science
+[EXTRACT] 190/200: Master Of Engineering Management
+[CATEGORY det] Master of Data Science → Computer Science & IT / Data Science
+Fetching 190/200: Master Of Engineering Management
+[EXTRACT] 191/200: Master Of Exercise Physiology
+Fetching 191/200: Master Of Exercise Physiology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-education-research
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-engineering-research
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-exercise-physiology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-engineering-management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-education-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-engineering-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-education-resea → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-engineering-res → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-education-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-engineering-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-education-research
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-engineering-research
+[EXTRACT] 192/200: Master Of Health Administration
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-engineering-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 193/200: Master Of Health Information Management
+Fetching 192/200: Master Of Health Administration
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-engineering-man → 0 field(s) (cost=$0.000000, in=1389 out=0)
+Fetching 193/200: Master Of Health Information Management
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-exercise-physiology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-engineering-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-engineering-management
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-exercise-physio → 0 field(s) (cost=$0.000000, in=1388 out=0)
+[EXTRACT] 194/200: Master Of Information Technology
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-exercise-physiology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 194/200: Master Of Information Technology
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-exercise-physiology
+[EXTRACT] 195/200: Master Of Laws Research
+Fetching 195/200: Master Of Laws Research
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-health-administration
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-information-technology
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-health-information-management
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-laws-research
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-information-tec → 0 field(s) (cost=$0.000000, in=1389 out=0)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-health-administration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-health-administ → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-health-administration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-information-technology
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-laws-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-health-information-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-health-administration
+[CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-health-informat → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-laws-research → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[EXTRACT] 196/200: Master Of Mental Health
+[EXTRACT] 197/200: Master Of Mental Health Nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-health-information-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-laws-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 196/200: Master Of Mental Health
+Fetching 197/200: Master Of Mental Health Nursing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-health-information-management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-laws-research
+[EXTRACT] 198/200: Master Of Musculoskeletal Physiotherapy
+[EXTRACT] 199/200: Master Of Nursing
+Fetching 198/200: Master Of Musculoskeletal Physiotherapy
+Fetching 199/200: Master Of Nursing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-mental-health-nursing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-musculoskeletal-physiotherapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-nursing
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-mental-health
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-mental-health-nursing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-mental-health-n → 0 field(s) (cost=$0.000000, in=1439 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-mental-health-nursing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-nursing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-mental-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-mental-health-nursing
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-musculoskeletal-physiotherapy — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-nursing → 0 field(s) (cost=$0.000000, in=1385 out=0)
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-mental-health → 0 field(s) (cost=$0.000000, in=1387 out=0)
+[CATEGORY det] Master of Mental Health Nursing → Medicine & Health / Nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-nursing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 200/200: Master Of Nursing Research
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-musculoskeletal → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-nursing
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-mental-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+Fetching 200/200: Master Of Nursing Research
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-musculoskeletal-physiotherapy (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Master of Nursing → Medicine & Health / Nursing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-mental-health
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-musculoskeletal-physiotherapy
+[CATEGORY det] Master of Musculoskeletal Physiotherapy → Medicine & Health / Physiotherapy
+[per-course browser ↻] https://www.latrobe.edu.au/courses/master-of-nursing-research
+[per-course browser ✓] https://www.latrobe.edu.au/courses/master-of-nursing-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.latrobe.edu.au/courses/master-of-nursing-researc → 0 field(s) (cost=$0.000000, in=1442 out=0)
+[FALLBACK] AI enriching https://www.latrobe.edu.au/courses/master-of-nursing-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.latrobe.edu.au/courses/master-of-nursing-research
+[CATEGORY det] Master of Nursing (Research) → Medicine & Health / Nursing
+[STAGE] skipped Bachelor of Business Analytics: rejected: no_international_fee
+[STAGE] skipped Bachelor of Early Childhood Education: rejected: no_international_fee
+[STAGE] skipped Bachelor of Archaeology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Orthoptics (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Podiatry (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Prosthetics and Orthotics (Honours): rejected: no_international_fee
+[STAGE] skipped Master of Professional Psychology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Dental Science (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Cybersecurity/bachelor of Commerce: rejected: no_international_fee
+[STAGE] skipped Bachelor of Cybersecurity/bachelor of Criminology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Business/bachelor of Psychological Science: rejected: online_only
+[STAGE] skipped Doctor of Midwifery: rejected: no_international_fee
+[STAGE] skipped Diploma of Elite Sport Business: rejected: no_international_fee
+[STAGE] skipped Doctor of Philosophy: rejected: no_international_fee
+[STAGE] skipped Master of Philosophy: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce/bachelor of Arts: rejected: no_international_fee
+[STAGE] skipped Master of Digital Health: rejected: no_international_fee
+[STAGE] skipped Bachelor of Physiotherapy (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Social Work (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Speech Pathology (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Occupational Therapy (Honours): rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Mental Health: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Public Health: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Information Technology Fundamentals: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Business Administration: rejected: no_international_fee
+[STAGE] skipped Bachelor of Biomedicine (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Wildlife and Conservation Biology: rejected: no_international_fee
+[STAGE] skipped Diploma of Information Technology: rejected: no_international_fee
+[STAGE] skipped Diploma of Science: rejected: no_international_fee
+[STAGE] skipped Master of Engineering: rejected: no_international_fee
+[STAGE] skipped Diploma of Biological Sciences: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Artificial Intelligence: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Criminology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Psychological Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Outdoor and Sustainability Education: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Education: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Education: rejected: no_international_fee
+[STAGE] skipped Associate Degree of Teacher Education: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce and Global Studies: rejected: no_international_fee
+[STAGE] skipped Diploma of Teacher Education, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Bachelor of Global Studies: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Business: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Commerce: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Global Studies: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Media Communication: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Logistics and Supply Chain Management: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Professional Accounting: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Logistics and Supply Chain Management: rejected: no_international_fee
+[STAGE] skipped Master of Extended Professional Accounting: rejected: no_international_fee
+[STAGE] skipped Master of Professional Accounting: rejected: no_international_fee
+[STAGE] skipped Bachelor of Health Information Management: rejected: no_international_fee
+[STAGE] skipped Master of Logistics and Supply Chain Management: rejected: no_international_fee
+[STAGE] skipped Master of Sports and Exercise Physiotherapy: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Arts: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma of Archaeology: rejected: no_international_fee
+[STAGE] skipped Master of Archaeology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Arts/bachelor of Science: rejected: no_international_fee
+[STAGE] skipped Master of Strength and Conditioning: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Rehabilitation Counselling: rejected: no_international_fee
+[STAGE] skipped Associate Degree in Engineering Technology: rejected: no_international_fee
+[STAGE] skipped Associate Degree in Early Childhood Education: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Engineering Management: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Business: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Data Science Fundamentals: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Cybersecurity: rejected: no_international_fee
+[STAGE] skipped Master of Social Work: rejected: no_international_fee
+[STAGE] skipped Diploma of Rural Health: rejected: no_international_fee
+[STAGE] skipped Bachelor of Visual Arts, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Bachelor of Education | Primary Or Secondary: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Artificial Intelligence, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Cybersecurity, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Data Science: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Information Technology, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Midwifery Practice: rejected: no_international_fee
+[STAGE] skipped Master of Teaching (Primary): rejected: no_international_fee
+[STAGE] skipped Master of Teaching (Secondary): rejected: no_international_fee
+[STAGE] skipped Diploma in Health Sciences: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Mental Health for Education, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Global Master of Business Administration: rejected: category_landing_page
+[STAGE] skipped Master of Physiotherapy Practice: rejected: no_international_fee
+[STAGE] skipped Bachelor of Biomedical Science (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Nursing: rejected: no_international_fee
+[STAGE] skipped Bachelor of Nursing/bachelor of Midwifery, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Midwifery: rejected: no_international_fee
+[STAGE] skipped Master of Quantum Information Technology: rejected: no_international_fee
+[STAGE] skipped Master of Marketing: rejected: no_international_fee
+[STAGE] skipped Master of Civil Engineering: rejected: no_international_fee
+[STAGE] skipped Master of Manufacturing Engineering, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Counselling, Rehabilitation and Mental Health: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Marketing, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Dietetics: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Education (Language and Literacy), Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Bachelor of Sport and Recreation Management, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Bachelor of Agriculture: rejected: no_international_fee
+[STAGE] skipped Bachelor of Biomedicine: rejected: no_international_fee
+[STAGE] skipped Diploma of Agricultural Science: rejected: no_international_fee
+[STAGE] skipped Master of Construction Engineering and Management: rejected: no_international_fee
+[STAGE] skipped Bachelor of Politics, Philosophy & Economics: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce/bachelor of Biomedicine: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Politics, Philosophy and Economics: rejected: no_international_fee
+[STAGE] skipped Bachelor of Laws (Honours)/bachelor of Biomedicine: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Family Therapy: First Nations: rejected: no_international_fee
+[STAGE] skipped Diploma of Teacher Education (Nexus): rejected: no_international_fee
+[STAGE] skipped Doctor of Science, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Doctor of Laws, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Doctor of Letters, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Artificial Intelligence: rejected: no_international_fee
+[STAGE] skipped Master of Cybersecurity: rejected: no_international_fee
+[STAGE] skipped Master of Nurse Practitioner: rejected: no_international_fee
+[STAGE] skipped Master of Nursing Practice, Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Professional Engineering: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate of Rural and Remote Nursing Practice: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Rural and Remote Nursing Practice: rejected: no_international_fee
+[STAGE] skipped Doctor of Education (Professional Doctorate), Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Professional Certificate in Cybersecurity: rejected: category_landing_page
+[STAGE] skipped Bachelor of Veterinary Nursing and Technology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Computer Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Education (Nexus): rejected: no_international_fee
+[STAGE] skipped Master of Teaching Nexus (Secondary), Courses and Degrees, La Trobe University: rejected: no_international_fee
+[STAGE] skipped Master of Teaching Nexus (Primary): rejected: no_international_fee
+[STAGE] skipped Master of Business Analytics: rejected: no_international_fee
+[STAGE] skipped Master of Business Information Systems: rejected: no_international_fee
+[STAGE] skipped Master of International Business: rejected: no_international_fee
+[STAGE] skipped Undergraduate Certificate in Cybersecurity: rejected: category_landing_page
+[STAGE] skipped Undergraduate Certificate in Health Sciences: rejected: category_landing_page
+[STAGE] skipped Undergraduate Certificate in Information Technology: rejected: category_landing_page
+[STAGE] skipped Undergraduate Certificate in Psychological Science: rejected: category_landing_page
+[STAGE] skipped Graduate Certificate in Sport Analytics: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Strength and Conditioning: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Sport Analytics: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Strength and Conditioning: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in International Business: rejected: no_international_fee
+[STAGE] skipped Graduate Diploma in Early Childhood Education: rejected: no_international_fee
+[STAGE] skipped Undergraduate Certificate in Agriculture: rejected: category_landing_page
+[STAGE] skipped Graduate Certificate in Registered Nurse Prescribing: rejected: no_international_fee
+[STAGE] skipped Master of Artificial Intelligence (Accelerated): rejected: no_international_fee
+[STAGE] skipped Master of Data Science (Accelerated): rejected: no_international_fee
+[STAGE] skipped Master of Information Technology (Accelerated): rejected: no_international_fee
+[STAGE] skipped Bachelor of Accounting: rejected: no_international_fee
+[STAGE] skipped Bachelor of Animal and Veterinary Biosciences: rejected: no_international_fee
+[STAGE] skipped Bachelor of Arts | BA Melbourne: rejected: no_international_fee
+[STAGE] skipped Bachelor of Arts/bachelor of Health Sciences: rejected: no_international_fee
+[STAGE] skipped Bachelor of Biological Sciences: rejected: no_international_fee
+[STAGE] skipped Bachelor of Biomedical Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Business: rejected: no_international_fee
+[STAGE] skipped Bachelor of Civil Engineering (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce / Computer Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce and Health Sciences: rejected: no_international_fee
+[STAGE] skipped Bachelor of Commerce/bachelor of Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Criminology: rejected: no_international_fee
+[STAGE] skipped Bachelor of Criminology and Psychological Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Food and Nutrition: rejected: no_international_fee
+[STAGE] skipped Bachelor of Health Sciences: rejected: no_international_fee
+[STAGE] skipped Bachelor of Information Technology (IT): rejected: no_international_fee
+[STAGE] skipped Bachelor of Media and Communication: rejected: no_international_fee
+[STAGE] skipped Bachelor of Oral Health Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Paramedic Practice with Honours: rejected: no_international_fee
+[STAGE] skipped Bachelor of Pharmacy (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Psychological Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Psychology (Honours): rejected: no_international_fee
+[STAGE] skipped Bachelor of Science: rejected: no_international_fee
+[STAGE] skipped Bachelor of Sport and Exercise Science: rejected: no_international_fee
+[STAGE] skipped Diploma in Business: rejected: no_international_fee
+[STAGE] skipped Diploma in Languages: rejected: no_international_fee
+[STAGE] skipped Diploma of Arts: rejected: no_international_fee
+[STAGE] skipped Doctor of Clinical Science: rejected: no_international_fee
+[STAGE] skipped Doctor of Nursing (Professional Doctorate): rejected: no_international_fee
+[STAGE] skipped Doctor of Public Health (Professional Doctorate): rejected: no_international_fee
+[STAGE] skipped Doctor of Social Work (Professional Doctorate): rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Business Analytics: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate in Family Therapy: rejected: no_international_fee
+[STAGE] skipped Graduate Certificate of Archaeology: rejected: no_international_fee
+[STAGE] skipped Juris Doctor | JD in Melbourne: rejected: category_landing_page
+[STAGE] skipped Master of Arts: rejected: no_international_fee
+[STAGE] skipped Master of Art Therapy: rejected: no_international_fee
+[STAGE] skipped Master of Biotechnology and Bioinformatics: rejected: no_international_fee
+[STAGE] skipped Master of Biotechnology Management: rejected: no_international_fee
+[STAGE] skipped Master of Business Administration | MBA: rejected: no_international_fee
+[STAGE] skipped Master of Business (Research): rejected: no_international_fee
+[STAGE] skipped Master of Clinical Audiology: rejected: no_international_fee
+[STAGE] skipped Master of Clinical Family Therapy: rejected: no_international_fee
+[STAGE] skipped Master of Clinical Psychology: rejected: no_international_fee
+[STAGE] skipped Master of Data Science: rejected: no_international_fee
+[STAGE] skipped Master of Education: rejected: no_international_fee
+[STAGE] skipped Master of Education (Research): rejected: no_international_fee
+[STAGE] skipped Master of Engineering (Research): rejected: no_international_fee
+[STAGE] skipped Master of Engineering Management: rejected: no_international_fee
+[STAGE] skipped Master of Exercise Physiology: rejected: no_international_fee
+[STAGE] skipped Master of Health Administration: rejected: no_international_fee
+[STAGE] skipped Master of Health Information Management: rejected: no_international_fee
+[STAGE] skipped Master of Information Technology: rejected: no_international_fee
+[STAGE] skipped Master of Laws (Research): rejected: no_international_fee
+[STAGE] skipped Master of Mental Health: rejected: no_international_fee
+[STAGE] skipped Master of Mental Health Nursing: rejected: no_international_fee
+[STAGE] skipped Master of Musculoskeletal Physiotherapy: rejected: no_international_fee
+[STAGE] skipped Master of Nursing: rejected: no_international_fee
+[STAGE] skipped Master of Nursing (Research): rejected: no_international_fee
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 9m 33s | Courses: 200 | Avg: 2.9s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:200 | Staged:0 | Skipped:200 | Errors:0
+Staged 0 courses, 200 skipped, 0 fetch errors

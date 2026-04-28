@@ -162,6 +162,22 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     # UTAS orientation / prep program info hubs
     "/orientation-program", "/orientation/",
     "/university-preparation", "/pathway-college",
+    # ACU / generic: research school nav pages discovered via nav crawl
+    # that look like course links but are hub/listing pages.
+    "/research-and-enterprise/",
+    "/graduate-research-school/",
+    "/graduate-research/",
+    # ACU / generic: admission pathway and English pathway listing pages.
+    # Individual pathway courses sometimes appear under /course/ instead,
+    # so only the broad programme-listing paths are blocked here.
+    "/admission-pathways/",
+    "/english-and-pathway-programs/",
+    "/pathway-programs/",
+    "/pathway-program/",
+    # Industry engagement / partnership pages that are never individual
+    # course detail pages.
+    "/industry-engagement/",
+    "/industry-opportunities/",
 )
 
 # Last-segment junk suffix regex (Node routes/scrape.ts:5540) — even
@@ -181,7 +197,10 @@ _JUNK_LAST_SEG_RE = re.compile(
     r"application-form-returning-students|"
     r"enrolment|enrollment|enrol|enroll|"
     r"orientation|induction|"
-    r"enquire|enquiry|enquiries|contact-us)$",
+    r"enquire|enquiry|enquiries|contact-us|"
+    # ACU / generic: research hub pages whose last path segment is a nav
+    # keyword rather than a course slug (projects, supervisors, engagement).
+    r"projects?|supervisors?|engagement|opportunities)$",
     re.I,
 )
 
