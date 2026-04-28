@@ -1,0 +1,69 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 14:04:02 UTC 2026
+
+  System load:           0.14
+  Usage of /:            3.4% of 231.44GB
+  Memory usage:          12%
+  Swap usage:            0%
+  Processes:             170
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 13:43:10 2026 from 162.243.190.66
+root@university-and-course-data:~# # Step 1: verify local postgres works
+sudo -u postgres psql -c "SELECT current_database();"
+
+# Step 2: find the right database and add the column
+sudo -u postgres psql -c "\l"
+ current_database 
+------------------
+ postgres
+(1 row)
+
+                                                         List of databases
+       Name        |   Owner   | Encoding | Locale Provider | Collate |  Ctype  | ICU Locale | ICU Rules |    Access privileges    
+-------------------+-----------+----------+-----------------+---------+---------+------------+-----------+-------------------------
+ postgres          | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+ template0         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ template1         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ test              | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/postgres           +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres  +
+                   |           |          |                 |         |         |            |           | test=CTc/postgres
+ university_portal | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                   |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+(5 rows)
+
+root@university-and-course-data:~# sudo -u postgres psql -d ACTUAL_DB_NAME -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  database "ACTUAL_DB_NAME" does not exist
+root@university-and-course-data:~# sudo -u postgres psql -t -c "SELECT datname FROM pg_database WHERE datname NOT IN ('template0','template1','postgres') ORDER BY datname LIMIT 1;" | xargs -I{} sudo -u postgres psql -d {} -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+ERROR:  relation "scraped_courses" does not exist
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+NOTICE:  column "scrape_warnings" of relation "scraped_courses" already exists, skipping
+ALTER TABLE
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "\d scraped_courses" | grep scrape_warnings
+ scrape_warnings        | jsonb                    |           |          | 
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "INSERT INTO alembic_version (version_num) VALUES ('006_add_scrape_warnings') ON CONFLICT DO NOTHING;"
+ERROR:  relation "alembic_version" does not exist
+LINE 1: INSERT INTO alembic_version (version_num) VALUES ('006_add_s...
+                    ^
+root@university-and-course-data:~# 
