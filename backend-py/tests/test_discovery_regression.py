@@ -140,3 +140,115 @@ async def test_sitemap_fallback_threshold_boundary(monkeypatch):
     # We hit the threshold exactly → sitemap fallback should NOT fire.
     assert not sitemap_called
     assert len(out) == n
+
+
+# ── AIT fix: detail pages classified from content must add self as candidate ─
+
+# Simulates AIT's /courses/2d-animation — URL looks like a category landing
+# (/courses/<slug>) but the page has real course content.  The page has no
+# outbound course links (only 1 nav link), so the legacy sweep would produce
+# 0 candidates and the URL would silently drop out of `found`.
+_AIT_LISTING_HTML = """\
+<html><head><title>Courses | AIT</title></head>
+<body>
+<h1>AIT Courses</h1>
+<ul>
+  <li><a href="/courses/2d-animation">2D Animation</a></li>
+  <li><a href="/courses/3d-animation">3D Animation</a></li>
+  <li><a href="/courses/game-design">Game Design</a></li>
+  <li><a href="/courses/information-technology">Information Technology</a></li>
+</ul>
+</body></html>
+"""
+
+# Each category page has course content (fee/duration/intake) but only
+# 1 outbound link → classifier calls it 'detail', legacy sweep suppressed.
+_AIT_COURSE_HTML = """\
+<html><head><title>{title} | AIT</title></head>
+<body>
+<h1>{title}</h1>
+<p>This advanced diploma course trains students in creative arts.</p>
+<p>Duration: 2 years full-time</p>
+<p>Intake: February, July</p>
+<p>Tuition Fee: $15,000 per year</p>
+<p>Study Mode: On Campus — Sydney</p>
+<a href="/courses">Back to courses</a>
+</body></html>
+"""
+
+_AIT_IT_LISTING_HTML = """\
+<html><head><title>Information Technology | AIT</title></head>
+<body>
+<h1>Information Technology</h1>
+<p>Earn a diploma in information technology at AIT.</p>
+<p>Duration: 1 year full-time</p>
+<p>Intake: February, July</p>
+<p>Tuition Fee: $12,000 per year</p>
+<p>Study Mode: On Campus — Melbourne</p>
+<a href="/courses/information-technology/vocational-diploma-of-it">Vocational Diploma of IT</a>
+<a href="/courses">Back to courses</a>
+</body></html>
+"""
+
+_AIT_CHILD_HTML = """\
+<html><head><title>Vocational Diploma of IT | AIT</title></head>
+<body>
+<h1>ICT50220 Diploma of Information Technology (Vocational)</h1>
+<p>Duration: 1 year</p>
+<p>Intake: March</p>
+<p>Tuition fee: $12,000</p>
+<p>Study Mode: On Campus</p>
+</body></html>
+"""
+
+
+@pytest.mark.asyncio
+async def test_ait_detail_pages_added_as_self_candidates(monkeypatch):
+    """AIT fix: pages classified as 'detail' (course content confirmed) must
+    add their OWN URL to the candidate set, not just their outbound links.
+
+    AIT has courses at /courses/2d-animation, /courses/3d-animation, etc.
+    These are 2-segment paths that look like category landings to the URL
+    heuristic, BUT the page content (fee/duration/intake) confirms they are
+    real course detail pages. Before the fix, all were visited and discarded.
+    """
+    _pages = {
+        "https://ait.edu.au/courses": _AIT_LISTING_HTML,
+        "https://ait.edu.au/courses/2d-animation": _AIT_COURSE_HTML.format(title="2D Animation"),
+        "https://ait.edu.au/courses/3d-animation": _AIT_COURSE_HTML.format(title="3D Animation"),
+        "https://ait.edu.au/courses/game-design": _AIT_COURSE_HTML.format(title="Game Design"),
+        "https://ait.edu.au/courses/information-technology": _AIT_IT_LISTING_HTML,
+        "https://ait.edu.au/courses/information-technology/vocational-diploma-of-it": _AIT_CHILD_HTML,
+    }
+
+    async def fake_fetch(url):
+        return _pages.get(url, "")
+
+    async def fake_sitemap(origin, *, emit=None):
+        return []
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_fetch)
+    import app.services.scraper.sitemap as sm
+    monkeypatch.setattr(sm, "discover_from_sitemap", fake_sitemap)
+
+    out = await discovery.discover_course_links(
+        "https://ait.edu.au/courses", max_pages=10, max_courses=50
+    )
+    urls = {c["url"] for c in out}
+
+    # Each detail page that was visited must be in the candidate set.
+    for u in (
+        "https://ait.edu.au/courses/2d-animation",
+        "https://ait.edu.au/courses/3d-animation",
+        "https://ait.edu.au/courses/game-design",
+        "https://ait.edu.au/courses/information-technology",
+    ):
+        assert u in urls, (
+            f"{u} was classified as detail but NOT added as candidate — "
+            "self-candidate fix missing"
+        )
+
+    # The child course linked from the IT category page must also appear.
+    assert "https://ait.edu.au/courses/information-technology/vocational-diploma-of-it" in urls, (
+        "Child course linked from a detail page must be harvested"
+    )
