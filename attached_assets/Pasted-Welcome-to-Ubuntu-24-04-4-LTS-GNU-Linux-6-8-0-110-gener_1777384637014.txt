@@ -1,0 +1,64 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 13:43:09 UTC 2026
+
+  System load:           0.19
+  Usage of /:            3.4% of 231.44GB
+  Memory usage:          29%
+  Swap usage:            0%
+  Processes:             228
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 12:07:30 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /path/to/University-and-Course-data
+git pull origin main
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+root@university-and-course-data:~# cd backend-py
+pip install -r requirements.txt  # if any new packages
+sudo systemctl restart uvicorn   # or whatever service name you use
+sudo systemctl restart celery
+-bash: cd: backend-py: No such file or directory
+error: externally-managed-environment
+
+× This environment is externally managed
+╰─> To install Python packages system-wide, try apt install
+    python3-xyz, where xyz is the package you are trying to
+    install.
+    
+    If you wish to install a non-Debian-packaged Python package,
+    create a virtual environment using python3 -m venv path/to/venv.
+    Then use path/to/venv/bin/python and path/to/venv/bin/pip. Make
+    sure you have python3-full installed.
+    
+    If you wish to install a non-Debian packaged Python application,
+    it may be easiest to use pipx install xyz, which will manage a
+    virtual environment for you. Make sure you have pipx installed.
+    
+    See /usr/share/doc/python3.12/README.venv for more information.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+Failed to restart uvicorn.service: Unit uvicorn.service not found.
+Failed to restart celery.service: Unit celery.service not found.
+root@university-and-course-data:~# sudo systemctl list-units | grep -E "uvicorn|celery|fastapi"
+  uni-celery.service                                                             loaded active running   University Portal Celery Worker (scraper)
+root@university-and-course-data:~# 
