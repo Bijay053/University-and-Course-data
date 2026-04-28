@@ -254,8 +254,14 @@ class _LinkExtractor(HTMLParser):
         self.links: list[tuple[str, str]] = []  # (href, text)
         self._current_href: str | None = None
         self._current_text: list[str] = []
+        # Track depth inside tags whose text content we should ignore
+        # (SVG <style> blocks, <script> blocks).
+        self._skip_depth: int = 0
+        self._skip_tags: frozenset[str] = frozenset({"style", "script", "svg"})
 
     def handle_starttag(self, tag: str, attrs) -> None:  # noqa: ANN001
+        if tag in self._skip_tags:
+            self._skip_depth += 1
         if tag == "a":
             href = next((v for (k, v) in attrs if k == "href" and v), None)
             if href:
@@ -263,10 +269,12 @@ class _LinkExtractor(HTMLParser):
                 self._current_text = []
 
     def handle_data(self, data: str) -> None:
-        if self._current_href is not None:
+        if self._current_href is not None and self._skip_depth == 0:
             self._current_text.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag in self._skip_tags and self._skip_depth > 0:
+            self._skip_depth -= 1
         if tag == "a" and self._current_href is not None:
             text = re.sub(r"\s+", " ", "".join(self._current_text)).strip()
             self.links.append((self._current_href, text))

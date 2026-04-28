@@ -1,0 +1,1097 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 12
+[status] [fetch] Fetching https://www.flinders.edu.au/...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Home page detected → course listing at https://www.flinders.edu.au/study/courses (high-priority probe)
+[status] [discover] [DISCOVER] Crawling from https://www.flinders.edu.au/study/courses (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] classified https://www.flinders.edu.au/study/courses: listing (15 course links found)
+[status] [discover] [DISCOVER] Page 1/25: +200 candidates (total 200) — https://www.flinders.edu.au/study/courses
+[status] [discover] Discovered 200 candidate course links
+[status] [extract] Extracting course details (200 pages)...
+[status] [extract] [EXTRACT] 1/200: a future postgraduate student
+[status] [extract] [EXTRACT] 2/200: View all saved courses
+[status] [extract] [EXTRACT] 3/200: Livestream Information Sessions
+[status] [extract] [EXTRACT] 4/200: Postgraduate information sessions
+[progress] [extract] Fetching 3/200: Livestream Information Sessions
+[progress] [extract] Fetching 2/200: View all saved courses
+[progress] [extract] Fetching 1/200: a future postgraduate student
+[progress] [extract] Fetching 4/200: Postgraduate information sessions
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/events-key-dates/webinars
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/saved-courses
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/postgrad
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/events-key-dates/livestream-postgraduate
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/events-key-dates/webinars — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/events-key-dates/livestream-postgraduate — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/saved-courses — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/postgrad — moving on
+[status] [extract] [GP-DEBUG] static=139052B rendered=0B using=static text_len=30
+[status] [extract] [GP-DEBUG] text[:500]='Flinders Chat fullscreen close'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/events-key-dates/webinars → 0 field(s) (cost=$0.000067, in=845 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/events-key-dates/webinars (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=133047B rendered=0B using=static text_len=30
+[status] [extract] [GP-DEBUG] text[:500]='Flinders Chat fullscreen close'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/events-key-dates/livestrea → 0 field(s) (cost=$0.000068, in=848 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/events-key-dates/livestream-postgraduate (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=279997B rendered=0B using=static text_len=69
+[status] [extract] [GP-DEBUG] text[:500]='Explore more of Tamika’s story Tamika Regnier Master of Public Health'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/postgrad → 0 field(s) (cost=$0.000068, in=850 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/postgrad (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=116539B rendered=0B using=static text_len=63
+[status] [extract] [GP-DEBUG] text[:500]='Course name Enquire Delete {{{courseName}}} mail_outline delete'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/saved-courses → 0 field(s) (cost=$0.000067, in=852 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/saved-courses (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 5/200: Year 12 entry
+[progress] [extract] Fetching 5/200: Year 12 entry
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/year-12-entry
+[status] [extract] [EXTRACT] 6/200: TAFE/VET to uni
+[progress] [extract] Fetching 6/200: TAFE/VET to uni
+[status] [extract] [EXTRACT] 7/200: Skills for Tertiary Admissions Test (STAT)
+[progress] [extract] Fetching 7/200: Skills for Tertiary Admissions Test (STAT)
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/tafevet-to-uni
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/stat
+[status] [extract] [EXTRACT] 8/200: Indigenous Admission Scheme
+[progress] [extract] Fetching 8/200: Indigenous Admission Scheme
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/indigenous-admission-scheme
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/year-12-entry — moving on
+[status] [extract] [GP-DEBUG] static=358013B rendered=0B using=static text_len=35
+[status] [extract] [GP-DEBUG] text[:500]='Year 12 entry - Flinders University'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/year-12-entry → 0 field(s) (cost=$0.000068, in=845 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/year-12-entry (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/stat — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/tafevet-to-uni — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/indigenous-admission-scheme — moving on
+[status] [extract] [GP-DEBUG] static=144063B rendered=0B using=static text_len=222
+[status] [extract] [GP-DEBUG] text[:500]='We’re here to help you every step of the way. If you would like to talk to one of our friendly advisers about applying to university or to discuss your study options and pathways, please contact us. Apply for study in 2026'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/stat → 0 field(s) (cost=$0.000070, in=890 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/stat (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=145299B rendered=0B using=static text_len=37
+[status] [extract] [GP-DEBUG] text[:500]='TAFE/VET to uni - Flinders University'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/tafevet-to-uni → 0 field(s) (cost=$0.000068, in=846 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/tafevet-to-uni (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=139147B rendered=0B using=static text_len=30
+[status] [extract] [GP-DEBUG] text[:500]='Flinders Chat fullscreen close'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/indigenous-admiss → 0 field(s) (cost=$0.000067, in=847 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/indigenous-admission-scheme (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [EXTRACT] 9/200: Military academic pathways
+[progress] [extract] Fetching 9/200: Military academic pathways
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/military-veterans
+[status] [extract] [EXTRACT] 10/200: Foundation Studies
+[progress] [extract] Fetching 10/200: Foundation Studies
+[status] [extract] [EXTRACT] 11/200: Associate Degree in Disability and Community Practice
+[progress] [extract] Fetching 11/200: Associate Degree in Disability and Community Practice
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/pathways/foundation-studies
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-disability-community-practice — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 12/200: Associate Degree in Health Sciences
+[progress] [extract] Fetching 12/200: Associate Degree in Health Sciences
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-health-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 13/200: Associate Degree in Medical Science (Laboratory Medicine)
+[progress] [extract] Fetching 13/200: Associate Degree in Medical Science (Laboratory Medicine)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/associate-degree-medical-science-laboratory-medicine — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 14/200: Bachelor of Accounting
+[progress] [extract] Fetching 14/200: Bachelor of Accounting
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-accounting — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 15/200: Bachelor of Allied Health (Occupational Therapy)
+[progress] [extract] Fetching 15/200: Bachelor of Allied Health (Occupational Therapy)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-occupational-therapy — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 16/200: Bachelor of Allied Health (Physiotherapy)
+[progress] [extract] Fetching 16/200: Bachelor of Allied Health (Physiotherapy)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-physiotherapy — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 17/200: Bachelor of Allied Health (Speech Pathology)
+[progress] [extract] Fetching 17/200: Bachelor of Allied Health (Speech Pathology)
+[status] [extract] [EXTRACT] 18/200: Bachelor of Archaeology
+[progress] [extract] Fetching 18/200: Bachelor of Archaeology
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-allied-health-speech-pathology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 19/200: Bachelor of Arts
+[progress] [extract] Fetching 19/200: Bachelor of Arts
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-archaeology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 20/200: Bachelor of Arts and Science
+[progress] [extract] Fetching 20/200: Bachelor of Arts and Science
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-arts — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 21/200: Bachelor of Business .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 21/200: Bachelor of Business .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-arts-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 22/200: Bachelor of Business (Online)
+[progress] [extract] Fetching 22/200: Bachelor of Business (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-business — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 23/200: Bachelor of Business Analytics .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 23/200: Bachelor of Business Analytics .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 24/200: Bachelor of Business majoring in Event Management and Tourism .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 24/200: Bachelor of Business majoring in Event Management and Tourism .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business-analytics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 25/200: Bachelor of Business majoring in Human Resource Management .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 25/200: Bachelor of Business majoring in Human Resource Management .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/event-management-tourism — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 26/200: Bachelor of Business majoring in International Business .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 26/200: Bachelor of Business majoring in International Business .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/human-resource-management — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 27/200: Bachelor of Business majoring in Leading Change .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 27/200: Bachelor of Business majoring in Leading Change .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/international-business — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 28/200: Bachelor of Business majoring in Management .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 28/200: Bachelor of Business majoring in Management .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/management — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 29/200: Bachelor of Business majoring in Marketing .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 29/200: Bachelor of Business majoring in Marketing .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/leading-change — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 30/200: Bachelor of Business majoring in Small Business Leadership .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 30/200: Bachelor of Business majoring in Small Business Leadership .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/marketing — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 31/200: Bachelor of Business majoring in Sports Management .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 31/200: Bachelor of Business majoring in Sports Management .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/small-business-leadership — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 32/200: Bachelor of Clinical Sciences, Doctor of Medicine
+[progress] [extract] Fetching 32/200: Bachelor of Clinical Sciences, Doctor of Medicine
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-clinical-sciences-doctor-medicine — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 33/200: Bachelor of Commerce .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 33/200: Bachelor of Commerce .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-business/sports-management — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 34/200: Bachelor of Computer Science .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 34/200: Bachelor of Computer Science .cls-1{fill:#000;stroke-width:0px;}
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/military-veterans — moving on
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-computer-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 35/200: Bachelor of Computer Science (Artificial Intelligence)
+[progress] [extract] Fetching 35/200: Bachelor of Computer Science (Artificial Intelligence)
+[status] [extract] [GP-DEBUG] static=231344B rendered=0B using=static text_len=93
+[status] [extract] [GP-DEBUG] text[:500]='Military Academic Pathway Program Learn more \ue5db Military Academic Pathway Program Learn more \ue5db'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/military-veterans → 0 field(s) (cost=$0.000068, in=861 out=13)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/military-veterans (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/pathways/foundation-studies — moving on
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-commerce — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 36/200: Bachelor of Computing and Mathematical Sciences (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 36/200: Bachelor of Computing and Mathematical Sciences (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-computer-science-artificial-intelligence — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 37/200: Bachelor of Creative Arts (Costume Design)
+[progress] [extract] Fetching 37/200: Bachelor of Creative Arts (Costume Design)
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours
+[status] [extract] [GP-DEBUG] static=361941B rendered=0B using=static text_len=24
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-costume-design — course page states domestic-students-only; skipping
+[status] [extract] [GP-DEBUG] text[:500]='Enquire now How to apply'
+[status] [extract] [EXTRACT] 38/200: Bachelor of Creative Arts (Dance) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[progress] [extract] Fetching 38/200: Bachelor of Creative Arts (Dance) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/pathways/foundation-studie → 0 field(s) (cost=$0.000068, in=844 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/pathways/foundation-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-dance — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 39/200: Bachelor of Creative Arts (Fashion)
+[progress] [extract] Fetching 39/200: Bachelor of Creative Arts (Fashion)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-fashion — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 40/200: Bachelor of Creative Arts (Interior Design) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 40/200: Bachelor of Creative Arts (Interior Design) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-interior-design — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 41/200: Bachelor of Creative Arts (Visual Arts)
+[progress] [extract] Fetching 41/200: Bachelor of Creative Arts (Visual Arts)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-arts-visual-arts — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 42/200: Bachelor of Creative Writing
+[progress] [extract] Fetching 42/200: Bachelor of Creative Writing
+[status] [extract] [EXTRACT] 43/200: Bachelor of Criminology .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 43/200: Bachelor of Criminology .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.flinders.edu.au/study/pathways/foundation-studies: duration_value, duration_unit
+[status] [extract] [EXTRACT] 44/200: Bachelor of Criminology (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 44/200: Bachelor of Criminology (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-creative-writing — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 45/200: Bachelor of Disability and Community Inclusion .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 45/200: Bachelor of Disability and Community Inclusion .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-disability-community-inclusion — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 46/200: Bachelor of Disability and Developmental Education .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 46/200: Bachelor of Disability and Developmental Education .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-criminology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 47/200: Bachelor of Early Childhood Education (Birth - 5) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 47/200: Bachelor of Early Childhood Education (Birth - 5) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-criminology-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 48/200: Bachelor of Early Childhood Education (Birth - 8) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 48/200: Bachelor of Early Childhood Education (Birth - 8) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-disability-developmental-education — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 49/200: Bachelor of Education (Inclusive Education)
+[progress] [extract] Fetching 49/200: Bachelor of Education (Inclusive Education)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-5 — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 50/200: Bachelor of Education (Primary) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 50/200: Bachelor of Education (Primary) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-early-childhood-education-birth-8 — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 51/200: Bachelor of Education (Secondary Health and Physical Education)
+[progress] [extract] Fetching 51/200: Bachelor of Education (Secondary Health and Physical Education)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-education-inclusive — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 52/200: Bachelor of Education (Secondary)
+[progress] [extract] Fetching 52/200: Bachelor of Education (Secondary)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-education-primary — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 53/200: Bachelor of Engineering (Biomedical) (Honours)
+[progress] [extract] Fetching 53/200: Bachelor of Engineering (Biomedical) (Honours)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-education-secondary-health-physical-education — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 54/200: Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)
+[progress] [extract] Fetching 54/200: Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-education-secondary — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 55/200: Bachelor of Engineering (Civil) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [EXTRACT] 56/200: Bachelor of Engineering (Civil) (Honours) / Master of Engineering Management
+[progress] [extract] Fetching 55/200: Bachelor of Engineering (Civil) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 56/200: Bachelor of Engineering (Civil) (Honours) / Master of Engineering Management
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-civil-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 57/200: Bachelor of Engineering (Electrical and Electronic) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 57/200: Bachelor of Engineering (Electrical and Electronic) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=318706B rendered=0B using=static text_len=506
+[status] [extract] [GP-DEBUG] text[:500]='Study Biomedical Engineering at Flinders Your five-year undergraduate pathway to a biomedical engineering masters. Take a pathway that enables high-achieving students to undertake what is normally a six-year course of study in only five years. In addition to equipping you with the skills to investigate, plan, design, manufacture and maintain systems and equipment that are used in all aspects of health care, this degree includes further medical topics and more advanced topics in biomedical engine'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000077, in=977 out=13)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-electrical-electronic-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 58/200: Bachelor of Engineering (Electrical and Electronic) (Honours) / Master of Engineering (Mechanical)
+[progress] [extract] Fetching 58/200: Bachelor of Engineering (Electrical and Electronic) (Honours) / Master of Engineering (Mechanical)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-biomedical-honours-master-engineering-biomedical: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 59/200: Bachelor of Engineering (Electrical and Electronic) (Honours) / Master of Engineering Management
+[progress] [extract] Fetching 59/200: Bachelor of Engineering (Electrical and Electronic) (Honours) / Master of Engineering Management
+[status] [extract] [GP-DEBUG] static=308265B rendered=0B using=static text_len=596
+[status] [extract] [GP-DEBUG] text[:500]='Study Civil Engineering and Engineering Management at Flinders Build the world we live in, create and innovate to solve civil engineering problems. Combine the Bachelor of Engineering (Civil) (Honours)/ Master of Engineering Management (Civil) (Honours) with the Master of Engineering Management. The civil component covers the four main civil engineering themes of structures, transport, water and geomechanics. Engineering management combines the problem-solving and technical design ability of eng'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000078, in=998 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-civil-honours-master-engineering-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=298641B rendered=0B using=static text_len=652
+[status] [extract] [GP-DEBUG] text[:500]='Study Electrical and Electronic Engineering and Mechanical Engineering at Flinders The blend of electrical and electronic engineering and mechanical engineering is exactly what many companies need. Many companies want engineers that combine the skills of electrical and electronic engineers with those of mechanical engineers. This combined degree takes all the advantages from both degrees, both of them accredited at the professional level. The interplay between developing solutions in mechanical '
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000081, in=1016 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-electrical-electronic-honours-master-engineering-mechanical (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-electrical-electronic-honours-master-engineering-mechanical: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 60/200: Bachelor of Engineering (Environmental) (Honours)
+[progress] [extract] Fetching 60/200: Bachelor of Engineering (Environmental) (Honours)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours — moving on
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-civil-honours-master-engineering-management: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 61/200: Bachelor of Engineering (Environmental) (Honours) / Master of Engineering (Civil)
+[progress] [extract] Fetching 61/200: Bachelor of Engineering (Environmental) (Honours) / Master of Engineering (Civil)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-environmental-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 62/200: Bachelor of Engineering (Honours) - Flexible Entry .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 62/200: Bachelor of Engineering (Honours) - Flexible Entry .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=325168B rendered=0B using=static text_len=689
+[status] [extract] [GP-DEBUG] text[:500]='Study Electrical and Electronic Engineering at Flinders Engineer the technology that will power the future. Master management. Change the world. The electrical and electronic engineering component of this course is a comprehensive, accredited degree providing both a theoretical and a practical basis of electrical and electronic systems, and allows you to specialise in one of four areas; electrical engineering, electronic engineering, computer and network systems or systems and security. The engi'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 43500,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 1 field(s) (cost=$0.000080, in=1025 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-electrical-electronic-honours-master-engineering-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-honours-flexible-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 63/200: Bachelor of Engineering (Honours) - General Entry .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 63/200: Bachelor of Engineering (Honours) - General Entry .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=552912B rendered=0B using=static text_len=102
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Tonsley or City Campus) Annual fees $7,136 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-computing → 0 field(s) (cost=$0.000069, in=870 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-honours-general-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 64/200: Bachelor of Engineering (Maritime) (Honours)
+[progress] [extract] Fetching 64/200: Bachelor of Engineering (Maritime) (Honours)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-maritime-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 65/200: Bachelor of Engineering (Mechanical) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 65/200: Bachelor of Engineering (Mechanical) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-mechanical-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 66/200: Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)
+[progress] [extract] Fetching 66/200: Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-computing-mathematical-sciences-honours: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 67/200: Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering Management
+[progress] [extract] Fetching 67/200: Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering Management
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-electrical-electronic-honours-master-engineering-management: fee_currency, duration_value, duration_unit
+[status] [extract] [GP-DEBUG] static=310023B rendered=0B using=static text_len=592
+[status] [extract] [EXTRACT] 68/200: Bachelor of Engineering (Robotics) (Honours)
+[status] [extract] [GP-DEBUG] text[:500]='Study Environmental Engineering and Civil Engineering at Flinders Be the person who builds an environmentally sustainable future. This combined degree takes all the advantages of being an in-demand environmental engineer and combines it with the knowledge needed to become an accredited civil engineer. You will not only be able to develop practical solutions that will protect and improve the quality of our environment but also create innovative infrastructure design and construction solutions acr'
+[progress] [extract] Fetching 68/200: Bachelor of Engineering (Robotics) (Honours)
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000079, in=998 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-environmental-honours-master-engineering-civil (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-robotics-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 69/200: Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)
+[progress] [extract] Fetching 69/200: Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-environmental-honours-master-engineering-civil: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 70/200: Bachelor of Engineering (Software) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 70/200: Bachelor of Engineering (Software) (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=310336B rendered=0B using=static text_len=762
+[status] [extract] [GP-DEBUG] static=317970B rendered=0B using=static text_len=578
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-software-honours — course page states domestic-students-only; skipping
+[status] [extract] [GP-DEBUG] text[:500]='Study Mechanical and Biomedical Engineering at Flinders Engineer your way from mechanical engineering to a biomedical engineering masters. Take a pathway that allows high-achieving students to complete a program of study in mechanical and biomedical engineering in only five years. You will study a variety of areas including dynamics, engineering design, biomechanics and biomedical instrumentation. The final year includes studies in advanced mechanical design and innovations in medical devices, a'
+[status] [extract] [GP-DEBUG] text[:500]='Study Mechanical Engineering and Engineering Mangement at Flinders Push mechanical systems to the limit and upgrade your ability to manage complex engineering projects. The Mechanical Engineering component of this course is a comprehensive, accredited degree providing both a theoretical and a real-world practical basis for designing and developing complex mechanical devices. Specialise in one of five areas - Advanced Mechanical Engineering, Electro-Mechanical Systems, Materials Engineering, Mari'
+[status] [extract] [EXTRACT] 71/200: Bachelor of Engineering Science .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[progress] [extract] Fetching 71/200: Bachelor of Engineering Science .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000082, in=1041 out=12)
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000078, in=995 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-mechanical-honours-master-engineering-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-mechanical-honours-master-engineering-biomedical (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 72/200: Bachelor of Engineering Science majoring in Design and User Experience .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 72/200: Bachelor of Engineering Science majoring in Design and User Experience .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=315935B rendered=0B using=static text_len=640
+[status] [extract] [GP-DEBUG] text[:500]='Study Robotics and Electrical and Electronic Engineering at Flinders Engineer your way from robotics engineering to an electrical and electronic engineering masters. Take part in a combination that allows high-achieving students to complete a program of study in robotics and electronics in only five years. It combines electronics, computer control, signal processing and programming in the design, development and operation of robots, and their integration with other systems in the work environmen'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000080, in=1012 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-robotics-honours-master-engineering-electrical-electronic (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-science/design-user-experience — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 73/200: Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)
+[progress] [extract] Fetching 73/200: Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-robotics-honours-master-engineering-electrical-electronic: fee_currency, duration_value, duration_unit
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-mechanical-honours-master-engineering-biomedical: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 74/200: Bachelor of Engineering Technology (Systems and Security) / Bachelor of Science (Physics)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-mechanical-honours-master-engineering-management: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 75/200: Bachelor of Exercise and Sport Science
+[progress] [extract] Fetching 74/200: Bachelor of Engineering Technology (Systems and Security) / Bachelor of Science (Physics)
+[progress] [extract] Fetching 75/200: Bachelor of Exercise and Sport Science
+[status] [extract] [EXTRACT] 76/200: Bachelor of Exercise and Sport Science / Master of Clinical Exercise Physiology
+[progress] [extract] Fetching 76/200: Bachelor of Exercise and Sport Science / Master of Clinical Exercise Physiology
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-engineering-technology-systems-security-bachelor-science-physics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 77/200: Bachelor of Film and Television (Screen Industries)
+[progress] [extract] Fetching 77/200: Bachelor of Film and Television (Screen Industries)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-exercise-sport-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 78/200: Bachelor of Film and Television (Screen Production)
+[progress] [extract] Fetching 78/200: Bachelor of Film and Television (Screen Production)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-exercise-sport-science-master-clinical-exercise-physiology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 79/200: Bachelor of Game Design .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 79/200: Bachelor of Game Design .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-film-television-screen-industries — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 80/200: Bachelor of Geospatial Information Systems
+[progress] [extract] Fetching 80/200: Bachelor of Geospatial Information Systems
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-film-television-screen-production — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 81/200: Bachelor of Health Sciences .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 81/200: Bachelor of Health Sciences .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=306082B rendered=0B using=static text_len=596
+[status] [extract] [GP-DEBUG] text[:500]='Study Advanced Manufacturing and Digital Design at Flinders Manufacture and design the future. Be industry 4.0 ready. Learn from the best. Constructed with substantial industry input and support, this course enables students to learn both the fundamentals and the practical application of a range of advanced manufacturing, digital design and industry 4.0 techniques. The degree enables students to specialise in three areas - Advanced Manufacturing and Mechanical Engineering, Advanced Manufacturing'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-engineeri → 0 field(s) (cost=$0.000079, in=999 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-engineering-technology-advanced-manufacturing-digital-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-game-design — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 82/200: Bachelor of Health Sciences (Vision Science) / Master of Optometry
+[progress] [extract] Fetching 82/200: Bachelor of Health Sciences (Vision Science) / Master of Optometry
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-geospatial-information-systems — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 83/200: Bachelor of Health Sciences / Master of Occupational Therapy
+[progress] [extract] Fetching 83/200: Bachelor of Health Sciences / Master of Occupational Therapy
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-engineering-technology-advanced-manufacturing-digital-design: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 84/200: Bachelor of Health Sciences / Master of Physiotherapy
+[progress] [extract] Fetching 84/200: Bachelor of Health Sciences / Master of Physiotherapy
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-health-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 85/200: Bachelor of Human Nutrition .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 85/200: Bachelor of Human Nutrition .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=306357B rendered=0B using=static text_len=411
+[status] [extract] [GP-DEBUG] text[:500]='Study Optometry at Flinders Realise your vision as a registered optometrist. Prepare yourself for a rewarding career in optometry in a high-quality learning environment. You will receive a grounding in the fundamentals of science with an emphasis on vision science, where you will study the visual system and factors that influence sight, in preparation for intensive study and clinical experience in optometry.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-health-sc → 0 field(s) (cost=$0.000074, in=949 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-human-nutrition — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 86/200: Bachelor of Information Technology .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 86/200: Bachelor of Information Technology .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [GP-DEBUG] static=300686B rendered=0B using=static text_len=501
+[status] [extract] [GP-DEBUG] text[:500]='Study Occupational Therapy at Flinders Provide high quality therapy and client-centred care. Develop the knowledge and skills required to become registered and work as an occupational therapist. The degree has a strong focus on preparing you for interprofessional practice, and on becoming a contemporary health professional able to work across a variety of settings and with a wide range of clients. Alternatively, learn more about studying Occupational Therapy in Port Pirie, Renmark, or Mt Gambier'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-health-sc → 0 field(s) (cost=$0.000076, in=971 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-health-sciences-master-occupational-therapy (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 87/200: Bachelor of Information Technology (Business and Information Systems) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 87/200: Bachelor of Information Technology (Business and Information Systems) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-health-science-vision-science-master-optometry: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 88/200: Bachelor of Information Technology (Data Analytics) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 88/200: Bachelor of Information Technology (Data Analytics) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-health-sciences-master-occupational-therapy: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 89/200: Bachelor of Information Technology (Digital Forensics)
+[progress] [extract] Fetching 89/200: Bachelor of Information Technology (Digital Forensics)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-business-information-systems — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 90/200: Bachelor of Information Technology (Game Development) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 90/200: Bachelor of Information Technology (Game Development) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-data-analytics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 91/200: Bachelor of Information Technology (Machine Learning) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 91/200: Bachelor of Information Technology (Machine Learning) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-game-development — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 92/200: Bachelor of Information Technology (Network and Cybersecurity Systems) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 92/200: Bachelor of Information Technology (Network and Cybersecurity Systems) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-digital-forensics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 93/200: Bachelor of Information Technology (Online)
+[progress] [extract] Fetching 93/200: Bachelor of Information Technology (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-information-technology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 94/200: Bachelor of International Relations and Political Science .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 94/200: Bachelor of International Relations and Political Science .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-network-cybersecurity-systems — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 95/200: Bachelor of International Relations and Political Science (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 95/200: Bachelor of International Relations and Political Science (Honours) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-information-technology-machine-learning — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 96/200: Bachelor of Languages
+[progress] [extract] Fetching 96/200: Bachelor of Languages
+[status] [extract] [GP-DEBUG] static=305821B rendered=0B using=static text_len=472
+[status] [extract] [GP-DEBUG] text[:500]='Study Physiotherapy at Flinders Maximise movement in people of all ages. Develop the knowledge and skills required to become registered and work as a physiotherapist. The degree builds on Flinders University’s strengths in rural health and health service improvement, and prepares you for a career as a contemporary health professional able to work across a variety of settings. Alternatively, learn more about studying Physiotherapy in Port Pirie, Renmark, or Mt Gambier.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-health-sc → 0 field(s) (cost=$0.000077, in=962 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-health-sciences-master-physiotherapy (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-languages — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 97/200: Bachelor of Laws (Honours) - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 97/200: Bachelor of Laws (Honours) - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-international-relations-political-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 98/200: Bachelor of Laws - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 98/200: Bachelor of Laws - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-international-relations-political-science-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 99/200: Bachelor of Mathematical Sciences
+[progress] [extract] Fetching 99/200: Bachelor of Mathematical Sciences
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-laws — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 100/200: Bachelor of Media and Communication .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 100/200: Bachelor of Media and Communication .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-laws-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 101/200: Bachelor of Medical Science
+[progress] [extract] Fetching 101/200: Bachelor of Medical Science
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-mathematical-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 102/200: Bachelor of Medical Science (Honours)
+[progress] [extract] Fetching 102/200: Bachelor of Medical Science (Honours)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-media-communication — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 103/200: Bachelor of Medical Science (Laboratory Medicine)
+[progress] [extract] Fetching 103/200: Bachelor of Medical Science (Laboratory Medicine)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-health-sciences-master-physiotherapy: fee_currency, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Health Sciences / Master of  → Medicine & Health / Physiotherapy
+[status] [extract] [EXTRACT] 104/200: Bachelor of Medical Science (Laboratory Medicine)(Regional External Program)
+[progress] [extract] Fetching 104/200: Bachelor of Medical Science (Laboratory Medicine)(Regional External Program)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-medical-science-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 105/200: Bachelor of Midwifery (Preregistration)
+[progress] [extract] Fetching 105/200: Bachelor of Midwifery (Preregistration)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-of-medical-science-laboratory-medicine-regional-external-program — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-medical-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 106/200: Bachelor of Nursing (Online)
+[status] [extract] [EXTRACT] 107/200: Bachelor of Nursing (Preregistration) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 106/200: Bachelor of Nursing (Online)
+[progress] [extract] Fetching 107/200: Bachelor of Nursing (Preregistration) .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-of-medical-science-laboratory-medicine — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 108/200: Bachelor of Nursing (Preregistration) Riverland
+[progress] [extract] Fetching 108/200: Bachelor of Nursing (Preregistration) Riverland
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-nursing-preregistration-riverland — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 109/200: Bachelor of Nutrition and Dietetics
+[progress] [extract] Fetching 109/200: Bachelor of Nutrition and Dietetics
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-nursing — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 110/200: Bachelor of Nutrition and Exercise (Online)
+[progress] [extract] Fetching 110/200: Bachelor of Nutrition and Exercise (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-midwifery-preregistration — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 111/200: Bachelor of Paramedicine
+[progress] [extract] Fetching 111/200: Bachelor of Paramedicine
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-nursing-preregistration — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 112/200: Bachelor of Paramedicine (Northern Territory)
+[progress] [extract] Fetching 112/200: Bachelor of Paramedicine (Northern Territory)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-nutrition-dietetics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 113/200: Bachelor of Paramedicine (Regional External Program)
+[progress] [extract] Fetching 113/200: Bachelor of Paramedicine (Regional External Program)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-nutrition-exercise — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 114/200: Bachelor of Performance (Acting)
+[progress] [extract] Fetching 114/200: Bachelor of Performance (Acting)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-paramedicine — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 115/200: Bachelor of Psychological Science .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 115/200: Bachelor of Psychological Science .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-paramedicine-nt — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 116/200: Bachelor of Psychology (Honours)
+[progress] [extract] Fetching 116/200: Bachelor of Psychology (Honours)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-paramedicine-regional-external-program — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 117/200: Bachelor of Public Health
+[progress] [extract] Fetching 117/200: Bachelor of Public Health
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-performance-acting — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 118/200: Bachelor of Science
+[progress] [extract] Fetching 118/200: Bachelor of Science
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-public-health — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 119/200: Bachelor of Science (Advanced Science)
+[progress] [extract] Fetching 119/200: Bachelor of Science (Advanced Science)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-psychology-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 120/200: Bachelor of Science (Animal Behaviour)
+[progress] [extract] Fetching 120/200: Bachelor of Science (Animal Behaviour)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-psychological-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 121/200: Bachelor of Science (Biodiversity and Conservation)
+[progress] [extract] Fetching 121/200: Bachelor of Science (Biodiversity and Conservation)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-biodiversity-conservation — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 122/200: Bachelor of Science (Biotechnology)
+[progress] [extract] Fetching 122/200: Bachelor of Science (Biotechnology)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-animal-behaviour — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 123/200: Bachelor of Science (Chemical Sciences)
+[progress] [extract] Fetching 123/200: Bachelor of Science (Chemical Sciences)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 124/200: Bachelor of Science (Environmental Science)
+[progress] [extract] Fetching 124/200: Bachelor of Science (Environmental Science)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-advanced-science — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-biotechnology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 125/200: Bachelor of Science (Forensic and Analytical Science)
+[status] [extract] [EXTRACT] 126/200: Bachelor of Science (Marine Biology)
+[progress] [extract] Fetching 125/200: Bachelor of Science (Forensic and Analytical Science)
+[progress] [extract] Fetching 126/200: Bachelor of Science (Marine Biology)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-environmental-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 127/200: Bachelor of Science (Palaeontology)
+[progress] [extract] Fetching 127/200: Bachelor of Science (Palaeontology)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-marine-biology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 128/200: Bachelor of Social Work .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 128/200: Bachelor of Social Work .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-chemical-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 129/200: Bachelor of Speech Pathology
+[progress] [extract] Fetching 129/200: Bachelor of Speech Pathology
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-forensic-analytical-science — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 130/200: Bachelor of Sport and Active Recreation .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 130/200: Bachelor of Sport and Active Recreation .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-science-palaeontology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 131/200: Bachelor of Urban and Regional Planning .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 131/200: Bachelor of Urban and Regional Planning .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-social-work — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 132/200: Bachelor of Urban and Regional Planning (Online)
+[progress] [extract] Fetching 132/200: Bachelor of Urban and Regional Planning (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-speech-pathology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 133/200: Bachelor of Visual Effects and Entertainment Design .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 133/200: Bachelor of Visual Effects and Entertainment Design .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/bachelor-urban-regional-planning — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 134/200: Diploma in Arts
+[progress] [extract] Fetching 134/200: Diploma in Arts
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-urban-regional-planning — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 135/200: Diploma in Business .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 135/200: Diploma in Business .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-sport-active-recreation — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 136/200: Diploma in Business (Online)
+[progress] [extract] Fetching 136/200: Diploma in Business (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-arts — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 137/200: Diploma in Criminology .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 137/200: Diploma in Criminology .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-business — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 138/200: Diploma in Digital Content Creation (Online)
+[progress] [extract] Fetching 138/200: Diploma in Digital Content Creation (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-criminology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 139/200: Diploma in Disability and Community Practice .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 139/200: Diploma in Disability and Community Practice .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/diploma-digital-content-creation — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 140/200: Diploma in Health Sciences .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 140/200: Diploma in Health Sciences .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/diploma-business — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 141/200: Diploma in Health Sciences (Online)
+[progress] [extract] Fetching 141/200: Diploma in Health Sciences (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/diploma-health-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 142/200: Diploma in Information Technology (Online)
+[progress] [extract] Fetching 142/200: Diploma in Information Technology (Online)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-disability-community-practice — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 143/200: Diploma in Language
+[progress] [extract] Fetching 143/200: Diploma in Language
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-health-sciences — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 144/200: Diploma in Laws .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 144/200: Diploma in Laws .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/online/courses/diploma-information-technology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 145/200: Diploma in Sports Management
+[progress] [extract] Fetching 145/200: Diploma in Sports Management
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-language — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 146/200: Diploma in Sports Management (Cricket)
+[progress] [extract] Fetching 146/200: Diploma in Sports Management (Cricket)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-visual-effects-entertainment-design — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 147/200: Major in Ancient Studies
+[progress] [extract] Fetching 147/200: Major in Ancient Studies
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/diplomas/diploma-sports-management — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 148/200: Major in Applied Linguistics
+[progress] [extract] Fetching 148/200: Major in Applied Linguistics
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/diploma-laws — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 149/200: Major in Archaeology
+[progress] [extract] Fetching 149/200: Major in Archaeology
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/diplomas/diploma-sports-management-cricket — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 150/200: Major in Chemistry
+[progress] [extract] Fetching 150/200: Major in Chemistry
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-ancient-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 151/200: Major in Creative Writing
+[progress] [extract] Fetching 151/200: Major in Creative Writing
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-applied-linguistics — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 152/200: Major in Critical Indigenous Studies
+[progress] [extract] Fetching 152/200: Major in Critical Indigenous Studies
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-archaeology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 153/200: Major in Digital Heritage
+[progress] [extract] Fetching 153/200: Major in Digital Heritage
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-creative-writing — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 154/200: Major in Drama
+[progress] [extract] Fetching 154/200: Major in Drama
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-digital-heritage — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-critical-indigenous-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 155/200: Major in English
+[status] [extract] [EXTRACT] 156/200: Major in Film and Television
+[progress] [extract] Fetching 155/200: Major in English
+[progress] [extract] Fetching 156/200: Major in Film and Television
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-drama — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 157/200: Major in French
+[progress] [extract] Fetching 157/200: Major in French
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-film-television-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 158/200: Major in Gender Studies
+[progress] [extract] Fetching 158/200: Major in Gender Studies
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-english — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 159/200: Major in Geography and Environmental Studies
+[progress] [extract] Fetching 159/200: Major in Geography and Environmental Studies
+[status] [extract] [GP-DEBUG] static=529186B rendered=0B using=static text_len=42
+[status] [extract] [GP-DEBUG] text[:500]='Major in Chemistry Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-chemistry → 0 field(s) (cost=$0.000067, in=847 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-chemistry (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-french — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 160/200: Major in Indonesian
+[progress] [extract] Fetching 160/200: Major in Indonesian
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-geography-environmental-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 161/200: Major in Italian
+[progress] [extract] Fetching 161/200: Major in Italian
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-gender-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 162/200: Major in Mathematics
+[progress] [extract] Fetching 162/200: Major in Mathematics
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-italian — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 163/200: Major in Medieval Studies
+[progress] [extract] Fetching 163/200: Major in Medieval Studies
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-indonesian — course page states domestic-students-only; skipping
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/major-chemistry: course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Major in Chemistry → Science & Mathematics / Chemistry
+[status] [extract] [EXTRACT] 164/200: Major in Molecular Biology
+[status] [extract] [EXTRACT] 165/200: Major in Nuclear Engineering
+[progress] [extract] Fetching 164/200: Major in Molecular Biology
+[progress] [extract] Fetching 165/200: Major in Nuclear Engineering
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-medieval-studies — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 166/200: Major in Philosophy
+[progress] [extract] Fetching 166/200: Major in Philosophy
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-nuclear-engineering — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 167/200: Major in Physics
+[progress] [extract] Fetching 167/200: Major in Physics
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-philosophy — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 168/200: Major in Political Science
+[progress] [extract] Fetching 168/200: Major in Political Science
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-political-science — course page states domestic-students-only; skipping
+[status] [extract] [GP-DEBUG] static=643024B rendered=0B using=static text_len=44
+[status] [extract] [EXTRACT] 169/200: Major in Sociology
+[status] [extract] [GP-DEBUG] text[:500]='Major in Mathematics Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[progress] [extract] Fetching 169/200: Major in Sociology
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-mathematics → 0 field(s) (cost=$0.000068, in=848 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-mathematics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-sociology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 170/200: Major in Spanish
+[progress] [extract] Fetching 170/200: Major in Spanish
+[status] [extract] [GP-DEBUG] static=690995B rendered=0B using=static text_len=40
+[status] [extract] [GP-DEBUG] text[:500]='Major in Physics Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-physics → 0 field(s) (cost=$0.000068, in=846 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-physics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-spanish — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 171/200: Major in Sustainability
+[progress] [extract] Fetching 171/200: Major in Sustainability
+[status] [extract] [GP-DEBUG] static=530515B rendered=0B using=static text_len=50
+[status] [extract] [GP-DEBUG] text[:500]='Major in Molecular Biology Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-molecular-bi → 0 field(s) (cost=$0.000068, in=851 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-molecular-biology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/major-mathematics: course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Major in Mathematics → Science & Mathematics / Mathematics
+[status] [extract] [EXTRACT] 172/200: Major in Visual Arts
+[progress] [extract] Fetching 172/200: Major in Visual Arts
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/major-visual-arts — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 173/200: Major in Wireless Systems Security .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 173/200: Major in Wireless Systems Security .cls-1{fill:#000;stroke-width:0px;}
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/major-physics: course_location, duration_value, duration_unit
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/major-molecular-biology: course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Major in Physics → Science & Mathematics / Physics
+[status] [extract] [EXTRACT] 174/200: Medical Science / Engineering (Biomedical) (Honours)
+[status] [extract] [EXTRACT] 175/200: Undergraduate Certificate in Acting
+[progress] [extract] Fetching 174/200: Medical Science / Engineering (Biomedical) (Honours)
+[progress] [extract] Fetching 175/200: Undergraduate Certificate in Acting
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/undergraduate-certificate-acting — course page states domestic-students-only; skipping
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/medical-science-engineering-biomedical-science-honours — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 176/200: Bachelor of Archaeology (Honours) 1 year
+[status] [extract] [EXTRACT] 177/200: Bachelor of Arts (Honours) 1 year
+[progress] [extract] Fetching 176/200: Bachelor of Archaeology (Honours) 1 year
+[progress] [extract] Fetching 177/200: Bachelor of Arts (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-arts
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-archaeology
+[status] [extract] [GP-DEBUG] static=618038B rendered=0B using=static text_len=47
+[status] [extract] [GP-DEBUG] text[:500]='Major in Sustainability Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-sustainabili → 0 field(s) (cost=$0.000068, in=850 out=13)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-sustainability (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=808952B rendered=0B using=static text_len=58
+[status] [extract] [GP-DEBUG] text[:500]='Major in Wireless Systems Security Book a chat Enquire now'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/major-wireless-sys → 0 field(s) (cost=$0.000069, in=855 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/major-wireless-systems-security (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/major-sustainability: course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Major in Sustainability → Agriculture & Environmental Science / Sustainability
+[status] [extract] [EXTRACT] 178/200: Bachelor of Business (Honours) 1 year
+[progress] [extract] Fetching 178/200: Bachelor of Business (Honours) 1 year
+[status] [extract] [FALLBACK] AI filled 1 field(s) on https://www.flinders.edu.au/study/courses/major-wireless-systems-security: course_location
+[status] [extract] [EXTRACT] 179/200: Bachelor of Commerce (Honours) 1 year
+[progress] [extract] Fetching 179/200: Bachelor of Commerce (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-business
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-commerce
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-arts — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-archaeology — moving on
+[status] [extract] [GP-DEBUG] static=179178B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-a → 0 field(s) (cost=$0.000071, in=904 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-arts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=186907B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 3500'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-a → 1 field(s) (cost=$0.000071, in=906 out=9)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-archaeology (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-arts: course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 180/200: Bachelor of Creative Arts (Honours) 1 year
+[progress] [extract] Fetching 180/200: Bachelor of Creative Arts (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-creative-arts
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-archaeology: course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 181/200: Bachelor of Creative Industries (Honours) 1 year
+[progress] [extract] Fetching 181/200: Bachelor of Creative Industries (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-creative-industries
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-business — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-commerce — moving on
+[status] [extract] [GP-DEBUG] static=177499B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='ingo_overall`: Not in text.\n    *   `sub_category`: "Commerce" ('
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-c → 0 field(s) (cost=$0.000073, in=905 out=16)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-commerce (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-commerce: course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 182/200: Bachelor of Criminology (Honours) 1 year
+[progress] [extract] Fetching 182/200: Bachelor of Criminology (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-criminology
+[status] [extract] [GP-DEBUG] static=188647B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-b → 0 field(s) (cost=$0.000072, in=905 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-creative-arts — moving on
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-business: duration_value, duration_unit
+[status] [extract] [EXTRACT] 183/200: Bachelor of Design and Technology (Honours) 1 year
+[progress] [extract] Fetching 183/200: Bachelor of Design and Technology (Honours) 1 year
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/honours-bachelor-design-technology — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 184/200: Bachelor of Education (Honours) 1 year
+[progress] [extract] Fetching 184/200: Bachelor of Education (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-education
+[status] [extract] [GP-DEBUG] static=195070B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 33000,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-c → 1 field(s) (cost=$0.000071, in=906 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-creative-arts (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-creative-arts: course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 185/200: Bachelor of Health Sciences (Honours) 1 year
+[progress] [extract] Fetching 185/200: Bachelor of Health Sciences (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-health-sciences
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-creative-industries — moving on
+[status] [extract] [GP-DEBUG] static=382378B rendered=0B using=static text_len=883
+[status] [extract] [GP-DEBUG] text[:500]='Bachelor of Arts Bachelor of Creative Arts (Costume Design) Bachelor of Creative Arts (Costume Design) (VET pathway) Bachelor of Creative Arts (Dance) Bachelor of Creative Arts (Fashion) Bachelor of Creative Arts (Fashion) (VET pathway) Bachelor of Creative Arts (Interior Design) Bachelor of Creative Arts (Visual Arts) Bachelor of Creative Writing Bachelor of Film and Television (Screen Industries) Bachelor of Film and Television (Screen Production) Bachelor of Game Design Bachelor of Media and '
+[status] [extract] [GP-DEBUG] raw_response="*: '1 year full-time'.\n    *   *ielts_overall"
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-c → 0 field(s) (cost=$0.000083, in=1063 out=11)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-creative-industries (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-creative-industries: duration_value, duration_unit
+[status] [extract] [EXTRACT] 186/200: Bachelor of International Relations and Political Science (Honours) 1 year
+[progress] [extract] Fetching 186/200: Bachelor of International Relations and Political Science (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-international-relations-political-science
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-criminology — moving on
+[status] [extract] [GP-DEBUG] static=188609B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-c → 0 field(s) (cost=$0.000072, in=906 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-criminology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-criminology: course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Criminology (Honours) 1 Year → Law & Legal Studies / Criminal Justice
+[status] [extract] [EXTRACT] 187/200: Bachelor of Medical Science (Honours) 1 year
+[progress] [extract] Fetching 187/200: Bachelor of Medical Science (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-medical-science
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-education — moving on
+[status] [extract] [GP-DEBUG] static=364105B rendered=0B using=static text_len=103
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park) and online Annual fees $4,738 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-e → 0 field(s) (cost=$0.000069, in=865 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-education (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-health-sciences — moving on
+[status] [extract] [GP-DEBUG] static=469466B rendered=0B using=static text_len=92
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park) Annual fees $9,537 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-h → 0 field(s) (cost=$0.000069, in=864 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-health-sciences (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 4 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-education: fee_currency, course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 188/200: Bachelor of Paramedicine (Honours) 1 year
+[progress] [extract] Fetching 188/200: Bachelor of Paramedicine (Honours) 1 year
+[status] [extract] [FALLBACK] AI filled 4 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-health-sciences: fee_currency, course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 189/200: Bachelor of Psychological Science (Honours) 1 year
+[progress] [extract] Fetching 189/200: Bachelor of Psychological Science (Honours) 1 year
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/honours-bachelor-paramedicine — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 190/200: Bachelor of Public Health (Honours) 1 year
+[progress] [extract] Fetching 190/200: Bachelor of Public Health (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-psychological-science
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-public-health
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-international-relations-political-science — moving on
+[status] [extract] [GP-DEBUG] static=189198B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-i → 0 field(s) (cost=$0.000071, in=913 out=10)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-international-relations-political-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-international-relations-political-science: course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 191/200: Bachelor of Science (Honours) 1 year
+[progress] [extract] Fetching 191/200: Bachelor of Science (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-science
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-medical-science — moving on
+[status] [extract] [GP-DEBUG] static=415264B rendered=0B using=static text_len=92
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park) Annual fees $9,537 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-m → 0 field(s) (cost=$0.000069, in=864 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-medical-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-medical-science: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] 192/200: Bachelor of Sport, Health and Physical Activity (Honours) 1 year
+[progress] [extract] Fetching 192/200: Bachelor of Sport, Health and Physical Activity (Honours) 1 year
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/honours-bachelor-sport-health-physical-activity
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-psychological-science — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-public-health — moving on
+[status] [extract] [GP-DEBUG] static=384551B rendered=0B using=static text_len=92
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park) Annual fees $9,537 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee":'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-p → 0 field(s) (cost=$0.000069, in=865 out=14)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-psychological-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=401195B rendered=0B using=static text_len=93
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park)* Annual fees $9,537 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-p → 0 field(s) (cost=$0.000068, in=864 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-public-health (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 4 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-psychological-science: fee_currency, course_location, duration_value, duration_unit
+[status] [extract] [EXTRACT] 193/200: Bachelor of Letters (Archaeology) (Graduate Entry)
+[progress] [extract] Fetching 193/200: Bachelor of Letters (Archaeology) (Graduate Entry)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-letters-archaeology-graduate-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 194/200: Bachelor of Letters (Creative Writing) (Graduate Entry)
+[progress] [extract] Fetching 194/200: Bachelor of Letters (Creative Writing) (Graduate Entry)
+[status] [extract] [FALLBACK] AI filled 4 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-public-health: fee_currency, course_location, duration_value, duration_unit
+[status] [classify] [CATEGORY det] Bachelor of Public Health (Honours) → Medicine & Health / Public Health
+[status] [extract] [EXTRACT] 195/200: Bachelor of Letters (Health) (Graduate Entry)
+[progress] [extract] Fetching 195/200: Bachelor of Letters (Health) (Graduate Entry)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-letters-creative-writing-graduate-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 196/200: Bachelor of Letters (History) (Graduate Entry)
+[progress] [extract] Fetching 196/200: Bachelor of Letters (History) (Graduate Entry)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-letters-health-graduate-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 197/200: Bachelor of Midwifery (Post-Registration) (Registered Nurse)
+[progress] [extract] Fetching 197/200: Bachelor of Midwifery (Post-Registration) (Registered Nurse)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-letters-history-graduate-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 198/200: Bachelor of Nursing (Graduate Entry)
+[progress] [extract] Fetching 198/200: Bachelor of Nursing (Graduate Entry)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-midwifery-post-registration — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 199/200: Bachelor of Psychological Studies (Graduate Entry) .cls-1{fill:#000;stroke-width:0px;}
+[progress] [extract] Fetching 199/200: Bachelor of Psychological Studies (Graduate Entry) .cls-1{fill:#000;stroke-width:0px;}
+[status] [fallback] [per-course browser ↻] https://www.flinders.edu.au/study/courses/bachelor-psychological-studies-graduate-entry
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/bachelor-nursing-graduate-entry — course page states domestic-students-only; skipping
+[status] [extract] [EXTRACT] 200/200: Graduate Diploma in Psychology (Advanced)
+[progress] [extract] Fetching 200/200: Graduate Diploma in Psychology (Advanced)
+[status] [extract] [DOMESTIC ONLY] https://www.flinders.edu.au/study/courses/postgraduate-psychology-advanced — course page states domestic-students-only; skipping
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-science — moving on
+[status] [extract] [GP-DEBUG] static=485562B rendered=0B using=static text_len=92
+[status] [extract] [GP-DEBUG] text[:500]='Key information. Delivery mode In person (Bedford Park) Annual fees $9,537 About these fees.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-s → 0 field(s) (cost=$0.000068, in=862 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-science (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 4 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-science: fee_currency, course_location, duration_value, duration_unit
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/honours-bachelor-sport-health-physical-activity — moving on
+[status] [extract] [GP-DEBUG] static=175428B rendered=0B using=static text_len=263
+[status] [extract] [GP-DEBUG] text[:500]="I am an International Student I am not a citizen of Australia or New Zealand. Switch to International I am a Domestic Student I am an Australian or New Zealand Citizen. I'm an Australian Permanent Resident (including Humanitarian Visa holders). Switch to Domestic"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/honours-bachelor-s → 0 field(s) (cost=$0.000073, in=910 out=15)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/honours-bachelor-sport-health-physical-activity (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 2 field(s) on https://www.flinders.edu.au/study/courses/honours-bachelor-sport-health-physical-activity: duration_value, duration_unit
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.flinders.edu.au/study/courses/bachelor-psychological-studies-graduate-entry — moving on
+[status] [extract] [GP-DEBUG] static=240756B rendered=0B using=static text_len=225
+[status] [extract] [GP-DEBUG] text[:500]='Up to 80% off fees due to Government subsidies*. *Government subsidies enable Flinders to offer Domestic applicants a reduction of up to 80% off full course fees through Commonwealth Supported Places. Offer subject to change.'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic'
+[status] [extract] [GEMINI] https://www.flinders.edu.au/study/courses/bachelor-psycholog → 0 field(s) (cost=$0.000071, in=900 out=12)
+[status] [extract] [FALLBACK] AI enriching https://www.flinders.edu.au/study/courses/bachelor-psychological-studies-graduate-entry (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.flinders.edu.au/study/courses/bachelor-psychological-studies-graduate-entry: fee_currency, duration_value, duration_unit
+[status] [extract] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build unknown] ielts_overall=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill postgraduate] 2 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill unknown] 163 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill undergraduate] 17 slot(s) filled across siblings
+[status] [stage] [STAGE] skipped Apply for Postgraduate Study: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Saved Courses: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Flinders University Livestream Information Sessions: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Flinders University Livestream Postgraduate Information Sessions: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Year 12 Entry: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Tafe/vet to Uni: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Skills for Tertiary Admissions Test (Stat): rejected: category_landing_page
+[status] [stage] [STAGE] skipped Indigenous Admission Scheme: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Military Academic Pathway Program: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Foundation Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Associate Degree in Disability and Community Practice: rejected: domestic_only
+[status] [stage] [STAGE] skipped Associate Degree in Health Sciences: rejected: domestic_only
+[status] [stage] [STAGE] skipped Associate Degree in Medical Science (Laboratory Medicine): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Accounting: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Allied Health (Occupational Therapy): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Allied Health (Physiotherapy): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Allied Health (Speech Pathology): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Archaeology: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Arts: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Arts and Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business Analytics .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Event Management and Tourism .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Human Resource Management .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in International Business .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Leading Change .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Management .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Marketing .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Small Business Leadership .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Business majoring in Sports Management .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Clinical Sciences, Doctor of Medicine: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Commerce .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Computer Science .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Computer Science (Artificial Intelligence): rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Computing and Mathematical Sciences (Honours)
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Costume Design): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Dance) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Fashion): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Interior Design) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Visual Arts): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Writing: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Criminology .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Criminology (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Disability and Community Inclusion .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Disability and Developmental Education .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Early Childhood Education (Birth - 5) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Early Childhood Education (Birth - 8) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Education (Inclusive Education): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Education (Primary) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Education (Secondary Health and Physical Education): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Education (Secondary): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Biomedical) (Honours): rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Civil) (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Civil) (Honours)/ Master of Engineering Management
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Electrical and Electronic) (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Electrical and Electronic) (Honours), Master of Engineering (Mechanical)
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Electrical and Electronic) (Honours)/master of Engineering Management
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Environmental) (Honours): rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Environmental) (Honours), Master of Engineering (Civil)
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Honours) - Flexible Entry .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Honours) - General Entry .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Maritime) (Honours): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Mechanical) (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Mechanical) (Honours)/ Master of Engineering Management
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Robotics) (Honours): rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)
+[status] [stage] [STAGE] skipped Bachelor of Engineering (Software) (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering Science .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Engineering Science majoring in Design and User Experience .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)
+[status] [stage] [STAGE] skipped Bachelor of Engineering Technology (Systems and Security) / Bachelor of Science (Physics): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Exercise and Sport Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Exercise and Sport Science / Master of Clinical Exercise Physiology: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Film and Television (Screen Industries): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Film and Television (Screen Production): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Game Design .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Geospatial Information Systems: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Health Sciences .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Health Sciences (Vision Science) / Master of Optometry
+[status] [stage] [STAGE] saved: Bachelor of Health Sciences / Master of Occupational Therapy
+[status] [stage] [STAGE] saved: Bachelor of Health Sciences / Master of Physiotherapy
+[status] [stage] [STAGE] skipped Bachelor of Human Nutrition .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Business and Information Systems) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Data Analytics) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Digital Forensics): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Game Development) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Machine Learning) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Network and Cybersecurity Systems) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Information Technology (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of International Relations and Political Science .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of International Relations and Political Science (Honours) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Languages: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Laws (Honours) - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Laws - Legal Practice Entry .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Mathematical Sciences: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Media and Communication .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Medical Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Medical Science (Honours): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Medical Science (Laboratory Medicine): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Medical Science (Laboratory Medicine)(Regional External Program): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Midwifery (Preregistration): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nursing (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nursing (Preregistration) .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nursing (Preregistration) Riverland: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nutrition and Dietetics: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nutrition and Exercise (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Paramedicine: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Paramedicine (Northern Territory): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Paramedicine (Regional External Program): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Performance (Acting): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Psychological Science .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Psychology (Honours): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Public Health: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Advanced Science): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Animal Behaviour): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Biodiversity and Conservation): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Biotechnology): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Chemical Sciences): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Environmental Science): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Forensic and Analytical Science): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Marine Biology): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Science (Palaeontology): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Social Work .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Speech Pathology: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Sport and Active Recreation .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Urban and Regional Planning .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Urban and Regional Planning (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Visual Effects and Entertainment Design .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Arts: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Business .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Business (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Criminology .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Digital Content Creation (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Disability and Community Practice .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Health Sciences .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Health Sciences (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Information Technology (Online): rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Language: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Laws .cls-1{fill:#000;stroke-width:0px;}: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Sports Management: rejected: domestic_only
+[status] [stage] [STAGE] skipped Diploma in Sports Management (Cricket): rejected: domestic_only
+[status] [stage] [STAGE] skipped Major in Ancient Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Applied Linguistics: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Archaeology: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Chemistry: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Creative Writing: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Critical Indigenous Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Digital Heritage: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Drama: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in English: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Film and Television: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in French: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Gender Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Geography and Environmental Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Indonesian: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Italian: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Mathematics: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Medieval Studies: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Molecular Biology: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Nuclear Engineering: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Philosophy: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Physics: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Political Science: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Sociology: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Spanish: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Sustainability: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Visual Arts: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Major in Wireless Systems Security: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Medical Science / Engineering (Biomedical) (Honours): rejected: category_landing_page
+[status] [stage] [STAGE] skipped Undergraduate Certificate in Acting: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Bachelor of Archaeology (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Arts (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Business (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Commerce (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Creative Arts (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Study Creative Arts and Media: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Bachelor of Criminology (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Design and Technology (Honours) 1 year: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Education (Honours): rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Health Sciences (Honours): rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of International Relations and Political Science (Honours) 1 Year: rejected: online_only
+[status] [stage] [STAGE] saved: Bachelor of Medical Science (Honours)
+[status] [stage] [STAGE] skipped Bachelor of Paramedicine (Honours) 1 year: rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Psychological Science (Honours): rejected: online_only
+[status] [stage] [STAGE] skipped Bachelor of Public Health (Honours): rejected: online_only
+[status] [stage] [STAGE] saved: Bachelor of Science (Honours)
+[status] [stage] [STAGE] skipped Bachelor of Sport, Health and Physical Activity (Honours) 1 Year: rejected: no_international_fee
+[status] [stage] [STAGE] skipped Bachelor of Letters (Archaeology) (Graduate Entry): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Letters (Creative Writing) (Graduate Entry): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Letters (Health) (Graduate Entry): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Letters (History) (Graduate Entry): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Midwifery (Post-Registration) (Registered Nurse): rejected: domestic_only
+[status] [stage] [STAGE] skipped Bachelor of Nursing (Graduate Entry): rejected: domestic_only
+[status] [stage] [STAGE] saved: Bachelor of Psychological Studies (Graduate Entry)
+[status] [stage] [STAGE] skipped Graduate Diploma in Psychology (Advanced): rejected: domestic_only
+[status] [complete] [GEMINI] Total cost: $0.0032 USD across 16 course(s) (~$0.00020/course)
+[status] [complete] [TIMING] Total: 14m 19s | Courses: 16 | Avg: 53.7s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:200 | Staged:16 | Skipped:184 | Errors:0
+[status] [complete] Staged 16 courses, 184 skipped, 0 fetch errors

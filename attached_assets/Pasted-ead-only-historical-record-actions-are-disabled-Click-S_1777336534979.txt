@@ -1,0 +1,97 @@
+ead-only (historical record) — actions are disabled. Click Sources to inspect evidence per field.
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode
+	
+Bachelor of Psychological Studies (Graduate Entry)
+Publish: review
+Eligibility: review
+69%	Bachelor's	1 Year	A$37,200/Annual	6	-	-	-	-	Mar, Jul	Bedford Park City	On Campus
+	
+Bachelor of Science (Honours)
+Science & Mathematics
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 Year	A$43,500/Annual	6	-	-	-	-		Bedford Park	On Campus
+	
+Bachelor of Medical Science (Honours)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor's	1 Year	A$9,537/Annual	6	-	-	-	-		Adelaide	On Campus
+	
+Bachelor of Health Sciences / Master of Physiotherapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$46,700/Annual	7	-	-	-	-	Mar	Adelaide	On Campus
+	
+Bachelor of Health Sciences / Master of Occupational Therapy
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$46,700/Annual	7	-	-	-	-	Mar	Adelaide	On Campus
+	
+Bachelor of Health Sciences (Vision Science) / Master of Optometry
+Medicine & Health
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$46,700/Annual	7	-	-	-	-	Mar	Adelaide	On Campus
+	
+Bachelor of Engineering Technology (Advanced Manufacturing and Digital Design)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Bachelor's	3 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Robotics) (Honours) / Master of Engineering (Electrical and Electronic)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Mechanical) (Honours)/ Master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Mechanical) (Honours) / Master of Engineering (Biomedical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Environmental) (Honours), Master of Engineering (Civil)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Electrical and Electronic) (Honours)/master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$43,500/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Electrical and Electronic) (Honours), Master of Engineering (Mechanical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5.5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Civil) (Honours)/ Master of Engineering Management
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Engineering (Biomedical) (Honours) / Master of Engineering (Biomedical)
+Engineering & Technology
+Publish: ready
+Eligibility: ready
+77%	Master's	5 Year	A$47,300/Annual	6	-	-	-	-	Mar, Jul	Adelaide	On Campus
+	
+Bachelor of Computing and Mathematical Sciences (Honours)
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Bachelor's	3 Year	A$43,500/Annual	6	-	-	-	-		Adelaide	On Campus

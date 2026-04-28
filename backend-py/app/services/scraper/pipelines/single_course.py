@@ -44,16 +44,23 @@ log = logging.getLogger(__name__)
 import re as _re
 
 _DOMESTIC_ONLY_RE = _re.compile(
+    # All patterns require the COURSE / PROGRAM to be the explicit subject.
+    # Bare phrases like "Available to domestic students only" or
+    # "Domestic students only" are intentionally excluded because they
+    # appear in *application-pathway* sections (e.g. SATAC blocks at
+    # Flinders University) even when the course IS available to
+    # international students, producing a 100% false-positive rate.
     r"(?:"
-    r"this\s+course\s+is\s+(?:only\s+)?not\s+available\s+(?:for|to)\s+international"
-    r"|not\s+available\s+(?:for|to)\s+international\s+students"
-    r"|this\s+course\s+is\s+not\s+open\s+to\s+international"
-    r"|available\s+to\s+domestic\s+students\s+only"
-    r"|domestic\s+students\s+only"
-    r"|this\s+course\s+is\s+only\s+available\s+to\s+(?:australian|domestic)"
+    # Explicit course-level "not available" statements
+    r"this\s+(?:course|program|degree)\s+is\s+(?:only\s+)?not\s+available\s+(?:for|to)\s+international"
+    r"|this\s+(?:course|program|degree)\s+is\s+not\s+open\s+to\s+international"
+    r"|this\s+(?:course|program|degree)\s+is\s+only\s+available\s+to\s+(?:australian|domestic)"
+    r"|this\s+(?:program|course|degree)\s+is\s+only\s+for\s+(?:australian|domestic)"
+    r"|this\s+(?:program|course|degree)\s+does\s+not\s+accept\s+international"
+    # "Sorry, this course is not available to international students"
+    r"|sorry[,.]?\s+this\s+(?:course|program)\s+is\s+not\s+available\s+to\s+international"
+    # "Open to domestic applicants only" — rare but unambiguous
     r"|open\s+to\s+domestic\s+applicants\s+only"
-    r"|sorry[,.]?\s+this\s+course\s+is\s+not\s+available\s+to\s+international"
-    r"|this\s+(?:program|course)\s+is\s+only\s+for\s+(?:australian|domestic)"
     r")",
     _re.IGNORECASE,
 )
