@@ -1,0 +1,198 @@
+Recommendation: Better scraping architecture with AI page discovery
+
+Add a Course Discovery Agent before scraping course data.
+
+Goal:
+The system must first find the real course listing page and real course detail pages before extracting data.
+
+Recommended flow:
+
+1. Start from university homepage
+Example:
+https://www.unisq.edu.au
+
+2. Find possible course listing pages
+Crawl only important internal links with keywords:
+
+study
+courses
+find a course
+degrees
+programs
+qualifications
+international students
+future students
+
+3. Use code scoring first
+
+Give higher score when:
+- URL contains courses, degrees, programs, find a course
+- Page title says courses, degrees, programs
+- Page has course search or filters
+- Page has many real course links
+- Page has study level filters like undergraduate and postgraduate
+- Page has campus, intake or study mode filters
+
+Give lower score or reject when:
+- Page is about apply, contact, key dates, fees, scholarships, blog, news, events, school, faculty, testimonials
+- Page only has menu links
+- Page only explains study options but does not list courses
+
+4. Use AI only after code scoring
+
+Send top 5 candidate pages to AI.
+
+AI should answer:
+
+{
+  "best_course_listing_url": "",
+  "reason": "",
+  "confidence_score": 0,
+  "likely_course_detail_url_pattern": "",
+  "bad_pages_to_ignore": []
+}
+
+Important:
+AI should only rank pages.
+AI should not save final result.
+Code must verify final result.
+
+5. Verify the selected listing page
+
+Before saving course listing URL, code must confirm:
+- Page has real course results
+- Page has more than 10 course detail links
+- Course links contain real course names
+- Course links are internal to the university domain
+- Page is not apply page, fee page, contact page or study area page
+
+6. Find real course detail pages
+
+From the confirmed listing page, collect course detail links only.
+
+Accept detail links only if:
+- URL contains course name or program name
+- Page title starts with qualification name
+- Page has one main course heading
+- Page has course specific details like duration, campus, intake, fee, CRICOS, study mode, entry requirements
+
+Reject detail links if title is:
+Study online
+Undergraduate study
+Postgraduate study
+Pathways to uni
+How to apply
+Compare degrees
+Arts and Communication
+Business
+Aviation
+Fees and scholarships
+Key dates
+Contact
+Schools
+Faculties
+
+7. AI support for unclear pages
+
+If code confidence is between 50 and 80, AI can classify:
+
+course_listing
+course_detail
+category_page
+info_page
+application_page
+fee_page
+english_requirement_page
+reject
+
+But final saving still depends on code validation.
+
+8. Use provider specific config
+
+Each university should store:
+
+{
+  "provider_name": "",
+  "website": "",
+  "course_listing_url": "",
+  "course_detail_url_pattern": "",
+  "scraping_method": "static/playwright/api",
+  "known_reject_patterns": [],
+  "known_accept_patterns": [],
+  "last_verified_at": "",
+  "confidence_score": 0
+}
+
+9. Prefer hidden API when available
+
+During Playwright crawling:
+- Capture network XHR requests
+- Detect JSON or GraphQL course search APIs
+- If API gives clean course data, save API endpoint as preferred scraping source
+
+Priority order:
+1. Official course API
+2. Static HTML
+3. Playwright rendered HTML
+4. AI assisted extraction only for missing fields
+
+10. Never use AI as the main scraper
+
+Correct use of AI:
+- Find likely course listing page
+- Classify unclear pages
+- Extract confusing fields from course page text
+- Validate whether course is international and on campus
+
+Wrong use of AI:
+- Guess course URLs
+- Guess fees
+- Guess PTE score
+- Guess campus
+- Publish course without source evidence
+
+11. Add source evidence for every field
+
+Each extracted field should store:
+
+{
+  "value": "",
+  "source_url": "",
+  "source_text": "",
+  "confidence": 0
+}
+
+Example:
+{
+  "ielts_overall": "6.5",
+  "source_url": "https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements",
+  "source_text": "IELTS Academic 6.5 overall",
+  "confidence": 95
+}
+
+12. Add review rules
+
+Auto publish only when:
+- Real course detail page confirmed
+- Course name valid
+- International availability confirmed
+- On campus or campus location confirmed
+- Fee is from course page or exact matched central fee table
+- English requirement has source proof
+- Confidence score is 85 or above
+
+Send to review when:
+- Course page is valid but some fields missing
+- Fee missing
+- Campus unclear
+- International availability unclear
+- Confidence score is below 85
+
+Reject when:
+- Online only
+- Domestic only
+- General study page
+- Category page
+- Application page
+- Fee only page
+- No course specific data
