@@ -1073,7 +1073,10 @@ async def extract_course(
                         "value": v,
                         "confidence": 0.7,
                         "method": fee_method,
-                        "snippet": fees_pdf_url,
+                        # source_url is required by enforce_source_evidence;
+                        # snippet holds a human-readable excerpt or the PDF URL.
+                        "source_url": fees_pdf_url or "",
+                        "snippet": fees_pdf_url or f"uni_pdf fee: {k}={v}",
                     }
                 )
         # Course-page-wins: only fill empty english slots from the
@@ -1095,7 +1098,9 @@ async def extract_course(
                     "value": v,
                     "confidence": 0.7,
                     "method": "uni_pdf:requirements",
-                    "snippet": reqs_pdf_url,
+                    # source_url required by enforce_source_evidence
+                    "source_url": reqs_pdf_url or "",
+                    "snippet": reqs_pdf_url or f"uni_pdf english: {k}={v}",
                 }
             )
 
@@ -1143,7 +1148,9 @@ async def extract_course(
                             "value": _v,
                             "confidence": 0.45,
                             "method": "central_page:fees",
-                            "snippet": _central_fee_url,
+                            # source_url required by enforce_source_evidence
+                            "source_url": _central_fee_url or "",
+                            "snippet": _central_fee_url or f"central_page fee: {_k}={_v}",
                         })
                         _filled_fee_keys.append(_k)
                     if emit and _filled_fee_keys:
@@ -1198,7 +1205,9 @@ async def extract_course(
                         "value": _v,
                         "confidence": 0.55,
                         "method": "central_page:english_level",
-                        "snippet": _central_eng_url,
+                        # source_url required by enforce_source_evidence
+                        "source_url": _central_eng_url or "",
+                        "snippet": _central_eng_url or f"central_page english_level: {_k}={_v}",
                     })
                     _eng_filled.append(_k)
                 if emit and _eng_filled:
@@ -1238,7 +1247,9 @@ async def extract_course(
                             "value": _v,
                             "confidence": 0.50,
                             "method": "central_page:english",
-                            "snippet": _central_eng_url,
+                            # source_url required by enforce_source_evidence
+                            "source_url": _central_eng_url or "",
+                            "snippet": _central_eng_url or f"central_page english: {_k}={_v}",
                         })
                         _eng_filled.append(_k)
                     if emit and _eng_filled:
