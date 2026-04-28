@@ -222,6 +222,15 @@ async def extract_course(
             _qs["international"] = ["true"]
             url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
 
+    # UniSQ: international-student fees, IELTS, campus, and intakes are only
+    # visible with ?studentType=international on each course detail page.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.unisq.edu.au", "unisq.edu.au") and "/degrees-and-courses/" in _parsed_url.path:
+        _qs = parse_qs(_parsed_url.query)
+        if "studentType" not in _qs:
+            _qs["studentType"] = ["international"]
+            url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
+
     # UOW: international-student fees, IELTS, intakes, and campus are only
     # visible with ?students=international on each course detail page.
     # Also pass the current year so UOW returns the correct session dates.

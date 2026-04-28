@@ -574,6 +574,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # eligible courses (bachelors + masters + combined programs).
             if _scrape_host in ("www.flinders.edu.au", "flinders.edu.au"):
                 max_courses = 400
+            # UniSQ: raise BFS page budget so the pre-seeded international
+            # listing pages (?studentType=international) are all visited within
+            # one pass and the full course catalogue is harvested.
+            if _scrape_host in ("www.unisq.edu.au", "unisq.edu.au"):
+                max_pages = 60
         log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")

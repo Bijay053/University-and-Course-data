@@ -36,11 +36,12 @@ _JUNK = re.compile(
     re.I,
 )
 _TRAILING_KEYS = re.compile(
-    r"\b(?:delivery\s*mode|delivery\s*method|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?)\b",
+    r"\b(?:delivery\s*mode|delivery\s*method|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?"
+    r"|view\s+dates|start\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))\b",
     re.I,
 )
 _REMOVE_VIRTUAL = re.compile(
-    r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus)\b",
+    r"\b(?:online|virtual|remote|distance(?:\s*learning)?|off[-\s]?campus|external)\b",
     re.I,
 )
 _LOCATION_WINDOW = re.compile(
@@ -54,6 +55,7 @@ _COMMON_CITIES = (
     "Auckland", "Wellington", "Christchurch", "Dunedin", "Hamilton",
     "Palmerston North", "Tauranga", "Rotorua", "Bathurst", "Albury", "Wodonga",
     "Port Macquarie", "Toowoomba",
+    "Ipswich", "Springfield",
 )
 
 _PERIOD_LABEL_RE = re.compile(
