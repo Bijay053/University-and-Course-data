@@ -844,16 +844,26 @@ export default function UniversityDetail() {
   const handleBulkApprove = async () => {
     if (rawSelectedIds.size === 0) return;
     setBulkApproveRunning(true);
-    let approved = 0; let failed = 0;
+    let approved = 0; let confidenceBlocked = 0; let otherFailed = 0;
     for (const courseId of rawSelectedIds) {
       try {
         const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
-        if (res.ok) approved++; else failed++;
-      } catch { failed++; }
+        if (res.ok) {
+          approved++;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          if (data?.detail?.error === "confidence_too_low") confidenceBlocked++;
+          else otherFailed++;
+        }
+      } catch { otherFailed++; }
     }
+    const failParts: string[] = [];
+    if (confidenceBlocked > 0) failParts.push(`${confidenceBlocked} blocked (low confidence)`);
+    if (otherFailed > 0) failParts.push(`${otherFailed} failed`);
     toast({
       title: "Bulk approve complete",
-      description: `${approved} approved${failed > 0 ? `, ${failed} failed` : ""}`,
+      description: `${approved} approved${failParts.length ? `, ${failParts.join(", ")}` : ""}`,
+      variant: approved === 0 && failParts.length > 0 ? "destructive" : "default",
     });
     setRawSelectedIds(new Set());
     await fetchRawData();
@@ -982,11 +992,17 @@ export default function UniversityDetail() {
     try {
       const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Approve failed");
+      if (!res.ok) {
+        const detail = data?.detail;
+        const msg = (typeof detail === "object" && detail?.message)
+          ? detail.message
+          : (typeof detail === "string" ? detail : data.error || "Approve failed");
+        throw new Error(msg);
+      }
       toast({ title: "Approved", description: "Course imported to production." });
       await fetchRawData();
     } catch (e) {
-      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+      toast({ title: "Cannot approve", description: (e as Error).message, variant: "destructive" });
     } finally {
       setApprovingId(null);
     }
@@ -1024,6 +1040,7 @@ export default function UniversityDetail() {
     let succeeded = 0;
     let failed = 0;
     const errors: string[] = [];
+    let confidenceBlocked = 0;
     for (const c of pending) {
       try {
         const res = await fetch(`${BASE}/api/scrape/staged/${c.id}/approve`, { method: "POST" });
@@ -1031,18 +1048,28 @@ export default function UniversityDetail() {
           succeeded++;
         } else {
           const data = await res.json().catch(() => ({}));
-          errors.push(data.error || "Unknown error");
-          failed++;
+          if (data?.detail?.error === "confidence_too_low") {
+            confidenceBlocked++;
+            failed++;
+          } else {
+            errors.push(
+              (typeof data?.detail === "object" && data.detail?.message)
+                ? data.detail.message
+                : (data?.detail || data.error || "Unknown error")
+            );
+            failed++;
+          }
         }
       } catch (e) {
         errors.push((e as Error).message);
         failed++;
       }
     }
+    const confNote = confidenceBlocked > 0 ? ` (${confidenceBlocked} blocked — low confidence)` : "";
     toast({
       title: "Import complete",
       description: failed
-        ? `${succeeded} imported, ${failed} failed${errors.length ? `: ${errors[0]}` : ""}.`
+        ? `${succeeded} imported, ${failed} failed${confNote}${errors.length ? `: ${errors[0]}` : ""}.`
         : `${succeeded} course${succeeded !== 1 ? "s" : ""} imported successfully.`,
       variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
     });
