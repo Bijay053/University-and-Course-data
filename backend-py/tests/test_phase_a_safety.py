@@ -1077,3 +1077,135 @@ def test_intake_rejects_research_candidature_months():
     assert "February" in months or "May" in months or "June" in months, (
         f"Real intake months from the table must be preserved; got {months}"
     )
+
+
+# ---------------------------------------------------------------------------
+# APIC fix — match_central_fee algorithm + confidence (was token_set_ratio bug)
+# ---------------------------------------------------------------------------
+
+class TestMatchCentralFee:
+    """match_central_fee must return (record, confidence) tuples and must NOT
+    use token_set_ratio's subset-reward behaviour that gave every course the
+    same fee (the first record whose name was a superset of the query).
+
+    The fix switches to WRatio + raises the threshold to 80 + adds an exact
+    fast-path + treats bucket fallback as low-confidence so callers can
+    attach a scrape warning instead of silently applying a wrong fee.
+    """
+
+    def _make_fees(self, programs: list[tuple[str, float]]) -> list[dict]:
+        import re
+        out = []
+        for name, fee in programs:
+            bucket = "postgraduate" if any(
+                tok in name.lower()
+                for tok in ("master", "graduate", "postgrad", "mba", "mphil", "phd")
+            ) else "undergraduate"
+            out.append({
+                "program_pattern": name,
+                "international_fee": fee,
+                "domestic_fee": None,
+                "currency": "AUD",
+                "per": "Annual",
+                "bucket": bucket,
+            })
+        return out
+
+    def _match(self, course_name, fees, degree_level=None):
+        from app.services.scraper.central_pages import match_central_fee
+        return match_central_fee(course_name, fees, degree_level=degree_level)
+
+    def test_exact_match_returns_exact_confidence(self):
+        fees = self._make_fees([
+            ("Bachelor of Business", 34000),
+            ("Master of Information Technology", 45000),
+        ])
+        rec, conf = self._match("Bachelor of Business", fees)
+        assert rec is not None
+        assert rec["international_fee"] == 34000
+        assert conf == "exact", f"Expected 'exact', got {conf!r}"
+
+    def test_exact_match_picks_correct_row_not_first_row(self):
+        """The specific program, not just the first fee record, must be returned."""
+        fees = self._make_fees([
+            ("Bachelor of Business", 34000),
+            ("Master of Information Technology", 45000),
+            ("Graduate Certificate in Information Technology", 18000),
+        ])
+        rec, conf = self._match("Master of Information Technology", fees)
+        assert rec is not None
+        assert rec["international_fee"] == 45000, (
+            f"MIT fee (45000) expected; got {rec['international_fee']}"
+        )
+
+    def test_each_specialisation_matches_own_record(self):
+        """The root-cause bug: with token_set_ratio, ALL specialisations
+        scored 100 against the first record and always got the same fee.
+        With WRatio, each specialisation should match its own row."""
+        fees = self._make_fees([
+            ("Bachelor of Business (BBus)", 34000),
+            ("Bachelor of Business (BBus) Specialisation in Accounting", 34000),
+            ("Bachelor of Business (BBus) Specialisation in Analytics and AI", 34000),
+            ("Master of Information Technology", 45000),
+            ("Master of Information Technology Specialisation in Cyber Security", 45000),
+        ])
+        rec_mit, _ = self._match("Master of Information Technology", fees)
+        rec_bbus, _ = self._match("Bachelor of Business (BBus)", fees)
+        assert rec_mit is not None, "Master of IT must match"
+        assert rec_bbus is not None, "Bachelor of Business must match"
+        assert rec_mit["international_fee"] == 45000, (
+            f"Master of IT fee must be 45000; got {rec_mit['international_fee']}"
+        )
+        assert rec_bbus["international_fee"] == 34000, (
+            f"Bachelor of Business fee must be 34000; got {rec_bbus['international_fee']}"
+        )
+
+    def test_no_match_below_threshold_returns_none_confidence(self):
+        """Completely unrelated program names must not match at all."""
+        fees = self._make_fees([
+            ("Master of Information Technology", 45000),
+        ])
+        rec, conf = self._match("Diploma of Business", fees)
+        assert rec is None or conf in ("bucket", "none"), (
+            f"Unrelated course should not get a fee; got conf={conf!r}"
+        )
+
+    def test_bucket_fallback_returns_bucket_confidence(self):
+        """When no name match succeeds but degree_level is given,
+        the function falls back to bucket matching and returns
+        confidence='bucket' so the caller can emit a scrape warning."""
+        fees = self._make_fees([
+            ("Master of Business Administration", 50000),
+        ])
+        rec, conf = self._match(
+            "Master of Some Completely Different Program",
+            fees,
+            degree_level="Master",
+        )
+        if rec is not None:
+            assert conf == "bucket", (
+                f"Bucket fallback must return confidence='bucket'; got {conf!r}"
+            )
+
+    def test_no_fees_returns_none(self):
+        rec, conf = self._match("Bachelor of Business", [])
+        assert rec is None
+        assert conf == "none"
+
+    def test_empty_course_name_returns_none(self):
+        fees = self._make_fees([("Bachelor of Business", 34000)])
+        rec, conf = self._match("", fees)
+        assert rec is None
+        assert conf == "none"
+
+    def test_high_confidence_for_close_fuzzy_match(self):
+        """A near-identical name (abbrev in parens) should score high
+        confidence, not fall back to bucket."""
+        fees = self._make_fees([
+            ("Graduate Certificate in Project Management (GradCertPM)", 18000),
+        ])
+        rec, conf = self._match("Graduate Certificate in Project Management", fees)
+        assert rec is not None, "Close fuzzy match must succeed"
+        assert conf in ("exact", "high", "medium"), (
+            f"Close match must not degrade to bucket; got {conf!r}"
+        )

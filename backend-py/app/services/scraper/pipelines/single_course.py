@@ -1246,49 +1246,77 @@ async def extract_course(
             _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
             _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
             if _fee_missing and _central_fees:
-                matched = match_central_fee(
-                    payload.get("course_name") or "",
+                _course_name_for_fee = payload.get("course_name") or ""
+                matched, _fee_confidence = match_central_fee(
+                    _course_name_for_fee,
                     _central_fees,
                     degree_level=payload.get("degree_level"),
                 )
-                if matched:
-                    _filled_fee_keys: list[str] = []
-                    for _k, _src_k in (
-                        ("international_fee", "international_fee"),
-                        ("domestic_fee", "domestic_fee"),
-                        ("currency", "currency"),
-                        ("fee_term", "per"),
-                    ):
-                        _v = matched.get(_src_k)
-                        if _v in (None, "", 0):
-                            continue
-                        if payload.get(_k) not in (None, "", 0):
-                            continue
-                        payload[_k] = _v
-                        evidence.append({
-                            "field_key": _k,
-                            "value": _v,
-                            "confidence": 0.45,
-                            "method": "central_page:fees",
-                            # source_url required by enforce_source_evidence
-                            "source_url": _central_fee_url or "",
-                            "snippet": _central_fee_url or f"central_page fee: {_k}={_v}",
-                        })
-                        _filled_fee_keys.append(_k)
-                    if emit and _filled_fee_keys:
-                        _prog = matched.get("program_pattern", "?")
-                        await emit(
-                            "status",
-                            f"[CENTRAL ✓] {payload.get('course_name', url)[:40]} — "
-                            f"fee from '{_prog}' row: "
-                            f"intl={matched.get('international_fee')} "
-                            f"per={matched.get('per')}",
-                            phase="fallback",
-                            kind="central_fee_applied",
-                            url=url,
-                            matched_program=_prog,
-                            filled=_filled_fee_keys,
+                if matched and _fee_confidence != "none":
+                    _prog = matched.get("program_pattern", "?")
+                    if _fee_confidence == "bucket":
+                        # Bucket fallback: degree-level match only — too imprecise
+                        # to apply silently.  Log a scrape warning and leave fee blank.
+                        _bucket_warn = (
+                            f"[FEE skip] course={_course_name_for_fee!r} — "
+                            f"only bucket match available (row={_prog!r}, "
+                            f"fee={matched.get('international_fee')}); "
+                            f"fee left blank to avoid wrong data"
                         )
+                        payload.setdefault("scrape_warnings", [])
+                        payload["scrape_warnings"].append(_bucket_warn)
+                        if emit:
+                            await emit(
+                                "status",
+                                _bucket_warn,
+                                phase="fallback",
+                                kind="central_fee_bucket_skip",
+                                url=url,
+                                matched_program=_prog,
+                            )
+                    else:
+                        # Confident name match (exact / high / medium) — apply fee.
+                        _confidence_numeric = (
+                            0.70 if _fee_confidence == "exact" else
+                            0.55 if _fee_confidence == "high" else
+                            0.45  # medium
+                        )
+                        _filled_fee_keys: list[str] = []
+                        for _k, _src_k in (
+                            ("international_fee", "international_fee"),
+                            ("domestic_fee", "domestic_fee"),
+                            ("currency", "currency"),
+                            ("fee_term", "per"),
+                        ):
+                            _v = matched.get(_src_k)
+                            if _v in (None, "", 0):
+                                continue
+                            if payload.get(_k) not in (None, "", 0):
+                                continue
+                            payload[_k] = _v
+                            evidence.append({
+                                "field_key": _k,
+                                "value": _v,
+                                "confidence": _confidence_numeric,
+                                "method": f"central_page:fees:{_fee_confidence}",
+                                "source_url": _central_fee_url or "",
+                                "snippet": _central_fee_url or f"central_page fee: {_k}={_v}",
+                            })
+                            _filled_fee_keys.append(_k)
+                        if emit and _filled_fee_keys:
+                            await emit(
+                                "status",
+                                f"[FEE match] course={_course_name_for_fee!r} "
+                                f"matched_row={_prog!r} "
+                                f"fee={matched.get('international_fee')} "
+                                f"confidence={_fee_confidence}",
+                                phase="fallback",
+                                kind="central_fee_applied",
+                                url=url,
+                                matched_program=_prog,
+                                fee_confidence=_fee_confidence,
+                                filled=_filled_fee_keys,
+                            )
 
             # ── English-requirements fallback ────────────────────────────
             # Two data paths, in priority order:

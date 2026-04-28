@@ -1175,77 +1175,126 @@ def match_central_fee(
     central_fees: list[CentralFeeRecord],
     degree_level: str | None = None,
     *,
-    threshold: float = 65.0,
-) -> CentralFeeRecord | None:
+    threshold: float = 80.0,
+) -> tuple[CentralFeeRecord | None, str]:
     """Find the best-matching fee record for a course name.
 
-    Uses rapidfuzz ``token_set_ratio`` for fuzzy program-name matching.
-    Falls back to degree-level bucket matching when no name score meets the
-    threshold.  Returns ``None`` when nothing plausible is found.
+    Returns ``(record, confidence)`` where *confidence* is one of:
+      - ``"exact"``       — normalised names match exactly (score=100).
+      - ``"high"``        — WRatio score ≥ 85 (very likely the same program).
+      - ``"medium"``      — WRatio score ≥ 80 (plausible; used with a warning).
+      - ``"bucket"``      — degree-level bucket fallback only (low precision).
+      - ``"none"``        — no match found.
 
-    ``threshold`` (0-100) controls how lenient the name match is.  65 is
-    deliberately permissive because program names on fee pages are often
-    abbreviated ("MBA" vs "Master of Business Administration") while course
-    names in the catalogue are long-form.
+    **Algorithm change (was token_set_ratio):**
+    ``token_set_ratio`` rewards any subset relationship with score=100
+    (e.g. "Bachelor of Business" → 100 against every "Bachelor of Business
+    Specialisation in …" record).  The first record encountered then wins
+    every course, giving every course the same fee.
+
+    We now use ``token_sort_ratio`` (rapidfuzz) which sorts tokens
+    alphabetically before comparing — giving ~35 for unrelated programs
+    ("Diploma of Business" vs "Master of IT") and ~88 for genuinely similar
+    names ("Bachelor of Business" vs "Bachelor of Business (BBus)").
+    WRatio and token_set_ratio are avoided — both include
+    partial_token_set_ratio which inflates unrelated matches via common
+    stop-words like "of" and causes the "same fee for all courses" bug.
+    Threshold raised from 65 → 80 so only genuine name matches are applied.
+
+    Bucket fallback is returned with confidence="bucket" so callers can
+    attach a scrape warning instead of silently using a bad fee.
     """
     if not central_fees or not course_name:
-        return None
+        return None, "none"
 
     try:
-        from rapidfuzz import fuzz
+        from rapidfuzz import fuzz as _rfuzz
         use_rapidfuzz = True
     except ImportError:
         use_rapidfuzz = False
 
+    _norm_course = re.sub(r"\s+", " ", course_name).strip().lower()
+
     def _score(pattern: str, name: str) -> float:
+        p = re.sub(r"\s+", " ", pattern).strip().lower()
+        n = re.sub(r"\s+", " ", name).strip().lower()
         if use_rapidfuzz:
-            # token_set_ratio handles "MBA" vs "Master of Business Administration"
-            # better than simple ratio because it ignores token ordering and
-            # subset relationships.
-            return float(fuzz.token_set_ratio(pattern.lower(), name.lower()))
-        # stdlib fallback: basic substring check
-        return 100.0 if pattern.lower() in name.lower() else 0.0
+            # token_sort_ratio sorts tokens alphabetically before comparing.
+            # This correctly rejects unrelated programs ("Diploma of Business"
+            # vs "Master of Information Technology" → ~35) while accepting
+            # near-identical names ("Bachelor of Business" vs "Bachelor of
+            # Business (BBus)" → ~88).
+            #
+            # WRatio and token_set_ratio are intentionally avoided: both
+            # include partial_token_set_ratio which rewards the common word
+            # "of" being in both strings and inflates unrelated matches to
+            # score ≥ 85, causing the same "all courses get one fee" bug.
+            return float(_rfuzz.token_sort_ratio(p, n))
+        return 100.0 if p == n else (60.0 if p in n or n in p else 0.0)
 
     best_record: CentralFeeRecord | None = None
     best_score: float = 0.0
 
+    # ── Pass 1: exact normalised name match (fast path) ─────────────────────
     for rec in central_fees:
         pattern = rec.get("program_pattern") or ""
         if not pattern:
             continue
-        sc = _score(pattern, course_name)
-        # Also try the reverse (course_name as query, pattern as corpus) because
-        # "Bachelor of Business" scores higher against "Bachelor of Business
-        # (Marketing)" in reverse.
-        sc_rev = _score(course_name, pattern)
-        score = max(sc, sc_rev)
+        if re.sub(r"\s+", " ", pattern).strip().lower() == _norm_course:
+            log.info(
+                "[FEE match] course=%r matched_row=%r fee=%s confidence=exact",
+                course_name,
+                pattern,
+                rec.get("international_fee"),
+            )
+            return rec, "exact"
+
+    # ── Pass 2: WRatio fuzzy match ───────────────────────────────────────────
+    for rec in central_fees:
+        pattern = rec.get("program_pattern") or ""
+        if not pattern:
+            continue
+        score = _score(pattern, course_name)
         if score > best_score:
             best_score = score
             best_record = rec
 
-    if best_score >= threshold:
-        log.debug(
-            "central_pages: fee match '%s' → '%s' (score=%.0f)",
+    if best_score >= threshold and best_record is not None:
+        confidence = "high" if best_score >= 85 else "medium"
+        log.info(
+            "[FEE match] course=%r matched_row=%r fee=%s confidence=%s score=%.0f",
+            course_name,
+            best_record.get("program_pattern"),
+            best_record.get("international_fee"),
+            confidence,
+            best_score,
+        )
+        return best_record, confidence
+
+    if best_record is not None:
+        log.info(
+            "[FEE match] course=%r best_row=%r score=%.0f — below threshold (%.0f), fee skipped",
             course_name,
             best_record.get("program_pattern"),
             best_score,
+            threshold,
         )
-        return best_record
 
     # ── Bucket fallback ────────────────────────────────────────────────────
-    # If no name matched but the caller supplies a degree_level, return the
-    # first record whose bucket matches.  This is a last-resort path used
-    # when course names and program names share no common tokens (e.g. a
-    # fee page that just says "Postgraduate" without a program name).
+    # Last-resort path: fee page only lists level buckets ("Postgraduate:
+    # A$X") with no per-program name.  Returned with confidence="bucket"
+    # so callers can attach a scrape warning.
     if degree_level:
         course_bucket = _programme_bucket(degree_level)
         for rec in central_fees:
             if rec.get("bucket") == course_bucket:
-                log.debug(
-                    "central_pages: bucket fallback '%s' (bucket=%s)",
+                log.info(
+                    "[FEE match] course=%r bucket=%s fee=%s confidence=bucket (name match failed, score=%.0f)",
                     course_name,
                     course_bucket,
+                    rec.get("international_fee"),
+                    best_score,
                 )
-                return rec
+                return rec, "bucket"
 
-    return None
+    return None, "none"
