@@ -1238,6 +1238,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # local ``job`` instance before the next commit.
             job.heartbeat_at = datetime.now(timezone.utc)
 
+        # ── Data-quality validation ───────────────────────────────────────────
+        # Run after the staging loop so every staged payload is inspected.
+        # Issues are streamed to the live log via emit and summarised in the
+        # server log. Never blocks the scrape — catches errors internally.
+        try:
+            from app.services.scraper.data_quality import run_quality_checks
+
+            _staged_dicts = [r for r in results if isinstance(r, dict) and not r.get("error")]
+            await run_quality_checks(_staged_dicts, emit=emit)
+        except Exception as _dq_exc:  # noqa: BLE001
+            log.warning("data_quality check raised: %s", _dq_exc)
+
         # T209: emit a single human-readable TIMING line + a typed DONE
         # event so the React log viewer can render the "══ DONE ══"
         # summary row. ``event="done"`` triggers the dedicated UI branch
