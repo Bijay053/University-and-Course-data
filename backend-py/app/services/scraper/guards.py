@@ -334,6 +334,13 @@ def should_stage_course(
     if "online" in _study_mode and not _has_campus_component:
         return (False, "online_only")
 
+    # Secondary check: mode is exactly "Blended" but no physical campus
+    # was found by any extractor (location_text is null/empty). Courses
+    # like "MBA Online" where Gemini still returns "Blended" instead of
+    # "Online" are effectively online-only — reject them too.
+    if _study_mode == "blended" and not (payload.get("location_text") or "").strip():
+        return (False, "online_only")
+
     # Bug B: no international fee after all extraction is done.
     # If the university has a centralized fee page, the fee may simply not
     # be listed for this specific course yet — stage for human review instead

@@ -202,6 +202,38 @@ _CATEGORY_BASE_SEGMENTS: frozenset[str] = frozenset({
 # Reject /node/<digits> URLs here so only the canonical clean URL is kept.
 _DRUPAL_NODE_RE = re.compile(r"/node/\d+(/|$)", re.I)
 
+# Some universities (e.g. SCU) publish every course at BOTH a /2026/ and a
+# /2027/ URL. Both land in ``found`` as separate candidates, consuming the
+# 200-slot budget and creating duplicate staged rows. Collapse them: keep
+# only the URL with the highest year.
+_YEAR_SUFFIX_RE = re.compile(r"/20(\d{2})(?:/|$)")
+
+
+def _dedup_year_variants(items: list[dict]) -> list[dict]:
+    """Collapse year-specific URL variants, keeping the highest year.
+
+    E.g. /course/2026/ and /course/2027/ → only /course/2027/ is returned.
+    URLs without a year suffix pass through unchanged.
+    """
+    groups: dict[str, list[tuple[int, dict]]] = {}
+    non_year: list[dict] = []
+
+    for item in items:
+        url = item.get("url", "")
+        m = _YEAR_SUFFIX_RE.search(url)
+        if m:
+            # base = everything before /20XX (e.g. /course-name-1007294)
+            base = url[: m.start()]
+            groups.setdefault(base, []).append((int(m.group(1)), item))
+        else:
+            non_year.append(item)
+
+    result = non_year[:]
+    for variants in groups.values():
+        best = max(variants, key=lambda t: t[0])
+        result.append(best[1])
+    return result
+
 
 def _is_known_non_course_url(url: str) -> bool:
     """True when the URL matches a hard-coded blocklist of nav/admin/
@@ -577,4 +609,5 @@ async def discover_course_links(
             if len(found) >= max_courses:
                 break
 
-    return [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]
+    raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]
+    return _dedup_year_variants(raw)

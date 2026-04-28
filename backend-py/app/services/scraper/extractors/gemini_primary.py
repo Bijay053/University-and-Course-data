@@ -95,8 +95,12 @@ _HARD_FIELDS: dict[str, str] = {
     ),
     "mode": (
         "Primary study mode. Pick EXACTLY one: 'On Campus', 'Online', 'Blended'. "
-        "Use 'Blended' only when the page explicitly describes a mix. "
-        "Default to 'On Campus' when a physical location is mentioned."
+        "'Online'  — course is taught entirely or primarily online with no required "
+        "physical attendance (includes courses whose location is listed as 'Online'). "
+        "'Blended' — course explicitly requires BOTH regular on-campus sessions AND "
+        "online components (not just optional intensives). "
+        "'On Campus' — default when a physical location is mentioned. "
+        "If the page lists 'Location: Online', always use 'Online'."
     ),
     "intake_text": (
         "Intake months as a comma-separated list of month names "
@@ -106,9 +110,10 @@ _HARD_FIELDS: dict[str, str] = {
     "location_text": (
         "Campus location(s) where this course is physically taught "
         "(e.g. 'Melbourne', 'Sydney, Brisbane', 'Ballarat'). "
-        "Use only real city/campus names. "
-        "Do NOT include 'Online' or 'Virtual'. "
-        "Null if not explicitly stated on this page."
+        "Use ONLY real city or campus names. "
+        "Do NOT include 'Online', 'Virtual', 'Teaching period', 'Term', "
+        "'Semester', 'Trimester', or any intake-period / study-period label. "
+        "Null if not explicitly stated or if delivery is online-only."
     ),
 }
 
