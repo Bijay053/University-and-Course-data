@@ -252,6 +252,50 @@ def _check_duplicates(payloads_with_urls: list[tuple[Payload, str]]) -> list[Qua
     return issues
 
 
+def _check_duplicate_fees(payloads_with_urls: list[tuple[Payload, str]]) -> list[QualityIssue]:
+    """Detect repeated fee values across courses — a strong indicator of a
+    selector-scope reuse bug (the same DOM element being scraped for every
+    course page). Fires when:
+      • At least 5 courses have a fee, AND
+      • ≥ 75% of fee-bearing courses share the same single fee value.
+    """
+    issues: list[QualityIssue] = []
+    fee_to_courses: dict[float, list[str]] = defaultdict(list)
+    for payload, _url in payloads_with_urls:
+        fee = payload.get("international_fee")
+        if fee is None:
+            continue
+        try:
+            fee_val = float(fee)
+            if fee_val > 0:
+                name = payload.get("course_name") or payload.get("name") or "?"
+                fee_to_courses[fee_val].append(name)
+        except (TypeError, ValueError):
+            pass
+
+    total_with_fee = sum(len(v) for v in fee_to_courses.values())
+    if total_with_fee < 5:
+        return issues  # Not enough data to detect duplicates reliably.
+
+    for fee_val, course_names in sorted(fee_to_courses.items()):
+        count = len(course_names)
+        pct = count / max(total_with_fee, 1)
+        if pct >= 0.75:
+            sample = ", ".join(course_names[:4]) + (" …" if len(course_names) > 4 else "")
+            issues.append(
+                QualityIssue(
+                    severity="critical",
+                    code="duplicate_fee_detected",
+                    message=(
+                        f"Fee ${fee_val:,.0f} appears on {count}/{total_with_fee} "
+                        f"courses ({pct:.0%}) — likely a selector-scope bug. "
+                        f"Affected: {sample}"
+                    ),
+                )
+            )
+    return issues
+
+
 # ---------------------------------------------------------------------------
 # Aggregate report
 # ---------------------------------------------------------------------------
@@ -296,8 +340,9 @@ async def run_quality_checks(
         course_issues = _check_course(payload, url)
         all_issues.extend(course_issues)
 
-    # Duplicate check is cross-course
+    # Duplicate checks are cross-course
     all_issues.extend(_check_duplicates(payloads_with_urls))
+    all_issues.extend(_check_duplicate_fees(payloads_with_urls))
 
     # Sort by severity then code then url for deterministic output.
     all_issues.sort(

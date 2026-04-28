@@ -31,7 +31,7 @@ def test_strong_location_sibling_div_classifies_via_structural_pass():
         "Structural <strong>Location</strong> sibling-div pre-pass must "
         "fire; pre-fix this cascade left the value on the floor."
     )
-    assert out[0].value == "Sydney"
+    assert out[0].value == "Sydney, Australia"
     assert out[0].method == "location.strong"
 
 
@@ -40,7 +40,7 @@ def test_dt_dd_location_classifies_via_existing_dl_path():
     in here so a future refactor of the cascade can't regress it."""
     html = "<dl><dt>Location</dt><dd>Melbourne, Brisbane</dd></dl>"
     out = _run(location.extract(html, "https://e/x"))
-    assert out and out[0].value == "Melbourne, Brisbane"
+    assert out and out[0].value == "Melbourne, Brisbane, Australia"
     assert out[0].method == "location.dl"
 
 
@@ -54,7 +54,7 @@ def test_th_td_location_classifies_via_existing_table_path():
         "</table>"
     )
     out = _run(location.extract(html, "https://e/x"))
-    assert out and out[0].value == "Adelaide, Perth"
+    assert out and out[0].value == "Adelaide, Perth, Australia"
     assert out[0].method == "location.table"
 
 
@@ -67,7 +67,7 @@ def test_strong_location_strips_online_virtual_from_value():
         '<div>Sydney, Online</div>'
     )
     out = _run(location.extract(html, "https://e/x"))
-    assert out and out[0].value == "Sydney"
+    assert out and out[0].value == "Sydney, Australia"
     assert out[0].method == "location.strong"
 
 
@@ -82,7 +82,7 @@ def test_strong_location_does_not_misfire_on_unrelated_strong_tags():
         '<dl><dt>Location</dt><dd>Brisbane</dd></dl>'
     )
     out = _run(location.extract(html, "https://e/x"))
-    assert out and out[0].value == "Brisbane"
+    assert out and out[0].value == "Brisbane, Australia"
     # Should fall through to the dl path (NOT the strong walker).
     assert out[0].method == "location.dl"
 
@@ -147,6 +147,6 @@ class TestCampusCodeExpansion:
         html = "<dl><dt>Campus Location</dt><dd>SYD | MEL | BNE</dd></dl>"
         out = _run(location.extract(html, "https://apicollege.edu.au/courses/test/"))
         assert out, "Location must be extracted from dl"
-        assert out[0].value == "Sydney, Melbourne, Brisbane", (
-            f"Campus codes must be expanded to city names; got {out[0].value!r}"
+        assert out[0].value == "Sydney, Melbourne, Brisbane, Australia", (
+            f"Campus codes must be expanded to city names (with country suffix); got {out[0].value!r}"
         )

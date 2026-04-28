@@ -164,6 +164,36 @@ _SPAN_ID_DELIVERY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── data-attribute patterns (Step 0b) ─────────────────────────────────────
+# Some universities (e.g. newer React/Vue SPAs) encode study mode directly in
+# HTML data-attributes such as data-delivery="On Campus", data-mode="Online",
+# data-study-mode="Blended".  These are highly reliable — zero prose noise.
+# Covers both quoted attribute forms and the most common attribute names.
+_DATA_ATTR_MODE_RE = re.compile(
+    r'data-(?:delivery|mode|study[-_]?mode|attendance[-_]?mode|'
+    r'learning[-_]?mode|delivery[-_]?mode)\s*=\s*["\']([^"\']{1,80})["\']',
+    re.IGNORECASE,
+)
+
+
+def _extract_data_attribute_mode(html: str) -> tuple[str | None, str | None]:
+    """Return ``(canonical_mode, snippet)`` when the page contains an HTML
+    element with a ``data-delivery`` / ``data-mode`` / ``data-study-mode``
+    attribute whose value maps to a recognised canonical mode.
+
+    This targets modern SPA sites that embed structured delivery data in the
+    HTML source even though the visible text is rendered by JavaScript.
+    """
+    if not html:
+        return None, None
+    for m in _DATA_ATTR_MODE_RE.finditer(html):
+        value = m.group(1).strip()
+        canonical = _classify_label_value(value)
+        if canonical:
+            snippet = html[max(0, m.start() - 10) : m.end() + 10].strip()
+            return canonical, snippet
+    return None, None
+
 
 def _extract_span_id_delivery(html: str) -> tuple[str | None, str | None]:
     """Return ``(canonical_mode, snippet)`` when the page contains a
@@ -365,11 +395,18 @@ def classify_study_mode(
     on footer / marketing copy.  Returns ``(None, None, None)`` when no
     pattern matches.
     """
-    # ── Step 0: id="delivery" span (UOW / Webflow) ───────────────────────
-    # Highest confidence: the value is in a named data attribute, not prose.
+    # ── Step 0a: id="delivery" span (UOW / Webflow) ───────────────────────
+    # Highest confidence: the value is in a named element, not prose.
     span_label, span_snippet = _extract_span_id_delivery(page_text)
     if span_label:
         return span_label, span_snippet, 0.9
+
+    # ── Step 0b: data-attribute patterns (SPA / React / Vue sites) ────────
+    # data-delivery="On Campus", data-mode="Online", data-study-mode="Blended"
+    # are machine-readable attributes — confidence as high as the span-id path.
+    data_attr_label, data_attr_snippet = _extract_data_attribute_mode(page_text)
+    if data_attr_label:
+        return data_attr_label, data_attr_snippet, 0.9
 
     # PR-6 Bug 2 — structural pre-pass SECOND. The DOM-aware
     # `<strong>Delivery</strong>` / sibling-div detector reads value

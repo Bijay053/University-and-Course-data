@@ -58,6 +58,78 @@ _COMMON_CITIES = (
     "Ipswich", "Springfield",
 )
 
+# ── Country suffix maps ───────────────────────────────────────────────────
+# Used by _append_country_suffix to determine what country tag to add to a
+# location string made entirely of cities from the same country.
+_AU_CITIES: frozenset[str] = frozenset({
+    "Sydney", "Melbourne", "Brisbane", "Adelaide", "Perth", "Canberra",
+    "Darwin", "Hobart", "Gold Coast", "Geelong", "Newcastle", "Wollongong",
+    "Cairns", "Townsville", "Ballarat", "Bendigo", "Launceston",
+    "Bathurst", "Albury", "Wodonga", "Port Macquarie", "Toowoomba",
+    "Ipswich", "Springfield", "Manly", "Parramatta", "Rockingham",
+    "Joondalup", "Fremantle", "Tweed Heads",
+    # ECU / Bond campuses
+    "Mount Lawley", "South West", "Perth City",
+})
+
+_NZ_CITIES: frozenset[str] = frozenset({
+    "Auckland", "Wellington", "Christchurch", "Dunedin", "Hamilton",
+    "Palmerston North", "Tauranga", "Rotorua",
+})
+
+
+def _append_country_suffix(display: str) -> str:
+    """Append ', Australia' or ', New Zealand' to a location string when
+    every city token belongs unambiguously to the same country.
+
+    Preserves the original string when:
+      • The location already contains a country word (Australia, New Zealand, …)
+      • Some tokens belong to different countries or are unrecognised
+      • The string contains a state / territory indicator (NSW, VIC, QLD …)
+
+    Examples
+    --------
+    >>> _append_country_suffix("Sydney")
+    'Sydney, Australia'
+    >>> _append_country_suffix("Sydney, Melbourne")
+    'Sydney, Melbourne, Australia'
+    >>> _append_country_suffix("Auckland")
+    'Auckland, New Zealand'
+    >>> _append_country_suffix("Sydney, Auckland")
+    'Sydney, Auckland'   # mixed — no suffix
+    >>> _append_country_suffix("Sydney, NSW")
+    'Sydney, NSW'        # already contextualised — leave as-is
+    """
+    if not display:
+        return display
+
+    _ALREADY_HAS_COUNTRY = re.compile(
+        r"\b(?:australia|new zealand|nz|united states|usa|uk|united kingdom|"
+        r"canada|india|china|nsw|vic|qld|sa|wa|nt|act|tas)\b",
+        re.IGNORECASE,
+    )
+    if _ALREADY_HAS_COUNTRY.search(display):
+        return display
+
+    tokens = [t.strip() for t in display.split(",") if t.strip()]
+    if not tokens:
+        return display
+
+    # Determine which country every token belongs to (if any).
+    au_count = sum(1 for t in tokens if t in _AU_CITIES)
+    nz_count = sum(1 for t in tokens if t in _NZ_CITIES)
+    unknown_count = len(tokens) - au_count - nz_count
+
+    if unknown_count > 0:
+        return display  # don't guess when not all tokens are known
+
+    if au_count > 0 and nz_count == 0:
+        return display + ", Australia"
+    if nz_count > 0 and au_count == 0:
+        return display + ", New Zealand"
+    # mixed AU+NZ — leave as-is
+    return display
+
 # Campus short-code → full city name mapping.
 # Universities (e.g. APIC College) publish location as 3-letter codes
 # ("SYD | MEL | BNE") rather than full city names. This map expands
@@ -565,6 +637,8 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         display = _sanitise_for_display(raw)
         if not display:
             continue
+        # Append country suffix when all tokens are unambiguous AU/NZ cities.
+        display = _append_country_suffix(display)
         return [
             ExtractionResult(
                 field_key="course_location",

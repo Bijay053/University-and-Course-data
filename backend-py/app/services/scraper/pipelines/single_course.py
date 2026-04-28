@@ -552,6 +552,57 @@ async def extract_course(
                     # the extractor returned first) is preserved.
                     payload.setdefault(k, v)
 
+    # ── Field-level extraction summary log ───────────────────────────────────
+    # After all static extractors have run, emit a structured per-field summary
+    # for the five critical fields so the live log shows exactly which strategy
+    # succeeded and what value it produced. Only fires when an emit handler is
+    # registered (i.e. the live WebSocket is open).
+    if emit:
+        _KEY_FIELDS = ("international_fee", "ielts_overall", "duration", "intake_months", "study_mode")
+        _FIELD_LABEL = {
+            "international_fee": "Fee",
+            "ielts_overall": "IELTS",
+            "duration": "Duration",
+            "intake_months": "Intake",
+            "study_mode": "StudyMode",
+        }
+        # Build a per-field dict: field_key → first evidence entry that filled it
+        _field_summary: dict[str, dict] = {}
+        for _ev in evidence:
+            _fk = _ev.get("field_key", "")
+            if _fk in _KEY_FIELDS and _fk not in _field_summary:
+                _field_summary[_fk] = _ev
+
+        _summary_lines: list[str] = []
+        for _fk in _KEY_FIELDS:
+            _label = _FIELD_LABEL[_fk]
+            _ev = _field_summary.get(_fk)
+            if _ev:
+                _method = (_ev.get("method") or "?")[:30]
+                _val = str(_ev.get("value") or "")[:30]
+                _conf = _ev.get("confidence") or 0
+                _summary_lines.append(f"  {_label}: ✅ {_val!r} [{_method} conf={_conf:.2f}]")
+            else:
+                _summary_lines.append(f"  {_label}: ❌ not found")
+
+        if _summary_lines:
+            _summary_name = (payload.get("course_name") or url.split("/")[-1] or url)[:50]
+            await emit(
+                "status",
+                f"[FIELD SUMMARY] {_summary_name}\n" + "\n".join(_summary_lines),
+                phase="extract",
+                kind="field_extraction_summary",
+                url=url,
+                fields={
+                    _fk: {
+                        "found": _fk in _field_summary,
+                        "method": (_field_summary[_fk].get("method") or "") if _fk in _field_summary else None,
+                        "value": (_field_summary[_fk].get("value")) if _fk in _field_summary else None,
+                    }
+                    for _fk in _KEY_FIELDS
+                },
+            )
+
     # ── Bug 1 (KBS): location-based mode correction ──────────────────────────
     # The bare `\bonline\b` fallback in study_mode.py fires on marketing copy
     # like "Apply Online" / "Enquire Online" found in footers/navs of pages
@@ -1812,6 +1863,56 @@ async def extract_course(
     # extract_course's callers (it is stripped in stage_course before DB write).
     if _extraction_method:
         payload["extraction_method"] = _extraction_method
+
+    # ── Confidence scoring ─────────────────────────────────────────────────
+    # Compute a 0-100 aggregate confidence score for this course payload based
+    # on the presence of the five critical fields.  Low scores are surfaced as
+    # scrape_warnings so the review UI can filter/flag them; we do NOT hard-
+    # reject here because some universities have central fee pages (ECU, Bond)
+    # where missing fee data is expected and handled separately.
+    try:
+        from app.services.scraper.confidence import (
+            CONFIDENCE_WARN,
+            format_confidence_log_line,
+            score_payload as _score_payload,
+        )
+
+        _conf_result = _score_payload(payload)
+        _conf_score = _conf_result["score"]
+        _conf_level = _conf_result["level"]
+
+        # Store the score in the payload so orchestrator/staging can gate on it.
+        payload["_confidence_score"] = _conf_score
+        payload["_confidence_level"] = _conf_level
+
+        # Attach scrape warning for low-confidence courses so the review UI
+        # can surface them prominently.
+        if _conf_level in ("warn", "low"):
+            _conf_warn_tag = f"confidence_{_conf_level}:{_conf_score}"
+            _sw = list(payload.get("scrape_warnings") or [])
+            if not any(w.startswith("confidence_") for w in _sw):
+                _sw.append(_conf_warn_tag)
+                payload["scrape_warnings"] = _sw
+
+        # Emit to the live scrape log
+        if emit:
+            _log_line = format_confidence_log_line(
+                payload.get("course_name") or "",
+                _conf_result,
+                url=url,
+            )
+            await emit(
+                "status",
+                _log_line,
+                phase="extract",
+                kind="confidence_score",
+                url=url,
+                score=_conf_score,
+                level=_conf_level,
+                missing=_conf_result.get("missing", []),
+            )
+    except Exception as _conf_exc:  # never break the pipeline
+        log.warning("Confidence scoring failed on %s: %s", url, _conf_exc)
 
     return {
         "url": url,
