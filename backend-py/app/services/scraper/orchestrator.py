@@ -1028,7 +1028,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
 
             sibling_dicts = [r for r in results if isinstance(r, dict)]
-            fills = await backfill_english_from_siblings(sibling_dicts, emit=emit)
+            # Bond University: require at least 2 courses to agree on an
+            # English score before promoting it to the sibling cache.  Bond's
+            # marketing and experience pages mention "IELTS 6.5" in running
+            # text; with min_quorum=1 (the default) a single such page seeds
+            # the cache and backfills all 50+ siblings with a value that may
+            # not apply to the specific program. min_quorum=2 requires a
+            # second independent extraction to corroborate the score first.
+            _bond_hosts = frozenset({"bond.edu.au", "www.bond.edu.au"})
+            _sibling_quorum = 2 if _scrape_host in _bond_hosts else 1
+            fills = await backfill_english_from_siblings(
+                sibling_dicts, emit=emit, min_quorum=_sibling_quorum
+            )
             if fills:
                 log.info("sibling-cache backfilled %d slot(s) across siblings", fills)
         except Exception as exc:  # noqa: BLE001 — never abort the run on cache failure
