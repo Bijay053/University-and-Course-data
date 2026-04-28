@@ -1,0 +1,447 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 14:04:02 UTC 2026
+
+  System load:           0.14
+  Usage of /:            3.4% of 231.44GB
+  Memory usage:          12%
+  Swap usage:            0%
+  Processes:             170
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 13:43:10 2026 from 162.243.190.66
+root@university-and-course-data:~# # Step 1: verify local postgres works
+sudo -u postgres psql -c "SELECT current_database();"
+
+# Step 2: find the right database and add the column
+sudo -u postgres psql -c "\l"
+ current_database 
+------------------
+ postgres
+(1 row)
+
+                                                         List of databases
+       Name        |   Owner   | Encoding | Locale Provider | Collate |  Ctype  | ICU Locale | ICU Rules |    Access privileges    
+-------------------+-----------+----------+-----------------+---------+---------+------------+-----------+-------------------------
+ postgres          | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | 
+ template0         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ template1         | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =c/postgres            +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres
+ test              | postgres  | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/postgres           +
+                   |           |          |                 |         |         |            |           | postgres=CTc/postgres  +
+                   |           |          |                 |         |         |            |           | test=CTc/postgres
+ university_portal | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                   |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+(5 rows)
+
+root@university-and-course-data:~# sudo -u postgres psql -d ACTUAL_DB_NAME -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  database "ACTUAL_DB_NAME" does not exist
+root@university-and-course-data:~# sudo -u postgres psql -t -c "SELECT datname FROM pg_database WHERE datname NOT IN ('template0','template1','postgres') ORDER BY datname LIMIT 1;" | xargs -I{} sudo -u postgres psql -d {} -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+ERROR:  relation "scraped_courses" does not exist
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS scrape_warnings JSONB;"
+NOTICE:  column "scrape_warnings" of relation "scraped_courses" already exists, skipping
+ALTER TABLE
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "\d scraped_courses" | grep scrape_warnings
+ scrape_warnings        | jsonb                    |           |          | 
+root@university-and-course-data:~# sudo -u postgres psql -d university_portal -c "INSERT INTO alembic_version (version_num) VALUES ('006_add_scrape_warnings') ON CONFLICT DO NOTHING;"
+ERROR:  relation "alembic_version" does not exist
+LINE 1: INSERT INTO alembic_version (version_num) VALUES ('006_add_s...
+                    ^
+root@university-and-course-data:~# # Create the alembic tracking table and mark all migrations applied
+cd /root/University-and-Course-data/backend-py && \
+sudo -u postgres psql -d university_portal -c "
+  CREATE TABLE IF NOT EXISTS alembic_version (
+    version_num VARCHAR(32) NOT NULL,
+    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+  );
+  INSERT INTO alembic_version VALUES
+    ('001_initial'),('002_add_intake'),('003_add_fees'),
+    ('004_add_study_mode'),('005_add_claim_count'),('006_add_scrape_warnings')
+  ON CONFLICT DO NOTHING;
+"
+
+# Fix the .env so alembic can connect next time
+echo "DATABASE_URL=postgresql+asyncpg://uniportal@localhost/university_portal" > /root/University-and-Course-data/backend-py/.env
+CREATE TABLE
+INSERT 0 6
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data && git pull origin main
+cd backend-py && source venv/bin/activate && alembic upgrade head
+systemctl restart uni-api-py.service uni-celery.service
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 60, in <module>
+    run_migrations_online()
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 54, in run_migrations_online
+    asyncio.run(run_async_migrations())
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 48, in run_async_migrations
+    async with connectable.connect() as connection:
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/base.py", line 121, in __aenter__
+    return await self.start(is_ctxmanager=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/engine.py", line 275, in start
+    await greenlet_spawn(self.sync_engine.connect)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 306, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # Verify the column landed
+sudo -u postgres psql -d university_portal -c "
+\d scraped_courses" | grep -E "scrape_warnings|rejection_reason"
+
+# Check current status of CSU data — what state are we actually in?
+sudo -u postgres psql -d university_portal -c "
+SELECT status, auto_publish_status, COUNT(*) 
+FROM scraped_courses 
+WHERE university_id=4 
+GROUP BY status, auto_publish_status
+ORDER BY status, auto_publish_status;
+"
+
+# Restart services and check they come up
+systemctl restart uni-api-py uni-celery
+sleep 5
+systemctl status uni-api-py --no-pager | grep -E "Active:|Main PID"
+systemctl status uni-celery --no-pager | grep -E "Active:|Main PID"
+
+# Make sure no errors on startup
+journalctl -u uni-api-py -n 20 --no-pager
+ERROR:  syntax error at or near "\"
+LINE 2: \d scraped_courses
+        ^
+  status  | auto_publish_status | count 
+----------+---------------------+-------
+ approved | approved            |   187
+ approved | pending_review      |    84
+ pending  | ready               |    30
+ pending  | review              |    11
+ rejected | approved            |    11
+ rejected | pending_review      |   169
+ rejected | ready               |     9
+ rejected | rejected            |     9
+ rejected | review              |   184
+(9 rows)
+
+     Active: active (running) since Tue 2026-04-28 14:08:30 UTC; 6s ago
+   Main PID: 1089796 (python)
+     Active: active (running) since Tue 2026-04-28 14:08:32 UTC; 5s ago
+   Main PID: 1089807 (celery)
+Apr 28 12:07:34 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 12:07:34 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 12:07:34 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 12:07:34 university-and-course-data systemd[1]: uni-api-py.service: Consumed 17.136s CPU time.
+Apr 28 12:07:34 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 13:58:12 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 13:58:12 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 13:58:12 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 13:58:12 university-and-course-data systemd[1]: uni-api-py.service: Consumed 1min 8.221s CPU time.
+Apr 28 13:58:12 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:07:35 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 14:07:35 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 14:07:35 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:07:35 university-and-course-data systemd[1]: uni-api-py.service: Consumed 5.248s CPU time, 154.6M memory peak, 0B memory swap peak.
+Apr 28 14:07:35 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:08:30 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 14:08:30 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 14:08:30 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:08:30 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.103s CPU time.
+Apr 28 14:08:30 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# echo 'DATABASE_URL=postgresql+asyncpg://uniportal:Bij%40y12345@localhost:5432/university_portal' > /root/University-and-Course-data/backend-py/.env
+
+cd /root/University-and-Course-data/backend-py && source venv/bin/activate && alembic upgrade head
+Traceback (most recent call last):
+  File "/root/University-and-Course-data/backend-py/venv/bin/alembic", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1047, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 1037, in main
+    self.run_cmd(cfg, options)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/config.py", line 971, in run_cmd
+    fn(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/command.py", line 483, in upgrade
+    script.run_env()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/script/base.py", line 545, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 116, in load_python_file
+    module = load_module_py(module_id, path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/alembic/util/pyfiles.py", line 136, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 60, in <module>
+    run_migrations_online()
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 54, in run_migrations_online
+    asyncio.run(run_async_migrations())
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/alembic/env.py", line 48, in run_async_migrations
+    async with connectable.connect() as connection:
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/base.py", line 121, in __aenter__
+    return await self.start(is_ctxmanager=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/engine.py", line 275, in start
+    await greenlet_spawn(self.sync_engine.connect)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/impl.py", line 306, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 389, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 674, in __init__
+    self.__connect()
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql -d university_portal -c "
+SELECT course_name, international_fee, ielts_overall, duration, intake_months, course_location
+FROM scraped_courses 
+WHERE university_id=4 
+  AND status='pending'
+ORDER BY id DESC
+LIMIT 10;
+"
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# journalctl -u uni-api-py.service -n 50 --no-pager | tail -30
+Apr 28 08:35:25 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 08:35:25 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 08:35:25 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 08:35:25 university-and-course-data systemd[1]: uni-api-py.service: Consumed 6.794s CPU time.
+Apr 28 08:35:25 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 11:52:39 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 11:52:40 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 11:52:40 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 11:52:40 university-and-course-data systemd[1]: uni-api-py.service: Consumed 1min 20.927s CPU time.
+Apr 28 11:52:40 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 12:07:34 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 12:07:34 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 12:07:34 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 12:07:34 university-and-course-data systemd[1]: uni-api-py.service: Consumed 17.136s CPU time.
+Apr 28 12:07:34 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 13:58:12 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 13:58:12 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 13:58:12 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 13:58:12 university-and-course-data systemd[1]: uni-api-py.service: Consumed 1min 8.221s CPU time.
+Apr 28 13:58:12 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:07:35 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 14:07:35 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 14:07:35 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:07:35 university-and-course-data systemd[1]: uni-api-py.service: Consumed 5.248s CPU time, 154.6M memory peak, 0B memory swap peak.
+Apr 28 14:07:35 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:08:30 university-and-course-data systemd[1]: Stopping uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)...
+Apr 28 14:08:30 university-and-course-data systemd[1]: uni-api-py.service: Deactivated successfully.
+Apr 28 14:08:30 university-and-course-data systemd[1]: Stopped uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+Apr 28 14:08:30 university-and-course-data systemd[1]: uni-api-py.service: Consumed 3.103s CPU time.
+Apr 28 14:08:30 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
