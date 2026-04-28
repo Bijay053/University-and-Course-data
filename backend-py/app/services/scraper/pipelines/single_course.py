@@ -832,16 +832,28 @@ async def extract_course(
         )
         missing = [k for k in _ai_target_keys if k not in payload or payload.get(k) is None]
 
-        # UOW-specific: explicit parser-failure logging so we can distinguish
-        # "data not on page" from "data on page but extractor missed it".
-        # UOW publishes fee and IELTS on every course page, so any miss here
-        # is a parser bug, not a data-absence.
-        _uow_critical = {"international_fee", "ielts_overall"}
+        # UOW / UniSQ: explicit parser-failure logging and parser_error flag.
+        # Both universities publish fee + IELTS on every course page. By this
+        # point the browser pass has run the full extractor suite against the
+        # JS-rendered DOM, so a still-empty slot indicates a genuine extractor
+        # miss or a page that hides data behind a login wall.
+        # When rendered HTML WAS obtained: mark parser_error so the row is not
+        # staged as a normal review-ready row. When rendered HTML was NOT
+        # obtained (browser timeout): log a warning but do NOT suppress staging
+        # (we don't want to silently drop courses due to browser infra issues).
+        _ext_critical = {"international_fee", "ielts_overall"}
         _parsed_host = (urlparse(url).netloc or "").lower()
-        if _parsed_host in ("www.uow.edu.au", "uow.edu.au"):
-            for _fld in _uow_critical:
-                if _fld in missing:
-                    _reason = "not found in static HTML (may require JS render)"
+        if _parsed_host in ("www.uow.edu.au", "uow.edu.au",
+                            "www.unisq.edu.au", "unisq.edu.au"):
+            _still_missing = [f for f in _ext_critical if f in missing]
+            if _still_missing:
+                _had_render = rendered_html is not None  # type: ignore[possibly-undefined]
+                _reason = (
+                    "not found in static HTML OR rendered DOM — data may be behind login"
+                    if _had_render
+                    else "browser render unavailable (timeout) — static HTML only"
+                )
+                for _fld in _still_missing:
                     log.warning("[UOW PARSER MISSING] %s — %s — %s", _fld, url, _reason)
                     if emit:
                         await emit(
@@ -851,7 +863,15 @@ async def extract_course(
                             kind="parser_missing",
                             field=_fld,
                             url=url,
+                            had_render=_had_render,
                         )
+                # Mark as parser_error when the browser DID render the page but
+                # extractors still could not fill the field — this prevents a
+                # row with blank fee/IELTS from being staged as review-ready and
+                # polluting the review queue with obviously incomplete data.
+                if _had_render:
+                    payload["parser_error"] = True
+                    payload["parser_error_fields"] = _still_missing
 
         if emit:
             await emit(
