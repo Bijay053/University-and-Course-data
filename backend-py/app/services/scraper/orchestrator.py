@@ -32,6 +32,74 @@ from app.services.scraper.stage_course import stage_course
 log = logging.getLogger(__name__)
 
 
+def _strip_provider_name_from_title(
+    course_name: str,
+    uni_name: str,
+    scrape_url: str = "",
+) -> str:
+    """Remove trailing '- Provider' or '| Provider' suffixes that universities
+    embed in their course page H1 elements.
+
+    Example: "Bachelor of Business - Aibi" → "Bachelor of Business"
+
+    The course_name extractor in extractors/course_name.py strips well-known
+    suffixes ("- Charles Sturt University", "| USQ") but cannot catch every
+    custom short name. This function uses the actual university name and the
+    domain-derived short name to do a targeted, case-insensitive strip.
+
+    Safety: the stripped result must be at least 5 chars long so we never
+    silently delete the whole course name for a page that has an unusually
+    short title.
+    """
+    import re
+    from urllib.parse import urlparse as _up
+
+    if not course_name:
+        return course_name
+
+    tokens: list[str] = []
+
+    # Full university name (e.g. "AIBI" or "Aibi Institute")
+    if uni_name:
+        tokens.append(uni_name.strip())
+        # First word of the name — often the short identifier
+        first = uni_name.strip().split()[0]
+        if first and first != uni_name.strip() and len(first) >= 2:
+            tokens.append(first)
+
+    # Domain-derived short name (e.g. "aibi" from "aibi.edu.au")
+    if scrape_url:
+        try:
+            host = _up(scrape_url).netloc.lower().lstrip("www.")
+            short = host.split(".")[0]
+            if short and len(short) >= 2:
+                tokens.append(short)
+        except Exception:
+            pass
+
+    _sep_pat = r"\s*[\-\u2013\u2014|:•]\s*"
+    for token in tokens:
+        if not token or len(token) < 2:
+            continue
+        pat = re.compile(
+            _sep_pat + re.escape(token) + r"\s*$",
+            re.IGNORECASE,
+        )
+        m = pat.search(course_name)
+        if m and m.start() > 0:
+            stripped = course_name[: m.start()].strip(" -–—|:•")
+            if stripped and len(stripped) >= 5:
+                log.info(
+                    "[COURSE NAME] stripped provider suffix %r from %r → %r",
+                    course_name[m.start() :].strip(),
+                    course_name,
+                    stripped,
+                )
+                return stripped
+
+    return course_name
+
+
 # Bug E: ordered (prefix-or-keyword, level) pairs the UI uses to colour
 # log lines. We tag every emit with one of these so the front-end can
 # style errors red, warnings amber, [SAMPLE✓] green, etc., without
@@ -1019,6 +1087,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
                 continue
             payload = dict(r.get("payload") or {})
+
+            # ── Provider-name suffix strip ────────────────────────────────
+            # Some universities embed their own name in H1 elements:
+            #   "Bachelor of Business - Aibi" → "Bachelor of Business"
+            # The course_name extractor handles well-known suffixes (USQ,
+            # Charles Sturt University, etc.) but misses custom short names.
+            # Use the actual uni_name + domain short name for a targeted strip
+            # so course_name is always provider-free before staging.
+            _raw_cn = (payload.get("course_name") or "").strip()
+            if _raw_cn:
+                _clean_cn = _strip_provider_name_from_title(
+                    _raw_cn, uni_name, uni_scrape_url
+                )
+                if _clean_cn != _raw_cn:
+                    payload["course_name"] = _clean_cn
 
             # ── Bug 5: defaultStudyMode config override ───────────────────
             # When a university's scrape_config (or UI override) contains

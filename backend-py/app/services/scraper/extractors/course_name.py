@@ -34,8 +34,17 @@ _ACRONYMS = {
     # "V", "I", "X" are skipped — too likely to be the letter, not a numeral.
 }
 _TITLE_SUFFIX = re.compile(
-    r"\s*[\|\-–—:•]\s*(?:[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy|School)|USQ|CSU|UTS|ANU|UNSW|RMIT|MIT|KBS)\s*$",
-    re.I,
+    # Named-institution suffix: "- Charles Sturt University", "| RMIT"
+    r"\s*[\|\-–—:•]\s*(?:"
+    # Full institutional name ending in a recognisable institution keyword
+    r"[A-Z][A-Za-z& ]{1,40}\s+(?:University|College|Institute|Academy|School)|"
+    # Explicit acronym/short-name list. Case-insensitive match handles
+    # "Aibi" (title-case) and "AIBI" (all-caps) uniformly.
+    # Orchestrator._strip_provider_name_from_title() is the second layer that
+    # catches any short names not in this list using the actual uni_name.
+    r"USQ|CSU|UTS|ANU|UNSW|RMIT|MIT|KBS|AIBI|ACAP|AIT|ASA|VIT|QIBT|SAIBT|PIBT"
+    r")\s*$",
+    re.IGNORECASE,
 )
 _DEGREE_QUAL_IN_TITLE_RE = re.compile(
     r"^\s*(?:master|bachelor|graduate|diploma|certificate|doctor|phd|mba\b|msc\b|bsc\b|bed\b)",

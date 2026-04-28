@@ -13,6 +13,8 @@ from app.services.scraper.guards import (
     should_stage_course,
     should_trust_generic_university_fee_fallback,
 )
+from app.services.scraper.orchestrator import _strip_provider_name_from_title
+from app.services.scraper.extractors.course_name import _clean as _course_name_clean
 
 
 class TestIsGenericCourseCategoryName:
@@ -387,3 +389,71 @@ class TestQualificationCodePrefix:
         assert ok is False, (
             f"{name!r} accepted — bare category names must still be rejected"
         )
+
+
+class TestProviderNameStrip:
+    """AIBI bug: course names must NOT have the university's short name appended.
+
+    Fix has two layers:
+    1. course_name extractor: _TITLE_SUFFIX now includes AIBI, ACAP, AIT, etc.
+       so pages with H1 "Bachelor of Business - AIBI" are cleaned at extraction time.
+    2. orchestrator: _strip_provider_name_from_title() uses uni_name + domain
+       short name to strip any remaining suffix before staging.
+    """
+
+    def test_orchestrator_strip_aibi_title_case(self) -> None:
+        """'Bachelor of Business - Aibi' → 'Bachelor of Business'."""
+        result = _strip_provider_name_from_title(
+            "Bachelor of Business - Aibi", "AIBI", "https://aibi.edu.au/courses"
+        )
+        assert result == "Bachelor of Business"
+
+    def test_orchestrator_strip_aibi_all_caps(self) -> None:
+        """'Bachelor of Cyber Security - AIBI' → 'Bachelor of Cyber Security'."""
+        result = _strip_provider_name_from_title(
+            "Bachelor of Cyber Security - AIBI", "AIBI", "https://aibi.edu.au/courses"
+        )
+        assert result == "Bachelor of Cyber Security"
+
+    def test_orchestrator_strip_long_name(self) -> None:
+        """Long course names with parentheses also stripped correctly."""
+        result = _strip_provider_name_from_title(
+            "Master of Information Technology (Cyber Security) - Aibi",
+            "AIBI",
+            "https://aibi.edu.au/courses",
+        )
+        assert result == "Master of Information Technology (Cyber Security)"
+
+    def test_orchestrator_no_suffix_unchanged(self) -> None:
+        """Course names without a suffix are returned unchanged."""
+        result = _strip_provider_name_from_title(
+            "Master of Business Administration (Digital Transformation)",
+            "AIBI",
+            "https://aibi.edu.au/courses",
+        )
+        assert result == "Master of Business Administration (Digital Transformation)"
+
+    def test_orchestrator_unrelated_suffix_not_stripped(self) -> None:
+        """'Bachelor of Science - Chemistry' must NOT be stripped (Chemistry ≠ AIBI)."""
+        result = _strip_provider_name_from_title(
+            "Bachelor of Science - Chemistry", "AIBI", "https://aibi.edu.au/courses"
+        )
+        assert result == "Bachelor of Science - Chemistry"
+
+    def test_course_name_extractor_strips_aibi_all_caps(self) -> None:
+        """_TITLE_SUFFIX in course_name.py catches '- AIBI' at extraction time."""
+        assert _course_name_clean("Bachelor of Business - AIBI") == "Bachelor of Business"
+
+    def test_course_name_extractor_strips_aibi_title_case(self) -> None:
+        """_TITLE_SUFFIX uses re.IGNORECASE so '- Aibi' is also caught."""
+        assert _course_name_clean("Bachelor of Business - Aibi") == "Bachelor of Business"
+
+    def test_course_name_extractor_strips_pipe_separator(self) -> None:
+        """Pipe separator ('| USQ') already worked, still works after change."""
+        result = _course_name_clean("Graduate Certificate of Business | USQ")
+        assert result == "Graduate Certificate of Business"
+
+    def test_course_name_extractor_does_not_strip_chemistry(self) -> None:
+        """'- Chemistry' is not an institution name — must NOT be stripped."""
+        result = _course_name_clean("Bachelor of Science - Chemistry")
+        assert result == "Bachelor of Science - Chemistry"

@@ -1,0 +1,84 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 23
+[status] [fetch] Fetching https://www.acu.edu.au/study-at-acu/find-a-course...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Crawling from https://www.acu.edu.au/study-at-acu/find-a-course (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] blocked marketing_page: https://www.acu.edu.au/study-at-acu/find-a-course
+[status] [discover] [DISCOVER] Crawl yielded only 0 candidate(s) (< 5); trying sitemap fallback
+[status] [discover] [DISCOVER] sitemap: probing 4 URL(s) at https://www.acu.edu.au
+[status] [discover] [DISCOVER] sitemap: done — 0 unique candidates
+[status] [discover] [DISCOVER] BFS returned 0 links — trying browser-based discovery (handles Cloudflare / JS-heavy sites)...
+[status] [discover] [DISCOVER] Browser: navigating to https://www.acu.edu.au/study-at-acu/find-a-course
+[status] [discover] [DISCOVER] Browser: start page → 6 course links, 50 nav candidates to follow
+[status] [discover] [DISCOVER] Browser: nav https://www.acu.edu.au/study-at-acu/admission-pathways/i-have-completed-military-service → +1 courses (total 7)
+[status] [discover] [DISCOVER] Browser: nav https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study → +2 courses (total 9)
+[status] [discover] [DISCOVER] Browser: nav https://www.acu.edu.au/about-acu/faculties-directorates-and-staff/faculty-of-health-sciences → +1 courses (total 10)
+[status] [discover] [DISCOVER] Browser: discovered 10 course links
+[status] [discover] Discovered 10 candidate course links
+[status] [discover] [CENTRAL] auto-discovered fee page: https://www.acu.edu.au/study-at-acu/fees-and-scholarships/international-student-scholarships
+[status] [discover] [CENTRAL] fee page parsed → 0 program record(s) from https://www.acu.edu.au/study-at-acu/fees-and-scholarships/international-student-scholarships
+[status] [extract] [EXTRACT] gate dropped (marketing_page): Undergraduate study at ACU
+[status] [extract] [EXTRACT] gate dropped (marketing_page): Postgraduate study at ACU
+[status] [extract] [EXTRACT] gate dropped (category_landing_page): Postgraduate study in Health Sciences
+[status] [extract] [EXTRACT] gate dropped 3 non-course candidate(s) — category_landing_page=1, marketing_page=2
+[status] [extract] Extracting course details (7 pages)...
+[status] [extract] [EXTRACT] 1/7: Diploma programs
+[status] [extract] [EXTRACT] 2/7: Admission pathways
+[status] [extract] [EXTRACT] 3/7: Join a research project
+[status] [extract] [EXTRACT] 4/7: Meet our supervisors
+[progress] [extract] Fetching 3/7: Join a research project
+[progress] [extract] Fetching 2/7: Admission pathways
+[progress] [extract] Fetching 1/7: Diploma programs
+[progress] [extract] Fetching 4/7: Meet our supervisors
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/supervisors
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/international-students/english-and-pathway-programs/diploma-programs
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/projects
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/international-students/english-and-pathway-programs/diploma-programs — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://www.acu.edu.au/international-students/english-and-pa → 0 field(s) (cost=$0.000000, in=1426 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/international-students/english-and-pathway-programs/diploma-programs (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:rule url=https://www.acu.edu.au/international-students/english-and-pathway-programs/diploma-programs
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/projects — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [EXTRACT] 5/7: Graduate Certificate in Business Administration-Online
+[status] [extract] [GEMINI] https://www.acu.edu.au/research-and-enterprise/graduate-rese → 0 field(s) (cost=$0.000000, in=1398 out=0)
+[progress] [extract] Fetching 5/7: Graduate Certificate in Business Administration-Online
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/projects (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/supervisors — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Ballarat, Blacktown, Brisbane, Canberra, Melbourne, North Sydney or Strathfield |' method=study_mode:location_derived url=https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/projects
+[status] [extract] [GEMINI] https://www.acu.edu.au/research-and-enterprise/graduate-rese → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[status] [extract] [EXTRACT] 6/7: Joint PhDs
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/supervisors (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[progress] [extract] Fetching 6/7: Joint PhDs
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:location_derived url=https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/supervisors
+[status] [extract] [EXTRACT] 7/7: Industry opportunities
+[progress] [extract] Fetching 7/7: Industry opportunities
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://www.acu.edu.au/research-and-enterprise/graduate-rese → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:location_derived url=https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/joint-phds
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online
+[status] [fallback] [per-course browser ↻] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/industry-engagement
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/joint-phds — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://www.acu.edu.au/research-and-enterprise/graduate-rese → 0 field(s) (cost=$0.000000, in=1399 out=0)
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/joint-phds (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:location_derived url=https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/research-degrees/joint-phds
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/industry-engagement — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[status] [extract] [GEMINI] https://www.acu.edu.au/research-and-enterprise/graduate-rese → 0 field(s) (cost=$0.000000, in=1397 out=0)
+[status] [fallback] [per-course browser ✓] https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online — IELTS=— PTE=— TOEFL=— CAE=— fee=8696 filled=[]
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/industry-engagement (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GEMINI] https://www.acu.edu.au/course/graduate-certificate-in-busine → 0 field(s) (cost=$0.000000, in=3480 out=0)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:location_derived url=https://www.acu.edu.au/research-and-enterprise/graduate-research-school/study/industry-engagement
+[status] [extract] [FALLBACK] AI enriching https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat' method=study_mode:rule url=https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online
+[status] [stage] [STAGE] saved: Diploma Programs
+[status] [stage] [STAGE] skipped Research Degrees: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Scholarship-supported Research Projects: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Graduate Research Supervisors: rejected: category_landing_page
+[status] [stage] [STAGE] saved: Graduate Certificate in Business Administration | Acu Online Courses
+[status] [stage] [STAGE] skipped Joint Phds: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Industry Engagement: rejected: category_landing_page
+[status] [complete] [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[status] [complete] [TIMING] Total: 4m 22s | Courses: 2 | Avg: 131.0s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:10 | Staged:2 | Skipped:5 | Errors:0
+[status] [complete] Staged 2 courses, 5 skipped, 0 fetch errors

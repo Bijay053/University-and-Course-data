@@ -1,0 +1,70 @@
+ACU scraper is discovering wrong pages and staging non course pages.
+
+From latest run:
+
+Wrong course title saved
+
+Current:
+Graduate Certificate in Business Administration | Acu Online Courses
+
+Correct:
+Graduate Certificate in Business Administration
+
+Remove page title suffixes like:
+| ACU Online Courses
+| ACU
+| Online Courses
+
+Online course marked as On Campus
+
+This course URL clearly says online:
+https://www.acu.edu.au/course/graduate-certificate-in-business-administration-online
+
+But scraper saved:
+
+Mode: On Campus
+Location: Sydney, Melbourne, Brisbane, Canberra, Townsville, Ballarat
+
+This is wrong. Do not derive campus locations from global ACU footer or generic location text. If URL/title contains “online” and page does not show campus delivery, mode should be Online and course should be skipped if we only want on campus courses.
+
+Non course page saved
+
+The scraper saved:
+Diploma Programs
+
+This is not a single course. It is a category or pathway page. Do not stage pages with generic titles like:
+Diploma Programs
+Admission pathways
+Join a research project
+Meet our supervisors
+Joint PhDs
+Industry opportunities
+
+Discovery issue
+
+The crawler is picking research, supervisor, admission pathway and marketing pages as course candidates. It should only include URLs under real course detail pattern:
+
+/course/{course-slug}
+
+Not:
+/research-and-enterprise/...
+/international-students/english-and-pathway-programs/...
+/study-at-acu/admission-pathways/...
+
+Fee issue
+
+Fee was extracted for the online course, but since this course is online only, it should not be staged as on campus.
+
+Required fixes
+
+Add stronger validation before staging:
+
+must have a proper course title
+must be individual course page, not category page
+must not have title suffix from browser title
+mode must come from course detail section only
+do not use global campus list as location
+online only courses should be skipped or marked online, not saved as on campus
+
+Main issue:
+ACU scraper is scraping navigation and marketing pages, then using global ACU campus names to fill missing locations. This creates fake on campus courses.
