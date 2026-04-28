@@ -755,7 +755,40 @@ async def extract_course(
     # students" only in JS-rendered content (a disabled tab, a warning
     # banner loaded via XHR).  The static-HTML check above misses these.
     # Re-run the same test against the rendered HTML when we have it.
-    if not payload.get("domestic_only") and rendered_html and _is_domestic_only_page(rendered_html):
+    #
+    # Skip this check when the evidence already proves the page is
+    # international — two independent signals are sufficient:
+    #
+    #  (A) URL contains an explicit international-student query parameter
+    #      (e.g. UOW ?students=international, Monash ?intlFees=1).  The
+    #      site's own URL routing is a stronger signal than any phrase in
+    #      the rendered DOM, which may contain inactive domestic-tab markup.
+    #
+    #  (B) The per-course browser just extracted BOTH a fee AND an English
+    #      score — this is only possible on a page that actually displays
+    #      international student data, so a domestic-only flag would be a
+    #      false positive.
+    _url_signals_international = bool(
+        _re.search(
+            r"[?&](students|studenttype|student_type|intlfees|international)=international",
+            url,
+            _re.IGNORECASE,
+        )
+    )
+    _browser_confirmed_intl = bool(
+        payload.get("international_fee") and (
+            payload.get("ielts_overall")
+            or payload.get("pte_overall")
+            or payload.get("toefl_overall")
+        )
+    )
+    if (
+        not payload.get("domestic_only")
+        and rendered_html
+        and _is_domestic_only_page(rendered_html)
+        and not _url_signals_international
+        and not _browser_confirmed_intl
+    ):
         payload["domestic_only"] = True
         await emit(
             "status",
