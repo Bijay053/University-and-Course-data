@@ -362,8 +362,11 @@ async def _extended_extract(
                 evidence.append({
                     "field_key": k,
                     "value": v,
+                    # enforce_source_evidence checks for "source_url" AND "snippet"
+                    # (not "source_text") — both must be non-empty or the field is
+                    # dropped from the payload before staging.
                     "source_url": url,
-                    "source_text": (r.snippet or "")[:240],
+                    "snippet": (r.snippet or f"browser-rendered: {k}={v}")[:240],
                     "confidence": min(1.0, (r.confidence or 0.6) + 0.05),
                     "method": "per_course_browser_extended",
                 })
