@@ -1,0 +1,62 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Apr 28 22:46:00 UTC 2026
+
+  System load:           0.26
+  Usage of /:            3.5% of 231.44GB
+  Memory usage:          15%
+  Swap usage:            0%
+  Processes:             182
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+  => There are 2 zombie processes.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Tue Apr 28 14:04:03 2026 from 162.243.190.66
+root@university-and-course-data:~# cd /path/to/repo && git pull origin main
+
+# Apply the new DB column
+sudo -u postgres psql -d university_portal -c \
+  "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS has_central_fee_page BOOLEAN NOT NULL DEFAULT FALSE;"
+
+# Restart services
+sudo systemctl restart uni-api-py uni-celery
+-bash: cd: /path/to/repo: No such file or directory
+ALTER TABLE
+root@university-and-course-data:~# cd /root/University-and-Course-data && git pull origin main && sudo systemctl restart uni-api-py uni-celery
+remote: Enumerating objects: 81, done.
+remote: Counting objects: 100% (81/81), done.
+remote: Compressing objects: 100% (59/59), done.
+remote: Total 59 (delta 48), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (59/59), 9.07 KiB | 442.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   ed333ac..588f387  main       -> origin/main
+Updating ed333ac..588f387
+error: Your local changes to the following files would be overwritten by merge:
+        backend-py/app/services/scraper/per_course_vision.py
+Please commit your changes or stash them before you merge.
+Aborting
+root@university-and-course-data:~/University-and-Course-data# find / -name "uni-api-py.service" 2>/dev/null | head -3
+# or
+find /root /home /opt /srv -name "orchestrator.py" 2>/dev/null | head -3
+/etc/systemd/system/multi-user.target.wants/uni-api-py.service
+/etc/systemd/system/uni-api-py.service
+/sys/fs/cgroup/system.slice/uni-api-py.service
+/root/University-and-Course-data/backend-py/app/services/scraper/orchestrator.py
+root@university-and-course-data:~/University-and-Course-data# 
