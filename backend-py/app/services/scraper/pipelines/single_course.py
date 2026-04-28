@@ -1817,12 +1817,17 @@ async def extract_course(
             _is_bachelor_master = any(x in _degree_l for x in ("bachelor", "master", "honours"))
             _SUSPICIOUS_MAX = 7.0 if _is_bachelor_master else 12.0
             if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25:
+                # Nullify the value so bad data never reaches staging.
+                # A missing duration is better than a wrong one — operators
+                # can fill it via the review UI; a wrong value propagates silently.
+                payload["duration"] = None
+                payload["duration_term"] = None
                 if "suspicious_duration" not in _scrape_warnings:
                     _scrape_warnings.append("suspicious_duration")
                 if emit:
                     await emit(
                         "status",
-                        f"[WARN] {payload.get('course_name','?')[:40]} — Suspicious duration: {_dur_val} {_dur_term} ({_dur_years:.1f} yrs)",
+                        f"[NULLIFIED] {payload.get('course_name','?')[:40]} — duration {_dur_val} {_dur_term} ({_dur_years:.1f} yrs) exceeds sanity limit; cleared",
                         phase="extract",
                         kind="scrape_warning",
                         warning="suspicious_duration",
