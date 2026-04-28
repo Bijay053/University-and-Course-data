@@ -708,7 +708,7 @@ async def extract_course(
         from app.services.scraper.per_course_vision import maybe_vision_refetch
 
         vision_filled, vision_evidence = await maybe_vision_refetch(
-            url, rendered_html, payload, emit=emit,
+            url, rendered_html or html, payload, emit=emit,
             image_cache=vision_image_cache,
         )
         for k, v in vision_filled.items():
@@ -1330,7 +1330,7 @@ async def extract_course(
                     _slot_methods.setdefault(_fk, set()).add(_meth)
 
             _cleared: list[str] = []
-            for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall"):
+            for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall"):
                 if payload.get(_slot) not in (None, "", 0):
                     # Keep vision-OCR-sourced values — they are per-course reliable
                     if _slot_methods.get(_slot, set()) & _PER_COURSE_VISION_METHODS:

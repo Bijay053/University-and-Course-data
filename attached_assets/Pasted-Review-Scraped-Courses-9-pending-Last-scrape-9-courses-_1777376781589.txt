@@ -1,0 +1,86 @@
+Review Scraped Courses
+9 pending
+Last scrape: 9 courses staged in 4m 14s • Started 2026-04-28 11:25 UTC
+
+Reject (9)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Master of Information Technology (Software Application Development)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$52,800/Full Course		-	-	-	100	Jan, Apr, Jul, Oct	Sydney, Australia	On Campus	
+
+
+
+	
+Master of Information Technology (Artificial Intelligence)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$52,800/Full Course		-	-	-	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Information Technology (Cyber Security)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$52,800/Full Course		-	-	-	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Master of Project Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$52,800/Full Course		-	-	-	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$58,080/Full Course	6	50	60	169	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$58,080/Full Course	6	50	60	169	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business Technology Management
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$58,080/Full Course	6	50	60	169	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business Hospitality Management
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$58,080/Full Course	6	50	60	169	100	Jan, Apr, Jul, Oct	Sydney	On Campus	
+
+
+
+	
+Bachelor of Business International Business
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$58,080/Full Course	6	50	60	169	100	Jan, Apr, Jul, Oct	Sydney

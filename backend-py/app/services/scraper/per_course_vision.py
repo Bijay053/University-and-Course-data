@@ -49,6 +49,7 @@ _ENGLISH_OVERALL_SLOTS: Final = (
     "pte_overall",
     "toefl_overall",
     "cambridge_overall",
+    "duolingo_overall",
 )
 
 # Output-filter slots — superset of overall + sub-bands. Vision results

@@ -1,0 +1,93 @@
+Worker claimed queued scrape job
+Cleared 9 stale pending/rejected scraped_courses rows (>10m old) for university 2
+Fetching https://www.asahe.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing found at https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Crawling from https://www.asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] Page 1/25: +9 candidates (total 9) — https://www.asahe.edu.au/our-courses/courses-grid-view
+Discovered 9 candidate course links
+Loaded uni-level PDF data: fee=yes english=yes
+[CENTRAL] fee page parsed → 0 program record(s) from http://asahe.edu.au/fees-and-charges
+[CENTRAL] english page parsed → no values from http://asahe.edu.au/policies-and-forms
+Extracting course details (9 pages)...
+[EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT] 4/9: Bachelor of Business
+Fetching 2/9: Bachelor of Business Hospitality Management
+Fetching 3/9: Bachelor of Business Technology Management
+Fetching 1/9: Bachelor of Business International Business
+Fetching 4/9: Bachelor of Business
+[per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-business
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — moving on
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — moving on
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-techno → 0 field(s) (cost=$0.000000, in=2995 out=0)
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/bachelor-of-business-international-business — moving on
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-hospit → 0 field(s) (cost=$0.000000, in=2945 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-intern → 0 field(s) (cost=$0.000000, in=2945 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business Technology Manageme → Business & Management / Technology Management
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[EXTRACT] 5/9: Bachelor of Professional Accounting
+[CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[EXTRACT] 6/9: Master of Project Management
+Fetching 5/9: Bachelor of Professional Accounting
+[EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+Fetching 6/9: Master of Project Management
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/bachelor-of-business — moving on
+Fetching 7/9: Master of Information Technology (Cyber Security)
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business → 0 field(s) (cost=$0.000000, in=3161 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+[per-course browser ↻] https://www.asahe.edu.au/courses/master-of-project-management
+[per-course browser ↻] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — moving on
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — moving on
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/master-of-project-management — moving on
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-professional-ac → 0 field(s) (cost=$0.000000, in=3315 out=0)
+[GEMINI] https://www.asahe.edu.au/courses/master-of-project-managemen → 0 field(s) (cost=$0.000000, in=3285 out=0)
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=3385 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[PG-SKIP ✗] Master of Project Management — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall (no level-keyed data from browser)
+[PG-SKIP ✗] Master of Information Technology (Cyber — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall (no level-keyed data from browser)
+[EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+[CATEGORY det] Master of Project Management → Business & Management / Project Management
+[CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+Fetching 9/9: Master of Information Technology (Software Application Development)
+[per-course browser ↻] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — moving on
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=3439 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[PG-SKIP ✗] Master of Information Technology (Artifi — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — moving on
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=2838 out=0)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[PG-SKIP ✗] Master of Information Technology (Softwa — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Software Engineering
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_overall=6.0 pte_overall=50.0 toefl_overall=60.0
+[STAGE] saved: Bachelor of Business International Business
+[STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE] saved: Bachelor of Business Technology Management
+[STAGE] saved: Bachelor of Business
+[STAGE] saved: Bachelor of Professional Accounting
+[STAGE] saved: Master of Project Management
+[STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE] saved: Master of Information Technology (Software Application Development)
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 4m 14s | Courses: 9 | Avg: 28.2s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+Staged 9 courses, 0 skipped, 0 fetch errors
