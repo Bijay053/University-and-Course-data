@@ -105,6 +105,19 @@ def _looks_marketing(text: str) -> bool:
     return len(t.split()) > 16
 
 
+def _is_only_delivery_method(text: str) -> bool:
+    """True when ``text`` reduces to nothing once delivery-method words
+    (online / virtual / remote / external / ...) and punctuation are
+    stripped.  Defence in depth so a location field never gets saved as
+    "Online" / "External" / "Online, Distance" / etc.
+    """
+    if not text:
+        return True
+    stripped = _REMOVE_VIRTUAL.sub("", text)
+    stripped = re.sub(r"[\s,;/&\-–—]+", "", stripped).strip()
+    return not stripped
+
+
 def _normalise(raw: str | None) -> str | None:
     if not raw:
         return None
@@ -120,6 +133,12 @@ def _normalise(raw: str | None) -> str | None:
     # these appear as ECU-style pivot-table column headers and must never be
     # returned as a campus location.
     if _PERIOD_LABEL_RE.match(head):
+        return None
+    # Phase A.5 — never accept a value that is only delivery-method
+    # words.  Stops "Online" / "External" / "Online, Distance" / etc.
+    # from being saved as a course location even if a future cascade
+    # method bypasses the _sanitise_for_display strip.
+    if _is_only_delivery_method(head):
         return None
     return head[:120]
 

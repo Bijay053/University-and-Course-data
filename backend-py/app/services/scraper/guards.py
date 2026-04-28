@@ -424,11 +424,64 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     ("/open-day",               "marketing_page"),
     ("/info-night",             "marketing_page"),
     ("/why-",                   "marketing_page"),
+    # Phase A.5 — pre-extraction reinforcements (user-reported leaks):
+    # marketing prefixes used to brand whole sub-sites that show every
+    # programme but are themselves not a single course.
+    ("/study-at-",              "marketing_page"),  # /study-at-uow, /study-at-une-online
+    ("/study-online/",          "category_landing_page"),
+    ("/study-with-us",          "marketing_page"),
+    # Pathway / preparation hub URLs (these are college pages, not real
+    # university degree pages).
+    ("/pathways-to-uni",        "pathway_page"),
+    ("/pathways-program",       "pathway_page"),
+    ("/pathway-program",        "pathway_page"),
+    ("/college/",               "pathway_page"),
+    # User UI surfaces inside the public site (saved/compare/favourites
+    # are session-state pages, never a course detail).
+    ("/saved-courses",          "ui_page"),
+    ("/favourites",             "ui_page"),
+    ("/favorites",              "ui_page"),
+    # Marketing widgets
+    ("/webinar",                "marketing_page"),
+    # Audience hubs (year-12, mature-age, parents — already partially
+    # blocked via /information-for/ in discovery; included here so the
+    # single source of truth knows about them too).
+    ("/year-12-entry",          "info_page"),
+    ("/year-12",                "info_page"),
+    ("/mature-age-students",    "info_page"),
+    ("/high-school-students",   "info_page"),
+    ("/parents-and-guardians",  "info_page"),
+    # Standalone test-info pages
+    ("/stat-test",              "info_page"),
 )
+
+# URL last-segment exact matches.  Used in addition to the substring list
+# above when we must NOT accidentally match a course slug containing the
+# same word (e.g. "/undergraduate-study" would substring-match both the
+# category page and a hypothetical "/courses/undergraduate-study-tips").
+# Compared against the path's last segment with trailing slash stripped.
+_BLOCK_URL_LAST_SEGMENTS: dict[str, str] = {
+    "undergraduate-study":      "category_landing_page",
+    "postgraduate-study":       "category_landing_page",
+    "study-online":             "category_landing_page",
+    "online-study":             "category_landing_page",
+    "online-courses":           "category_landing_page",
+    "double-degrees":           "category_landing_page",
+    "new-degrees":              "category_landing_page",
+    "english-language-programs": "pathway_page",
+    "english-language":         "pathway_page",
+    "saved-courses":            "ui_page",
+    "favourites":               "ui_page",
+    "favorites":                "ui_page",
+    "compare":                  "ui_page",
+    "webinars":                 "marketing_page",
+    "webinar":                  "marketing_page",
+    "stat":                     "info_page",
+}
 
 # Title prefix matches.  Lowercased and stripped before comparison, so
 # "Fees and Scholarships | UTAS" → "fees and scholarships" matches the
-# "fees and " prefix below.
+# "fees and " prefix below.  Order doesn't matter — first match wins.
 _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("apply now",                       "apply_page"),
     ("how to apply",                    "apply_page"),
@@ -444,24 +497,129 @@ _BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("contact",                         "contact_page"),
     ("about us",                        "about_page"),
     ("testimonials",                    "testimonials_page"),
+    # Phase A.5 — pre-extraction title gate (user-reported leaks).
+    # Real degree titles always start with a degree qualifier (Bachelor,
+    # Master, MBA, Diploma, Certificate, ...).  None of the patterns
+    # below can accidentally match a real course title.
+    ("study online",                    "category_landing_page"),
+    ("study at ",                       "marketing_page"),  # "Study at UOW", "Study at UNE"
+    # NOTE: do NOT add bare "undergraduate" / "postgraduate" prefixes —
+    # those would wrongly block real award titles like "Undergraduate
+    # Certificate of Psychology Fundamentals" and "Postgraduate Diploma
+    # of Counselling".  We instead match the specific category-landing
+    # phrasings and rely on _BLOCK_TITLE_EXACT for the bare nav items
+    # ("Undergraduate" / "Postgraduate" alone, with no following word).
+    ("undergraduate study",             "category_landing_page"),  # "Undergraduate study"
+    ("undergraduate degrees",           "category_landing_page"),
+    ("undergraduate courses",           "category_landing_page"),
+    ("undergraduate programs",          "category_landing_page"),
+    ("undergraduate programmes",        "category_landing_page"),
+    ("postgraduate study",              "category_landing_page"),  # "Postgraduate study"
+    ("postgraduate degrees",            "category_landing_page"),
+    ("postgraduate courses",            "category_landing_page"),
+    ("postgraduate programs",           "category_landing_page"),
+    ("postgraduate programmes",         "category_landing_page"),
+    ("graduate study",                  "category_landing_page"),
+    ("research study",                  "category_landing_page"),
+    ("higher degree by research",       "category_landing_page"),
+    ("higher degrees by research",      "category_landing_page"),
+    ("pathways to ",                    "pathway_page"),       # "Pathways to uni"
+    ("pathway to ",                     "pathway_page"),
+    ("pathway program",                 "pathway_page"),
+    ("pathways program",                "pathway_page"),
+    ("english language program",        "pathway_page"),       # "English Language Programs"
+    ("foundation program",              "pathway_page"),
+    ("saved course",                    "ui_page"),            # "Saved courses"
+    ("favourite",                       "ui_page"),            # "Favourites" / "Favourite course"
+    ("favorite",                        "ui_page"),            # US spelling
+    ("compare course",                  "ui_page"),
+    ("webinar",                         "marketing_page"),     # "Webinar(s)"
+    ("year 12",                         "info_page"),          # "Year 12 entry"
+    ("year 11",                         "info_page"),
+    ("why ",                            "marketing_page"),     # "Why study", "Why choose UNE"
+    ("explore courses",                 "category_landing_page"),
+    ("browse courses",                  "category_landing_page"),
+    ("our courses",                     "category_landing_page"),
+    ("study area",                      "category_landing_page"),  # "Study area" / "Study areas"
+    ("subject area",                    "category_landing_page"),
+    ("information for",                 "info_page"),          # "Information for international students"
+    ("how it works",                    "info_page"),
+    ("open day",                        "marketing_page"),
+    ("info night",                      "marketing_page"),
+    ("information session",             "marketing_page"),
 )
+
+# Title exact matches (full-string equals).  Use sparingly — only for
+# acronyms / short words that would generate too many false positives if
+# matched as a prefix (e.g. "stat" must NOT match "Statistics").
+_BLOCK_TITLE_EXACT: frozenset[str] = frozenset({
+    # Standalone admissions / test acronyms
+    "stat",
+    "saq",
+    "uac",
+    "qtac",
+    "vtac",
+    "tisc",
+    "satac",
+    "atar",
+    # Bare nav labels — full-string equals only so award titles like
+    # "Undergraduate Certificate of Psychology Fundamentals" or
+    # "Postgraduate Diploma of Counselling" are NEVER blocked.
+    "undergraduate",
+    "postgraduate",
+    "graduate",
+    "research",
+    "study",
+    "courses",
+    "programs",
+    "programmes",
+    "degrees",
+})
+
+
+def _last_path_segment(path: str) -> str:
+    """Return the last non-empty segment of a URL path, lowercased.
+
+    Examples
+    --------
+    >>> _last_path_segment("/study/degrees-and-courses/undergraduate-study")
+    'undergraduate-study'
+    >>> _last_path_segment("/saved-courses/")
+    'saved-courses'
+    """
+    p = (path or "").rstrip("/")
+    if not p:
+        return ""
+    return p.rsplit("/", 1)[-1]
 
 
 def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, str]:
     """Return ``(True, reason)`` when this URL/title is definitely not a
     course detail or course listing page; ``(False, "")`` otherwise.
 
-    Phase A safety net.  Callers:
+    Phase A safety net (extended in A.5 — pre-extraction gate).  Callers:
       * Discovery BFS — skip the URL before enqueuing it.
+      * Orchestrator — drop the candidate before extraction starts.
       * Staging gate — refuse to stage a course whose ``source_url`` is
-        on the blocklist (defence in depth: discovery should have caught
-        it, but a regression there must not silently publish bad data).
+        on the blocklist (defence in depth).
 
-    The function is **conservative**: only patterns that we know with
-    100% confidence are non-course pages are listed.  Generic words
-    appearing inside a real course slug (e.g. ``/bachelor-of-arts-and-
-    contact-with-society``) will not match any substring here because
-    every pattern includes its leading slash.
+    Three-pass URL check (cheapest first):
+
+      1. Substring match anywhere in path (``_BLOCK_URL_SUBSTRINGS``).
+      2. Last-segment exact match (``_BLOCK_URL_LAST_SEGMENTS``).
+         Stricter than substring — avoids accidentally matching a real
+         course slug that contains the same word elsewhere.
+
+    Two-pass title check:
+
+      3. Exact match on the normalised title (``_BLOCK_TITLE_EXACT``).
+      4. Prefix match on the normalised title (``_BLOCK_TITLE_PREFIXES``).
+
+    The function is **conservative**: every pattern is one we have
+    confirmed in production logs as a non-course page.  Generic words
+    inside a real course slug (e.g. ``/bachelor-of-arts-and-contact-
+    with-society``) won't match any substring because every URL pattern
+    includes its leading slash.
     """
     if url:
         try:
@@ -469,9 +627,14 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
         except Exception:  # noqa: BLE001 — malformed URL → no URL signal
             path = ""
         if path:
+            # Pass 1: substring match
             for pat, reason in _BLOCK_URL_SUBSTRINGS:
                 if pat in path:
                     return (True, reason)
+            # Pass 2: last-segment exact match (stricter than substring)
+            last = _last_path_segment(path)
+            if last and last in _BLOCK_URL_LAST_SEGMENTS:
+                return (True, _BLOCK_URL_LAST_SEGMENTS[last])
 
     if title:
         norm_title = re.sub(r"\s+", " ", title).strip().lower()
@@ -479,6 +642,10 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
         # still matches the "apply now" prefix.
         if "|" in norm_title:
             norm_title = norm_title.split("|", 1)[0].strip()
+        # Pass 3: exact match
+        if norm_title in _BLOCK_TITLE_EXACT:
+            return (True, "info_page")
+        # Pass 4: prefix match
         for pfx, reason in _BLOCK_TITLE_PREFIXES:
             if norm_title.startswith(pfx):
                 return (True, reason)

@@ -147,6 +147,233 @@ def test_title_does_not_block_real_course():
 
 
 # ---------------------------------------------------------------------------
+# Phase A.5 — pre-extraction gate (user-reported leaks: Pathways to uni,
+# Saved courses, Study online, Webinars, Year 12 entry, STAT, Study at UOW)
+# ---------------------------------------------------------------------------
+
+def test_blocks_undergraduate_postgraduate_landing_urls():
+    """Last-segment match: /undergraduate-study, /postgraduate-study."""
+    cases = [
+        ("https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international",
+         "category_landing_page"),
+        ("https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study",
+         "category_landing_page"),
+    ]
+    for url, expect in cases:
+        b, r = is_blocked_page(url)
+        assert b is True, f"{url} should be blocked"
+        assert r == expect, f"{url} expected {expect} got {r}"
+
+
+def test_blocks_study_online_and_pathway_urls():
+    cases = [
+        ("https://www.unisq.edu.au/study/degrees-and-courses/study-online",
+         "category_landing_page"),
+        ("https://www.unisq.edu.au/study/pathways-to-uni",
+         "pathway_page"),
+        ("https://www.uow.edu.au/study-at-uow", "marketing_page"),
+        ("https://www.uow.edu.au/study-online/", "category_landing_page"),
+    ]
+    for url, expect in cases:
+        b, r = is_blocked_page(url)
+        assert b is True, f"{url} should be blocked"
+        assert r == expect, f"{url} expected {expect} got {r}"
+
+
+def test_blocks_user_ui_pages():
+    """Saved courses, favourites, compare — these are session UI pages."""
+    cases = [
+        ("https://www.uni.edu.au/saved-courses",  "ui_page"),
+        ("https://www.uni.edu.au/favourites",     "ui_page"),
+        ("https://www.uni.edu.au/favorites",      "ui_page"),
+    ]
+    for url, expect in cases:
+        b, r = is_blocked_page(url)
+        assert b is True, f"{url} should be blocked"
+        assert r == expect
+
+
+def test_blocks_webinar_and_year12_urls():
+    cases = [
+        ("https://www.uni.edu.au/webinars",        "marketing_page"),
+        ("https://www.uni.edu.au/webinar",         "marketing_page"),
+        ("https://www.uni.edu.au/study/year-12-entry", "info_page"),
+        ("https://www.uni.edu.au/year-12",         "info_page"),
+        ("https://www.uni.edu.au/stat-test",       "info_page"),
+    ]
+    for url, expect in cases:
+        b, r = is_blocked_page(url)
+        assert b is True, f"{url} should be blocked"
+        assert r == expect
+
+
+def test_blocks_pathways_to_uni_title():
+    """Title gate catches the user's #1 reported leak."""
+    for title, expect in [
+        ("Pathways to uni",         "pathway_page"),
+        ("Pathways to UNE",         "pathway_page"),
+        ("Undergraduate study",     "category_landing_page"),
+        ("Postgraduate study",      "category_landing_page"),
+        ("Undergraduate degrees",   "category_landing_page"),
+        ("Postgraduate courses",    "category_landing_page"),
+        ("Undergraduate programs",  "category_landing_page"),
+        ("Postgraduate programmes", "category_landing_page"),
+        ("Study online",            "category_landing_page"),
+        ("Study at UOW",            "marketing_page"),
+        ("Saved courses",           "ui_page"),
+        ("Favourites",              "ui_page"),
+        ("Favorites",               "ui_page"),
+        ("Webinars",                "marketing_page"),
+        ("Webinar",                 "marketing_page"),
+        ("Year 12 entry",           "info_page"),
+        ("Why study at UNE",        "marketing_page"),
+        ("Why choose UOW",          "marketing_page"),
+        ("Explore courses",         "category_landing_page"),
+        ("Browse courses",          "category_landing_page"),
+        ("Our courses",             "category_landing_page"),
+        ("Study areas",             "category_landing_page"),
+        ("Information for international students", "info_page"),
+    ]:
+        b, r = is_blocked_page(
+            "https://www.uni.edu.au/courses/something-real",
+            title=title,
+        )
+        assert b is True, f"title {title!r} should be blocked"
+        assert r == expect, f"title {title!r}: expected {expect} got {r}"
+
+
+def test_blocks_bare_undergraduate_postgraduate_nav_titles():
+    """Bare 'Undergraduate' / 'Postgraduate' (alone, no degree word after)
+    are nav labels and must be blocked — but ONLY as exact matches so that
+    real award titles that begin with 'Undergraduate' / 'Postgraduate' are
+    not wrongly rejected (see test_does_not_block_undergrad_postgrad_award_titles).
+    """
+    for title in [
+        "Undergraduate",
+        "Postgraduate",
+        "Graduate",
+        "Research",
+        "Courses",
+        "Programs",
+        "Degrees",
+    ]:
+        b, r = is_blocked_page(
+            "https://www.uni.edu.au/study/something",
+            title=title,
+        )
+        assert b is True, f"bare nav title {title!r} should be blocked"
+
+
+def test_does_not_block_undergrad_postgrad_award_titles():
+    """REGRESSION GUARD (architect-flagged false positive): legitimate
+    award titles that START with 'Undergraduate' / 'Postgraduate' must
+    NOT be blocked.  These are real degrees from UniSQ / UNE / UOW.
+    """
+    for title in [
+        "Undergraduate Certificate of Psychology Fundamentals",
+        "Undergraduate Certificate in Data Analytics",
+        "Postgraduate Diploma of Counselling",
+        "Postgraduate Diploma in Education",
+        "Postgraduate Certificate in Business Administration",
+        "Postgraduate Certificate of Public Health",
+        "Graduate Certificate of Public Health",
+        "Graduate Diploma in Information Technology",
+        "Graduate Certificate in Business",
+    ]:
+        b, r = is_blocked_page(
+            "https://www.uni.edu.au/courses/some-slug",
+            title=title,
+        )
+        assert b is False, f"award title {title!r} wrongly blocked: {r}"
+
+
+def test_blocks_stat_exact_title_only():
+    """STAT must only match exact 'STAT' — never 'Statistics' or 'Master of Statistics'."""
+    # Exact match: blocked
+    b, r = is_blocked_page("https://www.uni.edu.au/info/x", title="STAT")
+    assert b is True, "exact 'STAT' should be blocked"
+    assert r == "info_page"
+    # Prefix-only: NOT blocked (statistics is a real degree)
+    b, r = is_blocked_page(
+        "https://www.uni.edu.au/courses/master-of-statistics",
+        title="Master of Statistics",
+    )
+    assert b is False, "Master of Statistics must NOT be blocked"
+    b, r = is_blocked_page(
+        "https://www.uni.edu.au/courses/bachelor-of-statistics",
+        title="Statistics",
+    )
+    assert b is False, "Statistics title must NOT be blocked"
+
+
+def test_real_courses_not_blocked_by_phase_a5():
+    """Regression guard: every Phase A.5 pattern must let real degrees through."""
+    real_course_titles = [
+        "Bachelor of Arts",
+        "Master of Public Health",
+        "Bachelor of Engineering (Honours)",
+        "Master of Business Administration",
+        "Graduate Certificate of Public Health",
+        "Doctor of Philosophy",
+        "MBA",
+        "Master of Statistics",
+        "Bachelor of Computer Science",
+        "Diploma of Nursing",
+    ]
+    for title in real_course_titles:
+        b, r = is_blocked_page(
+            "https://www.uni.edu.au/courses/some-slug",
+            title=title,
+        )
+        assert b is False, f"real course title {title!r} wrongly blocked: {r}"
+
+
+def test_real_course_urls_not_blocked_by_phase_a5():
+    """Real course detail URLs that contain words like 'study' or 'graduate'
+    in legitimate contexts must pass through."""
+    real_urls = [
+        "https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-arts",
+        "https://www.uow.edu.au/degrees/master-of-public-health/",
+        "https://www.flinders.edu.au/study/courses/graduate-diploma-in-counselling",
+        "https://www.une.edu.au/study/courses/master-of-engineering",
+    ]
+    for url in real_urls:
+        b, r = is_blocked_page(url)
+        assert b is False, f"real course URL {url} wrongly blocked: {r}"
+
+
+# ---------------------------------------------------------------------------
+# location._normalise — never accept delivery-method-only values
+# ---------------------------------------------------------------------------
+
+def test_location_rejects_delivery_method_only_values():
+    from app.services.scraper.extractors.location import _normalise
+    for raw in [
+        "Online",
+        "External",
+        "Online, External",
+        "Distance learning",
+        "Remote",
+        "Off-campus",
+        "Online, Distance, External",
+        "Virtual",
+    ]:
+        assert _normalise(raw) is None, f"{raw!r} should be rejected as delivery-only"
+
+
+def test_location_keeps_real_campus_names():
+    from app.services.scraper.extractors.location import _normalise
+    for raw, expect in [
+        ("Toowoomba",                     "Toowoomba"),
+        ("Springfield, Toowoomba",        "Springfield, Toowoomba"),
+        ("Sydney, Online",                "Sydney, Online"),  # mixed — kept; Online stripped at display
+        ("Bedford Park, City",            "Bedford Park, City"),
+    ]:
+        out = _normalise(raw)
+        assert out == expect, f"{raw!r}: expected {expect!r} got {out!r}"
+
+
+# ---------------------------------------------------------------------------
 # enforce_source_evidence — drops critical fields without source proof
 # ---------------------------------------------------------------------------
 
