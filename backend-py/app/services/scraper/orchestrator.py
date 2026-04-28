@@ -825,6 +825,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         "https://www.uow.edu.au/study/apply/english-requirements/"
                     )
 
+            # Bond University: fees and IELTS are JS-rendered (XHR-loaded) so
+            # Playwright and Gemini both see empty content for those fields.
+            # Bond publishes a stable central English-requirements page that we
+            # can hard-code here — same pattern as UOW above.  Without this,
+            # every Bond course stages with blank IELTS/PTE/TOEFL values.
+            if _scrape_host_eff in ("bond.edu.au", "www.bond.edu.au"):
+                _bond_pages = effective_config.setdefault("uniPages", {})
+                if not _bond_pages.get("entryPage") and not _bond_pages.get("requirementsPage"):
+                    _bond_pages["entryPage"] = (
+                        "https://bond.edu.au/international-students/"
+                        "english-language-requirements"
+                    )
+
             # ── Priority 1: request-body overrides (UI Advanced fields) ─────
             # The router stores these in job.request_payload so the orchestrator
             # can apply them without touching the persistent scrape_config.
