@@ -28,9 +28,22 @@ log = logging.getLogger(__name__)
 
 _ENGLISH_SLOTS: Final = (
     "ielts_overall",
+    "ielts_listening",
+    "ielts_reading",
+    "ielts_writing",
+    "ielts_speaking",
     "pte_overall",
+    "pte_listening",
+    "pte_reading",
+    "pte_writing",
+    "pte_speaking",
     "toefl_overall",
+    "toefl_listening",
+    "toefl_reading",
+    "toefl_writing",
+    "toefl_speaking",
     "cambridge_overall",
+    "duolingo_overall",
 )
 
 _UNDERGRAD_HINTS: Final = (
