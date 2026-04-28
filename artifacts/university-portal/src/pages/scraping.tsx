@@ -145,6 +145,7 @@ type StagedCourse = {
   status: string;
   completeness: number | null;
   notes: string | null;
+  scrapeWarnings: string[] | null;
   createdAt: string;
 };
 
@@ -1615,6 +1616,15 @@ export default function Scraping() {
                               }`}>
                                 Eligibility: {course.eligibilityStatus}
                               </Badge>
+                            )}
+                            {course.scrapeWarnings && course.scrapeWarnings.length > 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-medium cursor-help"
+                                title={course.scrapeWarnings.join("\n")}
+                              >
+                                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                {course.scrapeWarnings.length === 1 ? "1 scrape warning" : `${course.scrapeWarnings.length} scrape warnings`}
+                              </span>
                             )}
                           </div>
                           {course.notes && (
