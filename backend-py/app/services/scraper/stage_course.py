@@ -31,7 +31,12 @@ from app.models import ScrapedCourse, ScrapedFieldEvidence
 from app.services.auto_publish import should_auto_publish
 from app.services.scraper.category import map_course_to_category
 from app.services.scraper.completeness import compute_completeness, decide_eligibility
-from app.services.scraper.guards import is_generic_course_category_name, should_stage_course
+from app.services.scraper.guards import (
+    enforce_source_evidence,
+    is_blocked_page,
+    is_generic_course_category_name,
+    should_stage_course,
+)
 
 log = logging.getLogger(__name__)
 
@@ -135,6 +140,16 @@ async def stage_course(
     if is_generic_course_category_name(name):
         return StageResult(False, "rejected: generic category page")
 
+    # Phase A defence-in-depth: refuse to stage a course whose source URL
+    # is on the page blocklist (apply / fees / news / faculty / etc.).
+    # Discovery should have caught this earlier; if a regression there
+    # ever lets one through, this stops the bad row from being saved.
+    if source_url:
+        blocked, block_reason = is_blocked_page(source_url, payload.get("page_title"))
+        if blocked:
+            log.info("blocked_page rejected %r: %s (%s)", name, block_reason, source_url)
+            return StageResult(False, f"rejected: blocked_page:{block_reason}")
+
     # Bugs A / B / C (Torrens T007 sweep): staging gate that rejects category
     # landing pages, domestic-only courses, and online-only courses.  Runs
     # AFTER the generic-name guard (cheaper) but BEFORE any DB work (no point
@@ -143,6 +158,17 @@ async def stage_course(
     if not accept:
         log.info("staging_gate rejected %r: %s", name, gate_reason)
         return StageResult(False, f"rejected: {gate_reason}")
+
+    # Phase A: drop critical fields (fee, english tests, location, study_mode,
+    # duration) that lack source proof.  Better to publish "unknown" than
+    # publish a guess.  The dropped fields are logged so the operator can
+    # see WHY a row landed in review with NULLs.
+    payload, dropped_fields = enforce_source_evidence(payload, evidence)
+    if dropped_fields:
+        log.info(
+            "source_evidence dropped fields %s for %r (uni %s) — no source_url+snippet proof",
+            dropped_fields, name, university_id,
+        )
 
     # Diff item R (MIGRATION_AUDIT.md §6): category safety net. The
     # single_course pipeline runs map_course_to_category before staging,

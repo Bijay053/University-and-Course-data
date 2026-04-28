@@ -351,3 +351,203 @@ def should_stage_course(
         return (False, "no_international_fee")
 
     return (True, "accepted")
+
+
+# ---------------------------------------------------------------------------
+# Phase A — Page blocklist (URL + title)
+# ---------------------------------------------------------------------------
+# Single source of truth for "this is definitely not a course page".
+# Returns (blocked: bool, reason: str). Intentionally narrower and more
+# explicit than the larger discovery blocklist so callers (discovery BFS,
+# staging gate, future per-provider overrides) can share one rulebook
+# and the audit log shows a clean, single reason.
+#
+# Design rules:
+#   * URL match wins over title match (URL is more deterministic).
+#   * Reasons are stable string keys so they can be grep'd in logs and
+#     counted in metrics.
+#   * No regex backtracking risk: every pattern is a literal substring
+#     against a lowercased path.
+#   * Title matching uses anchored prefixes ("apply", "fees and ...") so
+#     titles that happen to mention "apply" mid-sentence don't trip it.
+
+_BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
+    # Application / enrolment funnels — never a course catalogue
+    ("/apply",                  "apply_page"),
+    ("/application",            "apply_page"),
+    ("/how-to-apply",           "apply_page"),
+    ("/how-to-enrol",           "apply_page"),
+    ("/enrol",                  "apply_page"),
+    ("/enrolment",              "apply_page"),
+    # Money pages — fees, scholarships, aid (the COURSE page lists fees;
+    # the standalone fee page does not list a course).
+    ("/fees-and-scholarships",  "fee_page"),
+    ("/fees-and-costs",         "fee_page"),
+    ("/scholarships",           "scholarship_page"),
+    ("/scholarship/",           "scholarship_page"),
+    ("/financial-aid",          "scholarship_page"),
+    # Calendar / dates
+    ("/key-dates",              "key_dates_page"),
+    ("/keydates",               "key_dates_page"),
+    ("/important-dates",        "key_dates_page"),
+    ("/academic-calendar",      "key_dates_page"),
+    # News / events / blog — never courses
+    ("/news/",                  "news_page"),
+    ("/newsroom/",              "news_page"),
+    ("/events/",                "events_page"),
+    ("/event/",                 "events_page"),
+    ("/blog/",                  "blog_page"),
+    ("/blogs/",                 "blog_page"),
+    ("/stories/",               "blog_page"),
+    ("/story/",                 "blog_page"),
+    # School / faculty / department landing pages
+    ("/schools/",               "faculty_page"),
+    ("/school/",                "faculty_page"),
+    ("/faculty/",               "faculty_page"),
+    ("/faculties/",             "faculty_page"),
+    ("/department/",            "faculty_page"),
+    ("/departments/",           "faculty_page"),
+    # Generic info / about / contact
+    ("/contact",                "contact_page"),
+    ("/about-us",               "about_page"),
+    ("/about/",                 "about_page"),
+    ("/testimonials",           "testimonials_page"),
+    ("/staff/",                 "staff_page"),
+    ("/people/",                "staff_page"),
+    # Campus / student-life — not academic catalogues
+    ("/campus/",                "campus_page"),
+    ("/campus-life",            "campus_page"),
+    ("/student-life",           "campus_page"),
+    ("/accommodation",          "campus_page"),
+    ("/library/",               "campus_page"),
+    # Open day / marketing funnels
+    ("/open-day",               "marketing_page"),
+    ("/info-night",             "marketing_page"),
+    ("/why-",                   "marketing_page"),
+)
+
+# Title prefix matches.  Lowercased and stripped before comparison, so
+# "Fees and Scholarships | UTAS" → "fees and scholarships" matches the
+# "fees and " prefix below.
+_BLOCK_TITLE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("apply now",                       "apply_page"),
+    ("how to apply",                    "apply_page"),
+    ("application",                     "apply_page"),
+    ("fees and ",                       "fee_page"),
+    ("scholarships",                    "scholarship_page"),
+    ("key dates",                       "key_dates_page"),
+    ("important dates",                 "key_dates_page"),
+    ("news",                            "news_page"),
+    ("blog",                            "blog_page"),
+    ("events",                          "events_page"),
+    ("contact us",                      "contact_page"),
+    ("contact",                         "contact_page"),
+    ("about us",                        "about_page"),
+    ("testimonials",                    "testimonials_page"),
+)
+
+
+def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, str]:
+    """Return ``(True, reason)`` when this URL/title is definitely not a
+    course detail or course listing page; ``(False, "")`` otherwise.
+
+    Phase A safety net.  Callers:
+      * Discovery BFS — skip the URL before enqueuing it.
+      * Staging gate — refuse to stage a course whose ``source_url`` is
+        on the blocklist (defence in depth: discovery should have caught
+        it, but a regression there must not silently publish bad data).
+
+    The function is **conservative**: only patterns that we know with
+    100% confidence are non-course pages are listed.  Generic words
+    appearing inside a real course slug (e.g. ``/bachelor-of-arts-and-
+    contact-with-society``) will not match any substring here because
+    every pattern includes its leading slash.
+    """
+    if url:
+        try:
+            path = urlparse(url).path.lower()
+        except Exception:  # noqa: BLE001 — malformed URL → no URL signal
+            path = ""
+        if path:
+            for pat, reason in _BLOCK_URL_SUBSTRINGS:
+                if pat in path:
+                    return (True, reason)
+
+    if title:
+        norm_title = re.sub(r"\s+", " ", title).strip().lower()
+        # Strip common "| University Name" suffixes so "Apply Now | UNE"
+        # still matches the "apply now" prefix.
+        if "|" in norm_title:
+            norm_title = norm_title.split("|", 1)[0].strip()
+        for pfx, reason in _BLOCK_TITLE_PREFIXES:
+            if norm_title.startswith(pfx):
+                return (True, reason)
+
+    return (False, "")
+
+
+# ---------------------------------------------------------------------------
+# Phase A — Source-evidence enforcement on critical fields
+# ---------------------------------------------------------------------------
+# Critical fields are the ones we publish to international students and
+# whose accuracy materially affects their decisions.  For each of these,
+# we require at least one evidence row with BOTH a non-empty source_url
+# AND a non-empty snippet (the actual on-page text we extracted from).
+# If proof is missing, the field is dropped (set to None) on the staged
+# course — better to publish "unknown" than a guess.
+_CRITICAL_FIELDS_REQUIRING_PROOF: tuple[str, ...] = (
+    "international_fee",
+    "ielts_overall",
+    "pte_overall",
+    "toefl_overall",
+    "duolingo_overall",
+    "cambridge_overall",
+    "location_text",
+    "study_mode",
+    "duration_text",
+)
+
+
+def enforce_source_evidence(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Drop critical fields from ``payload`` that lack source proof.
+
+    Returns ``(cleaned_payload, dropped_field_keys)``.  A field is kept
+    only when at least one evidence row for it has BOTH a non-empty
+    ``source_url`` AND a non-empty ``snippet``.  Otherwise the field is
+    set to ``None`` in the returned payload so the staging insert writes
+    NULL (and the row will fall to review for that field).
+
+    This is intentionally narrow: only the fields in
+    ``_CRITICAL_FIELDS_REQUIRING_PROOF`` are checked.  Everything else
+    passes through untouched so we don't accidentally null out fields
+    whose extractors don't yet emit evidence rows.
+    """
+    if not isinstance(payload, dict):
+        return ({}, [])
+
+    # Build a quick index: field_key -> True if at least one evidence row
+    # for it has both a source URL and a snippet.
+    proven: set[str] = set()
+    for ev in evidence or []:
+        if not isinstance(ev, dict):
+            continue
+        fk = ev.get("field_key")
+        if not fk:
+            continue
+        src = (ev.get("source_url") or "").strip()
+        snip = (ev.get("snippet") or "").strip()
+        if src and snip:
+            proven.add(str(fk))
+
+    cleaned = dict(payload)
+    dropped: list[str] = []
+    for field_key in _CRITICAL_FIELDS_REQUIRING_PROOF:
+        if cleaned.get(field_key) is None:
+            continue  # nothing to drop
+        if field_key not in proven:
+            cleaned[field_key] = None
+            dropped.append(field_key)
+    return (cleaned, dropped)
