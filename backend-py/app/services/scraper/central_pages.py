@@ -302,6 +302,14 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         return records
 
     # ── Strategy 2: plain-text line scan (card / DL layout) ────────────────
+    # Handles two layouts:
+    #   (a) Multi-line: program name on one line, fee on the next 1–3 lines.
+    #   (b) Same-line:  "Program Name — $fee" or "Program Name: $69,000"
+    #       (e.g. AIT /apply page lists total-course fees in this format).
+    _SAME_LINE_SPLIT_RE = re.compile(
+        r"^(.+?)\s*[-—–:]\s*(?=A?\$|USD\s|\bAUD\s)",
+        re.IGNORECASE,
+    )
     text = html_to_text(html)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for i, line in enumerate(lines):
@@ -315,6 +323,18 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             if _parse_fee_amount(cl) is None and len(cl) > 4:
                 prog_candidate = cl
                 break
+        # Fallback: same-line "Program Name — $fee" format.
+        # When both program name and fee appear on a single line (separated by
+        # a dash, em-dash, or colon), the backward scan above finds nothing
+        # because there is no prior line containing the name.  Extract the
+        # program name from the text before the separator instead.
+        if not prog_candidate:
+            m = _SAME_LINE_SPLIT_RE.match(line)
+            if m:
+                candidate = m.group(1).strip()
+                # Must look like a real program name: > 4 chars, no fee amount.
+                if len(candidate) > 4 and _parse_fee_amount(candidate) is None:
+                    prog_candidate = candidate
         if not prog_candidate:
             continue
         per_term = _infer_per_term(line) or _infer_per_term(" ".join(context_lines))
