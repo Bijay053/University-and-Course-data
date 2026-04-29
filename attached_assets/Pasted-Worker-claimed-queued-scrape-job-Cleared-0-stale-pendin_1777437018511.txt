@@ -1,0 +1,144 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+Fetching https://www.asahe.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing found at https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Crawling from https://www.asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] Page 1/25: +9 candidates (total 9) — https://www.asahe.edu.au/our-courses/courses-grid-view
+Discovered 9 candidate course links
+Loaded uni-level PDF data: fee=yes english=yes
+[CENTRAL] fee page parsed → 0 program record(s) from http://asahe.edu.au/fees-and-charges
+[CENTRAL] english page parsed → no values from http://asahe.edu.au/policies-and-forms
+Extracting course details (9 pages)...
+[EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT] 4/9: Bachelor of Business
+Fetching 3/9: Bachelor of Business Technology Management
+Fetching 2/9: Bachelor of Business Hospitality Management
+Fetching 1/9: Bachelor of Business International Business
+Fetching 4/9: Bachelor of Business
+[FIELD SUMMARY] Bachelor of Business Technology Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business International Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Hospitality Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=25994B rendered=0B using=static text_len=?
+[GP-DEBUG] static=25800B rendered=0B using=static text_len=?
+[GP-DEBUG] static=25772B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] static=26523B rendered=0B using=static text_len=?
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-intern → 0 field(s) (cost=$0.000000, in=2995 out=0) SKIP='GEMINI_API_KEY not set'
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-techno → 0 field(s) (cost=$0.000000, in=3045 out=0) SKIP='GEMINI_API_KEY not set'
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-hospit → 0 field(s) (cost=$0.000000, in=2995 out=0) SKIP='GEMINI_API_KEY not set'
+[GP-DEBUG] text[:500]=''
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — vocational static fallback
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — vocational static fallback
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — vocational static fallback
+[GP-DEBUG] raw_response=''
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business → 0 field(s) (cost=$0.000000, in=3211 out=0) SKIP='GEMINI_API_KEY not set'
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business — vocational static fallback
+[CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+[CATEGORY det] Bachelor of Business Technology Manageme → Business & Management / Technology Management
+[CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+✅ [PASS 100/100] Bachelor of Business Technology Management | bachelor-of-business-technology-manageme
+✅ [PASS 100/100] Bachelor of Business International Business | bachelor-of-business-international-busin
+✅ [PASS 100/100] Bachelor of Business Hospitality Management | bachelor-of-business-hospitality-managem
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business
+[EXTRACT] 5/9: Bachelor of Professional Accounting
+[EXTRACT] 6/9: Master of Project Management
+[EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+✅ [PASS 100/100] Bachelor of Business | bachelor-of-business
+Fetching 5/9: Bachelor of Professional Accounting
+Fetching 6/9: Master of Project Management
+Fetching 7/9: Master of Information Technology (Cyber Security)
+[EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[FIELD SUMMARY] Bachelor of Professional Accounting Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology (Cyber Security) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology (Artificial Intel Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=28246B rendered=0B using=static text_len=?
+[GP-DEBUG] static=27836B rendered=0B using=static text_len=?
+[GP-DEBUG] static=28546B rendered=0B using=static text_len=?
+[GP-DEBUG] static=28897B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] raw_response=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-professional-ac → 0 field(s) (cost=$0.000000, in=3365 out=0) SKIP='GEMINI_API_KEY not set'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-project-managemen → 0 field(s) (cost=$0.000000, in=3335 out=0) SKIP='GEMINI_API_KEY not set'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=3435 out=0) SKIP='GEMINI_API_KEY not set'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=3489 out=0) SKIP='GEMINI_API_KEY not set'
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-project-management — vocational static fallback
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — vocational static fallback
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — vocational static fallback
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — vocational static fallback
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-project-management
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[PG-SKIP ✗] Master of Information Technology (Cyber — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[PG-SKIP ✗] Master of Project Management — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+[PG-SKIP ✗] Master of Information Technology (Artifi — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+[CATEGORY det] Master of Project Management → Business & Management / Project Management
+✅ [PASS 100/100] Bachelor of Professional Accounting | bachelor-of-professional-accounting
+[CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+[WARN] Master of Information Technology (Cyber — English section detected in HTML but all scores blank
+[WARN] Master of Project Management — English section detected in HTML but all scores blank
+[EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+[WARN] Master of Information Technology (Artifi — English section detected in HTML but all scores blank
+⚠️ [WARN 75/100] Master of Information Technology (Cyber Security) — missing: english | master-of-information-technology-cyber-s
+⚠️ [WARN 75/100] Master of Project Management — missing: english | master-of-project-management
+Fetching 9/9: Master of Information Technology (Software Application Development)
+⚠️ [WARN 75/100] Master of Information Technology (Artificial Intel — missing: english | master-of-information-technology-artific
+[FIELD SUMMARY] Master of Information Technology (Software Applica Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=25696B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=2888 out=0) SKIP='GEMINI_API_KEY not set'
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — vocational static fallback
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[PG-SKIP ✗] Master of Information Technology (Softwa — nulled english for PG (Master's): ielts_overall, pte_overall, toefl_overall, cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Software Engineering
+[WARN] Master of Information Technology (Softwa — English section detected in HTML but all scores blank
+⚠️ [WARN 75/100] Master of Information Technology (Software Applica — missing: english | master-of-information-technology-softwar
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 duolingo_overall=100.0 ielts_listening=5.5 ielts_overall=6.0 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5 pte_overall=50.0 toefl_overall=60.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=5.5 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5
+[STAGE] saved: Bachelor of Business International Business
+[STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE] saved: Bachelor of Business Technology Management
+[STAGE] saved: Bachelor of Business
+[STAGE] saved: Bachelor of Professional Accounting
+[STAGE] saved: Master of Project Management
+[STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE] saved: Master of Information Technology (Software Application Development)
+[DATA QUALITY] 9 course(s) checked — 0 critical / 0 warning / 0 info
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 1m 5s | Courses: 9 | Avg: 7.2s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+Staged 9 courses, 0 skipped, 0 fetch errors
