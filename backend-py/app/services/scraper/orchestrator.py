@@ -1050,8 +1050,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # the cache and backfills all 50+ siblings with a value that may
             # not apply to the specific program. min_quorum=2 requires a
             # second independent extraction to corroborate the score first.
-            _bond_hosts = frozenset({"bond.edu.au", "www.bond.edu.au"})
-            _sibling_quorum = 2 if _scrape_host in _bond_hosts else 1
+            # Hosts where a single page can seed the sibling cache with
+            # institution-wide English scores that don't apply to specific
+            # courses.  min_quorum=2 requires at least two independent
+            # per-course extractions to agree before the value is promoted.
+            #   Bond: marketing pages mention "IELTS 6.5" in running text.
+            #   CDU:  category overview pages contain an English-requirement
+            #         image that vision OCR extracts; without quorum=2 the
+            #         extracted IELTS score backfills every course in the run.
+            _high_quorum_hosts = frozenset({
+                "bond.edu.au", "www.bond.edu.au",
+                "cdu.edu.au", "www.cdu.edu.au",
+            })
+            _sibling_quorum = 2 if _scrape_host in _high_quorum_hosts else 1
             fills = await backfill_english_from_siblings(
                 sibling_dicts, emit=emit, min_quorum=_sibling_quorum
             )
