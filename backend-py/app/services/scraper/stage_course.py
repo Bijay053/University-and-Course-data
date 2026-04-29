@@ -52,6 +52,45 @@ class StageResult:
         return self.saved
 
 
+# ---------------------------------------------------------------------------
+# Specialisation name augmentation
+# ---------------------------------------------------------------------------
+# Some universities (VIT) publish separate pages per specialisation that all
+# share the same extracted parent degree name.  We derive the specialisation
+# label from the URL path so review-table rows are distinguishable.
+#
+# Pattern:  /{degree_code}/{degree_code}-{spec-slug}
+#   e.g.    /bits/bits-artificial-intelligence-analytics
+#           → "Bachelor of IT and Systems (Artificial Intelligence Analytics)"
+_SPECIALIZATION_AUGMENT_HOSTS: frozenset[str] = frozenset({
+    "vit.edu.au", "www.vit.edu.au",
+})
+
+def _augment_specialization_name(course_name: str, source_url: str | None) -> str:
+    """Return course_name augmented with specialisation label when the URL encodes one."""
+    if not source_url:
+        return course_name
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(source_url)
+        if parsed.netloc not in _SPECIALIZATION_AUGMENT_HOSTS:
+            return course_name
+        parts = [p for p in parsed.path.strip("/").split("/") if p]
+        if len(parts) < 2:
+            return course_name
+        parent_code = parts[0]        # e.g. "bits"
+        spec_slug   = parts[1]        # e.g. "bits-artificial-intelligence-analytics"
+        prefix = f"{parent_code}-"
+        if spec_slug.startswith(prefix):
+            spec_slug = spec_slug[len(prefix):]
+        spec_words = spec_slug.replace("-", " ").title()
+        if spec_words and spec_words.lower() not in course_name.lower():
+            return f"{course_name} ({spec_words})"
+    except Exception:  # noqa: BLE001
+        pass
+    return course_name
+
+
 # Cap evidence rows per course. A pathological page can spam dozens of
 # duplicate matches for the same field; keeping the table lean keeps the
 # review modal fast and bounded.
@@ -165,32 +204,35 @@ async def stage_course(
         log.info("staging_gate rejected %r: %s", name, gate_reason)
         return StageResult(False, f"rejected: {gate_reason}")
 
-    # Within-job deduplication: some universities publish multiple URLs for the
-    # same course (e.g. VIT BBus has separate pages per specialisation:
-    # /bbus-business-technology, /bbus-marketing, /bbus-hr, …) but all pages
-    # share the same extracted course_name ("Bachelor of Business"). Staging
-    # every URL produces visually identical duplicate rows in the Review table.
-    # We keep the FIRST staged row for each (scrape_job_id, university_id,
-    # course_name) triple and silently skip the rest.
+    # Within-job URL deduplication: prevent the exact same source URL from
+    # being staged twice in one job (can happen if a BFS bug re-queues a URL).
+    # We intentionally do NOT dedup by course_name alone — universities like
+    # VIT publish separate pages per specialisation (e.g. /bits/bits-ai,
+    # /bits/bits-app-dev) that all share the same parent degree name but are
+    # genuinely distinct enrolment-level programmes.  Deduping by name
+    # silently drops those specialisations from the review queue.
+    # For VIT we also augment the course name with the specialisation derived
+    # from the URL path so reviewers can distinguish the rows.
+    name = _augment_specialization_name(name, source_url)
     try:
         _dup_q = await db.execute(
             select(ScrapedCourse.id)
             .where(
                 ScrapedCourse.scrape_job_id == scrape_job_id,
                 ScrapedCourse.university_id == university_id,
-                ScrapedCourse.course_name == name,
+                ScrapedCourse.course_website == source_url,
             )
             .limit(1)
         )
         _dup = _dup_q.scalar_one_or_none()
         if _dup is not None:
             log.info(
-                "stage_course: skipping duplicate %r (same name already staged in job %s)",
-                name, scrape_job_id,
+                "stage_course: skipping duplicate URL %r (already staged in job %s)",
+                source_url, scrape_job_id,
             )
-            return StageResult(False, "rejected: duplicate_in_job")
+            return StageResult(False, "rejected: duplicate_url_in_job")
     except Exception as _dep:  # noqa: BLE001 — never abort on dedup check failure
-        log.warning("stage_course: within-job dedup check failed for %r: %s", name, _dep)
+        log.warning("stage_course: within-job dedup check failed for %r: %s", source_url, _dep)
 
     # Phase A: drop critical fields (fee, english tests, location, study_mode,
     # duration) that lack source proof.  Better to publish "unknown" than
