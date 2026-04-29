@@ -1,0 +1,59 @@
+cd backend-py && source venv/bin/activate
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+remote: Enumerating objects: 23, done.
+remote: Counting objects: 100% (23/23), done.
+remote: Compressing objects: 100% (15/15), done.
+remote: Total 15 (delta 13), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (15/15), 3.09 KiB | 316.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   fdf986d..f5f7b50  main       -> origin/main
+Updating fdf986d..f5f7b50
+Fast-forward
+ backend-py/app/services/scraper/per_course_vision.py       | 52 +++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/pipelines/single_course.py | 46 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 98 insertions(+)
+[1] 1195880
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data 
+
+# 1. Pull the latest code (includes the slot-leak fix)
+git pull origin main
+
+# 2. Reset any DB jobs stuck in "running" state
+cd backend-py && source venv/bin/activate
+python3 - <<'EOF'
+import asyncio, sys
+sys.path.insert(0, ".")
+from app.db import get_async_session
+from sqlalchemy import text
+
+async def reset_stale():
+    async with get_async_session() as session:
+        r = await session.execute(text(
+            "UPDATE scrape_jobs SET status='failed', "
+            "error_message='Reset: worker restart after slot leak', "
+            "completed_at=now() WHERE status='running'"
+        ))
+        await session.commit()
+        print(f"Reset {r.rowcount} stuck running job(s) → failed")
+
+asyncio.run(reset_stale())
+EOF
+
+# 3. Kill old Celery worker and start fresh
+pkill -9 -f "celery.*worker"
+sleep 3
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+echo "Celery restarted — all 4 slots now free"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'app.db'
+[1]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1
+[1] 1196262
+Celery restarted — all 4 slots now free
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
