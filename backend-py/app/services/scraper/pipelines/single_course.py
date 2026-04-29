@@ -1468,13 +1468,34 @@ async def extract_course(
 
         # ── Vision sanity check ───────────────────────────────────────────
         # When a per-course vision OCR reading for an English slot diverges
-        # too far from the university-wide central-page value, the central
-        # page is more trustworthy (vision misread).  Revert the slot and
-        # remove the stale vision evidence so downstream sibling-cache and
-        # staging logic don't propagate the wrong value.
+        # too far from the university-wide central-page value, the course
+        # page always wins.  The central-page value is stored as a superseded
+        # evidence row so reviewers can see both readings in Evidence Review.
+        #
+        # Part 4 — corroboration: if the vision value also appears verbatim
+        # in the static page text (keyword + value within 100 chars), the
+        # reading is confirmed as real, not a hallucination.  The corroboration
+        # result is surfaced in the emit message and evidence snippet so
+        # reviewers know whether to trust a low value (e.g. IELTS 4.5 on an
+        # ELICOS page).  The keep-vs-revert decision is unaffected — the
+        # course page already wins unconditionally — but the corroboration
+        # flag is useful for distinguishing "genuinely low" from "misread".
         if central_data and vision_filled:
             _central_eng: dict = central_data.get("english") or {}
             _central_eng_url: str | None = central_data.get("english_page_url")
+            # Import corroboration helper once for this block
+            try:
+                from app.services.scraper.pathway_detection import (
+                    vision_value_appears_in_page_text as _vision_corroborated,
+                )
+                from app.services.scraper.extractors._text import (
+                    compact as _compact_text,
+                    html_to_text as _html_to_text,
+                )
+                _page_text_for_corroboration = _compact_text(_html_to_text(html or ""))
+            except Exception:  # noqa: BLE001
+                _vision_corroborated = None  # type: ignore[assignment]
+                _page_text_for_corroboration = ""
             for _slot, _max_delta in _VISION_SANITY_THRESHOLDS.items():
                 if _slot not in vision_filled:
                     continue
@@ -1488,17 +1509,28 @@ async def extract_course(
                     continue
                 if _delta <= _max_delta:
                     continue
+                # Check whether the vision value is corroborated in static HTML
+                _corroborated = bool(
+                    _vision_corroborated is not None
+                    and _vision_corroborated(
+                        _v_val, _slot, _page_text_for_corroboration
+                    )
+                )
                 # Course page always wins: do NOT revert to central-page value
                 # even when vision and central diverge.  Instead, store the
                 # central-page value as a superseded evidence row so the reviewer
                 # can see both readings side-by-side in Evidence Review.
+                _corr_note = " [corroborated by page text]" if _corroborated else " [not found in page text — review recommended]"
                 evidence.append({
                     "field_key": _slot,
                     "value": _c_val,
                     "confidence": 0.50,
                     "method": "central_page:english",
                     "source_url": _central_eng_url or url,
-                    "snippet": f"central_page:english {_slot}={_c_val} (diverges from course vision by {_delta:.1f}; course page value kept)",
+                    "snippet": (
+                        f"central_page:english {_slot}={_c_val} (diverges from course vision "
+                        f"by {_delta:.1f}; course page value kept{_corr_note})"
+                    ),
                     "decision_status": "superseded",
                 })
                 if emit:
@@ -1506,13 +1538,15 @@ async def extract_course(
                         "status",
                         f"[VISION vs CENTRAL] {payload.get('course_name', url)[:40]} — "
                         f"{_slot}: vision={_v_val} vs central={_c_val} "
-                        f"(delta={_delta:.1f} > {_max_delta}) — course page value kept",
+                        f"(delta={_delta:.1f} > {_max_delta}) — course page value kept"
+                        f"{_corr_note}",
                         phase="extract",
                         kind="vision_sanity_note",
                         url=url,
                         slot=_slot,
                         vision_val=_v_val,
                         central_val=_c_val,
+                        corroborated=_corroborated,
                     )
     except Exception as exc:  # noqa: BLE001
         log.warning("per-course vision fallback errored on %s: %s", url, exc)
@@ -1940,6 +1974,34 @@ async def extract_course(
                 }
             )
 
+    # ── Pathway program detection ─────────────────────────────────────────────
+    # Pathway / preparatory programs (Foundation Studies, ELICOS, UniPrep,
+    # bridging courses) have lower English admission requirements than standard
+    # academic degrees.  They must NOT inherit the university's main IELTS from
+    # the central English requirements page.
+    # Detection runs here — after course_name and degree_level are in the
+    # payload — so both signals are available, and before the central-data
+    # fallback that would wrongly apply the university-wide IELTS.
+    try:
+        from app.services.scraper.pathway_detection import is_pathway_program as _is_pathway
+        _pathway_flag = _is_pathway(
+            payload.get("course_name"),
+            degree_level=payload.get("degree_level"),
+        )
+    except Exception:  # noqa: BLE001
+        _pathway_flag = False
+    if _pathway_flag and not payload.get("is_pathway"):
+        payload["is_pathway"] = True
+        if emit:
+            await emit(
+                "status",
+                f"[PATHWAY] {payload.get('course_name', url)[:50]} — "
+                f"detected as pathway program; central English requirements will be skipped",
+                phase="extract",
+                kind="pathway_detected",
+                url=url,
+            )
+
     # Bug 2: central-pages fallback — applies fees and English requirements
     # pre-fetched from a university's central fee/admissions page when
     # per-course extractors, AI, and PDF backfill all left these slots empty.
@@ -2055,8 +2117,17 @@ async def extract_course(
             )
             _level_english: dict = _english_by_level.get(_level_bucket) or {}
 
+            # Pathway guard: pathway programs (Foundation Studies, ELICOS,
+            # UniPrep, bridging courses) must not inherit the university-wide
+            # IELTS from the central English page.  Their own pages may state
+            # a lower requirement (e.g. IELTS 4.5 for ELICOS) and wrongly
+            # applying the central 6.5 would block those values from ever
+            # surfacing.  NULL is correct until the course page itself provides
+            # a value; null is reviewable; a silently wrong 6.5 is not.
+            _is_pathway_course = bool(payload.get("is_pathway"))
+
             # Path 1: level-specific values available — use them unconditionally.
-            if _level_english:
+            if _level_english and not _is_pathway_course:
                 _eng_filled: list[str] = []
                 for _k, _v in _level_english.items():
                     if _v in (None, "", 0):
@@ -2096,7 +2167,7 @@ async def extract_course(
                 )
                 _skip_central_english = (
                     _pg_skip_configured and _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
-                )
+                ) or _is_pathway_course  # pathway: skip central English entirely
                 if _central_english and not _skip_central_english:
                     _eng_filled = []
                     for _k, _v in _central_english.items():
@@ -2129,15 +2200,20 @@ async def extract_course(
                             filled=_eng_filled,
                         )
                 elif _central_english and _skip_central_english and emit:
+                    _skip_reason = (
+                        "pathway program — central English not applicable"
+                        if _is_pathway_course
+                        else f"PG level ({_course_dl or 'unknown'}): no level-keyed data, pg_skip=true"
+                    )
                     await emit(
                         "status",
                         f"[CENTRAL —] {payload.get('course_name', url)[:40]} — "
-                        f"central english skipped for PG level ({_course_dl or 'unknown'}): "
-                        f"no level-keyed data, pg_skip=true",
+                        f"central english skipped: {_skip_reason}",
                         phase="fallback",
-                        kind="central_english_skipped_pg",
+                        kind="central_english_skipped_pathway" if _is_pathway_course else "central_english_skipped_pg",
                         url=url,
                         degree_level=_course_dl,
+                        is_pathway=_is_pathway_course,
                     )
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
