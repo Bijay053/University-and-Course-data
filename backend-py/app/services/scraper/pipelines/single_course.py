@@ -795,6 +795,52 @@ async def extract_course(
                 }
             )
 
+    # Belt-and-suspenders guard for Bug 1 (UniSQ "Recently viewed" sidebar):
+    # If study_mode was set to "On Campus" EXCLUSIVELY by the keyword-rule
+    # extractor (study_mode:rule — the last-resort fallback that scans raw
+    # tag-stripped text), AND both course_location AND location_text are
+    # blank, the "On Campus" match almost certainly came from sidebar noise
+    # (e.g. "Recently viewed" widget listing other courses' campus names).
+    # In that case the course's own Location field either says "Online" or
+    # was not captured — neither supports a confident "On Campus" assignment.
+    #
+    # Action: downgrade to "Online" so the online_only guard in guards.py
+    # can evaluate and reject the course when appropriate.  This ONLY fires
+    # when there is NO high-authority structural evidence (span_id_delivery,
+    # data_attribute, strong_label, gemini_primary, etc.) — those methods
+    # would have returned before the keyword fallback and would appear with
+    # a different method name in the evidence list.
+    _only_rule_based_on_campus = (
+        payload.get("study_mode") == "On Campus"
+        and not _has_physical_location
+        and not (payload.get("location_text") or "").strip()
+        and bool(_study_mode_evidence)
+        and all(
+            (e.get("method") or "").startswith("study_mode:rule")
+            for e in _study_mode_evidence
+        )
+    )
+    if _only_rule_based_on_campus:
+        payload["study_mode"] = "Online"
+        evidence.append(
+            {
+                "field_key": "study_mode",
+                "value": "Online",
+                "confidence": 0.55,
+                "method": "study_mode:no_location_online_override",
+                "snippet": (
+                    "study_mode:rule returned 'On Campus' but course_location "
+                    "and location_text are both blank — sidebar contamination "
+                    "suspected. Downgraded to Online for online_only guard."
+                ),
+            }
+        )
+        log.info(
+            "[STUDY_MODE OVERRIDE] course=%r — rule-only 'On Campus' with no "
+            "location evidence; downgraded to Online for guard evaluation.",
+            payload.get("course_name") or url,
+        )
+
     # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
     # the per-course browser pass because (a) it's pure-CPU (no Playwright
     # spin-up, no network), (b) the english_test extractor often misses
