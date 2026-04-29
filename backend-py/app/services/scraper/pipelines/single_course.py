@@ -1763,6 +1763,27 @@ async def extract_course(
                 }
             )
 
+    # ── Host-specific fee_term correction ────────────────────────────────────
+    # Some universities publish a FULL COURSE total on their course pages
+    # without any "per year" / "per annum" qualifier in the surrounding text.
+    # _normalize_fee_term (fee.py) therefore defaults to "Annual", which is
+    # wrong: showing "A$48,000/Annual" for a 2-year MITS implies $96,000 total
+    # when the actual cost is $48,000 total.
+    #
+    # VIT: charges per-unit fees and lists the total programme cost (e.g.
+    # $48,000 for MITS = 24 units × $2,000/unit).  No "per year" text
+    # appears near the figure on course pages.  Override to "Full Course"
+    # after all extractors have settled so the correction applies regardless
+    # of whether the fee came from the static pass, the browser extended
+    # extraction, or the PDF backfill.
+    _FULL_COURSE_FEE_HOSTS: frozenset[str] = frozenset({
+        "vit.edu.au",
+        "www.vit.edu.au",
+    })
+    _sc_host = (urlparse(url).hostname or "").lower()
+    if _sc_host in _FULL_COURSE_FEE_HOSTS and payload.get("fee_term") == "Annual":
+        payload["fee_term"] = "Full Course"
+
     # ── Scrape-quality warning detection ─────────────────────────────────────
     # After ALL extractors have settled, audit the final payload for cases
     # where the course page clearly contained a data section but the pipeline
