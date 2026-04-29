@@ -21,7 +21,7 @@ _FIELD_HINTS: dict[str, str] = {
     "international_fee": "Annual international tuition fee in the page's currency. Number only.",
     "fee_currency": "ISO currency code of the international tuition (AUD, USD, GBP, etc.).",
     "ielts_overall": "Required IELTS overall band score (e.g. 6.5). Number only.",
-    "intake_months": "List of intake month numbers (1-12) when this course starts.",
+    "intake_months": "List of month names (e.g. [\"January\", \"March\", \"July\"]) when this course starts.",
     "course_location": (
         "Campus city/location where this course is physically taught "
         "(e.g. 'Melbourne', 'Ballarat', 'Sydney, Brisbane'). "
@@ -121,16 +121,36 @@ def _coerce(field_key: str, value: Any) -> Any | None:
         except (TypeError, ValueError):
             return None
     if field_key == "intake_months":
+        _MONTH_NAMES = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+        _MONTH_ABBR_MAP = {m[:3].lower(): m for m in _MONTH_NAMES}
         if not isinstance(value, list):
             return None
-        out = []
+        out: list[str] = []
         for v in value:
-            try:
+            # Accept integer month numbers (1-12) → convert to name
+            if isinstance(v, (int, float)):
                 n = int(v)
-            except (TypeError, ValueError):
+                if 1 <= n <= 12:
+                    out.append(_MONTH_NAMES[n - 1])
                 continue
-            if 1 <= n <= 12:
-                out.append(n)
+            # Accept string: either a full name or an abbreviation
+            if isinstance(v, str):
+                s = v.strip()
+                # Try full/partial name match
+                abbr = s[:3].lower()
+                if abbr in _MONTH_ABBR_MAP:
+                    out.append(_MONTH_ABBR_MAP[abbr])
+                else:
+                    # Try parsing as an integer string
+                    try:
+                        n = int(s)
+                        if 1 <= n <= 12:
+                            out.append(_MONTH_NAMES[n - 1])
+                    except ValueError:
+                        pass
         return out or None
     if field_key in {"fee_currency", "duration_unit", "course_location"}:
         return str(value).strip() or None
