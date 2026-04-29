@@ -91,6 +91,17 @@ _SKIP_BROWSER_HOSTS: tuple[str, ...] = (
     # static HTML via _find_english_section_images — skipping the browser saves
     # 9 × 60s ≈ 9 minutes per scrape run with no loss of data.
     "asahe.edu.au",
+    # AIT (Academy of Interactive Technology): static HTML fetch succeeds and
+    # returns 250KB–1MB per course page, but the headless browser times out every
+    # single time (confirmed: 12/12 timeouts at 60s = 12 min wasted per run).
+    # The cause is heavy third-party trackers (ait.yourcreative.com.au, HubSpot CDN)
+    # that prevent networkidle from ever settling.  More importantly, the per-course
+    # browser yields NO additional data for AIT: fees live on /apply (not course
+    # pages) and IELTS appears only in HubSpot-hosted PDF course guides.
+    # Skipping the browser saves 12 × 60s ≈ 12 minutes per scrape run with
+    # zero data loss; the static extractors + central fee page handle all that
+    # AIT does publish on its public course detail pages.
+    "ait.edu.au",
 )
 
 
