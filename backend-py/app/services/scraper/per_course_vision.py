@@ -126,6 +126,11 @@ _DECORATIVE_HINTS: Final = (
     "photo", "photograph", "picture", "image", "pic",
     "illustration", "graphic", "artwork", "background", "bg",
     "hero-image", "feature",
+    # Testimonial / portrait / profile photos — never contain data tables
+    "testimonial", "testimonials", "portrait", "headshot",
+    "profile", "review", "reviews", "team-member", "team_member",
+    "case-study", "case_study", "success-story", "success_story",
+    "alumni", "alum",
 )
 
 # File extensions that are ALWAYS skipped by the vision extractor.

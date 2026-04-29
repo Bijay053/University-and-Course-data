@@ -1,0 +1,78 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Graduate Diploma of Legal Practice (Plt)
+Law
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	3 Year	A$15,619/Full Course	6.5	-	79	-	105	Jul, Nov	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended	
+
+
+
+	
+Graduate Diploma of Legal Practice
+Law
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	-	A$15,619/Full Course	6.5	-	-	-	-	May, Jul, Sep, Nov	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended	
+
+
+
+	
+Master of Social Work (Qualifying)
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$33,277/Annual	7	66	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Master of Psychology (Clinical)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$56,849/Annual	7	62	-	-	-	Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Master of Professional Psychology
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	1 Year	A$56,846/Full Course	7	66	-	-	-	Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Diploma of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$24,000/Full Course	6.5	-	-	-	-	Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$12,000/Full Course	6.5	-	-	-	-	Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Human Services
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	8 Month	A$15,812/Full Course	6.5	59	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Bachelor of Social Work
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Bachelor	4 Year	A$29,176/Annual	6	66	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended

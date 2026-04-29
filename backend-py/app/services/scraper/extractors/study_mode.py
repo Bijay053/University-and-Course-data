@@ -114,6 +114,15 @@ _MODE_TOKEN = (
     r"distance(?:\s+(?:learning|education))?|in[\s\-]?person|"
     r"face[\s\-]?to[\s\-]?face|onshore|remote"
 )
+# Colon-free "Study modes Online" / "Study mode: Blended" pattern used by
+# ACAP and similar sites that render the mode as an adjacent text pair
+# without a delimiter colon.  Checked BEFORE the percent-online heuristic
+# so an explicit "Study modes Online" label wins over the noisy
+# "100% online + on-campus" combination that incorrectly returns "Blended".
+_STUDY_MODES_NOCOLON_RE = re.compile(
+    r"\bstudy\s+modes?\s+(" + _MODE_TOKEN + r")\b",
+    re.IGNORECASE,
+)
 _MODE_JOINER = r"(?:\s+(?:and|or|&|/|,)\s+|\s*[/,]\s*)"
 # Delimiter is REQUIRED (`:`, `-`, `–`). Without it the regex fires on
 # unlabelled prose like "learn about mode of study online" and treats
@@ -451,6 +460,19 @@ def classify_study_mode(
         if canonical:
             start = max(0, label_match.start() - 20)
             end = min(len(plain), label_match.end() + 20)
+            return canonical, plain[start:end].strip(), 0.7
+
+    # Step 2b: colon-free "Study modes Online" label (e.g. ACAP).
+    # Must run BEFORE the percent-online heuristic so an explicit mode label
+    # wins over the "100% online + on-campus" combination that incorrectly
+    # returns "Blended" for courses that are 100% online but whose page also
+    # mentions physical campuses in unrelated copy.
+    nocolon_m = _STUDY_MODES_NOCOLON_RE.search(plain)
+    if nocolon_m:
+        canonical = _classify_label_value(nocolon_m.group(1))
+        if canonical:
+            start = max(0, nocolon_m.start() - 10)
+            end = min(len(plain), nocolon_m.end() + 10)
             return canonical, plain[start:end].strip(), 0.7
 
     pct = _PERCENT_ONLINE_RE.search(plain)

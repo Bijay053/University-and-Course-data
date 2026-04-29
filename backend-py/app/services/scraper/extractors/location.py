@@ -24,7 +24,8 @@ LOCATION_LABEL = re.compile(
     r"^\s*(?:campus(?:\s*locations?)?|location|locations|"
     r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
     r"availability\s+(?:&|and)\s+campus(?:es)?|"
-    r"where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location)\s*:?\s*$",
+    r"where\s+(?:can\s+)?(?:i|you)\s+study|delivery\s+location|"
+    r"available\s+at)\s*:?\s*$",
     re.I,
 )
 _MARKETING_HINTS = re.compile(
@@ -45,7 +46,8 @@ _REMOVE_VIRTUAL = re.compile(
     re.I,
 )
 _LOCATION_WINDOW = re.compile(
-    r"\b(?:campus\s+)?locations?\s*[:\-]?\s*([^\n]{0,220}?)(?=\b(?:intakes?|duration|fees?|student\s*type|learning\s*mode|study\s*mode|delivery|attendance)\b|$)",
+    r"\b(?:(?:campus\s+)?locations?|available\s+at)\s*[:\-]?\s*([^\n]{0,220}?)"
+    r"(?=\b(?:intakes?|duration|fees?|student\s*type|learning\s*mode|study\s*modes?|delivery|attendance)\b|$)",
     re.I,
 )
 _COMMON_CITIES = (
@@ -381,7 +383,7 @@ def _sanitise_for_display(raw: str | None) -> str | None:
 _LOCATION_LABEL_TAG_RE = re.compile(
     r"(?:campus(?:\s+locations?)?|locations?|"
     r"where\s+(?:can\s+)?(?:i|you)\s+study|"
-    r"delivery\s+location)",
+    r"delivery\s+location|available\s+at)",
     re.IGNORECASE,
 )
 _STRONG_VALUE_CHAR_CAP = 300

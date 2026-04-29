@@ -1,0 +1,178 @@
+Evidence Review
+Graduate Diploma of Legal Practice
+Eligibility: review - Missing: duration, academicLevel, academicScore, otherRequirement | Warnings: missing academic requirement, completeness 69% < 75%
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Law
+gemini_primary: category=Law
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+course_location
+selected
+selected
+/ location.text_block
+confidence 50%
+Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia
+Sydney, Melbourne, Brisbane, Adelaide, Perth
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Graduate Diploma of Legal Practice
+Graduate Diploma of Legal Practice
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Graduate Certificate
+Graduate Diploma of Legal Practice
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Study A Graduate Diploma Of Legal Practice (PLT Course) at ACAP. ✔ Online ✔ 14 weeks Full Time (plus workplace experience & professional engagement). Enrol Now.
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+domestic_fee
+selected
+selected
+/ gemini_primary
+confidence 75%
+11622.0
+gemini_primary: domestic_fee=11622.0
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+duration
+needs_review
+/ duration.structural
+confidence 85%
+3.0
+<strong>Duration</strong> -> Duration 14 Weeks Full Time View all options
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+duration_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Week
+gemini_primary: duration_term=Week
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+duration_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+14 Weeks Full Time
+gemini_primary: duration_text=14 Weeks Full Time
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+fee_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Full Course
+gemini_primary: fee_term=Full Course
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["May", "July", "September", "November"]
+Fees FEE-HELP Available Start dates View all Start dates Graduate Diploma of Legal Practice Victoria (PLT) 25 May 2026 20 July 2026 14 September 2026 16 November 2026 Apply Now chevron_right Understand legal practice Apply now chevron_right
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+intake_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+May, July, September, November
+gemini_primary: intake_text=May, July, September, November
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+available to international students
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+15619
+ternational Fees International International Fees Graduate Diploma of Legal Practice Victoria (PLT) Total Course Fee (Indicative)* (based on 1.0 EFTSL) $12,469-$15,619 AUD depending on units selected Practical Legal Training Coursework: LLP
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+Online
+gemini_primary: mode=Online
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+Blended
+I do my PLT online? At ACAP, our GDLP coursework is offered 100% online (outside of mandatory work experience and professional enga
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Legal Practice
+gemini_primary: sub_category=Legal Practice
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
