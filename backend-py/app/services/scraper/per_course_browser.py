@@ -161,6 +161,12 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # misleading fragment the static fetcher may have picked up.
     "uow.edu.au",
     "unisq.edu.au",
+    # VIT: static HTML renders the Domestic student panel by default, showing
+    # the domestic fee. The browser clicks the International toggle which
+    # reveals the correct international fee. We must always run the browser
+    # (even when english slots are filled from static) and override the fee
+    # slot so the international fee replaces the domestic one.
+    "vit.edu.au",
 )
 
 _NETWORKIDLE_SETTLE_MS = 3000
@@ -240,11 +246,18 @@ def _all_english_empty(payload: dict[str, Any]) -> bool:
 # (fee + intake + duration + location + study_mode + english_test) on the
 # rendered HTML, not just english_test.  Without this, fee.extract never
 # sees the JS-rendered accordion content and always returns empty for UOW/UniSQ.
+# VIT: the static HTML shows the Domestic student panel by default.  The
+# browser clicks the "International" toggle (see _INTERNATIONAL_TOGGLE_HOSTS)
+# which changes the displayed fee from the domestic rate (~$36k/yr) to the
+# correct international rate ($48k full course). Without extended extraction
+# + override, the domestic fee from the static pass is never replaced.
 _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
     "uow.edu.au",
     "www.uow.edu.au",
     "unisq.edu.au",
     "www.unisq.edu.au",
+    "vit.edu.au",
+    "www.vit.edu.au",
 })
 
 # Field slots that each extended extractor fills — used to guard against
