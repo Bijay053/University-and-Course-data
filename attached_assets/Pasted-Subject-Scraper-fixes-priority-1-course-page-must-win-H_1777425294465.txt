@@ -1,0 +1,174 @@
+Subject: Scraper fixes — priority 1: course page must win
+Hi,
+Thanks for the architecture writeup. I've reviewed it and have a list of fixes in priority order. The first one is the most important and is a design-level issue, not a bug fix.
+
+Priority 1 — Course page is the source of truth, not the fallback
+The scraper is currently jumping to central fee pages, requirement PDFs, and AI fallback too eagerly. Many courses have ~90% of the data on their own course page, but because we go straight to other sources, we end up with values that belong to the university default rather than the specific course.
+Symptom: postgrad and pathway courses get the undergraduate IELTS score because the central page wins. Specific-program fees get the generic international fee from the PDF. Course page had the right answer all along.
+Fix:
+Reorder the per-course extraction pipeline in single_course.py so the course page is fully exhausted before any other source is consulted.
+Current order (Stage 4 in the architecture doc):
+1. Static HTTP fetch
+2. Pre-seed extractors
+3. Gemini primary
+4. Regex/rule extractors
+5. Browser fallback
+6. Vision OCR fallback        ← only triggered if IELTS/fee still null
+7. AI fallback
+8. PDF backfills              ← university-wide source
+9. Central page backfill      ← university-wide source
+10. PG-SKIP guard
+11. enforce_source_evidence
+Required order:
+PHASE A — exhaust the course page (no university-wide sources allowed):
+  1. Static HTTP fetch
+  2. Pre-seed extractors
+  3. Regex/rule extractors                ← cheapest, run first
+  4. Gemini primary
+  5. Browser fallback (if SPA / accordion / fee toggle)
+  6. Vision OCR on course page screenshots ← if any required field still null
+  7. AI fallback on course page text only
+
+PHASE B — only if PHASE A left required fields null:
+  8. PDF backfills (fee, requirements)
+  9. Central page backfill
+  10. CRICOS-code cross-reference for PDF matching
+  11. PG-SKIP guard
+  12. enforce_source_evidence
+The key change is moving vision OCR and AI fallback into Phase A, before any university-wide source is touched. If the data is on the course page in any form (text, image, PDF embedded in the page), we get it from there. We only fall back to university-wide sources when the course page genuinely doesn't have the value.
+This also fixes the ASAHE-style problem where IELTS scores are stored as images on the course page itself. Today we don't see those images because we move to central sources before doing vision OCR. With the new order, vision OCR runs on the course page first, finds the embedded score, and we never need the central page.
+Authority model — replace _PER_COURSE_VISION_METHODS with a numeric ranking:
+pythonMETHOD_AUTHORITY = {
+    # Authority 1 — university-wide (lowest)
+    "central_page": 1,
+    "uni_pdf:fee": 2,
+    "uni_pdf:requirements": 2,
+
+    # Authority 3 — course-specific text
+    "gemini_primary": 3,
+    "rule:fee": 3,
+    "rule:english": 3,
+    "rule:duration": 3,
+    "per_course_browser": 3,
+    "ai_fallback": 3,
+
+    # Authority 4 — visual proof from the course page
+    "per_course_vision": 4,
+    "per_course_vision_cached": 4,
+
+    # Authority 5 — hard-coded site-specific extractor
+    "pre_seed": 5,
+}
+
+def can_override(existing_method, new_method):
+    return METHOD_AUTHORITY[new_method] > METHOD_AUTHORITY[existing_method]
+Higher authority wins. PG-SKIP becomes a special case: an authority-1 value cannot override an authority-3+ value on a Masters course. Vision sanity check becomes: don't revert authority-4 to authority-1.
+This generalizes the patch you made for uni_pdf:requirements so we don't keep finding the same class of bug for new extractors.
+
+Priority 2 — Vision OCR on the course page itself (the ASAHE image case)
+The architecture doc treats vision OCR as a fallback when fields are still null. But for some universities — ASAHE is the example, there are others — the IELTS/PTE scores are published as images on the course page itself. Tables saved as PNG, infographic-style requirement boxes, etc. The text is on the page, just not in the HTML.
+Fix:
+Vision OCR on the course page becomes part of Phase A above, not a fallback. It runs whenever:
+
+IELTS / PTE / TOEFL is still null after text extraction, AND
+The course page contains images that are large enough to plausibly contain a requirements table (heuristic: width > 300px AND height > 200px AND filename or alt text matches (english|ielts|requirement|entry|admission|table))
+
+Don't OCR every image on the page — that's expensive. Filter to candidate images first using the heuristic, then OCR. For each image with a hit, log the source URL of the image (not just the course page) in scraped_field_evidence.source_url so we can prove where the value came from.
+Cache aggressively — if the same image URL appears on multiple courses (university-wide requirement infographic), OCR it once.
+
+Priority 3 — CRICOS-code cross-reference for PDF matching
+
+Token-overlap fuzzy matching for PDFs … fails when the PDF and the website use significantly different names for the same course.
+
+This is a known issue from the architecture doc. CRICOS codes solve it cleanly:
+
+6 digits + a letter, globally unique per Australian course
+Almost always present in the fee PDF table
+Almost always present on the course page (footer, sidebar, "course code" field)
+
+Fix:
+In extractors/, add a cricos.py extractor that runs on every course page. It looks for \b\d{6}[A-Z]\b near words like "CRICOS", "Provider Code", "Course Code". Save the result as scraped_courses.cricos_code (column already exists) and as a scraped_field_evidence row with method rule:cricos.
+In pipelines/university_pdfs.py, change match_course_in_pdf_table() to:
+
+Try CRICOS-code match first. If both the course and a PDF row have CRICOS, exact match wins.
+Fall back to token overlap only when one or both sides have no CRICOS.
+If both CRICOS codes exist but don't match, log a field_conflicts row — never silently match a CRICOS-mismatched row by name.
+
+This will recover a meaningful chunk of fees that are currently lost to name mismatches.
+
+Priority 4 — Vision sanity check fix (pathway program problem)
+
+If a course has a different IELTS threshold from the university-wide default (e.g. a pathway program at 5.5 while the default is 6.5), the sanity check incorrectly reverts the correct course-specific value to the central default. Threshold is ±1.0 band.
+
+Fix:
+The current rule reverts vision values that differ from central by more than the threshold. Change the rule to:
+
+Revert only if the vision value is NOT present anywhere in the visible page text or image OCR text. If the value is on the page in any form, it's not an OCR hallucination — it's the correct course-specific value that simply differs from the university default.
+
+Concretely:
+pythondef vision_sanity_revert(field, vision_value, central_value, page_text, ocr_texts):
+    if abs(vision_value - central_value) <= THRESHOLD[field]:
+        return False  # within threshold, don't revert
+    # Outside threshold — but is the vision value actually on the page?
+    haystack = page_text + " ".join(ocr_texts)
+    if str(vision_value) in haystack:
+        return False  # value is on the page; trust the vision
+    return True  # genuine OCR hallucination, revert
+This combined with the authority-numeric model from Priority 1 should resolve the pathway-program issue completely.
+
+Priority 5 — Per-field fill-rate tracking + alerting
+The architecture doc calls this out as missing under §9 ("What is NOT automated"). Without it, regressions like ASAHE's PG-SKIP bug stay invisible until a user notices.
+Fix:
+After each scrape run, compute and store:
+field_fill_snapshots
+  id, run_id, university_id, field_key, total_courses,
+  populated_count, populated_pct, primary_method, created_at
+primary_method is the most-common method label across populated rows for that field — tells us whether IELTS is mostly coming from gemini_primary, per_course_vision, etc.
+Then a simple alert rule:
+If populated_pct drops by ≥ 30% vs the rolling 7-day median for that
+(university_id, field_key), emit an error log with:
+  - university name
+  - field name
+  - previous median pct, current pct
+  - top method labels in previous run vs this run (so we can see
+    "IELTS used to come from per_course_vision, now coming from
+    central_page" — that's the diagnostic clue)
+UI: add a "Coverage" tab to the scraping page showing fill rate per field per university, with red highlighting on drops. Don't need anything fancy — a table is fine.
+This would have caught the ASAHE issue the day it appeared instead of months later.
+
+Priority 6 — Gemini quota wrapper (operational, not data quality)
+
+Gemini API quota exhaustion … no automatic quota-aware throttling
+
+Fix:
+Wrap all Gemini calls in a gemini_client.py that:
+
+Maintains a daily token budget (configurable, e.g. 80% of the actual API quota as headroom).
+When 90% of budget is consumed, vision OCR calls are dropped (return None, log "skipped: quota near limit").
+When 95% is consumed, AI fallback calls are also dropped.
+When 100%, all calls are dropped — the run continues with whatever deterministic extractors produce.
+Log every drop with the course URL so we have a list of courses to re-scrape after quota resets.
+
+Critical: this should degrade visibly, not silently. Every dropped call gets a log entry the admin can see. Today, when the quota runs out, calls return empty and the data quality silently degrades — admins find out from user complaints.
+
+Implementation order
+I'd do them in this exact order — each makes the next easier to verify:
+
+Priority 1 (pipeline reorder + authority model) — half a day. The biggest data quality improvement of the lot.
+Priority 2 (vision OCR on course page) — one day. Required to fix ASAHE properly.
+Priority 3 (CRICOS matching) — half a day.
+Priority 4 (vision sanity check fix) — couple hours. Trivial once Priority 1 is in.
+Priority 5 (fill-rate tracking) — two days. Nice-to-have, but stops future regressions.
+Priority 6 (Gemini quota wrapper) — one day. Operational, but stops bulk re-scrapes from degrading midway.
+
+After Priority 1 and 2, ASAHE should re-scrape cleanly with IELTS coming from the actual course-page image. After Priority 3, missing fees on universities with PDF schedules should drop noticeably.
+Don't bundle these into one big PR — ship them one at a time with a re-scrape of one or two affected universities after each, so we can see the impact of each fix in isolation.
+Let me know which of these you want to tackle first or if any need clarification.
+Thanks.
+
+That's the full message. A couple of notes on what I deliberately included:
+
+I led with the philosophy ("course page is source of truth, not fallback") because that's the design shift, and the rest of the priorities flow from it. If they only do Priority 1, they get most of the wins.
+I called out the ASAHE image case explicitly under Priority 2 with a concrete heuristic so they don't have to invent one.
+I put "ship one at a time, re-scrape between" at the end because if they bundle everything into one PR, you'll never know which fix solved which problem.
+I didn't tell them to throw anything out. Their architecture is good. These are surgical changes.

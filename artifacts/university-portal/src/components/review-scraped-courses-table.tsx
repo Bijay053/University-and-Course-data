@@ -115,7 +115,14 @@ function finalValueForField(course: ReviewStagedCourse, fieldKey: string): strin
   switch (fieldKey) {
     case "courseName":        return v(course.courseName);
     case "courseLocation":    return v(course.courseLocation);
-    case "duration":          return course.duration != null && course.duration !== "" ? `${course.duration} ${course.durationTerm ?? ""}`.trim() : null;
+    case "duration": {
+      if (course.duration == null || course.duration === "") return null;
+      const dn = typeof course.duration === "number" ? course.duration : parseFloat(course.duration as string);
+      if (isNaN(dn)) return `${course.duration} ${course.durationTerm ?? ""}`.trim();
+      const dr = Math.round(dn * 10) / 10;
+      const dd = dr % 1 === 0 ? String(Math.round(dr)) : String(dr);
+      return `${dd} ${course.durationTerm ?? "Year"}`.trim();
+    }
     case "studyMode":         return v(course.studyMode);
     case "degreeLevel":       return v(course.degreeLevel);
     case "internationalFee":  return course.internationalFee != null && course.internationalFee !== "" ? `${course.currency ?? "AUD"} ${course.internationalFee}` : null;
