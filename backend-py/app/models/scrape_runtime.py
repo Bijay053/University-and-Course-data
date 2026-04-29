@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,8 @@ class ScrapeRuntimeJob(Base):
     claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     requeue_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     requeue_events: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    cost_ceiling_hit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    total_gemini_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
