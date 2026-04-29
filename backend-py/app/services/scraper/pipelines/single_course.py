@@ -877,7 +877,6 @@ async def extract_course(
             # is silently dropped by stage_course because intake_text is not
             # a column on ScrapedCourse — causing intakes to always show as "-".
             if _gp_filled.get("intake_text"):
-                import re as _re
                 from app.services.scraper.extractors.intake import (
                     _normalise_month as _nm,
                 )

@@ -1,0 +1,202 @@
+
+Worker claimed queued scrape job
+Cleared 84 stale pending/rejected scraped_courses rows (>10m old) for university 3
+Fetching https://www.torrens.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.torrens.edu.au/courses/course-guides (high-priority probe)
+[DISCOVER] Crawling from https://www.torrens.edu.au/courses/course-guides (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.torrens.edu.au/courses/course-guides: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/courses/course-guides
+[DISCOVER] Page 1/25: +1 candidates (total 1) — https://www.torrens.edu.au/courses/course-guides
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/employability/workforce-edge: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[DISCOVER] Page 2/25: +1 candidates (total 2) — https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/international-students: unknown (no course links or degree content detected)
+[DISCOVER] Page 3/25: +0 candidates (total 2) — https://www.torrens.edu.au/studying-with-us/international-students
+[DISCOVER] classified https://www.torrens.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] Page 4/25: +0 candidates (total 2) — https://www.torrens.edu.au/courses
+[DISCOVER] classified https://www.torrens.edu.au/courses/design: unknown (no course links or degree content detected)
+[DISCOVER] Page 5/25: +0 candidates (total 2) — https://www.torrens.edu.au/courses/design
+[DISCOVER] classified https://www.torrens.edu.au/courses/health: listing (3 course links + listing title)
+[DISCOVER] Page 6/25: +3 candidates (total 5) — https://www.torrens.edu.au/courses/health
+[DISCOVER] classified https://www.torrens.edu.au/courses/business: listing (3 course links + listing title)
+[DISCOVER] Page 7/25: +3 candidates (total 8) — https://www.torrens.edu.au/courses/business
+[DISCOVER] classified https://www.torrens.edu.au/courses/hospitality: listing (2 course links + listing title)
+[DISCOVER] Page 8/25: +2 candidates (total 10) — https://www.torrens.edu.au/courses/hospitality
+[DISCOVER] classified https://www.torrens.edu.au/courses/technology: listing (2 course links + listing title)
+[DISCOVER] Page 9/25: +2 candidates (total 12) — https://www.torrens.edu.au/courses/technology
+[DISCOVER] classified https://www.torrens.edu.au/courses/education: listing (3 course links + listing title)
+[DISCOVER] Page 10/25: +3 candidates (total 15) — https://www.torrens.edu.au/courses/education
+[DISCOVER] classified https://www.torrens.edu.au/courses/english: unknown (no course links or degree content detected)
+[DISCOVER] Page 11/25: +0 candidates (total 15) — https://www.torrens.edu.au/courses/english
+[DISCOVER] classified https://www.torrens.edu.au/courses/higher-degrees-by-research: listing (3 course links + listing title)
+[DISCOVER] Page 12/25: +3 candidates (total 18) — https://www.torrens.edu.au/courses/higher-degrees-by-research
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us: unknown (no course links or degree content detected)
+[DISCOVER] Page 13/25: +0 candidates (total 18) — https://www.torrens.edu.au/studying-with-us
+[DISCOVER] blocked marketing_page: https://www.torrens.edu.au/studying-with-us/why-study-with-us
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/employability: unknown (no course links or degree content detected)
+[DISCOVER] Page 15/25: +0 candidates (total 18) — https://www.torrens.edu.au/studying-with-us/employability
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options: listing (1 course links + listing title)
+[DISCOVER] Page 16/25: +1 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/study-options
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/campus-locations: unknown (no course links or degree content detected)
+[DISCOVER] Page 17/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/campus-locations
+[DISCOVER] blocked campus_page: https://www.torrens.edu.au/studying-with-us/student-life
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/student-support: unknown (no course links or degree content detected)
+[DISCOVER] Page 19/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/student-support
+[DISCOVER] blocked info_page: https://www.torrens.edu.au/studying-with-us/mature-age-students
+[DISCOVER] blocked info_page: https://www.torrens.edu.au/studying-with-us/high-school-students
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/choose-a-study-option: listing (1 course links + listing title)
+[DISCOVER] Page 22/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/choose-a-study-option
+[DISCOVER] classified https://www.torrens.edu.au/research/faculty-research: detail (course content present, only 2 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/research/faculty-research
+[DISCOVER] Page 23/25: +1 candidates (total 20) — https://www.torrens.edu.au/research/faculty-research
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options/undergraduate-courses: listing (6 course links found)
+[DISCOVER] Page 24/25: +6 candidates (total 26) — https://www.torrens.edu.au/studying-with-us/study-options/undergraduate-courses
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options/postgraduate-courses: listing (9 course links found)
+[DISCOVER] Page 25/25: +3 candidates (total 29) — https://www.torrens.edu.au/studying-with-us/study-options/postgraduate-courses
+Discovered 29 candidate course links
+Loaded uni-level PDF data: fee=yes english=no
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.torrens.edu.au/international-fees
+[CENTRAL] english page parsed → no values from https://www.torrens.edu.au/courses/english
+Extracting course details (29 pages)...
+[EXTRACT] 1/29: Course Guides
+[EXTRACT] 2/29: Workforce Edge
+[EXTRACT] 3/29: Bachelor of Health Science (Clinical Nutrition)
+[EXTRACT] 4/29: Diploma of Health Science
+Fetching 3/29: Bachelor of Health Science (Clinical Nutrition)
+Fetching 2/29: Workforce Edge
+Fetching 1/29: Course Guides
+Fetching 4/29: Diploma of Health Science
+[FIELD SUMMARY] Course Guides Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Workforce Edge Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Health Science (Clinical Nutrition) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Health Science Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[per-course browser ↻] https://www.torrens.edu.au/courses/course-guides
+[EXTRACT] 5/29: Graduate Diploma of Public Health
+Fetching 5/29: Graduate Diploma of Public Health
+[EXTRACT] 6/29: MBA (Advanced)
+Fetching 6/29: MBA (Advanced)
+[FIELD SUMMARY] Graduate Diploma of Public Health Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[EXTRACT] 7/29: Bachelor of Business (Sport Management)
+[EXTRACT] 8/29: MBA and Master of Global Project Management
+Fetching 7/29: Bachelor of Business (Sport Management)
+Fetching 8/29: MBA and Master of Global Project Management
+[per-course browser ✓] https://www.torrens.edu.au/studying-with-us/employability/workforce-edge — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 9/29: Bachelor of Business (Hospitality and Tourism...
+Fetching 9/29: Bachelor of Business (Hospitality and Tourism...
+[per-course browser ✓] https://www.torrens.edu.au/courses/course-guides — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 10/29: Diploma of Business (Hospitality and Tourism...
+Fetching 10/29: Diploma of Business (Hospitality and Tourism...
+[FIELD SUMMARY] Master of Business Administration and Master of Gl Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business (Sport Management) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business (Hospitality and Tourism Mana Fee: ✅ '82800' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ❌ not found Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Hospitality and Tourism Manag Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[EXTRACT] 11/29: Bachelor of Information Technology
+[EXTRACT] 12/29: Master of Information Technology
+[EXTRACT] 13/29: Master of Education (Inclusive Education)
+[EXTRACT] 14/29: Master of Education (Advanced)
+Fetching 13/29: Master of Education (Inclusive Education)
+Fetching 14/29: Master of Education (Advanced)
+Fetching 12/29: Master of Information Technology
+Fetching 11/29: Bachelor of Information Technology
+[FIELD SUMMARY] Bachelor of Information Technology Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Education (Inclusive Education) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Education (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[EXTRACT] 15/29: Graduate Diploma of Education
+[EXTRACT] 16/29: Master of Philosophy
+[EXTRACT] 17/29: Graduate Certificate of Research Studies
+[EXTRACT] 18/29: Master of Research Studies
+Fetching 15/29: Graduate Diploma of Education
+Fetching 16/29: Master of Philosophy
+Fetching 17/29: Graduate Certificate of Research Studies
+Fetching 18/29: Master of Research Studies
+[FIELD SUMMARY] Graduate Diploma of Education Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Philosophy Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Research Studies Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Research Studies Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[EXTRACT] 19/29: Diploma of Design
+[EXTRACT] 20/29: Faculty Research
+[EXTRACT] 21/29: Bachelor of Business
+[EXTRACT] 22/29: Undergraduate Health courses
+Fetching 19/29: Diploma of Design
+Fetching 20/29: Faculty Research
+Fetching 21/29: Bachelor of Business
+Fetching 22/29: Undergraduate Health courses
+[FIELD SUMMARY] Future Higher Degrees by Research Students Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January', 'October']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Health Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Business Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/research/faculty-research
+[per-course browser ↻] https://www.torrens.edu.au/courses/health
+[EXTRACT] 23/29: Undergraduate Business courses
+[EXTRACT] 24/29: Undergraduate Design courses
+Fetching 23/29: Undergraduate Business courses
+Fetching 24/29: Undergraduate Design courses
+[FIELD SUMMARY] Design Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Business Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business
+[per-course browser ↻] https://www.torrens.edu.au/courses/design
+[per-course browser ✓] https://www.torrens.edu.au/courses/health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/research/faculty-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 25/29: Undergraduate Technology courses
+[EXTRACT] 26/29: Undergraduate Hospitality courses
+Fetching 25/29: Undergraduate Technology courses
+Fetching 26/29: Undergraduate Hospitality courses
+[per-course browser ✓] https://www.torrens.edu.au/courses/business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 27/29: Master of Economics of Sustainability...
+Fetching 27/29: Master of Economics of Sustainability...
+[FIELD SUMMARY] Technology Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Hospitality Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/hospitality
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology
+[FIELD SUMMARY] Master of Economics of Sustainability (Partnership Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[EXTRACT] 28/29: Postgraduate Education courses
+[per-course browser ✓] https://www.torrens.edu.au/courses/design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+Fetching 28/29: Postgraduate Education courses
+[EXTRACT] 29/29: Postgraduate Research courses
+Fetching 29/29: Postgraduate Research courses
+[FIELD SUMMARY] Education Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Higher Degrees by Research Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/education
+[per-course browser ↻] https://www.torrens.edu.au/courses/higher-degrees-by-research
+[per-course browser ✓] https://www.torrens.edu.au/courses/hospitality — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/higher-degrees-by-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[STAGE] skipped Course Guides: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Workforce Edge: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Bachelor of Health Science (Clinical Nutrition): extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Diploma of Health Science: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Graduate Diploma of Public Health: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped MBA (Advanced): extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Bachelor of Business (Sport Management): extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped MBA and Master of Global Project Management: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Bachelor of Business (Hospitality and Tourism...: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Diploma of Business (Hospitality and Tourism...: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Bachelor of Information Technology: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Information Technology: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Education (Inclusive Education): extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Education (Advanced): extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Graduate Diploma of Education: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Philosophy: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Graduate Certificate of Research Studies: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Research Studies: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Diploma of Design: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Faculty Research: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Bachelor of Business: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Undergraduate Health courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Undergraduate Business courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Undergraduate Design courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Undergraduate Technology courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Undergraduate Hospitality courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Master of Economics of Sustainability...: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Postgraduate Education courses: extract: cannot access local variable '_re' where it is not associated with a value
+[STAGE] skipped Postgraduate Research courses: extract: cannot access local variable '_re' where it is not associated with a value
+[DATA QUALITY] 0 course(s) checked — 0 critical / 0 warning / 0 info
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 1m 40s | Courses: 29 | Avg: 3.4s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:29 | Staged:0 | Skipped:0 | Errors:29
+Staged 0 courses, 0 skipped, 0 fetch errors
