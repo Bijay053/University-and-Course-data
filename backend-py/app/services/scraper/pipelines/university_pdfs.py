@@ -574,14 +574,27 @@ def _pick_per_course_amounts(text: str) -> dict[str, dict[str, Any]]:
 
 
 def match_course_in_pdf_table(
-    course_name: str, by_course: dict[str, dict[str, Any]]
-) -> dict[str, Any] | None:
+    course_name: str,
+    by_course: dict[str, dict[str, Any]],
+    cricos_code: str | None = None,
+) -> tuple[dict[str, Any] | None, str]:
     """Find the best PDF row for a given DB course name.
 
-    Strategy: tokenise both names with :func:`_name_tokens` (stopwords
-    removed) and require **at least two shared distinctive tokens** OR
-    full token-set equality. Among qualifying rows pick the one with
-    the highest ``max(db_coverage, pdf_coverage)`` score (≥ 0.5).
+    Returns a ``(row, method_suffix)`` tuple where ``method_suffix`` is
+    ``"cricos_match"`` when a direct CRICOS key hit was used, or
+    ``"name_match"`` when the fuzzy name-token path fired.
+    Returns ``(None, "no_match")`` when no PDF row qualifies.
+
+    **CRICOS-first lookup**: when *cricos_code* is supplied and matches a
+    key in *by_course* (which is already keyed by CRICOS), that row is
+    returned directly — zero fuzzy matching needed.  This eliminates the
+    "IT-Cyber Security gets IT-AI fees" failure mode that arises from
+    overlapping distinctive tokens.
+
+    **Fuzzy fallback**: tokenise both names with :func:`_name_tokens`
+    (stopwords removed) and require **at least two shared distinctive
+    tokens** OR full token-set equality. Among qualifying rows pick the
+    one with the highest ``max(db_coverage, pdf_coverage)`` score (≥ 0.5).
 
     The two-token floor is the fix for PR-7 review finding #2: with the
     old single-direction ``max`` score, a generic short PDF row like
@@ -592,13 +605,30 @@ def match_course_in_pdf_table(
     exact-set escape hatch keeps short legitimate matches working
     (e.g. PDF "Master of Design" → DB "Master of Design").
 
-    Returns ``None`` when no PDF row qualifies, so we fall back to the
+    Returns ``(None, "no_match")`` when no PDF row qualifies, so callers
+    fall back to the
     uni-wide value rather than mis-stamp a course.
     """
     db_tokens = _name_tokens(course_name)
     db_level = _degree_level(course_name)
     if not db_tokens or not by_course:
-        return None
+        return None, "no_match"
+
+    # CRICOS-first: when the caller has a CRICOS code and it is present as a
+    # key in ``by_course`` (which _pick_per_course_amounts already keys by
+    # CRICOS), skip fuzzy matching entirely.  Direct-key lookup is O(1) and
+    # 100% accurate — no token confusion between related programmes.
+    if cricos_code:
+        cricos_row = by_course.get(cricos_code)
+        if cricos_row:
+            log.debug(
+                "CRICOS-first hit for %r → CRICOS=%s fee=$%s",
+                course_name,
+                cricos_code,
+                cricos_row.get("international_fee"),
+            )
+            cleaned = {k: v for k, v in cricos_row.items() if not k.startswith("_")}
+            return cleaned, "cricos_match"
 
     best: tuple[tuple[float, int], dict[str, Any]] | None = None
     for row in by_course.values():
@@ -677,10 +707,10 @@ def match_course_in_pdf_table(
             best = (key, row)
 
     if best is None:
-        return None
+        return None, "no_match"
 
     # Strip the private match-helper fields before returning to callers.
-    return {k: v for k, v in best[1].items() if not k.startswith("_")}
+    return {k: v for k, v in best[1].items() if not k.startswith("_")}, "name_match"
 
 
 async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, Any]:
