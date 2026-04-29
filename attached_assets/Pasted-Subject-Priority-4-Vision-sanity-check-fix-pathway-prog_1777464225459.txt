@@ -1,0 +1,257 @@
+Subject: Priority 4 — Vision sanity check fix + pathway program handling
+Pathway programs (Foundation Studies, ELICOS, UniPrep, certificate-level prep, bridging programs) currently get wrong English requirements assigned because:
+
+The central English requirements extractor applies the university's main IELTS (e.g., 6.5) to every course, including pathway programs that have their own lower requirements.
+Vision OCR and regex extractors may find the target-degree requirement on a pathway page ("after this you can apply for our Bachelor's with IELTS 6.5") instead of the pathway's own entry requirement (IELTS 5.5).
+Existing sanity checks have hardcoded English floors (e.g., IELTS ≥ 5.5) that nullify legitimate pathway values like ELICOS's IELTS 4.5.
+
+We've seen this on UniSQ's UniPrep page (uniprep-approval-form-2026.ashx) which got tagged with the central page's IELTS 6.5 when UniPrep's actual entry is well below that. Will hit every university with foundation or ELICOS programs.
+Four-part fix
+Part 1: Pathway program detection
+Add a helper that classifies courses as "pathway" based on course name patterns:
+python# backend-py/app/services/scraper/pathway_detection.py
+
+import re
+
+PATHWAY_NAME_PATTERNS = [
+    r"\bfoundation\s+(studies|program|year)\b",
+    r"\bpathway\b",
+    r"\belicos\b",
+    r"\benglish\s+language\s+(program|course|preparation)\b",
+    r"\bpre-?university\b",
+    r"\bpre-?bachelor\b",
+    r"\bbridging\b",
+    r"\benabling\b",
+    r"\buniprep\b",
+    r"\btertiary\s+preparation\b",
+    r"\bdirect\s+entry\b",
+    r"\bacademic\s+english\b",
+]
+
+# Course types that are NOT pathways even if they share words
+# (e.g., "Diploma of Counselling" is a real qualification, not a pathway)
+PATHWAY_EXCLUSION_PATTERNS = [
+    r"\bdiploma\s+of\s+",  # diplomas are usually full quals, not pathways
+    r"\bgraduate\s+diploma\b",  # postgrad qualification
+    r"\bgraduate\s+certificate\b",  # postgrad qualification
+]
+
+def is_pathway_program(course_name: str | None,
+                       degree_level: str | None = None) -> bool:
+    """Return True if the course is a pathway/preparatory program.
+    
+    Pathway programs typically have lower English requirements than
+    standard academic degrees and should not inherit the university's
+    main IELTS minimum.
+    """
+    if not course_name:
+        return False
+    name = course_name.lower()
+    
+    # Hard exclusions first
+    for pat in PATHWAY_EXCLUSION_PATTERNS:
+        if re.search(pat, name):
+            return False
+    
+    # Pattern match
+    for pat in PATHWAY_NAME_PATTERNS:
+        if re.search(pat, name):
+            return True
+    
+    # Degree-level hint: AQF Level 4 and below are usually pathway
+    if degree_level and degree_level.lower() in {
+        "certificate iv", "certificate iii", "certificate ii", "certificate i",
+        "english language", "foundation", "non-award"
+    }:
+        return True
+    
+    return False
+This runs after course name extraction. Result is stored on the course payload as is_pathway: bool.
+Part 2: Don't propagate central English requirements to pathway courses
+Currently when a university has a central English requirements page (like UniSQ's english-language-requirements), that page's IELTS value is applied to every course at that university. For pathway courses this is wrong.
+In the central page application logic, add a guard:
+pythondef apply_central_english_to_course(course: CoursePayload, 
+                                     central_values: dict) -> None:
+    if course.is_pathway:
+        # Pathway programs have their own English requirements, don't 
+        # inherit university-wide values.
+        log.info(f"[CENTRAL SKIP pathway] {course.url} — pathway program, "
+                 f"skipping central English requirements")
+        return
+    
+    # ... existing application logic
+After this, pathway courses' English fields stay null unless their own page extractor finds values. That's correct behaviour — better to leave null and flag for review than to apply wrong values.
+Part 3: Pathway-aware sanity check floors
+The current sanity check has hardcoded floors for English values. Make these floors depend on whether the course is a pathway program:
+python# backend-py/app/services/scraper/validators.py
+
+ENGLISH_FLOORS_STANDARD = {
+    "ielts_overall": 5.5,
+    "ielts_listening": 5.0,
+    "ielts_reading": 5.0,
+    "ielts_speaking": 5.0,
+    "ielts_writing": 5.0,
+    "toefl_overall": 46,
+    "pte_overall": 36,
+    "cambridge_overall": 154,  # ~B2 lower
+    "duolingo_overall": 80,
+}
+
+ENGLISH_FLOORS_PATHWAY = {
+    "ielts_overall": 4.5,
+    "ielts_listening": 4.0,
+    "ielts_reading": 4.0,
+    "ielts_speaking": 4.0,
+    "ielts_writing": 4.0,
+    "toefl_overall": 32,
+    "pte_overall": 30,
+    "cambridge_overall": 140,  # ~B1
+    "duolingo_overall": 65,
+}
+
+def get_english_floor(field: str, is_pathway: bool) -> float:
+    floors = ENGLISH_FLOORS_PATHWAY if is_pathway else ENGLISH_FLOORS_STANDARD
+    return floors.get(field, 0)
+
+
+def english_value_passes_sanity(field: str, value: float, 
+                                 is_pathway: bool) -> bool:
+    floor = get_english_floor(field, is_pathway)
+    ceiling = ENGLISH_CEILINGS.get(field, float("inf"))  # existing ceilings
+    return floor <= value <= ceiling
+The existing sanity check that currently runs if value < 5.5: revert becomes if not english_value_passes_sanity(field, value, course.is_pathway): revert.
+Part 4: Don't revert vision values that appear in page text
+Separate fix from Part 3, but related. Currently vision OCR values can be reverted by the sanity check even when the same value appears verbatim in the page's static text — meaning regex would have found it too if it had matched, and the value is real, not hallucinated.
+pythondef vision_value_appears_in_page_text(value: float, field: str, 
+                                       page_text: str) -> bool:
+    """Check if a vision-extracted value also appears in page text.
+    If it does, the value is corroborated and should not be reverted by
+    sanity check, even if it's outside the normal floor/ceiling range.
+    """
+    if not page_text or value is None:
+        return False
+    
+    page_lower = page_text.lower()
+    
+    # Field-specific keyword + value patterns
+    field_keywords = {
+        "ielts_overall": ["ielts"],
+        "toefl_overall": ["toefl"],
+        "pte_overall": ["pte", "pearson"],
+        "cambridge_overall": ["cambridge", "cae", "c1", "c2"],
+        "duolingo_overall": ["duolingo", "det"],
+    }
+    
+    keywords = field_keywords.get(field, [])
+    if not any(kw in page_lower for kw in keywords):
+        return False  # the test isn't even mentioned on the page
+    
+    # Look for the value near the keyword
+    # Format value as both "6.5" and "6" for IELTS, etc.
+    value_strs = [f"{value:g}", f"{int(value)}" if value == int(value) else None]
+    value_strs = [v for v in value_strs if v]
+    
+    for kw in keywords:
+        for v_str in value_strs:
+            # Within 100 chars of the keyword, look for the value
+            for match in re.finditer(rf"\b{re.escape(kw)}\b", page_lower):
+                start = max(0, match.start() - 100)
+                end = min(len(page_lower), match.end() + 100)
+                context = page_lower[start:end]
+                if re.search(rf"\b{re.escape(v_str)}\b", context):
+                    return True
+    return False
+In the sanity check logic, before reverting a vision value:
+pythondef maybe_revert_vision_value(course, field, vision_value, page_text):
+    # Existing logic decides to revert because value is suspicious
+    if not english_value_passes_sanity(field, vision_value, course.is_pathway):
+        # NEW: don't revert if the value appears in the page text
+        if vision_value_appears_in_page_text(vision_value, field, page_text):
+            log.info(f"[VISION KEPT] {course.url} {field}={vision_value} "
+                     f"corroborated by page text, sanity floor bypassed")
+            return False  # don't revert
+        return True  # revert
+    return False  # passes sanity, don't revert
+This means: if vision says IELTS=4.5 and the page also contains "IELTS 4.5" near a mention of IELTS, vision's value is trusted. If vision says IELTS=4.5 but the page doesn't mention 4.5 near IELTS, sanity check still reverts (likely hallucination).
+Integration
+The four parts wire into the existing pipeline as follows:
+
+After course name extraction, run is_pathway_program(name, degree_level) and store is_pathway on the course payload.
+In central English application, check course.is_pathway before applying values.
+In existing sanity check, replace hardcoded floors with get_english_floor(field, is_pathway).
+In existing sanity check, before reverting a vision value, run vision_value_appears_in_page_text first.
+
+Tests
+Please add tests in backend-py/tests/test_pathway_detection.py:
+pythondef test_pathway_detection():
+    # Should detect as pathway
+    assert is_pathway_program("UniPrep")
+    assert is_pathway_program("Foundation Studies")
+    assert is_pathway_program("Foundation Year")
+    assert is_pathway_program("ELICOS")
+    assert is_pathway_program("English Language Program")
+    assert is_pathway_program("Bridging Course")
+    assert is_pathway_program("Tertiary Preparation Program")
+    
+    # Should NOT detect as pathway
+    assert not is_pathway_program("Bachelor of Arts")
+    assert not is_pathway_program("Master of Information Technology")
+    assert not is_pathway_program("Diploma of Counselling")  # full qual
+    assert not is_pathway_program("Graduate Diploma of Business")  # postgrad
+    assert not is_pathway_program("Graduate Certificate of Aviation")
+    
+    # Edge cases worth confirming
+    assert is_pathway_program("Diploma of English")  # English-language diploma
+    assert not is_pathway_program("Diploma of Education")  # full teaching qual
+
+def test_pathway_floors_lower():
+    assert get_english_floor("ielts_overall", is_pathway=True) < \
+           get_english_floor("ielts_overall", is_pathway=False)
+
+def test_vision_value_in_page_text_keyword_required():
+    # Value in text but no test name nearby — shouldn't count
+    page = "The campus has 6.5 acres of gardens."
+    assert not vision_value_appears_in_page_text(6.5, "ielts_overall", page)
+    
+    # Value near test name — should count
+    page = "Minimum IELTS overall: 6.5 with no band below 6.0."
+    assert vision_value_appears_in_page_text(6.5, "ielts_overall", page)
+    
+    # Test name mentioned but value not nearby
+    page = "We accept IELTS as proof of English. Some courses require 6.5."
+    # 6.5 is 50+ chars from "IELTS" — borderline. Check your context window
+    # parameter (currently 100 chars) and adjust if this case is wrong.
+Verification
+After deployment, re-scrape UniSQ and check the UniPrep entry:
+sqlSELECT course_name, ielts_overall, toefl_overall, 
+       cambridge_overall, duolingo_overall
+FROM scraped_courses
+WHERE university_id = 1  -- UniSQ
+  AND (course_name ILIKE '%uniprep%' OR course_name ILIKE '%foundation%');
+Expected:
+
+is_pathway = true on the course payload
+IELTS field is null OR matches whatever's actually on the UniPrep page (probably 5.5)
+Should NOT show 6.5 from the central page extractor
+
+Also verify the sanity check now accepts pathway-appropriate low values:
+sql-- After re-scrape, find any pathway courses with English values
+-- Check the values are pathway-appropriate (lower)
+SELECT sc.course_name, sc.ielts_overall, sc.is_pathway,
+       sfe.method, sfe.normalized_value, sfe.source_url
+FROM scraped_courses sc
+LEFT JOIN scraped_field_evidence sfe 
+  ON sfe.scraped_course_id = sc.id AND sfe.field_key = 'ielts_overall'
+WHERE sc.is_pathway = true
+ORDER BY sc.university_id, sc.course_name;
+Expected: pathway courses either have low IELTS values (4.5-5.5 range) extracted from their own pages, OR have null IELTS that's been flagged for review. They should NOT have university-wide IELTS values from the central page extractor.
+Out of scope for this priority
+The following are related but separate fixes that should NOT be bundled into this work:
+
+Sibling cache hallucination propagation (separate bug)
+Vision OCR hallucinating from logos/icons (separate bug)
+AI fallback fabricating intake months (separate bug)
+
+If during implementation you find that any of those affect pathway pages specifically, log them as separate issues but don't expand this PR.
+Estimated effort
+About half a day. The four parts are independent enough that they can be implemented sequentially with tests at each step. If you hit any blockers (e.g., the sanity check code is structured in a way that makes injecting is_pathway awkward), flag it back to me before refactoring further.
