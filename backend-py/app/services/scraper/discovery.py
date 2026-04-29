@@ -420,6 +420,17 @@ def _is_nav(url: str) -> bool:
 
 _SITEMAP_FALLBACK_THRESHOLD = 5
 
+# Hosts where the BFS HTTP crawl structurally misses courses because
+# category listing pages are JS-rendered SPAs (0 anchor-based course links
+# in static HTML).  For these universities we ALWAYS merge sitemap results
+# with BFS candidates — even when BFS exceeded the fallback threshold — so
+# that courses only discoverable from the sitemap (e.g. Torrens design,
+# arts) are not silently omitted.
+_ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
+    "www.torrens.edu.au",
+    "torrens.edu.au",
+})
+
 
 async def discover_course_links(
     start_url: str,
@@ -789,6 +800,46 @@ async def discover_course_links(
             found[u] = n
             if len(found) >= max_courses:
                 break
+
+    # ── Unconditional sitemap supplement for JS-heavy catalogues ────────────
+    # For universities whose category listing pages are React/Vue SPAs the BFS
+    # HTTP pass can only find courses that appear in static HTML (e.g. featured
+    # picks or courses linked from nav).  The sitemap exposes the full
+    # catalogue; merge it here so we don't silently miss entire disciplines.
+    if parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS and origin:
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] JS-heavy site — supplementing {len(found)} BFS candidate(s) "
+                f"with sitemap to catch discipline courses missing from static HTML",
+                phase="discover",
+                kind="sitemap_supplement",
+            )
+        try:
+            _supp_courses = await discover_from_sitemap(origin, emit=emit)
+        except Exception as _supp_exc:
+            log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)
+            _supp_courses = []
+        _supp_added = 0
+        for _sc in _supp_courses:
+            _su = _sc.get("url")
+            _sn = _sc.get("name") or ""
+            if not _su or _su in found:
+                continue
+            found[_su] = _sn
+            _supp_added += 1
+            if len(found) >= max_courses:
+                break
+        if emit and _supp_added:
+            await emit(
+                "status",
+                f"[DISCOVER] sitemap supplement added {_supp_added} new candidate(s) "
+                f"(total now {len(found)})",
+                phase="discover",
+                kind="sitemap_supplement_done",
+                added=_supp_added,
+                total=len(found),
+            )
 
     # ── Category-filter expansion (T004) ────────────────────────────────
     # VIT-style course-list pages expose category filters (?course_categories
