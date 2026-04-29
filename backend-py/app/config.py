@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://localhost:6379/0")
     gemini_api_key: str = Field(default="")
-    gemini_model: str = Field(default="gemini-2.0-flash")
+    gemini_model: str = Field(default="gemini-2.5-flash-lite")
     daily_gemini_budget_usd: float = Field(default=100.0)
     session_secret: str = Field(default="dev-only-change-me")
     cors_origins: list[str] = Field(
