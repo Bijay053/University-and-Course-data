@@ -46,6 +46,28 @@ _ENGLISH_SLOTS: Final = (
     "duolingo_overall",
 )
 
+# Subset of _ENGLISH_SLOTS that the sibling-cache is permitted to backfill.
+#
+# PTE, TOEFL, Cambridge, and Duolingo scores are institution-wide equivalences,
+# NOT per-course values.  ACU (and many other universities) publish only the
+# IELTS requirement on individual course pages; the PTE/TOEFL/CAE/DET
+# equivalences live on a central Admissions policy page that may not map
+# cleanly to each course's true minimum.  Backfilling these from siblings
+# causes every course to show the same non-IELTS scores even when those tests
+# are never mentioned on the course page itself, flagged by data-quality checks
+# as inconsistent (e.g. IELTS 6.0 + Cambridge 176 = IELTS 7.0 threshold gap).
+#
+# Rule: sibling-cache may only propagate IELTS scores. PTE / TOEFL / CAE /
+# Duolingo are left null unless they were explicitly on the course page itself.
+# This applies globally across all universities.
+_SIBLING_BACKFILL_SLOTS: Final = (
+    "ielts_overall",
+    "ielts_listening",
+    "ielts_reading",
+    "ielts_writing",
+    "ielts_speaking",
+)
+
 _UNDERGRAD_HINTS: Final = (
     "bachelor", "undergraduate", "diploma", "certificate", "associate",
     "foundation", "bridging", "honours",
@@ -149,10 +171,10 @@ def _build_bucket_cache(
         course_url: str = r.get("url") or ""
         bucket = _bucket_for(payload)
         slot_counters = buckets.setdefault(
-            bucket, {k: Counter() for k in _ENGLISH_SLOTS}
+            bucket, {k: Counter() for k in _SIBLING_BACKFILL_SLOTS}
         )
         bucket_origins = first_origin.setdefault(
-            bucket, {k: {} for k in _ENGLISH_SLOTS}
+            bucket, {k: {} for k in _SIBLING_BACKFILL_SLOTS}
         )
         # Build a quick lookup: field_key → method that actually SET the value.
         # first-write-wins in the pipeline means the earliest evidence entry
@@ -163,7 +185,7 @@ def _build_bucket_cache(
             if fk and fk not in evidence_method:
                 evidence_method[fk] = ev.get("method", "")
 
-        for k in _ENGLISH_SLOTS:
+        for k in _SIBLING_BACKFILL_SLOTS:
             v = payload.get(k)
             if v in (None, "", 0):
                 continue
