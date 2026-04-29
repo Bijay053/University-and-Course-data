@@ -88,6 +88,15 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "scrape"},
         },
+        # Recompute fill-rate baselines from the trailing 30 days of clean runs.
+        # Runs once a week (Sunday 04:00 UTC) — baselines drift slowly so a
+        # weekly refresh keeps them fresh without incurring unnecessary DB load.
+        "refresh-baselines-weekly": {
+            "task": "scrape.refresh_baselines",
+            "schedule": crontab(hour=4, minute=0, day_of_week=0),
+            "args": (),
+            "options": {"queue": "scrape"},
+        },
     },
 )
 
