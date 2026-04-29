@@ -1266,6 +1266,13 @@ def _fee_url_specificity(url: str) -> int:
 
     Used when multiple candidate URLs tie on vote count so that
     ``/admissions/fees/international-fees`` wins over ``/admissions/fees``.
+
+    ACU regression note: both the fees page and the scholarships page sit
+    under ``/fees-and-scholarships/`` so both contain "fee" and "international"
+    in their paths and previously tied on score.  The path-length tiebreaker
+    then selected the (longer) scholarships URL over the (shorter) fees URL.
+    A heavy penalty for "scholarship" in the path ensures the real fees page
+    always outscores the scholarships page.
     """
     from urllib.parse import urlparse
     path = urlparse(url).path.lower()
@@ -1275,6 +1282,12 @@ def _fee_url_specificity(url: str) -> int:
     if "fee" in path:
         score += 5
     score += len(path) // 10  # longer, more-specific paths preferred
+    # Strong penalty: scholarship pages are never the fee schedule source.
+    # Without this, /fees-and-scholarships/international-student-scholarships
+    # outscores /fees-and-scholarships/international-student-fees because it
+    # contains both "fee" (from "fees-and-scholarships") and is longer.
+    if "scholarship" in path:
+        score -= 50
     return score
 
 
