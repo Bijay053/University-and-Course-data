@@ -20,11 +20,14 @@ from app.models.import_job import ImportJob
 from app.models.intake import Intake
 from app.models.scholarship import Scholarship
 from app.models.scrape_feedback import ScrapeFeedback
+from app.models.scrape_run_alert import ScrapeRunAlert
+from app.models.scrape_run_metrics import ScrapeRunMetrics
 from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.models.scraped_course import ScrapedCourse
 from app.models.scraping_change import ScrapingChange
 from app.models.scraping_job import ScrapingJob
 from app.models.university import University
+from app.models.university_field_baseline import UniversityFieldBaseline
 
 __all__ = [
     "AcademicLevelOption",
@@ -43,6 +46,8 @@ __all__ = [
     "Intake",
     "Scholarship",
     "ScrapeFeedback",
+    "ScrapeRunAlert",
+    "ScrapeRunMetrics",
     "ScrapeRuntimeJob",
     "ScrapeRuntimeLog",
     "ScrapedCourse",
@@ -50,4 +55,5 @@ __all__ = [
     "ScrapingChange",
     "ScrapingJob",
     "University",
+    "UniversityFieldBaseline",
 ]
