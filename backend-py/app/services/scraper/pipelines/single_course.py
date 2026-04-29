@@ -166,6 +166,66 @@ METHOD_AUTHORITY: dict[str, int] = {
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
 }
 
+# ── Structural course-page method protection ──────────────────────────────────
+# Gemini PRIMARY runs after all structural extractors and may overwrite fields
+# those extractors already set correctly.  The rules below define which source
+# methods represent direct, non-AI parses of the course page's structured
+# markup (DOM labels, meta tags, H1s, regex patterns).  When Gemini PRIMARY
+# tries to write a field whose current best evidence comes from one of these
+# methods, the write is skipped — "course page wins".
+#
+# NOT protected (Gemini may still fill / override these):
+#   ai_fallback         — itself an AI call, no special authority
+#   vit_static_fallback — site-specific static lookup, sometimes incomplete
+#   sibling_cache       — inherited from a sibling course (weaker than live page)
+#   central_page*       — university-wide values deliberately designed to be
+#                         overrideable by course-specific reads
+#   uni_pdf*            — university-wide PDFs; Gemini can override with per-
+#                         course page data (already handled by fee_term guard)
+#
+# English slots (ielts_overall, pte_overall, toefl_overall, …) are excluded from
+# the protection even when set by rule:english, because Gemini reading the actual
+# course page is more reliable than a generic degree-level heuristic rule.
+_ENGLISH_SLOTS: frozenset[str] = frozenset({
+    "ielts_overall", "ielts_reading", "ielts_writing",
+    "ielts_listening", "ielts_speaking",
+    "pte_overall", "toefl_overall", "toefl_listening",
+    "toefl_reading", "toefl_writing", "toefl_speaking",
+    "cambridge_overall", "duolingo_overall",
+    "english_requirement_text",
+})
+
+_STRUCTURAL_COURSE_PAGE_EXACT: frozenset[str] = frozenset({
+    "regex",           # structured DOM text via compiled patterns
+    "per_course_browser",  # browser-fetched and DOM-parsed course page
+})
+
+_STRUCTURAL_COURSE_PAGE_PREFIXES: tuple[str, ...] = (
+    "duration.",       # duration.structural — reads explicit Course Duration label
+    "course_name.",    # course_name.h1, course_name.title, …
+    "description.",    # description.meta, description.og, …
+    "study_mode:",     # study_mode:rule — reads explicit Delivery/Mode label
+    "location.",       # location.strong, location.structured, …
+    "rule:duration",   # rule-based duration inference from degree label
+    "rule:intake",     # rule-based intake inference
+    "rule:study_mode", # rule-based study-mode inference
+    "rule:cricos",     # rule-based CRICOS inference
+    # NOTE: rule:english and rule:fee intentionally excluded — Gemini reading
+    # the actual page is more reliable than a generic degree-level heuristic.
+)
+
+
+def _is_structural_course_page_method(method: str) -> bool:
+    """Return True when *method* represents a non-AI, structural parse of the
+    course page (DOM labels, meta tags, H1 headings, regex patterns).
+
+    Used to enforce "course page wins": when such a method already owns a
+    field, ``gemini_primary`` is not allowed to overwrite it.
+    """
+    if method in _STRUCTURAL_COURSE_PAGE_EXACT:
+        return True
+    return any(method.startswith(p) for p in _STRUCTURAL_COURSE_PAGE_PREFIXES)
+
 
 def _method_authority(method: str) -> int:
     """Return the authority level for a given extraction method string.
@@ -1103,6 +1163,27 @@ async def extract_course(
                     _cl_method = _best_ev_method("course_location")
                     if _cl_method and _cl_method.startswith("location."):
                         continue  # structural extractor already owns this field
+
+                # General "course page wins" guard ───────────────────────────
+                # If the current best evidence for this field was written by a
+                # structural (non-AI) course-page extractor, Gemini PRIMARY must
+                # not overwrite it.  Structural extractors parse explicit DOM
+                # labels (e.g. "Course Duration: 2 years Full Time"), meta tags,
+                # H1 headings, or compiled regex patterns — all of which are more
+                # precise than Gemini reading the same prose.
+                #
+                # English fields are intentionally excluded: a generic
+                # degree-level rule (rule:english) is LESS reliable than Gemini
+                # reading the actual page's requirements section, so Gemini is
+                # allowed to override rule:english.
+                #
+                # The specific guards above (intake_months/regex, fee_term/uni_pdf,
+                # course_location/location.*) are now redundant but kept for
+                # readability / documentation of the original intent.
+                if _gp_k not in _ENGLISH_SLOTS:
+                    _cur_method = _best_ev_method(_gp_k)
+                    if _cur_method and _is_structural_course_page_method(_cur_method):
+                        continue  # course page structural extractor owns this field
 
                 # PRIMARY: always overwrite payload value.
                 # Keep prior evidence rows so Evidence Review can show every
