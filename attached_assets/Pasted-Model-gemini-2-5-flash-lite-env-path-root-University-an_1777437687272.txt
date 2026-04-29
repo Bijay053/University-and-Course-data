@@ -1,0 +1,29 @@
+Model: gemini-2.5-flash-lite
+.env path: /root/University-and-Course-data/backend-py/.env
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # Find where GEMINI_API_KEY actually lives on this server
+grep -r "GEMINI_API_KEY" /root/ /etc/ 2>/dev/null | grep -v "Binary\|\.pyc\|\.git" | head -20
+
+# Also check .env
+cat /root/University-and-Course-data/backend-py/.env 2>/dev/null || echo "NO .env FILE"
+/root/ecosystem.config.cjs:      GEMINI_API_KEY: "AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68",
+/root/backups/before_python_migration_20260423.sql:1608 scrape_1776756477710_n7f286     1       status  {"message": "Using university: asa (ID: 2) — FAST MODE (browser disabled) — GEMINI_API_KEY missing, AI features disabled"} 2026-04-21 07:27:57.719135+00
+/root/.pm2/dump.pm2.bak:      "GEMINI_API_KEY": "AIzaSyA7Bv1NsejhMVVb113-G0KcPrYJKO85W4U",
+/root/.pm2/dump.pm2.bak:    "GEMINI_API_KEY": "AIzaSyA7Bv1NsejhMVVb113-G0KcPrYJKO85W4U",
+/root/.pm2/dump.pm2:    "GEMINI_API_KEY": "AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68",
+/root/.pm2/dump.pm2:      "GEMINI_API_KEY": "AIzaSyDQPDHTK1IErRH5lrgHk1IUgkkw45PrG68",
+/root/.pm2/logs/api-server-out.log:Batch classify attempt 1/3 error: GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Batch classify attempt 2/3 error: GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Batch classify attempt 3/3 error: GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor of Business International Business": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor of Business Hospitality Management": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor of Business Technology Management": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor of Business": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor of Professional Accounting": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Master of Software Application Development": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Master of Project Management": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Master of Information Technology (Cyber Security)": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Master of Information Technology (Artificial Intelligence)": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor Of Business": GEMINI_API_KEY not configured
+/root/.pm2/logs/api-server-out.log:Per-course classify failed for "Bachelor Of Business Hospitality Management": GEMINI_API_KEY not configured
+DATABASE_URL=postgresql+asyncpg://uniportal:Bij%40y12345@localhost:5432/university_portal
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
