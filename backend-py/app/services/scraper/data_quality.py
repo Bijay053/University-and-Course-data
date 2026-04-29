@@ -105,6 +105,127 @@ _VALID_MONTHS = frozenset({
 })
 
 
+def _check_english_coherence(payload: Payload, url: str, name: str) -> list[QualityIssue]:
+    """Flag English test values that contradict each other across fields.
+
+    Each extractor (regex, vision, sibling_cache) writes fields independently.
+    Without a cross-field check, a course can end up with IELTS 6.0 + TOEFL 95
+    (two different admission levels) because each field was sourced from a
+    different page or cache entry.
+
+    Thresholds are deliberately permissive: we only flag combinations that are
+    separated by ≥ 1 full IELTS band-width from any plausible equivalence.
+    This means TOEFL 80 for an IELTS 5.5 course (above ETS official but used
+    by many Australian universities) is NOT flagged, but TOEFL 95 for an
+    IELTS 6.0 course (which corresponds to IELTS 7.0-7.5) IS flagged.
+
+    All issues are "warning" severity — they flag for human review without
+    blocking staging, because unusual-but-valid equivalences exist.
+    """
+    issues: list[QualityIssue] = []
+
+    def _num(key: str) -> float | None:
+        v = payload.get(key)
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    ielts = _num("ielts_overall")
+    if ielts is None:
+        return issues  # no anchor — nothing to cross-check against
+
+    toefl = _num("toefl_overall")
+    pte = _num("pte_overall")
+    duolingo = _num("duolingo_overall")
+    cambridge = _num("cambridge_overall")
+
+    def _add(code: str, msg: str) -> None:
+        issues.append(QualityIssue("warning", code, msg, url=url, course_name=name))
+
+    # ── IELTS vs TOEFL ──────────────────────────────────────────────────
+    # TOEFL 85+ ≈ IELTS 6.5+; IELTS ≤ 6.0 + TOEFL ≥ 85 is a mismatch.
+    # TOEFL 75- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + TOEFL ≤ 75 is a mismatch.
+    if toefl is not None:
+        if ielts <= 6.0 and toefl >= 85:
+            _add(
+                "english_coherence_toefl",
+                f"IELTS {ielts} + TOEFL {toefl} is inconsistent: "
+                f"TOEFL {toefl:.0f} corresponds to IELTS ≥ 6.5. "
+                f"One value is likely sourced from a different level or hallucinated.",
+            )
+        elif ielts >= 7.0 and toefl <= 75:
+            _add(
+                "english_coherence_toefl",
+                f"IELTS {ielts} + TOEFL {toefl} is inconsistent: "
+                f"TOEFL {toefl:.0f} corresponds to IELTS ≤ 5.5. "
+                f"One value is likely sourced from a different level or hallucinated.",
+            )
+
+    # ── IELTS vs PTE ────────────────────────────────────────────────────
+    # PTE 65+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + PTE ≥ 65 is a mismatch.
+    # PTE 45- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + PTE ≤ 45 is a mismatch.
+    if pte is not None:
+        if ielts <= 6.0 and pte >= 65:
+            _add(
+                "english_coherence_pte",
+                f"IELTS {ielts} + PTE {pte} is inconsistent: "
+                f"PTE {pte:.0f} corresponds to IELTS ≥ 7.0. "
+                f"One value is likely sourced from a different level or hallucinated.",
+            )
+        elif ielts >= 7.0 and pte <= 45:
+            _add(
+                "english_coherence_pte",
+                f"IELTS {ielts} + PTE {pte} is inconsistent: "
+                f"PTE {pte:.0f} corresponds to IELTS ≤ 5.0. "
+                f"One value is likely sourced from a different level or hallucinated.",
+            )
+
+    # ── IELTS vs Duolingo ───────────────────────────────────────────────
+    # Duolingo 115+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + DET ≥ 115 is a mismatch.
+    # Duolingo 95-  ≈ IELTS ≤ 5.5; IELTS ≥ 7.5 + DET ≤ 95 is a mismatch.
+    if duolingo is not None:
+        if ielts <= 6.0 and duolingo >= 115:
+            _add(
+                "english_coherence_duolingo",
+                f"IELTS {ielts} + Duolingo {duolingo} is inconsistent: "
+                f"Duolingo {duolingo:.0f} corresponds to IELTS ≥ 7.0. "
+                f"Duolingo value may be hallucinated or from wrong level cache.",
+            )
+        elif ielts >= 7.5 and duolingo <= 95:
+            _add(
+                "english_coherence_duolingo",
+                f"IELTS {ielts} + Duolingo {duolingo} is inconsistent: "
+                f"Duolingo {duolingo:.0f} corresponds to IELTS ≤ 5.5. "
+                f"Duolingo value may be hallucinated or from wrong level cache.",
+            )
+
+    # ── IELTS vs Cambridge (CAE) ─────────────────────────────────────────
+    # Cambridge 176+ ≈ IELTS 7.0+; IELTS ≤ 6.0 + CAE ≥ 176 is a mismatch.
+    # Cambridge 162- ≈ IELTS ≤ 5.5; IELTS ≥ 7.0 + CAE ≤ 162 is a mismatch.
+    # Note: VIT shows CAE 176 on vocational courses with IELTS 5.5 — this fires
+    # on those rows intentionally, since 176 is the C1 Advanced threshold (IELTS 7.0).
+    if cambridge is not None:
+        if ielts <= 6.0 and cambridge >= 176:
+            _add(
+                "english_coherence_cambridge",
+                f"IELTS {ielts} + Cambridge {cambridge} is inconsistent: "
+                f"CAE {cambridge:.0f} corresponds to IELTS ≥ 7.0 (C1 Advanced threshold). "
+                f"Cambridge value may be a university-wide default that doesn't apply to this level.",
+            )
+        elif ielts >= 7.0 and cambridge <= 162:
+            _add(
+                "english_coherence_cambridge",
+                f"IELTS {ielts} + Cambridge {cambridge} is inconsistent: "
+                f"CAE {cambridge:.0f} corresponds to IELTS ≤ 5.5. "
+                f"One value is likely sourced from a different level.",
+            )
+
+    return issues
+
+
 def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
     """Return a list of quality issues for one staged course payload."""
     issues: list[QualityIssue] = []
@@ -160,6 +281,19 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
     if not has_any_english:
         add("warning", "missing_english_requirement",
             "No English language test score found (IELTS / PTE / TOEFL / CAE).")
+
+    # ── 3a. Cross-field English coherence ────────────────────────────────
+    # Each test score should be broadly consistent with the others — if
+    # the extractor wrote each field from a different source (regex, vision,
+    # sibling cache) without cross-checking, impossible combinations can
+    # appear (e.g. IELTS 6.0 + TOEFL 95 = two different admission levels).
+    #
+    # Thresholds are permissive (not the strict ETS official equivalence)
+    # because Australian universities sometimes set their own stricter tables
+    # (e.g. TOEFL 80 for IELTS 5.5 courses, which is above the ETS equivalent
+    # of 72 but still within a defensible margin). We only flag combinations
+    # that are clearly impossible — separated by ≥ 1 IELTS band-width.
+    issues.extend(_check_english_coherence(payload, url, name))
 
     # ── 4. Duration ───────────────────────────────────────────────────────
     duration = payload.get("duration")
