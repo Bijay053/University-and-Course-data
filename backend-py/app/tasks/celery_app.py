@@ -12,10 +12,16 @@ If Redis isn't reachable, the FastAPI process still boots — only the
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import worker_ready
 
 from app.config import settings
+
+log = logging.getLogger(__name__)
 
 celery_app = Celery(
     "uniportal",
@@ -84,3 +90,60 @@ celery_app.conf.update(
         },
     },
 )
+
+
+# ---------------------------------------------------------------------------
+# Worker startup: free any ghost slots left by a previous SIGKILL
+# ---------------------------------------------------------------------------
+# When the worker process is killed with SIGKILL (e.g. during a deployment
+# restart), Python's exception handlers never run, so scraping_jobs rows
+# remain in status='running' forever.  The heartbeat reaper in /active takes
+# up to 5 minutes to notice.  This hook fires the moment the new worker is
+# fully ready and immediately resets those ghost jobs to 'failed', freeing
+# all 4 Celery slots right away — no manual "Cancel All" needed.
+
+async def _reset_ghost_running_jobs() -> int:
+    """Mark all scraping_jobs rows stuck in status='running' as failed.
+
+    Returns the number of rows reset.
+    """
+    from datetime import datetime, timezone as _tz
+
+    from sqlalchemy import text
+
+    from app.database import AsyncSessionLocal, engine
+
+    await engine.dispose()
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text(
+                "UPDATE scraping_jobs "
+                "SET status = 'failed', "
+                "    completed_at = :now, "
+                "    error_message = 'Worker restarted — slot freed on startup' "
+                "WHERE status = 'running'"
+            ),
+            {"now": datetime.now(_tz.utc)},
+        )
+        await db.commit()
+        return result.rowcount  # type: ignore[return-value]
+
+
+@worker_ready.connect
+def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
+    """Reset ghost 'running' scraping_jobs when the Celery worker comes online.
+
+    Runs once per worker process start — harmless if there are no stuck rows.
+    """
+    try:
+        reset = asyncio.run(_reset_ghost_running_jobs())
+        if reset:
+            log.warning(
+                "worker_ready: reset %d ghost running job(s) → failed "
+                "(left over from previous worker process)",
+                reset,
+            )
+        else:
+            log.info("worker_ready: no ghost running jobs found — all slots clean")
+    except Exception as exc:
+        log.error("worker_ready: ghost-job reset failed: %s", exc)
