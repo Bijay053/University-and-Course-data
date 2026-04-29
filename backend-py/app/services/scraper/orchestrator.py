@@ -1078,10 +1078,72 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _total_gemini_in_tokens: int = 0
         _total_gemini_out_tokens: int = 0
 
+        # ── Cost ceiling monitor ──────────────────────────────────────────────
+        from app.services.scraper.cost_ceiling import (
+            JobCostMonitor as _JCM,
+            get_budget_for_university as _get_budget,
+        )
+        _uni_slug = (uni_name or "").lower().replace(" ", "")
+        _cost_monitor = _JCM(
+            scrape_run_id=runtime_job_id,
+            university_slug=_uni_slug,
+            budget_usd=_get_budget(_uni_slug),
+        )
+
+        # ── Gemini call log — batch-write all call entries from all courses ───
+        _all_gemini_calls: list[dict] = []
+        for _r in results:
+            if isinstance(_r, dict):
+                _calls = _r.get("gemini_calls") or []
+                for _call in _calls:
+                    _all_gemini_calls.append({**_call, "course_url": _r.get("url")})
+
+        if _all_gemini_calls:
+            try:
+                from sqlalchemy import text as _gcl_text
+                async with AsyncSessionLocal() as _gcl_db:
+                    for _entry in _all_gemini_calls:
+                        await _gcl_db.execute(
+                            _gcl_text(
+                                """
+                                INSERT INTO gemini_call_log
+                                    (scrape_run_id, university_id, course_url, call_type,
+                                     model, input_tokens, output_tokens, cost_usd,
+                                     duration_ms, success, error_message, created_at)
+                                VALUES
+                                    (:run_id, :uni_id, :url, :call_type,
+                                     :model, :in_tok, :out_tok, :cost,
+                                     :dur_ms, :ok, :err, NOW())
+                                """
+                            ),
+                            {
+                                "run_id": runtime_job_id,
+                                "uni_id": uni_id,
+                                "url": _entry.get("course_url"),
+                                "call_type": _entry.get("call_type", "primary_full"),
+                                "model": _entry.get("model", ""),
+                                "in_tok": _entry.get("input_tokens", 0),
+                                "out_tok": _entry.get("output_tokens", 0),
+                                "cost": _entry.get("cost_usd", 0.0),
+                                "dur_ms": _entry.get("duration_ms", 0),
+                                "ok": _entry.get("success", True),
+                                "err": _entry.get("error_message"),
+                            },
+                        )
+                    await _gcl_db.commit()
+                log.info(
+                    "[GEMINI LOG] wrote %d call entries for job %s",
+                    len(_all_gemini_calls), runtime_job_id,
+                )
+            except Exception as _gcl_exc:
+                log.warning("gemini_call_log write failed: %s", _gcl_exc)
+
         for r in results:
             # Accumulate Gemini PRIMARY cost (zero when Gemini was skipped/unavailable)
             if isinstance(r, dict):
-                _total_gemini_cost_usd += r.get("gemini_primary_cost_usd", 0.0)
+                _course_cost = r.get("gemini_primary_cost_usd", 0.0)
+                _total_gemini_cost_usd += _course_cost
+                _cost_monitor.record_call(_course_cost)
 
             # Stop check between rows: lets the user interrupt mid-batch.
             # Anything left in ``results`` at this point came back from the
@@ -1409,6 +1471,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.imported = summary["staged"]
         job.skipped = summary["skipped"]
         job.errors = summary["errors"]
+        # Gemini cost tracking (Component 3 & 4)
+        job.total_gemini_cost_usd = round(_total_gemini_cost_usd, 8)
+        job.cost_ceiling_hit = _cost_monitor.aborted
         if finished_cleanly:
             job.error_message = None  # clear any stale message
         else:
