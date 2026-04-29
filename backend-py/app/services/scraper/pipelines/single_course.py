@@ -973,14 +973,62 @@ async def extract_course(
             # when the page has a structured DOM label (strong/dt/th), which
             # many modern sites omit — making AI the primary source for
             # location on generic sites like Federation University.
+            #
+            # Protections (Issue 4):
+            # 1. Reject values that are study-mode labels ("On Campus",
+            #    "Online", "Blended") — Gemini sometimes confuses mode with
+            #    location when the page presents them together.
+            # 2. Protect a value already set by the structural location
+            #    extractor (method starts with "location.") — it read an
+            #    explicit DOM label and is more reliable than Gemini's prose
+            #    read.  Generic sites that have NO structural label still get
+            #    Gemini's value as before.
+            _STUDY_MODE_KEYWORDS = frozenset(
+                {"on campus", "online", "blended", "distance", "virtual",
+                 "flexible", "on-campus", "face to face", "face-to-face"}
+            )
             if _gp_filled.get("location_text"):
                 _loc = str(_gp_filled["location_text"]).strip()
-                if _loc:
-                    _gp_filled["course_location"] = _loc
+                if _loc and _loc.lower() not in _STUDY_MODE_KEYWORDS:
+                    _has_structural_loc = any(
+                        ev.get("field_key") == "course_location"
+                        and str(ev.get("method", "")).startswith("location.")
+                        for ev in evidence
+                    )
+                    if not _has_structural_loc:
+                        _gp_filled["course_location"] = _loc
+
+            # Helper: return the method of the current best evidence row for
+            # a field, ignoring superseded rows.
+            def _best_ev_method(fk: str) -> str | None:
+                for _ev in evidence:
+                    if _ev.get("field_key") == fk and _ev.get("decision_status") != "superseded":
+                        return str(_ev.get("method") or "")
+                return None
 
             for _gp_k, _gp_v in _gp_filled.items():
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above
+
+                # Issue 3: Don't let Gemini PRIMARY override a regex-extracted
+                # intake_months.  The intake regex reads structured DOM text
+                # (e.g. "Intake Options: January, April, July, October") and is
+                # more reliable than Gemini reading prose where nearby months
+                # from other sections may leak in.  If regex already filled
+                # intake_months, keep it.
+                if _gp_k == "intake_months" and _best_ev_method("intake_months") == "regex":
+                    continue
+
+                # Issue 5: Don't let Gemini PRIMARY override a uni_pdf
+                # fee_term.  The PDF fee schedule (e.g. "Full Course") is more
+                # authoritative than Gemini reading per-unit fee text from the
+                # course page (which returns "Per Unit" for ASAHE courses even
+                # though the total fee is what the DB stores).
+                if _gp_k == "fee_term":
+                    _ft_method = _best_ev_method("fee_term")
+                    if _ft_method and _ft_method.startswith("uni_pdf"):
+                        continue
+
                 # PRIMARY: always overwrite payload value.
                 # Keep prior evidence rows so Evidence Review can show every
                 # source that found a value — mark them "superseded" so the UI
@@ -1127,6 +1175,62 @@ async def extract_course(
                 payload[k] = v
             # else: existing value has tier ≥ 4 authority (pre-seed) — keep it
         evidence.extend(vision_evidence)
+
+        # ── Vision negative-suppression ───────────────────────────────────
+        # When vision processed a comprehensive English-requirements image
+        # (evidenced by ≥ 2 distinct English overalls found) but did NOT
+        # find a specific slot (e.g. DET, CAE), any university-wide PDF value
+        # for that slot should be nulled.  The course-specific image is the
+        # ground truth: its ABSENCE of DET/CAE means those tests don't apply
+        # here.  Without this suppression, the PDF's generic Duolingo or
+        # Cambridge row bleeds into every course even when the course page
+        # explicitly shows no requirement.
+        #
+        # Only fires when:
+        #  1. vision_filled has ≥ 2 English overall slots (comprehensive table)
+        #  2. The slot to null has ONLY uni-wide evidence (max authority < 3)
+        #  3. The slot is not present in vision_filled (image lacks that test)
+        _ENGLISH_OVERALL_VISION = (
+            "ielts_overall", "pte_overall", "toefl_overall",
+            "cambridge_overall", "duolingo_overall",
+        )
+        _vision_overalls_found = sum(
+            1 for s in _ENGLISH_OVERALL_VISION if s in vision_filled
+        )
+        if _vision_overalls_found >= 2:
+            for _vs in _ENGLISH_OVERALL_VISION:
+                if _vs in vision_filled:
+                    continue  # vision found it — not absent
+                if payload.get(_vs) in (None, "", 0):
+                    continue  # nothing to suppress
+                _vs_max_auth = max(
+                    (_method_authority(ev.get("method", ""))
+                     for ev in evidence if ev.get("field_key") == _vs),
+                    default=0,
+                )
+                if _vs_max_auth >= _AUTHORITY_COURSE_SPECIFIC:
+                    continue  # course-specific evidence — don't null it
+                # Null the uni-wide-only value and mark evidence superseded
+                payload[_vs] = None
+                for _ev in evidence:
+                    if _ev.get("field_key") == _vs and _ev.get("decision_status") != "superseded":
+                        _ev["decision_status"] = "superseded"
+                log.info(
+                    "[VISION NEG-SUPPRESS] %s: nulled %s (image absent; "
+                    "was %s from uni-wide source)",
+                    url, _vs, _vs_max_auth,
+                )
+                if emit:
+                    await emit(
+                        "status",
+                        f"[VISION NEG-SUPPRESS] {payload.get('course_name', url)[:40]} — "
+                        f"nulled {_vs} (course image has no {_vs} row; "
+                        f"uni-wide PDF value suppressed)",
+                        phase="fallback",
+                        kind="vision_neg_suppress",
+                        url=url,
+                        slot=_vs,
+                    )
 
         # ── Vision sanity check ───────────────────────────────────────────
         # When a per-course vision OCR reading for an English slot diverges

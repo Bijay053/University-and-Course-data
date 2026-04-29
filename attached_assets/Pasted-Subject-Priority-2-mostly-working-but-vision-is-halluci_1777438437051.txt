@@ -1,0 +1,69 @@
+Subject: Priority 2 mostly working — but vision is hallucinating from logos, and AI fallback is fabricating intakes/locationsThe browser-skip + vision OCR fixes are working. Run time is back to 42s, both ASAHE images are detected, evidence rows correctly point to the source images for IELTS overall and TOEFL. Major progress.But the Evidence Review for Master IT Software App Dev shows new problems that need investigation before we move on:Issue 1 (CRITICAL): Vision OCR is hallucinating English data from social media iconsFor Master of IT (Software Application Development), evidence rows show:ielts_reading    → 6.0 from .../68660d9386e56f070b7bec3d_Icon-facebook_2.png
+ielts_speaking   → 6.0 from .../Icon-facebook_2.png
+ielts_writing    → 6.0 from .../Icon-facebook_2.png
+duolingo_overall → 100.0 from .../Icon-facebook_2.png
+cambridge_overall → 176.0 from .../68e3dc9254324a7fcc22ec67_Insta%20white%20200.pngThese images are the Facebook and Instagram footer logos. They contain no English requirement data. Gemini Vision is hallucinating values when asked to extract data from logos.The MaSTER.png image only has IELTS overall + sub-bands, PTE overall, TOEFL overall + sub-bands. It does NOT have CAE or DET rows. So the only legitimate vision sources for this course should be MaSTER.png. Yet Facebook/Instagram icons are appearing as evidence sources for fields the real image doesn't even contain.Two fixes needed:Fix 1A — Filter out decorative/social-media images BEFORE OCR:pythonNON_REQUIREMENT_FILENAME_PATTERNS = [
+    r"facebook", r"twitter", r"instagram", r"linkedin", r"youtube",
+    r"icon[-_]", r"logo", r"social", r"footer",
+    r"_(\d+)\.png$",  # icons often end with size suffix like "_200.png"
+]
+
+def _is_decorative_image(url: str) -> bool:
+    filename = url.lower().split("/")[-1]
+    return any(re.search(pat, filename) for pat in NON_REQUIREMENT_FILENAME_PATTERNS)Apply this BEFORE the candidate list goes to Gemini. Should drop facebook/instagram icons immediately.Fix 1B — Validate OCR output contains test keywords before trusting it:Even with filtering, some non-data images may slip through. Add a post-OCR validation:pythondef _ocr_result_is_valid_english_table(ocr_text: str) -> bool:
+    """Reject OCR results that don't look like an English requirements table."""
+    if not ocr_text:
+        return False
+    lower = ocr_text.lower()
+    # Must mention at least 2 distinct test names
+    test_names = ["ielts", "pte", "toefl", "cambridge", "duolingo"]
+    matches = sum(1 for t in test_names if t in lower)
+    if matches < 2:
+        return False
+    # Must look like a table (has score-like numbers near test names)
+    if not re.search(r"\b\d+(?:\.\d)?\b", ocr_text):
+        return False
+    return TrueDiscard any OCR result that fails this. No evidence row written for hallucinated data.Issue 2: CAE=176 on Masters is suspectThe MaSTER.png image we manually inspected does not show CAE. But evidence shows cambridge_overall=176.0 from Insta white 200.png — definitely wrong source. After Issue 1 fixes, this should disappear (no Cambridge data anywhere → null).But please verify: does ASAHE have a separate image with Cambridge requirements for Masters? If yes, we need to find its URL. If no, Cambridge for Masters should be null.Issue 3 (CRITICAL): AI fallback is fabricating intakes for some MastersThree Masters show intakes "Feb, May, Aug, Nov" but the actual ASAHE pages show "Jan, Apr, Jul, Oct" (regex extractor correctly parsed this from page text). The AI fallback enrichment is inventing intake months that don't exist on the page.Looking at the log:
+[FALLBACK] AI enriching ... (missing: ..., intake_text, ...)When AI fallback is asked for intake_text and the page already has Jan/Apr/Jul/Oct in regex output, AI shouldn't be asked. But somehow it's being called and returning different values that override the regex output.Fix: The AI fallback prompt needs to be strict:Return ONLY values you can directly verify in the page text below.
+Return null for any field you cannot find with explicit textual evidence.
+Do NOT infer, guess, or estimate values.
+Do NOT generate plausible-looking values to fill the schema.Also, AI fallback values should NEVER override a regex-extracted value for the same field. The current authority model should prevent this — please verify ai_fallback (tier 3) is not allowed to override regex (tier 3) for the same field.Issue 4: Course location is wrong for two Masters
+Master IT Cyber Security: course_location = "Melbourne" (wrong, should be Sydney, Australia)
+Master Project Management: course_location = "On Campus" (not even a location)
+Looking at the log for Cyber Security:
+[FIELD TRACE] study_mode='On Campus' location='Melbourne' method=study_mode:ruleThe study_mode:rule extractor is somehow writing "Melbourne" into location. This is an extractor leak. Same issue for Project Management where location='On Campus' got written.Investigation needed: the study_mode:rule shouldn't touch the location field at all. Please trace what's writing these values. Likely candidates:
+
+Race condition between location extractor and study_mode extractor on shared payload
+study_mode:rule extractor accidentally setting location alongside mode
+AI fallback hallucinating location and being trusted
+Issue 5: Fee term changed from "Full Course" to "Per Unit"Previous run: A$52,800/Full Course (from uni_pdf:fees:per_course)
+Current run: A$52,800/Per Unit (from gemini_primary per evidence panel)A $52,800 per-unit fee is implausible (units typically cost $3-5k). The PDF's "Full Course" was likely correct.This is an authority issue: gemini_primary (tier 3) is overriding uni_pdf:fees:per_course for fee_term, even though the PDF source had a more authoritative parse.Verify: the authority model should hold uni_pdf:fees:per_course (tier 2 university PDF) lower than gemini_primary (tier 3 course-specific). But for fee_term specifically, the PDF is parsing a structured fee table while Gemini is guessing from prose. The authority model is technically correct but the outcome is wrong.Possible fix: add a sanity check on fee_term — if international_fee > $20,000 and fee_term = "Per Unit", that's implausible. Either:
+
+Reject the "Per Unit" attribution and fall back to PDF's "Full Course"
+Flag as data quality warning for manual review
+Issue 6: DET=100 phantom is still presentBoth Bachelors and Masters show DET=100 in the staging table. The Bachelor and Master images BOTH lack a Duolingo row. Either the negative-suppression fix wasn't deployed, or it didn't fire because vision OCR also returned DET=100 (from the hallucinated Facebook icon read).After Issue 1 fixes (filter out decorative images), DET should:
+
+Not get a value from vision OCR (no real image has DET)
+Get DET=100 from uni_pdf:requirements (PDF DOES have a Duolingo row)
+And then negative-suppression should null it because the course-specific image has no DET
+So Issue 6's full fix depends on Issue 1's filter being correct AND the negative-suppression logic from earlier being deployed.Verification requestAfter the fixes for Issues 1, 3, 4, 5, 6 are deployed:sql-- Show every evidence source URL for English fields on one Master course
+SELECT field_key, method, normalized_value, source_url
+FROM scraped_field_evidence
+WHERE scraped_course_id = (
+    SELECT id FROM scraped_courses
+    WHERE course_name ILIKE '%Master of Information Technology (Software Application Development)%'
+    ORDER BY created_at DESC LIMIT 1
+)
+AND field_key IN ('ielts_overall', 'ielts_listening', 'ielts_reading',
+                  'ielts_speaking', 'ielts_writing', 'pte_overall',
+                  'toefl_overall', 'cambridge_overall', 'duolingo_overall')
+AND selected = true
+ORDER BY field_key;What I expect for a healthy result:
+
+Every row's source_url ends in MaSTER.png (NOT facebook/instagram URLs)
+IELTS overall + 4 bands all from the same image
+PTE overall from MaSTER.png
+TOEFL overall + 4 bands from MaSTER.png
+cambridge_overall row does NOT exist (Master image has no CAE row → null)
+duolingo_overall row does NOT exist (Master image has no DET row, negative-suppression nullifies PDF value → null)
+If those hold, ASAHE is genuinely correct.

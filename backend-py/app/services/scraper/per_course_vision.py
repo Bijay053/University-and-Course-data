@@ -96,14 +96,20 @@ _LAZY_SRC_RE: Final = re.compile(
 )
 _ALT_RE = re.compile(r"\balt\s*=\s*\"([^\"]*)\"|\balt\s*=\s*'([^']*)'", re.IGNORECASE)
 
-# Words that flag an image as decorative — same allow-list as Node's
-# ``isDecorativeImage``. Whole-word match against the URL path tail or
-# the alt attribute (lower-cased).
+# Substrings that flag an image filename as decorative. Checked against
+# the URL-decoded filename (last path segment) and alt text — NOT the
+# full URL — to avoid false-positives on CDN path hashes.
+#
+# NOTE: Do NOT use \b word-boundary regex here. Python regex treats `_`
+# as a word character (\w), so `\bicon\b` fails to match in a CDN filename
+# like ``bec3d_Icon-facebook_2.png`` because the underscore before "icon"
+# prevents the boundary from firing.  Simple substring matching on just the
+# filename is more reliable and covers all the real-world patterns we see.
 _DECORATIVE_HINTS: Final = (
     "logo", "icon", "banner", "hero", "sprite", "avatar", "favicon",
     "social", "footer", "header", "nav", "menu", "decoration",
     "spinner", "loader", "placeholder", "thumb", "thumbnail",
-    "sponsor", "partner", "facebook", "twitter", "instagram",
+    "sponsor", "partner", "facebook", "twitter", "instagram", "insta",
     "linkedin", "youtube", "tiktok",
     # Contact / UI widgets — never contain requirements tables
     "phone", "email", "map-marker", "map_marker", "marker",
@@ -153,14 +159,17 @@ ENGLISH_SECTION_HEADING_RE: Final = re.compile(
     re.IGNORECASE,
 )
 
-# At least one recognised English-test name must appear in the OCR output
-# for the result to be accepted. Guards against images inside the English
-# section that are actually diagrams, logos, or "How to apply" graphics —
-# Gemini may return text for them but none will mention IELTS/PTE/etc.
-_VALID_ENGLISH_OCR_RE: Final = re.compile(
-    r"\b(?:IELTS|PTE|TOEFL|Cambridge|Duolingo)\b",
-    re.IGNORECASE,
-)
+# English-test names used for post-OCR validation.
+_ENGLISH_TEST_NAMES: Final = ("ielts", "pte", "toefl", "cambridge", "duolingo")
+
+# A valid OCR result must mention at least this many distinct test names.
+# Requiring 2+ guards against Gemini hallucinating a single test name when
+# processing a logo or decorative image — real requirements tables always
+# list multiple tests side-by-side.
+_OCR_MIN_TEST_NAMES: Final = 2
+
+# Must also contain at least one numeric score (e.g. "6.5", "58", "85").
+_OCR_SCORE_RE: Final = re.compile(r"\b\d{1,3}(?:\.\d)?\b")
 
 
 def _find_english_section_images(html: str, base_url: str) -> list[tuple[str, str]]:
@@ -215,14 +224,27 @@ def _find_english_section_images(html: str, base_url: str) -> list[tuple[str, st
 
 
 def _is_valid_english_ocr_result(ocr_text: str) -> bool:
-    """Return ``True`` if OCR output contains at least one English-test keyword.
+    """Return ``True`` when OCR output looks like a real English requirements table.
 
-    Discards false-positive OCR runs where Gemini reads a logo, diagram, or
-    "How to apply" graphic inside the English requirements section and returns
-    generic text that happens to match the score format patterns but contains
-    no IELTS / PTE / TOEFL / Cambridge / Duolingo mention.
+    Two conditions must both hold:
+
+    1. At least :data:`_OCR_MIN_TEST_NAMES` (2) distinct test names appear
+       (IELTS, PTE, TOEFL, Cambridge, Duolingo).  A logo or decorative image
+       that slips through the filename filter and triggers a Gemini
+       hallucination will typically only mention one test (or none), whereas
+       a genuine requirements table always lists several tests side-by-side.
+
+    2. At least one numeric score (e.g. ``6.5``, ``58``, ``85``) is present.
+       Guards against prose like "Prepare for IELTS and PTE" that contains
+       test names but no actual scores.
     """
-    return bool(ocr_text and _VALID_ENGLISH_OCR_RE.search(ocr_text))
+    if not ocr_text:
+        return False
+    lower = ocr_text.lower()
+    distinct_tests = sum(1 for t in _ENGLISH_TEST_NAMES if t in lower)
+    if distinct_tests < _OCR_MIN_TEST_NAMES:
+        return False
+    return bool(_OCR_SCORE_RE.search(ocr_text))
 
 
 def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
@@ -272,10 +294,15 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
             continue
         m_alt = _ALT_RE.search(tag)
         alt = (m_alt.group(1) or m_alt.group(2) or "").strip() if m_alt else ""
-        # URL-decode before the word-boundary check so "%20square%20" is
-        # seen as " square " (word boundaries intact).
-        decision_text = f"{unquote(src)} {alt}".lower()
-        if any(re.search(rf"\b{re.escape(h)}\b", decision_text) for h in _DECORATIVE_HINTS):
+        # Check the URL-decoded FILENAME (last path segment) + alt text for
+        # decorative hints using simple substring matching. Do NOT apply the
+        # check to the full URL string — CDN paths contain opaque hashes like
+        # ``bec3d_Icon-facebook_2.png`` where the hash-underscore prefix
+        # (``bec3d_``) is classified as a word character (\w) by Python regex,
+        # causing \b word-boundary patterns to miss the keyword entirely.
+        _filename = unquote(src).split("/")[-1].lower()
+        _alt_lower = alt.lower()
+        if any(h in _filename or h in _alt_lower for h in _DECORATIVE_HINTS):
             continue
         try:
             absolute = urljoin(base_url, src)
