@@ -130,7 +130,7 @@ _AUTHORITY_COURSE_SPECIFIC = 3   # threshold: keep values at or above this
 _AUTHORITY_COURSE_VISION = 4
 _AUTHORITY_PRE_SEED = 5
 
-METHOD_AUTHORITY: dict[str, int] = {
+METHOD_AUTHORITY: dict[str, float] = {
     # 1 — university-wide HTML
     "central_page": _AUTHORITY_UNIVERSITY_WIDE,
     "central_page:english": _AUTHORITY_UNIVERSITY_WIDE,
@@ -138,12 +138,16 @@ METHOD_AUTHORITY: dict[str, int] = {
     "central_page:fees:high": _AUTHORITY_UNIVERSITY_WIDE,
     "central_page:fees:medium": _AUTHORITY_UNIVERSITY_WIDE,
     "sibling_cache": _AUTHORITY_UNIVERSITY_WIDE,
-    # 2 — university-wide PDF
+    # 2 — university-wide PDF (fuzzy / uni-wide)
     "uni_pdf:fee": _AUTHORITY_UNIVERSITY_PDF,
     "uni_pdf:fees": _AUTHORITY_UNIVERSITY_PDF,
     "uni_pdf:fees:per_course": _AUTHORITY_UNIVERSITY_PDF,
     "uni_pdf:requirements": _AUTHORITY_UNIVERSITY_PDF,
     "uni_pdf:english": _AUTHORITY_UNIVERSITY_PDF,
+    # 2.5 — university-wide PDF matched via CRICOS code (beats fuzzy PDF, below
+    #         course-specific text).  Float tier; _method_authority returns float.
+    "uni_pdf:cricos_match:fees": 2.5,
+    "uni_pdf:cricos_match:requirements": 2.5,
     # 3 — course-specific text
     "gemini_primary": _AUTHORITY_COURSE_SPECIFIC,
     "rule:fee": _AUTHORITY_COURSE_SPECIFIC,
@@ -227,13 +231,16 @@ def _is_structural_course_page_method(method: str) -> bool:
     return any(method.startswith(p) for p in _STRUCTURAL_COURSE_PAGE_PREFIXES)
 
 
-def _method_authority(method: str) -> int:
+def _method_authority(method: str) -> float:
     """Return the authority level for a given extraction method string.
 
     Exact-key lookup first; then prefix scan so ``"central_page:english"``
     correctly resolves to ``"central_page"`` → 1.  Falls back to
     ``_AUTHORITY_COURSE_SPECIFIC`` (3) for unknown methods so new extractors
     are not accidentally treated as university-wide.
+
+    Returns float to accommodate the 2.5 tier used by CRICOS-matched PDF
+    methods (``uni_pdf:cricos_match:fees``).
     """
     if method in METHOD_AUTHORITY:
         return METHOD_AUTHORITY[method]
@@ -1808,6 +1815,46 @@ async def extract_course(
             method=_mode_method,
         )
 
+    # ── CRICOS code extraction from the course page ──────────────────────────
+    # Extract CRICOS code early so it is available during PDF row matching.
+    # ``cricos_code`` is stored in the payload and mapped to the DB column by
+    # the staging layer automatically (hasattr(ScrapedCourse, "cricos_code")).
+    # Only runs for AU country scrapes; harmless but no-op for non-AU pages.
+    if "cricos_code" not in payload or not payload.get("cricos_code"):
+        try:
+            from app.services.scraper.extractors.cricos_code import (
+                extract_cricos_code,
+                extract_cricos_code_from_html_structured,
+            )
+
+            _cricos_html = html or ""
+            _cricos_text = ""
+            try:
+                from bs4 import BeautifulSoup as _BS
+
+                _cricos_text = _BS(_cricos_html, "html.parser").get_text(" ", strip=True)
+            except Exception:  # noqa: BLE001
+                pass
+
+            _cricos_val = extract_cricos_code_from_html_structured(
+                _cricos_html
+            ) or extract_cricos_code(_cricos_html, _cricos_text)
+
+            if _cricos_val:
+                payload["cricos_code"] = _cricos_val
+                evidence.append(
+                    {
+                        "field_key": "cricos_code",
+                        "value": _cricos_val,
+                        "confidence": 0.95,
+                        "method": "regex:cricos",
+                        "snippet": f"CRICOS code extracted from course page: {_cricos_val}",
+                    }
+                )
+                log.info("[CRICOS] extracted %s from %s", _cricos_val, url)
+        except Exception as _cricos_exc:  # noqa: BLE001
+            log.debug("cricos_code extraction failed on %s: %s", url, _cricos_exc)
+
     # Last-resort: backfill from university-level PDFs (fee schedule,
     # admissions/IELTS policy). Only fills keys still missing after
     # page extractors + AI. Each filled key emits a provenance row that
@@ -1821,7 +1868,8 @@ async def extract_course(
         # NEW: prefer the per-course row from the fee schedule PDF over
         # the uni-wide value. ``fee_by_course`` is populated when the
         # PDF was a multi-row schedule (ASA, Torrens, …). Matching is
-        # done by distinctive course-name tokens — see
+        # done by CRICOS-first lookup (when the course page exposes a
+        # CRICOS code) then distinctive course-name token overlap — see
         # :func:`match_course_in_pdf_table`. When a row matches, it
         # *replaces* ``fee_block`` for this course and is tagged with a
         # different provenance method so reviewers can tell per-course
@@ -1843,18 +1891,25 @@ async def extract_course(
                 match_course_in_pdf_table,
             )
 
-            matched_row = match_course_in_pdf_table(
-                payload.get("course_name") or "", fee_by_course
+            matched_row, _match_suffix = match_course_in_pdf_table(
+                payload.get("course_name") or "",
+                fee_by_course,
+                cricos_code=payload.get("cricos_code"),
             )
             if matched_row:
                 log.info(
-                    "[FEE] per-course PDF row matched for %r: $%s (%s)",
+                    "[FEE] per-course PDF row matched for %r via %s: $%s (%s)",
                     payload.get("course_name"),
+                    _match_suffix,
                     matched_row.get("international_fee"),
                     matched_row.get("fee_term"),
                 )
                 fee_block = matched_row
-                fee_method = "uni_pdf:fees:per_course"
+                fee_method = (
+                    "uni_pdf:cricos_match:fees"
+                    if _match_suffix == "cricos_match"
+                    else "uni_pdf:fees:per_course"
+                )
             elif per_course_table_active:
                 # No per-course row matched, but the schedule itself
                 # parses cleanly. Suppress the uni-wide stamp so we
