@@ -1,0 +1,325 @@
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Certificate III in Carpentry (Cpc30220 Certificate Iii In Carpentry)
+Built Environment
+Publish: review
+Eligibility: ready
+77%	Certificate	2 Year	A$24,000/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Australia	On Campus	
+
+
+
+	
+Advanced Diploma of Information Technology (Ict60220 Advanced Diploma Of Information Technology)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Advanced Diploma	2 Year	A$28,000/Full Course	5.5	58	100	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide, Australia	On Campus	
+
+
+
+	
+Diploma of Information Technology (Ict50220 Diploma Of Information Technology)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Diploma	1.5 Year	A$15,500/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Adelaide, Sydney, Australia	On Campus	
+
+
+
+	
+Certificate IV in Information Technology (Ict40120 Certificate Iv In Information Technology)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Certificate	1 Year	A$12,000/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide, Australia	On Campus	
+
+
+
+	
+Advanced Diploma of Hospitality Management (Sit60322 Advanced Diploma Of Hospitality Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Advanced Diploma	2 Year	A$17,219/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Adelaide, Sydney, Australia	On Campus	
+
+
+
+	
+Diploma of Hospitality Management (Sit50422 Diploma Of Hospitality Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Diploma	1.5 Year	A$16,219/Full Course	5.5	42	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Adelaide, Sydney, Australia	On Campus	
+
+
+
+	
+Certificate IV in Patisserie (Sit40721 Certificate Iv In Patisserie)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Certificate	1.5 Year	A$15,919/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul	Melbourne, Australia	On Campus	
+
+
+
+	
+Certificate III in Patisserie (Sit31021 Certificate Iii In Patisserie)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Certificate	1 Year	A$13,169/Full Course	5.5	42	94	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Australia	On Campus	
+
+
+
+	
+Certificate IV in Kitchen Management (Sit40521 Certificate Iv In Kitchen Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Certificate	2 Year	A$14,919/Full Course	5.5	58	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Sydney, Adelaide, Australia	On Campus	
+
+
+
+	
+Certificate III in Commercial Cookery (Sit30821 Certificate Iii In Commercial Cookery)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: ready
+77%	Certificate	1 Year	A$12,169/Full Course	5.5	42	80	176	100	Feb, Mar, May, Jun, Jul, Aug	Melbourne, Adelaide, Sydney, Australia	On Campus	
+
+
+
+	
+Diploma of Business
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Diploma	1 Year	A$12,000/Full Course	5.5	39	51	162	105	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus Business Technology)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus Human Resource Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus Accounting)
+Accounting & Finance
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus Tourism And Hospitality Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Business (Bbus International Business Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$36,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Business Administration (Gcba)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	6 Month	A$7,000/Full Course	6.5	55	81	176	100	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Graduate Diploma of Business Administration (Gdba)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$14,000/Full Course	6.5	55	81	176	100	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (Project Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$28,000/Full Course	6.5	55	81	176	110	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (Tourism And Hospitality Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (Leadership And Management)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$28,000/Full Course	6.5	55	81	176	100	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (Information Systems)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	115	Mar, May, Aug, Sep, Dec	Melbourne, Sydney, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (Finance)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$28,000/Full Course	6.5	55	81	176	100	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$28,000/Full Course	6.5	55	81	176	100	Jan, Mar, May, Jun, Aug, Oct	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Information Technology and Systems (Gcits)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	6 Month	A$9,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Graduate Diploma of Information Technology and Systems (Gdits)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	12 Month	A$18,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Information Technology and Systems (Software Engineering)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Information Technology and Systems (Information Systems)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Information Technology and Systems (Cybersecurity)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	120	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Information Technology and Systems (Business Analytics)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Master of Information Technology and Systems
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$48,000/Full Course	6.5	55	81	176	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems (Networking)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$51,000/Full Course	6	47	67	169	105	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems (Cyber Security)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$51,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems (Application Development)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$51,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems (Artificial Intelligence Analytics)
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$51,000/Full Course	6	47	67	169	100	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+
+	
+Bachelor of Information Technology and Systems
+Computer Science & IT
+Publish: review
+Eligibility: ready
+77%	Bachelor	3 Year	A$51,000/Full Course	6	47	67	169	120	Mar, May, Aug, Sep, Dec	Sydney, Melbourne, Adelaide, Geelong, Australia	On Campus	
+
+
+

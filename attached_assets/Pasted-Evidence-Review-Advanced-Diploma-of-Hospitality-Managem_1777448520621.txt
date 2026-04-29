@@ -1,0 +1,230 @@
+Evidence Review
+Advanced Diploma of Hospitality Management (Sit60322 Advanced Diploma Of Hospitality Management)
+Eligibility: ready - ok
+Conflicts
+ielts_overall: 6.5 vs 5.5 - per_course_vision_cached vs regex disagreed
+cambridge_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+176.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Hospitality, Tourism & Events
+gemini_primary: category=Hospitality, Tourism & Events
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+course_location
+selected
+selected
+/ location.heading
+confidence 70%
+Melbourne, Adelaide, Sydney, Australia
+Melbourne, Adelaide, Sydney
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Advanced Diploma of Hospitality Management
+SIT60322 - Advanced Diploma of Hospitality Management
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Advanced Diploma
+Advanced Diploma of Hospitality Management
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+description
+selected
+selected
+/ description.meta
+confidence 95%
+VIT Australia offers the best training in hospitality management courses. Join and learn skills and knowledge in the hospitality management function area. Apply today!
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+duolingo_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+100.0
+Shape Images
+https://vit.edu.au/assets/award.svg
+duration
+selected
+selected
+/ duration.structural
+confidence 85%
+2.0
+<strong>Duration</strong> -> Duration: 107 weeks including breaks
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+2.0
+ai_fallback: duration_value=2.0
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+ielts_listening
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+ielts_overall
+selected
+selected
+/ regex
+confidence 85%
+5.5
+Advanced Diploma of Hospitality Management Course | VIT Australia BITS Bachelor of Information Technology and Systems (BITS) BITS focuses on delivering knowledge and skills in computer networking, app
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+needs_review
+/ per_course_vision_cached
+confidence 85%
+6.5
+Shape Images
+https://vit.edu.au/assets/students.svg
+ielts_reading
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+ielts_speaking
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+ielts_writing
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["February", "March", "May", "June", "July", "August"]
+ne Adelaide Sydney 2026 intakes: 09-Feb-2026 16-Mar-2026 04-May-2026 08-June-2026 20-July-2026 24-Aug-2026 Duration 107 Weeks (Course Breaks Included) Fees $17,219 You are considered a Domestic Student If you are An Australian citizen or An
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+international_eligible
+selected
+selected
+/ eligibility.positive
+confidence 85%
+True
+Cricos Code: 091095A
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+international_fee
+selected
+selected
+/ regex
+confidence 80%
+17219
+bourne Adelaide Sydney 2026 intakes: 09-Feb-2026 16-Mar-2026 04-May-2026 08-June-2026 20-July-2026 24-Aug-2026 Duration 107 Weeks (Course Breaks Included) Fees $17,219 You are considered a Domestic Student If you are An Australian citizen o
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+location_text
+selected
+selected
+/ vit_static_fallback
+confidence 85%
+Melbourne, Sydney, Adelaide
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: mode=On Campus
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+pte_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+58.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+e, email, or visit our campus in person . Your success journey begins
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Hospitality Management
+gemini_primary: sub_category=Hospitality Management
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+toefl_listening
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+12.0
+sibling-cache backfill from undergraduate bucket: toefl_listening=12.0
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+toefl_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+80.0
+Shape Images
+https://vit.edu.au/assets/students.svg
+toefl_reading
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+12.0
+sibling-cache backfill from undergraduate bucket: toefl_reading=12.0
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+toefl_speaking
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+17.0
+sibling-cache backfill from undergraduate bucket: toefl_speaking=17.0
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+toefl_writing
+needs_review
+/ sibling_cache:undergraduate
+confidence 55%
+14.0
+sibling-cache backfill from undergraduate bucket: toefl_writing=14.0
+https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
