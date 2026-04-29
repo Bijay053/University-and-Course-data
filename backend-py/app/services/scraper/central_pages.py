@@ -576,11 +576,20 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
     # pool is exhausted, which caused 1h+ hangs on the Celery worker.
     import asyncio as _asyncio
 
+    # Hosts whose fee/english pages are React/Vue SPAs that need extra time
+    # after DOMContentLoaded before fee tables/cards are injected into the DOM.
+    _SLOW_SPA_HOSTS = frozenset({
+        "www.torrens.edu.au", "torrens.edu.au",
+    })
+    from urllib.parse import urlparse as _urlparse
+    _host = _urlparse(url).netloc
+    _extra_wait_ms = 6_000 if _host in _SLOW_SPA_HOSTS else 3_000
+
     async def _browser_fetch() -> str | None:
         from app.services.scraper.browser_pool import pool as browser_pool
         async with browser_pool.page() as page:
             await page.goto(url, wait_until="domcontentloaded", timeout=25_000)
-            await page.wait_for_timeout(3_000)
+            await page.wait_for_timeout(_extra_wait_ms)
             rendered = await page.content()
             if rendered and len(rendered) > 1000:
                 return rendered

@@ -383,7 +383,13 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-gray-600 whitespace-nowrap align-top">
-                      {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
+                      {course.duration != null && course.duration !== "" ? (() => {
+                        const n = typeof course.duration === "number" ? course.duration : parseFloat(course.duration as string);
+                        if (isNaN(n)) return `${course.duration} ${course.durationTerm || ""}`.trim();
+                        const r = Math.round(n * 10) / 10;
+                        const display = r % 1 === 0 ? String(Math.round(r)) : String(r);
+                        return `${display} ${course.durationTerm || "Year"}`.trim();
+                      })() : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-right font-medium whitespace-nowrap align-top">
                       {feeDisplay(course) ?? <MissingBadge title="Missing international fee" />}

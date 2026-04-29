@@ -1,0 +1,454 @@
+Worker claimed queued scrape job
+Cleared 36 stale pending/rejected scraped_courses rows (>10m old) for university 38
+Fetching https://vit.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://vit.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://vit.edu.au/courses: listing (38 course links found)
+[DISCOVER] Page 1/25: +38 candidates (total 38) — https://vit.edu.au/courses
+[DISCOVER] blocked category_landing_page: https://vit.edu.au/resources/study-online
+[DISCOVER] classified https://vit.edu.au/resources/study-on-campus: listing (38 course links found)
+[DISCOVER] Page 3/25: +0 candidates (total 38) — https://vit.edu.au/resources/study-on-campus
+[DISCOVER] classified https://vit.edu.au/resources/course-entry-requirements: listing (38 course links found)
+[DISCOVER] Page 4/25: +0 candidates (total 38) — https://vit.edu.au/resources/course-entry-requirements
+[DISCOVER] blocked about_page: https://vit.edu.au/about/about-us/academic-board
+[DISCOVER] classified https://vit.edu.au/course-list: listing (38 course links found)
+[DISCOVER] Page 6/25: +0 candidates (total 38) — https://vit.edu.au/course-list
+[DISCOVER] classified https://vit.edu.au/course-list?page=2: listing (38 course links found)
+[DISCOVER] Page 7/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=2
+[DISCOVER] classified https://vit.edu.au/course-list?page=3: listing (38 course links found)
+[DISCOVER] Page 8/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=3
+[DISCOVER] classified https://vit.edu.au/course-list?page=4: listing (38 course links found)
+[DISCOVER] Page 9/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=4
+[DISCOVER] classified https://vit.edu.au/course-list?page=5: listing (38 course links found)
+[DISCOVER] Page 10/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=5
+[DISCOVER] classified https://vit.edu.au/course-list?page=6: listing (38 course links found)
+[DISCOVER] Page 11/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=6
+[DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=vocational: listing (38 course links found)
+[DISCOVER] Page 12/25: +0 candidates (total 38) — https://vit.edu.au/course-list?course_categories[0]=vocational
+[DISCOVER] classified https://vit.edu.au/course-list?course_categories[0]=elicos: listing (38 course links found)
+[DISCOVER] Page 13/25: +0 candidates (total 38) — https://vit.edu.au/course-list?course_categories[0]=elicos
+[DISCOVER] classified https://vit.edu.au/course-list?page=1: listing (38 course links found)
+[DISCOVER] Page 14/25: +0 candidates (total 38) — https://vit.edu.au/course-list?page=1
+Discovered 38 candidate course links
+[CENTRAL] auto-discovered fee page: https://vit.edu.au/about/why-study-with-us/fees-scholarships
+[CACHE] fee_schedule hit → 35 record(s) (cached, skipping fetch of https://vit.edu.au/about/why-study-with-us/fees-scholarships)
+Extracting course details (38 pages)...
+[EXTRACT] 1/38: Bachelor of Information Technology and Systems (BITS)
+[EXTRACT] 2/38: BITS - Artificial Intelligence and Analytics Specialisation
+[EXTRACT] 3/38: BITS - Application Development Specialisation
+[EXTRACT] 4/38: BITS - Cyber Security Specialisation
+Fetching 2/38: BITS - Artificial Intelligence and Analytics Specialisation
+Fetching 3/38: BITS - Application Development Specialisation
+Fetching 1/38: Bachelor of Information Technology and Systems (BITS)
+Fetching 4/38: BITS - Cyber Security Specialisation
+[FIELD SUMMARY] Bachelor of Information Technology and Systems Fee: ✅ '51000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Information Technology and Systems Fee: ✅ '51000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Information Technology and Systems Fee: ✅ '51000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Information Technology and Systems Fee: ✅ '51000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/bits/bits-application-development
+[per-course browser ↻] https://vit.edu.au/bits/bits-cyber-security
+[per-course browser ↻] https://vit.edu.au/bits
+[per-course browser ↻] https://vit.edu.au/bits/bits-artificial-intelligence-analytics
+[per-course browser ✓] https://vit.edu.au/bits/bits-application-development — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=51000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/bits/bits-artificial-intelligence-analytics — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=51000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/bits/bits-application-development → 0 field(s) (cost=$0.000000, in=1401 out=0)
+[GEMINI] https://vit.edu.au/bits/bits-artificial-intelligence-analyti → 0 field(s) (cost=$0.000000, in=1406 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/bits/bits-application-development (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/bits/bits-artificial-intelligence-analytics (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bits/bits-application-development
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bits/bits-artificial-intelligence-analytics
+[per-course browser ✓] https://vit.edu.au/bits/bits-cyber-security — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=51000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/bits — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=51000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[GEMINI] https://vit.edu.au/bits/bits-cyber-security → 0 field(s) (cost=$0.000000, in=1396 out=0)
+✅ [PASS 100/100] Bachelor of Information Technology and Systems | bits-application-development
+[GEMINI] https://vit.edu.au/bits → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/bits (missing: domestic_fee, duration_text, intake_text, location_text)
+✅ [PASS 100/100] Bachelor of Information Technology and Systems | bits-artificial-intelligence-analytics
+[EXTRACT] 5/38: BITS - Networking Specialisation
+[FALLBACK] AI enriching https://vit.edu.au/bits/bits-cyber-security (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 5/38: BITS - Networking Specialisation
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bits
+[EXTRACT] 6/38: Master of Information Technology and Systems
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bits/bits-cyber-security
+[CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+Fetching 6/38: Master of Information Technology and Systems
+[CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Bachelor of Information Technology and Systems | bits
+✅ [PASS 100/100] Bachelor of Information Technology and Systems | bits-cyber-security
+[EXTRACT] 7/38: MITS - Business Analytics Specialisation
+[EXTRACT] 8/38: MITS - Cyber Security Specialisation
+Fetching 7/38: MITS - Business Analytics Specialisation
+Fetching 8/38: MITS - Cyber Security Specialisation
+[FIELD SUMMARY] Bachelor of Information Technology and Systems Fee: ✅ '51000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology and Systems Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology and Systems Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology and Systems Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/bits/bits-networking
+[per-course browser ↻] https://vit.edu.au/mits
+[per-course browser ↻] https://vit.edu.au/mits/mits-business-analytics
+[per-course browser ↻] https://vit.edu.au/mits/mits-cybersecurity
+[per-course browser ✓] https://vit.edu.au/bits/bits-networking — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=51000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/bits/bits-networking → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[per-course browser ✓] https://vit.edu.au/mits/mits-business-analytics — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[FALLBACK] AI enriching https://vit.edu.au/bits/bits-networking (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://vit.edu.au/mits/mits-business-analytics → 0 field(s) (cost=$0.000000, in=1398 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/mits/mits-business-analytics (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bits/bits-networking
+[per-course browser ✓] https://vit.edu.au/mits/mits-cybersecurity — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[CATEGORY det] Bachelor of Information Technology and S → Computer Science & IT / Information Systems
+[GEMINI] https://vit.edu.au/mits/mits-cybersecurity → 0 field(s) (cost=$0.000000, in=1396 out=0)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/mits-business-analytics
+✅ [PASS 100/100] Bachelor of Information Technology and Systems | bits-networking
+[CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[FALLBACK] AI enriching https://vit.edu.au/mits/mits-cybersecurity (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 9/38: MITS - Information Systems Specialisation
+✅ [PASS 100/100] Master of Information Technology and Systems | mits-business-analytics
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/mits-cybersecurity
+[per-course browser ✓] https://vit.edu.au/mits — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[EXTRACT] 10/38: MITS - Software Engineering Specialisation
+Fetching 9/38: MITS - Information Systems Specialisation
+[CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[GEMINI] https://vit.edu.au/mits → 0 field(s) (cost=$0.000000, in=1395 out=0)
+Fetching 10/38: MITS - Software Engineering Specialisation
+✅ [PASS 100/100] Master of Information Technology and Systems | mits-cybersecurity
+[FALLBACK] AI enriching https://vit.edu.au/mits (missing: domestic_fee, duration_text, intake_text, location_text)
+[EXTRACT] 11/38: GDITS-Graduate Diploma of Information Technology and Systems
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits
+[CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+Fetching 11/38: GDITS-Graduate Diploma of Information Technology and Systems
+✅ [PASS 100/100] Master of Information Technology and Systems | mits
+[EXTRACT] 12/38: GCITS-Graduate Certificate of Information Technology and Systems
+Fetching 12/38: GCITS-Graduate Certificate of Information Technology and Systems
+[FIELD SUMMARY] Graduate Diploma of Information Technology and Sys Fee: ✅ '18000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '12.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology and Systems Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology and Systems Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Information Technology and Fee: ✅ '9000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '6.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/mits/gdits
+[per-course browser ↻] https://vit.edu.au/mits/mits-information-systems
+[per-course browser ↻] https://vit.edu.au/mits/mits-software-engineering
+[per-course browser ↻] https://vit.edu.au/mits/gcits
+[per-course browser ✓] https://vit.edu.au/mits/gdits — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=18000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/mits/gdits → 0 field(s) (cost=$0.000000, in=1397 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/mits/gdits (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/gdits
+[CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+[per-course browser ✓] https://vit.edu.au/mits/gcits — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=9000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/mits/mits-software-engineering — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/mits/mits-information-systems — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+✅ [PASS 100/100] Graduate Diploma of Information Technology and Sys | gdits
+[GEMINI] https://vit.edu.au/mits/gcits → 0 field(s) (cost=$0.000000, in=1398 out=0)
+[GEMINI] https://vit.edu.au/mits/mits-software-engineering → 0 field(s) (cost=$0.000000, in=1399 out=0)
+[GEMINI] https://vit.edu.au/mits/mits-information-systems → 0 field(s) (cost=$0.000000, in=1399 out=0)
+[EXTRACT] 13/38: Master of Business Administration
+[FALLBACK] AI enriching https://vit.edu.au/mits/gcits (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/mits/mits-software-engineering (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/mits/mits-information-systems (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 13/38: Master of Business Administration
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/gcits
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/mits-software-engineering
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mits/mits-information-systems
+[CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+[CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+[CATEGORY det] Master of Information Technology and Sys → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Graduate Certificate of Information Technology and | gcits
+✅ [PASS 100/100] Master of Information Technology and Systems | mits-software-engineering
+✅ [PASS 100/100] Master of Information Technology and Systems | mits-information-systems
+[EXTRACT] 14/38: MBA - Finance Specialisation
+[EXTRACT] 15/38: MBA - Information Systems Specialisation
+[EXTRACT] 16/38: MBA - Leadership and Management Specialisation
+Fetching 14/38: MBA - Finance Specialisation
+Fetching 15/38: MBA - Information Systems Specialisation
+Fetching 16/38: MBA - Leadership and Management Specialisation
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '28000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '28000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '28000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/mba/mba-leadership-and-management
+[per-course browser ↻] https://vit.edu.au/mba/mba-finance
+[per-course browser ↻] https://vit.edu.au/mba
+[per-course browser ↻] https://vit.edu.au/mba/mba-information-systems
+[per-course browser ✓] https://vit.edu.au/mba/mba-leadership-and-management — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=28000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/mba/mba-leadership-and-management → 0 field(s) (cost=$0.000000, in=1400 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/mba/mba-leadership-and-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/mba-leadership-and-management
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[per-course browser ✓] https://vit.edu.au/mba — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=28000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/mba/mba-information-systems — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/mba/mba-finance — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=28000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+✅ [PASS 100/100] Master of Business Administration | mba-leadership-and-management
+[GEMINI] https://vit.edu.au/mba → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[GEMINI] https://vit.edu.au/mba/mba-information-systems → 0 field(s) (cost=$0.000000, in=1398 out=0)
+[GEMINI] https://vit.edu.au/mba/mba-finance → 0 field(s) (cost=$0.000000, in=1392 out=0)
+[EXTRACT] 17/38: MBA - Tourism and Hospitality Management Specialisation
+[FALLBACK] AI enriching https://vit.edu.au/mba (missing: domestic_fee, duration_text, intake_text, location_text)
+[VIT static fallback ✓] Master of Business Administration — recovered location=Melbourne, Sydney, Adelaide, Geelong
+[FALLBACK] AI enriching https://vit.edu.au/mba/mba-finance (missing: domestic_fee, duration_text, intake_text, location_text)
+Fetching 17/38: MBA - Tourism and Hospitality Management Specialisation
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba
+[FALLBACK] AI enriching https://vit.edu.au/mba/mba-information-systems (missing: domestic_fee, duration_text, intake_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/mba-finance
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Sydney, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/mba-information-systems
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+✅ [PASS 100/100] Master of Business Administration | mba
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT] 18/38: MBA - Project Management Specialisation
+✅ [PASS 100/100] Master of Business Administration | mba-finance
+✅ [PASS 100/100] Master of Business Administration | mba-information-systems
+Fetching 18/38: MBA - Project Management Specialisation
+[EXTRACT] 19/38: GDBA - Graduate Diploma of Business Administration
+[EXTRACT] 20/38: GCBA - Graduate Certificate of Business Administration
+Fetching 19/38: GDBA - Graduate Diploma of Business Administration
+Fetching 20/38: GCBA - Graduate Certificate of Business Administration
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '48000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Business Administration Fee: ✅ '7000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration Fee: ✅ '28000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Business Administration Fee: ✅ '14000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['January', 'March', 'May', 'J" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/mba/mba-tourism-and-hospitality-management
+[per-course browser ↻] https://vit.edu.au/mba/gcba
+[per-course browser ↻] https://vit.edu.au/mba/mba-project-management
+[per-course browser ↻] https://vit.edu.au/mba/gdba
+[per-course browser ✓] https://vit.edu.au/mba/gdba — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=14000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/mba/gdba → 0 field(s) (cost=$0.000000, in=1394 out=0)
+[per-course browser ✓] https://vit.edu.au/mba/mba-project-management — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=28000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[FALLBACK] AI enriching https://vit.edu.au/mba/gdba (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://vit.edu.au/mba/mba-project-management → 0 field(s) (cost=$0.000000, in=1401 out=0)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/gdba
+[FALLBACK] AI enriching https://vit.edu.au/mba/mba-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+✅ [PASS 100/100] Graduate Diploma of Business Administration | gdba
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/mba-project-management
+[EXTRACT] 21/38: Bachelor of Business (BBus)
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[per-course browser ✓] https://vit.edu.au/mba/gcba — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=7000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+Fetching 21/38: Bachelor of Business (BBus)
+[per-course browser ✓] https://vit.edu.au/mba/mba-tourism-and-hospitality-management — IELTS=6.5 PTE=55.0 TOEFL=81.0 CAE=176.0 fee=48000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+✅ [PASS 100/100] Master of Business Administration | mba-project-management
+[GEMINI] https://vit.edu.au/mba/gcba → 0 field(s) (cost=$0.000000, in=1395 out=0)
+[GEMINI] https://vit.edu.au/mba/mba-tourism-and-hospitality-managemen → 0 field(s) (cost=$0.000000, in=1404 out=0)
+[EXTRACT] 22/38: BBus - International Business Management Specialisation
+[FALLBACK] AI enriching https://vit.edu.au/mba/gcba (missing: domestic_fee, duration_text, intake_text, location_text)
+[VIT static fallback ✓] Master of Business Administration — recovered location=Melbourne, Sydney, Adelaide, Geelong
+Fetching 22/38: BBus - International Business Management Specialisation
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/gcba
+[FALLBACK] AI enriching https://vit.edu.au/mba/mba-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text)
+✅ [PASS 100/100] Graduate Certificate of Business Administration | gcba
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Sydney, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/mba/mba-tourism-and-hospitality-management
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[EXTRACT] 23/38: BBus - Tourism and Hospitality Management Specialisation
+✅ [PASS 100/100] Master of Business Administration | mba-tourism-and-hospitality-management
+Fetching 23/38: BBus - Tourism and Hospitality Management Specialisation
+[EXTRACT] 24/38: BBus - Accounting Specialisation
+Fetching 24/38: BBus - Accounting Specialisation
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-international-business-management
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hospitality-management
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-accounting
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/bachelor-of-business → 0 field(s) (cost=$0.000000, in=1391 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business
+✅ [PASS 100/100] Bachelor of Business | bachelor-of-business
+[EXTRACT] 25/38: BBus - Human Resource Management Specialisation
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-international-business-management — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hospitality-management — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-accounting — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+Fetching 25/38: BBus - Human Resource Management Specialisation
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-international-b → 0 field(s) (cost=$0.000000, in=1411 out=0)
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hos → 0 field(s) (cost=$0.000000, in=1411 out=0)
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-accounting → 0 field(s) (cost=$0.000000, in=1402 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-international-business-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hospitality-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-accounting (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-international-business-management
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-tourism-and-hospitality-management
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-accounting
+✅ [PASS 100/100] Bachelor of Business | bbus-international-business-management
+✅ [PASS 100/100] Bachelor of Business | bbus-tourism-and-hospitality-management
+✅ [PASS 100/100] Bachelor of Business | bbus-accounting
+[EXTRACT] 26/38: BBus - Marketing Specialisation
+[EXTRACT] 27/38: BBus - Business Technology Specialisation
+[EXTRACT] 28/38: DipBus - Diploma of Business
+Fetching 26/38: BBus - Marketing Specialisation
+Fetching 27/38: BBus - Business Technology Specialisation
+Fetching 28/38: DipBus - Diploma of Business
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business Fee: ✅ '12000' [regex conf=1.00] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ✅ '36000' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['March', 'May', 'August', 'Se" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-human-resource-management
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-business-technology
+[per-course browser ↻] https://vit.edu.au/diploma-of-business
+[per-course browser ↻] https://vit.edu.au/bachelor-of-business/bbus-marketing
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-business-technology — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-business-techno → 0 field(s) (cost=$0.000000, in=1407 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-business-technology (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-business-technology
+✅ [PASS 100/100] Bachelor of Business | bbus-business-technology
+[per-course browser ✓] https://vit.edu.au/diploma-of-business — IELTS=5.5 PTE=39.0 TOEFL=51.0 CAE=162.0 fee=12000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-human-resource-management — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[EXTRACT] 29/38: Certificate III in Commercial Cookery
+[per-course browser ✓] https://vit.edu.au/bachelor-of-business/bbus-marketing — IELTS=6.0 PTE=47.0 TOEFL=67.0 CAE=169.0 fee=36000 filled=['cambridge_overall', 'duration', 'duration_term', 'ielts_overall', 'intake_months', 'international_fee', 'pte_overall', 'study_mode', 'toefl_overall']
+[GEMINI] https://vit.edu.au/diploma-of-business → 0 field(s) (cost=$0.000000, in=1391 out=0)
+Fetching 29/38: Certificate III in Commercial Cookery
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-human-resource- → 0 field(s) (cost=$0.000000, in=1407 out=0)
+[GEMINI] https://vit.edu.au/bachelor-of-business/bbus-marketing → 0 field(s) (cost=$0.000000, in=1402 out=0)
+[FALLBACK] AI enriching https://vit.edu.au/diploma-of-business (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-marketing (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://vit.edu.au/bachelor-of-business/bbus-human-resource-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/diploma-of-business
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-marketing
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Adelaide, Geelong, Australia' method=per_course_browser_extended url=https://vit.edu.au/bachelor-of-business/bbus-human-resource-management
+✅ [PASS 100/100] Diploma of Business | diploma-of-business
+✅ [PASS 100/100] Bachelor of Business | bbus-marketing
+✅ [PASS 100/100] Bachelor of Business | bbus-human-resource-management
+[EXTRACT] 30/38: Certificate IV in Kitchen Management
+[EXTRACT] 31/38: Certificate III in Patisserie
+[EXTRACT] 32/38: Certificate IV in Patisserie
+Fetching 30/38: Certificate IV in Kitchen Management
+Fetching 31/38: Certificate III in Patisserie
+Fetching 32/38: Certificate IV in Patisserie
+[FIELD SUMMARY] Certificate III in Commercial Cookery Fee: ✅ '12169' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Certificate IV in Kitchen Management Fee: ✅ '14919' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Certificate III in Patisserie Fee: ✅ '13169' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Certificate IV in Patisserie Fee: ✅ '15919' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser skipped] https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie — vocational static fallback
+[GEMINI] https://vit.edu.au/vocational/sit30821-certificate-iii-in-co → 0 field(s) (cost=$0.000000, in=1408 out=0)
+[GEMINI] https://vit.edu.au/vocational/sit40521-certificate-iv-in-kit → 0 field(s) (cost=$0.000000, in=1406 out=0)
+[GEMINI] https://vit.edu.au/vocational/sit40721-certificate-iv-in-pat → 0 field(s) (cost=$0.000000, in=1405 out=0)
+[GEMINI] https://vit.edu.au/vocational/sit31021-certificate-iii-in-pa → 0 field(s) (cost=$0.000000, in=1407 out=0)
+[VIT static fallback ✓] Certificate III in Commercial Cookery — recovered intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[VIT static fallback ✓] Certificate IV in Kitchen Management — recovered intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[VIT static fallback ✓] Certificate IV in Patisserie — recovered intakes=February,March,May,June,July, location=Melbourne
+[VIT static fallback ✓] Certificate III in Patisserie — recovered intakes=February,March,May,June,July,August, location=Melbourne
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management (missing: domestic_fee, duration_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie (missing: domestic_fee, duration_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery (missing: domestic_fee, duration_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie (missing: domestic_fee, duration_text)
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Sydney, Adelaide, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit40521-certificate-iv-in-kitchen-management
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit31021-certificate-iii-in-patisserie
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Adelaide, Sydney, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit30821-certificate-iii-in-commercial-cookery
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit40721-certificate-iv-in-patisserie
+[CATEGORY det] Certificate IV in Patisserie → Hospitality, Tourism & Events / Cookery
+[CATEGORY det] Certificate III in Patisserie → Hospitality, Tourism & Events / Cookery
+[CATEGORY det] Certificate III in Commercial Cookery → Hospitality, Tourism & Events / Cookery
+[CATEGORY det] Certificate IV in Kitchen Management → Hospitality, Tourism & Events / Cookery
+✅ [PASS 100/100] Certificate IV in Patisserie | sit40721-certificate-iv-in-patisserie
+✅ [PASS 100/100] Certificate III in Patisserie | sit31021-certificate-iii-in-patisserie
+✅ [PASS 100/100] Certificate III in Commercial Cookery | sit30821-certificate-iii-in-commercial-c
+✅ [PASS 100/100] Certificate IV in Kitchen Management | sit40521-certificate-iv-in-kitchen-manag
+[EXTRACT] 33/38: Diploma of Hospitality Management
+[EXTRACT] 34/38: Advanced Diploma of Hospitality Management
+[EXTRACT] 35/38: Certificate IV in Information Technology
+[EXTRACT] 36/38: Diploma of Information Technology
+Fetching 33/38: Diploma of Hospitality Management
+Fetching 35/38: Certificate IV in Information Technology
+Fetching 34/38: Advanced Diploma of Hospitality Management
+Fetching 36/38: Diploma of Information Technology
+[FIELD SUMMARY] Certificate IV in Information Technology Fee: ✅ '12000' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.0' [duration.structural conf=0.85] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Hospitality Management Fee: ✅ '16219' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Information Technology Fee: ✅ '15500' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.5' [duration.structural conf=0.85] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Advanced Diploma of Hospitality Management Fee: ✅ '17219' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser skipped] https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/ict50220-diploma-of-information-technology — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management — vocational static fallback
+[GEMINI] https://vit.edu.au/vocational/ict40120-certificate-iv-in-inf → 0 field(s) (cost=$0.000000, in=1409 out=0)
+[GEMINI] https://vit.edu.au/vocational/sit50422-diploma-of-hospitalit → 0 field(s) (cost=$0.000000, in=1404 out=0)
+[GEMINI] https://vit.edu.au/vocational/sit60322-advanced-diploma-of-h → 0 field(s) (cost=$0.000000, in=1409 out=0)
+[GEMINI] https://vit.edu.au/vocational/ict50220-diploma-of-informatio → 0 field(s) (cost=$0.000000, in=1406 out=0)
+[VIT static fallback ✓] Certificate IV in Information Technology — recovered location=Melbourne, Sydney, Adelaide
+[VIT static fallback ✓] Diploma of Hospitality Management — recovered intakes=February,March,May,June,July,August, location=Melbourne, Sydney, Adelaide
+[VIT static fallback ✓] Advanced Diploma of Hospitality Manageme — recovered location=Melbourne, Sydney, Adelaide
+[VIT static fallback ✓] Diploma of Information Technology — recovered location=Melbourne, Sydney, Adelaide
+[FALLBACK] AI enriching https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology (missing: domestic_fee, duration_text, intake_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management (missing: domestic_fee, duration_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management (missing: domestic_fee, duration_text, intake_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/ict50220-diploma-of-information-technology (missing: domestic_fee, duration_text, intake_text)
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Sydney, Adelaide, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/ict40120-certificate-iv-in-information-technology
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Adelaide, Sydney, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit60322-advanced-diploma-of-hospitality-management
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Adelaide, Sydney, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/sit50422-diploma-of-hospitality-management
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Adelaide, Sydney, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/ict50220-diploma-of-information-technology
+[CATEGORY det] Certificate IV in Information Technology → Computer Science & IT / Information Systems
+[CATEGORY det] Advanced Diploma of Hospitality Manageme → Hospitality, Tourism & Events / Hospitality Management
+[CATEGORY det] Diploma of Hospitality Management → Hospitality, Tourism & Events / Hospitality Management
+[CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Certificate IV in Information Technology | ict40120-certificate-iv-in-information-t
+✅ [PASS 100/100] Advanced Diploma of Hospitality Management | sit60322-advanced-diploma-of-hospitality
+✅ [PASS 100/100] Diploma of Hospitality Management | sit50422-diploma-of-hospitality-manageme
+✅ [PASS 100/100] Diploma of Information Technology | ict50220-diploma-of-information-technolo
+[EXTRACT] 37/38: Advanced Diploma of Information Technology
+[EXTRACT] 38/38: Certificate III in Carpentry
+Fetching 37/38: Advanced Diploma of Information Technology
+Fetching 38/38: Certificate III in Carpentry
+[FIELD SUMMARY] Certificate III in Carpentry Fee: ✅ '24000' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Advanced Diploma of Information Technology Fee: ✅ '28000' [regex conf=0.80] IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['February', 'March', 'May', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser skipped] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry — vocational static fallback
+[per-course browser skipped] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology — vocational static fallback
+[GEMINI] https://vit.edu.au/vocational/cpc30220-certificate-iii-in-ca → 0 field(s) (cost=$0.000000, in=1405 out=0)
+[GEMINI] https://vit.edu.au/vocational/ict60220-advanced-diploma-of-i → 0 field(s) (cost=$0.000000, in=1407 out=0)
+[VIT static fallback ✓] Certificate III in Carpentry — recovered location=Melbourne
+[VIT static fallback ✓] Advanced Diploma of Information Technolo — recovered location=Melbourne, Sydney, Adelaide
+[FALLBACK] AI enriching https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology (missing: domestic_fee, duration_text, intake_text)
+[FALLBACK] AI enriching https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry (missing: domestic_fee, duration_text, intake_text)
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Sydney, Adelaide, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/ict60220-advanced-diploma-of-information-technology
+[FIELD TRACE] study_mode='On Campus' location='Melbourne, Australia' method=study_mode:rule url=https://vit.edu.au/vocational/cpc30220-certificate-iii-in-carpentry
+[CATEGORY det] Advanced Diploma of Information Technolo → Computer Science & IT / Information Systems
+[CATEGORY det] Certificate III in Carpentry → Trades & Construction / Carpentry
+✅ [PASS 100/100] Advanced Diploma of Information Technology | ict60220-advanced-diploma-of-information
+✅ [PASS 100/100] Certificate III in Carpentry | cpc30220-certificate-iii-in-carpentry
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 ielts_listening=5.5 ielts_overall=6.0 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5 pte_listening=40.0 pte_overall=47.0 pte_reading=42.0 pte_speaking=39.0 pte_writing=41.0 toefl_listening=12.0 toefl_overall=67.0 toefl_reading=12.0 toefl_speaking=17.0 toefl_writing=14.0
+[EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0 pte_listening=47.0 pte_overall=55.0 pte_reading=48.0 pte_speaking=54.0 pte_writing=51.0 toefl_listening=16.0 toefl_overall=81.0 toefl_reading=16.0 toefl_speaking=19.0 toefl_writing=19.0
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 147 slot(s) filled across siblings
+[STAGE] saved: Bachelor of Information Technology and Systems
+[STAGE] skipped Bachelor of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] saved: Master of Information Technology and Systems
+[STAGE] skipped Master of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Master of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Master of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] skipped Master of Information Technology and Systems: rejected: duplicate_in_job
+[STAGE] saved: Graduate Diploma of Information Technology and Systems
+[STAGE] saved: Graduate Certificate of Information Technology and Systems
+[STAGE] saved: Master of Business Administration
+[STAGE] skipped Master of Business Administration: rejected: duplicate_in_job
+[STAGE] skipped Master of Business Administration: rejected: duplicate_in_job
+[STAGE] skipped Master of Business Administration: rejected: duplicate_in_job
+[STAGE] skipped Master of Business Administration: rejected: duplicate_in_job
+[STAGE] skipped Master of Business Administration: rejected: duplicate_in_job
+[STAGE] saved: Graduate Diploma of Business Administration
+[STAGE] saved: Graduate Certificate of Business Administration
+[STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE] saved: Bachelor of Business
+[STAGE] skipped Bachelor of Business: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Business: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Business: rejected: duplicate_in_job
+[STAGE] skipped Bachelor of Business: rejected: online_only
+[STAGE] skipped Bachelor of Business: rejected: duplicate_in_job
+[STAGE] saved: Diploma of Business
+[STAGE] saved: Certificate III in Commercial Cookery
+[STAGE] saved: Certificate IV in Kitchen Management
+[STAGE] saved: Certificate III in Patisserie
+[STAGE] saved: Certificate IV in Patisserie
+[STAGE] saved: Diploma of Hospitality Management
+[STAGE] saved: Advanced Diploma of Hospitality Management
+[STAGE] saved: Certificate IV in Information Technology
+[STAGE] saved: Diploma of Information Technology
+[STAGE] saved: Advanced Diploma of Information Technology
+[STAGE] saved: Certificate III in Carpentry
+[DATA QUALITY] 38 course(s) checked — 0 critical / 4 warning / 0 info
+[DATA QUALITY][WARN] duplicate_course_name × 4: Course name 'bachelor of information technology and systems' appears 5 times in this batch. URLs: https://vit.edu.au/bits, https://vit.edu.au/bits/bits-artificial-intelligence-analytics, https://vit.edu.au/bits/bits-application-development (…) (and 3 more)
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 4m 23s | Courses: 19 | Avg: 13.8s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:38 | Staged:19 | Skipped:19 (rejected:_duplicate_in_job=17, rejected:_online_only=2) | Errors:0
+Staged 19 courses, 19 skipped, 0 fetch errors
