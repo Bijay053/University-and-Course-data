@@ -85,6 +85,22 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
+    except BaseException as exc:
+        # asyncio.CancelledError is BaseException (not Exception) in Python
+        # 3.8+.  Without this block it escapes silently and the Celery slot
+        # appears stuck until the 2-hour soft-time-limit fires.  Reraise
+        # SystemExit / KeyboardInterrupt so Celery can still shut down cleanly.
+        if isinstance(exc, (SystemExit, KeyboardInterrupt)):
+            raise
+        log.error(
+            "scrape_university BaseException id=%s: %s",
+            runtime_job_id, exc,
+        )
+        try:
+            asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
+        except Exception:
+            pass
+        return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
 
 
 @celery_app.task(name="scrape.repair", bind=True, max_retries=0)
@@ -105,6 +121,15 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         except Exception:
             pass
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
+    except BaseException as exc:
+        if isinstance(exc, (SystemExit, KeyboardInterrupt)):
+            raise
+        log.error("repair_university BaseException id=%s: %s", runtime_job_id, exc)
+        try:
+            asyncio.run(_mark_failed(runtime_job_id, f"BaseException: {exc}"))
+        except Exception:
+            pass
+        return {"ok": False, "id": runtime_job_id, "error": f"BaseException: {exc}"}
 
 
 async def _async_find_stale() -> list[tuple[str, str, int]]:
