@@ -104,28 +104,92 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
     "Doctorate",
 })
 
-# Evidence methods that are per-course reliable and must NOT be wiped by the
-# PG clear-out even when ``central_english_pg_skip`` is True and level-keyed
-# data is unavailable from the browser.
+# ── Extraction-method authority model ────────────────────────────────────────
+# Every extraction method is assigned a numeric authority level.  Higher
+# authority wins when two methods disagree about the same field, and the PG
+# clear-out only erases values whose best-authority method is below the
+# COURSE-SPECIFIC threshold (_AUTHORITY_COURSE_SPECIFIC).
 #
-# • per_course_vision / per_course_vision_cached — direct screenshot OCR of
-#   the course's own page; cannot carry UG-only central values.
-# • ai_fallback — the fallback AI enriches against the course URL and page
-#   text, NOT the generic central english page.  A 6.5 it returns for a
-#   Master's course is course-specific; clearing it silently is wrong.
-# • uni_pdf:requirements — the configured requirements PDF is a university-
-#   level authoritative source for english entry standards.  Unlike the
-#   scraped central HTML page (which may mix UG/PG tiers), the PDF is
-#   typically a dedicated admissions document.  Its english values should
-#   survive the PG clear-out — clearing them silently loses the only
-#   reliable source for universities like ASAHE whose course pages publish
-#   entry requirements as images only (no parseable text).
-_PER_COURSE_VISION_METHODS: frozenset[str] = frozenset({
-    "per_course_vision",
-    "per_course_vision_cached",
-    "ai_fallback",
-    "uni_pdf:requirements",
-})
+# Authority bands:
+#   1 — university-wide HTML scrape (central page)
+#   2 — university-wide PDF  (fee schedule / admissions PDF)
+#   3 — course-specific text (regex, Gemini, browser, AI fallback)
+#   4 — visual proof from the course page itself (vision OCR screenshot)
+#   5 — hard-coded site-specific extractor (pre-seed; highest confidence)
+#
+# How to read the PG clear-out rule:
+#   "If the best authority for an English slot is < 3, the value came from a
+#    university-wide source; clear it.  If ≥ 3, it came from the course page
+#    in some form; keep it."
+#
+# This generalises the old _PER_COURSE_VISION_METHODS frozenset so we don't
+# have to hand-add each new extractor that needs to survive the clear-out.
+_AUTHORITY_UNIVERSITY_WIDE = 1
+_AUTHORITY_UNIVERSITY_PDF = 2
+_AUTHORITY_COURSE_SPECIFIC = 3   # threshold: keep values at or above this
+_AUTHORITY_COURSE_VISION = 4
+_AUTHORITY_PRE_SEED = 5
+
+METHOD_AUTHORITY: dict[str, int] = {
+    # 1 — university-wide HTML
+    "central_page": _AUTHORITY_UNIVERSITY_WIDE,
+    "central_page:english": _AUTHORITY_UNIVERSITY_WIDE,
+    "central_page:fees:exact": _AUTHORITY_UNIVERSITY_WIDE,
+    "central_page:fees:high": _AUTHORITY_UNIVERSITY_WIDE,
+    "central_page:fees:medium": _AUTHORITY_UNIVERSITY_WIDE,
+    "sibling_cache": _AUTHORITY_UNIVERSITY_WIDE,
+    # 2 — university-wide PDF
+    "uni_pdf:fee": _AUTHORITY_UNIVERSITY_PDF,
+    "uni_pdf:fees": _AUTHORITY_UNIVERSITY_PDF,
+    "uni_pdf:fees:per_course": _AUTHORITY_UNIVERSITY_PDF,
+    "uni_pdf:requirements": _AUTHORITY_UNIVERSITY_PDF,
+    "uni_pdf:english": _AUTHORITY_UNIVERSITY_PDF,
+    # 3 — course-specific text
+    "gemini_primary": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:fee": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:english": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:duration": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:intake": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:study_mode": _AUTHORITY_COURSE_SPECIFIC,
+    "rule:cricos": _AUTHORITY_COURSE_SPECIFIC,
+    "per_course_browser": _AUTHORITY_COURSE_SPECIFIC,
+    "ai_fallback": _AUTHORITY_COURSE_SPECIFIC,
+    "regex": _AUTHORITY_COURSE_SPECIFIC,
+    "vit_static_fallback": _AUTHORITY_COURSE_SPECIFIC,
+    # 4 — visual proof from the course page
+    "per_course_vision": _AUTHORITY_COURSE_VISION,
+    "per_course_vision_cached": _AUTHORITY_COURSE_VISION,
+    # 5 — hard-coded site-specific extractor
+    "pre_seed": _AUTHORITY_PRE_SEED,
+    "csu_static_extract": _AUTHORITY_PRE_SEED,
+    "bond_pre_seed": _AUTHORITY_PRE_SEED,
+    "ecu_pre_seed": _AUTHORITY_PRE_SEED,
+}
+
+
+def _method_authority(method: str) -> int:
+    """Return the authority level for a given extraction method string.
+
+    Exact-key lookup first; then prefix scan so ``"central_page:english"``
+    correctly resolves to ``"central_page"`` → 1.  Falls back to
+    ``_AUTHORITY_COURSE_SPECIFIC`` (3) for unknown methods so new extractors
+    are not accidentally treated as university-wide.
+    """
+    if method in METHOD_AUTHORITY:
+        return METHOD_AUTHORITY[method]
+    for key, auth in METHOD_AUTHORITY.items():
+        if method.startswith(key + ":") or method.startswith(key + "_"):
+            return auth
+    return _AUTHORITY_COURSE_SPECIFIC
+
+
+def can_override(existing_method: str, new_method: str) -> bool:
+    """Return True if *new_method* may replace a value already set by *existing_method*.
+
+    A higher-authority method always wins.  Equal authority does NOT override
+    (first-writer wins for same-tier methods).
+    """
+    return _method_authority(new_method) > _method_authority(existing_method)
 
 # Maximum allowable delta between a per-course vision OCR reading and the
 # university-wide central-page value for the same English slot.  When vision
@@ -726,93 +790,31 @@ async def extract_course(
                     url=url,
                 )
 
-    # T207/T208: per-course browser fallback + Gemini PRIMARY + vision.
-    # Split into three separate try/except blocks so a failure in any one
-    # does not short-circuit the others.
+    # ── PHASE A — exhaust the course page (no university-wide sources) ──────────
+    # All extractors in this phase read exclusively from the course's own page:
+    # static HTML, Gemini AI on that HTML, browser-rendered DOM, and vision OCR
+    # screenshots.  University-wide sources (PDF backfill, central page) are
+    # Phase B — only reached when this phase leaves a required field null.
     #
-    # Order rationale:
-    #   1. Browser render first — gives Gemini real JS-rendered HTML (not just
-    #      the HTML shell that static fetch returns for SPA-based sites like KBS).
-    #   2. Gemini PRIMARY second — text-based extraction on the best available
-    #      HTML.  PRIMARY means Gemini wins over regex for the 16 hard fields;
-    #      regex/vision are fallbacks for anything Gemini leaves null.
-    #   3. Vision OCR last — screenshot-based extraction for image-heavy pages
-    #      where text extraction (regex+Gemini) still left gaps.
+    # Phase A order (each step in its own try/except):
+    #   1. Regex / rule extractors   ← complete above; zero network I/O
+    #   2. Gemini PRIMARY            ← AI extraction on static HTML (below)
+    #   3. Browser fallback          ← JS-render + fee-toggle clicks (below)
+    #   4. Domestic-only re-check    ← uses browser-rendered DOM (below)
+    #   5. Vision OCR                ← screenshot / image OCR (below)
+    #   6. AI fallback               ← last course-page resort (below)
+    #
+    # Gemini runs on static HTML before the browser so we avoid paying for a
+    # Playwright launch on pages the domestic-only re-check will skip.
+    # For SPA-only sites the static HTML is sparse — but those are handled by
+    # university-specific pre-seeds; the browser fills any remaining gaps.
     rendered_html: str | None = None
-    try:
-        from app.services.scraper.per_course_browser import (
-            _force_browser_for_url,
-            maybe_browser_refetch,
-        )
 
-        _force = _force_browser_for_url(url)
-        browser_filled, browser_evidence, rendered_html, _override = (
-            await maybe_browser_refetch(url, payload, emit=emit, force=_force)
-        )
-        for k, v in browser_filled.items():
-            if _override:
-                payload[k] = v
-            else:
-                payload.setdefault(k, v)
-        evidence.extend(browser_evidence)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("per-course browser fallback errored on %s: %s", url, exc)
-
-    # ── Domestic-only re-check on rendered HTML ───────────────────────────────
-    # Some sites (e.g. Federation) show "Not available to international
-    # students" only in JS-rendered content (a disabled tab, a warning
-    # banner loaded via XHR).  The static-HTML check above misses these.
-    # Re-run the same test against the rendered HTML when we have it.
-    #
-    # Skip this check when the evidence already proves the page is
-    # international — two independent signals are sufficient:
-    #
-    #  (A) URL contains an explicit international-student query parameter
-    #      (e.g. UOW ?students=international, Monash ?intlFees=1).  The
-    #      site's own URL routing is a stronger signal than any phrase in
-    #      the rendered DOM, which may contain inactive domestic-tab markup.
-    #
-    #  (B) The per-course browser just extracted BOTH a fee AND an English
-    #      score — this is only possible on a page that actually displays
-    #      international student data, so a domestic-only flag would be a
-    #      false positive.
-    _url_signals_international = bool(
-        _re.search(
-            r"[?&](students|studenttype|student_type|intlfees|international)=international",
-            url,
-            _re.IGNORECASE,
-        )
-    )
-    _browser_confirmed_intl = bool(
-        payload.get("international_fee") and (
-            payload.get("ielts_overall")
-            or payload.get("pte_overall")
-            or payload.get("toefl_overall")
-        )
-    )
-    if (
-        not payload.get("domestic_only")
-        and rendered_html
-        and _is_domestic_only_page(rendered_html)
-        and not _url_signals_international
-        and not _browser_confirmed_intl
-    ):
-        payload["domestic_only"] = True
-        await emit(
-            "status",
-            f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
-            phase="extract",
-            kind="domestic_only_skip",
-            url=url,
-        )
-        return {"url": url, "payload": payload, "evidence": evidence}
-
-    # ── Gemini Flash PRIMARY ─────────────────────────────────────────────────
-    # Uses rendered_html when available (JS-rendered SPA pages like KBS),
-    # falls back to raw static html for plain-HTML sites (ASA, Torrens, etc.).
-    # PRIMARY semantics: Gemini's value always wins over an earlier regex hit
-    # for the 16 hard fields.  Evidence entries for those fields are replaced
-    # so extraction_method correctly credits gemini_primary.
+    # ── Gemini Flash PRIMARY (Phase A, step 2) ───────────────────────────────
+    # Runs on static HTML; rendered_html is not yet available (browser is
+    # step 3).  PRIMARY semantics: Gemini's value always wins over an earlier
+    # regex hit for the 16 hard fields.  Evidence entries for those fields are
+    # replaced so extraction_method correctly credits gemini_primary.
     # Emit [GEMINI] unconditionally — even when 0 fields filled — so every
     # course has a visible log entry for diagnostics.
     #
@@ -954,6 +956,78 @@ async def extract_course(
         log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
     except Exception as _gp_exc:
         log.warning("gemini_primary: failed on %s — %s", url, _gp_exc)
+
+    # ── Per-course browser fallback (Phase A, step 3) ────────────────────────
+    # Renders JS-heavy SPAs and clicks "International students" fee toggles.
+    # Runs after Gemini so static-HTML cost is not wasted on domestic-only
+    # pages that the re-check below will short-circuit.
+    try:
+        from app.services.scraper.per_course_browser import (
+            _force_browser_for_url,
+            maybe_browser_refetch,
+        )
+
+        _force = _force_browser_for_url(url)
+        browser_filled, browser_evidence, rendered_html, _override = (
+            await maybe_browser_refetch(url, payload, emit=emit, force=_force)
+        )
+        for k, v in browser_filled.items():
+            if _override:
+                payload[k] = v
+            else:
+                payload.setdefault(k, v)
+        evidence.extend(browser_evidence)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("per-course browser fallback errored on %s: %s", url, exc)
+
+    # ── Domestic-only re-check on rendered HTML ───────────────────────────────
+    # Some sites (e.g. Federation) show "Not available to international
+    # students" only in JS-rendered content (a disabled tab, a warning
+    # banner loaded via XHR).  The static-HTML check above misses these.
+    # Re-run the same test against the rendered HTML when we have it.
+    #
+    # Skip this check when the evidence already proves the page is
+    # international — two independent signals are sufficient:
+    #
+    #  (A) URL contains an explicit international-student query parameter
+    #      (e.g. UOW ?students=international, Monash ?intlFees=1).  The
+    #      site's own URL routing is a stronger signal than any phrase in
+    #      the rendered DOM, which may contain inactive domestic-tab markup.
+    #
+    #  (B) The per-course browser just extracted BOTH a fee AND an English
+    #      score — this is only possible on a page that actually displays
+    #      international student data, so a domestic-only flag would be a
+    #      false positive.
+    _url_signals_international = bool(
+        _re.search(
+            r"[?&](students|studenttype|student_type|intlfees|international)=international",
+            url,
+            _re.IGNORECASE,
+        )
+    )
+    _browser_confirmed_intl = bool(
+        payload.get("international_fee") and (
+            payload.get("ielts_overall")
+            or payload.get("pte_overall")
+            or payload.get("toefl_overall")
+        )
+    )
+    if (
+        not payload.get("domestic_only")
+        and rendered_html
+        and _is_domestic_only_page(rendered_html)
+        and not _url_signals_international
+        and not _browser_confirmed_intl
+    ):
+        payload["domestic_only"] = True
+        await emit(
+            "status",
+            f"[DOMESTIC ONLY] {url} — rendered page states domestic-students-only; skipping",
+            phase="extract",
+            kind="domestic_only_skip",
+            url=url,
+        )
+        return {"url": url, "payload": payload, "evidence": evidence}
 
     try:
         from app.services.scraper.per_course_vision import maybe_vision_refetch
@@ -1684,8 +1758,16 @@ async def extract_course(
             _cleared: list[str] = []
             for _slot in ("ielts_overall", "pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall"):
                 if payload.get(_slot) not in (None, "", 0):
-                    # Keep vision-OCR-sourced values — they are per-course reliable
-                    if _slot_methods.get(_slot, set()) & _PER_COURSE_VISION_METHODS:
+                    # Keep the value if any evidence for this slot has course-specific
+                    # authority (≥ _AUTHORITY_COURSE_SPECIFIC = 3).  This replaces the
+                    # old _PER_COURSE_VISION_METHODS frozenset with a numeric model so
+                    # new extractors automatically get the right treatment without needing
+                    # a hand-written exemption here.
+                    _slot_max_auth = max(
+                        (_method_authority(m) for m in _slot_methods.get(_slot, set())),
+                        default=0,
+                    )
+                    if _slot_max_auth >= _AUTHORITY_COURSE_SPECIFIC:
                         continue
                     payload[_slot] = None
                     _cleared.append(_slot)
