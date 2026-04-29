@@ -55,6 +55,27 @@ def _ielts(text: str) -> dict[str, float] | None:
         if 4 <= ov <= 9 and 4 <= mn <= 9:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
 
+    # Pattern 1b: "Academic IELTS 6.5 (no band less than 6.0)" / "IELTS 6.5 with
+    # no band below 6.0" — the overall score follows IELTS *directly* (no
+    # "overall" keyword), then a short bridge leads to "no band less than /
+    # below / not less than / minimum of".  This is Torrens's standard phrase
+    # for postgraduate requirements.  Placed after Pattern 1 so the richer
+    # "IELTS overall X no band below Y" form (with the explicit "overall"
+    # keyword) wins first; Pattern 1b catches only the bare-score variant.
+    m = re.search(
+        r"(?:academic\s+)?ielts(?:\s+academic)?\s+"
+        r"([0-9]+(?:\.[0-9]+)?)"
+        r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score)\s+(?:below|less\s+than|under)|"
+        r"not\s+less\s+than|minimum\s+(?:band\s+)?(?:of\s+)?)"
+        r"\s*([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        if 4 <= ov <= 9 and 4 <= mn <= 9:
+            return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+
     # Pattern 2: "IELTS 6.5 overall with 6.0 in each band"
     m = re.search(
         r"ielts(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall"
