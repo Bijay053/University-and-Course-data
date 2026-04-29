@@ -1,0 +1,41 @@
+sleep 5
+python3 -c "import sys; sys.path.insert(0,'.')
+from app.config import settings
+print('Model:', settings.gemini_model)"
+root     1178309  1.3  1.3 134932 108160 ?       Ss   03:55   0:01 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1178311  0.0  1.0 134972 86652 ?        S    03:55   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1178312  0.0  1.0 134976 86656 ?        S    03:55   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1178313  0.0  1.0 134980 86660 ?        S    03:55   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1178314  0.0  1.0 134984 86660 ?        S    03:55   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+[1] 1178481
+New Celery PID: 1178481
+Model: gemini-2.5-flash-lite
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data/backend-py
+source venv/bin/activate
+
+python3 - << 'EOF'
+import sys, asyncio
+sys.path.insert(0, '.')
+from app.config import settings
+from google import genai
+
+print(f"API key length: {len(settings.gemini_api_key) if settings.gemini_api_key else 0}")
+print(f"Model: {settings.gemini_model}")
+
+async def test():
+    c = genai.Client(api_key=settings.gemini_api_key)
+    try:
+        r = await c.aio.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents="Reply with one word: OK"
+        )
+        print(f"API call result: {r.text.strip()}")
+    except Exception as e:
+        print(f"API call FAILED: {e}")
+
+asyncio.run(test())
+EOF
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+ImportError: cannot import name 'genai' from 'google' (unknown location)
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
