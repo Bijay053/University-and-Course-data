@@ -84,6 +84,13 @@ _SKIP_BROWSER_PATH_PREFIXES: dict[str, tuple[str, ...]] = {
 # ≥5 and never produced better data than the static extractor.
 _SKIP_BROWSER_HOSTS: tuple[str, ...] = (
     "study.csu.edu.au",
+    # ASAHE publishes English requirements as image-only screenshots (MaSTER.png /
+    # Bachelor.png embedded in Webflow HTML).  The browser never reaches networkidle
+    # (Cloudflare + analytics prevent it) so every ASAHE course hits the full 60s
+    # ceiling and returns nothing.  Vision OCR reads the images directly off the
+    # static HTML via _find_english_section_images — skipping the browser saves
+    # 9 × 60s ≈ 9 minutes per scrape run with no loss of data.
+    "asahe.edu.au",
 )
 
 
