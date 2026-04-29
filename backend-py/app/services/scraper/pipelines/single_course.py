@@ -1188,21 +1188,35 @@ async def extract_course(
         # even when text extraction happened to fill the slot with a value.
         # Pre-seeds (tier 5) are NOT overridden — they are site-specific
         # hard-coded values that should always win.
+        #
+        # TIER GUARD (Fix 3): only tier-0 vision images (those found inside
+        # the "English Requirements" / "Entry Requirements" DOM section) are
+        # allowed to *override* an existing tier-3 page-text value.  Tier-1/2
+        # images can FILL empty slots but must not supersede regex /
+        # equivalence_table results — they may have slipped through the
+        # decorative filter and be hallucinating plausible-looking scores.
         for k, v in vision_filled.items():
             _prior_method = ""
             for _ev in reversed(evidence):
                 if _ev.get("field_key") == k and _ev.get("decision_status") != "superseded":
                     _prior_method = _ev.get("method", "")
                     break
+            # Look up which tier this vision evidence came from.
+            _vision_ev = next(
+                (ev for ev in vision_evidence if ev.get("field_key") == k), None
+            )
+            _vision_is_tier0 = _vision_ev is not None and _vision_ev.get("source_tier", 1) == 0
             if payload.get(k) in (None, "", 0):
-                payload[k] = v  # fill null slot — no conflict
-            elif can_override(_prior_method, "per_course_vision"):
-                # vision (tier 4) beats existing tier-3 value — supersede it
+                payload[k] = v  # fill null slot — always safe regardless of tier
+            elif _vision_is_tier0 and can_override(_prior_method, "per_course_vision"):
+                # Tier-0 image (from English requirements DOM section) beats
+                # tier-3 text — supersede the existing value.
                 for _ev in evidence:
                     if _ev.get("field_key") == k and _ev.get("decision_status") != "superseded":
                         _ev["decision_status"] = "superseded"
                 payload[k] = v
-            # else: existing value has tier ≥ 4 authority (pre-seed) — keep it
+            # else: either non-tier0 vision (must not override page-text) or
+            #       existing value already has tier ≥ 4 authority — keep it.
         evidence.extend(vision_evidence)
 
         # ── Vision negative-suppression ───────────────────────────────────
