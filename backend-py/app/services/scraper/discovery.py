@@ -638,23 +638,26 @@ async def discover_course_links(
                 )
             continue
 
-        html = await fetch_html(url)
+        # Discovery-level fetch: one shot (retries=0) so that this loop —
+        # not the inner http_fetcher retry loop — controls the retry policy.
+        # fetch_html(retries=2) [default] would add 3 attempts × 30s timeout
+        # inside every discovery-level retry, multiplying total wait time by 9
+        # for URLs that ultimately fail (9 HTTP calls instead of 3).
+        html = await fetch_html(url, retries=0)
         if not html:
-            # First attempt failed — wait 3 s and try once more.  Category
-            # listing pages (e.g. /nursing-and-midwifery) sometimes return
-            # a transient 5xx or timeout on the first hit; a brief pause
-            # usually resolves it and avoids losing an entire category of
-            # course candidates.
-            await asyncio.sleep(3)
-            html = await fetch_html(url)
+            # Brief pause then one more attempt on the same URL — handles
+            # transient 5xx / rate-limit blips on category listing pages
+            # (e.g. /nursing-and-midwifery) without compounding delay.
+            await asyncio.sleep(1)
+            html = await fetch_html(url, retries=0)
         # Issue 3: if still nothing and the URL had a query string (e.g.
-        # ?studentType=international), retry with the bare path — some servers
-        # reject the param but serve the page fine without it.
+        # ?studentType=international), retry with the bare path once — some
+        # servers reject the param but serve the page fine without it.
         if not html and "?" in url:
             _bare_url = url.split("?", 1)[0]
             if _bare_url not in visited:
-                await asyncio.sleep(2)
-                html = await fetch_html(_bare_url)
+                await asyncio.sleep(1)
+                html = await fetch_html(_bare_url, retries=0)
                 if html:
                     log.info(
                         "[DISCOVER] fetch succeeded without query params for %s", url
