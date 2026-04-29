@@ -514,22 +514,48 @@ async def maybe_vision_refetch(
                         _VISION_PROMPT, [img_bytes]
                     )
                 except Exception as exc:  # noqa: BLE001
-                    log.warning(
-                        "[VISION FAIL] %s: Gemini call failed — %s "
-                        "(quota exhausted or API key invalid?)",
-                        img_url, exc,
+                    _fail_msg = (
+                        f"[VISION FAIL] {img_url[:70]}: Gemini call failed — {exc} "
+                        f"(quota exhausted or API key invalid?)"
                     )
-                    if leader_future is not None:
+                    log.warning(_fail_msg)
+                    if emit:
+                        await emit(
+                            "status",
+                            _fail_msg,
+                            phase="fallback",
+                            kind="per_course_vision_fail",
+                            url=url,
+                            image_url=img_url,
+                        )
+                    # Evict this URL from the image cache so sibling courses
+                    # can retry independently instead of inheriting the failure.
+                    # (Download failures stay cached because a 404 won't fix
+                    # itself; API quota failures may clear between courses.)
+                    if image_cache is not None and img_url in image_cache:
+                        del image_cache[img_url]
+                    if leader_future is not None and not leader_future.done():
                         leader_future.set_result({})
                     continue
                 if resp.skipped or not resp.text:
                     skip_reason = getattr(resp, "skip_reason", "no text returned")
-                    log.warning(
-                        "[VISION FAIL] %s: Gemini skipped — %s "
-                        "(likely quota exhausted)",
-                        img_url, skip_reason,
+                    _skip_msg = (
+                        f"[VISION FAIL] {img_url[:70]}: Gemini skipped — {skip_reason} "
+                        f"(likely quota exhausted)"
                     )
-                    if leader_future is not None:
+                    log.warning(_skip_msg)
+                    if emit:
+                        await emit(
+                            "status",
+                            _skip_msg,
+                            phase="fallback",
+                            kind="per_course_vision_fail",
+                            url=url,
+                            image_url=img_url,
+                        )
+                    if image_cache is not None and img_url in image_cache:
+                        del image_cache[img_url]
+                    if leader_future is not None and not leader_future.done():
                         leader_future.set_result({})
                     continue
                 # Validate that the OCR text contains at least one English-test
