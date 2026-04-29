@@ -1444,6 +1444,60 @@ async def extract_course(
                 (ev for ev in vision_evidence if ev.get("field_key") == k), None
             )
             _vision_is_tier0 = _vision_ev is not None and _vision_ev.get("source_tier", 1) == 0
+
+            # ── IELTS sub-band coherence guard (Fix: vision portrait bug) ─
+            # Sub-bands from a non-requirements-section (tier-1/2) image are
+            # rejected when the page text already established a higher
+            # ielts_overall.  Root cause: Gemini halluccinates plausible-
+            # looking IELTS bands (e.g. 6.0 L / 6.5 R) from an image of a
+            # student portrait that contains no IELTS data at all.  The
+            # hallucinated values are below the overall (7.0) that regex found
+            # on the same page — a reliable coherence signal.
+            #
+            # Guard fires when ALL of:
+            #   1. k is an IELTS sub-band slot
+            #   2. The image is NOT tier-0 (not from the English requirements
+            #      DOM section) — tier-0 images are trusted unconditionally
+            #   3. ielts_overall is already set in the payload from a
+            #      page-text method (regex, structural — NOT vision or pdf)
+            #   4. The vision sub-band value is strictly less than the
+            #      established overall — physically impossible for a real table
+            #      whose "no band below X" floor equals the overall
+            _IELTS_SUBBAND_SET = frozenset({
+                "ielts_listening", "ielts_reading",
+                "ielts_speaking", "ielts_writing",
+            })
+            if k in _IELTS_SUBBAND_SET and not _vision_is_tier0 and v is not None:
+                _est_overall = payload.get("ielts_overall")
+                if _est_overall is not None:
+                    _overall_method = next(
+                        (
+                            ev.get("method", "")
+                            for ev in reversed(evidence)
+                            if ev.get("field_key") == "ielts_overall"
+                            and ev.get("decision_status") != "superseded"
+                        ),
+                        "",
+                    )
+                    _overall_from_text = bool(
+                        _overall_method
+                        and not _overall_method.startswith("per_course_vision")
+                        and not _overall_method.startswith("uni_pdf")
+                    )
+                    if _overall_from_text:
+                        try:
+                            if float(v) < float(_est_overall):
+                                log.info(
+                                    "[VISION SUBBAND REJECT] %s: %s=%.1f from "
+                                    "tier-1/2 image rejected — below "
+                                    "ielts_overall=%.1f established by %r",
+                                    url, k, float(v), float(_est_overall),
+                                    _overall_method,
+                                )
+                                continue
+                        except (TypeError, ValueError):
+                            pass
+
             if payload.get(k) in (None, "", 0):
                 payload[k] = v  # fill null slot — always safe regardless of tier
             elif _vision_is_tier0 and can_override(_prior_method, "per_course_vision"):

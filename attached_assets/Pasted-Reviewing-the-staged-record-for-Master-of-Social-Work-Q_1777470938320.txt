@@ -1,0 +1,75 @@
+Reviewing the staged record for `Master of Social Work (Qualifying)` (ACAP, university 41) — every IELTS sub-band is wrong, and the source is a student headshot, not an IELTS panel.
+
+---
+
+**The ground truth (from the live ACAP page)**
+
+Minimum English requirement is:
+- IELTS Academic: overall 7.0 with **no individual band below 7**
+- PTE Academic: 66
+
+So every sub-band should be 7.0, not anything lower.
+
+---
+
+**What got staged**
+
+| Field | Staged value | Source | Correct value |
+|---|---|---|---|
+| ielts_overall | 7.0 | regex (page text) | 7.0 ✅ |
+| ielts_listening | 6.0 | per_course_vision | 7.0 ❌ |
+| ielts_reading | 6.5 | per_course_vision | 7.0 ❌ |
+| ielts_speaking | 7.0 | per_course_vision | 7.0 ✅ (coincidence) |
+| ielts_writing | 6.0 | per_course_vision | 7.0 ❌ |
+| pte_overall | 66.0 | regex (page text) | 66 ✅ |
+
+Three of four sub-bands wrong. There's also a conflict on the evidence panel for ielts_overall (per_course_vision says 6.5, regex says 7.0, the system correctly took the regex value).
+
+---
+
+**Root cause: vision OCR is reading a student photo and producing numbers**
+
+The sub-band evidence all points to:
+```
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2021/10/Kripa.jpg
+```
+With caption text "Kripa". That's a 2021 student headshot, not an IELTS requirements panel. There are no English-test scores anywhere in or near that image. The vision model is either:
+- Hallucinating IELTS band values from training-data priors (likely — 6.0/6.5 are *very* common bachelor-level bands, and the model has seen thousands of IELTS panels), OR
+- Reading numbers off something incidental on the page and tagging them as IELTS sub-bands
+
+Either way, the source URL — a student photo — should disqualify this image from being a valid English-requirement source. Vision OCR has no way to verify it's looking at the right thing, so the upstream filter has to.
+
+---
+
+**Fix proposals**
+
+1. **Image whitelist for English-requirements vision OCR.** Only run vision OCR for IELTS/PTE/TOEFL/CAE on images that look like requirements panels. Heuristics: image filename or alt text contains `ielts`/`pte`/`english`/`requirements`/`entry`, or image is in a `<section>` whose heading contains those terms. A photo in `/wp-content/uploads/2021/10/Kripa.jpg` should never be parsed for IELTS sub-bands.
+
+2. **Trust regex over vision when they disagree.** The evidence panel correctly resolved `ielts_overall` (regex 7.0 won over vision 6.5), but did *not* apply the same logic to sub-bands — vision sub-bands were accepted even when regex had already established overall=7.0 with no contradicting sub-band evidence. If overall is 7.0 from regex and vision proposes a sub-band <7.0 from a non-requirements image, reject the vision sub-band.
+
+3. **Inconsistency check at validation time.** The `english_coherence` check should also catch this: if `ielts_overall=7.0` requires every sub-band to be ≥6.0 (and ACAP's requirement specifically has *no band below 7*), staged sub-bands of 6.0/6.5/6.0 are inconsistent. Right now the data quality system caught a different inconsistency (PTE 66 vs IELTS 6.0 on Bachelor of Social Work) but didn't flag this one because no IELTS overall vs sub-band coherence rule exists.
+
+4. **Don't infer sub-bands when they aren't on the page.** ACAP's page has "overall 7.0 with no band below 7" — there's no per-skill breakdown to extract. The correct sub-band values would all be 7.0 (the floor), or null. Infering 6.0/6.5 sub-bands from an image of someone's face is the worst case.
+
+---
+
+**Cross-cutting note**
+
+This is a different failure mode from the hallucinated PTE/TOEFL/CAE backfill from siblings (the ACU/CDU/ACAP-Bachelor-of-Social-Work bug). That one comes from sibling-cache backfilling values that were never on the page at all. This one comes from vision OCR producing values from images that don't contain any IELTS data. Both need fixing, but the fixes are different:
+
+- Sibling cache: don't backfill English fields across siblings.
+- Vision OCR: filter source images so non-requirements images don't get parsed for English bands.
+
+If both fixes ship, the only English values that get staged are the ones actually present in the page text or in actual requirements-panel images. That's the correct behaviour.
+
+---
+
+**Other ACAP courses likely affected**
+
+Looking at the run log, almost every staged ACAP course has the postgraduate sibling-cache backfill (47 slots filled), and several have vision OCR runs on `cdn-ileicgm.nitrocdn.com` images. Worth spot-checking:
+- Master of Psychology (Clinical) — IELTS 7.0 from page, sub-bands likely also wrong
+- Master of Professional Psychology — IELTS 7.0 from page
+- Graduate Certificate of Human Services — IELTS 6.5 from page
+- Graduate Certificate of Professional Accounting — IELTS 6.5 from page
+
+All of these probably have sub-band values that don't match the actual page text. Worth re-validating after the fix lands.

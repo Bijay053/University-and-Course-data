@@ -1,0 +1,1377 @@
+Y][WARN] missing_international_fee_central_page × 8: International fee absent — marked for central fee page review. (and 7 more)
+[GEMINI] Total cost: $0.0017 USD across 6 course(s) (~$0.00029/course)
+[TIMING] Total: 1m 58s | Courses: 6 | Avg: 19.7s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:8 | Staged:6 | Skipped:2 (rejected:_confidence_55_missing_english_=1, rejected:_category_landing_page=1) | Errors:0
+Staged 6 courses, 2 skipped, 0 fetch errors
+Review 6 Courses
+New
+ACAP University College
+
+14
+Staged
+13
+Skipped
+0
+Errors
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 41
+Fetching https://acap.edu.au/courses...
+Discovering candidate course pages...
+[DISCOVER] Crawling from https://acap.edu.au/courses (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://acap.edu.au/courses: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://acap.edu.au/courses
+[DISCOVER] Page 1/25: +1 candidates (total 1) — https://acap.edu.au/courses
+[DISCOVER] Crawl yielded only 1 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 5 URL(s) at https://acap.edu.au
+[DISCOVER] sitemap index https://acap.edu.au/sitemap.xml: 10 sub-sitemap(s)
+[DISCOVER] sub-sitemap https://www.acap.edu.au/courses-sitemap.xml: +27 candidates (total 27)
+[DISCOVER] sitemap: done — 27 unique candidates
+Discovered 28 candidate course links
+[EXTRACT] gate dropped (info_page): Courses
+[EXTRACT] gate dropped 1 non-course candidate(s) — info_page=1
+Extracting course details (27 pages)...
+[EXTRACT] 1/27: Associate Degree Of Criminal Justice
+[EXTRACT] 2/27: Bachelor Of Counselling
+[EXTRACT] 3/27: Bachelor Of Criminology And Justice
+[EXTRACT] 4/27: Bachelor Of Psychological Science
+Fetching 1/27: Associate Degree Of Criminal Justice
+Fetching 3/27: Bachelor Of Criminology And Justice
+Fetching 2/27: Bachelor Of Counselling
+Fetching 4/27: Bachelor Of Psychological Science
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/associate-degree-of-criminal-justice/ — course page states domestic-students-only; skipping
+[EXTRACT] 5/27: Bachelor Of Psychological Science Honours
+Fetching 5/27: Bachelor Of Psychological Science Honours
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-counselling/ — course page states domestic-students-only; skipping
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science/ — course page states domestic-students-only; skipping
+[EXTRACT] 6/27: Bachelor Of Psychological Science And Counselling
+[EXTRACT] 7/27: Bachelor Of Psychological Science And Criminology
+Fetching 6/27: Bachelor Of Psychological Science And Counselling
+Fetching 7/27: Bachelor Of Psychological Science And Criminology
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-criminology-and-justice/ — course page states domestic-students-only; skipping
+[EXTRACT] 8/27: Bachelor Of Social Work
+Fetching 8/27: Bachelor Of Social Work
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-honours/ — course page states domestic-students-only; skipping
+[EXTRACT] 9/27: Diploma Of Counselling Skills
+Fetching 9/27: Diploma Of Counselling Skills
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-criminology/ — course page states domestic-students-only; skipping
+[EXTRACT] 10/27: Graduate Certificate In Business Administration
+Fetching 10/27: Graduate Certificate In Business Administration
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-counselling/ — course page states domestic-students-only; skipping
+[FIELD SUMMARY] Bachelor of Social Work Fee: ✅ '29176' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '4.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/diploma-of-counselling-skills/ — course page states domestic-students-only; skipping
+[EXTRACT] 11/27: Graduate Certificate Of Applied Coaching
+[FIELD SUMMARY] Graduate Certificate in Business Administration Fee: ✅ '15250' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '8.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[EXTRACT] 12/27: Graduate Certificate Of Counselling
+Fetching 11/27: Graduate Certificate Of Applied Coaching
+Fetching 12/27: Graduate Certificate Of Counselling
+[FIELD SUMMARY] Graduate Certificate of Applied Coaching Fee: ✅ '15092' [regex conf=1.00] IELTS: ❌ not found Duration: ✅ '8.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-certificate-of-counselling/ — course page states domestic-students-only; skipping
+[EXTRACT] 13/27: Graduate Certificate Of Human Services
+Fetching 13/27: Graduate Certificate Of Human Services
+[FIELD SUMMARY] Graduate Certificate of Human Services Fee: ✅ '15812' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '8.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.acap.edu.au/courses/bachelor-of-social-work/ → classification_only cat='?' (cost=$0.000043)
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/bachelor-of-social-work/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.acap.edu.au/courses/graduate-certificate-in-busi → classification_only cat='?' (cost=$0.000044)
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-huma → classification_only cat='?' (cost=$0.000043)
+[VISION] 1 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/
+✅ [PASS 100/100] Graduate Certificate in Business Administration |
+[EXTRACT] 14/27: Graduate Certificate Of Professional Accounting
+Fetching 14/27: Graduate Certificate Of Professional Accounting
+[FIELD SUMMARY] Graduate Certificate of Professional Accounting Fee: ✅ '12000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '8.0' [duration.structural conf=0.85] Intake: ✅ "['September', 'February']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course vision img 1/1] https://www.acap.edu.au/courses/graduate-certificate-of-human-services/ — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-human-services/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-prof → classification_only cat='?' (cost=$0.000044)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 3 field(s) on https://www.acap.edu.au/courses/bachelor-of-social-work/: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/bachelor-of-social-work/
+[CATEGORY det] Bachelor of Social Work → Education & Social Work / Social Work
+✅ [PASS 100/100] Bachelor of Social Work |
+[EXTRACT] 15/27: Graduate Certificate Of Psychological Science
+Fetching 15/27: Graduate Certificate Of Psychological Science
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-certificate-of-psychological-science/ — course page states domestic-students-only; skipping
+[EXTRACT] 16/27: Graduate Diploma Of Business Administration
+Fetching 16/27: Graduate Diploma Of Business Administration
+[FIELD SUMMARY] Graduate Diploma of Business Administration Fee: ✅ '22875' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '16.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+✅ [PASS 100/100] Graduate Certificate of Human Services |
+[EXTRACT] 17/27: Graduate Diploma Of Professional Accounting
+Fetching 17/27: Graduate Diploma Of Professional Accounting
+[FIELD SUMMARY] Graduate Diploma of Professional Accounting Fee: ✅ '24000' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [duration.structural conf=0.85] Intake: ✅ "['September', 'February']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=391433B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.acap.edu.au/courses/graduate-certificate-of-appl → 0 field(s) (cost=$0.000000, in=0 out=0) SKIP='timeout after 30.0s'
+[per-course browser ↻] https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+[per-course browser ✓] https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15092 filled=[]
+[VISION] 4 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-professi → classification_only cat='?' (cost=$0.000044)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-business → classification_only cat='?' (cost=$0.000044)
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 2/2] https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/ — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[per-course vision img 0/2 (cache hits 2)] https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+✅ [PASS 100/100] Graduate Diploma of Business Administration |
+[EXTRACT] 18/27: Graduate Diploma Of Psychological Science
+Fetching 18/27: Graduate Diploma Of Psychological Science
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/graduate-diploma-of-psychological-science/ — course page states domestic-students-only; skipping
+[EXTRACT] 19/27: Master Of Business Administration
+Fetching 19/27: Master Of Business Administration
+[FIELD SUMMARY] Master of Business Administration (MBA) Fee: ✅ '22875' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+[CATEGORY det] Graduate Certificate of Professional Acc → Business & Management / Accounting
+✅ [PASS 100/100] Graduate Certificate of Professional Accounting |
+[EXTRACT] 20/27: Master Of Counselling And Psychotherapy
+Fetching 20/27: Master Of Counselling And Psychotherapy
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/master-of-counselling-and-psychotherapy/ — course page states domestic-students-only; skipping
+[EXTRACT] 21/27: Master Of Professional Psychology
+Fetching 21/27: Master Of Professional Psychology
+[FIELD SUMMARY] Master of Professional Psychology Fee: ✅ '56846' [regex conf=1.00] IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '1.0' [duration.structural conf=0.85] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 3 field(s) on https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+[CATEGORY det] Graduate Diploma of Professional Account → Business & Management / Accounting
+✅ [PASS 100/100] Graduate Diploma of Professional Accounting |
+[EXTRACT] 22/27: Master Of Psychology Clinical
+Fetching 22/27: Master Of Psychology Clinical
+[FIELD SUMMARY] Master of Psychology (Clinical) Fee: ✅ '56849' [regex conf=1.00] IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GEMINI] https://www.acap.edu.au/courses/master-of-professional-psych → classification_only cat='?' (cost=$0.000043)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 4/4] https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ — IELTS=6.5 PTE=58.0 TOEFL=79.0 CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.acap.edu.au/courses/master-of-business-administr → classification_only cat='?' (cost=$0.000044)
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GEMINI] https://www.acap.edu.au/courses/master-of-psychology-clinica → classification_only cat='?' (cost=$0.000042)
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.acap.edu.au/courses/master-of-psychology-clinical/ — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-psychology-clinical/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 1/2 (cache hits 1)] https://www.acap.edu.au/courses/master-of-professional-psychology/ — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-professional-psychology/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/: fee_currency, duration_unit
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+✅ [PASS 100/100] Graduate Certificate of Applied Coaching |
+[EXTRACT] 23/27: Master Of Psychology Practice Clinical
+Fetching 23/27: Master Of Psychology Practice Clinical
+[FIELD SUMMARY] Master of Psychology Practice (Clinical) Fee: ✅ '44184' [regex conf=1.00] IELTS: ❌ not found Duration: ✅ '1.0' [duration.structural conf=0.85] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=390745B rendered=0B using=static text_len=20736
+[GP-DEBUG] text[:500]='Master of Psychology Practice (Clinical) Master of Psychology Practice (Clinical) Advance your knowledge and skills in the practice of clinical psychology Master of Psychology Practice (Clinical) Duration 1 Year Full Time (3 Trimesters) View all options Duration Master of Psychology Practice (Clinical) Full Time Part Time Equivalent 1 Year (3 Trimesters) Available 6 Trimesters Master Australian Qualification Framework: 9 Available at Online Study modes Online Study modes You can choose to study '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": 44184,\n "fee_term": "Full Course",\n "duration_value": 1,\n "duration_unit": "years",\n "duration_text": "1 Year Full Time",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Clinical Psychology",\n "category": "Health Sciences",\n "mode": "On'
+[GEMINI] https://www.acap.edu.au/courses/master-of-psychology-practic → 12 field(s) (cost=$0.000532, in=6624 out=116)
+[per-course browser ↻] https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/master-of-professional-psychology/: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-professional-psychology/
+[CATEGORY det] Master of Professional Psychology → Medicine & Health / Psychology
+✅ [PASS 100/100] Master of Professional Psychology |
+[EXTRACT] 24/27: Master Of Social Work Qualifying
+Fetching 24/27: Master Of Social Work Qualifying
+[per-course browser ✓] https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ — IELTS=— PTE=— TOEFL=— CAE=— fee=44184 filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[FIELD SUMMARY] Master of Social Work (Qualifying) Fee: ✅ '33277' [regex conf=1.00] IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'September', 'February" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — None (likely quota exhausted)
+[GEMINI] https://www.acap.edu.au/courses/master-of-social-work-qualif → classification_only cat='?' (cost=$0.000043)
+[VISION] 3 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/master-of-psychology-clinical/: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-psychology-clinical/
+[CATEGORY det] Master of Psychology (Clinical) → Medicine & Health / Psychology
+✅ [PASS 100/100] Master of Psychology (Clinical) |
+[EXTRACT] 25/27: Undergraduate Certificate Of Psychological Science
+Fetching 25/27: Undergraduate Certificate Of Psychological Science
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/undergraduate-certificate-of-psychological-science/ — course page states domestic-students-only; skipping
+[EXTRACT] 26/27: Graduate Diploma Of Legal Practice
+Fetching 26/27: Graduate Diploma Of Legal Practice
+[FIELD SUMMARY] Graduate Diploma of Legal Practice Fee: ✅ '15619' [regex conf=1.00] IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['May', 'July', 'September', '" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course vision img 1/2 (cache hits 1)] https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ — IELTS=7.0 PTE=59.0 TOEFL=100.0 CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/ (missing: location_text)
+[per-course vision img 2/2] https://www.acap.edu.au/courses/master-of-business-administration/ — IELTS=— PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-business-administration/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=401858B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-legal-pr → 0 field(s) (cost=$0.000000, in=7542 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[per-course browser ↻] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+[per-course browser ✓] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15619 filled=[]
+[VISION] 2 candidate image(s) found — starting OCR pass
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/master-of-business-administration/: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-business-administration/
+[CATEGORY det] Master of Business Administration (MBA) → Business & Management / MBA
+✅ [PASS 100/100] Master of Business Administration (MBA) |
+[EXTRACT] 27/27: Graduate Diploma Of Legal Practice Nsw
+Fetching 27/27: Graduate Diploma Of Legal Practice Nsw
+[FIELD SUMMARY] Graduate Diploma of Legal Practice (Plt) Fee: ✅ '15619' [regex conf=1.00] IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['July', 'November']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/: duration_value, duration_unit
+[FIELD TRACE] study_mode='Online' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+[CATEGORY det] Master of Psychology Practice (Clinical) → Medicine & Health / Psychology
+✅ [PASS 100/100] Master of Psychology Practice (Clinical) |
+[GP-DEBUG] static=389404B rendered=0B using=static text_len=19954
+[GP-DEBUG] text[:500]='NSW Law Graduates Graduate Diploma of Legal Practice (PLT) NSW Law Graduates Graduate Diploma of Legal Practice (PLT) Built with the legal profession Applied learning curriculum Personalised support and supervision Career-focused with professional engagement Graduate Diploma of Legal Practice New South Wales (PLT) Duration 14 Weeks Full Time View all options Duration Graduate Diploma of Legal Practice New South Wales (PLT) Full Time 14 Weeks Apply Now chevron_right Graduate Diploma AQF Level 8 A'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": 15619,\n "domestic_fee": 11622,\n "fee_term": "Full Course",\n "duration_value": null,\n "duration_unit": null,\n "duration_text": "14 Weeks Full Time",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Legal Practice",\n "category": "Law",\n "mode": "Blended",\n "int'
+[GEMINI] https://www.acap.edu.au/courses/graduate-diploma-of-legal-pr → 10 field(s) (cost=$0.000517, in=6429 out=115)
+[per-course browser ↻] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+[per-course browser ✓] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ — IELTS=— PTE=— TOEFL=— CAE=— fee=15619 filled=[]
+[VISION] 5 candidate image(s) found — starting OCR pass
+[per-course vision img 2/2] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ — IELTS=6.5 PTE=58.0 TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 3 field(s) on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+✅ [PASS 100/100] Graduate Diploma of Legal Practice |
+[per-course vision img 3/3] https://www.acap.edu.au/courses/master-of-social-work-qualifying/ — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/master-of-social-work-qualifying/ (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.acap.edu.au/courses/master-of-social-work-qualifying/: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+[CATEGORY det] Master of Social Work (Qualifying) → Education & Social Work / Social Work
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — None (likely quota exhausted)
+✅ [PASS 100/100] Master of Social Work (Qualifying) |
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[per-course vision img 4/5 (cache hits 1)] https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ — IELTS=6.5 PTE=58.0 TOEFL=79.0 CAE=176.0
+[FALLBACK] AI enriching https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ (missing: none)
+[FALLBACK] AI filled 3 field(s) on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/: fee_currency, duration_value, duration_unit
+[FIELD TRACE] study_mode='Blended' location='Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia' method=study_mode:rule url=https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+✅ [PASS 100/100] Graduate Diploma of Legal Practice (Plt) |
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=7.0 ielts_overall=6.5 ielts_reading=7.0 ielts_speaking=7.0 ielts_writing=6.0
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 12 slot(s) filled across siblings
+[STAGE] skipped Associate Degree Of Criminal Justice: rejected: domestic_only
+[STAGE] skipped Bachelor Of Counselling: rejected: domestic_only
+[STAGE] skipped Bachelor Of Criminology And Justice: rejected: domestic_only
+[STAGE] skipped Bachelor Of Psychological Science: rejected: domestic_only
+[STAGE] skipped Bachelor Of Psychological Science Honours: rejected: domestic_only
+[STAGE] skipped Bachelor Of Psychological Science And Counselling: rejected: domestic_only
+[STAGE] skipped Bachelor Of Psychological Science And Criminology: rejected: domestic_only
+[STAGE] saved: Bachelor of Social Work
+[STAGE] skipped Diploma Of Counselling Skills: rejected: domestic_only
+[STAGE] saved: Graduate Certificate in Business Administration
+[STAGE] saved: Graduate Certificate of Applied Coaching
+[STAGE] skipped Graduate Certificate Of Counselling: rejected: domestic_only
+[STAGE] saved: Graduate Certificate of Human Services
+[STAGE] saved: Graduate Certificate of Professional Accounting
+[STAGE] skipped Graduate Certificate Of Psychological Science: rejected: domestic_only
+[STAGE] saved: Graduate Diploma of Business Administration
+[STAGE] saved: Graduate Diploma of Professional Accounting
+[STAGE] skipped Graduate Diploma Of Psychological Science: rejected: domestic_only
+[STAGE] saved: Master of Business Administration (MBA)
+[STAGE] skipped Master Of Counselling And Psychotherapy: rejected: domestic_only
+[STAGE] saved: Master of Professional Psychology
+[STAGE] saved: Master of Psychology (Clinical)
+[STAGE] saved: Master of Psychology Practice (Clinical)
+[STAGE] saved: Master of Social Work (Qualifying)
+[STAGE] skipped Undergraduate Certificate Of Psychological Science: rejected: category_landing_page
+[STAGE] saved: Graduate Diploma of Legal Practice
+[STAGE] saved: Graduate Diploma of Legal Practice (Plt)
+[DATA QUALITY] 27 course(s) checked — 26 critical / 40 warning / 39 info
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/associate-degree-of-criminal-justice/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-counselling/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-criminology-and-justice/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-counselling/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-criminology/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-honours/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/bachelor-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/diploma-of-counselling-skills/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/graduate-certificate-of-counselling/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/graduate-certificate-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/graduate-diploma-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/master-of-counselling-and-psychotherapy/
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.acap.edu.au/courses/undergraduate-certificate-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/associate-degree-of-criminal-justice/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-counselling/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-criminology-and-justice/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-counselling/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-and-criminology/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-psychological-science-honours/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/bachelor-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/diploma-of-counselling-skills/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/graduate-certificate-of-counselling/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/graduate-certificate-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/graduate-diploma-of-psychological-science/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/master-of-counselling-and-psychotherapy/
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.acap.edu.au/courses/undergraduate-certificate-of-psychological-science/
+[DATA QUALITY][WARN] english_coherence_pte × 1: IELTS 6.0 + PTE 66.0 is inconsistent: PTE 66 corresponds to IELTS ≥ 7.0. One value is likely sourced from a different level or hallucinated.
+[DATA QUALITY][WARN] missing_degree_level × 13: Degree level not extracted. (and 12 more)
+[DATA QUALITY][WARN] missing_duration × 13: Duration not extracted. (and 12 more)
+[DATA QUALITY][WARN] missing_english_requirement × 13: No English language test score found (IELTS / PTE / TOEFL / CAE). (and 12 more)
+[GEMINI] Total cost: $0.0015 USD across 14 course(s) (~$0.00011/course)
+[TIMING] Total: 3m 25s | Courses: 14 | Avg: 14.6s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:28 | Staged:14 | Skipped:13 (rejected:_domestic_only=12, rejected:_category_landing_page=1) | Errors:0
+Staged 14 courses, 13 skipped, 0 fetch errors
+Review 14 Courses
+New
+Review Scraped Courses
+14 pending
+Last scrape: 14 courses staged in 3m 25s • Started 2026-04-29 13:47 UTC • 13 skipped
+
+Reject (14)
+Review each course below. Edit any details or reject to discard. To approve and import, go to the university's Raw Data tab.
+
+	Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Graduate Diploma of Legal Practice (Plt)
+Law
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	3 Month	A$15,619/Full Course	6.5	58	79	176	110	Jul, Nov	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended	
+
+
+
+	
+Graduate Diploma of Legal Practice
+Law & Legal Studies
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	3 Month	A$15,619/Full Course	6.5	58	-	-	-	May, Jul, Sep, Nov	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended	
+
+
+
+	
+Master of Social Work (Qualifying)
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$33,277/Annual	7	66	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Master of Psychology Practice (Clinical)
+Health Sciences
+Publish: review
+Eligibility: ready
+77%	Master	1 Year	A$44,184/Full Course	7	59	100	-	120	Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Online	
+
+
+
+	
+Master of Psychology (Clinical)
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$56,849/Annual	7	-	-	-	-	Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Master of Professional Psychology
+Medicine & Health
+Publish: review
+Eligibility: ready
+77%	Master	1 Year	A$56,846/Full Course	7	66	-	-	-	Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Master of Business Administration (MBA)
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Master	2 Year	A$22,875/Annual	6.5	-	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Online	
+
+
+
+	
+Graduate Diploma of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	1 Year	A$24,000/Full Course	6.5	-	-	-	-	Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Diploma of Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	16 Month	A$22,875/Annual	6.5	-	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Online	
+
+
+
+	
+Graduate Certificate of Professional Accounting
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$12,000/Full Course	6.5	-	-	-	-	Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Human Services
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	8 Month	A$15,812/Full Course	6.5	59	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	On Campus	
+
+
+
+	
+Graduate Certificate of Applied Coaching
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	8 Month	A$15,092/Full Course	6.5	58	79	-	110	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Online	
+
+
+
+	
+Graduate Certificate in Business Administration
+Business & Management
+Publish: review
+Eligibility: ready
+77%	Graduate Certificate	8 Month	A$15,250/Full Course	6.5	-	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Online	
+
+
+
+	
+Bachelor of Social Work
+Education & Social Work
+Publish: review
+Eligibility: ready
+77%	Bachelor	4 Year	A$29,176/Annual	6	66	-	-	-	May, Sep, Feb	Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia	Blended	
+
+
+
+Scrape History
+1–10 of 753
+Per page:
+
+10
+Prev
+Page 1 / 76
+Next
+Refresh
+✓
+asa
+29 Apr, 20:40 • 1m 38s • https://www.asahe.edu.au/
+Found: 9
+Staged: 9
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+✓
+Australian Catholic University (ACU)
+29 Apr, 20:28 • 14m 5s • https://acu.edu.au
+Found: 200
+Staged: 125
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+✓
+AIT Academy of Interactive Technology
+29 Apr, 20:27 • 43s • https://ait.edu.au/courses
+Found: 12
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+✓
+vit
+29 Apr, 20:27 • 4m 53s • https://vit.edu.au/
+Found: 38
+Staged: 36
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+■
+Australian Catholic University (ACU)
+29 Apr, 20:27 • 58s • https://acu.edu.au
+Found: 0
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+✓
+asa
+29 Apr, 20:27 • 1m 40s • https://www.asahe.edu.au/
+Found: 9
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+■
+asa
+29 Apr, 20:27 • 3s • https://www.asahe.edu.au/
+Found: 0
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+■
+asa
+29 Apr, 20:27 • 1s • https://www.asahe.edu.au/
+Found: 0
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+■
+asa
+29 Apr, 20:26 • 1m 10s • https://www.asahe.edu.au/
+Found: 9
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+■
+asa
+29 Apr, 20:26 • 3s • https://www.asahe.edu.au/
+Found: 0
+Staged: 0
+Approved: 0
+Rejected: 0
+View Logs
+View Courses
+University Coverage
+asa
+
+Sydney, Australia
+
+8
+courses
+ACAP University College
+
+Sydney, Australia
+
+0
+courses
+AIBI
+
+Sydney, Australia
+
+0
+courses
+AIT Academy of Interactive Technology
+
+Sydney, Australia
+
+0
+courses
+APIC College
+
+Sydney, Australia
+
+0
+courses
+ASA Institute of Higher Education
+
+Sydney, Australia
+
+0
+courses
+ATMC New Zealand
+
+Auckland, New Zealand
+
+0
+courses
+Auckland Institute of Studies (AIS)
+
+Auckland, New Zealand
+
+0
+courses
+Auckland University of Technology (AUT)
+
+Auckland, New Zealand
+
+0
+courses
+Australian Catholic University
+
+North Sydney, Australia
+
+0
+courses
+Australian Catholic University (ACU)
+
+Sydney, Australia
+
+0
+courses
+Australian International Institute of Higher Education
+
+Sydney, Australia
+
+0
+courses
+Blue Mountains International Hotel Management School
+
+Sydney, Australia
+
+0
+courses
+Bond University
+
+Gold Coast, Australia
+
+0
+courses
+Bond University
+
+Gold Coast, Australia
+
+0
+courses
+Box Hill TAFE
+
+Melbourne, Australia
+
+0
+courses
+CDU
+
+Darwain, Australia
+
+0
+courses
+Canberra Institute of Technology (CIT)
+
+Canberra, Australia
+
+0
+courses
+Canterbury Institute of Management (CIM)
+
+Sydney, Australia
+
+0
+courses
+Charles Sturt University Sydney & Melbourne
+
+Sydney/Melbourne, Australia
+
+0
+courses
+Charles Sturt university
+
+Bathurst, Australia
+
+173
+courses
+Chisholm TAFE
+
+Melbourne, Australia
+
+0
+courses
+Crown Institute of Higher Education
+
+Sydney, Australia
+
+0
+courses
+ECA College of Health Science
+
+Melbourne, Australia
+
+0
+courses
+ECU
+
+Perth, Australia
+
+0
+courses
+Excelsia University College
+
+Sydney, Australia
+
+0
+courses
+Federation
+
+Melbourne, Australia
+
+0
+courses
+Federation University
+
+Melbourne, Australia
+
+0
+courses
+Flinders University
+
+Adelidae, Australia
+
+0
+courses
+Franklin Institute of Agri-Technology
+
+Auckland, New Zealand
+
+0
+courses
+Griffith University
+
+Brisbane, Australia
+
+0
+courses
+Holmes Institute
+
+Melbourne, Australia
+
+0
+courses
+Holmesglen TAFE
+
+Melbourne, Australia
+
+0
+courses
+ICL Education Group
+
+Auckland, New Zealand
+
+0
+courses
+ICMS
+
+Sydney, Australia
+
+0
+courses
+International College of Hotel Management (ICHM)
+
+Adelaide, Australia
+
+0
+courses
+James Cook University (JCU)
+
+Townsville, Australia
+
+0
+courses
+KBS
+
+sydney, Australia
+
+0
+courses
+Kaplan Business School
+
+Sydney, Australia
+
+0
+courses
+La Trobe University Main Campus
+
+Melbourne, Australia
+
+0
+courses
+La Trobe University Sydney
+
+Sydney, Australia
+
+0
+courses
+Lincoln University
+
+Christchurch, New Zealand
+
+0
+courses
+MIT
+
+Sydney, Australia
+
+0
+courses
+Macquarie University
+
+Sydney, Australia
+
+0
+courses
+Macquarie University
+
+Sydney, Australia
+
+0
+courses
+Massey University
+
+Auckland, New Zealand
+
+0
+courses
+Media Design School (MDS)
+
+Auckland, New Zealand
+
+0
+courses
+Murdoch College
+
+Perth, Australia
+
+0
+courses
+Murdoch university
+
+Perth, Australia
+
+0
+courses
+New Zealand Institute of Sport (NZIS)
+
+Auckland, New Zealand
+
+0
+courses
+New Zealand Management Academies (NZMA)
+
+Auckland, New Zealand
+
+0
+courses
+New Zealand School of Tourism (NZST)
+
+Auckland, New Zealand
+
+0
+courses
+New Zealand Tertiary College
+
+Auckland, New Zealand
+
+0
+courses
+Pacific International Hotel Management School
+
+New Plymouth, New Zealand
+
+0
+courses
+Queensland University of Technology (QUT)
+
+Brisbane, Australia
+
+0
+courses
+RMIT University
+
+Melbourne, Australia
+
+0
+courses
+SAE University College
+
+Sydney, Australia
+
+0
+courses
+SCU
+
+sydney, Australia
+
+0
+courses
+Stanley College
+
+Perth, Australia
+
+0
+courses
+Stott’s College
+
+Sydney, Australia
+
+0
+courses
+Sydney Institute of Business & Technology (SIBT)
+
+Sydney, Australia
+
+0
+courses
+Sydney Met
+
+Sydney, Australia
+
+0
+courses
+TAFE NSW
+
+NSW, Australia
+
+0
+courses
+TAFE Queensland
+
+QLD, Australia
+
+0
+courses
+TAFE SA
+
+SA, Australia
+
+0
+courses
+TasTAFE & GETI
+
+Tasmania, Australia
+
+0
+courses
+The University of Adelaide
+
+Adelaide, Australia
+
+0
+courses
+The University of Auckland
+
+Auckland, New Zealand
+
+0
+courses
+The University of New South Wales (UNSW)
+
+Sydney, Australia
+
+0
+courses
+The University of Queensland (UQ)
+
+Brisbane, Australia
+
+0
+courses
+UHE
+
+Sydney, Australia
+
+0
+courses
+UNE
+
+Armedale, Australia
+
+0
+courses
+UOW
+
+wollongong, Australia
+
+0
+courses
+Unitec Institute of Technology
+
+Auckland, New Zealand
+
+0
+courses
+University of Canberra (UC) Sydney Campus
+
+Sydney, Australia
+
+0
+courses
+University of Canterbury
+
+Christchurch, New Zealand
+
+0
+courses
+University of New Castle
+
+New Castle, Australia
+
+0
+courses
+University of Newcastle College
+
+Newcastle, Australia
+
+0
+courses
+University of Notre Dame
+
+Sydney, Australia
+
+0
+courses
+University of Otago
+
+Dunedin, New Zealand
+
+0
+courses
+University of Southern Queenland
+
+Toowoomba, Australia
+
+67
+courses
+University of Sunshine Coast Adelaide
+
+Adelaide, Australia
+
+0
+courses
+University of Tasmania
+
+Hobart, Australia
+
+0
+courses
+University of Tasmania (UTAS) Sydney & Melbourne
+
+Sydney/Melbourne, Australia
+
+0
+courses
+University of Technology Sydney (UTS)
+
+Sydney, Australia
+
+0
+courses
+University of Waikato
+
+Hamilton, New Zealand
+
+0
+courses
+VIT Victorian Institute of Technology
+
+Melbourne, Australia
+
+0
+courses
+Victoria University Sydney/Brisbane
+
+Sydney/Brisbane, Australia
+
+0
+courses
+Victoria University of Wellington
+
+Wellington, New Zealand
+
+0
+courses
+Western Sydney University Sydney City Campus
+
+Sydney, Australia
+
+0
+courses
+Western sydney university
+
+Sydney, Australia
+
+0
+courses
+Yoobee College of Creative Innovation
+
+Auckland, New Zealand
+
+0
+courses
+aut
+
+Auckland, New Zealand
+
+0
+courses
+cqu
+
+sydney, Australia
+
+0
+courses
+torrens
+
+Melbourne, Australia
+
+74
+courses
+vit
+
+Vellore, India
+
+30
+courses
+Import History
+Refresh
+No import jobs yet.
+
+Use Bulk Upload or the AI Scraper above.
+
+Evidence Review
+Graduate Diploma of Legal Practice (Plt)
+Eligibility: ready - ok
+cambridge_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+176.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Law
+gemini_primary: category=Law
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+course_location
+selected
+selected
+/ location.text_block
+confidence 50%
+Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia
+Sydney, Melbourne, Brisbane, Adelaide, Perth
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Graduate Diploma of Legal Practice (Plt)
+Graduate Diploma of Legal Practice (PLT)
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Graduate Certificate
+Graduate Diploma of Legal Practice (Plt)
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+description
+selected
+selected
+/ description.meta
+confidence 95%
+Study A Graduate Diploma Of Legal Practice (PLT Course) in New South Wales at ACAP University College. Enrol Now.
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+domestic_fee
+selected
+selected
+/ gemini_primary
+confidence 75%
+11622.0
+gemini_primary: domestic_fee=11622.0
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+duolingo_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+110.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+duration
+selected
+selected
+/ duration.structural
+confidence 85%
+3.0
+<strong>Duration</strong> -> Duration 14 Weeks Full Time View all options
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+duration_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+14 Weeks Full Time
+gemini_primary: duration_text=14 Weeks Full Time
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+weeks
+ai_fallback: duration_unit=weeks
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+14.0
+ai_fallback: duration_value=14.0
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+fee_currency
+selected
+selected
+/ ai_fallback
+confidence 50%
+AUD
+ai_fallback: fee_currency=AUD
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+fee_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Full Course
+gemini_primary: fee_term=Full Course
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+ielts_listening
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+ielts_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.5
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+ielts_reading
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+ielts_speaking
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+ielts_writing
+selected
+selected
+/ per_course_vision
+confidence 85%
+6.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["July", "November"]
+Fees FEE-HELP Available Start dates View all Start dates Graduate Diploma of Legal Practice New South Wales (PLT) 20 July 2026 16 November 2026 Apply Now chevron_right Understand legal practice Apply now chevron_right Download course guide
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+intake_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+July, November
+gemini_primary: intake_text=July, November
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+international_fee
+selected
+selected
+/ regex
+confidence 100%
+15619
+onal Fees International International Fees Graduate Diploma of Legal Practice New South Wales (PLT) Total Course Fee (Indicative)* (based on 1.0 EFTSL) $12,469-$15,619 AUD depending on units selected Practical Legal Training Coursework: LLP
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+location_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+Sydney
+gemini_primary: location_text=Sydney
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+Blended
+gemini_primary: mode=Blended
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+pte_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+58.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+Blended
+and teacher feedback. Blended Blended delivery is a combination of online an
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Legal Practice
+gemini_primary: sub_category=Legal Practice
+https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+toefl_listening
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+18.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+toefl_overall
+selected
+selected
+/ per_course_vision
+confidence 85%
+79.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+toefl_reading
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+18.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+toefl_speaking
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+18.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+toefl_writing
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+18.0
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
+https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/kaden-testimonials.jpg
