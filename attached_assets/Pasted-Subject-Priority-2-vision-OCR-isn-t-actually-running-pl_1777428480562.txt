@@ -1,0 +1,50 @@
+Subject: Priority 2 — vision OCR isn't actually running; plus a sibling-cache data integrity bug
+I checked the evidence panel for "Master of Information Technology (Artificial Intelligence)" after the latest re-scrape. The values are still coming from uni_pdf:requirements (IELTS=6.0, PTE=50, TOEFL=60) — vision OCR did NOT win. But the staging table displays IELTS=6.5/PTE=58/TOEFL=85, which doesn't match the evidence.
+This reveals two separate problems:
+Problem 1: Vision OCR never fires for any course in the scrape
+Looking at the full log, there are zero [VISION] / [per_course_vision] log entries for any of the 9 ASAHE courses. The pipeline jumps from browser timeout straight to AI fallback to PG-SKIP wipe — vision OCR is skipped entirely.
+Most likely cause: this line at the end of the log:
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+Vision OCR uses Gemini Vision, which shares quota with Gemini text. If quota is exhausted, vision OCR silently fails too. This is the "Gemini API quota exhaustion" pain point from §10 of the architecture doc.
+Please verify:
+
+Is the Gemini API key set in production? echo $GEMINI_API_KEY | head -c 8 should show non-empty.
+If the key is set, is the quota exhausted? Check the Google AI Studio console for the project's daily token usage.
+Add an explicit log line at the start of vision OCR: [VISION] attempting OCR on {image_url} (and [VISION FAIL] {image_url}: {reason} on failure) so we can see whether vision is being skipped because of quota, missing image candidates, or never being called.
+
+Until vision OCR demonstrably fires, Priority 2 isn't shippable.
+Problem 2: Sibling cache fills values without creating evidence rows
+The staging table for AI Masters shows:
+
+IELTS = 6.5
+PTE = 58
+TOEFL = 85
+
+The evidence panel for the same course shows:
+
+ielts_overall = 6.0 from uni_pdf:requirements
+pte_overall = 50 from uni_pdf:requirements
+toefl_overall = 60 from uni_pdf:requirements
+
+These don't agree. The table is showing values from this log line:
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=5.5 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5
+But there's no corresponding evidence row for the sibling-cache values. So the architecture's enforce_source_evidence guarantee — "drops any field that has no evidence record with a non-empty snippet AND a non-empty source_url" — is being bypassed for sibling-cached fields.
+This is a data integrity problem regardless of Priority 2: any field shown in the staging UI must have a corresponding evidence row, otherwise admins approving courses are seeing values they can't trace.
+Please:
+
+Confirm the sibling cache is creating evidence rows when it propagates a value to another course. Method label could be sibling_cache:postgraduate with the source_url being the original course's evidence source.
+If the sibling cache bypasses evidence, the staging table's value source IS the evidence — meaning the staging table should display 6.0/50/60 (from PDF evidence), not 6.5/58/85 (from undocumented cache).
+
+Where 6.5/58/85 came from — I need to know
+These values are different from both the PDF (6.0/50/60) AND from any course-page text on ASAHE. They have to be coming from somewhere. Three possibilities:
+
+A previous successful scrape that wrote these to the database before the quota ran out
+Hardcoded fallback values somewhere in the pipeline
+A cached vision OCR result from a previous run
+
+If you can grep the codebase for 6.5 / 58 / 85 in the context of English scores, or check vision_image_cache for entries containing those values, that'd resolve where they're coming from.
+Verification once both are fixed
+Same SQL as before, but I'm specifically looking for:
+
+At least one row with method = 'per_course_vision' and source_url ending in .png
+Values matching what the actual MaSTER.png image shows (currently unknown — please open it and document the values)

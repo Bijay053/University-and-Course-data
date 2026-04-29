@@ -66,20 +66,25 @@ _HARD_FIELDS: dict[str, str] = {
         "(e.g. '2 years full-time', '18 months'). Null if not found."
     ),
     "ielts_overall": (
-        "Minimum IELTS *overall* band score required for admission (e.g. 6.5). "
+        "Minimum IELTS *overall* band score required for admission. "
         "Return the OVERALL (total) score ONLY — NOT a sub-band score for "
         "listening, reading, writing, or speaking. "
         "Example: if the page says 'overall score of 7.0, with a minimum of 6.5 "
         "in writing', return 7.0, not 6.5. "
-        "Number only. Null if not stated on this page."
+        "CRITICAL: return null if the page does not state an explicit IELTS score "
+        "in a number. Do NOT guess or use a default value."
     ),
     "pte_overall": (
-        "Minimum PTE Academic overall score required for admission (e.g. 58). "
-        "Number only. Null if not stated on this page."
+        "Minimum PTE Academic overall score required for admission. "
+        "Number only. "
+        "CRITICAL: return null if the page does not state an explicit PTE score. "
+        "Do NOT guess or use a default value."
     ),
     "toefl_overall": (
-        "Minimum TOEFL iBT total score required for admission (e.g. 85). "
-        "Number only. Null if not stated on this page."
+        "Minimum TOEFL iBT total score required for admission. "
+        "Number only. "
+        "CRITICAL: return null if the page does not state an explicit TOEFL score. "
+        "Do NOT guess or use a default value."
     ),
     "cambridge_overall": (
         "Minimum Cambridge English (CAE/C1/C2) score required for admission (e.g. 169). "

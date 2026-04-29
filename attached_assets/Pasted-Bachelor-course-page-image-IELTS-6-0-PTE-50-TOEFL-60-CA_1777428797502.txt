@@ -1,0 +1,51 @@
+Bachelor course page image: IELTS 6.0 / PTE 50 / TOEFL 60 / CAE 169 / NO DET
+Master course page image (MaSTER.png): IELTS 6.5 / PTE 58 / TOEFL 85 / NO CAE / NO DET
+Both images have a header reading "Undergraduate Requirement" but the values are different — ASAHE's web team mislabeled them. The numerical values themselves are real and represent the actual per-level requirements.
+What this means: vision OCR for Masters partially succeeded (3 of 4 Masters got 6.5/58/85, which is correct). Vision OCR for Bachelors is not running — Bachelors are showing PDF-sourced data that happens to mostly match the Bachelor image except for a phantom DET=100.
+Issue 1 (CRITICAL): Sibling cache fills values without evidence rows
+The Master AI course displays IELTS=6.5, PTE=58, TOEFL=85 in the staging table. The evidence panel for the same course shows ielts_overall=6.0 from uni_pdf:requirements.
+These don't match. The displayed value (6.5) is correct per the source image. The evidence (6.0) is stale or misattributed. The user can't tell what's actually in the database or where it came from.
+This is what the architecture's enforce_source_evidence is supposed to prevent. Either:
+
+The sibling cache is writing to scraped_courses columns without creating evidence rows, OR
+Stale evidence from a previous scrape isn't being purged when new values are written
+
+Please verify which one. The fix differs:
+
+If sibling cache bypasses evidence: every cached value needs an evidence row with method sibling_cache:postgraduate (or similar) and source_url pointing at the original course's vision evidence URL
+If old evidence isn't purged: when new values are written for a (course, field), old evidence rows for that field need to be marked superseded or deleted
+
+Issue 2: Master IT Software App Dev is blank because it processed before the sibling cache built
+Three of four Masters got 6.5/58/85 from vision via sibling cache. The fourth (Software App Development) shows blank because it was processed before the cache was populated by the first successful vision OCR.
+The sibling cache is acting as a workaround for vision OCR not running on every Master course. Real fix: vision OCR (or its cached image-URL result) should run for every course that has a candidate image, not just for one and then propagate to siblings.
+If VisionImageCache is keyed on the image URL itself, every course pointing at MaSTER.png should get a cache hit on subsequent calls — no need for a separate sibling cache layer. Please check whether the image-URL cache is actually being hit for the 2nd through 4th Master courses, or whether each course is independently re-fetching.
+Issue 3: Bachelor courses show phantom DET=100 from PDF
+The actual Bachelor image (linked below) lists IELTS, PTE, TOEFL, CAE, Cambridge Proficiency. NO Duolingo. NO DET row.
+But every Bachelor in the staging table shows DET=100, sourced from uni_pdf:requirements. The PDF parser is including a Duolingo row that doesn't apply to these courses — probably a generic Duolingo policy entry from a different part of the PDF being mis-mapped.
+Two-step fix:
+
+Once vision OCR runs on the Bachelor image, the Bachelor image becomes the authoritative tier-4 source. With no DET row in the image, DET stays null. PDF tier-2 cannot override.
+But until vision OCR fires on Bachelor pages, PDF still wins. We need vision running on Bachelor pages too — likely the same root cause as Issue 2 (vision isn't running consistently).
+
+Bachelor image URL: please check by opening one of the Bachelor course pages in DevTools and finding the entry requirements image. Add it to the test set when verifying.
+Why vision didn't run on more courses
+Looking at the log: [GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted). This suggests Gemini quota issues. But somehow vision OCR DID succeed at least once (otherwise the sibling cache would be empty and ALL Masters would be blank). So vision did fire successfully at least once before quota issues kicked in, or quota is partial rather than fully exhausted.
+Please add explicit [VISION] called for {url} and [VISION] result for {url}: {fields} log lines so we can see exactly which courses got vision and which didn't.
+Verification queries
+After fixes, run for a fresh scrape:
+sql-- Should show per_course_vision wins for all 4 Masters AND all 5 Bachelors
+SELECT sc.course_name, sc.degree_level, sfe.field_key,
+       sfe.method, sfe.normalized_value, sfe.source_url
+FROM scraped_courses sc
+JOIN scraped_field_evidence sfe ON sfe.scraped_course_id = sc.id
+WHERE sc.scrape_job_id = '<NEW_JOB_ID>'
+  AND sfe.field_key IN ('ielts_overall','pte_overall','toefl_overall',
+                        'cambridge_overall','duolingo_overall')
+  AND sfe.selected = true
+ORDER BY sc.degree_level, sc.course_name, sfe.field_key;
+Expected:
+
+All 4 Masters: ielts=6.5/pte=58/toefl=85, no CAE row, no DET row, all method=per_course_vision, all source_url ending in MaSTER.png
+All 5 Bachelors: ielts=6.0/pte=50/toefl=60/cae=169, no DET row, all method=per_course_vision, source_url is the Bachelor image URL
+
+If both match, Priority 2 is genuinely complete and we ship.
