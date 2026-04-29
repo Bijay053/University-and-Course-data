@@ -1,0 +1,92 @@
+Could you put together an architecture document covering the following? Diagrams help where they make sense, but text is fine too.
+1. System overview
+
+High-level diagram of how the scraper runs end-to-end, from "trigger" to "data in database"
+Whether it runs on a schedule, on demand, or both
+Where it's hosted (Replit, server, cloud, etc.)
+
+2. Tech stack
+
+Language and version
+Main libraries (HTTP client, HTML parser, browser automation, queue, ORM, etc.)
+Database engine and version
+Any external services (LLM APIs, proxy services, scraping APIs, etc.)
+
+3. Data flow — every stage
+For each stage, explain what it does, what it inputs, what it outputs, and where the code lives:
+
+How universities are configured (config files? database table? hardcoded?)
+How course list pages are discovered
+How individual course URLs are queued
+How pages are fetched (simple HTTP or full browser?)
+How fields are extracted (selectors? regex? LLM? mix?)
+How raw values are parsed and normalized
+How data is validated before save
+How data is saved (overwrite? merge? append?)
+
+4. Database schema
+
+Every table relevant to scraping, with column names and types
+Foreign keys / relationships
+Specifically: how is fee stored? How is IELTS stored? Are manual and scraped values separated?
+Are there backup or change-log tables?
+
+5. Per-university configuration
+
+How each university's specifics are stored (selectors, URLs, special handling)
+How a new university gets added
+How config changes are deployed
+
+6. Field extraction strategy
+
+For each of these fields, exactly how the scraper tries to extract it: course name, level, duration, intake, fee, IELTS, PTE, TOEFL, mode, location
+Whether there are fallbacks when the primary method fails
+Where the LLM or AI is used (if at all)
+
+7. Error handling and logging
+
+What happens when a fetch fails
+What happens when a field extraction fails
+Where logs are written and how long they're kept
+Whether failed scrapes are retried automatically
+
+8. Data quality controls
+
+Are there validation rules before save?
+What stops bad scraped data from overwriting good data?
+Is manual data protected from being wiped by the scraper?
+Is there a review queue for low-confidence data?
+
+9. Monitoring and dashboards
+
+How do you know if a scrape run failed?
+How do you know if a university suddenly has 50% missing fees?
+Are there metrics tracked per run?
+
+10. Known limitations and pain points
+
+Which universities currently work well, which don't
+What problems you already know about
+What you've tried that didn't work
+Any technical debt that affects scrape quality
+
+11. Repository structure
+
+Folder tree of the project (top 2-3 levels of directories is enough)
+Which files contain the most important logic
+
+12. Recent changes
+
+Anything changed in the last 1-3 months that might be related to data quality issues
+Any university websites that changed their structure recently
+
+Format
+A markdown document or PDF works best. If diagrams are helpful, ASCII diagrams are fine — no need for fancy tooling.
+Redact freely
+
+API keys, passwords, DB credentials
+Internal-only URLs that shouldn't leave the team
+Any commercial or licensing info
+
+I'd rather have a thorough document with rough drawings than a polished doc with details left out. Once I have this I can point to the specific layers where fee and IELTS data is getting lost, instead of guessing.
+Thanks.
