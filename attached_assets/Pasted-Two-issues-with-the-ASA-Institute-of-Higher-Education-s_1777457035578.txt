@@ -1,0 +1,52 @@
+Two issues with the ASA Institute of Higher Education scrape (university 35).
+
+---
+
+**Bug 1: All international fees blank — fee data is in a linked PDF, not the fee page HTML**
+
+Log shows:
+```
+[CENTRAL] auto-discovered fee page: https://asahe.edu.au/fees-and-charges
+[CENTRAL] fee page parsed → 0 program record(s)
+```
+And then every course logs `[WARN] — Fee section detected but fee is blank`.
+
+The fee page (https://asahe.edu.au/fees-and-charges) doesn't contain the fees inline. It links to a PDF which has the full fee schedule:
+
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+
+The PDF is a clean fee table. Confirmed values (international, AUD, annual):
+
+- Bachelor of Professional Accounting — $19,360/yr ($58,080 total)
+- Bachelor of Business (and all majors: Technology Management, International Business, Hospitality Management) — $19,360/yr ($58,080 total)
+- Master of Information Technology (Artificial Intelligence) — $26,400/yr ($52,800 total)
+- Master of Information Technology (Cyber Security) — $26,400/yr ($52,800 total)
+- Master of Project Management — $26,400/yr ($52,800 total)
+- Master of Software Application Design — $26,400/yr ($52,800 total)
+
+Fix: when the central fee page returns 0 records, the parser should follow PDF links on that page (look for hrefs ending in .pdf with fee-related anchor text like "Fees Schedule", "Tuition Fees", "Fee Schedule") and parse the PDF table. The same pattern likely applies to other small Australian higher-ed providers — their fee data is often a PDF rather than inline HTML.
+
+---
+
+**Bug 2: Master of Software Application Development missing**
+
+The scraper found 8 courses via sitemap. The actual course listing page (https://www.asahe.edu.au/our-courses/courses-grid-view) lists 9:
+
+Undergraduate (5):
+- Bachelor of Business International Business
+- Bachelor of Business Hospitality Management
+- Bachelor of Business Technology Management
+- Bachelor of Business
+- Bachelor of Professional Accounting
+
+Postgraduate (4):
+- Master of Software Application Development ← MISSING
+- Master of Project Management
+- Master of Information Technology (Cyber Security)
+- Master of Information Technology (Artificial Intelligence)
+
+Root cause: the discover step failed to fetch the seed URL (`asahe.edu.au/courses` returned a fetch error in the log) and fell back to the sitemap, which only contained 8 entries. The Master of Software Application Development URL (https://www.asahe.edu.au/courses/master-of-software-application-development) is presumably not in sitemap.xml.
+
+Fix: when the seed URL fails, the discover step should also try common course-listing URL patterns (e.g. `/our-courses`, `/our-courses/courses-grid-view`, `/study/courses`, `/courses/all`) before relying on sitemap alone. The actual courses page on this site is at `/our-courses/courses-grid-view`, not `/courses`. Also worth setting up sitemap as a supplement to crawl results, not a fallback — if both succeed, take the union, since sitemaps often miss recent additions.
+
+The Software Application Design degree also appears in the fee PDF, so once the PDF parser is fixed and the discover step picks it up, it'll have fee data ready to go.

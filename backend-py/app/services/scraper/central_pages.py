@@ -873,6 +873,63 @@ async def prefetch_central_pages(
                             url=fee_url,
                         )
                     log.info("central_pages: %d fee records from %s", len(records), fee_url)
+
+                    # ── PDF fallback: if the HTML fee page has no inline fee
+                    # data, look for linked PDFs (e.g. "Fees Schedule.pdf" on
+                    # a CDN) and attempt to parse them instead. ──────────────
+                    if not records:
+                        _pdf_links = _extract_pdf_fee_links(fee_html, fee_url)
+                        if _pdf_links:
+                            log.info(
+                                "central_pages: 0 inline records from %s — "
+                                "probing %d PDF fee link(s): %s",
+                                fee_url,
+                                len(_pdf_links),
+                                _pdf_links[:3],
+                            )
+                        for _pdf_url in _pdf_links[:3]:  # cap at 3 PDFs
+                            try:
+                                from app.services.scraper.pdf_fetcher import (
+                                    download_pdf_text,
+                                )
+
+                                _pdf_text = await download_pdf_text(_pdf_url)
+                                if not _pdf_text or len(_pdf_text) < 50:
+                                    continue
+                                # Wrap in <pre> so html_to_text strips tags
+                                # correctly and Strategy-2 line scan runs.
+                                _pdf_records = _parse_fee_page_html(
+                                    f"<pre>{_pdf_text}</pre>", _pdf_url
+                                )
+                                if _pdf_records:
+                                    records = _pdf_records
+                                    result["fees"] = records
+                                    log.info(
+                                        "central_pages: PDF fee parse (%s) → "
+                                        "%d record(s)",
+                                        _pdf_url,
+                                        len(records),
+                                    )
+                                    if emit:
+                                        await emit(
+                                            "status",
+                                            f"[CENTRAL] PDF fee parsed → "
+                                            f"{len(records)} record(s) from "
+                                            f"{_pdf_url}",
+                                            phase="discover",
+                                            kind="central_fee_pdf_parsed",
+                                            count=len(records),
+                                            url=_pdf_url,
+                                        )
+                                    break
+                            except Exception as _pdf_exc:
+                                log.warning(
+                                    "central_pages: PDF fee fetch/parse failed "
+                                    "(%s): %s",
+                                    _pdf_url,
+                                    _pdf_exc,
+                                )
+
                     # Store in cache
                     if university_id is not None:
                         await _cache_set(
@@ -1058,6 +1115,65 @@ _FEE_ANCHOR_TEXT = (
     "program fees",
     "study costs",
 )
+
+
+def _extract_pdf_fee_links(html: str, base_url: str) -> list[str]:
+    """Find PDF links on a fee page that may contain fee data not inline in HTML.
+
+    Unlike :func:`_extract_fee_link_candidates` this function allows cross-domain
+    URLs (e.g. CDN-hosted PDFs on ``cdn.prod.website-files.com``) because
+    institutions routinely publish fee schedules as third-party-hosted PDFs.
+
+    Selection criteria:
+    - href ends with ``.pdf`` (case-insensitive)
+    - anchor text OR URL path contains a fee-related keyword
+
+    Returns absolute URLs, deduplicated.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin, urlparse
+    except ImportError:
+        return []
+
+    _PDF_FEE_ANCHOR_TOKENS = (
+        "fee",
+        "tuition",
+        "cost",
+        "schedule",
+        "international student",
+        "rate",
+        "price list",
+        "pricing",
+    )
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return []
+
+    seen: set[str] = set()
+    results: list[str] = []
+
+    for a in soup.find_all("a", href=True):
+        href: str = (a.get("href") or "").strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        abs_url = urljoin(base_url, href)
+        parsed = urlparse(abs_url)
+        path_lower = parsed.path.lower()
+        if not path_lower.endswith(".pdf"):
+            continue
+        anchor_text = a.get_text(" ", strip=True).lower()
+        # Match on anchor text or URL path tokens.
+        if not any(tok in anchor_text or tok in path_lower for tok in _PDF_FEE_ANCHOR_TOKENS):
+            continue
+        clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if clean not in seen:
+            seen.add(clean)
+            results.append(clean)
+
+    return results
 
 
 def _extract_fee_link_candidates(html: str, base_domain: str) -> list[str]:

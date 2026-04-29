@@ -140,7 +140,13 @@ _NON_COURSE_URL_PATTERNS: tuple[str, ...] = (
     "/discipline-areas/", "/discipline-area/",
     "/fields-of-study/", "/field-of-study/",
     "/areas-of-study/", "/area-of-study/",
-    "/our-courses/", "/our-programs/",
+    # NOTE: "/our-courses/" and "/our-programs/" were removed from this list.
+    # Some universities (e.g. ASA Institute) publish individual course detail
+    # pages under /our-courses/<course-slug> — blocking the whole prefix
+    # prevented those courses from being added as candidates.  The listing
+    # pages themselves (/our-courses/ and /our-programs/) are correctly
+    # rejected by _is_category_landing() and _JUNK_LAST_SEG_RE, so removing
+    # them here does not risk staging listing pages as courses.
     # Generic marketing / info page indicators (slash-bounded so partial
     # path segments like /discover-X are not accidentally blocked).
     "/explore/", "/discover/",
@@ -865,6 +871,56 @@ async def discover_course_links(
             found[u] = n
             if len(found) >= max_courses:
                 break
+
+    # ── Alternative listing path probe ───────────────────────────────────────
+    # When the seed URL failed (e.g. /courses 404s) and the sitemap is
+    # incomplete or absent, probe a small set of well-known alternative listing
+    # paths (e.g. /our-courses/courses-grid-view) and harvest any linked
+    # courses from each.  Only fires when found is below a generous threshold
+    # so healthy universities with many results are unaffected.
+    _ALT_PROBE_THRESHOLD = 15
+    _ALT_LISTING_PATHS: tuple[str, ...] = (
+        "/our-courses/courses-grid-view",
+        "/our-courses",
+        "/our-programs/all",
+        "/our-programs",
+        "/courses/all",
+        "/all-courses",
+        "/study/all",
+    )
+    if len(found) < _ALT_PROBE_THRESHOLD and origin:
+        for _alt_path in _ALT_LISTING_PATHS:
+            if len(found) >= max_courses:
+                break
+            _alt_url = f"{origin}{_alt_path}"
+            if _alt_url in visited:
+                continue
+            _alt_html = await fetch_html(_alt_url, retries=0)
+            if not _alt_html:
+                continue
+            visited.add(_alt_url)
+            try:
+                from bs4 import BeautifulSoup as _BS4
+
+                _alt_soup = _BS4(_alt_html, "html.parser")
+                for _a in _alt_soup.find_all("a", href=True):
+                    _href = (_a.get("href") or "").strip()
+                    _text = _a.get_text(" ", strip=True)[:200]
+                    if not _href or _href.startswith(("#", "mailto:", "tel:", "javascript:")):
+                        continue
+                    _full = _resolve(_href, _alt_url, origin)
+                    if not _full or _full in found:
+                        continue
+                    if _looks_like_course(_full, _text):
+                        found[_full] = _text
+                        if len(found) >= max_courses:
+                            break
+            except Exception as _alt_exc:
+                log.warning(
+                    "discovery: alt listing probe failed for %s: %s",
+                    _alt_url,
+                    _alt_exc,
+                )
 
     # ── Unconditional sitemap supplement for JS-heavy catalogues ────────────
     # For universities whose category listing pages are React/Vue SPAs the BFS
