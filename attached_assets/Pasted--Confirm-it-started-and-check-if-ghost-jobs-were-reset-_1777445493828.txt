@@ -1,0 +1,45 @@
+# Confirm it started and check if ghost jobs were reset:
+sleep 5 && tail -20 /var/log/celery-worker.log
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[1]-  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1  (wd: ~/University-and-Course-data/backend-py)
+(wd now: ~/University-and-Course-data)
+[3] 1197486
+- ** ---------- .> transport:   redis://localhost:6379/0
+- ** ---------- .> results:     redis://localhost:6379/0
+- *** --- * --- .> concurrency: 4 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> scrape           exchange=scrape(direct) key=scrape
+                
+
+[tasks]
+  . scrape.repair
+  . scrape.requeue_stale
+  . scrape.university
+  . tasks.snapshot.editable
+
+[2026-04-29 06:50:38,729: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2026-04-29 06:50:38,734: INFO/MainProcess] mingle: searching for neighbors
+[2026-04-29 06:50:39,744: INFO/MainProcess] mingle: all alone
+[2026-04-29 06:50:39,788: ERROR/MainProcess] worker_ready: ghost-job reset failed: [Errno -5] No address associated with hostname
+[2026-04-29 06:50:39,788: INFO/MainProcess] celery@university-and-course-data ready.
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # Connect via the local postgres system user (bypasses hostname resolution)
+sudo -u postgres psql university_portal -c "
+  UPDATE scraping_jobs
+  SET status='failed',
+      completed_at=now(),
+      error_message='Reset: slot-leak recovery'
+  WHERE status='running';
+
+  SELECT status, count(*) FROM scraping_jobs GROUP BY status ORDER BY status;
+"
+ERROR:  column "completed_at" of relation "scraping_jobs" does not exist
+LINE 4:       completed_at=now(),
+              ^
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# sudo -u postgres psql -l | grep -i uni
+ university_portal | uniportal | UTF8     | libc            | C.UTF-8 | C.UTF-8 |            |           | =Tc/uniportal          +
+                   |           |          |                 |         |         |            |           | uniportal=CTc/uniportal
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 

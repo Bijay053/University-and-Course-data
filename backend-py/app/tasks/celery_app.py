@@ -102,36 +102,65 @@ celery_app.conf.update(
 # fully ready and immediately resets those ghost jobs to 'failed', freeing
 # all 4 Celery slots right away — no manual "Cancel All" needed.
 
+_RESET_SQL = (
+    "UPDATE scrape_runtime_jobs "
+    "SET status = 'failed', "
+    "    completed_at = now(), "
+    "    error_message = 'Worker restarted — slot freed on startup' "
+    "WHERE status = 'running'"
+)
+
+
+async def _reset_via_asyncpg(url: str) -> int:
+    """Run the ghost-job reset using a given asyncpg URL."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    _engine = create_async_engine(url, pool_size=1, max_overflow=0, future=True)
+    try:
+        _Session = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+        async with _Session() as db:
+            result = await db.execute(text(_RESET_SQL))
+            await db.commit()
+            return result.rowcount  # type: ignore[return-value]
+    finally:
+        await _engine.dispose()
+
+
 async def _reset_ghost_running_jobs() -> int:
-    """Mark all scraping_jobs rows stuck in status='running' as failed.
+    """Mark all scrape_runtime_jobs rows stuck in status='running' as failed.
+
+    Tries the configured DATABASE_URL first; if DNS resolution fails (common
+    when the .env has a cloud DB URL that is unreachable from the server),
+    falls back to the local 127.0.0.1 credentials baked into config.py.
 
     Returns the number of rows reset.
     """
-    from datetime import datetime, timezone as _tz
+    from app.config import settings
 
-    from sqlalchemy import text
+    primary_url = settings.database_url
 
-    from app.database import AsyncSessionLocal, engine
+    # Attempt 1: use the configured URL
+    try:
+        return await _reset_via_asyncpg(primary_url)
+    except OSError as dns_exc:
+        # DNS / network unreachable — fall through to local fallback
+        log.warning("worker_ready: primary DB unreachable (%s) — trying 127.0.0.1 fallback", dns_exc)
+    except Exception as exc:
+        log.warning("worker_ready: primary DB attempt failed (%s) — trying 127.0.0.1 fallback", exc)
 
-    await engine.dispose()
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            text(
-                "UPDATE scraping_jobs "
-                "SET status = 'failed', "
-                "    completed_at = :now, "
-                "    error_message = 'Worker restarted — slot freed on startup' "
-                "WHERE status = 'running'"
-            ),
-            {"now": datetime.now(_tz.utc)},
-        )
-        await db.commit()
-        return result.rowcount  # type: ignore[return-value]
+    # Attempt 2: local PostgreSQL via 127.0.0.1 (works on the DigitalOcean host
+    # when the .env DATABASE_URL is a cloud endpoint that doesn't resolve locally).
+    # Credentials match the server_default in config.py.
+    fallback_url = (
+        "postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal"
+    )
+    return await _reset_via_asyncpg(fallback_url)
 
 
 @worker_ready.connect
 def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
-    """Reset ghost 'running' scraping_jobs when the Celery worker comes online.
+    """Reset ghost 'running' scrape_runtime_jobs when the Celery worker comes online.
 
     Runs once per worker process start — harmless if there are no stuck rows.
     """
