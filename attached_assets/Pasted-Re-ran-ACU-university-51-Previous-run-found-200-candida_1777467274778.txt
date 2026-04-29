@@ -1,0 +1,78 @@
+Re-ran ACU (university 51). Previous run found 200 candidates and staged 125 (with the data-quality issues from my last ACU report). This run found only 4 candidates and staged 0. The discover crawl got over-blocked, and the sitemap fallback returned nothing.
+
+---
+
+**Bug 1: discover over-blocking, only 4 candidates found**
+
+The new discover crawl is clearly stricter than before — it's correctly rejecting marketing/apply/fee pages, but it's also failing to find any actual course detail pages. Out of 25 pages crawled, only 4 things got classified as `detail`:
+```
+https://acu.edu.au/courses
+https://acu.edu.au/study-at-acu/find-a-course/undergraduate-study-at-acu
+https://acu.edu.au/study-at-acu/find-a-course/postgraduate-study-at-acu
+https://acu.edu.au/research-and-enterprise/graduate-research-school/study
+```
+
+Three of those got dropped at the extraction gate as `info_page` or `marketing_page` (correctly). The fourth — the graduate research page — also got dropped. So zero candidates made it to extraction.
+
+What the crawl seems to have missed entirely: the actual `/course/{slug}` URLs that we were getting in the previous run (Bachelor of Nursing, Bachelor of Arts/Laws, etc.). Looking at the previous ACU run log, those came from the sitemap, which had 590 URLs. This run shows:
+```
+[DISCOVER] Crawl yielded only 4 candidate(s) (< 5); trying sitemap fallback
+[DISCOVER] sitemap: probing 5 URL(s) at https://acu.edu.au
+[DISCOVER] sitemap: done — 0 unique candidates
+```
+Sitemap fallback only probed 5 URLs and got 0 candidates. Last time it probed many more and found 590. Something about the sitemap fetch / parse / dedup changed.
+
+Worth checking:
+1. Is the sitemap URL still being resolved correctly? Last run it was clearly returning hundreds of URLs.
+2. What does "5 URL(s)" mean here — is it a sitemap index file with 5 child sitemaps, and only one was followed? ACU's sitemap is at https://acu.edu.au/sitemap.xml (sitemap index) which then links out to multiple sub-sitemaps.
+3. Did the sitemap-fallback code change to dedup against URLs already seen during crawl, and accidentally dedup everything?
+4. Was the URL filter from my previous ACU report (filter to `/course/{slug}` and reject older handbook years) applied too aggressively, such that it's now rejecting all candidates including valid ones?
+
+Best fix path is probably: log the raw sitemap URL list before filtering so we can see what's coming in, then check the filter logic. The previous ACU report asked for filtering to `/course/{slug}` or `/handbook/handbook-2026/...` only — if that filter was implemented but accidentally excludes the live `/course/{slug}` pattern, that would explain this collapse.
+
+---
+
+**Bug 2: 5m 52s for a 4-candidate run that did no extraction**
+
+```
+[TIMING] Total: 5m 52s | Courses: 4 | Avg: 88.0s/course
+```
+88 seconds per candidate when none of them got extracted is suspicious. Either the 25-page discover crawl is hitting timeouts (possibly the same browser-networkidle issue as the AIT report), or the sitemap probe is hanging on each of the 5 URLs. Worth checking the per-page timing to see where the time went.
+
+---
+
+**Bug 3: central fee page returning 0 records (already-known)**
+
+```
+[CENTRAL] auto-discovered fee page: https://acu.edu.au/study-at-acu/fees-and-scholarships/international-student-scholarships
+[CENTRAL] fee page parsed → 0 program record(s)
+```
+Note the auto-discovery picked the *scholarships* page rather than the actual international-student-fees page. ACU has both:
+- https://acu.edu.au/study-at-acu/fees-and-scholarships/international-student-fees (actual fees — blocked correctly as `fee_page` at discover, but never picked up as the central fee source)
+- https://acu.edu.au/study-at-acu/fees-and-scholarships/international-student-scholarships (scholarships, picked up by central but yields 0 records)
+
+Fix: prefer URLs containing `/international-student-fees` or `/international-fees` over `/scholarships` when auto-discovering a central fee source.
+
+---
+
+**Comparison to previous ACU run**
+
+| | Previous run | This run |
+|---|---|---|
+| Candidates discovered | 200 | 4 |
+| Sitemap fallback | 590 URLs (used) | 5 URLs (0 unique) |
+| Staged | 125 (with bad URLs/fees) | 0 |
+| Run time | (similar) | 5m 52s |
+
+Previous run was over-permissive (took handbook archive years, used domestic fees, hallucinated PTE/TOEFL/CAE). This run is over-restrictive (missing all real course pages). Goal is the middle: filter sitemap to live `/course/{slug}` URLs only, rejecting `/handbook/handbook-{2021..2024}/` but keeping `/handbook/handbook-2025/` and `/handbook/handbook-2026/` plus the live `/course/` namespace.
+
+---
+
+**Reminder of unfixed issues from previous ACU report**
+
+1. Course pages have a Domestic/International toggle; need to fetch with `?type=International` URL suffix to get true international fees
+2. Hallucinated PTE/TOEFL/CAE via sibling-cache backfill (now also reported in CDU report — needs global fix)
+3. Some courses had duration=10 years from regex bug (also reported in AIT and CDU reports)
+4. `auth.acu.edu.au` redirect URLs causing fetch_failed
+
+None of these can be verified in this run since no candidates made it through. They'll resurface once Bug 1 above is fixed.

@@ -1,0 +1,48 @@
+Re-ran the AIT scrape (university 37). Still 0/12 staged. Same fee/IELTS issues from my previous AIT report (fees live on /apply, IELTS not on the public site) — those haven't been addressed. But this run also surfaced a new issue: every single per-course browser fetch timed out at 60s.
+
+---
+
+**New issue: every per-course browser fetch hit the 60s timeout**
+
+Log shows the timeout firing on all 12 courses:
+```
+timeout: per-course browser exceeded 60s on https://ait.edu.au/courses/3d-animation — moving on
+timeout: per-course browser exceeded 60s on https://ait.edu.au/courses/2d-animation — moving on
+timeout: per-course browser exceeded 60s on https://ait.edu.au/courses/information-technology/vocational-diploma-of-it — moving on
+... (and 9 more, one per course)
+```
+
+This differs from the previous AIT run, where the browser fetches succeeded with `[per-course browser ✓]` (just returned no fee/IELTS data because the data isn't on those pages). Something has changed — either AIT added bot protection, or the browser pool is misconfigured, or the page is loading slow third-party scripts (the page does pull from `ait.yourcreative.com.au` and HubSpot CDN). Total run time jumped from 0m 43s last run to 3m 42s this run, almost entirely from the timeouts.
+
+Worth checking:
+- Is the browser actually waiting for `networkidle` or similar? AIT pages have a lot of trackers and CDN-hosted assets that may never settle. Switching to `domcontentloaded` or `load` would likely fix it.
+- Are these timeouts new across other universities too, or just AIT? If AIT-specific, it's something on their site.
+- The fact that the static fetch succeeded fine (got 250KB–1MB of HTML each time) means the site is reachable — only the headless browser is hanging.
+
+Claude (the AI helping with these reports) note: even if the browser timeout were fixed, the data isn't on these pages anyway — see previous AIT report. The browser fetch is wasted work for AIT regardless. Worth adding a per-site flag to skip the per-course browser step when prior runs have shown it doesn't yield additional fields.
+
+---
+
+**Reminder of unfixed AIT bugs from previous report**
+
+1. **Fees are on /apply, not on course pages.** Confirmed values from https://ait.edu.au/apply (international, 2026, AUD total course):
+   - Bachelor of 2D / 3D Animation / Game Design — $69,000
+   - Diploma of 2D / 3D Animation / Game Design — $23,000
+   - ICT50220 Diploma of IT (Vocational) — $8,000
+   Fix: extend the central fee parser to recognise /apply, /admissions, /fees, /tuition, /how-to-apply as candidate fee pages.
+
+2. **IELTS not on the public site.** Likely lives in HubSpot-hosted course guide PDFs (`493379.fs1.hubspotusercontent-na1.net/...`) linked as "Download a Course Guide" on each course page. Either fetch+parse those, or use a manual override table.
+
+3. **Category landing pages still being fetched and rejected.** Same 5 wasted fetches: `/courses/2d-animation`, `/3d-animation`, `/game-design`, `/information-technology`, plus `/information-technology/diploma-of-it` (which is actually a detail page named the same as the listing — H1 "IT Courses" trips the rejector). Worth filtering at discover time using the URL depth heuristic from the previous report.
+
+4. **`ICT50220` regex producing duration=15 years.** Same bug as the ACU `Master of Psychology (Clinical)` 10-year and `Master of Professional Psychology` 10-year cases I flagged in the ACU report. Tighten the regex to require a unit word (year/month/week) within ~20 chars of the number.
+
+---
+
+**Summary of this run vs the previous AIT run**
+
+- Previous run: browser fetches succeeded but found no fee/IELTS data → 0 staged, fast (43s)
+- This run: browser fetches all timed out at 60s → 0 staged, slow (3m 42s)
+- Outcome is the same; the timeout just made it slower.
+
+Fix priority: address bugs 1 and 2 from the previous report first — those will actually unblock staging. The timeout issue is real but secondary because the data isn't on those pages anyway.

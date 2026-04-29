@@ -1,0 +1,87 @@
+CDU scrape (university 19, https://www.cdu.edu.au/) staged 0/19. Discover walked the site fine but never reached an actual course detail page — every candidate it found was a category overview, info page, or top-level study area. The course list on those pages is JS-rendered, so the static HTML the scraper sees doesn't contain links to the real course pages.
+
+---
+
+**Bug 1 (root cause): course list is JS-rendered, discover only sees category landing pages**
+
+Discover crawled 19 candidates, none of which were actual course pages. Examples of what got classified as `detail`:
+- `/study/hdr` (research overview)
+- `/study/tafe-courses` (TAFE category)
+- `/study/pathway-courses` (pathways info)
+- `/study/essentials`, `/study/essentials/study-pathways`, `/study/essentials/course-fees`, `/study/essentials/student-profile` (info pages)
+- `/international/study-darwin` (city info)
+- `/study/redirect/find-supervisor` (research entry)
+- `/schools-engagement` (high school outreach)
+- `/study/accounting`, `/study/arts`, `/study/business`, `/study/community-social-work`, `/study/postgraduate` (study area overviews)
+
+I fetched https://www.cdu.edu.au/study/accounting directly to confirm. The page has marketing copy ("Choose CDU for accounting courses", "Why study an accounting degree", career outcomes) and a `[Jump to courses]` button anchoring to `#js-automated-course-list-66390`. The course list itself is dynamically rendered into that element — it's not in the static HTML, so discover never sees links to the actual course detail pages (Bachelor of Accounting, Master of Professional Accounting, etc.).
+
+This is why every page got classified as `detail (course content present, only 1 outbound links)`. The classifier sees marketing copy mentioning courses and decides it's a course page, but there are no outbound course links because they haven't been rendered yet.
+
+**Fix options:**
+1. Render `/study/{area}` pages via headless browser during discover (not just per-course) so the JS-injected course list is visible. This is what's needed for CDU.
+2. Find the underlying API/JSON endpoint that populates `js-automated-course-list-*` and hit it directly. Faster but requires reverse-engineering.
+3. CDU also has a course catalogue at https://stapps.cdu.edu.au/f?p=100:30:0 (linked in the footer) which may be more scrapeable — worth checking as a backup seed.
+
+Also the classifier heuristic "course content present, only 1 outbound links" is too weak for CDU — every category page tripped it. Better positive signals for `detail` classification: presence of CRICOS code on the page, explicit fee/duration figures, or specific URL patterns like a course code or `bachelor-of-`/`master-of-` slug. Pages with `Jump to courses` buttons are by definition not detail pages.
+
+---
+
+**Bug 2: hallucinated PTE/TOEFL/CAE via sibling-cache backfill (same as ACU)**
+
+Log shows it again on category overview pages that don't even have real data:
+```
+[per-course vision img 2/3 (cache hits 1)] https://www.cdu.edu.au/study/accounting — IELTS=6.5 PTE=64.0 TOEFL=80.0 CAE=176.0
+[per-course vision img 4/6 (cache hits 1)] https://www.cdu.edu.au/study/arts — IELTS=6.5 PTE=65.0 TOEFL=80.0 CAE=176.0
+[per-course vision img 2/6] https://www.cdu.edu.au/study/business — IELTS=7.0 PTE=73.0 TOEFL=104.0 CAE=185.0
+```
+And the sibling-cache log line at the end:
+```
+[EXTRACT] [sibling cache ↻ backfill unknown] 34 slot(s) filled across siblings
+```
+Same issue as ACU — institution-wide English-test policy values getting backfilled across unrelated pages. Per the ACU instruction: only show PTE/TOEFL/CAE/DET when explicitly extracted from the course page itself; never backfill these from siblings. This needs to be a global fix across all unis.
+
+---
+
+**Bug 3: `fetch_failed` on `/study/redirect/bachelor-arts-...` URLs**
+
+Two cases in the log:
+```
+[BROWSER↑] HTTP blocked for https://www.cdu.edu.au/study/redirect/bachelor-arts-communications-and — retrying via browser
+[BROWSER↑] HTTP blocked for https://www.cdu.edu.au/study/redirect/bachelor-arts-creative-and-digit — retrying via browser
+[STAGE] skipped See course structure: fetch_failed
+[STAGE] skipped See course structure: fetch_failed
+```
+These are the only actual course-link candidates discover found (via `/study/communications-and-design`'s 3-link listing classification). `/study/redirect/*` URLs do an auth/handbook redirect that the HTTP fetcher and browser both fail on. Same family as the auth.acu.edu.au redirect issue from the ACU report. Worth following the redirect target if possible, or filtering `/redirect/` URLs at discover and substituting the canonical handbook URL.
+
+Note the URLs are also truncated (`bachelor-arts-communications-and`, `bachelor-arts-creative-and-digit`) — looks like discover is cutting slugs at some character limit. Worth checking.
+
+---
+
+**Bug 4: `12.0 year` duration extracted somewhere**
+
+Data quality warning:
+```
+[DATA QUALITY][WARN] suspicious_duration × 1: Duration 12.0 year(s) is outside the expected range (0 < duration ≤ 10.0).
+```
+This is the same regex bug family as the AIT `ICT50220` 15-year case and the ACU `Master of Psychology (Clinical)` 10-year case. Some number near a unit-less context is being treated as years. The fix is the same one I've flagged before: tighten the regex to require an explicit time unit (year/month/week/semester) within ~20 chars of the number, and reject values >10 unless explicitly multi-year-research-degree-coded.
+
+---
+
+**Bug 5: central international-fee page parsed → 0 records**
+
+```
+[CENTRAL] auto-discovered fee page: https://www.cdu.edu.au/international/how-apply/international-fees-payments
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.cdu.edu.au/international/how-apply/international-fees-payments
+```
+Likely the same issue as the ASA fees page — actual fees are in a linked PDF or in a JS-rendered table on this page rather than static HTML. Worth following PDF links from this page if any exist, and rendering via browser if static parse comes up empty.
+
+---
+
+**Summary**
+
+- **Bug 1** is the blocker. Until discover can see the JS-rendered course list, no actual CDU course pages will be reached.
+- **Bugs 2 and 4** are duplicates of issues already flagged in ACU/AIT reports and need global fixes.
+- **Bugs 3 and 5** are CDU-specific but smaller scope.
+
+Fix order: Bug 1 (browser-render during discover for CDU, or find the course-list API endpoint), then Bug 5 (PDF following on central fee page), then verify Bugs 2 and 4 once a real course page actually gets through the pipeline.

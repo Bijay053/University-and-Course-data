@@ -1,0 +1,543 @@
+Subject: Priority — Gemini cost optimisation (skip wasted calls + quota protection + cost reporting)
+Gemini API spending is currently uncontrolled. Run logs show three categories of waste:
+
+Calling Gemini when regex/CSS extractors already have all the data. UniSQ field summaries consistently show regex extracting fee, IELTS, duration, intake, and study mode at high confidence — then Gemini runs anyway and returns mostly nulls or duplicate values. Pure waste.
+No quota protection. When Gemini quota exhausts mid-batch (this has happened multiple times in the last week), every subsequent call fails silently with (likely quota exhausted) and the scrape continues producing degraded data. No circuit breaker, no backoff, no escalation.
+No cost visibility. We have per-call costs in run logs but no aggregate reporting. Can't answer "which university costs most to scrape" or "did this week cost more than last week."
+
+This priority addresses all three with a single coordinated change. Estimated 1 day.
+Component 1: Skip Gemini when extractors already have the data
+The current orchestrator calls Gemini on every course unconditionally. Add a "completeness check" that runs before the Gemini call: if regex/CSS extractors have already populated all the high-priority fields with sufficient confidence, skip Gemini entirely.
+python# backend-py/app/services/scraper/gemini_gate.py
+
+# Fields Gemini is most useful for. If all of these are already populated
+# with high confidence by other extractors, Gemini adds little.
+GEMINI_HIGH_VALUE_FIELDS = {
+    "international_fee",
+    "ielts_overall",
+    "duration_value",
+    "intake_months",
+    "course_name",
+    "study_mode",
+    "category",  # Gemini IS good at this — but only if everything else is missing
+}
+
+# Fields that Gemini is uniquely good at extracting. Even if the others
+# are populated, run Gemini for these.
+GEMINI_UNIQUE_FIELDS = {
+    "category",        # taxonomy classification
+    "sub_category",    # taxonomy classification
+    "description",     # narrative summarization (sometimes)
+}
+
+CONFIDENCE_THRESHOLD = 0.70  # only count fields that pass this bar
+
+
+def should_skip_gemini_primary(payload: CoursePayload, 
+                                evidence_so_far: dict) -> tuple[bool, str]:
+    """Decide whether to call Gemini's primary text extraction for a course.
+    
+    Returns (should_skip, reason). Reasons:
+    - 'all_high_value_fields_populated': skip — regex/CSS got everything
+    - 'classification_only': run, but with classification-only prompt (cheaper)
+    - 'full_extraction_needed': run with full prompt (most expensive)
+    """
+    populated_high_value = {
+        field for field in GEMINI_HIGH_VALUE_FIELDS
+        if (payload.get(field) is not None
+            and evidence_so_far.get(field, {}).get("confidence", 0) >= CONFIDENCE_THRESHOLD)
+    }
+    
+    coverage = len(populated_high_value) / len(GEMINI_HIGH_VALUE_FIELDS)
+    
+    # If 90%+ of high-value fields are populated by other extractors,
+    # only run Gemini if classification (category/sub_category) is missing.
+    if coverage >= 0.90:
+        if not payload.get("category") or not payload.get("sub_category"):
+            return False, "classification_only"  # run with cheaper prompt
+        return True, "all_high_value_fields_populated"
+    
+    return False, "full_extraction_needed"
+
+
+def build_classification_only_prompt(course_name: str, page_text: str) -> str:
+    """Cheaper prompt that only asks for category and sub_category.
+    
+    Used when other fields are already populated. Saves both input tokens
+    (smaller prompt) and output tokens (smaller schema).
+    """
+    # Truncate page text aggressively — we only need enough to classify
+    page_snippet = page_text[:1500] if page_text else ""
+    
+    return f"""Given this course information, return ONLY the category and sub_category.
+
+Course name: {course_name}
+Page excerpt: {page_snippet}
+
+Respond with JSON containing only:
+{{
+  "category": "...",       // top-level field e.g. "Business & Management"
+  "sub_category": "..."   // specific area e.g. "Marketing"
+}}
+"""
+Wire this into the orchestrator before the existing Gemini call:
+python# In backend-py/app/services/scraper/single_course.py (or wherever Gemini is called)
+
+skip, reason = should_skip_gemini_primary(payload, evidence)
+
+if reason == "all_high_value_fields_populated":
+    log.info(f"[GEMINI SKIP] {course_url} — all fields populated by extractors")
+    metrics.gemini_calls_skipped += 1
+    # Do NOT call Gemini. Move on.
+elif reason == "classification_only":
+    log.info(f"[GEMINI CHEAP] {course_url} — classification-only prompt")
+    response = await call_gemini_with_prompt(
+        build_classification_only_prompt(payload.course_name, page_text),
+        max_output_tokens=80,  # ~75% smaller than full schema
+    )
+    metrics.gemini_calls_classification_only += 1
+elif reason == "full_extraction_needed":
+    response = await call_gemini_with_full_prompt(...)  # existing logic
+    metrics.gemini_calls_full += 1
+Expected impact:
+
+UniSQ-style universities (static-HTML-rich): ~70% of Gemini calls become "skip" or "classification only" → ~60-65% Gemini cost reduction for those universities
+ASAHE/VIT-style universities (image-heavy, less regex-friendly): no change — full extraction still runs
+Across the full 80-uni dataset: estimated 30-40% Gemini text-extraction cost reduction
+
+Component 2: Quota wrapper with circuit breaker
+Wrap all Gemini calls in a quota-aware client that tracks failures and short-circuits when quota is clearly exhausted, instead of letting every subsequent call hit the API and fail.
+python# backend-py/app/services/scraper/gemini_client.py
+
+from datetime import datetime, timedelta
+from collections import deque
+import asyncio
+
+class GeminiQuotaTracker:
+    """Tracks recent failures and trips a circuit breaker when quota
+    is likely exhausted. Persists state across requests in the same process.
+    """
+    
+    def __init__(self):
+        self.recent_failures = deque(maxlen=20)
+        self.circuit_open_until: datetime | None = None
+        self.failure_threshold = 5         # 5 failures within window
+        self.window_seconds = 60            # 60-second window
+        self.cool_down_seconds = 300        # circuit stays open for 5 min after trip
+    
+    def record_failure(self, error_code: int | None, error_message: str):
+        """Record a Gemini API failure. May trip the circuit breaker."""
+        now = datetime.now()
+        is_quota_error = self._looks_like_quota(error_code, error_message)
+        
+        if is_quota_error:
+            self.recent_failures.append(now)
+            recent_window = [t for t in self.recent_failures 
+                            if (now - t).total_seconds() < self.window_seconds]
+            
+            if len(recent_window) >= self.failure_threshold:
+                self.circuit_open_until = now + timedelta(seconds=self.cool_down_seconds)
+                log.warning(f"[GEMINI CIRCUIT OPEN] {len(recent_window)} quota errors "
+                           f"in {self.window_seconds}s — pausing calls until "
+                           f"{self.circuit_open_until.isoformat()}")
+    
+    def is_circuit_open(self) -> bool:
+        if not self.circuit_open_until:
+            return False
+        if datetime.now() >= self.circuit_open_until:
+            log.info("[GEMINI CIRCUIT CLOSED] cool-down complete")
+            self.circuit_open_until = None
+            self.recent_failures.clear()
+            return False
+        return True
+    
+    def time_until_circuit_close(self) -> float:
+        if not self.circuit_open_until:
+            return 0
+        return max(0, (self.circuit_open_until - datetime.now()).total_seconds())
+    
+    def _looks_like_quota(self, error_code: int | None, message: str) -> bool:
+        if error_code in (429, 503):
+            return True
+        if message and any(kw in message.lower() for kw in [
+            "quota", "rate limit", "exhausted", "exceeded", "resource_exhausted"
+        ]):
+            return True
+        return False
+
+
+# Singleton — shared across the process
+_quota_tracker = GeminiQuotaTracker()
+
+
+async def call_gemini_safe(*args, **kwargs):
+    """Wrapper around Gemini API client. Honors circuit breaker.
+    
+    Returns None if circuit is open or call fails (existing callers should
+    already handle None responses gracefully).
+    """
+    if _quota_tracker.is_circuit_open():
+        wait_time = _quota_tracker.time_until_circuit_close()
+        log.info(f"[GEMINI SKIP-CIRCUIT] circuit open for {wait_time:.0f}s more")
+        return None
+    
+    try:
+        response = await actual_gemini_call(*args, **kwargs)
+        return response
+    except QuotaExceededError as e:
+        _quota_tracker.record_failure(429, str(e))
+        return None
+    except Exception as e:
+        _quota_tracker.record_failure(getattr(e, "code", None), str(e))
+        # Don't raise — caller already handles None
+        return None
+When circuit is open, the orchestrator continues processing courses but skips Gemini entirely. Other extractors (regex, CSS, vision) keep working. Stagings produced during circuit-open periods get tagged with a degraded-quality flag for later re-scrape.
+Component 3: Cost ceiling per scrape job
+Hard cap on how much a single scrape job can spend. If hit, the job pauses and emits an alert.
+python# backend-py/app/services/scraper/cost_ceiling.py
+
+# Per-university per-job budgets (USD). Adjust based on observed costs.
+DEFAULT_PER_JOB_BUDGET_USD = 1.00
+LARGE_UNI_BUDGETS = {
+    # Universities known to have many courses
+    "unisq": 2.00,
+    "rmit": 3.00,
+    "uts": 2.50,
+    "monash": 3.00,
+    "uq": 2.50,
+}
+
+
+class JobCostMonitor:
+    """Tracks Gemini spend for a scrape job. Aborts if budget is exceeded."""
+    
+    def __init__(self, scrape_run_id: int, university_code: str, budget_usd: float):
+        self.scrape_run_id = scrape_run_id
+        self.university_code = university_code
+        self.budget_usd = budget_usd
+        self.spent_usd = 0.0
+        self.aborted = False
+    
+    def record_call(self, cost_usd: float):
+        self.spent_usd += cost_usd
+        if self.spent_usd >= self.budget_usd:
+            self.aborted = True
+            log.error(f"[COST CEILING] {self.university_code} run {self.scrape_run_id} "
+                     f"exceeded budget: ${self.spent_usd:.4f} >= ${self.budget_usd:.2f}")
+            # Emit critical alert
+            asyncio.create_task(self._emit_alert())
+    
+    def can_continue(self) -> bool:
+        return not self.aborted
+    
+    async def _emit_alert(self):
+        # Reuse the alert system from Priority 5 if it exists, otherwise 
+        # log + email
+        ...
+
+
+def get_budget_for_university(university_code: str) -> float:
+    return LARGE_UNI_BUDGETS.get(university_code.lower(), DEFAULT_PER_JOB_BUDGET_USD)
+Wire into the orchestrator:
+python# At job start
+cost_monitor = JobCostMonitor(
+    scrape_run_id=run.id,
+    university_code=university.code,
+    budget_usd=get_budget_for_university(university.code),
+)
+
+# Before every Gemini call
+if not cost_monitor.can_continue():
+    log.warning(f"[COST CEILING SKIP] {course_url} — budget exhausted")
+    return  # skip this course's Gemini call
+
+# After every Gemini call
+response = await call_gemini_safe(...)
+if response and response.cost_usd:
+    cost_monitor.record_call(response.cost_usd)
+Ceiling-stopped runs should be marked in scrape_runtime_jobs:
+sqlALTER TABLE scrape_runtime_jobs 
+    ADD COLUMN cost_ceiling_hit BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN total_gemini_cost_usd NUMERIC(10,6) NOT NULL DEFAULT 0;
+Future scrapes can pick up where ceiling-stopped runs left off if needed (separate priority — this just tracks the state).
+Component 4: Cost tracking and reporting
+Add per-call cost recording to a new table:
+sqlCREATE TABLE gemini_call_log (
+    id BIGSERIAL PRIMARY KEY,
+    scrape_run_id BIGINT REFERENCES scrape_runtime_jobs(id),
+    university_id INT NOT NULL,
+    course_url TEXT,
+    call_type VARCHAR(32) NOT NULL,  -- 'primary_full', 'classification_only', 'vision', 'ai_fallback'
+    model VARCHAR(64) NOT NULL,
+    input_tokens INT NOT NULL,
+    output_tokens INT NOT NULL,
+    cost_usd NUMERIC(10,6) NOT NULL,
+    duration_ms INT,
+    success BOOLEAN NOT NULL,
+    error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_gemini_log_run ON gemini_call_log(scrape_run_id);
+CREATE INDEX idx_gemini_log_uni_date ON gemini_call_log(university_id, created_at);
+CREATE INDEX idx_gemini_log_call_type ON gemini_call_log(call_type, created_at);
+Log every Gemini call:
+pythonasync def call_gemini_safe(*args, call_type: str = "primary_full", 
+                            scrape_run_id: int | None = None,
+                            university_id: int | None = None,
+                            course_url: str | None = None,
+                            **kwargs):
+    started_at = datetime.now()
+    response = None
+    error_message = None
+    success = False
+    
+    try:
+        response = await actual_gemini_call(*args, **kwargs)
+        success = True
+        return response
+    except Exception as e:
+        error_message = str(e)
+        _quota_tracker.record_failure(getattr(e, "code", None), str(e))
+        return None
+    finally:
+        duration_ms = int((datetime.now() - started_at).total_seconds() * 1000)
+        await session.execute(insert(GeminiCallLog).values(
+            scrape_run_id=scrape_run_id,
+            university_id=university_id,
+            course_url=course_url,
+            call_type=call_type,
+            model=response.model if response else "unknown",
+            input_tokens=response.usage.input_tokens if response else 0,
+            output_tokens=response.usage.output_tokens if response else 0,
+            cost_usd=response.cost_usd if response else 0,
+            duration_ms=duration_ms,
+            success=success,
+            error_message=error_message,
+        ))
+Reporting SQL views:
+sql-- Per-university cost over time
+CREATE VIEW v_gemini_cost_by_university AS
+SELECT 
+    u.code,
+    u.name,
+    DATE_TRUNC('day', g.created_at) AS day,
+    COUNT(*) AS total_calls,
+    COUNT(*) FILTER (WHERE g.success = true) AS successful_calls,
+    SUM(g.cost_usd) AS daily_cost_usd,
+    AVG(g.cost_usd) AS avg_cost_per_call,
+    AVG(g.input_tokens) AS avg_input_tokens
+FROM gemini_call_log g
+JOIN universities u ON u.id = g.university_id
+GROUP BY u.code, u.name, DATE_TRUNC('day', g.created_at);
+
+-- Per-call-type cost breakdown
+CREATE VIEW v_gemini_cost_by_call_type AS
+SELECT 
+    call_type,
+    DATE_TRUNC('day', created_at) AS day,
+    COUNT(*) AS calls,
+    SUM(cost_usd) AS total_cost_usd,
+    AVG(input_tokens) AS avg_input_tokens,
+    AVG(output_tokens) AS avg_output_tokens
+FROM gemini_call_log
+WHERE success = true
+GROUP BY call_type, DATE_TRUNC('day', created_at);
+
+-- Top 10 most expensive universities (last 30 days)
+CREATE VIEW v_gemini_top_spenders_30d AS
+SELECT 
+    u.code,
+    u.name,
+    COUNT(*) AS total_calls,
+    SUM(g.cost_usd) AS total_cost_usd,
+    SUM(g.cost_usd) / COUNT(*) AS avg_cost_per_call,
+    SUM(g.cost_usd) / NULLIF(COUNT(DISTINCT g.scrape_run_id), 0) AS avg_cost_per_scrape
+FROM gemini_call_log g
+JOIN universities u ON u.id = g.university_id
+WHERE g.created_at > NOW() - INTERVAL '30 days'
+GROUP BY u.code, u.name
+ORDER BY total_cost_usd DESC
+LIMIT 10;
+
+-- Skip rate — what % of courses had Gemini skipped?
+CREATE VIEW v_gemini_skip_efficiency AS
+SELECT 
+    DATE_TRUNC('day', sj.completed_at) AS day,
+    COUNT(DISTINCT sc.id) AS total_courses,
+    COUNT(DISTINCT g.course_url) AS courses_called_gemini,
+    COUNT(DISTINCT sc.id) - COUNT(DISTINCT g.course_url) AS courses_skipped_gemini,
+    (COUNT(DISTINCT sc.id) - COUNT(DISTINCT g.course_url))::float 
+        / NULLIF(COUNT(DISTINCT sc.id), 0) AS skip_rate
+FROM scrape_runtime_jobs sj
+JOIN scraped_courses sc ON sc.scrape_run_id = sj.id
+LEFT JOIN gemini_call_log g ON g.scrape_run_id = sj.id 
+    AND g.call_type IN ('primary_full', 'classification_only')
+WHERE sj.status = 'completed'
+GROUP BY DATE_TRUNC('day', sj.completed_at);
+Component 5: Model selection check
+Before deploying, confirm what model is being used and whether it's optimal:
+python# backend-py/scripts/check_gemini_model.py
+
+# Run this once to see what's currently configured
+from app.services.scraper.gemini_client import GEMINI_MODEL_NAME
+print(f"Current model: {GEMINI_MODEL_NAME}")
+
+# Recommendations:
+# - If using gemini-2.0-flash: keep it. Best price/perf for our use case.
+# - If using gemini-2.5-pro or any "pro" variant: switch to gemini-2.0-flash 
+#   for primary text extraction. Pro is overkill for structured field extraction.
+# - For vision: gemini-2.0-flash works fine. No need for vision-specific model.
+# - For AI fallback (last-resort field filling): gemini-2.0-flash is fine, 
+#   but consider gemini-2.0-flash-lite if it ships and is cheaper.
+If the current model is already gemini-2.0-flash, no change needed — it's already the cost-optimal choice for this use case. If something more expensive is in use, switch to gemini-2.0-flash for primary text and vision.
+Component 6: Tests
+python# backend-py/tests/test_gemini_gate.py
+
+def test_skip_when_all_fields_populated():
+    payload = MockCoursePayload(
+        international_fee=29400, ielts_overall=6.5, duration_value=3,
+        intake_months=["Feb", "Jun"], course_name="Bachelor of Arts",
+        study_mode="On Campus", category="Arts & Humanities",
+        sub_category="Liberal Arts",
+    )
+    evidence = {f: {"confidence": 0.85} for f in payload.dict() if payload.get(f)}
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+    assert skip is True
+    assert reason == "all_high_value_fields_populated"
+
+
+def test_classification_only_when_only_category_missing():
+    payload = MockCoursePayload(
+        international_fee=29400, ielts_overall=6.5, duration_value=3,
+        intake_months=["Feb"], course_name="Bachelor of Arts",
+        study_mode="On Campus",
+        # category and sub_category missing
+    )
+    evidence = {f: {"confidence": 0.85} for f in payload.dict() if payload.get(f)}
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+    assert skip is False
+    assert reason == "classification_only"
+
+
+def test_full_extraction_when_fields_missing():
+    payload = MockCoursePayload(
+        course_name="Bachelor of Arts",
+        # everything else missing
+    )
+    evidence = {"course_name": {"confidence": 0.90}}
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+    assert skip is False
+    assert reason == "full_extraction_needed"
+
+
+def test_low_confidence_doesnt_count_as_populated():
+    payload = MockCoursePayload(
+        international_fee=29400, ielts_overall=6.5, duration_value=3,
+        intake_months=["Feb"], course_name="Bachelor of Arts",
+        study_mode="On Campus",
+    )
+    # All fields populated but with LOW confidence
+    evidence = {f: {"confidence": 0.40} for f in payload.dict() if payload.get(f)}
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+    # Should run full extraction because evidence is too weak
+    assert skip is False
+    assert reason == "full_extraction_needed"
+
+
+# tests/test_quota_tracker.py
+
+def test_circuit_opens_after_threshold():
+    tracker = GeminiQuotaTracker()
+    for _ in range(5):
+        tracker.record_failure(429, "Quota exceeded")
+    assert tracker.is_circuit_open() is True
+
+
+def test_circuit_only_counts_quota_errors():
+    tracker = GeminiQuotaTracker()
+    for _ in range(5):
+        tracker.record_failure(500, "Internal server error")  # not quota
+    assert tracker.is_circuit_open() is False  # 500 errors don't trip circuit
+
+
+def test_circuit_resets_after_cooldown():
+    tracker = GeminiQuotaTracker()
+    tracker.cool_down_seconds = 0.1  # short for test
+    for _ in range(5):
+        tracker.record_failure(429, "Quota exceeded")
+    assert tracker.is_circuit_open() is True
+    time.sleep(0.15)
+    assert tracker.is_circuit_open() is False  # cool-down expired
+
+
+# tests/test_cost_ceiling.py
+
+def test_ceiling_blocks_after_budget_exceeded():
+    monitor = JobCostMonitor(scrape_run_id=1, university_code="test", budget_usd=0.05)
+    monitor.record_call(0.04)
+    assert monitor.can_continue() is True
+    monitor.record_call(0.02)
+    assert monitor.can_continue() is False
+Verification after deployment
+Step 1: Re-scrape UniSQ (static-HTML-rich university). Compare cost before/after:
+sql-- Cost comparison: previous run vs latest run
+WITH runs AS (
+    SELECT id, completed_at, total_gemini_cost_usd
+    FROM scrape_runtime_jobs
+    WHERE university_id = 1 AND status = 'completed'
+    ORDER BY completed_at DESC LIMIT 2
+)
+SELECT * FROM runs;
+Expected: latest run cost should be ~30-50% lower than previous run.
+Step 2: Confirm skips are happening:
+sqlSELECT 
+    call_type, 
+    COUNT(*) AS calls,
+    AVG(input_tokens) AS avg_input
+FROM gemini_call_log
+WHERE scrape_run_id = (SELECT MAX(id) FROM scrape_runtime_jobs WHERE university_id = 1)
+GROUP BY call_type;
+Expected: rows for primary_full, classification_only, and a low total count vs total courses staged. Should see "classification_only" calls with much smaller avg_input than primary_full.
+Step 3: Confirm circuit breaker works. Trigger by sending a barrage of bad calls in test environment:
+python# Manual test
+for _ in range(10):
+    await call_gemini_safe(invalid_args=True)  # forces failures
+
+# Now confirm a real call gets short-circuited
+response = await call_gemini_safe(real_args)
+assert response is None  # circuit open
+Step 4: Confirm cost ceiling triggers. Use a test budget of $0.001 to force trip:
+pythonmonitor = JobCostMonitor(run_id=test_run.id, university_code="test", budget_usd=0.001)
+# After 1-2 normal calls, monitor should report aborted=True
+assert monitor.aborted is True
+Step 5: Run the cost report views:
+sqlSELECT * FROM v_gemini_top_spenders_30d;
+SELECT * FROM v_gemini_skip_efficiency ORDER BY day DESC LIMIT 7;
+SELECT * FROM v_gemini_cost_by_call_type WHERE day > NOW() - INTERVAL '7 days';
+Expected: data populates, top spenders are universities with bad page structure (lots of full extractions), skip rate trending up over time as more universities get static-HTML-rich.
+Out of scope for this priority
+
+Decorative-image filter for vision OCR: separate priority (vision hallucination fix, sibling cache, etc.). Important but not bundled here to keep this PR focused.
+Boilerplate stripping before Gemini text calls: separate small follow-up. The skip logic captures most of the savings; stripping is icing.
+Switching to streaming responses to reduce latency: not a cost win, separate concern.
+Smart caching across scrape runs (re-use last week's data if page hasn't changed): bigger architecture change, separate priority if needed.
+
+Risk considerations
+
+Skip logic could miss edge cases: a university where regex extracts wrong values at high confidence would now never get Gemini's correction. Mitigation: the confidence threshold (0.70) is relatively high, and fall-through still happens for mis-classified courses. Monitor skip rate vs data quality alerts (Priority 5) for the first week post-deploy.
+Circuit breaker too aggressive: if Gemini has transient errors that aren't quota-related, the circuit could trip unnecessarily. Mitigation: only trips on errors matching quota patterns (429, 503, "exhausted", "rate limit"). Other errors don't count.
+Cost ceiling might block legitimate large universities: budgets are set per-university with LARGE_UNI_BUDGETS. If a uni hits its budget legitimately, increase the budget for that uni rather than letting it abort silently. Alerts will surface this.
+
+Estimated effort
+About 1 day. Order of implementation:
+
+Component 5 (model check) — 15 min, do first to confirm baseline
+Component 4 (cost log table + recording) — 1.5 hours, ship first so all subsequent work is measurable
+Component 1 (skip logic) + tests — 2 hours, biggest savings
+Component 2 (circuit breaker) + tests — 1.5 hours
+Component 3 (cost ceiling) + tests — 1.5 hours
+SQL views + verification queries — 1 hour
+Re-run a known university to confirm savings — 30 min
+
+If you hit a blocker (e.g., the Gemini client is structured in a way that makes the call_gemini_safe wrapper hard to inject), flag before refactoring.
