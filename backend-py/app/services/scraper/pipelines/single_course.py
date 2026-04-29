@@ -113,10 +113,18 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
 # • ai_fallback — the fallback AI enriches against the course URL and page
 #   text, NOT the generic central english page.  A 6.5 it returns for a
 #   Master's course is course-specific; clearing it silently is wrong.
+# • uni_pdf:requirements — the configured requirements PDF is a university-
+#   level authoritative source for english entry standards.  Unlike the
+#   scraped central HTML page (which may mix UG/PG tiers), the PDF is
+#   typically a dedicated admissions document.  Its english values should
+#   survive the PG clear-out — clearing them silently loses the only
+#   reliable source for universities like ASAHE whose course pages publish
+#   entry requirements as images only (no parseable text).
 _PER_COURSE_VISION_METHODS: frozenset[str] = frozenset({
     "per_course_vision",
     "per_course_vision_cached",
     "ai_fallback",
+    "uni_pdf:requirements",
 })
 
 # Maximum allowable delta between a per-course vision OCR reading and the
