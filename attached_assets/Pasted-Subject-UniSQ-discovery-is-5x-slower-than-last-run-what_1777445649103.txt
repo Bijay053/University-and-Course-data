@@ -1,0 +1,29 @@
+Subject: UniSQ discovery is 5x slower than last run — what changed?
+The current UniSQ scrape (job in progress) is averaging ~25 seconds per discovery page. Last run averaged ~4-5 seconds per page. Discovery alone is going to take 5-7 minutes before extraction even starts.
+Can you check:
+
+Did anything change in the discovery layer between the last run and this one? Specifically: is Playwright/browser now being launched during discovery instead of just static fetch?
+What's the response time of a simple curl from the production VPS?
+
+   time curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" \
+     "https://www.unisq.edu.au/study/degrees-and-courses/arts-and-communication?studentType=international"
+If this comes back in under 2 seconds, the slowness is in our pipeline, not UniSQ. If it's 10+ seconds, UniSQ may be rate-limiting us.
+
+Is the worker doing other work concurrently? If multiple universities are scraping in parallel and they're sharing network/CPU, each one runs slower.
+
+Don't wait for the current run to finish — please kill it and run the curl test, then we can decide whether to debug pipeline code or back off the request rate.
+
+Now, more important context for you:
+Why this matters now
+Looking at the bigger picture: the scraper has been moving through fixes at a steady pace, but the data quality issues stack up faster than they're getting fixed. ASAHE has hallucinated CAE/DET. VIT has hallucinated IELTS from link.png. UniSQ is now slow on discovery. Each fix exposes new issues.
+This is partly normal for any complex pipeline being debugged in production, but it's also a signal worth heeding: the scraper is running on more universities than it can reliably handle right now. Trying to do all 80 in one run is going to surface problems faster than fixes can land.
+A more defensive approach for the next week or two:
+1. Run one university at a time, verify, then move on. ASAHE's data still has wrong values (CAE 176 for Masters, phantom DET=100). Until that's clean, running UniSQ adds another 165 courses worth of unverified rows to the review queue. Fix universities sequentially, not in parallel.
+2. Use the review queue ruthlessly. Don't approve anything to production until both:
+
+The evidence panel matches the staging table
+The values match what's actually on the source page (manually spot-check 2-3 courses per university)
+
+3. Treat the data quality issues as the bottleneck, not scrape speed. A 3-minute UniSQ run that produces correct data is more valuable than a 25-minute run that produces wrong data. Speed will follow correctness — it's not the other way around.
+4. The image hallucination problem will hit every university with logo/icon images. It's not unique to ASAHE or VIT. Until vision OCR has the decorative-image filter and the OCR-text-validation gate, every university you scrape risks adding hallucinated English scores to your data. That fix should ship before you proceed with bulk scraping.
+You've made real progress — the architecture is solid, the fixes are landing, evidence rows are mostly correct. But the system isn't ready for "scrape all 80 universities" yet. It's ready for "scrape and verify one at a time, fixing patterns as they emerge."
