@@ -1,0 +1,135 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Apr 29 04:21:39 UTC 2026
+
+  System load:           0.72
+  Usage of /:            3.5% of 231.44GB
+  Memory usage:          19%
+  Swap usage:            0%
+  Processes:             199
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Wed Apr 29 03:55:37 2026 from 162.243.190.66
+root@university-and-course-data:~# grep -i "gemini\|warn\|fail" /var/log/celery-worker.log | tail -30
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+[2026-04-29 03:58:34,298: ERROR/ForkPoolWorker-1] Task failed id=job_b5c13ea9c2af: [Errno -3] Temporary failure in name resolution
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+[2026-04-29 03:58:34,313: INFO/ForkPoolWorker-1] Task scrape.university[47dd0610-1953-458f-a62b-97aca127d929] succeeded in 0.02868392295204103s: {'ok': False, 'id': 'job_b5c13ea9c2af', 'error': '[Errno -3] Temporary failure in name resolution'}
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+[2026-04-29 04:05:02,997: ERROR/ForkPoolWorker-1] Task failed id=job_cbe62fcdf474: [Errno -3] Temporary failure in name resolution
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+[2026-04-29 04:05:03,012: INFO/ForkPoolWorker-1] Task scrape.university[72c6815c-300f-404b-ba89-3dc7ff6d82bc] succeeded in 0.028770255972631276s: {'ok': False, 'id': 'job_cbe62fcdf474', 'error': '[Errno -3] Temporary failure in name resolution'}
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git pull
+
+source backend-py/venv/bin/activate
+pkill -9 -f "celery.*worker"
+sleep 3
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+echo "PID: $!"
+remote: Enumerating objects: 35, done.
+remote: Counting objects: 100% (35/35), done.
+remote: Compressing objects: 100% (24/24), done.
+remote: Total 24 (delta 21), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (24/24), 2.91 KiB | 270.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   deff4b8..4b0497c  main       -> origin/main
+Updating deff4b8..4b0497c
+Fast-forward
+ backend-py/app/services/scraper/extractors/gemini_primary.py | 6 +++---
+ backend-py/app/services/scraper/pipelines/single_course.py   | 7 ++++++-
+ backend-py/pyproject.toml                                    | 2 +-
+ backend-py/requirements.txt                                  | 2 +-
+ 4 files changed, 11 insertions(+), 6 deletions(-)
+[1] 1180935
+PID: 1180935
+(venv) root@university-and-course-data:~/University-and-Course-data# # Test if googleapis.com resolves
+nslookup generativelanguage.googleapis.com
+
+# Also test basic connectivity
+curl -s --max-time 5 https://generativelanguage.googleapis.com/ && echo "OK" || echo "FAILED"
+Server:         127.0.0.53
+Address:        127.0.0.53#53
+
+Non-authoritative answer:
+Name:   generativelanguage.googleapis.com
+Address: 216.239.34.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.36.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.32.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.38.223
+Name:   generativelanguage.googleapis.com
+Address: 2404:6800:4009:801::200a
+Name:   generativelanguage.googleapis.com
+Address: 2404:6800:4009:80d::200a
+Name:   generativelanguage.googleapis.com
+Address: 2404:6800:4009:80e::200a
+Name:   generativelanguage.googleapis.com
+Address: 2404:6800:4009:804::200a
+
+<!DOCTYPE html>
+<html lang=en>
+  <meta charset=utf-8>
+  <meta name=viewport content="initial-scale=1, minimum-scale=1, width=device-width">
+  <title>Error 404 (Not Found)!!1</title>
+  <style>
+    *{margin:0;padding:0}html,code{font:15px/22px arial,sans-serif}html{background:#fff;color:#222;padding:15px}body{margin:7% auto 0;max-width:390px;min-height:180px;padding:30px 0 15px}* > body{background:url(//www.google.com/images/errors/robot.png) 100% 5px no-repeat;padding-right:205px}p{margin:11px 0 22px;overflow:hidden}ins{color:#777;text-decoration:none}a img{border:0}@media screen and (max-width:772px){body{background:none;margin-top:0;max-width:none;padding-right:0}}#logo{background:url(//www.google.com/images/branding/googlelogo/1x/googlelogo_color_150x54dp.png) no-repeat;margin-left:-5px}@media only screen and (min-resolution:192dpi){#logo{background:url(//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png) no-repeat 0% 0%/100% 100%;-moz-border-image:url(//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png) 0}}@media only screen and (-webkit-min-device-pixel-ratio:2){#logo{background:url(//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png) no-repeat;-webkit-background-size:100% 100%}}#logo{display:inline-block;height:54px;width:150px}
+  </style>
+  <a href=//www.google.com/><span id=logo aria-label=Google></span></a>
+  <p><b>404.</b> <ins>That’s an error.</ins>
+  <p>The requested URL <code>/</code> was not found on this server.  <ins>That’s all we know.</ins>
+OK
+(venv) root@university-and-course-data:~/University-and-Course-data# # Get the IP first (run from a machine that has working DNS, like your local computer):
+nslookup generativelanguage.googleapis.com 8.8.8.8
+
+# Then on the production server, add it to /etc/hosts:
+echo "142.251.x.x generativelanguage.googleapis.com" >> /etc/hosts
+# (replace 142.251.x.x with the actual IP)
+Server:         8.8.8.8
+Address:        8.8.8.8#53
+
+Non-authoritative answer:
+Name:   generativelanguage.googleapis.com
+Address: 216.239.34.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.32.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.36.223
+Name:   generativelanguage.googleapis.com
+Address: 216.239.38.223
+Name:   generativelanguage.googleapis.com
+Address: 2001:4860:4802:36::223
+Name:   generativelanguage.googleapis.com
+Address: 2001:4860:4802:34::223
+Name:   generativelanguage.googleapis.com
+Address: 2001:4860:4802:38::223
+Name:   generativelanguage.googleapis.com
+Address: 2001:4860:4802:32::223
+
+(venv) root@university-and-course-data:~/University-and-Course-data# # Point to Google's public DNS
+echo "nameserver 8.8.8.8
+nameserver 8.8.4.4" > /etc/resolv.conf
+(venv) root@university-and-course-data:~/University-and-Course-data# 
