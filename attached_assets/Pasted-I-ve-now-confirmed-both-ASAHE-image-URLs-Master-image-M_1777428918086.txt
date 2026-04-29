@@ -1,0 +1,63 @@
+I've now confirmed both ASAHE image URLs:
+
+Master image: MaSTER.png — filename contains "master", current level-aware sort works
+Bachelor image: 696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png — filename is just a screenshot timestamp with NO level hint
+
+The current image detection in per_course_vision.py relies on _ENGLISH_IMG_PRIORITY_KEYWORDS (containing "english", "ielts", "master", "bachelor", etc.) plus the new level-aware sort matching degree_level against filename. Neither matches the Bachelor image. It will either be filtered out as non-candidate or scored too low to OCR before quota runs out.
+This explains the symptom we're seeing: Bachelors stuck on PDF values, no vision evidence rows for them. Vision OCR isn't being called for Bachelor courses because the Bachelor image isn't recognized as a candidate.
+Fix: detect English-section images by DOM structure, not filename
+Add a new function in per_course_vision.py that finds images inside any DOM container near a heading matching English (Language) Requirements? or Entry Requirements?:
+pythonENGLISH_SECTION_HEADING_RE = re.compile(
+    r"(English\s+(?:Language\s+)?Requirements?|Entry\s+Requirements?)",
+    re.IGNORECASE,
+)
+
+def _find_english_section_images(html: str, base_url: str) -> list[str]:
+    """
+    Find images inside a section whose heading matches English/Entry requirements.
+    Filename-agnostic — works regardless of how images are named.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    images = []
+    for text_node in soup.find_all(string=ENGLISH_SECTION_HEADING_RE):
+        # walk up to a reasonable container (section/article/div)
+        container = text_node.find_parent(["section", "article", "div"])
+        if not container:
+            continue
+        # then take any image within that container
+        for img in container.find_all("img"):
+            src = img.get("src")
+            if src:
+                full_url = urljoin(base_url, src)
+                if full_url not in images:
+                    images.append(full_url)
+    return images
+Use this BEFORE the existing keyword/dimension filters. Images found via this method get top priority — they're definitionally candidates because they're inside the English requirements section of the page.
+Validate OCR results contain English-test keywords
+For any image OCR'd, verify the resulting text contains at least one of IELTS|PTE|TOEFL|Cambridge|Duolingo. If not, discard the result and don't write evidence — it's likely a false positive (an image of something else inside the English section, like a logo or a "How to apply" diagram).
+pythondef _is_valid_english_ocr_result(ocr_text: str) -> bool:
+    if not ocr_text:
+        return False
+    return bool(re.search(
+        r"\b(IELTS|PTE|TOEFL|Cambridge|Duolingo)\b",
+        ocr_text,
+        re.IGNORECASE
+    ))
+Test cases for verification
+After deploying, please verify both image URLs are detected and OCR'd:
+python# In a quick test
+from app.services.scraper.per_course_vision import _find_english_section_images
+import httpx
+
+for url in [
+    "https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development",
+    "https://www.asahe.edu.au/courses/bachelor-of-business",
+]:
+    html = httpx.get(url).text
+    images = _find_english_section_images(html, url)
+    print(f"{url}\n  → {images}\n")
+Expected output for the Master URL: should include .../696d888d52876a0edc8b3450_MaSTER.png
+Expected output for the Bachelor URL: should include .../696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png
+If both URLs are found, run a full ASAHE re-scrape and verify per the SQL from my last message — Bachelors should now show method=per_course_vision, source_url ending in the Screenshot URL, and the phantom DET=100 should be gone (because the Bachelor image has no DET row).
+Side note: the Master image filename is "MaSTER.png" but its header says "Undergraduate Requirement"
+ASAHE has labeled their image headers wrong — both Bachelor and Master images claim to be "Undergraduate Requirement" but the values differ between them. The values themselves are correct per-level (Masters higher than Bachelors) so we trust the values, not the labels. This means the OCR output text will have "Undergraduate" in it for both levels — the level association comes from which page the image is embedded on, not from the image content. Don't try to use OCR'd header text to determine level.

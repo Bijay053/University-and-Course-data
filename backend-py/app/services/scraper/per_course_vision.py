@@ -29,6 +29,7 @@ from typing import Any, Awaitable, Callable, Final
 from urllib.parse import unquote, urljoin
 
 import httpx
+from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.services.ai import gemini_client
@@ -144,18 +145,105 @@ _VISION_PROMPT: Final = (
 )
 
 
+# Regex that matches English / Entry Requirements section headings.
+# Used by :func:`_find_english_section_images` to locate images that are
+# definitionally inside the requirements section — regardless of filename.
+ENGLISH_SECTION_HEADING_RE: Final = re.compile(
+    r"(?:English\s+(?:Language\s+)?Requirements?|Entry\s+Requirements?)",
+    re.IGNORECASE,
+)
+
+# At least one recognised English-test name must appear in the OCR output
+# for the result to be accepted. Guards against images inside the English
+# section that are actually diagrams, logos, or "How to apply" graphics —
+# Gemini may return text for them but none will mention IELTS/PTE/etc.
+_VALID_ENGLISH_OCR_RE: Final = re.compile(
+    r"\b(?:IELTS|PTE|TOEFL|Cambridge|Duolingo)\b",
+    re.IGNORECASE,
+)
+
+
+def _find_english_section_images(html: str, base_url: str) -> list[tuple[str, str]]:
+    """Find ``<img>`` tags inside a DOM section headed by English/Entry Requirements.
+
+    Filename-agnostic — works for images with opaque CDN names such as
+    ``Screenshot%202026-01-19%20104316.png`` (the ASAHE Bachelor image) that
+    contain no level or English-requirement hint in the URL.
+
+    Strategy: use BeautifulSoup to find every text node that matches
+    :data:`ENGLISH_SECTION_HEADING_RE`, walk up to the nearest block
+    container (``<section>``, ``<article>``, ``<div>``), then collect every
+    ``<img>`` inside that container.  Lazy-loading attributes
+    (``data-src`` / ``data-lazy-src`` / ``data-lazy`` / ``data-original``)
+    are tried in order when ``src`` is absent or a data-URI.
+
+    Returns ``[(absolute_url, alt_text)]`` deduplicated in DOM order.
+    The caller (:func:`_extract_img_candidates`) promotes these to tier-0
+    so they are processed before all other candidates.
+    """
+    seen: set[str] = set()
+    result: list[tuple[str, str]] = []
+    try:
+        soup = BeautifulSoup(html or "", "lxml")
+    except Exception:  # noqa: BLE001
+        return result
+
+    for text_node in soup.find_all(string=ENGLISH_SECTION_HEADING_RE):
+        container = text_node.find_parent(["section", "article", "div"])
+        if not container:
+            continue
+        for img in container.find_all("img"):
+            src: str = img.get("src") or ""
+            if not src or src.startswith("data:"):
+                for attr in ("data-src", "data-lazy-src", "data-lazy", "data-original"):
+                    src = img.get(attr) or ""
+                    if src and not src.startswith("data:"):
+                        break
+            if not src or src.startswith("data:"):
+                continue
+            try:
+                absolute = urljoin(base_url, src)
+            except Exception:  # noqa: BLE001
+                continue
+            if absolute in seen:
+                continue
+            seen.add(absolute)
+            alt: str = img.get("alt") or ""
+            result.append((absolute, alt))
+
+    return result
+
+
+def _is_valid_english_ocr_result(ocr_text: str) -> bool:
+    """Return ``True`` if OCR output contains at least one English-test keyword.
+
+    Discards false-positive OCR runs where Gemini reads a logo, diagram, or
+    "How to apply" graphic inside the English requirements section and returns
+    generic text that happens to match the score format patterns but contains
+    no IELTS / PTE / TOEFL / Cambridge / Duolingo mention.
+    """
+    return bool(ocr_text and _VALID_ENGLISH_OCR_RE.search(ocr_text))
+
+
 def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
     """Return ``[(absolute_url, alt_text)]`` for non-decorative ``<img>``.
 
-    Candidates are sorted so images whose URL contains English-requirement
-    keywords (``_ENGLISH_IMG_PRIORITY_KEYWORDS``) appear first — this lets
-    the early-stop loop in :func:`maybe_vision_refetch` trigger as soon as
-    the requirements table is found without burning Gemini calls on later
-    decorative images.
+    Three priority tiers (lower number = higher priority):
 
-    The raw HTML-order list is first built (up to 2× ``_MAX_IMAGES``), then
-    split into a high-priority and low-priority tier, and the final list is
-    capped at ``_MAX_IMAGES``.
+    * **Tier 0** — images found by :func:`_find_english_section_images` inside
+      a DOM section headed "English Requirements" / "Entry Requirements".
+      Filename-agnostic: even opaque CDN names like a screenshot timestamp
+      are included here if they live in the right section.
+    * **Tier 1** — images whose URL contains a keyword from
+      ``_ENGLISH_IMG_PRIORITY_KEYWORDS`` (``master``, ``bachelor``,
+      ``ielts``, ``requirement``, etc.).
+    * **Tier 2** — all other non-decorative images.
+
+    The early-stop loop in :func:`maybe_vision_refetch` fires as soon as
+    every overall slot is filled, so images processed later (tier 1/2) are
+    only OCR'd if the tier-0 image didn't satisfy all overalls.
+
+    The raw list is capped at ``_MAX_IMAGES`` after sorting.
 
     Lazy-loading support: modern sites use ``data-src`` / ``data-lazy-src``
     / ``data-lazy`` / ``data-original`` instead of ``src`` (Intersection
@@ -164,6 +252,13 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
     ``src`` first; if it is missing or a data-URI we fall back to the lazy
     attributes in ``_LAZY_SRC_RE`` order so the real image URL is found.
     """
+    # ── Tier 0: DOM-based English-section images ───────────────────────────
+    # Build a set of absolute URLs for these so we can de-duplicate them out
+    # of the regex scan below (they'd otherwise appear at tier 1 or 2 too).
+    tier0 = _find_english_section_images(html, base_url)
+    tier0_urls = {item[0] for item in tier0}
+
+    # ── Tiers 1 & 2: regex scan of raw <img> tags ─────────────────────────
     raw: list[tuple[str, str]] = []
     for tag in _IMG_TAG_RE.findall(html or ""):
         m_src = _SRC_RE.search(tag)
@@ -186,17 +281,23 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
             absolute = urljoin(base_url, src)
         except Exception:  # noqa: BLE001 — never fail the scrape on a bad src
             continue
+        # Skip images already captured as tier-0 English-section candidates.
+        if absolute in tier0_urls:
+            continue
         raw.append((absolute, alt))
         if len(raw) >= _MAX_IMAGES * 2:
             break
 
-    # Promote English-requirement images to the front.
+    # Promote English-requirement images to tier 1 (keyword in URL).
     def _priority(item: tuple[str, str]) -> int:
         url_lower = item[0].lower()
-        return 0 if any(kw in url_lower for kw in _ENGLISH_IMG_PRIORITY_KEYWORDS) else 1
+        return 1 if any(kw in url_lower for kw in _ENGLISH_IMG_PRIORITY_KEYWORDS) else 2
 
     raw.sort(key=_priority)
-    return raw[:_MAX_IMAGES]
+
+    # Combine: tier-0 first, then sorted tier-1/2, capped at _MAX_IMAGES.
+    combined = tier0 + raw
+    return combined[:_MAX_IMAGES]
 
 
 async def _download(url: str) -> bytes | None:
@@ -427,6 +528,23 @@ async def maybe_vision_refetch(
                         "[VISION FAIL] %s: Gemini skipped — %s "
                         "(likely quota exhausted)",
                         img_url, skip_reason,
+                    )
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    continue
+                # Validate that the OCR text contains at least one English-test
+                # keyword (IELTS, PTE, TOEFL, Cambridge, Duolingo). This guards
+                # against images that are inside the English requirements section
+                # of the page but are actually logos, diagrams, or "How to apply"
+                # graphics — Gemini returns text for them but none of it refers to
+                # a language test, so the result is useless and should be discarded
+                # before we attempt to parse scores from it.
+                if not _is_valid_english_ocr_result(resp.text):
+                    log.info(
+                        "[VISION SKIP OCR] %s: Gemini returned text but no "
+                        "IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — "
+                        "likely a non-requirements image (logo, diagram, etc.)",
+                        img_url,
                     )
                     if leader_future is not None:
                         leader_future.set_result({})

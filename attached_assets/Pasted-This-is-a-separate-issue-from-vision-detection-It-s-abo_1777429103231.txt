@@ -1,0 +1,83 @@
+This is a separate issue from vision detection. It's about data integrity in the review UI.What I'm seeingFor Master of Information Technology (Artificial Intelligence) in the most recent ASAHE scrape:Staging table (the row admins see when reviewing):
+
+IELTS = 6.5
+PTE = 58
+TOEFL = 85
+Evidence Review panel (clicked into the same course):
+
+ielts_overall = 6.0, method = uni_pdf:requirements, source URL = the Admissions Policy PDF
+pte_overall = 50.0, method = uni_pdf:requirements, source URL = the Admissions Policy PDF
+toefl_overall = 60.0, method = uni_pdf:requirements, source URL = the Admissions Policy PDF
+These do not match. Same scraped_courses row, same scrape job, two different sets of values displayed in two different parts of the UI.Why this is criticalThe review queue is the gate between scraped data and the production courses table. Admins approve or reject based on what they see. If the staging table shows one value and the evidence shows a different value, admins are approving values they cannot trace. The whole point of scraped_field_evidence is that every value on a course must be backed by a provable source.The architecture doc explicitly states (Section 8):
+enforce_source_evidence: Drops any field with no snippet + source URL proof. Prevents ghost values with no proof.
+Right now we have ghost values. The 6.5/58/85 displayed in the staging table has no matching evidence row that explains where those numbers came from.Where the values are coming fromI traced this from the run logs. The relevant line is:[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=5.5 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5Some kind of sibling-level cache ("postgraduate") is propagating values across Master courses without writing to scraped_field_evidence. The values it propagates appear to come from a vision OCR result on MaSTER.png (which legitimately shows 6.5/58/85), but only one course received the OCR — the cache then writes those values into the other Masters' scraped_courses columns directly, bypassing the evidence pipeline.Three possible root causes — please verify whichA. Sibling cache writes directly to scraped_courses without going through the evidence layer.
+If true: every cached value needs to also create a scraped_field_evidence row. Method should be something like sibling_cache:postgraduate with source_url pointing at the originating course's evidence URL (the actual MaSTER.png URL, since that's where the data ultimately came from). Same confidence score as the originating evidence, since the values are identical.B. New evidence rows were created but old PDF evidence rows were not removed.
+If true: when a new evidence row is selected for a field, all previous selected = true rows for that (scraped_course_id, field_key) should be set to selected = false. Right now the staging table might be reading from the columns (which got the new value) while the evidence query is showing all evidence rows including stale ones — and the PDF row is sorting first or marked selected.C. Two different scraped_courses rows for the same course exist and the UI is reading from different rows.
+The earlier log line Cleared 18 stale pending/rejected scraped_courses rows (>10m old) suggests there's some cleanup logic. If a previous scrape left rows behind and the new scrape created fresh ones, the staging table query and the evidence panel query might be hitting different rows.How to identify which one it isRun this query against the latest ASAHE scrape job:sql-- Show every scraped_courses row for one course, plus all evidence rows
+WITH target AS (
+  SELECT id, course_name, scrape_job_id,
+         ielts_overall, pte_overall, toefl_overall,
+         created_at, status
+  FROM scraped_courses
+  WHERE course_name ILIKE '%Master of Information Technology (Artificial Intelligence)%'
+  ORDER BY created_at DESC
+)
+SELECT 'COURSE_ROW' AS type, t.id::text AS row_id,
+       t.scrape_job_id AS job, t.status,
+       'ielts=' || COALESCE(t.ielts_overall::text,'NULL') ||
+       ' pte=' || COALESCE(t.pte_overall::text,'NULL') ||
+       ' toefl=' || COALESCE(t.toefl_overall::text,'NULL') AS values,
+       t.created_at::text AS info
+FROM target t
+UNION ALL
+SELECT 'EVIDENCE' AS type, sfe.id::text,
+       sfe.method,
+       sfe.field_key,
+       sfe.normalized_value,
+       sfe.selected::text || ' | ' || COALESCE(sfe.source_url, '(no url)')
+FROM scraped_field_evidence sfe
+WHERE sfe.scraped_course_id IN (SELECT id FROM target)
+  AND sfe.field_key IN ('ielts_overall','pte_overall','toefl_overall')
+ORDER BY type, info DESC;This shows:
+
+How many scraped_courses rows exist for this course (Cause C)
+What values are stored in their columns
+All evidence rows for the English fields, with which are selected and their source_url
+What I expect to see if the system is healthy:
+
+One COURSE_ROW with current values matching the staging table
+For each field, exactly one EVIDENCE row with selected=true whose normalized_value matches the column value
+All selected=false rows (if any) are historical/superseded
+What I expect to see if it's broken:
+
+Either multiple COURSE_ROWs (Cause C), or
+Column values don't match the selected evidence (Cause A or B), or
+Multiple selected=true rows for the same field (Cause B partial)
+Fix priorities once cause is identifiedIf Cause A (sibling cache bypasses evidence):
+
+In whatever function logs [sibling cache ↻ build postgraduate], add evidence row creation for every field copied from the source course. Method label sibling_cache:postgraduate, source_url = source course's selected evidence URL for that field, confidence = source evidence's confidence.
+Add enforce_source_evidence check to fire AFTER sibling cache propagation, not before. Any column value without a corresponding selected=true evidence row gets nulled.
+If Cause B (stale evidence not deselected):
+
+When writing a new selected evidence row for a (scraped_course_id, field_key), first UPDATE scraped_field_evidence SET selected = false WHERE scraped_course_id = ? AND field_key = ?. Then insert the new row with selected = true.
+The Evidence Review panel query needs WHERE selected = true to show only current evidence, OR show all evidence with the selected one highlighted.
+If Cause C (multiple scraped_courses rows):
+
+The "Cleared stale rows" cleanup needs to run BEFORE the scrape begins, not as a side effect later.
+The dedup key (university_id, course_website) should prevent duplicates being created in the first place — verify the unique constraint exists on the table and is being enforced.
+The Evidence Review query needs to join on the most recent scraped_courses row for the course, not the first one it finds.
+The "no DET row in image but DET=100 in data" problem fits the same patternBachelor courses show DET=100 from uni_pdf:requirements but the Bachelor image (which we want to be the authoritative source) has no DET row at all. Even after vision OCR succeeds for Bachelors, this PDF-sourced DET will linger unless we also ensure: when vision wins for the (course, field_key), all PDF-sourced rows for the same (course, field_key) are deselected, and any column value not backed by a selected=true evidence row is nulled.This is the same enforce_source_evidence guarantee — it should fire after every Phase B step, not just at initial scrape time. If a higher-authority source supersedes a lower one, the lower one's column writes need to be reverted too.What good looks like after fixRun the verification SQL from my previous message after the fix:sqlSELECT sc.course_name, sc.degree_level, sfe.field_key,
+       sfe.method, sfe.normalized_value, sfe.source_url
+FROM scraped_courses sc
+JOIN scraped_field_evidence sfe ON sfe.scraped_course_id = sc.id
+WHERE sc.scrape_job_id = '<NEW_JOB_ID>'
+  AND sfe.selected = true
+  AND sfe.field_key IN ('ielts_overall','pte_overall','toefl_overall',
+                        'cambridge_overall','duolingo_overall')
+ORDER BY sc.degree_level, sc.course_name, sfe.field_key;For every (course, field) combination:
+
+The value displayed in the staging table column equals normalized_value in the matching selected=true evidence row
+The source_url accurately identifies where that specific value came from (image URL, PDF URL, course page URL)
+There is exactly one selected=true row per (course, field)
+No course has a column value without a matching evidence row
+If all four hold, the Evidence Review panel becomes a trustworthy audit trail again.Why this matters operationallyRight now if I were an admin reviewing the scraped data, I would have no way to trust what I see. The table value (6.5) doesn't match the evidence (6.0). I'd either approve a value with bad provenance, or reject the scrape thinking it's broken when actually the displayed value is correct and the evidence is what's wrong.This becomes much worse when one of the values is wrong — admins won't know which to trust. Fixing this is more important than expanding vision OCR coverage because it's a foundation for everything downstream.
