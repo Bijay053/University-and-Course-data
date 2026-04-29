@@ -1035,9 +1035,29 @@ async def extract_course(
         vision_filled, vision_evidence = await maybe_vision_refetch(
             url, rendered_html or html, payload, emit=emit,
             image_cache=vision_image_cache,
+            degree_level=payload.get("degree_level"),
         )
+        # Authority-aware merge: per_course_vision (tier 4) overrides any
+        # tier-3 text extraction (regex, Gemini, browser, AI fallback).
+        # This is the key ASAHE fix: the image is the authoritative source
+        # even when text extraction happened to fill the slot with a value.
+        # Pre-seeds (tier 5) are NOT overridden — they are site-specific
+        # hard-coded values that should always win.
         for k, v in vision_filled.items():
-            payload.setdefault(k, v)
+            _prior_method = ""
+            for _ev in reversed(evidence):
+                if _ev.get("field_key") == k and _ev.get("decision_status") != "superseded":
+                    _prior_method = _ev.get("method", "")
+                    break
+            if payload.get(k) in (None, "", 0):
+                payload[k] = v  # fill null slot — no conflict
+            elif can_override(_prior_method, "per_course_vision"):
+                # vision (tier 4) beats existing tier-3 value — supersede it
+                for _ev in evidence:
+                    if _ev.get("field_key") == k and _ev.get("decision_status") != "superseded":
+                        _ev["decision_status"] = "superseded"
+                payload[k] = v
+            # else: existing value has tier ≥ 4 authority (pre-seed) — keep it
         evidence.extend(vision_evidence)
 
         # ── Vision sanity check ───────────────────────────────────────────

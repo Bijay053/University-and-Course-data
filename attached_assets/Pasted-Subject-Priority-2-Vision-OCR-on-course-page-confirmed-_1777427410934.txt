@@ -1,0 +1,100 @@
+Subject: Priority 2 — Vision OCR on course page (confirmed bug: wrong ASAHE English data)
+Hi,
+Manual inspection of https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development confirmed that English requirements are stored as a PNG on the course page, and the values in that image do NOT match what's in the central admissions PDF.
+Image URL: https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+Current scraper behavior: vision OCR is configured as a fallback for when text extraction fails. But for ASAHE the text extraction technically "succeeds" because the central PDF parser fills the slots — so vision OCR never runs on the course page. Result: every ASAHE Masters course currently shows the wrong IELTS/PTE/TOEFL/CAE/DET in production.
+Fix needed:
+Move course-page vision OCR from "fallback when nulls remain" to "always runs in Phase A, before any university-wide source." This is the change we discussed for Priority 2.
+Implementation
+In single_course.py, after the existing course-page extractors (regex/Gemini/browser) but before Phase B (PDF backfill, central page backfill):
+python# PHASE A — final step: vision OCR on course-page images
+# Runs even if other extractors filled some slots, because the course
+# page may have authoritative course-specific data (e.g. ASAHE Masters).
+
+ENGLISH_FIELD_KEYS = {
+    "ielts_overall", "ielts_listening", "ielts_reading",
+    "ielts_writing", "ielts_speaking",
+    "pte_overall", "toefl_overall",
+    "cambridge_overall", "duolingo_overall",
+}
+
+if _course_page_has_candidate_images(html):
+    vision_result = await per_course_vision_extract(
+        course_url=course_url,
+        html=html,
+        target_fields=ENGLISH_FIELD_KEYS,
+    )
+    if vision_result:
+        # Per the authority model: per_course_vision (tier 4) overrides
+        # any tier 3 or below. Phase B (PDF / central) cannot then
+        # overwrite these because they are tier 1-2.
+        for field, value in vision_result.items():
+            if value is not None:
+                _set_field_with_authority(
+                    payload, field, value,
+                    method="per_course_vision",
+                    source_url=vision_result["_image_url"],
+                    snippet=vision_result.get("_ocr_text"),
+                )
+Image-candidate filtering
+Don't OCR every image on every page — that exhausts the Gemini quota fast. Filter to candidates first:
+pythondef _course_page_has_candidate_images(html: str) -> list[str]:
+    """Return URLs of images likely to contain English requirement tables."""
+    soup = BeautifulSoup(html, "lxml")
+    candidates = []
+    for img in soup.find_all("img"):
+        src = img.get("src") or ""
+        alt = (img.get("alt") or "").lower()
+        # filename hints (lowercased filename for matching)
+        filename = src.lower().split("/")[-1]
+
+        keywords_in_filename = any(k in filename for k in [
+            "ielts", "english", "language", "requirement", "entry",
+            "admission", "master", "bachelor"
+        ])
+        keywords_in_alt = any(k in alt for k in [
+            "english", "ielts", "requirement", "entry", "admission"
+        ])
+        # ASAHE-style: filename like "MaSTER.png", "BACHELOR.png"
+        looks_like_level_image = any(
+            level in filename for level in ["master", "bachelor", "diploma", "phd"]
+        )
+
+        if keywords_in_filename or keywords_in_alt or looks_like_level_image:
+            candidates.append(src)
+    return candidates
+Caching
+ASAHE has one image per level used across all courses at that level. Don't OCR the same image 9 times. Cache by image URL:
+python@lru_cache(maxsize=500)
+def _vision_ocr_image(image_url: str) -> dict | None:
+    # ... fetch image, send to Gemini Vision, parse JSON response
+In the evidence row, the source_url should be the image URL, not the course page URL — so we can prove exactly which image the value came from. Method label: per_course_vision (tier 4 in our authority model).
+Level-aware image selection
+ASAHE has separate images: MaSTER.png for Masters, presumably BACHELOR.png (or similar) for Bachelors. Pick the right image based on the course's degree_level:
+pythondef _select_image_for_course(candidate_urls: list[str], degree_level: str) -> str | None:
+    level_lower = (degree_level or "").lower()
+    for url in candidate_urls:
+        filename = url.lower().split("/")[-1]
+        if "master" in level_lower and "master" in filename:
+            return url
+        if "bachelor" in level_lower and ("bachelor" in filename or "undergrad" in filename):
+            return url
+    # fallback: first candidate
+    return candidate_urls[0] if candidate_urls else None
+Logging fix while you're in there
+Currently this log fires from end-of-Phase-A, before the PDF backfill runs:
+[WARN] Master of Project Management — English section detected in HTML but all scores blank
+That's misleading because the PDF backfill in Phase B then fills those slots — the course ends up complete, but the warning makes it look broken. Move this warning to end-of-Phase-B, after all backfills have run. If English is still null after Phase B, that's a real warning. If it's only null between Phase A and Phase B, it's noise.
+Verification after deploy
+Re-scrape ASAHE. Check that:
+
+Masters courses show IELTS values from the MaSTER.png image (whatever those actually are — please confirm by reading the image), and the source URL in the evidence panel points to the image URL, not the PDF URL.
+Bachelor courses show their own (different) values from a Bachelor-level image, again sourced from the image URL.
+The fee remains sourced from uni_pdf:fees:per_course for ASAHE — that's correct, the course pages legitimately don't have fees outside the PDF link.
+
+After verifying ASAHE, run the same image-detection on three other universities to see if any of them also have image-stored requirements that we've been missing. Likely candidates: small private colleges with infographic-style pages.
+What this fixes
+ASAHE Masters courses currently show wrong English scores in production (PDF undergraduate values applied to Masters courses). After this fix, they show the correct course-page-image values.
+This is also why the existing data has every Master at the same scores and every Bachelor at the same scores — they all came from one wrong source.
+Let me know when this is deployed and I'll do another verification round.
+Thanks.
