@@ -151,6 +151,21 @@ def _strip_tags(html: str) -> str:
     return _WS_RE.sub(" ", _TAG_RE.sub(" ", cleaned))
 
 
+# "Recently viewed" sidebar strips — same contamination vector as the
+# intake extractor: UniSQ (and similar sites) embed other courses' campus
+# names ("Toowoomba", "Springfield") and mode text ("On Campus") in a
+# "Recently viewed" widget.  When the keyword-fallback pattern scan runs on
+# the full tag-stripped text it finds "On Campus" from the sidebar instead
+# of the current course's own Location field, misclassifying online-only
+# courses as "On Campus".  Strip this block before the fallback keyword scan
+# (the structural pre-passes — span-id, data-attribute, strong-label —
+# operate on the raw HTML and are unaffected).
+_RECENTLY_VIEWED_SM_RE = re.compile(
+    r"recently\s+viewed\b.{0,3000}",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
 # UOW (and Webflow-based sites) publish delivery mode as
 # ``<span id="delivery">On Campus</span>`` in their static HTML.
 # This is the most reliable signal on those pages because it is a
@@ -420,6 +435,14 @@ def classify_study_mode(
         return strong_label, strong_snippet, 0.7
 
     plain = _strip_tags(page_text)
+
+    # Strip "Recently viewed" sidebar from the keyword-fallback text so
+    # campus names / mode keywords from unrelated courses in the widget
+    # don't trigger the "On Campus" pattern for the current course.
+    # The structural pre-passes above (span-id, data-attribute, strong-label)
+    # already returned if they found authoritative evidence — this only
+    # affects the greedy keyword scan that runs on the whole tag-stripped text.
+    plain = _RECENTLY_VIEWED_SM_RE.sub("", plain)
 
     label_match = _LABEL_RE.search(plain)
     if label_match:
