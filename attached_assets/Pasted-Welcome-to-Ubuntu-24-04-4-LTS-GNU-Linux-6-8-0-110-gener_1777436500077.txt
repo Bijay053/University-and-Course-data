@@ -1,0 +1,67 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Apr 29 04:21:39 UTC 2026
+
+  System load:           0.72
+  Usage of /:            3.5% of 231.44GB
+  Memory usage:          19%
+  Swap usage:            0%
+  Processes:             199
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Wed Apr 29 03:55:37 2026 from 162.243.190.66
+root@university-and-course-data:~# grep -i "gemini\|warn\|fail" /var/log/celery-worker.log | tail -30
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+[2026-04-29 03:58:34,298: ERROR/ForkPoolWorker-1] Task failed id=job_b5c13ea9c2af: [Errno -3] Temporary failure in name resolution
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+[2026-04-29 03:58:34,313: INFO/ForkPoolWorker-1] Task scrape.university[47dd0610-1953-458f-a62b-97aca127d929] succeeded in 0.02868392295204103s: {'ok': False, 'id': 'job_b5c13ea9c2af', 'error': '[Errno -3] Temporary failure in name resolution'}
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+[2026-04-29 04:05:02,997: ERROR/ForkPoolWorker-1] Task failed id=job_cbe62fcdf474: [Errno -3] Temporary failure in name resolution
+socket.gaierror: [Errno -3] Temporary failure in name resolution
+[2026-04-29 04:05:03,012: INFO/ForkPoolWorker-1] Task scrape.university[72c6815c-300f-404b-ba89-3dc7ff6d82bc] succeeded in 0.028770255972631276s: {'ok': False, 'id': 'job_cbe62fcdf474', 'error': '[Errno -3] Temporary failure in name resolution'}
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/platforms.py:841: SecurityWarning: You're running the worker with superuser privileges: this is
+  warnings.warn(SecurityWarning(ROOT_DISCOURAGED.format(
+root@university-and-course-data:~# cd /root/University-and-Course-data
+git pull
+
+source backend-py/venv/bin/activate
+pkill -9 -f "celery.*worker"
+sleep 3
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+echo "PID: $!"
+remote: Enumerating objects: 35, done.
+remote: Counting objects: 100% (35/35), done.
+remote: Compressing objects: 100% (24/24), done.
+remote: Total 24 (delta 21), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (24/24), 2.91 KiB | 270.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+   deff4b8..4b0497c  main       -> origin/main
+Updating deff4b8..4b0497c
+Fast-forward
+ backend-py/app/services/scraper/extractors/gemini_primary.py | 6 +++---
+ backend-py/app/services/scraper/pipelines/single_course.py   | 7 ++++++-
+ backend-py/pyproject.toml                                    | 2 +-
+ backend-py/requirements.txt                                  | 2 +-
+ 4 files changed, 11 insertions(+), 6 deletions(-)
+[1] 1180935
+PID: 1180935
+(venv) root@university-and-course-data:~/University-and-Course-data# 
