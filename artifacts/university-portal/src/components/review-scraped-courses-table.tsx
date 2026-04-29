@@ -115,7 +115,14 @@ function finalValueForField(course: ReviewStagedCourse, fieldKey: string): strin
   switch (fieldKey) {
     case "courseName":        return v(course.courseName);
     case "courseLocation":    return v(course.courseLocation);
-    case "duration":          return course.duration != null && course.duration !== "" ? `${course.duration} ${course.durationTerm ?? ""}`.trim() : null;
+    case "duration": {
+      if (course.duration == null || course.duration === "") return null;
+      const dn = typeof course.duration === "number" ? course.duration : parseFloat(course.duration as string);
+      if (isNaN(dn)) return `${course.duration} ${course.durationTerm ?? ""}`.trim();
+      const dr = Math.round(dn * 10) / 10;
+      const dd = dr % 1 === 0 ? String(Math.round(dr)) : String(dr);
+      return `${dd} ${course.durationTerm ?? "Year"}`.trim();
+    }
     case "studyMode":         return v(course.studyMode);
     case "degreeLevel":       return v(course.degreeLevel);
     case "internationalFee":  return course.internationalFee != null && course.internationalFee !== "" ? `${course.currency ?? "AUD"} ${course.internationalFee}` : null;
@@ -383,7 +390,13 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence }: P
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-gray-600 whitespace-nowrap align-top">
-                      {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
+                      {course.duration != null && course.duration !== "" ? (() => {
+                        const n = typeof course.duration === "number" ? course.duration : parseFloat(course.duration as string);
+                        if (isNaN(n)) return `${course.duration} ${course.durationTerm || ""}`.trim();
+                        const r = Math.round(n * 10) / 10;
+                        const display = r % 1 === 0 ? String(Math.round(r)) : String(r);
+                        return `${display} ${course.durationTerm || "Year"}`.trim();
+                      })() : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-right font-medium whitespace-nowrap align-top">
                       {feeDisplay(course) ?? <MissingBadge title="Missing international fee" />}
