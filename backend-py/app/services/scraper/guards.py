@@ -403,6 +403,13 @@ def should_stage_course(
     # available on campus.
     # Courses that are genuinely mixed-mode have study_mode = "Blended" or
     # "On Campus, Online" and pass through because they contain campus keywords.
+    #
+    # Exception — multi-campus universities (e.g. ACAP with 5 city campuses):
+    # when course_location lists 3+ distinct non-virtual cities the "Online"
+    # label most likely reflects one delivery mode among several (the course IS
+    # also delivered on campus in each city).  Fewer than 3 tokens is not
+    # sufficient — many universities cite one head-office city even for purely
+    # online courses.
     _study_mode = (payload.get("study_mode") or "").strip().lower()
     _has_campus_component = any(
         kw in _study_mode
@@ -417,14 +424,35 @@ def should_stage_course(
     ).strip()
 
     if "online" in _study_mode and not _has_campus_component:
-        log.info(
-            "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
-            "decision=reject (online_only — study_mode is authoritative)",
-            effective_name,
-            payload.get("study_mode", "Online"),
-            _physical_location or "none",
-        )
-        return (False, "online_only")
+        # Count non-virtual, non-trivial location tokens (each city name is one token).
+        _virtual_kws = ("online", "virtual", "remote", "distance", "web")
+        _campus_tokens = [
+            t.strip()
+            for t in _physical_location.split(",")
+            if t.strip()
+            and len(t.strip()) > 2  # filter bare country codes like "AU"
+            and not any(vk in t.lower() for vk in _virtual_kws)
+        ]
+        if len(_campus_tokens) >= 3:
+            # 3+ distinct physical cities → treat as dual-mode; fall through
+            # to the international_fee guard rather than rejecting.
+            log.info(
+                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
+                "decision=pass (online_only overridden — %d physical campus city/cities)",
+                effective_name,
+                payload.get("study_mode", "Online"),
+                _physical_location,
+                len(_campus_tokens),
+            )
+        else:
+            log.info(
+                "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
+                "decision=reject (online_only — study_mode is authoritative)",
+                effective_name,
+                payload.get("study_mode", "Online"),
+                _physical_location or "none",
+            )
+            return (False, "online_only")
 
     # Note: we do NOT reject study_mode="Blended" when location is absent.
     # "Blended" means the extractor found explicit evidence of both online
