@@ -115,7 +115,21 @@ _DECORATIVE_HINTS: Final = (
     "phone", "email", "map-marker", "map_marker", "marker",
     # ASA-style square-format logos ("ASA square 32.png")
     "square",
+    # UI chrome / navigation affordances
+    "arrow", "chevron", "breadcrumb", "external",
 )
+
+# Exact filename stems (without extension) that are always decorative UI
+# affordances regardless of surrounding context. Used in addition to
+# _DECORATIVE_HINTS so that short common names like "link" don't
+# accidentally match legitimate image names that contain "link" as a
+# substring (e.g. a hypothetical "curriculum-link-chart.png").
+_DECORATIVE_EXACT_STEMS: Final = frozenset({
+    "link", "chain", "check", "tick", "cross", "close", "play",
+    "download", "share", "search", "upload", "edit", "delete",
+    "add", "remove", "back", "next", "prev", "forward",
+    "plus", "minus", "caret", "dot", "bullet",
+})
 
 # URL path-segment keywords that strongly suggest the image contains
 # English language requirement scores.  Images whose URL (lower-cased)
@@ -247,7 +261,53 @@ def _is_valid_english_ocr_result(ocr_text: str) -> bool:
     return bool(_OCR_SCORE_RE.search(ocr_text))
 
 
-def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
+# Mapping from test keyword → tuple of fields that belong to that test.
+# Used by :func:`_vision_fields_consistent_with_ocr` to cross-validate
+# that every test claimed in the extracted fields has its name present in
+# the raw OCR text.
+_TEST_FIELD_MAP: Final = {
+    "ielts": (
+        "ielts_overall", "ielts_listening", "ielts_reading",
+        "ielts_writing", "ielts_speaking",
+    ),
+    "pte": (
+        "pte_overall", "pte_listening", "pte_reading",
+        "pte_writing", "pte_speaking",
+    ),
+    "toefl": (
+        "toefl_overall", "toefl_listening", "toefl_reading",
+        "toefl_writing", "toefl_speaking",
+    ),
+    "cambridge": ("cambridge_overall",),
+    "duolingo": ("duolingo_overall",),
+}
+
+
+def _vision_fields_consistent_with_ocr(
+    ocr_text: str, normalized: dict[str, Any]
+) -> bool:
+    """Cross-check: every test that appears in ``normalized`` must also be
+    named in ``ocr_text``.
+
+    This catches the case where ``english_test.extract`` parses a value for
+    (e.g.) TOEFL from a half-hallucinated Gemini response that never actually
+    mentioned the word "TOEFL" — a strong indicator that the parser matched
+    noise and the entire result should be discarded.
+
+    Does NOT catch consistent hallucinations where Gemini both names the test
+    AND invents a plausible score — those are addressed by Fix 1 (decorative
+    filter) and Fix 3 (tier-0 authority model).
+    """
+    lower = ocr_text.lower()
+    for test_name, fields in _TEST_FIELD_MAP.items():
+        if any(normalized.get(f) for f in fields) and test_name not in lower:
+            return False
+    return True
+
+
+def _extract_img_candidates(
+    html: str, base_url: str
+) -> tuple[list[tuple[str, str]], frozenset[str]]:
     """Return ``[(absolute_url, alt_text)]`` for non-decorative ``<img>``.
 
     Three priority tiers (lower number = higher priority):
@@ -304,6 +364,11 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
         _alt_lower = alt.lower()
         if any(h in _filename or h in _alt_lower for h in _DECORATIVE_HINTS):
             continue
+        # Exact-stem check: short UI affordance names like "link.png" that
+        # don't contain any _DECORATIVE_HINTS substring but are clearly icons.
+        _stem = _filename.rsplit(".", 1)[0]
+        if _stem in _DECORATIVE_EXACT_STEMS:
+            continue
         try:
             absolute = urljoin(base_url, src)
         except Exception:  # noqa: BLE001 — never fail the scrape on a bad src
@@ -324,7 +389,7 @@ def _extract_img_candidates(html: str, base_url: str) -> list[tuple[str, str]]:
 
     # Combine: tier-0 first, then sorted tier-1/2, capped at _MAX_IMAGES.
     combined = tier0 + raw
-    return combined[:_MAX_IMAGES]
+    return combined[:_MAX_IMAGES], frozenset(tier0_urls)
 
 
 async def _download(url: str) -> bytes | None:
@@ -423,7 +488,7 @@ async def maybe_vision_refetch(
         )
         return {}, []
 
-    candidates = _extract_img_candidates(rendered_html, url)
+    candidates, tier0_url_set = _extract_img_candidates(rendered_html, url)
     if not candidates:
         log.info("[VISION SKIP] no candidate images found on page — %s", url)
         return {}, []
@@ -627,11 +692,24 @@ async def maybe_vision_refetch(
                             continue
                         normalized.setdefault(k, v)
                 if normalized:
-                    log.info(
-                        "[VISION OK] %s: extracted %s",
-                        img_url,
-                        " ".join(f"{k}={v}" for k, v in sorted(normalized.items())),
-                    )
+                    # Secondary cross-check: every test claimed in the
+                    # extracted fields must also appear in the raw OCR text.
+                    # Catches partial hallucinations where english_test.extract
+                    # matched noise and the claimed test name is absent from
+                    # the Gemini text response.
+                    if not _vision_fields_consistent_with_ocr(resp.text, normalized):
+                        log.info(
+                            "[VISION SKIP OCR] %s: extracted fields inconsistent "
+                            "with OCR text (claimed test not named) — discarding",
+                            img_url,
+                        )
+                        normalized = {}
+                    else:
+                        log.info(
+                            "[VISION OK] %s: extracted %s",
+                            img_url,
+                            " ".join(f"{k}={v}" for k, v in sorted(normalized.items())),
+                        )
                 else:
                     log.info("[VISION] %s: Gemini returned text but no English scores parsed", img_url)
                 if leader_future is not None:
@@ -671,6 +749,13 @@ async def maybe_vision_refetch(
                     # image the value came from.
                     "source_url": img_url,
                     "snippet": (alt or img_url)[:240],
+                    # source_tier=0 means the image was found inside the
+                    # English/Entry Requirements DOM section — strong signal.
+                    # source_tier=1 means it passed the decorative filter but
+                    # wasn't DOM-anchored to the requirements section — treat
+                    # as lower-authority: can fill empty slots but must NOT
+                    # override existing page-text extractor values.
+                    "source_tier": 0 if img_url in tier0_url_set else 1,
                 }
             )
 
