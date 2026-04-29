@@ -471,6 +471,13 @@ async def maybe_browser_refetch(
     """
     if not _all_english_empty(payload) and not force:
         return {}, [], None, False
+    # For force-browser hosts (e.g. UniSQ, UOW), the browser ALWAYS runs so
+    # JS-rendered fee/IELTS accordion content is captured.  But if BOTH english
+    # AND fee are already populated (e.g. from a previous browser pass or a
+    # sibling-cache hit), launching a new browser instance would yield nothing
+    # new and just waste 10–60 s of wall-clock time per course.  Skip safely.
+    if force and not _all_english_empty(payload) and payload.get("international_fee"):
+        return {}, [], None, False
 
     # Issue 1: skip browser pass for paths where a static fallback is
     # sufficient and the browser is known to always time out (e.g. VIT
