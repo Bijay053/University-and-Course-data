@@ -1,0 +1,63 @@
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main
+sudo systemctl restart uni-api-py uni-celery
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 3.51 KiB | 1.76 MiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   8f9a38d..645759e  main       -> origin/main
+Updating 8f9a38d..645759e
+Fast-forward
+ backend-py/app/services/scraper/per_course_vision.py | 140 +++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 129 insertions(+), 11 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# WITH course_cols AS (
+  SELECT sc.id AS scraped_course_id, 'ielts_overall' AS field_key, sc.ielts_overall::text AS col_val FROM scraped_courses sc WHERE sc.ielts_overall IS NOT NULL
+  UNION ALL SELECT sc.id, 'pte_overall', sc.pte_overall::text FROM scraped_courses sc WHERE sc.pte_overall IS NOT NULL
+  UNION ALL SELECT sc.id, 'toefl_overall', sc.toefl_overall::text FROM scraped_courses sc WHERE sc.toefl_overall IS NOT NULL
+  UNION ALL SELECT sc.id, 'cambridge_overall', sc.cambridge_overall::text FROM scraped_courses sc WHERE sc.cambridge_overall IS NOT NULL
+  UNION ALL SELECT sc.id, 'duolingo_overall', sc.duolingo_overall::text FROM scraped_courses sc WHERE sc.duolingo_overall IS NOT NULL
+  UNION ALL SELECT sc.id, 'ielts_listening', sc.ielts_listening::text FROM scraped_courses sc WHERE sc.ielts_listening IS NOT NULL
+  UNION ALL SELECT sc.id, 'ielts_reading', sc.ielts_reading::text FROM scraped_courses sc WHERE sc.ielts_reading IS NOT NULL
+  UNION ALL SELECT sc.id, 'ielts_writing', sc.ielts_writing::text FROM scraped_courses sc WHERE sc.ielts_writing IS NOT NULL
+  UNION ALL SELECT sc.id, 'ielts_speaking', sc.ielts_speaking::text FROM scraped_courses sc WHERE sc.ielts_speaking IS NOT NULL
+  UNION ALL SELECT sc.id, 'international_fee', sc.international_fee::text FROM scraped_courses sc WHERE sc.international_fee IS NOT NULL
+),
+ranked AS (
+  SELECT sfe.id AS ev_id,
+    ROW_NUMBER() OVER (PARTITION BY sfe.scraped_course_id, sfe.field_key ORDER BY sfe.confidence DESC NULLS LAST, sfe.id ASC) AS rn
+  FROM scraped_field_evidence sfe
+  JOIN course_cols cc ON cc.scraped_course_id = sfe.scraped_course_id AND cc.field_key = sfe.field_key
+    AND ABS(COALESCE(sfe.normalized_value::numeric, -9999999) - COALESCE(cc.col_val::numeric, -9999998)) < 0.001
+  WHERE sfe.decision_status != 'superseded'
+)
+UPDATE scraped_field_evidence sfe
+SET decision_status = 'selected', selected = true
+FROM ranked r
+WHERE sfe.id = r.ev_id AND r.rn = 1 AND sfe.decision_status != 'selected';
+-bash: syntax error near unexpected token `('
+SELECT: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+UNION: command not found
+-bash: syntax error near unexpected token `)'
+-bash: syntax error near unexpected token `('
+SELECT: command not found
+-bash: syntax error near unexpected token `OVER'
+FROM: command not found
+JOIN: command not found
+-bash: syntax error near unexpected token `('
+WHERE: command not found
+-bash: syntax error near unexpected token `)'
+UPDATE: command not found
+SET: command not found
+FROM: command not found
+WHERE: command not found
+root@university-and-course-data:~/University-and-Course-data# 

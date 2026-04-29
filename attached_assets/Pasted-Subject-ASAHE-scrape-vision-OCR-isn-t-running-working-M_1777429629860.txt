@@ -1,0 +1,109 @@
+Subject: ASAHE scrape — vision OCR isn't running, "working" Masters are accidentally correct via sibling cache
+After two attempts at Priority 2, the data still has serious problems even though some values look correct on the surface. Need a deeper investigation.
+What the latest scrape shows
+Masters: 3 of 4 show IELTS=6.5/PTE=58/TOEFL=85 (these match the actual MaSTER.png image content, so values are correct).
+1 Master (Software App Development) shows blank.
+Bachelors: show 6.0/50/60/169 (mostly match the Bachelor image) plus a phantom DET=100 (Bachelor image has no DET row — this is wrong).
+Key log signals
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+timeout: per-course browser exceeded 60s on https://www.asahe.edu.au/... (every course)
+[per-course browser ↻] (no follow-up success line for any course)
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=169.0 duolingo_overall=100.0 ielts_overall=6.0 ...
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=5.5 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5
+Important: the sibling cache build postgraduate line only contains IELTS sub-bands, not overall scores. But 3 of 4 Master courses show ielts_overall=6.5 in the staging table. Where is 6.5 coming from?
+Three things need investigation:
+Issue 1: Gemini quota exhausted, but vision OCR is supposed to also use Gemini Vision
+The log explicitly says No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted). If Gemini text calls aren't billing, Gemini Vision calls are not billing either — they share the same key. So vision OCR cannot have run successfully via Gemini in this scrape.
+But somehow 3 of 4 Masters got 6.5/58/85 anyway. Where did these values come from?
+Please grep the codebase and database for these specific patterns:
+bash# In codebase
+grep -rn "6\.5" backend-py/app/services/scraper/ --include="*.py" | grep -v test
+grep -rn "ielts.*6\.5\|6\.5.*ielts" backend-py/app/services/scraper/ -i
+
+# Find any cached vision results
+grep -rn "vision_image_cache\|VisionImageCache" backend-py/app/services/scraper/
+
+# Database — any vision_image_cache table or evidence rows from prior runs
+SELECT id, field_key, normalized_value, method, source_url, created_at
+FROM scraped_field_evidence
+WHERE field_key IN ('ielts_overall','pte_overall','toefl_overall')
+  AND normalized_value IN ('6.5','58.0','85.0','58','85')
+  AND created_at > NOW() - INTERVAL '7 days'
+ORDER BY created_at DESC LIMIT 50;
+The 6.5/58/85 values are coming from somewhere. Until we know where, we cannot trust them — they could disappear on the next scrape if a cache expires.
+Issue 2: Browser times out on every single course (60s each)
+Compare run timing:
+
+Before Priority 2 changes: 22 seconds total for 9 courses
+After Priority 2 changes: 4 minutes 4 seconds (every course hits the 60s timeout)
+
+This is a regression that landed with the Priority 2 changes. The per-course browser is now exceeding its budget on every page. Something in the new code is making the browser step block.
+Possible causes to investigate in single_course.py and per_course_vision.py:
+
+Is vision OCR being called inside the browser timeout window instead of after it? Check the call order.
+Are images being downloaded synchronously inside the browser step?
+Did the degree_level parameter we added thread through somewhere it shouldn't be?
+
+Please add timestamped logs to identify which step inside the browser flow is consuming the 60s:
+pythonlog.info(f"[BROWSER {url}] step=goto t={time.time()-t0:.1f}s")
+log.info(f"[BROWSER {url}] step=wait_idle t={time.time()-t0:.1f}s")
+log.info(f"[BROWSER {url}] step=extract_html t={time.time()-t0:.1f}s")
+log.info(f"[BROWSER {url}] step=vision_call t={time.time()-t0:.1f}s")
+Run on one course and share the timing breakdown.
+Issue 3: The sibling cache is producing values that have no source
+Looking at the log [EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=5.5 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5 — this only mentions sub-bands. But the staging table for 3 Masters has ielts_overall=6.5. The build line doesn't show 6.5 anywhere.
+So ielts_overall=6.5 for those Master courses comes from a different code path than the sibling cache build line. Possibilities:
+
+A different sibling cache mechanism we don't see logged
+A cached result from a different table
+An evidence row from a previous run that's being reused
+
+The Evidence Review panel for Master AI shows ielts_overall=6.0 from uni_pdf:requirements. But the staging table shows 6.5. The staging column and the evidence row do not match for the same course.
+This means the architecture's enforce_source_evidence guarantee is broken: there's a value in scraped_courses.ielts_overall (6.5) that has no selected=true evidence row backing it. Admins reviewing this course see a value they cannot trace.
+Diagnostic SQL to identify which code path is writing 6.5:
+sql-- Show every scraped_courses row + every evidence row for one specific course
+WITH target AS (
+  SELECT id, course_name, ielts_overall, pte_overall, toefl_overall,
+         created_at, scrape_job_id
+  FROM scraped_courses
+  WHERE course_name ILIKE '%Master of Information Technology (Artificial Intelligence)%'
+  ORDER BY created_at DESC
+  LIMIT 5
+)
+SELECT 'COURSE' AS type,
+       t.id::text AS row_id,
+       t.scrape_job_id AS job,
+       'ielts=' || COALESCE(t.ielts_overall::text,'NULL') ||
+       ' pte=' || COALESCE(t.pte_overall::text,'NULL') ||
+       ' toefl=' || COALESCE(t.toefl_overall::text,'NULL') AS info,
+       t.created_at::text AS created
+FROM target t
+UNION ALL
+SELECT 'EVIDENCE',
+       sfe.id::text,
+       sfe.method,
+       sfe.field_key || '=' || COALESCE(sfe.normalized_value,'NULL') ||
+       ' selected=' || sfe.selected::text,
+       sfe.created_at::text
+FROM scraped_field_evidence sfe
+WHERE sfe.scraped_course_id IN (SELECT id FROM target)
+  AND sfe.field_key IN ('ielts_overall','pte_overall','toefl_overall')
+ORDER BY type, created DESC;
+This shows whether multiple scraped_courses rows exist for the course, what each row's columns contain, and what evidence rows exist. The expected good state is: ONE course row, with column values matching ONE selected=true evidence row per field.
+What I need from this investigation
+Please answer these specific questions before any more code changes:
+
+Is the Gemini API key working in production right now? Run a test: curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"hi"}]}]}'. If it returns 429 or quota error, that's the root cause of nothing working.
+Where are the 6.5/58/85 values coming from? Run the grep + SQL above and tell me what you find. If it's a cached previous result, the next scrape after cache expiry will return all Masters to blank — so we're not actually fixed, we're just reading old correct data.
+Why is the browser timing out 60s on every course? The timing breakdown logs above will tell us.
+Is the Bachelor image being detected as a candidate for vision OCR? The Bachelor image URL is https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d703fd6206a1f990605d7_Screenshot%202026-01-19%20104316.png — filename is just a screenshot timestamp, no level hint. Run _extract_img_candidates against a Bachelor course HTML and see if this URL is in the result list. If not, our level-aware filename matching can't find it.
+
+Why this matters
+Right now the data looks plausible (3 Masters correct, Bachelors mostly correct) but we have no idea why it's correct. If it's correct because of a stale cache from a previous run that worked, then:
+
+The next scrape may regress to all-blank
+We can't extend the same approach to other universities
+We have no actual reproducible fix
+
+Until we know where the 6.5 value comes from in the current scrape (where Gemini didn't bill, browser timed out, and AI fallback also didn't run), we can't claim this is fixed. It's working by accident.
+Please investigate the four questions above and report back before more changes. The right next step depends entirely on whether Gemini is dead, the cache is stale, or something else is going on.
