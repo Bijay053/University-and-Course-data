@@ -1223,12 +1223,24 @@ async def extract_course(
                 if _gp_k == "intake_months" and _best_ev_method("intake_months") == "regex":
                     continue
 
-                # Issue 5: Don't let Gemini PRIMARY override a uni_pdf
-                # fee_term.  The PDF fee schedule (e.g. "Full Course") is more
-                # authoritative than Gemini reading per-unit fee text from the
-                # course page (which returns "Per Unit" for ASAHE courses even
-                # though the total fee is what the DB stores).
+                # Issue 5: Don't let Gemini PRIMARY set fee_term when it
+                # didn't also find a fee amount.  fee_term without a fee is
+                # meaningless and will pollute the payload when the actual fee
+                # later comes from the university PDF (e.g. ASAHE courses where
+                # Gemini reads "Per Unit" from the page prose but returns
+                # international_fee=null, while the PDF provides the total
+                # course fee with its own fee_term).
+                #
+                # Additionally, don't let Gemini PRIMARY override a fee_term
+                # that was already set by a uni_pdf extractor.  The PDF fee
+                # schedule is more authoritative than Gemini's prose reading.
                 if _gp_k == "fee_term":
+                    _gp_has_fee = bool(
+                        _gp_filled.get("international_fee") is not None
+                        or _gp_filled.get("domestic_fee") is not None
+                    )
+                    if not _gp_has_fee:
+                        continue
                     _ft_method = _best_ev_method("fee_term")
                     if _ft_method and _ft_method.startswith("uni_pdf"):
                         continue

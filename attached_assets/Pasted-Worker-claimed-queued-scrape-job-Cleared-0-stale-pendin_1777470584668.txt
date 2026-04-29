@@ -1,0 +1,169 @@
+Worker claimed queued scrape job
+Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 2
+Fetching https://www.asahe.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing found at https://www.asahe.edu.au/our-courses/courses-grid-view
+[DISCOVER] Crawling from https://www.asahe.edu.au/our-courses/courses-grid-view (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.asahe.edu.au/our-courses/courses-grid-view: listing (9 course links found)
+[DISCOVER] Page 1/25: +9 candidates (total 9) — https://www.asahe.edu.au/our-courses/courses-grid-view
+Discovered 9 candidate course links
+Loaded uni-level PDF data: fee=yes english=yes
+[CENTRAL] fee page parsed → 0 program record(s) from http://asahe.edu.au/fees-and-charges
+[CENTRAL] english page parsed → no values from http://asahe.edu.au/policies-and-forms
+Extracting course details (9 pages)...
+[EXTRACT] 1/9: Bachelor of Business International Business
+[EXTRACT] 2/9: Bachelor of Business Hospitality Management
+[EXTRACT] 3/9: Bachelor of Business Technology Management
+[EXTRACT] 4/9: Bachelor of Business
+Fetching 2/9: Bachelor of Business Hospitality Management
+Fetching 1/9: Bachelor of Business International Business
+Fetching 3/9: Bachelor of Business Technology Management
+Fetching 4/9: Bachelor of Business
+[FIELD SUMMARY] Bachelor of Business Hospitality Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Technology Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business International Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=25825B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-intern → 0 field(s) (cost=$0.000000, in=2995 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=26019B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-techno → 0 field(s) (cost=$0.000000, in=3045 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=25774B rendered=0B using=static text_len=6215
+[GP-DEBUG] text[:500]='Course Overview The Bachelor of Business with a major in Hospitality Management is designed to prepare students for dynamic careers in one of the world’s most vibrant and globally interconnected industries. Building on a strong foundation of core business knowledge in the first year, this major offers students the opportunity to deepen their understanding of the hospitality sector through targeted study and practical engagement. In the second year, students begin to explore key operational and s'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "over 100, 200 and 300 levels",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Hospitality Management",\n "category": "Business & Managemen'
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business-hospit → 9 field(s) (cost=$0.000260, in=2995 out=119)
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=26532B rendered=0B using=static text_len=7100
+[GP-DEBUG] text[:500]='Course Overview Course Overview ASA Institute of Higher Education (ASA)’s Bachelor of Business is designed to equip graduates with the knowledge and skills required for success in a wide range of professional roles across various industries. This course develops core business competencies, including strong business acumen, problem-solving, critical thinking, financial literacy, data analysis, and effective communication. These essential skills enable graduates to navigate the complexities of the'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Business",\n "category": "Business & Management",\n "mode": "On Campus",\n "intake_tex'
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-business → 8 field(s) (cost=$0.000274, in=3211 out=109)
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-business — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696f7aafec: Gemini skipped — None (likely quota exhausted)
+[per-course vision img 1/2 (cache hits 1)] https://www.asahe.edu.au/courses/bachelor-of-business-technology-management — IELTS=6.0 PTE=50.0 TOEFL=60.0 CAE=169.0
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-technology-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 1/2 (cache hits 1)] https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management — IELTS=6.0 PTE=50.0 TOEFL=60.0 CAE=169.0
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management (missing: international_fee, domestic_fee, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-hospitality-management
+[CATEGORY det] Bachelor of Business Hospitality Managem → Hospitality, Tourism & Events / Hospitality Management
+✅ [PASS 100/100] Bachelor of Business Hospitality Management | bachelor-of-business-hospitality-managem
+[EXTRACT] 5/9: Bachelor of Professional Accounting
+Fetching 5/9: Bachelor of Professional Accounting
+[FIELD SUMMARY] Bachelor of Professional Accounting Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-technology-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-technology-management
+[CATEGORY det] Bachelor of Business Technology Manageme → Business & Management / Technology Management
+✅ [PASS 100/100] Bachelor of Business Technology Management | bachelor-of-business-technology-manageme
+[EXTRACT] 6/9: Master of Project Management
+Fetching 6/9: Master of Project Management
+[FIELD SUMMARY] Master of Project Management Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course vision img 2/2] https://www.asahe.edu.au/courses/bachelor-of-business-international-business — IELTS=6.0 PTE=50.0 TOEFL=60.0 CAE=169.0
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business-international-business (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[GP-DEBUG] static=27837B rendered=0B using=static text_len=7589
+[GP-DEBUG] text[:500]='Course Overview Course Overview ASA Institute of Higher Education’s (ASA) Master of Project Management, including the nested Graduate Diploma and Graduate Certificate qualifications, will provide graduates with the knowledge and skills for employment in various business, information technology and construction positions. These courses also can provide a structured pathway for further study at the postgraduate level. The courses have been developed in close consultation with key industry experts '
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": "2 Year Course",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Project Management",\n "category": "Business & Management",\n "mode": "Blen'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-project-managemen → 10 field(s) (cost=$0.000285, in=3335 out=116)
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-project-management — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.asahe.edu.au/courses/bachelor-of-business — IELTS=6.0 PTE=50.0 TOEFL=60.0 CAE=169.0
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-business (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business-international-business: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business-international-business
+[CATEGORY det] Bachelor of Business International Busin → Business & Management / International Business
+✅ [PASS 100/100] Bachelor of Business International Business | bachelor-of-business-international-busin
+[EXTRACT] 7/9: Master of Information Technology (Cyber Security)
+Fetching 7/9: Master of Information Technology (Cyber Security)
+[FIELD SUMMARY] Master of Information Technology (Cyber Security) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=28271B rendered=0B using=static text_len=7704
+[GP-DEBUG] text[:500]="Course Overview Accounting, the process of measuring, processing, and sharing financial and other information about businesses and corporations, is often referred to as the language of business. Understanding this language allows accountants to contribute to all businesses, and to translate the requirements for sustainable and scalable success. Armed with such skills, accountants can apply their knowledge in any number of dynamic industries. ASA's Bachelor of Professional Accounting is a rigorou"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": 3,\n "duration_unit": "years",\n "duration_text": "twenty-four (24) units of core units and electives over 100, 200 and 300 levels",\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Professio'
+[GEMINI] https://www.asahe.edu.au/courses/bachelor-of-professional-ac → 9 field(s) (cost=$0.000292, in=3365 out=132)
+[per-course browser skipped] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — vocational static fallback
+[VISION] 4 candidate image(s) found — starting OCR pass
+[GP-DEBUG] static=28547B rendered=0B using=static text_len=7972
+[GP-DEBUG] text[:500]='Course Overview Course Overview Cyber security is one of the fastest growing sectors in Australia and around the world. With rapid technological advancements and the evolving threat increasing demand that is set to see thousands of jobs required over the next five years. The Master of Information Technology (Cyber Security) aims to develop cyber and information security professionals with advanced knowledge and processes. This course is designed for students with a cognate degree who wish to gai'
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": 2,\n "duration_unit": "years",\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Cyber Security",\n "category": "Computer Science & IT",\n "mode": "On Campus",\n "inta'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 8 field(s) (cost=$0.000291, in=3435 out=111)
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — vocational static fallback
+[VISION] 1 candidate image(s) found — starting OCR pass
+[per-course vision img 0/1 (cache hits 1)] https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course vision img 2/2] https://www.asahe.edu.au/courses/master-of-project-management — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-project-management (missing: international_fee, domestic_fee, intake_text)
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-cyber-security
+[PG-SKIP ✗] Master of Information Technology (Cyber — nulled english for PG (Master's): cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Cyber → Computer Science & IT / Cyber Security
+✅ [PASS 100/100] Master of Information Technology (Cyber Security) | master-of-information-technology-cyber-s
+[EXTRACT] 8/9: Master of Information Technology (Artificial Intelligence)
+Fetching 8/9: Master of Information Technology (Artificial Intelligence)
+[FIELD SUMMARY] Master of Information Technology (Artificial Intel Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-project-management: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-project-management
+[PG-SKIP ✗] Master of Project Management — nulled english for PG (Master's): cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Project Management → Business & Management / Project Management
+✅ [PASS 100/100] Master of Project Management | master-of-project-management
+[EXTRACT] 9/9: Master of Information Technology (Software Application Development)
+Fetching 9/9: Master of Information Technology (Software Application Development)
+[FIELD SUMMARY] Master of Information Technology (Software Applica Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [duration.structural conf=0.85] Intake: ✅ "['January', 'April', 'July', '" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[GP-DEBUG] static=28898B rendered=0B using=static text_len=?
+[GP-DEBUG] text[:500]=''
+[GP-DEBUG] raw_response=''
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 0 field(s) (cost=$0.000000, in=3489 out=0) SKIP="503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[VISION FAIL] https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/69688cb102: Gemini skipped — None (likely quota exhausted)
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-business: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-business
+✅ [PASS 100/100] Bachelor of Business | bachelor-of-business
+[GP-DEBUG] static=25721B rendered=0B using=static text_len=5765
+[GP-DEBUG] text[:500]="Course Overview Course Overview All industries today require software specialists with advanced skill sets and an ability to develop, test, and maintain software to meet ever-evolving modern industry and commercial requirements. The Master of IT (Software Application Development) is designed for current Information and Communication Technology (ICT) professionals with a bachelor's degree in information technology or computer science who wish to gain advanced technical skills and expertise for th"
+[GP-DEBUG] raw_response='```json\n{\n "international_fee": null,\n "domestic_fee": null,\n "fee_term": "Per Unit",\n "duration_value": null,\n "duration_unit": "years",\n "duration_text": null,\n "ielts_overall": null,\n "pte_overall": null,\n "toefl_overall": null,\n "cambridge_overall": null,\n "duolingo_overall": null,\n "sub_category": "Software Application Development",\n "category": "Computer Science & IT",\n "mode":'
+[GEMINI] https://www.asahe.edu.au/courses/master-of-information-techn → 6 field(s) (cost=$0.000251, in=2888 out=116)
+[per-course browser skipped] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — vocational static fallback
+[VISION] 2 candidate image(s) found — starting OCR pass
+[per-course vision img 1/2 (cache hits 1)] https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[VISION FAIL] https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/698c01c1f6: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[per-course vision img 4/4] https://www.asahe.edu.au/courses/bachelor-of-professional-accounting — IELTS=6.0 PTE=50.0 TOEFL=60.0 CAE=169.0
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/bachelor-of-professional-accounting (missing: international_fee, domestic_fee, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-artificial-intelligence
+[PG-SKIP ✗] Master of Information Technology (Artifi — nulled english for PG (Master's): cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Artifi → Computer Science & IT / Artificial Intelligence
+✅ [PASS 100/100] Master of Information Technology (Artificial Intel | master-of-information-technology-artific
+[per-course vision img 1/2 (cache hits 1)] https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development — IELTS=6.5 PTE=58.0 TOEFL=85.0 CAE=—
+[FALLBACK] AI enriching https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/bachelor-of-professional-accounting: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/bachelor-of-professional-accounting
+[CATEGORY det] Bachelor of Professional Accounting → Business & Management / Accounting
+✅ [PASS 100/100] Bachelor of Professional Accounting | bachelor-of-professional-accounting
+[FALLBACK] AI filled 2 field(s) on https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development: duration_value, duration_unit
+[FIELD TRACE] study_mode='On Campus' location='Sydney, Australia' method=study_mode:rule url=https://www.asahe.edu.au/courses/master-of-information-technology-software-application-development
+[PG-SKIP ✗] Master of Information Technology (Softwa — nulled english for PG (Master's): cambridge_overall, duolingo_overall (no level-keyed data from browser)
+[CATEGORY det] Master of Information Technology (Softwa → Computer Science & IT / Software Engineering
+✅ [PASS 100/100] Master of Information Technology (Software Applica | master-of-information-technology-softwar
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_listening=5.5 ielts_overall=6.0 ielts_reading=5.5 ielts_speaking=5.5 ielts_writing=5.5
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+[STAGE] saved: Bachelor of Business International Business
+[STAGE] saved: Bachelor of Business Hospitality Management
+[STAGE] saved: Bachelor of Business Technology Management
+[STAGE] saved: Bachelor of Business
+[STAGE] saved: Bachelor of Professional Accounting
+[STAGE] saved: Master of Project Management
+[STAGE] saved: Master of Information Technology (Cyber Security)
+[STAGE] saved: Master of Information Technology (Artificial Intelligence)
+[STAGE] saved: Master of Information Technology (Software Application Development)
+[DATA QUALITY] 9 course(s) checked — 0 critical / 0 warning / 0 info
+[GEMINI] Total cost: $0.0017 USD across 9 course(s) (~$0.00018/course)
+[TIMING] Total: 2m 25s | Courses: 9 | Avg: 16.1s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:9 | Staged:9 | Skipped:0 | Errors:0
+Staged 9 courses, 0 skipped, 0 fetch errors
