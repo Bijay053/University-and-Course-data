@@ -499,8 +499,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
               {logs.length === 0 ? (
                 jobStatus === "queued" ? (
                   <div className="flex flex-col gap-1.5 pt-2">
-                    <span className="text-amber-400 font-medium">⏳ Queued — waiting for a worker slot</span>
-                    <span className="text-gray-500">The Celery worker pool is full. This job will start automatically once a slot frees up.</span>
+                    <span className="text-amber-400 font-medium">⏳ Queued — waiting for a worker to pick up this job</span>
+                    <span className="text-gray-500">This job is in the queue and will start automatically once a worker slot is available.</span>
                   </div>
                 ) : (
                   <span className="text-gray-500">Starting…</span>
