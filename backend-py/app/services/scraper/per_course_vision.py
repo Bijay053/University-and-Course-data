@@ -117,7 +117,25 @@ _DECORATIVE_HINTS: Final = (
     "square",
     # UI chrome / navigation affordances
     "arrow", "chevron", "breadcrumb", "external",
+    # People / scene / marketing illustrations (VIT: students.svg, award.svg)
+    # These are always decorative photography or artwork — never data tables.
+    "student", "students", "award", "trophy", "medal",
+    "campus", "building", "library",
+    "people", "person", "staff", "teacher", "lecturer", "professor",
+    "graduate", "graduation",
+    "photo", "photograph", "picture", "image", "pic",
+    "illustration", "graphic", "artwork", "background", "bg",
+    "hero-image", "feature",
 )
+
+# File extensions that are ALWAYS skipped by the vision extractor.
+# SVG is a vector format — it is used for icons, logos, and illustrations,
+# never for scanned English-requirement tables (which are always raster
+# screenshots: PNG, JPG, WebP). Sending an SVG to Gemini Vision causes it
+# to hallucinate scores because the model "sees" shapes it interprets as
+# numbers, not actual scanned data. GIF is excluded for the same reason
+# (animated UI affordances, not data images).
+_SKIP_EXTENSIONS: Final = frozenset({".svg", ".gif"})
 
 # Exact filename stems (without extension) that are always decorative UI
 # affordances regardless of surrounding context. Used in addition to
@@ -223,6 +241,11 @@ def _find_english_section_images(html: str, base_url: str) -> list[tuple[str, st
                     if src and not src.startswith("data:"):
                         break
             if not src or src.startswith("data:"):
+                continue
+            # Skip vector / animated formats — they are always decorative
+            # (icons, logos, illustrations) and cause Gemini to hallucinate.
+            _ext = "." + src.rsplit(".", 1)[-1].split("?")[0].lower() if "." in src else ""
+            if _ext in _SKIP_EXTENSIONS:
                 continue
             try:
                 absolute = urljoin(base_url, src)
@@ -402,6 +425,12 @@ def _extract_img_candidates(
         # (``bec3d_``) is classified as a word character (\w) by Python regex,
         # causing \b word-boundary patterns to miss the keyword entirely.
         _filename = unquote(src).split("/")[-1].lower()
+        # Skip vector / animated formats unconditionally — SVG/GIF are never
+        # scanned requirements tables; sending them to Gemini causes hallucination
+        # (e.g. VIT's students.svg → fabricated IELTS 6.5, award.svg → DET 100).
+        _ext = "." + _filename.rsplit(".", 1)[-1].split("?")[0] if "." in _filename else ""
+        if _ext in _SKIP_EXTENSIONS:
+            continue
         _alt_lower = alt.lower()
         if any(h in _filename or h in _alt_lower for h in _DECORATIVE_HINTS):
             continue
