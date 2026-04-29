@@ -29,6 +29,7 @@ async def test_fill_missing_no_call_when_payload_complete():
         "intake_months": [2, 7],
         "duration_value": 18,
         "duration_unit": "months",
+        "course_location": "Darwin",
     }
     with patch.object(ai_fallback.gemini_client, "generate") as gen:
         out = await ai_fallback.fill_missing(payload, html=HTML_SAMPLE, url="x")
@@ -67,7 +68,7 @@ async def test_fill_missing_parses_and_coerces_response():
     assert out["international_fee"] == 42500.0
     assert out["fee_currency"] == "AUD"
     assert out["ielts_overall"] == 6.5
-    assert out["intake_months"] == [2, 7]  # 99 and "bad" filtered
+    assert out["intake_months"] == ["February", "July"]  # 99 and "bad" filtered; ints → month names
     assert out["duration_value"] == 18.0
     assert out["duration_unit"] == "months"
 
@@ -94,7 +95,7 @@ async def test_fill_missing_only_requests_missing_fields():
     assert "ielts_overall" in captured["prompt"]
     assert out == {
         "ielts_overall": 6.0,
-        "intake_months": [2],
+        "intake_months": ["February"],  # int 2 → month name
         "duration_value": 2.0,
         "duration_unit": "years",
     }
