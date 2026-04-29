@@ -15,7 +15,7 @@ import asyncio
 import logging
 import re
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl
 
 from app.services.scraper.http_fetcher import fetch_html
 
@@ -290,13 +290,34 @@ def _is_known_non_course_url(url: str) -> bool:
     return False
 
 
+def _normalize_url_for_dedup(url: str) -> str:
+    """Strip non-essential query parameters for URL deduplication.
+
+    Keeps path-essential params (e.g. pagination ?page=N) but drops
+    audience-filter params like ``?studentType=international`` that cause
+    the same page to appear twice in the BFS queue — once with the param
+    (pre-seeded) and once without (from a link on another page).
+    """
+    _STRIP_PARAMS = frozenset(
+        {"studentType", "studenttype", "student_type", "_ga", "_gl", "_gid"}
+    )
+    try:
+        p = urlparse(url)
+        qs = [(k, v) for k, v in parse_qsl(p.query) if k not in _STRIP_PARAMS]
+        return urlunparse(p._replace(query=urlencode(qs)))
+    except Exception:
+        return url
+
+
 def _is_category_landing(url: str) -> bool:
     """True for `/<catalogue>/<single-segment>` URLs whose final segment
     has no degree qualifier — i.e. category index pages like
     /courses/design, /programs/business, /degrees/health.
 
     Also handles 3-segment paths like /study/degrees-and-courses/arts
-    (UniSQ discipline pages) where the first segment is a catalog root
+    (UniSQ discipline pages) and 4-segment sub-discipline paths like
+    /study/degrees-and-courses/arts-and-communication/communication
+    (UniSQ sub-discipline pages) where the first segment is a catalog root
     and the last segment carries no degree qualifier. The BFS uses this
     to (a) reject them from the candidate set and (b) enqueue them for
     drill-in so their listed courses are harvested. Mirrors Node's
@@ -320,6 +341,18 @@ def _is_category_landing(url: str) -> bool:
         if parts[0] not in _CATEGORY_BASE_SEGMENTS:
             return False
         last = parts[2].replace("-", " ").replace("_", " ")
+        return not _COURSE_TEXT.search(last)
+    # 4-segment paths: e.g. /study/degrees-and-courses/arts-and-communication/communication
+    # (UniSQ sub-discipline pages). Same rule: first segment is a catalog root
+    # and the last segment carries no degree qualifier → it's a sub-category
+    # that should be drilled into, not treated as a course detail page.
+    # Without this, the /study/ URL hint causes sub-discipline URLs to pass
+    # _looks_like_course and end up in the extraction queue, wasting Gemini
+    # calls on pages that always return null for every field.
+    if len(parts) == 4:
+        if parts[0] not in _CATEGORY_BASE_SEGMENTS:
+            return False
+        last = parts[3].replace("-", " ").replace("_", " ")
         return not _COURSE_TEXT.search(last)
     return False
 
@@ -497,6 +530,10 @@ async def discover_course_links(
 
     queue: list[tuple[str, int]] = [(start_url, 0)]
     visited: set[str] = set()
+    # Normalized URL set for deduplication: strips non-essential query params
+    # (e.g. ?studentType=international) so the same page isn't fetched twice
+    # — once from a pre-seed with the param and once from a plain link without.
+    visited_normalized: set[str] = set()
     found: dict[str, str] = {}
 
     # UOW: course listing paginates across ~62 pages (?page=N).  The BFS
@@ -569,9 +606,13 @@ async def discover_course_links(
 
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
-        if url in visited:
+        # Dedup on normalized URL so ?studentType=international and the bare
+        # URL are treated as the same page and not fetched twice (Issue 2).
+        _url_norm = _normalize_url_for_dedup(url)
+        if url in visited or _url_norm in visited_normalized:
             continue
         visited.add(url)
+        visited_normalized.add(_url_norm)
 
         # Phase A safety net (SCRAPING_ACCURACY_PLAN.md §A.3): drop URLs
         # that match the explicit page blocklist (apply / fees / news /
@@ -606,13 +647,34 @@ async def discover_course_links(
             # course candidates.
             await asyncio.sleep(3)
             html = await fetch_html(url)
+        # Issue 3: if still nothing and the URL had a query string (e.g.
+        # ?studentType=international), retry with the bare path — some servers
+        # reject the param but serve the page fine without it.
+        if not html and "?" in url:
+            _bare_url = url.split("?", 1)[0]
+            if _bare_url not in visited:
+                await asyncio.sleep(2)
+                html = await fetch_html(_bare_url)
+                if html:
+                    log.info(
+                        "[DISCOVER] fetch succeeded without query params for %s", url
+                    )
         if not html:
+            # Log at ERROR level so missing-category failures are visible
+            # in the dashboard sweep log, not just silently skipped.
+            log.error(
+                "[DISCOVER] fetch failed (all retries) — %s — courses in this "
+                "category will be missing from this run",
+                url,
+            )
             if emit:
                 await emit(
                     "status",
-                    f"[DISCOVER] Page {len(visited)}/{max_pages}: fetch failed — {url}",
+                    f"[DISCOVER] ERROR: fetch failed for {url} — courses in this "
+                    f"category will be missing. Check site connectivity.",
                     phase="discover",
                     kind="page_fetch_fail",
+                    error=True,
                 )
             continue
 

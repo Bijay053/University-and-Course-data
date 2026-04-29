@@ -1,0 +1,71 @@
+Subject: UniSQ scrape projecting 107 minutes for 165 courses — multiple time sinks
+UniSQ scrape after 2m 35s: 4 of 165 courses done. That's ~38 seconds per course → ~107 minutes total for one university. Across 80 universities that's not viable. Several specific issues to fix:
+Issue 1 (BIGGEST): Listing pages are being processed as courses
+Two of the first four "courses" are actually category index pages:
+
+"Communication" → arts-and-communication/communication?studentType=international
+"Creative Arts" → arts-and-communication/creative-arts?studentType=international
+
+These pages contain LINKS to actual courses (Bachelor of Communication, Master of Communication, etc.), not a single course. The discovery layer correctly classified them earlier:
+[DISCOVER] classified .../arts-and-communication?studentType=international: listing (28 course links found)
+But then they appear in the extraction queue as if they were individual courses. The extractor sends 30,568 chars of text to Gemini, which correctly returns null for every field — wasted API call.
+Fix: When discovery classifies a page as listing, those URLs should be added to the discovery queue (to recurse into and find their child courses), NOT to the extraction queue. Or if they're already being recursed correctly, the extraction queue should filter out URLs whose path matches a known category-listing pattern.
+Looking at the URLs:
+arts-and-communication                    ← category listing
+arts-and-communication/communication      ← still a sub-listing of programs
+arts-and-communication/communication/bachelor-of-communication-and-media  ← actual course
+Two-level category structure. The discovery probably stopped at level 1 and missed level 2 sub-listings.
+Issue 2: Discovery double-crawls every category
+Page 3:  arts-and-communication?studentType=international  → +25 candidates
+Page 31: arts-and-communication                            → +0 candidates  (duplicate)
+Page 4:  aviation?studentType=international                → +7 candidates
+Page 32: aviation                                          → +0 candidates  (duplicate)
+Every category page is being fetched twice — once with the ?studentType=international query string, once without. The second fetch adds zero new candidates because URLs are already deduped. This is ~9 wasted fetches, probably 20-40 seconds total.
+Fix: Normalize URLs before adding to the discovery queue. Strip studentType=international (or any non-essential query param) when checking dedup, so the with-and-without versions are treated as the same URL.
+Issue 3: Three category pages failed to fetch and weren't retried
+[DISCOVER] Page 11/60: fetch failed — nursing-and-midwifery?studentType=international
+[DISCOVER] Page 12/60: fetch failed — psychology-and-counselling?studentType=international
+[DISCOVER] Page 14/60: fetch failed — uniprep?studentType=international
+Result: every nursing/midwifery and psychology/counselling course is missing from the candidate list of 167. UniSQ has nursing programs that should be in the data. Silent loss.
+Fix: If a discovery fetch fails:
+
+Retry with the version of the URL without ?studentType=international
+If that also fails, log it as an error-level entry in the run log so it shows in the dashboard
+Add to a discovery_failures table for later re-discovery
+
+Right now these failures slip past silently and result in missing data with no audit trail.
+Issue 4: Gemini being asked to extract courses from forms
+The first 500 characters of the page text Gemini sees:
+'Take your first step First Name * Email Address * I'm not sure 
+I'm in high school I'm looking to do my first degree I'm looking 
+to do another bachelor degree...'
+This is the lead-capture form at the top of every UniSQ page, not course content. The actual course details are deeper in the page. Gemini wastes input tokens parsing the form.
+Fix: Strip known boilerplate sections before sending to Gemini. For UniSQ specifically, the form content can be removed by selector: <form id="lead-capture">, <section class="enquiry-form"> — whatever the actual class is. After stripping, Gemini gets the actual course content from the start.
+Worth doing for any university where the same form appears on every page. The text-trimming saves money on every call across the run.
+Issue 5: Browser refetch firing too readily on slow hosts
+UniSQ is in _SLOW_HOSTS (60s networkidle ceiling). If browser refetch fires when English is empty, that's 60s × every course missing English.
+But UniSQ has a [CACHE] english_requirements hit → ielts_overall=6.5 — IELTS is filled university-wide. So the gate _all_english_empty(payload) should be returning false and skipping the browser.
+But the log shows [per-course browser ↻] for every Gemini call I checked. Either the gate isn't catching this case, or the browser is being launched for a different reason (fee? duration?).
+Fix: Add the same SKIP_BROWSER pattern we did for ASAHE:
+
+If the only missing fields are non-English and the static HTML is large (>50KB), skip the browser
+OR: tighten the browser gate to only fire when English is empty AND there's no candidate image AND IELTS isn't already cached from english_requirements
+
+For UniSQ specifically, IELTS is cached from the central English requirements page. The browser doesn't need to look for English values per-course. Whatever's making the browser fire on every UniSQ course should be fixed.
+Recommended fix order
+
+Fix Issue 1 (category pages → listing queue, not course queue). Biggest impact — drops ~30+ courses from extraction immediately.
+Fix Issue 5 (browser refetch firing unnecessarily on UniSQ). Will roughly halve per-course time if it's currently firing on every course.
+Fix Issue 4 (strip boilerplate before Gemini). Saves money on every call across all universities.
+Fix Issues 2 + 3 (discovery dedup + failure retry). Smaller wall-clock impact but recovers missing courses.
+
+After these fixes, the same UniSQ scrape should complete in roughly 15-25 minutes (best case) instead of 107.
+What I want to see in the next run
+Please re-run UniSQ after fixes and share:
+
+Total runtime
+Total courses staged (should be > 165 because nursing/psych will recover)
+Average per-course time
+A grep for ↻ retry counts before vs after
+
+If runtime drops below 25 minutes and course count comes in higher than 165 (because we recover the failed-fetch categories), we're good to apply the same fixes to other slow universities.
