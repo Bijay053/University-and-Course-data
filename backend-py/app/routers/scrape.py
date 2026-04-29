@@ -165,7 +165,7 @@ async def _attach_evidence_bulk(
             "FROM scraped_field_evidence "
             "WHERE scraped_course_id = ANY(:ids) "
             "ORDER BY scraped_course_id, field_key, "
-            "confidence DESC NULLS LAST, id"
+            "selected DESC, confidence DESC NULLS LAST, id"
         ),
         {"ids": ids},
     )).mappings().all()
@@ -1267,7 +1267,7 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
             "validation_status, decision_status, selected, created_at "
             "FROM scraped_field_evidence "
             "WHERE scraped_course_id = :i "
-            "ORDER BY field_key, confidence DESC NULLS LAST, id"
+            "ORDER BY field_key, selected DESC, confidence DESC NULLS LAST, id"
         ),
         {"i": sc_id},
     )).mappings().all()
