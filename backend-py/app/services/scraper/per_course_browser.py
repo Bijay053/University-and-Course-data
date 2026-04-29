@@ -107,9 +107,6 @@ def _skip_browser_for_url(url: str) -> bool:
 
 
 _NETWORKIDLE_HOSTS: tuple[str, ...] = (
-    # VIT: SPA that requires JS rendering + 3s settle to surface the
-    # International tab's fee and english-requirements sections.
-    "vit.edu.au",
     # Murdoch: heavy React SPA (450KB static → 1MB rendered). Must wait for
     # networkidle before the International toggle click fires correctly, otherwise
     # the toggle target element hasn't mounted yet.
@@ -122,6 +119,17 @@ _NETWORKIDLE_HOSTS: tuple[str, ...] = (
     # React-rendered after page load. Need networkidle to catch the XHR content.
     "unisq.edu.au",
 )
+
+# Hosts that need domcontentloaded + a longer-than-default JS settle window.
+# VIT was previously in _NETWORKIDLE_HOSTS (30s outer) but its analytics
+# widgets (Intercom, Hotjar, GA stream) prevent networkidle from ever firing,
+# so every course hit the 30s ceiling and timed out before the International
+# toggle could be clicked.  domcontentloaded fires as soon as the HTML is
+# parsed; the 6s settle gives the Vue/React SPA enough time to mount the
+# International toggle button.  Same strategy used for Torrens in central_pages.
+_DCL_SETTLE_MS_OVERRIDES: dict[str, int] = {
+    "vit.edu.au": 6_000,
+}
 
 # Hosts that need the full 60s / networkidle treatment.
 # These are sites that are either genuinely slow from our DigitalOcean
@@ -193,8 +201,12 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
 
     * Hosts in :data:`_SLOW_HOSTS` (ASA, KBS, CSU) get ``networkidle``
       + 3s settle, 60s outer ceiling, 50s goto.
-    * Hosts in :data:`_NETWORKIDLE_HOSTS` (VIT) get ``networkidle`` + 3s
+    * Hosts in :data:`_NETWORKIDLE_HOSTS` get ``networkidle`` + 3s
       settle, 30s outer ceiling, 25s goto.
+    * Hosts in :data:`_DCL_SETTLE_MS_OVERRIDES` get ``domcontentloaded``
+      + a host-specific settle, 60s outer ceiling, 50s goto.  Used for
+      VIT: analytics widgets prevent networkidle from firing, so we use
+      domcontentloaded + 6s settle to let the International toggle mount.
     * Everyone else gets ``domcontentloaded`` + 1.5s settle, 60s outer
       ceiling, 50s goto.  The default was raised from 20s after multiple
       Australian education sites proved too slow for the old ceiling.
@@ -217,6 +229,14 @@ def _browser_config_for(url: str) -> tuple[str, int, int, int]:
             _NETWORKIDLE_OUTER_TIMEOUT_SEC,
             _NETWORKIDLE_GOTO_TIMEOUT_MS,
         )
+    for h, settle_ms in _DCL_SETTLE_MS_OVERRIDES.items():
+        if host == h or host.endswith("." + h):
+            return (
+                "domcontentloaded",
+                settle_ms,
+                _DEFAULT_OUTER_TIMEOUT_SEC,
+                _DEFAULT_GOTO_TIMEOUT_MS,
+            )
     return (
         "domcontentloaded",
         _DEFAULT_SETTLE_MS,
