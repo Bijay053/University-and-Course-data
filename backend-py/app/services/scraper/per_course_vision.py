@@ -305,6 +305,85 @@ _TEST_FIELD_MAP: Final = {
     "duolingo": ("duolingo_overall",),
 }
 
+# Page-text keywords for each test. Multiple aliases because universities spell
+# them differently ("Duolingo", "DET", "Duolingo English Test"; "Cambridge",
+# "CAE", "C1 Advanced", "C2 Proficiency"). Checked against plain text extracted
+# from the rendered course-page HTML — if none of a test's keywords appear
+# anywhere on the page, any vision result for that test is a hallucination.
+_PAGE_TEST_KEYWORDS: Final[dict[str, tuple[str, ...]]] = {
+    "ielts":     ("ielts",),
+    "pte":       ("pte", "pearson test of english"),
+    "toefl":     ("toefl",),
+    "cambridge": ("cambridge", "cae", "c1 advanced", "c2 proficiency"),
+    "duolingo":  ("duolingo", "det "),
+}
+
+
+def _extract_page_text(html: str) -> str:
+    """Return lower-cased plain text from rendered course-page HTML.
+
+    Uses BeautifulSoup to strip all tags so keyword matching runs against
+    actual page content, not attribute noise or CDN path strings.
+    """
+    try:
+        soup = BeautifulSoup(html or "", "lxml")
+        return soup.get_text(" ", strip=True).lower()
+    except Exception:  # noqa: BLE001
+        return (html or "").lower()
+
+
+def _tests_in_page_text(page_text: str) -> frozenset[str]:
+    """Return the set of test keys (from _TEST_FIELD_MAP) found in page_text."""
+    return frozenset(
+        test
+        for test, keywords in _PAGE_TEST_KEYWORDS.items()
+        if any(kw in page_text for kw in keywords)
+    )
+
+
+def _filter_by_page_tests(
+    normalized: dict[str, Any],
+    page_tests: frozenset[str],
+    *,
+    img_url: str = "",
+) -> dict[str, Any]:
+    """Remove fields for tests whose keywords don't appear anywhere on the page.
+
+    When Gemini Vision returns (e.g.) ``cambridge_overall=170`` but the page
+    HTML never mentions "cambridge", "CAE", or "C1 Advanced", that value is
+    a hallucination — there is nothing on the page for the model to have read.
+    This filter discards such fields before they reach the evidence table.
+
+    IELTS is always kept — it appears on virtually every Australian university
+    page and false-negatives from an absent keyword would be harmful.
+
+    This catches *consistent* hallucinations where Gemini invents both the
+    test name in its output text (passing _vision_fields_consistent_with_ocr)
+    and the score — because neither check currently reads the original HTML.
+    """
+    filtered: dict[str, Any] = {}
+    dropped: list[str] = []
+    for k, v in normalized.items():
+        owning_test: str | None = None
+        for test, fields in _TEST_FIELD_MAP.items():
+            if k in fields:
+                owning_test = test
+                break
+        if owning_test is None or owning_test == "ielts":
+            # Unknown field or IELTS — always keep
+            filtered[k] = v
+        elif owning_test in page_tests:
+            filtered[k] = v
+        else:
+            dropped.append(f"{k}={v}")
+    if dropped:
+        log.info(
+            "[VISION FILTER] %s: discarded %s — test keyword not found on page",
+            img_url or "?",
+            ", ".join(dropped),
+        )
+    return filtered
+
 
 # Sub-band groups used by :func:`_infer_missing_subbands`. Keys are the
 # overall slot; values are the four sub-band slots for that test.
@@ -563,6 +642,19 @@ async def maybe_vision_refetch(
         log.info("[VISION SKIP] no candidate images found on page — %s", url)
         return {}, []
 
+    # Compute which English tests are mentioned anywhere in the page HTML.
+    # Vision results for tests NOT mentioned on the page are hallucinations
+    # (there is nothing for the model to read) and are discarded before
+    # they reach the evidence table. Computed once here — not per image —
+    # so the cost is one BS4 parse per course, not one per Gemini call.
+    _page_text = _extract_page_text(rendered_html)
+    _page_tests = _tests_in_page_text(_page_text)
+    if _page_tests:
+        log.info(
+            "[VISION] page mentions tests: %s — %s",
+            ", ".join(sorted(_page_tests)), url,
+        )
+
     # ── Level-aware image promotion ───────────────────────────────────────
     # When the page has images for different degree levels (e.g. ASAHE has
     # MaSTER.png and BACHELOR.png), put the image that matches this course's
@@ -803,6 +895,19 @@ async def maybe_vision_refetch(
                 if leader_future is not None and not leader_future.done():
                     leader_future.set_exception(exc)
                 raise
+
+        if not normalized:
+            continue
+
+        # Apply page-text filter: discard test fields whose test keyword
+        # doesn't appear anywhere in the course-page HTML.  If a course page
+        # never mentions "Cambridge" / "CAE" / "C1 Advanced", any
+        # cambridge_overall from vision is a hallucination — there was
+        # nothing on the page for Gemini to read it from.
+        # Note: the image cache stores UNFILTERED results so sibling courses
+        # with different page content apply their own filter independently.
+        if _page_tests:
+            normalized = _filter_by_page_tests(normalized, _page_tests, img_url=img_url)
 
         if not normalized:
             continue
