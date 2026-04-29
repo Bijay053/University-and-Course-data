@@ -124,19 +124,23 @@ _ENGLISH_IMG_PRIORITY_KEYWORDS: Final = (
 _VISION_PROMPT: Final = (
     "You are reading an image taken from a university course page. The "
     "image likely contains an English-language requirements table or "
-    "an admissions chart. Extract every English-test score visible in "
-    "the image and return ONLY a plain-text dump with one fact per "
-    "line, like:\n"
-    "  IELTS overall: 6.5\n"
-    "  IELTS listening: 6.0\n"
-    "  PTE overall: 58\n"
-    "  TOEFL iBT: 79\n"
-    "  Cambridge Advanced: 176\n"
-    "  Duolingo English Test: 105\n"
-    "Include the score exactly as shown. Do NOT add commentary, "
-    "headings, or markdown. If a value is not present, omit the line "
-    "— never guess. If the image is decorative (logo/banner/icon) "
-    "with no scores, return nothing."
+    "an admissions chart. Extract every English-test score VISIBLE IN "
+    "THE IMAGE and return ONLY a plain-text dump with one fact per "
+    "line, following this format exactly:\n"
+    "  IELTS overall: [number]\n"
+    "  IELTS listening: [number]\n"
+    "  PTE overall: [number]\n"
+    "  TOEFL iBT: [number]\n"
+    "  Cambridge Advanced: [number]\n"
+    "  Duolingo English Test: [number]\n"
+    "CRITICAL RULES:\n"
+    "- Only report scores you can literally READ from the image pixels.\n"
+    "- Do NOT invent, guess, or recall typical values — ONLY transcribe "
+    "what is visually present.\n"
+    "- If a score is not shown, omit that line entirely.\n"
+    "- If the image is decorative (logo, banner, icon, photo) with no "
+    "numeric scores, return nothing at all.\n"
+    "- Do NOT add commentary, headings, or markdown."
 )
 
 
@@ -282,12 +286,18 @@ async def maybe_vision_refetch(
     or Gemini skipped for every candidate).
     """
     if not rendered_html:
+        log.info("[VISION SKIP] no rendered HTML — %s", url)
         return {}, []
     if not getattr(settings, "gemini_api_key", None):
+        log.warning(
+            "[VISION SKIP] GEMINI_API_KEY not configured — vision OCR will "
+            "never run until the key is set. url=%s", url
+        )
         return {}, []
 
     candidates = _extract_img_candidates(rendered_html, url)
     if not candidates:
+        log.info("[VISION SKIP] no candidate images found on page — %s", url)
         return {}, []
 
     # ── Level-aware image promotion ───────────────────────────────────────
@@ -316,10 +326,14 @@ async def maybe_vision_refetch(
             return 1  # no level match — process after level-matched images
         candidates = sorted(candidates, key=_level_key)
 
+    log.info(
+        "[VISION] %d candidate image(s) found — starting OCR pass for %s",
+        len(candidates), url,
+    )
     if emit:
         await emit(
             "status",
-            f"[per-course vision img 0/{len(candidates)}] {url}",
+            f"[VISION] {len(candidates)} candidate image(s) found — starting OCR pass",
             phase="fallback",
             kind="per_course_vision_start",
             url=url,
@@ -331,15 +345,15 @@ async def maybe_vision_refetch(
     images_consumed = 0
     cache_hits = 0
     for img_url, alt in candidates:
-        # Stop early once every overall slot is filled — saves Gemini
-        # calls and keeps the live log tidy on pages where the first
-        # image was the one we needed. Sub-bands intentionally don't
-        # gate this loop: getting all four overalls is the win condition;
-        # we don't want to keep paying for OCR just to backfill sub-bands.
-        if all(
-            payload.get(k) not in (None, "", 0) or k in filled
-            for k in _ENGLISH_OVERALL_SLOTS
-        ):
+        # Stop early once the vision pass ITSELF has found every overall
+        # slot — saves Gemini calls on extra images once the requirements
+        # image has already been read.
+        # NOTE: we do NOT check payload.get(k) here — payload values may
+        # have come from text extraction (tier 3) and vision (tier 4) is
+        # allowed to override them. Stopping on payload values would skip
+        # the image entirely when text extraction filled the slot with the
+        # wrong value (the ASAHE bug).
+        if all(k in filled for k in _ENGLISH_OVERALL_SLOTS):
             break
 
         # ── Per-image cache lookup with in-flight coalescing ─────────
@@ -383,11 +397,13 @@ async def maybe_vision_refetch(
         if leader_future is not None or image_cache is None:
             # Leader (or no cache at all) actually does the work.
             try:
+                log.info("[VISION] attempting OCR on %s", img_url)
                 img_bytes = await _download(img_url)
                 if not img_bytes:
                     # Negative-cache: a 404 / oversized image must not
                     # be re-downloaded per sibling course. Resolve the
                     # Future with {} so waiters short-circuit too.
+                    log.info("[VISION FAIL] %s: download returned empty (404 or oversized)", img_url)
                     if leader_future is not None:
                         leader_future.set_result({})
                     continue
@@ -398,18 +414,20 @@ async def maybe_vision_refetch(
                     )
                 except Exception as exc:  # noqa: BLE001
                     log.warning(
-                        "per_course_vision Gemini failed for %s: %s", img_url, exc
+                        "[VISION FAIL] %s: Gemini call failed — %s "
+                        "(quota exhausted or API key invalid?)",
+                        img_url, exc,
                     )
                     if leader_future is not None:
                         leader_future.set_result({})
                     continue
                 if resp.skipped or not resp.text:
-                    if resp.skipped:
-                        log.info(
-                            "per_course_vision: Gemini skipped (%s) for %s",
-                            resp.skip_reason,
-                            img_url,
-                        )
+                    skip_reason = getattr(resp, "skip_reason", "no text returned")
+                    log.warning(
+                        "[VISION FAIL] %s: Gemini skipped — %s "
+                        "(likely quota exhausted)",
+                        img_url, skip_reason,
+                    )
                     if leader_future is not None:
                         leader_future.set_result({})
                     continue
@@ -423,7 +441,7 @@ async def maybe_vision_refetch(
                         text_html, url
                     )
                 except Exception as exc:  # noqa: BLE001
-                    log.debug("english_test parse-of-vision failed: %s", exc)
+                    log.warning("[VISION FAIL] %s: english_test parse failed — %s", img_url, exc)
                     if leader_future is not None:
                         leader_future.set_result({})
                     continue
@@ -437,6 +455,14 @@ async def maybe_vision_refetch(
                         if k not in _ENGLISH_OUTPUT_SLOTS:
                             continue
                         normalized.setdefault(k, v)
+                if normalized:
+                    log.info(
+                        "[VISION OK] %s: extracted %s",
+                        img_url,
+                        " ".join(f"{k}={v}" for k, v in sorted(normalized.items())),
+                    )
+                else:
+                    log.info("[VISION] %s: Gemini returned text but no English scores parsed", img_url)
                 if leader_future is not None:
                     leader_future.set_result(dict(normalized))
             except BaseException as exc:
