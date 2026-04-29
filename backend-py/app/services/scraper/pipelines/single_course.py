@@ -104,13 +104,19 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
     "Doctorate",
 })
 
-# Evidence methods produced by per-course vision OCR.  These represent a
-# direct read of the course's own page screenshots and are per-course
-# reliable — they must NOT be wiped by the PG clear-out even when
-# ``central_english_pg_skip`` is True and level-keyed data is unavailable.
+# Evidence methods that are per-course reliable and must NOT be wiped by the
+# PG clear-out even when ``central_english_pg_skip`` is True and level-keyed
+# data is unavailable from the browser.
+#
+# • per_course_vision / per_course_vision_cached — direct screenshot OCR of
+#   the course's own page; cannot carry UG-only central values.
+# • ai_fallback — the fallback AI enriches against the course URL and page
+#   text, NOT the generic central english page.  A 6.5 it returns for a
+#   Master's course is course-specific; clearing it silently is wrong.
 _PER_COURSE_VISION_METHODS: frozenset[str] = frozenset({
     "per_course_vision",
     "per_course_vision_cached",
+    "ai_fallback",
 })
 
 # Maximum allowable delta between a per-course vision OCR reading and the
