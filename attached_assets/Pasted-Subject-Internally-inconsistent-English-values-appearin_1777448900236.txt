@@ -1,0 +1,67 @@
+Subject: Internally-inconsistent English values appearing in staging — need cross-field sanity check
+Found two staging rows with English scores that contradict each other:
+Row 1: IELTS 6.5 / TOEFL 80 / Duolingo 120
+Row 2: IELTS 6.0 / TOEFL 95 / Duolingo 120
+Row 2 is impossible. IELTS 6.0 corresponds to TOEFL 60-78. TOEFL 95 corresponds to IELTS 7.0-7.5. These can't describe the same course minimum. Duolingo 120 in both is suspicious — same value across two different IELTS levels suggests it's hallucinated, not extracted from each course's actual page.
+Could you trace these to their evidence rows? I want to see the method and source_url for each English field on these two courses:
+sqlSELECT sc.course_name, sfe.field_key, sfe.method,
+       sfe.normalized_value, sfe.source_url, sfe.selected
+FROM scraped_courses sc
+JOIN scraped_field_evidence sfe ON sfe.scraped_course_id = sc.id
+WHERE sfe.field_key IN ('ielts_overall','toefl_overall','duolingo_overall')
+  AND sc.id IN (<the two course IDs>)
+ORDER BY sc.id, sfe.field_key, sfe.selected DESC;
+If the methods are mixed (regex for one field, vision_cached for another, sibling_cache for another) with no shared source_url, that confirms the architecture is writing fields independently without cross-checking that they make sense together.
+Proposed fix: cross-field equivalence sanity check
+After all extractors run and before staging, validate that English values are coherent. Use the same equivalence table that VIT's equivalence_table extractor already uses — IELTS 6.5 → TOEFL ~85, PTE ~58, etc.
+pythondef validate_english_coherence(payload, log):
+    """Flag implausible combinations of English values."""
+    ielts = payload.get("ielts_overall")
+    toefl = payload.get("toefl_overall")
+    duolingo = payload.get("duolingo_overall")
+    pte = payload.get("pte_overall")
+
+    if not ielts:
+        return  # nothing to anchor against
+
+    expected = ENGLISH_EQUIVALENCE[ielts]  # {"toefl": (low, high), "duolingo": (low, high), ...}
+
+    issues = []
+    if toefl and not (expected["toefl"][0] - 5 <= toefl <= expected["toefl"][1] + 5):
+        issues.append(f"TOEFL {toefl} inconsistent with IELTS {ielts}")
+    if duolingo and not (expected["duolingo"][0] - 10 <= duolingo <= expected["duolingo"][1] + 10):
+        issues.append(f"Duolingo {duolingo} inconsistent with IELTS {ielts}")
+    if pte and not (expected["pte"][0] - 5 <= pte <= expected["pte"][1] + 5):
+        issues.append(f"PTE {pte} inconsistent with IELTS {ielts}")
+
+    if issues:
+        # Flag for review, demote confidence on outlier fields
+        for issue in issues:
+            log.append({"level": "warning", "msg": f"English coherence: {issue}"})
+        # Reduce confidence on the inconsistent fields so they don't auto-publish
+This wouldn't auto-correct the values — it would flag the row for human review, which is the right behavior when extractors disagree across fields.
+Also: where is Duolingo 120 actually coming from?
+A duolingo_overall = 120 specifically is suspicious because:
+
+120 isn't a common requirement value (most universities use 100, 105, 110, 115)
+The same value appearing across multiple courses with different IELTS suggests it's not being extracted from each course independently
+Could be sibling cache leak, could be vision OCR of a non-DET image, could be PDF parsing error reading a different number
+
+Please grep the run log for "120" near "duolingo" to find the source. If it's all coming from one extractor (sibling cache, or one PDF), that's a single-point fix.
+
+Send that. A few things for you:
+The honest answer to "how is this possible": It's possible because the pipeline writes each field separately without ever asking "do these numbers make sense together?" The architecture has confidence scores, evidence rows, and authority tiers — but no cross-field consistency check. That's a real gap.
+Don't trust any of these rows for production yet. If Row 2 (IELTS 6.0 / TOEFL 95) made it past validation and into staging, then the validators aren't catching this class of error. Anything sitting in staging right now should be considered suspect on the English fields specifically.
+The cross-field check is worth doing. It's a 30-line function that catches a category of bugs the current architecture can't see. Even a permissive version (only flag obvious contradictions like IELTS 6.0 + TOEFL 95) would have caught this row.
+Duolingo 120 is the smoking gun. That same value appearing on two courses with different IELTS minimums is the strongest signal that something is propagating Duolingo values across courses without checking. My bet is sibling cache, but the dev should confirm by tracing the evidence row.
+Until cross-field validation is in place, you can do a manual SQL check to find these in the staging table:
+sql-- Find courses where TOEFL doesn't match IELTS (rough heuristic)
+SELECT id, course_name, ielts_overall, toefl_overall, duolingo_overall, pte_overall
+FROM scraped_courses
+WHERE ielts_overall IS NOT NULL
+  AND (
+    (ielts_overall <= 6.0 AND toefl_overall >= 85)
+    OR (ielts_overall >= 7.0 AND toefl_overall <= 75)
+    OR (ielts_overall <= 6.0 AND duolingo_overall >= 115)
+    OR (ielts_overall >= 7.5 AND duolingo_overall <= 105)
+  );
