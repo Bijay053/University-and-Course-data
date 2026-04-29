@@ -1,0 +1,15 @@
+ps aux | grep celery | grep -v grep
+root     1012777  0.0  0.0  17140  7036 ?        S    Apr28   0:00 sudo journalctl -u uni-celery.service -f
+root     1012778  0.0  0.0  17140  2708 pts/1    Ss   Apr28   0:00 sudo journalctl -u uni-celery.service -f
+root     1012779  0.0  0.2 356800 21752 pts/1    T+   Apr28   0:00 journalctl -u uni-celery.service -f
+root     1189686  6.8  1.3 134748 108216 pts/2   S    05:04   0:02 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189694  0.2  1.1 285784 93628 pts/2    S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189695  7.1  1.3 134808 108024 ?       Ss   05:04   0:02 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189696  0.0  1.0 135856 86596 pts/2    S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189697  0.1  1.0 135860 86604 pts/2    S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189698  0.1  1.0 135864 86600 pts/2    S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189701  0.1  1.0 134856 86584 ?        S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189702  0.1  1.0 134860 86592 ?        S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189703  0.1  1.0 134864 86588 ?        S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+root     1189704  0.1  1.0 134868 86596 ?        S    05:04   0:00 /root/University-and-Course-data/backend-py/venv/bin/python3.12 /root/University-and-Course-data/backend-py/venv/bin/celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
