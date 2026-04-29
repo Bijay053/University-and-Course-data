@@ -500,6 +500,10 @@ async def extract_course(
     _gemini_primary_cost: float = 0.0
     _is_csu_page: bool = False  # set True by the CSU pre-seed; gates Gemini Primary
 
+    # Reset per-coroutine Gemini call log accumulator so this course starts fresh.
+    from app.services.ai.gemini_client import get_call_log as _gcl_get, reset_call_log as _gcl_reset
+    _gcl_reset()
+
     # ── Domestic-only early exit ──────────────────────────────────────────────
     # If the page text explicitly states the course is not available to
     # international students, flag it immediately.  The staging guard will
@@ -1030,40 +1034,110 @@ async def extract_course(
                 )
         else:
             from app.services.scraper.extractors import gemini_primary as _gp
-
-            _gp_html = rendered_html or html
-            _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
-                _gp.extract_primary(_gp_html, url),
-                timeout=_AI_FALLBACK_TIMEOUT_SEC,
+            from app.services.scraper.gemini_gate import (
+                build_classification_only_prompt as _build_class_prompt,
+                should_skip_gemini_primary as _gate_check,
             )
-            _gemini_primary_cost = _gp_cost
+            from app.services.scraper.extractors._text import html_to_text as _h2t_gate
+            from app.services.ai import gemini_client as _gc
+            import json as _gp_json
 
-            # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
-            if emit and _gp_dbg:
-                await emit(
-                    "status",
-                    f"[GP-DEBUG] static={len(html) if html else 0}B "
-                    f"rendered={len(rendered_html) if rendered_html else 0}B "
-                    f"using={'rendered' if rendered_html else 'static'} "
-                    f"text_len={_gp_dbg.get('text_len', '?')}",
-                    phase="extract",
-                    kind="gp_debug_html",
-                    url=url,
+            _gate_skip, _gate_reason = _gate_check(payload, evidence)
+
+            _gp_filled: dict[str, Any] = {}
+            _gp_dbg: dict[str, Any] = {}
+            _gp_in_tok: int = 0
+            _gp_out_tok: int = 0
+
+            if _gate_skip:
+                # All high-value fields already covered at high confidence — skip.
+                _gemini_primary_cost = 0.0
+                if emit:
+                    await emit(
+                        "status",
+                        f"[GEMINI] {url[:60]} → skipped ({_gate_reason}) (cost=$0.000000)",
+                        phase="extract",
+                        kind="gemini_primary_done",
+                        filled=[],
+                        cost_usd=0.0,
+                        input_tokens=0,
+                        output_tokens=0,
+                        gate_reason=_gate_reason,
+                        url=url,
+                    )
+
+            elif _gate_reason == "classification_only":
+                # Only category/sub_category missing — use cheap 100-token prompt.
+                _class_text = _h2t_gate(rendered_html or html)
+                _class_prompt = _build_class_prompt(
+                    payload.get("course_name") or "",
+                    _class_text,
                 )
-                await emit(
-                    "status",
-                    f"[GP-DEBUG] text[:500]={_gp_dbg.get('text_snippet', '')!r}",
-                    phase="extract",
-                    kind="gp_debug_text",
-                    url=url,
+                _class_resp = await _gc.generate(
+                    _class_prompt,
+                    max_output_tokens=120,
+                    call_type="classification_only",
+                    course_url=url,
                 )
-                await emit(
-                    "status",
-                    f"[GP-DEBUG] raw_response={_gp_dbg.get('raw_response', '')!r}",
-                    phase="extract",
-                    kind="gp_debug_raw",
-                    url=url,
+                _gemini_primary_cost = _class_resp.cost_usd
+                _gp_in_tok = _class_resp.input_tokens
+                _gp_out_tok = _class_resp.output_tokens
+                if _class_resp.text and not _class_resp.skipped:
+                    try:
+                        _gp_filled = _gp_json.loads(_class_resp.text)
+                    except Exception:
+                        pass
+                if emit:
+                    await emit(
+                        "status",
+                        f"[GEMINI] {url[:60]} → classification_only "
+                        f"cat={_gp_filled.get('category', '?')!r} "
+                        f"(cost=${_class_resp.cost_usd:.6f})",
+                        phase="extract",
+                        kind="gemini_primary_done",
+                        filled=list(_gp_filled.keys()),
+                        cost_usd=_class_resp.cost_usd,
+                        input_tokens=_class_resp.input_tokens,
+                        output_tokens=_class_resp.output_tokens,
+                        gate_reason=_gate_reason,
+                        url=url,
+                    )
+
+            else:
+                # Full extraction needed — run the complete Gemini primary prompt.
+                _gp_html = rendered_html or html
+                _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
+                    _gp.extract_primary(_gp_html, url),
+                    timeout=_AI_FALLBACK_TIMEOUT_SEC,
                 )
+                _gemini_primary_cost = _gp_cost
+
+                # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
+                if emit and _gp_dbg:
+                    await emit(
+                        "status",
+                        f"[GP-DEBUG] static={len(html) if html else 0}B "
+                        f"rendered={len(rendered_html) if rendered_html else 0}B "
+                        f"using={'rendered' if rendered_html else 'static'} "
+                        f"text_len={_gp_dbg.get('text_len', '?')}",
+                        phase="extract",
+                        kind="gp_debug_html",
+                        url=url,
+                    )
+                    await emit(
+                        "status",
+                        f"[GP-DEBUG] text[:500]={_gp_dbg.get('text_snippet', '')!r}",
+                        phase="extract",
+                        kind="gp_debug_text",
+                        url=url,
+                    )
+                    await emit(
+                        "status",
+                        f"[GP-DEBUG] raw_response={_gp_dbg.get('raw_response', '')!r}",
+                        phase="extract",
+                        kind="gp_debug_raw",
+                        url=url,
+                    )
             # ────────────────────────────────────────────────────────────────────
 
             # Map duration_value/duration_unit → canonical duration/duration_term
@@ -2641,4 +2715,5 @@ async def extract_course(
         "evidence": evidence,
         "provenance_footer": footer,
         "gemini_primary_cost_usd": _gemini_primary_cost,
+        "gemini_calls": _gcl_get(),
     }
