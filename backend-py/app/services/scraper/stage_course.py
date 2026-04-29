@@ -361,7 +361,21 @@ async def stage_course(
         **{k: _clean(v) for k, v in payload.items() if hasattr(ScrapedCourse, k) and k != "course_name"},
     )
     db.add(sc)
-    await db.flush()  # need sc.id for the FK on evidence rows
+    try:
+        await db.flush()  # need sc.id for the FK on evidence rows
+    except Exception as exc:  # noqa: BLE001
+        # Explicit rollback prevents returning a poisoned connection to the
+        # pool. Without this, asyncpg leaves the connection in a
+        # "transaction aborted" state; every subsequent course on the same
+        # pooled connection then fails with InFailedSQLTransactionError
+        # even though the root error was something unrelated (e.g. a
+        # missing column from an unapplied migration).
+        await db.rollback()
+        log.warning(
+            "stage_course: initial flush failed for %r (uni %s): %s — rolling back",
+            name, university_id, exc,
+        )
+        return StageResult(False, f"flush failed: {exc}")
 
     # ----- Bug C: completeness + eligibility + auto_publish -----
     # Computed against the in-memory ScrapedCourse before commit so the row

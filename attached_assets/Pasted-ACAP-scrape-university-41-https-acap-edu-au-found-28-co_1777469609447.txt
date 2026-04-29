@@ -1,0 +1,110 @@
+ACAP scrape (university 41, https://acap.edu.au/) found 28 courses and extracted them well — fees, IELTS, durations, intakes, study modes all populated correctly. But 9 valid stagings were lost to a database transaction error, and 5 more were rejected by the over-aggressive online_only filter. Final result: 0 staged out of 28.
+
+---
+
+**Bug 1 (blocker): database transaction aborted partway through staging, lost 9 records**
+
+First staging error:
+```
+[STAGE] error on Bachelor of Social Work: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InFailedSQLTransactionError'>: current transaction is aborted, commands ignored until end of transaction block
+```
+Every subsequent staging attempt (Graduate Certificate of Human Services, Graduate Certificate of Professional Accounting, Graduate Diploma of Professional Accounting, Master of Professional Psychology, Master of Psychology Clinical, Master of Social Work Qualifying, Graduate Diploma of Legal Practice, Graduate Diploma of Legal Practice PLT) hit the same `InFailedSQLTransactionError`.
+
+This is the SQLAlchemy/asyncpg pattern where one earlier statement raised an exception inside the transaction, but the code didn't roll back — so every subsequent INSERT in the same transaction returns this error until the block ends. The actual root-cause exception isn't in the log; it would have happened just before "Bachelor of Social Work" or possibly during one of the cleared 99 stale-row deletions at the start.
+
+Looking at the data being inserted in the failing INSERTs, two things stand out as candidates for the original fault:
+
+1. **`scrape_warnings` column appearing only in some inserts.** The first 7 erroring INSERTs have 65 `$N` parameters and no `scrape_warnings` column. The last two (Graduate Diploma of Legal Practice and PLT version, both `WARN 75/100`) have 66 parameters with `scrape_warnings` in the column list (column 64). If the schema was migrated mid-job, or if `scrape_warnings` is a newer column that's only included when warnings exist, the first INSERT that triggered the abort might have been one whose schema didn't match. Worth checking which INSERT statement was issued *before* the Bachelor of Social Work one and whether it had a column-count or type mismatch.
+
+2. **`fee_term` values look inconsistent.** Some say `'Annual'` (Bachelor of Social Work → fee 29176, Master of Psychology Clinical → 56849, Master of Social Work → 33277) and some say `'Full Course'` (the certificates and diplomas). If `fee_term` has a CHECK constraint or enum that one of these violates, that would also abort the transaction. Worth verifying.
+
+**Fix:** wrap each per-course staging INSERT in its own transaction (or savepoint) so a failure on one row doesn't poison the rest. With 27 courses going through, one bad row shouldn't take out 9 good ones. Also surface the original asyncpg error rather than only the `InFailedSQLTransactionError` cascade — right now we can't see what actually broke.
+
+---
+
+**Bug 2: online_only rejection is over-aggressive (same as the original UniSQ report)**
+
+Five courses were rejected as `online_only`:
+- Graduate Certificate in Business Administration (study_mode=Online via rule)
+- Graduate Certificate of Applied Coaching (study_mode=Online via rule)
+- Graduate Diploma of Business Administration (study_mode=Online via rule)
+- Master of Business Administration / MBA (study_mode=Online via rule)
+- Master of Psychology Practice (Clinical) (study_mode=Online via rule)
+
+ACAP genuinely has on-campus delivery for several of these. From their own field summaries:
+- MBA: page text shows "Online" but ACAP has Sydney/Melbourne/Brisbane/Adelaide/Perth campuses listed and the location is "Sydney, Melbourne, Brisbane, Adelaide, Perth, Australia" — that doesn't match a pure-online program.
+- Graduate Certificate in Business Administration likewise has all 5 campuses in location.
+
+Looks like the rule-based study_mode is over-classifying as Online when the page mentions online study options, even though on-campus is also available. For ACAP specifically, most courses are dual-mode (online + on-campus) — the filter should treat dual-mode as eligible, not online-only.
+
+Fix: only reject as `online_only` when study_mode is Online AND location_text is also missing/online-only (not when there's a list of physical campuses). Or use the same fix from the original UniSQ report — never default to Online when location is unknown; only use Online when explicitly stated as online-only.
+
+---
+
+**Bug 3: domestic_only filter blocked 12 courses (likely working as intended, worth verifying)**
+
+12 courses were rejected as `domestic_only`:
+```
+[DOMESTIC ONLY] https://www.acap.edu.au/courses/associate-degree-of-criminal-justice/ — course page states domestic-students-only; skipping
+```
+...and 11 more across counselling, criminology, psychology variants, and graduate certificate/diploma psych.
+
+ACAP does mark several courses as domestic-only on their pages (especially psychology and counselling courses which require provisional registration), so this filter is doing real work. But worth a sanity-check that all 12 actually are domestic-only on the live pages — if even one is misclassified, that's a missed staging.
+
+Note also these 12 generated `missing_course_name` and `missing_international_fee` critical warnings because the filter dropped them before extraction. That's a tidy-up issue: courses dropped at the domestic_only gate shouldn't be flagged as missing data, since we never tried to extract them.
+
+---
+
+**Bug 4: english_coherence_pte data quality warning — hallucinated PTE again**
+
+```
+[DATA QUALITY][WARN] english_coherence_pte × 1: IELTS 6.0 + PTE 66.0 is inconsistent: PTE 66 corresponds to IELTS ≥ 7.0
+```
+Somewhere a course got IELTS 6.0 (correct — typical bachelor's level) backfilled with PTE 66.0 (which corresponds to IELTS 7.0+). This is the same hallucinated-PTE-via-sibling-cache pattern from the ACU and CDU reports. Log shows the sibling cache backfilling 47 slots:
+```
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 47 slot(s) filled across siblings
+```
+The Bachelor of Social Work record has IELTS 6.0 and PTE 66.0 — that's almost certainly the inconsistent pair. PTE 66 is a postgraduate-level requirement for ACAP; backfilling it onto a bachelor's course where the actual page only stated IELTS is the bug.
+
+Fix is the same as before: don't backfill PTE/TOEFL/CAE/DET from siblings. Apply globally.
+
+---
+
+**Bug 5: Gemini service degradation**
+
+Lots of `503 UNAVAILABLE` and `circuit_open` errors during vision OCR:
+```
+[VISION FAIL] https://cdn-ileicgm.nitrocdn.com/... — Gemini skipped — circuit_open (likely quota exhausted)
+```
+This isn't an ACAP-specific bug, but it meant the last few courses didn't get vision OCR at all. Consider: the circuit-open state should probably trigger a fallback to non-Gemini OCR, or skip vision entirely with a flag rather than waste cycles checking.
+
+---
+
+**Bug 6: extraction_method JSONB serialisation**
+
+Looking at the failed INSERTs, one of the fields being inserted is `extraction_method` as a JSON string with truncation indicated. Worth verifying the truncation isn't producing invalid JSON, e.g.:
+```
+'{"course_name": "course_name.h1", ...  (229 characters truncated) ... ion_value": "ai_fallback", ...}'
+```
+The `(N characters truncated)` is just log truncation, but if the actual database value is being truncated by a VARCHAR length cap somewhere upstream of the JSONB column, that would also cause an INSERT to fail. Worth a quick check.
+
+---
+
+**What worked well**
+
+- Discover → sitemap fallback worked correctly: 1 candidate from crawl, 27 from sitemap (different from the over-aggressive ACU regression — ACAP's sitemap gave a clean course-pages-only list).
+- Field extraction was excellent: every non-domestic-only course got fee + IELTS + duration + intake + study_mode, mostly via regex.
+- The domestic_only detection at the page level worked.
+- Run was fast: 1m 59s for 28 courses (~4.2s each).
+
+---
+
+**Summary**
+
+- **Bug 1** is the blocker. Fix: per-row transactions or savepoints, plus surface the original asyncpg error.
+- **Bugs 2 and 4** are recurrences of issues already flagged; they need global fixes (same as UniSQ for online_only, same as ACU/CDU for hallucinated PTE).
+- **Bug 3** is mostly working but worth a sanity check.
+- **Bug 5** is environmental and probably self-resolving.
+- **Bug 6** is a guess based on log shape; may or may not be real.
+
+If Bug 1 is fixed, this run would have staged ~9 courses cleanly. If Bug 2 is also fixed, another ~3-5 would stage. ACAP is the closest to working of any university so far — the data is good, the pipeline works, only staging is broken.
