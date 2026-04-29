@@ -347,3 +347,24 @@ async def _mark_failed(runtime_job_id: str, err: str) -> None:
             job.status = "failed"
             job.error_message = f"Scraping failed: {err[:200]}"
             await db.commit()
+
+
+@celery_app.task(name="scrape.refresh_baselines", bind=True, max_retries=0)
+def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
+    """Celery beat task — recompute fill-rate baselines from the trailing 30 days.
+
+    Runs weekly (Sunday 04:00 UTC via beat_schedule in celery_app.py).
+    Idempotent: uses INSERT ... ON CONFLICT DO UPDATE so re-running is safe.
+    """
+    async def _run() -> dict:
+        await engine.dispose()
+        async with AsyncSessionLocal() as db:
+            from app.scripts.seed_baselines import seed_baselines
+            count = await seed_baselines(db)
+            return {"ok": True, "baselines_upserted": count}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        log.exception("refresh_baselines_weekly failed: %s", exc)
+        return {"ok": False, "reason": str(exc)}

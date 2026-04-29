@@ -1,0 +1,386 @@
+Subject: Priority 3 — CRICOS code matching for AU PDF↔course pairing
+Australian course pages and university-wide PDFs (fee schedules, English requirements docs) both publish CRICOS codes — unique 6-7 digit + letter identifiers registered with the Australian government. Currently we match PDF rows to course pages using fuzzy name overlap, which produces wrong pairings for similarly-named programs (Master of IT - Cyber Security accidentally inheriting Master of IT - AI's fee, etc.).
+CRICOS codes are deterministic. When both sides have one, the match is unambiguous and confidence should be near 1.0. When either side is missing the code, fall back to existing fuzzy matching.
+This is AU-specific by design. Universities outside Australia won't have CRICOS codes; the matching logic will skip the CRICOS step for them and use fuzzy matching as today. No regression to non-AU scraping.
+Estimated effort: half a day.
+Component 1: CRICOS code extractor (course pages)
+New module backend-py/app/services/scraper/extractors/cricos_code.py:
+python"""CRICOS code extraction from Australian course pages.
+
+CRICOS = Commonwealth Register of Institutions and Courses for Overseas
+Students. Australian government register; unique program identifier per
+course version.
+
+Format: 6-7 digits + 1 uppercase letter (e.g., '084932E', '0101389').
+"""
+
+import re
+from bs4 import BeautifulSoup
+
+# Regex patterns ordered by specificity
+CRICOS_LABEL_PATTERNS = [
+    # "CRICOS Code: 084932E" / "CRICOS code: 084932E" / "CRICOS#: 084932E"
+    re.compile(r"CRICOS\s*(?:Code|code|number|#)?\s*[:\-]?\s*([0-9]{6,7}[A-Z])\b", re.IGNORECASE),
+    # "CRICOS 084932E" (bare label + code)
+    re.compile(r"\bCRICOS\s+([0-9]{6,7}[A-Z])\b"),
+]
+
+# Bare CRICOS code without label — only used as last-resort
+CRICOS_BARE_PATTERN = re.compile(r"\b([0-9]{6,7}[A-Z])\b")
+
+# CRICOS-like noise to ignore (postal codes, room numbers, etc.)
+CRICOS_NOISE_PATTERNS = [
+    re.compile(r"\bROOM\s+\d+[A-Z]"),
+    re.compile(r"\bBLOCK\s+\d+[A-Z]"),
+]
+
+
+def extract_cricos_code(html: str | None, text: str | None) -> str | None:
+    """Extract CRICOS code from a course page.
+    
+    Returns the first labeled CRICOS code found, or None if none present.
+    Always returns the code in uppercase canonical form.
+    """
+    if not html and not text:
+        return None
+    
+    # Prefer labeled patterns (most reliable)
+    for source in [text, html]:
+        if not source:
+            continue
+        for pattern in CRICOS_LABEL_PATTERNS:
+            match = pattern.search(source)
+            if match:
+                code = match.group(1).upper()
+                if not _is_noise(source, match.start()):
+                    return code
+    
+    # Bare-code fallback only on text near a CRICOS keyword
+    if text and "cricos" in text.lower():
+        # Look for bare codes within 50 chars of any 'cricos' mention
+        for cricos_match in re.finditer(r"cricos", text, re.IGNORECASE):
+            start = cricos_match.end()
+            window = text[start:start + 80]
+            bare_match = CRICOS_BARE_PATTERN.search(window)
+            if bare_match:
+                return bare_match.group(1).upper()
+    
+    return None
+
+
+def extract_cricos_code_from_html_structured(html: str) -> str | None:
+    """Try to find CRICOS in structured HTML elements (more reliable than regex)."""
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    
+    # Look in definition lists, tables, and key-value structures
+    for elem in soup.find_all(["dt", "th", "strong", "label", "span"]):
+        if elem.string and "cricos" in elem.string.lower():
+            # Sibling or parent might have the code
+            sibling = elem.find_next_sibling(["dd", "td", "span"])
+            if sibling and sibling.string:
+                match = CRICOS_BARE_PATTERN.search(sibling.string)
+                if match:
+                    return match.group(1).upper()
+            # Or it might be in the parent's text
+            parent_text = elem.parent.get_text(" ", strip=True) if elem.parent else ""
+            for pattern in CRICOS_LABEL_PATTERNS:
+                match = pattern.search(parent_text)
+                if match:
+                    return match.group(1).upper()
+    
+    return None
+
+
+def _is_noise(text: str, position: int) -> bool:
+    """Check if a CRICOS-like match is actually noise (room number, etc.)."""
+    window = text[max(0, position - 40):position + 40]
+    return any(p.search(window) for p in CRICOS_NOISE_PATTERNS)
+Wire into the existing course-page extractor pipeline. Add cricos_code field to course payload. Confidence 0.95. Method regex:cricos.
+Validation: a CRICOS code is valid if it matches the format ^\d{6,7}[A-Z]$. Don't store malformed codes.
+Component 2: CRICOS extraction from PDFs
+Extend the existing pipelines/university_pdfs.py parser. Currently it returns ProgramRecord objects keyed by program name. Add cricos_code to the record:
+python# backend-py/app/services/scraper/pipelines/university_pdfs.py
+
+from dataclasses import dataclass, field
+
+@dataclass
+class ProgramRecord:
+    program_name: str
+    cricos_code: str | None = None  # NEW
+    international_fee: float | None = None
+    domestic_fee: float | None = None
+    fee_term: str | None = None
+    ielts_overall: float | None = None
+    # ... existing fields
+
+
+CRICOS_IN_ROW_PATTERN = re.compile(r"\b([0-9]{6,7}[A-Z])\b")
+
+
+def extract_cricos_from_pdf_row(row_cells: list[str]) -> str | None:
+    """Search all cells in a PDF row for a CRICOS-format code.
+    
+    PDFs have inconsistent column layouts. CRICOS might be in column 1, 3,
+    embedded in the program-name cell, or in a separate row above/below.
+    """
+    for cell in row_cells:
+        if not cell or not isinstance(cell, str):
+            continue
+        match = CRICOS_IN_ROW_PATTERN.search(cell)
+        if match:
+            return match.group(1).upper()
+    return None
+
+
+def parse_pdf_program_records(pdf_text: str) -> list[ProgramRecord]:
+    """Existing parser — add cricos_code to each record."""
+    records = []
+    for row in iterate_pdf_table_rows(pdf_text):  # existing
+        record = ProgramRecord(
+            program_name=clean_name(row),
+            cricos_code=extract_cricos_from_pdf_row(row.cells),  # NEW
+            international_fee=...,  # existing
+            ielts_overall=...,
+            # ... existing
+        )
+        records.append(record)
+    return records
+Important — adjacent-row CRICOS: some PDFs put the CRICOS code on a row immediately above or below the program name (formatted as a "header" or "subtitle"). Add a second pass that, for any record without cricos_code, checks the immediately preceding and following rows for a bare CRICOS-format value:
+pythondef fill_adjacent_row_cricos(records: list[ProgramRecord], 
+                              raw_rows: list[list[str]]) -> None:
+    """For records missing CRICOS, check adjacent PDF rows."""
+    for i, record in enumerate(records):
+        if record.cricos_code:
+            continue
+        # Check row above and below in the original raw_rows
+        for offset in [-1, 1]:
+            adj_idx = i + offset
+            if 0 <= adj_idx < len(raw_rows):
+                code = extract_cricos_from_pdf_row(raw_rows[adj_idx])
+                if code:
+                    record.cricos_code = code
+                    break
+Component 3: CRICOS-first matcher in the orchestrator
+The current PDF→course matching code probably lives in the orchestrator or single_course.py and looks something like:
+pythondef match_pdf_record_to_course(course, pdf_records):
+    return fuzzy_name_match(course, pdf_records)  # current
+Replace with:
+pythondef match_pdf_record_to_course(
+    course: CoursePayload,
+    pdf_records: list[ProgramRecord],
+) -> tuple[ProgramRecord | None, str]:
+    """Match a course to its PDF record. Returns (record, match_method).
+    
+    Match priority:
+    1. CRICOS code equality (deterministic, confidence 0.95)
+    2. Fuzzy name match (existing behavior, confidence 0.70)
+    
+    Returns (None, 'no_match') if neither finds a match.
+    """
+    # 1. CRICOS-first
+    if course.cricos_code:
+        cricos_matches = [
+            r for r in pdf_records 
+            if r.cricos_code and r.cricos_code == course.cricos_code
+        ]
+        if len(cricos_matches) == 1:
+            return cricos_matches[0], "cricos_match"
+        elif len(cricos_matches) > 1:
+            # Same CRICOS in multiple PDF rows is unusual — could mean
+            # the PDF lists per-campus or per-intake variants. Pick the
+            # first one but log a warning.
+            log.warning(f"Multiple PDF rows match CRICOS {course.cricos_code} "
+                       f"for {course.url}: {len(cricos_matches)} matches")
+            return cricos_matches[0], "cricos_match_ambiguous"
+    
+    # 2. Fall back to existing fuzzy match
+    fuzzy_match = fuzzy_name_match(course, pdf_records)
+    if fuzzy_match:
+        return fuzzy_match, "fuzzy_match"
+    
+    return None, "no_match"
+Update the evidence-row writer to use the new method labels. When a value comes from a CRICOS-matched PDF record, write evidence with method uni_pdf:cricos_match:fees or uni_pdf:cricos_match:requirements (replacing the existing uni_pdf:fees:per_course etc.). When fuzzy-matched, keep the existing labels.
+Component 4: Authority model update
+The existing authority tier dict probably has:
+pythonMETHOD_AUTHORITY = {
+    "central_page": 1,
+    "uni_pdf:fees:per_course": 2,
+    "uni_pdf:requirements": 2,
+    "regex": 3,
+    "gemini_primary": 3,
+    # ... etc
+}
+Add the CRICOS-matched variants at a higher tier within their group:
+pythonMETHOD_AUTHORITY = {
+    "central_page": 1,
+    "uni_pdf:cricos_match:fees": 1.5,           # NEW — beats other tier 2
+    "uni_pdf:cricos_match:requirements": 1.5,    # NEW
+    "uni_pdf:fees:per_course": 2,
+    "uni_pdf:requirements": 2,
+    "regex": 3,
+    "gemini_primary": 3,
+    # ... etc
+}
+Tier 1.5 means: a CRICOS-matched PDF value beats a fuzzy-matched PDF value AND beats most page-text extractors, but is still below central_page (which is the most authoritative because it comes from the university's official policy page).
+Component 5: Schema additions
+sqlALTER TABLE scraped_courses
+    ADD COLUMN cricos_code VARCHAR(16);
+
+CREATE INDEX idx_scraped_courses_cricos ON scraped_courses(cricos_code) 
+    WHERE cricos_code IS NOT NULL;
+Also update scraped_field_evidence if there's a fixed-set method enum — add the new method labels.
+Component 6: Tests
+python# backend-py/tests/test_cricos_extraction.py
+
+def test_extract_cricos_from_labeled_text():
+    assert extract_cricos_code(None, "CRICOS Code: 084932E") == "084932E"
+    assert extract_cricos_code(None, "CRICOS code: 0101389") == "0101389"
+    assert extract_cricos_code(None, "CRICOS#: 067687K") == "067687K"
+    assert extract_cricos_code(None, "CRICOS 084932E") == "084932E"
+
+
+def test_extract_cricos_returns_uppercase():
+    assert extract_cricos_code(None, "CRICOS code: 084932e") == "084932E"
+
+
+def test_extract_cricos_returns_none_when_absent():
+    assert extract_cricos_code(None, "Bachelor of Arts. No code here.") is None
+
+
+def test_extract_cricos_ignores_noise():
+    # Room/Block patterns should not be matched as CRICOS
+    assert extract_cricos_code(None, "Located at Room 084932E in Building C") is None
+
+
+def test_extract_cricos_from_html_structured():
+    html = """<dl>
+        <dt>CRICOS Code</dt>
+        <dd>084932E</dd>
+    </dl>"""
+    assert extract_cricos_code_from_html_structured(html) == "084932E"
+
+
+def test_pdf_cricos_extraction_from_row():
+    row = ["Master of IT (Cyber Security)", "082461C", "AUD 31,840", "6.5"]
+    assert extract_cricos_from_pdf_row(row) == "082461C"
+
+
+def test_pdf_cricos_adjacent_row():
+    rows = [
+        ["082461C"],  # CRICOS-only header row
+        ["Master of IT (Cyber Security)", "AUD 31,840", "IELTS 6.5"],  # data row
+    ]
+    records = [ProgramRecord(program_name="Master of IT (Cyber Security)")]
+    fill_adjacent_row_cricos(records, rows)
+    assert records[0].cricos_code == "082461C"
+
+
+# tests/test_cricos_matching.py
+
+def test_cricos_match_takes_precedence_over_fuzzy():
+    course = CoursePayload(
+        course_name="Master of Information Technology",
+        cricos_code="082461C",
+    )
+    pdf_records = [
+        ProgramRecord(program_name="Master of IT (Cyber Security)", 
+                      cricos_code="082461C", international_fee=31840),
+        ProgramRecord(program_name="Master of Information Technology",  # fuzzy match
+                      cricos_code=None, international_fee=99999),  # wrong
+    ]
+    match, method = match_pdf_record_to_course(course, pdf_records)
+    assert match.cricos_code == "082461C"
+    assert match.international_fee == 31840
+    assert method == "cricos_match"
+
+
+def test_fuzzy_fallback_when_no_cricos_on_course():
+    course = CoursePayload(course_name="Bachelor of Arts", cricos_code=None)
+    pdf_records = [
+        ProgramRecord(program_name="Bachelor of Arts", 
+                      cricos_code="012345A", international_fee=29400),
+    ]
+    match, method = match_pdf_record_to_course(course, pdf_records)
+    assert match is not None
+    assert method == "fuzzy_match"
+
+
+def test_no_match_returns_none():
+    course = CoursePayload(course_name="Bachelor of Arts", cricos_code="999999X")
+    pdf_records = []  # empty
+    match, method = match_pdf_record_to_course(course, pdf_records)
+    assert match is None
+    assert method == "no_match"
+
+
+def test_cricos_match_ambiguous_logs_warning():
+    course = CoursePayload(course_name="Test", cricos_code="084932E")
+    pdf_records = [
+        ProgramRecord(program_name="A", cricos_code="084932E"),
+        ProgramRecord(program_name="B", cricos_code="084932E"),
+    ]
+    match, method = match_pdf_record_to_course(course, pdf_records)
+    assert match is not None
+    assert method == "cricos_match_ambiguous"
+Verification after deployment
+Step 1: Re-scrape an Australian university with PDFs (UniSQ, ACAP, ASAHE) and check that CRICOS codes are now populated:
+sqlSELECT COUNT(*) FILTER (WHERE cricos_code IS NOT NULL) AS with_cricos,
+       COUNT(*) AS total_courses,
+       (COUNT(*) FILTER (WHERE cricos_code IS NOT NULL))::float / COUNT(*) AS cricos_coverage
+FROM scraped_courses
+WHERE university_id IN (1, 2, 41)  -- UniSQ, ACAP example IDs
+  AND status = 'pending';
+Expected: at least 70-80% of AU course rows now have a CRICOS code. Domestic-only programs and pathway/preparation courses won't have CRICOS, so 100% coverage is unrealistic.
+Step 2: Check that CRICOS-matched PDF values are flowing into evidence:
+sqlSELECT method, field_key, COUNT(*) AS count
+FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+WHERE sc.university_id = 1  -- UniSQ
+  AND method LIKE 'uni_pdf%'
+GROUP BY method, field_key
+ORDER BY method, field_key;
+Expected: rows with method uni_pdf:cricos_match:fees and uni_pdf:cricos_match:requirements should appear. Some uni_pdf:fees:per_course (fuzzy fallback) is fine — that's domestic-only courses or programs whose CRICOS isn't on the page.
+Step 3: Spot-check a known previously-wrong course. The pattern we hit was Master of IT specialisations getting wrong fees because the fuzzy matcher confused them. Pick one such course, look at its evidence panel:
+sqlSELECT field_key, method, normalized_value, source_url, confidence
+FROM scraped_field_evidence
+WHERE scraped_course_id = (
+    SELECT id FROM scraped_courses 
+    WHERE course_name ILIKE '%cyber security%' 
+      AND university_id = 1
+    ORDER BY created_at DESC LIMIT 1
+)
+AND field_key IN ('international_fee', 'ielts_overall')
+ORDER BY field_key, selected DESC;
+Expected: the selected=true row for international_fee shows method uni_pdf:cricos_match:fees, confidence 0.95, and the value matches what's actually in the university's PDF for the correct CRICOS-coded program.
+Step 4: Confirm no regression on non-Australian universities. Run a known UK/NZ/CA university and verify the scrape completes normally:
+sql-- Should complete without errors and produce normal evidence rows
+SELECT method, COUNT(*) FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+WHERE sc.university_id = <non-AU university id>
+GROUP BY method;
+Expected: same methods as before this PR (no cricos_match rows because non-AU universities have no CRICOS codes). The CRICOS extractor returns None for these and matching falls through to the existing fuzzy logic. This is the correct behavior — no regression.
+Edge cases worth handling but not blocking
+
+CRICOS revoked/changed: a program's CRICOS code can change between PDF version and current page. The matcher will treat them as non-matching, which is correct — the data really is from different program versions.
+Multiple campuses, same CRICOS: rare but happens. The current spec picks the first match and logs a warning. This is acceptable; the logged ambiguity will tell us if it's a real issue.
+Domestic-only courses: no CRICOS code (Australian-only programs aren't CRICOS-registered). These will fall through to fuzzy matching, same as today. No special handling needed.
+
+Out of scope for this priority
+
+Generalising to other countries' program codes (NZQA, UCAS, etc.) — separate priority, only worth doing if AU CRICOS matching proves valuable
+Building a CRICOS-code-to-course-name lookup table for cross-validation — overengineering for now
+Backfilling CRICOS codes on existing scraped_courses rows — the next scheduled scrape will populate them naturally
+
+Estimated effort
+About half a day. Order of implementation:
+
+Component 1 (extractor) + tests — 1.5 hours
+Component 5 (schema migration) — 15 min
+Component 2 (PDF-side extraction) + tests — 1 hour
+Component 3 (matcher) + tests — 1 hour
+Component 4 (authority update) — 30 min
+Verification on UniSQ/ACAP/ASAHE — 30 min
+
+If you hit a blocker (e.g., the existing PDF parser is structured in a way that makes adding CRICOS extraction non-trivial), flag it before refactoring.

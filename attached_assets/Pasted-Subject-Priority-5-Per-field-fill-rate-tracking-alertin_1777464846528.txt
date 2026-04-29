@@ -1,0 +1,509 @@
+Subject: Priority 5 — Per-field fill-rate tracking + alerting
+Build observability so we catch data quality regressions automatically instead of manually spot-checking the Evidence Review panel. The bugs we've debugged in recent weeks (vision hallucinating from logos, sibling cache propagating wrong values, AI fallback fabricating intakes, fee_term flips) all sat in staging undetected because we have no metrics infrastructure. This adds it.
+This is a system, not a bug fix. Estimated 1-1.5 days. The four components are independent and can ship sequentially with verification at each step.
+Component 1: Metrics table + collection
+Add a metrics table that captures per-scrape-run, per-field, per-method counts. Computed automatically at the end of each scrape job from scraped_field_evidence.
+sqlCREATE TABLE scrape_run_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    scrape_run_id BIGINT NOT NULL REFERENCES scrape_runtime_jobs(id),
+    university_id INT NOT NULL,
+    field_key VARCHAR(64) NOT NULL,
+    method VARCHAR(64) NOT NULL,
+    count INT NOT NULL,
+    courses_total INT NOT NULL,  -- denominator for the fill-rate calculation
+    fill_rate NUMERIC(5,4) NOT NULL,  -- count / courses_total
+    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_run_metrics_run ON scrape_run_metrics(scrape_run_id);
+CREATE INDEX idx_run_metrics_uni_field ON scrape_run_metrics(university_id, field_key);
+CREATE INDEX idx_run_metrics_method ON scrape_run_metrics(method);
+After every scrape job completes, run a metrics collector that fills this table:
+python# backend-py/app/services/scraper/metrics.py
+
+async def compute_run_metrics(scrape_run_id: int, university_id: int) -> None:
+    """Compute per-field per-method metrics for a completed scrape run."""
+    
+    # Total successfully-staged courses for this run
+    courses_total = await session.execute(
+        select(func.count(ScrapedCourse.id))
+        .where(ScrapedCourse.scrape_run_id == scrape_run_id)
+        .where(ScrapedCourse.status.in_(['pending', 'review_ready']))
+    ).scalar()
+    
+    if courses_total == 0:
+        return  # nothing to measure
+    
+    # Per-field, per-method evidence counts
+    rows = await session.execute(
+        select(
+            ScrapedFieldEvidence.field_key,
+            ScrapedFieldEvidence.method,
+            func.count(distinct(ScrapedFieldEvidence.scraped_course_id)).label('count')
+        )
+        .join(ScrapedCourse, ScrapedCourse.id == ScrapedFieldEvidence.scraped_course_id)
+        .where(ScrapedCourse.scrape_run_id == scrape_run_id)
+        .where(ScrapedFieldEvidence.selected == True)
+        .group_by(ScrapedFieldEvidence.field_key, ScrapedFieldEvidence.method)
+    ).all()
+    
+    metrics = []
+    for row in rows:
+        metrics.append(ScrapeRunMetrics(
+            scrape_run_id=scrape_run_id,
+            university_id=university_id,
+            field_key=row.field_key,
+            method=row.method,
+            count=row.count,
+            courses_total=courses_total,
+            fill_rate=row.count / courses_total,
+        ))
+    
+    session.add_all(metrics)
+    await session.commit()
+Wire this into the existing scrape job completion handler. Should run automatically; not a manual step.
+Tracked fields (everything that has evidence rows):
+
+All English fields: ielts_overall, ielts_listening/reading/speaking/writing, toefl_*, pte_overall, cambridge_overall, duolingo_overall
+Fees: international_fee, domestic_fee, fee_term, fee_year, fee_currency
+Course details: duration, duration_value, duration_unit, intake_months, course_location, study_mode, mode
+Classification: category, sub_category, degree_level
+
+Component 2: Expected baselines table
+Add a baselines table that holds expected fill rates per university per field:
+sqlCREATE TABLE university_field_baselines (
+    id BIGSERIAL PRIMARY KEY,
+    university_id INT NOT NULL,
+    field_key VARCHAR(64) NOT NULL,
+    expected_fill_rate NUMERIC(5,4) NOT NULL,  -- e.g., 0.95
+    expected_method_distribution JSONB NOT NULL,  -- {"regex": 0.85, "per_course_vision": 0.10, "ai_fallback": 0.05}
+    floor_threshold NUMERIC(5,4) NOT NULL,  -- alert if actual < this
+    sample_size INT NOT NULL,  -- how many runs went into this baseline
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(university_id, field_key)
+);
+Initial population script (run once after table is created):
+python# backend-py/scripts/seed_baselines.py
+
+async def seed_baselines() -> None:
+    """Populate university_field_baselines from last 30 days of metrics.
+    
+    Excludes runs that resulted in known-bad data (manually flagged) so
+    the baseline reflects what 'good' looks like.
+    """
+    cutoff = datetime.now() - timedelta(days=30)
+    
+    # Get the median fill rate per university per field across recent runs
+    median_rates = await session.execute("""
+        WITH recent_runs AS (
+            SELECT 
+                m.university_id,
+                m.field_key,
+                m.scrape_run_id,
+                SUM(m.fill_rate) as total_fill_rate,
+                jsonb_object_agg(m.method, m.fill_rate) as method_dist
+            FROM scrape_run_metrics m
+            JOIN scrape_runtime_jobs j ON j.id = m.scrape_run_id
+            WHERE j.completed_at > :cutoff
+              AND j.status = 'completed'
+              AND COALESCE(j.flagged_bad, false) = false
+            GROUP BY m.university_id, m.field_key, m.scrape_run_id
+        )
+        SELECT 
+            university_id,
+            field_key,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY total_fill_rate) as median_fill_rate,
+            percentile_cont(0.10) WITHIN GROUP (ORDER BY total_fill_rate) as p10_fill_rate,
+            COUNT(*) as sample_size
+        FROM recent_runs
+        GROUP BY university_id, field_key
+        HAVING COUNT(*) >= 3  -- need at least 3 runs to baseline
+    """, {"cutoff": cutoff})
+    
+    for row in median_rates:
+        baseline = UniversityFieldBaseline(
+            university_id=row.university_id,
+            field_key=row.field_key,
+            expected_fill_rate=row.median_fill_rate,
+            floor_threshold=max(0.50, row.p10_fill_rate - 0.05),  # p10 minus 5pp, but never below 50%
+            expected_method_distribution=...,  # similar median calculation
+            sample_size=row.sample_size,
+        )
+        await session.merge(baseline)
+    
+    await session.commit()
+Universities with < 3 historical runs won't have baselines initially. For those, the alert evaluator falls back to global defaults (see Component 3).
+Weekly baseline refresh job (Celery beat task):
+python# backend-py/app/services/scraper/jobs.py
+
+@celery.task
+async def refresh_baselines_weekly() -> None:
+    """Recompute baselines from the trailing 30 days of clean runs."""
+    await seed_baselines()  # same logic, idempotent via UNIQUE constraint
+Schedule: run weekly. Baselines drift slowly so weekly refresh is plenty.
+Component 3: Alert evaluator + rules engine
+After every scrape run completes, the evaluator compares the run's metrics against baselines and emits alerts.
+python# backend-py/app/services/scraper/alerts.py
+
+# Global default thresholds for universities without baselines yet
+GLOBAL_DEFAULT_FLOORS = {
+    "international_fee": 0.70,
+    "ielts_overall": 0.85,
+    "duration": 0.90,
+    "intake_months": 0.85,
+    "course_name": 0.99,  # course name should always populate
+    # ... all tracked fields
+}
+
+# Method distribution rules — flag if these methods exceed thresholds
+METHOD_QUALITY_RULES = [
+    {
+        "rule_id": "vision_dominance",
+        "description": "Vision OCR producing >40% of values for a field suggests "
+                       "page-text extractors are failing or vision is hallucinating",
+        "fields": ["ielts_overall", "toefl_overall", "duolingo_overall", "cambridge_overall"],
+        "method": "per_course_vision",
+        "threshold": 0.40,
+        "severity": "warning",
+    },
+    {
+        "rule_id": "sibling_cache_dominance",
+        "description": "Sibling cache producing >30% of values means most values "
+                       "are propagated, not extracted per-course",
+        "fields": "*",
+        "method_pattern": "sibling_cache:*",
+        "threshold": 0.30,
+        "severity": "warning",
+    },
+    {
+        "rule_id": "ai_fallback_dominance",
+        "description": "AI fallback producing >25% of values means primary "
+                       "extractors are failing",
+        "fields": "*",
+        "method": "ai_fallback",
+        "threshold": 0.25,
+        "severity": "critical",
+    },
+    {
+        "rule_id": "facebook_icon_source",
+        "description": "Evidence source URL contains 'facebook' or 'instagram' or "
+                       "'icon' — should never happen for English fields",
+        "fields": ["ielts_overall", "toefl_overall", "pte_overall", 
+                   "duolingo_overall", "cambridge_overall"],
+        "url_pattern": r"(facebook|instagram|icon[-_]|^link\.|logo)",
+        "threshold": 0.0,  # any occurrence is wrong
+        "severity": "critical",
+    },
+]
+
+
+async def evaluate_run_alerts(scrape_run_id: int) -> list[Alert]:
+    """Check a completed run against baselines + global rules."""
+    alerts = []
+    
+    # Load this run's metrics
+    metrics = await load_run_metrics(scrape_run_id)
+    if not metrics:
+        return []
+    
+    university_id = metrics[0].university_id
+    
+    # Load baselines for this university
+    baselines = await load_baselines(university_id)
+    
+    # Check 1: per-field fill-rate vs baseline floor
+    field_totals = aggregate_by_field(metrics)
+    for field_key, total_rate in field_totals.items():
+        baseline = baselines.get(field_key)
+        floor = baseline.floor_threshold if baseline else GLOBAL_DEFAULT_FLOORS.get(field_key, 0.50)
+        
+        if total_rate < floor:
+            severity = "critical" if total_rate < (floor - 0.20) else "warning"
+            alerts.append(Alert(
+                scrape_run_id=scrape_run_id,
+                rule_id=f"fill_rate_drop:{field_key}",
+                severity=severity,
+                message=f"{field_key} fill-rate {total_rate:.0%} below floor {floor:.0%}",
+                expected=floor,
+                actual=total_rate,
+            ))
+    
+    # Check 2: method-distribution rules
+    for rule in METHOD_QUALITY_RULES:
+        violations = check_method_rule(metrics, rule)
+        for v in violations:
+            alerts.append(Alert(
+                scrape_run_id=scrape_run_id,
+                rule_id=rule["rule_id"],
+                severity=rule["severity"],
+                message=f"{rule['description']} (field={v.field}, "
+                        f"method={v.method}, rate={v.actual:.0%})",
+                expected=rule.get("threshold"),
+                actual=v.actual,
+            ))
+    
+    # Check 3: trend detection vs last 5 runs
+    recent_runs = await get_last_n_runs(university_id, n=5, exclude=scrape_run_id)
+    if len(recent_runs) >= 3:
+        for field_key, current_rate in field_totals.items():
+            trend = compute_trend(recent_runs, field_key)
+            if trend.is_significant_drop(current_rate):
+                alerts.append(Alert(
+                    scrape_run_id=scrape_run_id,
+                    rule_id=f"trend_drop:{field_key}",
+                    severity="warning",
+                    message=f"{field_key} dropped {trend.drop_pct:.0%} below "
+                            f"trailing 5-run average ({trend.mean:.0%})",
+                ))
+    
+    return alerts
+
+
+def check_method_rule(metrics: list, rule: dict) -> list:
+    """Apply a single method-distribution rule to the metrics."""
+    violations = []
+    
+    fields_to_check = (
+        [m.field_key for m in metrics]  # all fields
+        if rule["fields"] == "*"
+        else rule["fields"]
+    )
+    
+    for field in set(fields_to_check):
+        field_metrics = [m for m in metrics if m.field_key == field]
+        if not field_metrics:
+            continue
+        total = sum(m.count for m in field_metrics)
+        if total == 0:
+            continue
+        
+        # Match method or method pattern
+        matching = [m for m in field_metrics 
+                    if method_matches(m.method, rule)]
+        matching_count = sum(m.count for m in matching)
+        rate = matching_count / total
+        
+        if "url_pattern" in rule:
+            # Need to check evidence URLs, not just counts
+            bad_url_count = await count_evidence_with_url_pattern(
+                field, rule["url_pattern"], metrics[0].scrape_run_id
+            )
+            rate = bad_url_count / total
+        
+        if rate > rule["threshold"]:
+            violations.append(SimpleNamespace(
+                field=field,
+                method=rule.get("method", rule.get("method_pattern", "*")),
+                actual=rate,
+            ))
+    
+    return violations
+Trigger: wire evaluate_run_alerts(scrape_run_id) into the scrape job completion handler, immediately after compute_run_metrics. Both should run as part of the same job-completion sequence.
+Component 4: Alert delivery (dashboard + critical-only email/Slack)
+Persist alerts to a scrape_run_alerts table:
+sqlCREATE TABLE scrape_run_alerts (
+    id BIGSERIAL PRIMARY KEY,
+    scrape_run_id BIGINT NOT NULL REFERENCES scrape_runtime_jobs(id),
+    rule_id VARCHAR(128) NOT NULL,
+    severity VARCHAR(16) NOT NULL,  -- 'info' | 'warning' | 'critical'
+    message TEXT NOT NULL,
+    expected NUMERIC,
+    actual NUMERIC,
+    acknowledged BOOLEAN NOT NULL DEFAULT false,
+    acknowledged_by VARCHAR(128),
+    acknowledged_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_run_alerts_run ON scrape_run_alerts(scrape_run_id);
+CREATE INDEX idx_run_alerts_unack_critical ON scrape_run_alerts(severity, acknowledged) 
+    WHERE severity = 'critical' AND acknowledged = false;
+Dashboard side — these SQL views power whatever UI you build later. Even without a dashboard, you can run them as CLI queries:
+sql-- View 1: Latest run health for each university
+CREATE VIEW v_university_run_health AS
+SELECT 
+    u.code,
+    u.name,
+    j.id as scrape_run_id,
+    j.completed_at,
+    COUNT(a.id) FILTER (WHERE a.severity = 'critical') as critical_alerts,
+    COUNT(a.id) FILTER (WHERE a.severity = 'warning') as warning_alerts,
+    array_agg(DISTINCT a.rule_id) FILTER (WHERE a.severity = 'critical') as critical_rule_ids
+FROM universities u
+JOIN scrape_runtime_jobs j ON j.university_id = u.id
+LEFT JOIN scrape_run_alerts a ON a.scrape_run_id = j.id
+WHERE j.completed_at = (
+    SELECT MAX(j2.completed_at) 
+    FROM scrape_runtime_jobs j2 
+    WHERE j2.university_id = u.id AND j2.status = 'completed'
+)
+GROUP BY u.code, u.name, j.id, j.completed_at
+ORDER BY critical_alerts DESC, warning_alerts DESC;
+
+-- View 2: Top deteriorating fields across all universities
+CREATE VIEW v_field_health_trend AS
+SELECT 
+    field_key,
+    AVG(fill_rate) FILTER (WHERE rn <= 5) as recent_avg,
+    AVG(fill_rate) FILTER (WHERE rn BETWEEN 6 AND 10) as previous_avg,
+    AVG(fill_rate) FILTER (WHERE rn <= 5) - 
+        AVG(fill_rate) FILTER (WHERE rn BETWEEN 6 AND 10) as delta
+FROM (
+    SELECT 
+        m.*,
+        ROW_NUMBER() OVER (
+            PARTITION BY m.university_id, m.field_key 
+            ORDER BY m.computed_at DESC
+        ) as rn
+    FROM scrape_run_metrics m
+) ranked
+WHERE rn <= 10
+GROUP BY field_key
+HAVING AVG(fill_rate) FILTER (WHERE rn BETWEEN 6 AND 10) IS NOT NULL
+ORDER BY delta ASC;
+Critical alert delivery — email + Slack, only for severity='critical':
+python# backend-py/app/services/scraper/alert_delivery.py
+
+async def deliver_alerts(alerts: list[Alert]) -> None:
+    """Send critical alerts to email/Slack. Warnings stay on dashboard only."""
+    critical = [a for a in alerts if a.severity == "critical"]
+    if not critical:
+        return
+    
+    # Group by run for digest format
+    by_run = group_by(critical, key=lambda a: a.scrape_run_id)
+    
+    for run_id, run_alerts in by_run.items():
+        message = format_alert_digest(run_id, run_alerts)
+        
+        if SLACK_WEBHOOK_URL:
+            await send_slack(SLACK_WEBHOOK_URL, message)
+        
+        if ALERT_EMAIL_TO:
+            await send_email(
+                to=ALERT_EMAIL_TO,
+                subject=f"[Scraper alert] {len(run_alerts)} critical issues in run {run_id}",
+                body=message,
+            )
+
+
+def format_alert_digest(run_id: int, alerts: list) -> str:
+    lines = [f"Scrape run {run_id} produced {len(alerts)} critical alerts:\n"]
+    for a in alerts:
+        lines.append(f"• {a.rule_id}: {a.message}")
+    lines.append(f"\nReview at: https://your-dashboard/runs/{run_id}")
+    return "\n".join(lines)
+Set SLACK_WEBHOOK_URL and ALERT_EMAIL_TO as env variables. If both are unset, the dashboard is the only output (which is fine).
+Component 5: Tests
+Add tests in backend-py/tests/test_metrics_alerts.py:
+pythonasync def test_metrics_collected_after_run():
+    """After a successful scrape, metrics rows should exist for each field/method."""
+    run_id = await complete_test_scrape_run(fixtures.acap_courses)
+    metrics = await session.execute(
+        select(ScrapeRunMetrics).where(ScrapeRunMetrics.scrape_run_id == run_id)
+    ).all()
+    assert len(metrics) > 0
+    
+    # IELTS should have at least one row
+    ielts_rows = [m for m in metrics if m.field_key == "ielts_overall"]
+    assert len(ielts_rows) > 0
+
+
+async def test_alert_fires_on_facebook_icon_source():
+    """Vision evidence with facebook URL must trigger critical alert."""
+    run_id = await complete_test_scrape_run([
+        course_with_evidence(
+            field="ielts_overall",
+            method="per_course_vision",
+            source_url="https://example.edu/static/Icon-facebook_2.png",
+        )
+    ])
+    alerts = await evaluate_run_alerts(run_id)
+    facebook_alerts = [a for a in alerts if a.rule_id == "facebook_icon_source"]
+    assert len(facebook_alerts) == 1
+    assert facebook_alerts[0].severity == "critical"
+
+
+async def test_alert_fires_on_sibling_cache_dominance():
+    """If >30% of values come from sibling_cache, fire warning."""
+    run_id = await complete_test_scrape_run(
+        # 5 courses, 4 with sibling_cache duolingo, 1 with regex
+        [course_with_evidence("duolingo_overall", "sibling_cache:postgraduate", url="...") for _ in range(4)]
+        + [course_with_evidence("duolingo_overall", "regex", url="...")]
+    )
+    alerts = await evaluate_run_alerts(run_id)
+    cache_alerts = [a for a in alerts if a.rule_id == "sibling_cache_dominance"]
+    assert len(cache_alerts) >= 1
+
+
+async def test_baseline_floor_alerts():
+    """Field falling below baseline floor fires alert."""
+    # Seed a baseline of 95% IELTS coverage
+    await create_test_baseline(
+        university_id=42, field_key="ielts_overall",
+        expected_fill_rate=0.95, floor_threshold=0.85,
+    )
+    # Run produces only 60% IELTS coverage
+    run_id = await complete_test_scrape_run_with_coverage(
+        university_id=42, ielts_coverage=0.60
+    )
+    alerts = await evaluate_run_alerts(run_id)
+    drop_alerts = [a for a in alerts if "fill_rate_drop:ielts_overall" in a.rule_id]
+    assert len(drop_alerts) == 1
+
+
+async def test_no_alert_when_within_floor():
+    """If field is within baseline floor, no alert."""
+    await create_test_baseline(
+        university_id=42, field_key="ielts_overall",
+        expected_fill_rate=0.95, floor_threshold=0.85,
+    )
+    run_id = await complete_test_scrape_run_with_coverage(
+        university_id=42, ielts_coverage=0.92  # within tolerance
+    )
+    alerts = await evaluate_run_alerts(run_id)
+    drop_alerts = [a for a in alerts if "fill_rate_drop:ielts_overall" in a.rule_id]
+    assert len(drop_alerts) == 0
+Verification after deployment
+Step 1: Run on a known-good university, confirm metrics populate:
+sqlSELECT field_key, method, count, fill_rate
+FROM scrape_run_metrics
+WHERE scrape_run_id = (
+    SELECT MAX(id) FROM scrape_runtime_jobs WHERE status = 'completed'
+)
+ORDER BY field_key, fill_rate DESC;
+Expected: rows per (field, method) combination, fill_rate values between 0 and 1.
+Step 2: Re-run a known-bad university (ACAP, where we caught DET hallucination), confirm alerts fire:
+sqlSELECT severity, rule_id, message
+FROM scrape_run_alerts
+WHERE scrape_run_id = (
+    SELECT MAX(id) FROM scrape_runtime_jobs 
+    WHERE university_id = 41 AND status = 'completed'
+)
+ORDER BY severity, rule_id;
+Expected: at least one critical alert for facebook_icon_source (because ACAP's vision did hit Facebook icons in the recent run we debugged), and at least one warning for sibling_cache_dominance on duolingo_overall.
+Step 3: Check the dashboard view for the latest run health:
+sqlSELECT * FROM v_university_run_health LIMIT 20;
+Should show universities sorted by alert severity, with the most concerning ones at the top.
+Step 4: If Slack/email integration is configured, force a test critical alert and verify it arrives:
+python# Manual trigger script
+await deliver_alerts([Alert(
+    rule_id="test_alert",
+    severity="critical",
+    message="Test critical alert — please ignore",
+    scrape_run_id=0,
+)])
+Out of scope for this priority
+These are related but separate:
+
+The actual dashboard UI that consumes the SQL views (this priority just builds the data layer)
+A CLI tool for querying metrics interactively (nice-to-have, can come later)
+Fix-suggestion logic that says "if facebook_icon_source fires, run X" (alerts only diagnose; humans decide how to fix)
+Auto-rollback of bad runs (too risky to automate; alerts inform humans who decide)
+
+If during implementation you find that any of these are needed before this work is useful, flag them and we can decide whether to expand scope.
+Estimated effort
+About 1 to 1.5 days. Components 1+2 are mechanical and ship in the first half-day. Components 3+4+5 are the second half-day plus the test pass.
+Order matters: ship Components 1 (metrics table) and 2 (baselines) first so we accumulate data even before alerting works. Component 3 (alert evaluator) and Component 4 (delivery) can ship together.
+If estimating time and you find a blocker (e.g., the existing scrape job completion handler has no clean integration point), flag it before refactoring.
