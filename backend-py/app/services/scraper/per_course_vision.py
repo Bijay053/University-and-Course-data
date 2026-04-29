@@ -248,38 +248,73 @@ async def maybe_vision_refetch(
     *,
     emit: Callable[..., Awaitable[None]] | None = None,
     image_cache: VisionImageCache | None = None,
+    degree_level: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """If at least one english slot is still missing AND vision is
-    available, scan ``<img>`` tags on the rendered HTML and ask Gemini
-    Vision to read the score table.
+    """Scan ``<img>`` tags on the course page and ask Gemini Vision to
+    read any English-requirement tables found.
+
+    **Phase A behaviour (Priority 2):** vision now runs whenever the
+    page contains candidate images — even when every English slot is
+    already filled from text extraction.  This ensures course-page image
+    values (tier-4 authority) can override wrong tier-3 text values
+    (e.g. ASAHE Masters whose true requirements are image-only).
 
     ``image_cache`` is an optional caller-owned mapping (one per scrape
     run, created via :func:`new_vision_image_cache`) keyed by absolute
     image URL. When the same image appears on multiple course pages
-    (ASA's ``MaSTER.png`` lives on every Master page; the
-    ``Screenshot 2026-01-19 104316.png`` lives on every Bachelor of
-    Business variant) we OCR it exactly once and reuse the parsed
-    values — saving Gemini cost AND eliminating the per-course vision
-    non-determinism that left 3/4 IT Masters with IELTS=— while one
-    sibling came back with IELTS=6.5 from the same image. The cache
-    stores ``asyncio.Future`` values so concurrent coroutines for the
-    same URL coalesce: the first ("leader") performs the work, others
-    ("waiters") await its result.
+    (ASA's ``MaSTER.png`` lives on every Master page) we OCR it exactly
+    once and reuse the parsed values — saving Gemini cost AND eliminating
+    per-course vision non-determinism.  The cache stores
+    ``asyncio.Future`` values so concurrent coroutines for the same URL
+    coalesce: the first ("leader") performs the work, others ("waiters")
+    await its result.
 
-    Returns ``(filled_values, evidence_rows)`` — both empty when the
-    fallback no-ops (slots already filled, no API key, no rendered HTML,
-    no candidate images, or Gemini skipped).
+    ``degree_level`` is used for level-aware image selection: images
+    whose filename matches the course's level (e.g. "master" in
+    MaSTER.png for a Master's course) are promoted to the front of the
+    processing queue so the correct level image is OCR'd first.
+
+    Returns ``(filled_values, evidence_rows)``.  ``filled_values``
+    contains ALL English slots the vision pass found — including slots
+    that were already set from text extraction — so the caller can apply
+    the authority model and decide whether to override.  Both dicts are
+    empty when vision no-ops (no API key, no HTML, no candidate images,
+    or Gemini skipped for every candidate).
     """
     if not rendered_html:
         return {}, []
     if not getattr(settings, "gemini_api_key", None):
         return {}, []
-    if not any(payload.get(k) in (None, "", 0) for k in _ENGLISH_OVERALL_SLOTS):
-        return {}, []
 
     candidates = _extract_img_candidates(rendered_html, url)
     if not candidates:
         return {}, []
+
+    # ── Level-aware image promotion ───────────────────────────────────────
+    # When the page has images for different degree levels (e.g. ASAHE has
+    # MaSTER.png and BACHELOR.png), put the image that matches this course's
+    # degree level at the front so the early-stop loop picks the right one
+    # without burning Gemini calls on the wrong-level image.
+    if degree_level:
+        _dl = degree_level.lower()
+        def _level_key(item: tuple[str, str]) -> int:
+            _fn = item[0].lower().split("/")[-1]
+            if "master" in _dl and "master" in _fn:
+                return 0
+            if ("bachelor" in _dl or "undergraduate" in _dl) and (
+                "bachelor" in _fn or "undergrad" in _fn
+            ):
+                return 0
+            if ("doctoral" in _dl or "phd" in _dl or "doctorate" in _dl) and (
+                "phd" in _fn or "doctor" in _fn
+            ):
+                return 0
+            if "diploma" in _dl and "diploma" in _fn:
+                return 0
+            if "certificate" in _dl and ("cert" in _fn or "certificate" in _fn):
+                return 0
+            return 1  # no level match — process after level-matched images
+        candidates = sorted(candidates, key=_level_key)
 
     if emit:
         await emit(
@@ -421,7 +456,11 @@ async def maybe_vision_refetch(
                 continue
             if v in (None, "", 0):
                 continue
-            if k in filled or payload.get(k) not in (None, "", 0):
+            # `filled` de-dupes within one vision pass (first image wins
+            # for any given slot). We do NOT gate on `payload.get(k)` here
+            # — the caller applies the authority model (tier-4 vision may
+            # override tier-3 text) and decides whether to write to payload.
+            if k in filled:
                 continue
             filled[k] = v
             evidence.append(
@@ -430,6 +469,10 @@ async def maybe_vision_refetch(
                     "value": v,
                     "confidence": 0.85,
                     "method": cached_method,
+                    # source_url is the image URL, not the course page URL,
+                    # so the Evidence Review panel can show exactly which
+                    # image the value came from.
+                    "source_url": img_url,
                     "snippet": (alt or img_url)[:240],
                 }
             )
