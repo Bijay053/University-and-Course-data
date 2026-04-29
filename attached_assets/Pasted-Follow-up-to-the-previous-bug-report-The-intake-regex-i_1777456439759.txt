@@ -1,0 +1,60 @@
+Follow-up to the previous bug report. The intake regex is still wrong on the latest run — same root cause (regex not anchored to the Start field) but two specific failure modes worth flagging:
+
+---
+
+**Bug 2a: regex picks up application/orientation dates from "View dates" expanded content**
+
+Example: Bachelor of Information Technology
+URL: https://www.unisq.edu.au/study/degrees-and-courses/bachelor-of-information-technology?studentType=international
+
+The Start field on this page lists exactly: **Feb, Jun, Sep**
+
+When the user clicks "View dates" the page expands to show a study dates table:
+
+```
+Trimester 1, 2026  Orientation Mon 9 Feb   Start Mon 16 Feb
+Trimester 2, 2026  Orientation Mon 25 May  Start Mon 1 Jun
+Trimester 3, 2026  Orientation Mon 7 Sep   Start Mon 14 Sep
+```
+
+The scraper picked up **Feb, May, Jun, Sep** — it grabbed the May from the orientation date for Trimester 2 (Mon 25 May), even though the actual intake month for that trimester is June.
+
+This is the regex matching month names anywhere in the page including the expanded "View dates" table. The orientation column is the problem — those months are not intakes, they're orientation week start dates that fall in the preceding month.
+
+---
+
+**Bug 2b: regex picks up dates from application timeline tables**
+
+Example: Master of Professional Psychology
+URL: https://www.unisq.edu.au/study/degrees-and-courses/master-of-professional-psychology?studentType=international
+
+The Start field on this page lists exactly: **Jan** (one intake — Block 1 only)
+
+The "View dates" section contains an application process timeline:
+
+```
+Applications open: Tuesday 5 August 2025
+Applications close: Monday 15 September 2025
+Interviews from: Monday 22 September 2025
+Outcomes from: 17 October 2025
+Block 1 study period start: Monday 19 January 2026
+```
+
+The scraper picked up **Jul, Aug, Sep, Oct, Jan** — every month name from the application timeline, not just the actual intake (Jan).
+
+Same issue as Master of Clinical Psychology in this run, which staged with the same wrong months.
+
+---
+
+**The fix is the same as before but worth being explicit about scope:**
+
+The intake regex must extract ONLY from the labeled "Start" field at the top of the course summary block (e.g., the text immediately following "Start" and before "View dates" or "Fees"). It must NOT scan:
+
+1. The "Recently viewed" sidebar (previous bug)
+2. The "View dates" expanded study dates table (Bug 2a) — specifically the Orientation column, which contains months that are NOT intake months
+3. Application process / timeline tables (Bug 2b) — these contain dates for application steps, not enrolment
+4. Body text mentioning months for any other reason
+
+The Start field text is short and consistent across UniSQ pages — "Start Feb, Jun, Sep" or "Start Jan". Anchor the regex to that span and stop there.
+
+Without this scoping, intake data will continue to be unreliable on every UniSQ course and likely on similar Sitecore-based university templates.
