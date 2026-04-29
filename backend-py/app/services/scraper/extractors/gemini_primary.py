@@ -431,14 +431,14 @@ async def extract_primary(
         )
     except _asyncio.TimeoutError:
         log.warning("gemini_primary: timed out after %ss on %s", timeout, url)
-        return {}, 0.0, 0, 0, {}
+        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": f"timeout after {timeout}s"}
     except Exception as exc:
         log.warning("gemini_primary: generate failed on %s: %s", url, exc)
-        return {}, 0.0, 0, 0, {}
+        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": str(exc)}
 
     if resp.skipped:
         log.warning("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
-        return {}, 0.0, resp.input_tokens, 0, {}
+        return {}, 0.0, resp.input_tokens, 0, {"skipped": True, "skip_reason": resp.skip_reason}
 
     raw_data = _parse_json(resp.text)
     filled: dict[str, Any] = {}
