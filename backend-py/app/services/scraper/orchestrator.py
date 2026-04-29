@@ -1419,6 +1419,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.completed_at = datetime.now(timezone.utc)
         await db.commit()
         log.info("Scrape %s %s: %s", runtime_job_id, job.status, summary)
+
+        # ── Priority 5: metrics + alerts ──────────────────────────────────
+        # Run only when the job completed cleanly and the university is known.
+        # Both calls are fire-and-forget from the orchestrator's perspective;
+        # errors are logged but never bubble up to fail the job.
+        if finished_cleanly and uni_id is not None:
+            try:
+                from app.services.scraper.metrics import compute_run_metrics
+                await compute_run_metrics(db, runtime_job_id, uni_id)
+            except Exception as _metrics_exc:  # noqa: BLE001
+                log.warning("[METRICS] failed for run %s: %s", runtime_job_id, _metrics_exc)
+
+            try:
+                from app.services.scraper.alerts import evaluate_run_alerts
+                from app.services.scraper.alert_delivery import deliver_alerts
+                _alerts = await evaluate_run_alerts(db, runtime_job_id, uni_id)
+                await deliver_alerts(_alerts)
+            except Exception as _alert_exc:  # noqa: BLE001
+                log.warning("[ALERTS] failed for run %s: %s", runtime_job_id, _alert_exc)
+
         return {"ok": finished_cleanly, **summary}
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
