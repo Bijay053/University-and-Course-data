@@ -1,0 +1,50 @@
+Subject: ACAP staging is publishing DET scores for a university that doesn't accept Duolingo at all
+ACAP's official Conditions of Enrolment page lists only IELTS, TOEFL, and LanguageCert Academic as recognized English tests. They do not accept Duolingo English Test for international admissions.
+But every ACAP course in staging shows DET=110 or DET=120. Looking at the run log:
+[EXTRACT] [sibling cache ↻ build postgraduate] cambridge_overall=176.0 duolingo_overall=110.0 ...
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 10 slot(s) filled across siblings
+Tracing: every per-course Gemini response returned "duolingo_overall": null. Per-course vision results showed no DET values either. The DET values came from the sibling cache, which built them from somewhere upstream and then propagated them to 10 courses.
+This is publishing wrong information that could harm prospective students — they might book a DET exam (~$60 USD) thinking it counts toward ACAP admission, then find out it doesn't.
+Three fixes needed
+Fix 1 (URGENT): Sibling cache must require source evidence.
+Right now the sibling cache writes values to the staging table that have no scraped_field_evidence row pointing at a real source. It just "builds" a representative postgrad bucket from somewhere and copies values across siblings.
+The fix: when the sibling cache fills a slot on course B from a value originally extracted on course A, it should write an evidence row with method='sibling_cache:postgraduate' AND the source_url of course A's original evidence row. Then we can trace any sibling-cache value back to its origin.
+If the original evidence row was vision OCR of a Facebook icon or hero image, we can detect and reject the propagation.
+Fix 2: Negative values for "test not accepted".
+The schema currently has duolingo_overall = NULL mean two completely different things:
+
+"We didn't find a value but it might be there"
+"This test is explicitly not accepted by this university"
+
+These need to be distinguishable. Suggest adding a sentinel or a separate column:
+sqlALTER TABLE scraped_courses
+  ADD COLUMN duolingo_accepted BOOLEAN NULL;
+-- NULL = unknown, FALSE = explicitly not accepted, TRUE = accepted
+When a university's English requirements page or admissions page lists accepted tests but doesn't include Duolingo, the central English requirements extractor should set duolingo_accepted = FALSE for that university. Then individual courses default to NULL/FALSE for DET unless they have a specific override.
+For ACAP specifically: their policy page lists IELTS, TOEFL, LanguageCert. The extractor should set duolingo_accepted=FALSE and cambridge_accepted=FALSE (CAE also isn't listed) at the university level.
+Fix 3 (URGENT): Vision OCR should not produce DET/CAE values when those tests aren't on the page.
+The Bachelor of Social Work vision OCR returned IELTS=6.5 PTE=50 TOEFL=80 CAE=170 for ACAP. ACAP doesn't accept CAE either. So vision is reading non-data images and returning Cambridge values that have no source.
+Same fix as we discussed for VIT and ASAHE: vision OCR's output must be validated against what the OCR text actually contains. If the OCR text doesn't contain "Cambridge" or "CAE", the cambridge_overall return value should be discarded, not stored as evidence.
+Verification
+After fixes, please re-scrape ACAP and verify:
+sqlSELECT course_name,
+       ielts_overall, toefl_overall, pte_overall,
+       cambridge_overall, duolingo_overall
+FROM scraped_courses
+WHERE university_id = 41
+ORDER BY course_name;
+Expected: all rows should have cambridge_overall = NULL and duolingo_overall = NULL because ACAP doesn't accept those tests. Only IELTS, TOEFL, and PTE should populate.
+Also check that no scraped_field_evidence rows exist for cambridge_overall or duolingo_overall for any ACAP course:
+sqlSELECT COUNT(*) FROM scraped_field_evidence sfe
+JOIN scraped_courses sc ON sc.id = sfe.scraped_course_id
+WHERE sc.university_id = 41
+  AND sfe.field_key IN ('cambridge_overall', 'duolingo_overall');
+Should return 0. If it returns >0, those rows are hallucinated and need to be deleted.
+Related cleanup
+Other universities likely have the same pattern:
+
+Universities that only accept IELTS+TOEFL but show CAE/DET values in staging
+Universities that accept IELTS+PTE+TOEFL+CAE but not Duolingo (very common)
+Universities that have completely different test panels for different course levels
+
+Once the *_accepted boolean columns exist, the central English requirements extractor can set them per-university based on the actual policy page. This is a structural fix, not a per-university patch.
