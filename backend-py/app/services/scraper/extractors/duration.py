@@ -77,7 +77,23 @@ _DURATION_ANTI_CONTEXT = re.compile(
     r"history|track\s+record|over\s+a\s+decade|years?\s+of\s+industry|"
     # PSYCH/HDR eligibility clauses: "no earlier than 8 years previous to
     # the year of application" — not a program duration.
-    r"previous\s+to|year\s+of\s+application|year\s+of\s+enrol(?:lment)?)\b",
+    r"previous\s+to|year\s+of\s+application|year\s+of\s+enrol(?:lment)?|"
+    # Recency-window eligibility clauses — e.g. "completed within the last
+    # 10 years", "awarded in the last 8 years", "obtained within the past
+    # 5 years", "completed in the past 15 years".  These appear on admission
+    # requirements pages and produce false-positive duration values (e.g.
+    # ACU "Master of Psychology (Clinical)" → 10 years, AIT ICT50220 → 15
+    # years).  The number in these clauses is a recency window, not the
+    # program length.  Match the preposition phrase that introduces the window
+    # so the entire sentence is disqualified from Pattern-2 firing.
+    r"within\s+the\s+(?:last|past)|in\s+the\s+(?:last|past)|"
+    r"(?:no\s+more\s+than|not\s+more\s+than|at\s+least)\s+\d+\s+years?\s+(?:prior|before|ago)|"
+    # Marketing / institutional copy: "over X years" without an explicit
+    # duration label is almost always history/tenure, not a program length.
+    r"over\s+\d+\s+years?\s+(?:of|in|as)|"
+    # "received within", "awarded within", "granted within" — qualification
+    # currency checks that reference time elapsed, not program length.
+    r"received\s+within|awarded\s+within|granted\s+within|obtained\s+within)\b",
     re.I,
 )
 
