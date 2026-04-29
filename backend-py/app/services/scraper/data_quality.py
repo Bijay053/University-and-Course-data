@@ -282,7 +282,26 @@ def _check_course(payload: Payload, url: str) -> list[QualityIssue]:
         add("warning", "missing_english_requirement",
             "No English language test score found (IELTS / PTE / TOEFL / CAE).")
 
-    # ── 3a. Cross-field English coherence ────────────────────────────────
+    # ── 3a. Test-accepted flag violations ────────────────────────────────
+    # If a university explicitly does not accept a test (*_accepted=False)
+    # but the pipeline wrote a score for it anyway (from vision, sibling cache,
+    # etc.), that is a definite pipeline error — the score cannot be correct.
+    for _test_prefix, _flag_key, _score_key in (
+        ("Duolingo",  "duolingo_accepted",  "duolingo_overall"),
+        ("Cambridge", "cambridge_accepted", "cambridge_overall"),
+        ("PTE",       "pte_accepted",       "pte_overall"),
+        ("TOEFL",     "toefl_accepted",     "toefl_overall"),
+    ):
+        if payload.get(_flag_key) is False and payload.get(_score_key) is not None:
+            add(
+                "warning",
+                f"test_not_accepted_but_scored_{_test_prefix.lower()}",
+                f"{_test_prefix} score ({payload[_score_key]}) found but "
+                f"{_flag_key}=False — university does not accept this test. "
+                f"Score is likely hallucinated (vision or sibling cache). Discard it.",
+            )
+
+    # ── 3b. Cross-field English coherence ────────────────────────────────
     # Each test score should be broadly consistent with the others — if
     # the extractor wrote each field from a different source (regex, vision,
     # sibling cache) without cross-checking, impossible combinations can
