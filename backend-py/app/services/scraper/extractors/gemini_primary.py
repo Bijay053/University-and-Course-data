@@ -173,14 +173,28 @@ Course page text (may be truncated):
 # ---------------------------------------------------------------------------
 
 # Boilerplate element tags and class-name fragments that reliably contain
-# navigation, menus, and footers rather than course-specific content.
-# Removed BEFORE html_to_text so the content Gemini receives is course data.
-_BOILERPLATE_TAGS = {"nav", "header", "footer", "aside"}
+# navigation, menus, footers, and lead-capture forms rather than
+# course-specific content. Removed BEFORE html_to_text so the content
+# Gemini receives is course data only.
+#
+# <form> is included here: actual course data (fees, IELTS, intakes, etc.)
+# is never inside a form element — only enquiry / registration / lead-capture
+# widgets live in forms. Stripping all forms avoids the common situation where
+# UniSQ/other universities embed a large lead-capture form at the TOP of every
+# course page, causing Gemini to parse "First Name / Email / I'm in high
+# school / I'm looking to do my first degree…" instead of course content.
+_BOILERPLATE_TAGS = {"nav", "header", "footer", "aside", "form"}
 _BOILERPLATE_CLASS_FRAGS = (
     "nav", "navigation", "menu", "breadcrumb",
     "header", "footer", "sidebar", "widget",
     "cookie", "banner", "alert", "announcement",
     "social", "share", "search-bar",
+    # Lead-capture / enquiry form sections that appear before the actual course
+    # content on many Australian university pages (UniSQ, etc.).
+    "enquir", "enquiry-form", "lead-capture", "contact-form",
+    "register-form", "registration-form", "interest-form",
+    "apply-now", "application-form", "get-in-touch",
+    "chat-widget", "intercom", "hotjar", "drift",
 )
 
 
