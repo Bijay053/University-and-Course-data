@@ -1,0 +1,273 @@
+Evidence Review
+Master of Project Management
+Eligibility: ready - ok
+Conflicts
+course_location: Sydney, Australia vs On Campus - location.strong vs gemini_primary disagreed
+cambridge_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+176.0
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Business & Management
+gemini_primary: category=Business & Management
+https://www.asahe.edu.au/courses/master-of-project-management
+course_location
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: course_location=On Campus
+https://www.asahe.edu.au/courses/master-of-project-management
+superseded
+/ location.strong
+confidence 90%
+Sydney, Australia
+Sydney
+https://www.asahe.edu.au/courses/master-of-project-management
+course_name
+selected
+selected
+/ course_name.h1
+confidence 90%
+Master of Project Management
+Master of Project Management
+https://www.asahe.edu.au/courses/master-of-project-management
+currency
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+AUD
+uni_pdf fee: currency=AUD
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+degree_level
+selected
+selected
+/ degree_level:name
+confidence 90%
+Master's
+Master of Project Management
+https://www.asahe.edu.au/courses/master-of-project-management
+description
+selected
+selected
+/ description.meta
+confidence 95%
+ASA Institute of Higher Education is a Sydney-based provider offering undergraduate and postgraduate programs in IT and Business.
+https://www.asahe.edu.au/courses/master-of-project-management
+https://www.asahe.edu.au/courses/master-of-project-management
+duolingo_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+110.0
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+duration
+selected
+selected
+/ gemini_primary
+confidence 75%
+2.0
+gemini_primary: duration=2.0
+https://www.asahe.edu.au/courses/master-of-project-management
+superseded
+/ duration.structural
+confidence 85%
+2.0
+<strong>Course Duration</strong> -> Course Duration 2 years Full Time
+https://www.asahe.edu.au/courses/master-of-project-management
+duration_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Year
+gemini_primary: duration_term=Year
+https://www.asahe.edu.au/courses/master-of-project-management
+duration_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+2 Year Course
+gemini_primary: duration_text=2 Year Course
+https://www.asahe.edu.au/courses/master-of-project-management
+duration_unit
+selected
+selected
+/ ai_fallback
+confidence 50%
+years
+ai_fallback: duration_unit=years
+https://www.asahe.edu.au/courses/master-of-project-management
+duration_value
+selected
+selected
+/ ai_fallback
+confidence 50%
+2.0
+ai_fallback: duration_value=2.0
+https://www.asahe.edu.au/courses/master-of-project-management
+fee_term
+selected
+selected
+/ gemini_primary
+confidence 75%
+Per Unit
+gemini_primary: fee_term=Per Unit
+https://www.asahe.edu.au/courses/master-of-project-management
+fee_year
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+2026
+uni_pdf fee: fee_year=2026
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+ielts_listening
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.5
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+ielts_reading
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+ielts_speaking
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+ielts_writing
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+6.0
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/68660d9386e56f070b7bec3d_Icon-facebook_2.png
+intake_months
+selected
+selected
+/ regex
+confidence 70%
+["January", "April", "July", "October"]
+ation 2 years Full Time Intake Options‍ January, April, July, October See Key Dates ‍ AQF Level AQF Level 9 delivered by ASA Institute of Higher Education Download course brochure Course Overview Entry Requirements Fees and Scholarships Cou
+https://www.asahe.edu.au/courses/master-of-project-management
+international_fee
+selected
+selected
+/ uni_pdf:fees:per_course
+confidence 70%
+52800
+uni_pdf fee: international_fee=52800
+https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf
+location_text
+selected
+selected
+/ gemini_primary
+confidence 75%
+On Campus
+gemini_primary: location_text=On Campus
+https://www.asahe.edu.au/courses/master-of-project-management
+mode
+selected
+selected
+/ gemini_primary
+confidence 75%
+Blended
+gemini_primary: mode=Blended
+https://www.asahe.edu.au/courses/master-of-project-management
+pte_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+58.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+study_mode
+selected
+selected
+/ study_mode:rule
+confidence 70%
+On Campus
+<strong>Delivery</strong> -> Delivery Face to Face on campus
+https://www.asahe.edu.au/courses/master-of-project-management
+sub_category
+selected
+selected
+/ gemini_primary
+confidence 75%
+Project Management
+gemini_primary: sub_category=Project Management
+https://www.asahe.edu.au/courses/master-of-project-management
+toefl_listening
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_overall
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+85.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_reading
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_speaking
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+toefl_writing
+selected
+selected
+/ per_course_vision_cached
+confidence 85%
+20.0
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png
+https://cdn.prod.website-files.com/68660d9386e56f070b7bec59/696d888d52876a0edc8b3450_MaSTER.png

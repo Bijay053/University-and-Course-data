@@ -1029,6 +1029,35 @@ async def extract_course(
                     if _ft_method and _ft_method.startswith("uni_pdf"):
                         continue
 
+                # Issue 4b: Belt-and-suspenders guard for course_location.
+                #
+                # The Issue-4 block (~30 lines above) prevents populating
+                # _gp_filled["course_location"] when location_text is a
+                # study-mode keyword.  However Gemini can still set
+                # course_location here via two edge cases:
+                #
+                #   a) location_text contains extra words that make the
+                #      keyword check miss (e.g. "On Campus, Sydney" is not
+                #      exactly in _STUDY_MODE_KEYWORDS but looks wrong).
+                #   b) The field reaches this loop via another code path
+                #      that does not go through the keyword guard above.
+                #
+                # Guard 1 — reject if the raw value is purely a study-mode
+                #            label ("On Campus", "Online", …).
+                # Guard 2 — reject if the structural location extractor
+                #            (method starts with "location.") already owns
+                #            the course_location field.  That extractor reads
+                #            an explicit DOM label and is more reliable than
+                #            Gemini's prose read.  Generic sites with no
+                #            structural label still get Gemini's value.
+                if _gp_k == "course_location":
+                    if (isinstance(_gp_v, str)
+                            and _gp_v.strip().lower() in _STUDY_MODE_KEYWORDS):
+                        continue  # study-mode phrase — not a real location
+                    _cl_method = _best_ev_method("course_location")
+                    if _cl_method and _cl_method.startswith("location."):
+                        continue  # structural extractor already owns this field
+
                 # PRIMARY: always overwrite payload value.
                 # Keep prior evidence rows so Evidence Review can show every
                 # source that found a value — mark them "superseded" so the UI
