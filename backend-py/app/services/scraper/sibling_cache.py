@@ -103,8 +103,16 @@ def _build_bucket_cache(
     results: list[dict[str, Any]],
     *,
     min_quorum: int = 1,
-) -> dict[str, dict[str, Any]]:
-    """Build ``{bucket: {slot: most_common_value}}``.
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, str]]]:
+    """Build ``{bucket: {slot: most_common_value}}`` and the matching origin URLs.
+
+    Returns a 2-tuple ``(cache, origins)`` where:
+
+    * ``cache`` — ``{bucket: {slot: value}}`` — the modal value per slot per bucket
+    * ``origins`` — ``{bucket: {slot: origin_course_url}}`` — the URL of the
+      first course whose evidence contributed the winning (modal) value; used
+      by :func:`backfill_english_from_siblings` to write evidence rows that
+      point back to the actual source course, not the recipient course.
 
     Ignores empty / None slots and only emits a slot when at least one
     sibling has a value (so back-fill never invents data). Ties on
@@ -130,13 +138,21 @@ def _build_bucket_cache(
         misreads).
     """
     buckets: dict[str, dict[str, Counter]] = {}
+    # Track the first course URL that contributed each (bucket, slot, value).
+    # Used to write source-traceable evidence rows during back-fill.
+    first_origin: dict[str, dict[str, dict[Any, str]]] = {}
+
     for r in results:
         if not isinstance(r, dict):
             continue
         payload = r.get("payload") or {}
+        course_url: str = r.get("url") or ""
         bucket = _bucket_for(payload)
         slot_counters = buckets.setdefault(
             bucket, {k: Counter() for k in _ENGLISH_SLOTS}
+        )
+        bucket_origins = first_origin.setdefault(
+            bucket, {k: {} for k in _ENGLISH_SLOTS}
         )
         # Build a quick lookup: field_key → method that actually SET the value.
         # first-write-wins in the pipeline means the earliest evidence entry
@@ -155,9 +171,16 @@ def _build_bucket_cache(
             if _is_cross_level_method(evidence_method.get(k, "")):
                 continue
             slot_counters[k][v] += 1
+            # Record the first course URL that contributed this (slot, value).
+            if v not in bucket_origins[k]:
+                bucket_origins[k][v] = course_url
+
     cache: dict[str, dict[str, Any]] = {}
+    origins: dict[str, dict[str, str]] = {}
     for bucket, counters in buckets.items():
         slot_values: dict[str, Any] = {}
+        slot_origins: dict[str, str] = {}
+        bucket_first = first_origin.get(bucket) or {}
         for k, counter in counters.items():
             if not counter:
                 continue
@@ -169,9 +192,28 @@ def _build_bucket_cache(
             if count < min_quorum:
                 continue
             slot_values[k] = most_common
+            slot_origins[k] = (bucket_first.get(k) or {}).get(most_common, "")
         if slot_values:
             cache[bucket] = slot_values
-    return cache
+            origins[bucket] = slot_origins
+    return cache, origins
+
+
+# Mapping from test prefix → the payload flag key that indicates whether
+# the university accepts that test.  NULL = unknown; False = not accepted;
+# True = explicitly accepted.  The sibling cache must not backfill a slot
+# whose test the university has declared it does not accept.
+_SLOT_ACCEPTED_FLAG: Final[dict[str, str]] = {
+    slot: flag
+    for prefix, flag in (
+        ("toefl",     "toefl_accepted"),
+        ("pte",       "pte_accepted"),
+        ("cambridge", "cambridge_accepted"),
+        ("duolingo",  "duolingo_accepted"),
+    )
+    for slot in _ENGLISH_SLOTS
+    if slot.startswith(prefix)
+}
 
 
 async def backfill_english_from_siblings(
@@ -198,7 +240,7 @@ async def backfill_english_from_siblings(
         Defaults to 1 to preserve the original behaviour for all universities
         that didn't exhibit this false-positive; pass 2 for Bond and similar.
     """
-    cache = _build_bucket_cache(results, min_quorum=min_quorum)
+    cache, cache_origins = _build_bucket_cache(results, min_quorum=min_quorum)
     if not cache:
         return 0
 
@@ -227,25 +269,39 @@ async def backfill_english_from_siblings(
         slot_values = cache.get(bucket) or {}
         if not slot_values:
             continue
-        # The course URL for this result — used as source_url in evidence so
-        # enforce_source_evidence (guards.py) keeps the backfilled value.
+        bucket_origins = cache_origins.get(bucket) or {}
+        # Fallback URL for evidence rows when origin tracking found no URL.
         course_url: str = r.get("url") or ""
         for k, v in slot_values.items():
             existing = payload.get(k)
             if existing not in (None, "", 0):
                 continue
+            # Respect *_accepted flags: if the university has explicitly
+            # declared it does not accept this test (False), skip the slot
+            # entirely so we don't publish scores for a test the university
+            # rejects (e.g. ACAP doesn't accept Duolingo — duolingo_accepted=False).
+            accepted_flag = _SLOT_ACCEPTED_FLAG.get(k)
+            if accepted_flag and payload.get(accepted_flag) is False:
+                continue
             payload[k] = v
+            # Use the origin course URL (the actual source) not the recipient
+            # URL — this makes every sibling-cache evidence row traceable
+            # back to the sibling where the value was extracted, so reviewers
+            # can verify whether the source extractor is trustworthy.
+            origin_url = bucket_origins.get(k) or course_url
             evidence.append(
                 {
                     "field_key": k,
                     "value": v,
                     "confidence": 0.55,
                     "method": f"sibling_cache:{bucket}",
-                    # enforce_source_evidence requires both source_url and snippet
-                    # to be non-empty; use the current course URL as the source
-                    # (sibling values came from the same university's courses).
-                    "source_url": course_url,
-                    "snippet": f"sibling-cache backfill from {bucket} bucket: {k}={v}",
+                    # origin_url is the course that originally yielded this
+                    # value; course_url is the recipient being backfilled.
+                    "source_url": origin_url,
+                    "snippet": (
+                        f"sibling-cache backfill from {bucket} bucket "
+                        f"(source: {origin_url or 'unknown'}): {k}={v}"
+                    ),
                 }
             )
             fills_total += 1
