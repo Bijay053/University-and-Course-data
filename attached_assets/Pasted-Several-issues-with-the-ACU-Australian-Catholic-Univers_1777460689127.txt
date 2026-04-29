@@ -1,0 +1,66 @@
+Several issues with the ACU (Australian Catholic University) scrape (university 51). 200 candidates discovered, 125 staged — but most rows have wrong source URLs, missing international fees, and English test scores that aren't actually published on the course pages. Three connected bugs:
+
+---
+
+**Bug 1: Scraper extracted from old handbook URLs instead of current course pages**
+
+The sitemap returned 590 URLs, including handbook archives going back to 2021 (`/handbook/handbook-2021/`, `2022/`, `2023/`, `2024/`, `2025/` and `2026/`). Discover took the first 200 without filtering, so many courses got staged from stale URLs. Examples from the log:
+
+- Bachelor of Arts/Bachelor of Laws — staged TWICE from `/handbook/handbook-2022/...` and `/handbook/handbook-2023/...`
+- Bachelor of Arts/Bachelor of Laws (Honours) — staged FOUR times: 2021, 2022, 2023, 2024 handbooks
+- Bachelor of Nursing — staged from `/handbook/handbook-2024/course/bachelor-of-nursing` instead of the live `/course/bachelor-of-nursing`
+
+Result: 11 duplicate course-name warnings in the data quality report, and the scraped data reflects old years (different fees, different intake dates, sometimes different durations).
+
+Fix: in discover, filter URLs by year. ACU's current pattern is `/course/{slug}` (live page) or `/handbook/handbook-2026/course/{slug}` (current year handbook). Reject `/handbook/handbook-{year}/` URLs where year < current year. More general fix: when the sitemap returns multiple candidates that resolve to the same course slug, keep only the one with the highest year (or no year prefix).
+
+---
+
+**Bug 2: International fees missing because scraper isn't requesting the international view**
+
+Every course logged `[WARN] Fee section detected but fee is blank` for international, and 167 courses got `missing_international_fee_central_page`. The few rows that did stage with fees (Master of Religious Education $23,170, Bachelor of Arts Western Civilisation $96,000, etc.) all came from regex extraction of "Fees (first year)*" — but those are *domestic* fees, not international. Several show oddly low values like `$5,920` (Master of Teaching Secondary), `$7,518` (Bachelor of Nursing), `$10,300` (Bachelor of Computer Science) which are clearly Commonwealth-supported domestic rates, not international.
+
+ACU course pages have a tab toggle: Domestic / International. The international fees only appear when you append `?type=International` to the URL (e.g. https://www.acu.edu.au/course/bachelor-of-nursing-honours?type=International). The scraper is fetching only the default (domestic) view.
+
+There's also a downloadable 2026 international fee schedule PDF linked from https://www.acu.edu.au/study-at-acu/fees-and-scholarships/international-student-fees — same fix pattern as the ASA bug report I sent: when the central fee page returns 0 records, follow the PDF link.
+
+Fix:
+- For ACU specifically (and any future site with a Domestic/International toggle), append `?type=International` when extracting fees, OR fetch both views and prefer the international one
+- Detect the `domestic_fee` regex hit — if it's the only fee found and the fee section explicitly mentions "Domestic" / "CSP" / "Commonwealth supported", do NOT use it as `international_fee`
+- Add the PDF-following logic from the ASA bug report
+
+Note: a few courses show fees that are clearly correct ($96,000 for Bachelor of Arts Western Civilisation matches public listings, $69,000 for various bachelors). Worth distinguishing in the parser between obviously-international values ($25k+ for bachelors, $20k+ for postgrad) vs domestic-CSP values ($5k–$15k range). Anything under $20k for a full-time bachelor degree at an Australian uni is almost certainly a CSP rate, not international.
+
+---
+
+**Bug 3: PTE / TOEFL / CAE / DET scores are being hallucinated via sibling-cache backfill**
+
+Log shows:
+```
+[EXTRACT] [sibling cache ↻ build undergraduate] cambridge_overall=176.0 duolingo_overall=110.0 ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ... pte_overall=50.0 toefl_overall=80.0 ...
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 627 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 665 slot(s) filled across siblings
+```
+
+Result: every undergraduate course in the output table shows `IELTS 6 / PTE 50 / TOEFL 60 / CAE 176 / DET 110` (or for postgrad, `6.5 / 65 / 80 / 185 / 110`). These look like ACU's institution-wide *defaults* that the cache learned from one or two courses that DID have full data, then propagated to every sibling. But ACU course pages typically only state the IELTS requirement — the equivalent PTE/TOEFL/CAE scores aren't on each course page; they're in the central Admission to Coursework Programs Policy.
+
+The data quality check caught two of these: `english_coherence_cambridge` warnings flagged that IELTS 6.0 + Cambridge 176 is inconsistent (CAE 176 = IELTS ≥7.0 = C1 threshold). That's the canary — the values were assumed, not extracted.
+
+User instruction on this: only show PTE / TOEFL / CAE / DET when they're explicitly on the course page. Don't backfill from siblings or fall back to institution-wide defaults.
+
+Fix:
+- In the sibling-cache backfill, distinguish between fields that are course-specific (IELTS overall, course duration, fees) vs fields that are institution-wide policy (PTE/TOEFL/CAE/DET equivalences). Only backfill the course-specific ones.
+- OR: only backfill English scores if at least 2 sibling courses agree AND the source course page actually has an English/Admissions section with explicit non-IELTS scores. If only IELTS is mentioned on the source page, leave PTE/TOEFL/CAE/DET as null.
+- In the output table, show `—` (or blank) instead of inheriting from sibling cache for any English test score that wasn't on the course page itself.
+
+Apply this rule globally — across all universities, only display PTE/TOEFL/CAE/DET when they were extracted from the course page itself, not from sibling-cache backfill.
+
+---
+
+**Other things flagged in the log worth fixing**
+
+- 32 courses rejected as `online_only`. ACU's online courses are tagged `(Acu Online)` in the title and many of these are likely valid Australian-delivered programs that international students CAN take — worth checking whether the online_only filter is too aggressive for ACU specifically.
+- `Master of Psychology (Clinical)` and `Master of Professional Psychology` had duration=10.0 years extracted (regex confused by something) — nullified by sanity check, which left them with no duration. Same regex issue as the AIT `ICT50220` case.
+- 3 courses skipped with `extract: sequence item 0: expected str instance, int found` — a type error in the extractor when intake_months comes back as ints not strings. Affects: Graduate Certificate in Mental Health Online, Graduate Certificate in Religious Education Online, Graduate Diploma in Psychology Online.
+- 8 fetch_failed errors (`https://auth.acu.edu.au/...`) — ACU is redirecting some pages to an auth subdomain. The browser-fallback retry handled most but not all. Worth detecting `auth.acu.edu.au` redirects and rewriting back to `www.acu.edu.au`.
+- The `Course is extracted from wrong URL` problem (Bug 1) is the root cause of most of the duplicate rows in the output — fixing that should clean up most of the noise.

@@ -432,6 +432,23 @@ async def extract_course(
             _qs["studentType"] = ["international"]
             url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
 
+    # ACU: Australian Catholic University serves a Domestic / International tab
+    # toggle on every course detail page.  The international fees, IELTS score,
+    # and campus details only appear when ?type=International is appended to the
+    # URL.  Without this rewrite the scraper gets CSP/domestic values (~$5–8 k)
+    # instead of the real international tuition (~$25–35 k).
+    # Auth-subdomain guard: ACU occasionally redirects to auth.acu.edu.au — strip
+    # back to www.acu.edu.au so the fetch doesn't follow the login redirect.
+    _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("auth.acu.edu.au",):
+        url = urlunparse(_parsed_url._replace(netloc="www.acu.edu.au"))
+        _parsed_url = urlparse(url)
+    if _parsed_url.netloc in ("www.acu.edu.au", "acu.edu.au"):
+        _qs = parse_qs(_parsed_url.query)
+        if "type" not in _qs:
+            _qs["type"] = ["International"]
+            url = urlunparse(_parsed_url._replace(query=urlencode({k: v[0] for k, v in _qs.items()})))
+
     # UOW: international-student fees, IELTS, intakes, and campus are only
     # visible with ?students=international on each course detail page.
     # Also pass the current year so UOW returns the correct session dates.
@@ -1272,7 +1289,8 @@ async def extract_course(
     #      false positive.
     _url_signals_international = bool(
         _re.search(
-            r"[?&](students|studenttype|student_type|intlfees|international)=international",
+            r"[?&](students|studenttype|student_type|intlfees|international)=international"
+            r"|[?&]type=international",
             url,
             _re.IGNORECASE,
         )
