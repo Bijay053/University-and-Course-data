@@ -1,0 +1,75 @@
+Subject: Vision OCR hallucinating from link.png and other non-data images on VIT — overriding correct page valuesVIT MBA Information Systems shows the same hallucination pattern as ASAHE, with course-page values being correctly extracted and then thrown away in favor of vision OCR of decorative images.Evidence Review for https://vit.edu.au/mba/mba-information-systems:ielts_overall   → 6.5  from https://vit.edu.au/assets/link.png   (selected)
+                  6.5  from regex (page text)                     (superseded)
+toefl_overall   → 80   from https://vit.edu.au/assets/link.png   (selected)
+                  81   from equivalence_table (page text)         (superseded)
+ielts_listening → 6.0  from link.png    (vision hallucination)
+ielts_reading   → 6.0  from link.png    (vision hallucination)
+ielts_speaking  → 6.0  from link.png    (vision hallucination)
+ielts_writing   → 6.0  from link.png    (vision hallucination)
+toefl_listening → 18   from link.png    (vision hallucination)
+toefl_reading   → 18   from link.png    (vision hallucination)
+toefl_speaking  → 18   from link.png    (vision hallucination)
+toefl_writing   → 18   from link.png    (vision hallucination)
+duolingo_overall → 110 from sibling_cache:postgraduate (chained hallucination)
+course_location → "Melbourne" from gemini_primary    (selected)
+                  "Melbourne, Sydney, Adelaide, Geelong" from location.heading (superseded)link.png is a decorative external-link icon. It contains no English requirement data. Vision OCR is being asked "what English requirements are in this image?" and inventing plausible numbers.The decorative-image filter we discussed for ASAHE either wasn't deployed for the VIT case or doesn't catch link.png. Same root cause as the ASAHE Facebook/Instagram icon hallucination.Three concrete fixes neededFix 1 (URGENT): Filter out non-data images before OCRThe current candidate list includes https://vit.edu.au/assets/link.png. Filename patterns like link, arrow, external, chain should be excluded alongside the social icons we already discussed. Also exclude any image hosted under /assets/ paths if it's small (UI assets), unless its filename contains a strong data hint.pythonNON_DATA_IMAGE_PATTERNS = [
+    # social icons
+    r"facebook", r"twitter", r"instagram", r"linkedin", r"youtube", r"tiktok",
+    # UI affordances
+    r"^link\.", r"^arrow\.", r"^external\.", r"^chain\.",
+    r"^icon[-_]", r"^logo", r"^social", r"^footer",
+    # generic naming patterns
+    r"_(\d+)\.(?:png|jpg|svg|webp)$",  # "icon_200.png"
+]
+
+def _is_non_data_image(url: str) -> bool:
+    filename = url.lower().split("/")[-1]
+    return any(re.search(pat, filename) for pat in NON_DATA_IMAGE_PATTERNS)Apply this BEFORE Gemini Vision is called. We're paying API cost to hallucinate from icons.Fix 2 (URGENT): Validate OCR output looks like a real English requirements tableEven with filtering, edge cases will slip through. Add a post-OCR check that REJECTS results that don't look like a real table:pythondef _ocr_result_is_valid_english_table(ocr_text: str | None,
+                                        returned_fields: dict) -> bool:
+    """An OCR result is valid only if the OCR text looks like a real
+    English requirements table — not just plausible numbers."""
+    if not ocr_text:
+        return False
+    lower = ocr_text.lower()
+
+    # The OCR-recovered TEXT must mention test names that match the
+    # values being claimed. If we're claiming IELTS=6.5 and TOEFL=85,
+    # the OCR text must contain "IELTS" AND "TOEFL".
+    claimed_tests = []
+    if returned_fields.get("ielts_overall"):
+        claimed_tests.append("ielts")
+    if returned_fields.get("toefl_overall"):
+        claimed_tests.append("toefl")
+    if returned_fields.get("pte_overall"):
+        claimed_tests.append("pte")
+    if returned_fields.get("cambridge_overall"):
+        claimed_tests.append("cambridge")
+    if returned_fields.get("duolingo_overall"):
+        claimed_tests.append("duolingo")
+
+    for test in claimed_tests:
+        if test not in lower:
+            return False  # claimed value, but test name not in OCR text → hallucination
+    return TrueDiscard OCR results that fail this. No evidence row written. Falls through to page-text extractors which already have the correct values.Fix 3 (CRITICAL): Course-page extractors must beat hallucinated visionEven if vision tier 4 beats regex tier 3 by the authority model, this only makes sense when vision is reading a REAL data image. When vision is hallucinating, regex (which read the actual page text) is the correct answer.Two ways to do this:Option A — Conditional authority demotion. If vision OCR's source image fails the validation in Fix 2, demote that vision evidence row to tier 0 so it cannot supersede anything. Effectively: hallucinated vision evidence stays as a record but never wins.Option B — Image-source whitelist. Vision results only get tier 4 authority if the source image is in a known-safe pattern (filename contains test name keywords like "ielts/english/requirement/master/bachelor", OR the image is inside a DOM section whose heading matches "English Requirements"). Otherwise tier 2.Option B is cleaner. The DOM-aware image discovery (_find_english_section_images) already identifies which images are inside the English requirements section — that signal should be carried through into the authority assignment.For the VIT case specifically: link.png is in the page footer or somewhere unrelated to entry requirements. If we only allow tier-4 authority for images inside the entry-requirements DOM section, link.png would never qualify and the regex/equivalence_table values would correctly win.Issue 4: Course location supersedes correct page extractionSeparate from vision: gemini_primary returned "Melbourne" alone, location.heading returned the full list "Melbourne, Sydney, Adelaide, Geelong, Australia". Authority chose Gemini.But location.heading extracts a structured value from the actual page, while Gemini is summarizing in prose. For multi-campus courses, the structured extractor is more accurate.Possible fix: when location.heading returns a multi-campus list AND gemini_primary returns a single campus that's a SUBSET of the heading list, keep the heading value. Gemini is just picking one mention from prose; the heading lists all of them.Or simpler: course_location specifically — location.heading should beat gemini_primary. The heading is reading a specific structured element (probably an h2 or nav with all locations); Gemini is reading any mention of a city in the description.Why this matters for the projectYou're hitting this on every university with images that are not English-requirement images. ASAHE had Facebook icons. VIT has link.png. Other universities will have tracking pixels, partner logos, accreditation badges, GIF arrows, anything. The current pipeline pays Gemini API cost on every one of these and accepts hallucinated output as evidence.Fixes 1+2+3 together make vision OCR a reliable Phase A step that:
+
+Only OCRs images likely to contain data (Fix 1)
+Trusts results only when OCR text confirms it's a real table (Fix 2)
+Only outranks page-text extractors when the source image is genuinely inside an English requirements section (Fix 3)
+After this, "course page wins first" becomes the actual behavior, not just the design intent.VerificationAfter deploying, re-run VIT MBA Information Systems and verify:sqlSELECT field_key, method, normalized_value, source_url, selected
+FROM scraped_field_evidence
+WHERE scraped_course_id = (
+    SELECT id FROM scraped_courses
+    WHERE course_name ILIKE '%Master of Business Administration (Information Systems)%'
+      AND course_website LIKE '%vit.edu.au%'
+    ORDER BY created_at DESC LIMIT 1
+)
+AND field_key IN ('ielts_overall','toefl_overall','course_location',
+                  'duolingo_overall','cambridge_overall')
+ORDER BY field_key, selected DESC;Expected:
+
+ielts_overall: selected=true, method=regex or equivalence_table, source_url=course page URL (NOT link.png)
+toefl_overall: selected=true, method=equivalence_table, value=81 (the page-derived value), source_url=course page URL
+course_location: selected=true, method=location.heading, value contains all four cities
+duolingo_overall: ideally no row at all (page has no DET data); acceptable if from PDF/equivalence_table; NOT from sibling_cache
+cambridge_overall: from equivalence_table with value 176 — that's a real page-derived equivalence calculation
+If link.png appears anywhere as a source_url, Fix 1 didn't take effect.
