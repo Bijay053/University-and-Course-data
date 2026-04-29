@@ -1,0 +1,32 @@
+[2026-04-29 06:54:56,903: INFO/MainProcess] mingle: searching for neighbors
+[2026-04-29 06:54:57,913: INFO/MainProcess] mingle: all alone
+[2026-04-29 06:54:57,954: WARNING/MainProcess] worker_ready: primary DB unreachable ([Errno -5] No address associated with hostname) — trying 127.0.0.1 fallback
+[2026-04-29 06:54:58,010: INFO/MainProcess] worker_ready: no ghost running jobs found — all slots clean
+[2026-04-29 06:54:58,010: INFO/MainProcess] celery@university-and-course-data ready.
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# cd /root/University-and-Course-data && git pull origin main
+pkill -9 -f "celery.*worker"; sleep 3
+cd backend-py && source venv/bin/activate
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+sleep 6 && tail -5 /var/log/celery-worker.log
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.29 KiB | 330.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   e47e549..1627b1d  main       -> origin/main
+Updating e47e549..1627b1d
+Fast-forward
+ backend-py/app/services/scraper/discovery.py | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
+[3]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1  (wd: ~/University-and-Course-data/backend-py)
+(wd now: ~/University-and-Course-data)
+[3] 1197803
+[2026-04-29 07:02:29,640: INFO/MainProcess] mingle: searching for neighbors
+[2026-04-29 07:02:30,648: INFO/MainProcess] mingle: all alone
+[2026-04-29 07:02:30,710: WARNING/MainProcess] worker_ready: primary DB unreachable ([Errno -5] No address associated with hostname) — trying 127.0.0.1 fallback
+[2026-04-29 07:02:30,790: INFO/MainProcess] worker_ready: no ghost running jobs found — all slots clean
+[2026-04-29 07:02:30,790: INFO/MainProcess] celery@university-and-course-data ready.
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
