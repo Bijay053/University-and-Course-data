@@ -1,0 +1,46 @@
+# Kill and restart Celery
+pkill -9 -f "celery.*worker"; sleep 3
+cd /root/University-and-Course-data/backend-py && source venv/bin/activate
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+(integer) 0
+[1]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1
+[1] 1190640
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. Restore the DNS fix (must have been overwritten)
+echo "nameserver 8.8.8.8
+nameserver 8.8.4.4" > /etc/resolv.conf
+
+# 2. Test — extract DB host and verify it resolves now
+DB_HOST=$(grep DATABASE_URL /root/University-and-Course-data/backend-py/.env | sed 's|.*@||' | cut -d/ -f1 | cut -d: -f1)
+echo "DB host: $DB_HOST"
+nslookup $DB_HOST
+
+# 3. Reset the stuck VIT job (DNS failure left it in "queued" but Celery task is gone)
+curl -s -X POST http://localhost:80/api/scrape/force-cancel-all | python3 -m json.tool
+
+# 4. Restart Celery now that DNS works
+pkill -9 -f "celery.*worker"; sleep 3
+cd /root/University-and-Course-data/backend-py && source venv/bin/activate
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+echo "PID: $!"
+DB host: localhost
+Server:         8.8.8.8
+Address:        8.8.8.8#53
+
+** server can't find localhost: NXDOMAIN
+
+{
+    "ok": true,
+    "cancelled": 0,
+    "celery_killed": 0
+}
+[1]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1
+[1] 1191019
+PID: 1191019
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # Prevent NetworkManager from overwriting resolv.conf
+echo "[main]
+dns=none" >> /etc/NetworkManager/NetworkManager.conf
+systemctl restart NetworkManager 2>/dev/null || true
+-bash: /etc/NetworkManager/NetworkManager.conf: No such file or directory
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
