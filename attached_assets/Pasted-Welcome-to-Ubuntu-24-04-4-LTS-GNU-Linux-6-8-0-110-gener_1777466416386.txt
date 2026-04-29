@@ -1,0 +1,63 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Apr 29 12:39:53 UTC 2026
+
+  System load:           0.0
+  Usage of /:            3.5% of 231.44GB
+  Memory usage:          23%
+  Swap usage:            0%
+  Processes:             198
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Wed Apr 29 11:56:39 2026 from 162.243.190.66
+root@university-and-course-data:~# # 1. Pull latest code
+cd /path/to/University-and-Course-data
+git pull origin main
+
+# 2. Apply the new migration (adds cricos_code column)
+cd backend-py
+PYTHONPATH=. alembic upgrade head
+
+# 3. Restart services
+sudo systemctl restart uni-api-py.service
+sudo systemctl restart uni-celery.service
+
+# 4. Verify services are up
+sudo systemctl status uni-api-py.service
+sudo systemctl status uni-celery.service
+-bash: cd: /path/to/University-and-Course-data: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+-bash: cd: backend-py: No such file or directory
+Command 'alembic' not found, but can be installed with:
+apt install alembic
+● uni-api-py.service - University Portal Python API (FastAPI + Uvicorn)
+     Loaded: loaded (/etc/systemd/system/uni-api-py.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-04-29 12:39:59 UTC; 2s ago
+   Main PID: 1208958 (python)
+      Tasks: 8 (limit: 9483)
+     Memory: 150.6M (peak: 150.9M)
+        CPU: 3.728s
+     CGroup: /system.slice/uni-api-py.service
+             ├─1208958 /root/University-and-Course-data/backend-py/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 --access-log --lo>
+             ├─1208968 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.resource_tracker import main;main(6)"
+             ├─1208969 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+             └─1208970 /root/University-and-Course-data/backend-py/venv/bin/python -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_ha>
+
+Apr 29 12:39:59 university-and-course-data systemd[1]: Started uni-api-py.service - University Portal Python API (FastAPI + Uvicorn).
+lines 1-14/14 (END)
