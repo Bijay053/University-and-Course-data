@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "39_SjyadJeZGwr7Dbl2mX"
+uri = "file://attached_assets/architecture.md"
+type = "text"
+title = "Scraper Architecture Document"

@@ -1,0 +1,1678 @@
+Worker claimed queued scrape job
+Cleared 16 stale pending/rejected scraped_courses rows (>10m old) for university 3
+Fetching https://www.torrens.edu.au/...
+Discovering candidate course pages...
+[DISCOVER] Home page detected → course listing at https://www.torrens.edu.au/courses/course-guides (high-priority probe)
+[DISCOVER] Crawling from https://www.torrens.edu.au/courses/course-guides (max 25 pages, max 200 candidates)
+[DISCOVER] classified https://www.torrens.edu.au/courses/course-guides: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/courses/course-guides
+[DISCOVER] Page 1/25: +1 candidates (total 1) — https://www.torrens.edu.au/courses/course-guides
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/employability/workforce-edge: detail (course content present, only 0 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[DISCOVER] Page 2/25: +1 candidates (total 2) — https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/international-students: unknown (no course links or degree content detected)
+[DISCOVER] Page 3/25: +0 candidates (total 2) — https://www.torrens.edu.au/studying-with-us/international-students
+[DISCOVER] classified https://www.torrens.edu.au/courses: unknown (no course links or degree content detected)
+[DISCOVER] Page 4/25: +0 candidates (total 2) — https://www.torrens.edu.au/courses
+[DISCOVER] classified https://www.torrens.edu.au/courses/design: unknown (no course links or degree content detected)
+[DISCOVER] Page 5/25: +0 candidates (total 2) — https://www.torrens.edu.au/courses/design
+[DISCOVER] classified https://www.torrens.edu.au/courses/health: listing (3 course links + listing title)
+[DISCOVER] Page 6/25: +3 candidates (total 5) — https://www.torrens.edu.au/courses/health
+[DISCOVER] classified https://www.torrens.edu.au/courses/business: listing (3 course links + listing title)
+[DISCOVER] Page 7/25: +3 candidates (total 8) — https://www.torrens.edu.au/courses/business
+[DISCOVER] classified https://www.torrens.edu.au/courses/hospitality: listing (2 course links + listing title)
+[DISCOVER] Page 8/25: +2 candidates (total 10) — https://www.torrens.edu.au/courses/hospitality
+[DISCOVER] classified https://www.torrens.edu.au/courses/technology: listing (2 course links + listing title)
+[DISCOVER] Page 9/25: +2 candidates (total 12) — https://www.torrens.edu.au/courses/technology
+[DISCOVER] classified https://www.torrens.edu.au/courses/education: listing (3 course links + listing title)
+[DISCOVER] Page 10/25: +3 candidates (total 15) — https://www.torrens.edu.au/courses/education
+[DISCOVER] classified https://www.torrens.edu.au/courses/english: unknown (no course links or degree content detected)
+[DISCOVER] Page 11/25: +0 candidates (total 15) — https://www.torrens.edu.au/courses/english
+[DISCOVER] classified https://www.torrens.edu.au/courses/higher-degrees-by-research: listing (3 course links + listing title)
+[DISCOVER] Page 12/25: +3 candidates (total 18) — https://www.torrens.edu.au/courses/higher-degrees-by-research
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us: unknown (no course links or degree content detected)
+[DISCOVER] Page 13/25: +0 candidates (total 18) — https://www.torrens.edu.au/studying-with-us
+[DISCOVER] blocked marketing_page: https://www.torrens.edu.au/studying-with-us/why-study-with-us
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/employability: unknown (no course links or degree content detected)
+[DISCOVER] Page 15/25: +0 candidates (total 18) — https://www.torrens.edu.au/studying-with-us/employability
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options: listing (1 course links + listing title)
+[DISCOVER] Page 16/25: +1 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/study-options
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/campus-locations: unknown (no course links or degree content detected)
+[DISCOVER] Page 17/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/campus-locations
+[DISCOVER] blocked campus_page: https://www.torrens.edu.au/studying-with-us/student-life
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/student-support: unknown (no course links or degree content detected)
+[DISCOVER] Page 19/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/student-support
+[DISCOVER] blocked info_page: https://www.torrens.edu.au/studying-with-us/mature-age-students
+[DISCOVER] blocked info_page: https://www.torrens.edu.au/studying-with-us/high-school-students
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/choose-a-study-option: listing (1 course links + listing title)
+[DISCOVER] Page 22/25: +0 candidates (total 19) — https://www.torrens.edu.au/studying-with-us/choose-a-study-option
+[DISCOVER] classified https://www.torrens.edu.au/research/faculty-research: detail (course content present, only 2 outbound links)
+[DISCOVER] added self as candidate https://www.torrens.edu.au/research/faculty-research
+[DISCOVER] Page 23/25: +1 candidates (total 20) — https://www.torrens.edu.au/research/faculty-research
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options/undergraduate-courses: listing (6 course links found)
+[DISCOVER] Page 24/25: +6 candidates (total 26) — https://www.torrens.edu.au/studying-with-us/study-options/undergraduate-courses
+[DISCOVER] classified https://www.torrens.edu.au/studying-with-us/study-options/postgraduate-courses: listing (9 course links found)
+[DISCOVER] Page 25/25: +3 candidates (total 29) — https://www.torrens.edu.au/studying-with-us/study-options/postgraduate-courses
+[DISCOVER] JS-heavy site — supplementing 29 BFS candidate(s) with sitemap to catch discipline courses missing from static HTML
+[DISCOVER] sitemap: probing 4 URL(s) at https://www.torrens.edu.au
+[DISCOVER] sitemap index https://www.torrens.edu.au/sitemap.xml: 1 sub-sitemap(s)
+[DISCOVER] sitemap https://www.torrens.edu.au/sitemap.xml: +159 candidates (total 159)
+[DISCOVER] sitemap: done — 159 unique candidates
+[DISCOVER] sitemap supplement added 139 new candidate(s) (total now 168)
+Discovered 168 candidate course links
+Loaded uni-level PDF data: fee=yes english=no
+[CENTRAL] fee page parsed → 0 program record(s) from https://www.torrens.edu.au/international-fees
+[CENTRAL] english page parsed → no values from https://www.torrens.edu.au/courses/english
+Extracting course details (168 pages)...
+[EXTRACT] 1/168: Course Guides
+[EXTRACT] 2/168: Workforce Edge
+[EXTRACT] 3/168: Bachelor of Health Science (Clinical Nutrition)
+[EXTRACT] 4/168: Diploma of Health Science
+Fetching 3/168: Bachelor of Health Science (Clinical Nutrition)
+Fetching 1/168: Course Guides
+Fetching 2/168: Workforce Edge
+Fetching 4/168: Diploma of Health Science
+[FIELD SUMMARY] Course Guides Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Diploma of Health Science Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Health Science (Clinical Nutrition) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Workforce Edge Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/course-guides
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-health → 0 field(s) (cost=$0.000000, in=13895 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-health- → 0 field(s) (cost=$0.000000, in=9266 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-health-science (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-health-science-clinical-nutrition
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-health-science
+✅ [PASS 100/100] Bachelor of Health Science (Clinical Nutrition) | bachelor-of-health-science-clinical-nutr
+✅ [PASS 100/100] Diploma of Health Science | diploma-of-health-science
+[EXTRACT] 5/168: Graduate Diploma of Public Health
+[EXTRACT] 6/168: MBA (Advanced)
+Fetching 5/168: Graduate Diploma of Public Health
+Fetching 6/168: MBA (Advanced)
+[FIELD SUMMARY] Graduate Diploma of Public Health Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/health/graduate-diploma-o → 0 field(s) (cost=$0.000000, in=6829 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=10543 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/graduate-diploma-of-public-health
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-advanced
+[CATEGORY det] Graduate Diploma of Public Health → Medicine & Health / Public Health
+[CATEGORY det] Master of Business Administration (Advan → Business & Management / MBA
+✅ [PASS 100/100] Graduate Diploma of Public Health | graduate-diploma-of-public-health
+✅ [PASS 100/100] Master of Business Administration (Advanced) | master-of-business-administration-advanc
+[EXTRACT] 7/168: Bachelor of Business (Sport Management)
+[EXTRACT] 8/168: MBA and Master of Global Project Management
+Fetching 7/168: Bachelor of Business (Sport Management)
+Fetching 8/168: MBA and Master of Global Project Management
+[FIELD SUMMARY] Bachelor of Business (Sport Management) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration and Master of Gl Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=10647 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=12035 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business-sports-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-and-global-project-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business-sports-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-and-global-project-management
+✅ [PASS 100/100] Bachelor of Business (Sport Management) | bachelor-of-business-sports-management
+[CATEGORY det] Master of Business Administration and Ma → Business & Management / MBA
+[EXTRACT] 9/168: Bachelor of Business (Hospitality and Tourism...
+✅ [PASS 100/100] Master of Business Administration and Master of Gl | master-of-business-administration-and-gl
+Fetching 9/168: Bachelor of Business (Hospitality and Tourism...
+[EXTRACT] 10/168: Diploma of Business (Hospitality and Tourism...
+Fetching 10/168: Diploma of Business (Hospitality and Tourism...
+[per-course browser ✓] https://www.torrens.edu.au/courses/course-guides — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/studying-with-us/employability/workforce-edge — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/course-guides → 0 field(s) (cost=$0.000000, in=3155 out=0)
+[GEMINI] https://www.torrens.edu.au/studying-with-us/employability/wo → 0 field(s) (cost=$0.000000, in=4009 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/course-guides (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/studying-with-us/employability/workforce-edge (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/course-guides
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/studying-with-us/employability/workforce-edge
+[WARN] Course Guides — Fee section detected but fee is blank
+[WARN] Workforce Edge — Fee section detected but fee is blank
+❌ [LOW 35/100] Course Guides — missing: english, duration, intake | course-guides
+❌ [LOW 55/100] Workforce Edge — missing: english, duration | workforce-edge
+[EXTRACT] 11/168: Bachelor of Information Technology
+[EXTRACT] 12/168: Master of Information Technology
+Fetching 11/168: Bachelor of Information Technology
+Fetching 12/168: Master of Information Technology
+[FIELD SUMMARY] Bachelor of Information Technology Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Hospitality and Tourism Manag Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business (Hospitality and Tourism Mana Fee: ✅ '82800' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ❌ not found Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Information Technology Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/technology/bachelor-of-in → 0 field(s) (cost=$0.000000, in=11368 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/diploma-of-bu → 0 field(s) (cost=$0.000000, in=7785 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/master-of-info → 0 field(s) (cost=$0.000000, in=9962 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/bachelor-of-b → 0 field(s) (cost=$0.000000, in=11302 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/bachelor-of-information-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/diploma-of-business-hospitality-and-tourism-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/bachelor-of-business-hospitality-and-tourism-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/master-of-information-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/diploma-of-business-hospitality-and-tourism-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/bachelor-of-information-technology
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/bachelor-of-business-hospitality-and-tourism-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/master-of-information-technology
+[CATEGORY det] Diploma of Business (Hospitality and Tou → Hospitality, Tourism & Events / Tourism Management
+[CATEGORY det] Bachelor of Business (Hospitality and To → Hospitality, Tourism & Events / Tourism Management
+[CATEGORY det] Bachelor of Information Technology → Computer Science & IT / Information Systems
+[CATEGORY det] Master of Information Technology → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Diploma of Business (Hospitality and Tourism Manag | diploma-of-business-hospitality-and-tour
+✅ [PASS 80/100] Bachelor of Business (Hospitality and Tourism Mana — missing: duration | bachelor-of-business-hospitality-and-tou
+✅ [PASS 100/100] Bachelor of Information Technology | bachelor-of-information-technology
+✅ [PASS 100/100] Master of Information Technology | master-of-information-technology
+[EXTRACT] 13/168: Master of Education (Inclusive Education)
+[EXTRACT] 14/168: Master of Education (Advanced)
+[EXTRACT] 15/168: Graduate Diploma of Education
+[EXTRACT] 16/168: Master of Philosophy
+Fetching 13/168: Master of Education (Inclusive Education)
+Fetching 14/168: Master of Education (Advanced)
+Fetching 16/168: Master of Philosophy
+Fetching 15/168: Graduate Diploma of Education
+[FIELD SUMMARY] Graduate Diploma of Education Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Philosophy Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Education (Inclusive Education) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Education (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/education/graduate-diplom → 0 field(s) (cost=$0.000000, in=9999 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=7217 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/education/master-of-educa → 0 field(s) (cost=$0.000000, in=11309 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/education/master-of-educa → 0 field(s) (cost=$0.000000, in=13892 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/graduate-diploma-of-education (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/master-of-philosophy (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/master-of-education-inclusive-education (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/master-of-education-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/graduate-diploma-of-education
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/master-of-philosophy
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/master-of-education-inclusive-education
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/master-of-education-advanced
+[WARN] Graduate Diploma of Education — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Education (Inclusive Education) | master-of-education-inclusive-education
+✅ [PASS 100/100] Master of Education (Advanced) | master-of-education-advanced
+✅ [PASS 100/100] Master of Philosophy | master-of-philosophy
+✅ [PASS 100/100] Graduate Diploma of Education | graduate-diploma-of-education
+[EXTRACT] 17/168: Graduate Certificate of Research Studies
+[EXTRACT] 18/168: Master of Research Studies
+[EXTRACT] 19/168: Diploma of Design
+[EXTRACT] 20/168: Faculty Research
+Fetching 17/168: Graduate Certificate of Research Studies
+Fetching 18/168: Master of Research Studies
+Fetching 19/168: Diploma of Design
+Fetching 20/168: Faculty Research
+[FIELD SUMMARY] Future Higher Degrees by Research Students Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January', 'October']" [regex conf=0.40] StudyMode: ❌ not found
+[FIELD SUMMARY] Graduate Certificate of Research Studies Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Research Studies Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/research/faculty-research
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=5662 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=13896 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-design → 0 field(s) (cost=$0.000000, in=9849 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/graduate-certificate-of-research-studies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/master-of-research-studies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/graduate-certificate-of-research-studies
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/master-of-research-studies
+[WARN] Diploma of Design — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Research Studies | master-of-research-studies
+[WARN] Graduate Certificate of Research Studies — Fee section detected but fee is blank
+[EXTRACT] 21/168: Bachelor of Business
+✅ [PASS 100/100] Graduate Certificate of Research Studies | graduate-certificate-of-research-studies
+✅ [PASS 100/100] Diploma of Design | diploma-of-design
+Fetching 21/168: Bachelor of Business
+[EXTRACT] 22/168: Undergraduate Health courses
+[EXTRACT] 23/168: Undergraduate Business courses
+Fetching 23/168: Undergraduate Business courses
+Fetching 22/168: Undergraduate Health courses
+[FIELD SUMMARY] Business Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Health Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Business Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business
+[per-course browser ↻] https://www.torrens.edu.au/courses/health
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=11013 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business
+✅ [PASS 100/100] Bachelor of Business | bachelor-of-business
+[EXTRACT] 24/168: Undergraduate Design courses
+Fetching 24/168: Undergraduate Design courses
+[per-course browser ✓] https://www.torrens.edu.au/research/faculty-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/research/faculty-research → 0 field(s) (cost=$0.000000, in=2708 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/research/faculty-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location=None method=none url=https://www.torrens.edu.au/research/faculty-research
+[WARN] Future Higher Degrees by Research Studen — Fee section detected but fee is blank
+❌ [LOW 45/100] Future Higher Degrees by Research Students — missing: english, duration, mode | faculty-research
+[EXTRACT] 25/168: Undergraduate Technology courses
+Fetching 25/168: Undergraduate Technology courses
+[FIELD SUMMARY] Design Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ❌ not found
+[per-course browser ↻] https://www.torrens.edu.au/courses/design
+[FIELD SUMMARY] Technology Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology
+[per-course browser ✓] https://www.torrens.edu.au/courses/health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/business — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health → 0 field(s) (cost=$0.000000, in=3680 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business → 0 field(s) (cost=$0.000000, in=5059 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health
+❌ [LOW 55/100] Business Courses and Degrees — missing: english, duration | business
+[WARN] Health Courses and Degrees — Fee section detected but fee is blank
+[EXTRACT] 26/168: Undergraduate Hospitality courses
+❌ [LOW 55/100] Health Courses and Degrees — missing: english, duration | health
+Fetching 26/168: Undergraduate Hospitality courses
+[EXTRACT] 27/168: Master of Economics of Sustainability...
+Fetching 27/168: Master of Economics of Sustainability...
+[per-course browser ✓] https://www.torrens.edu.au/courses/design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design → 0 field(s) (cost=$0.000000, in=3562 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode=None location=None method=none url=https://www.torrens.edu.au/courses/design
+[WARN] Design Courses and Degrees — Fee section detected but fee is blank
+❌ [LOW 45/100] Design Courses and Degrees — missing: english, duration, mode | design
+[EXTRACT] 28/168: Postgraduate Education courses
+Fetching 28/168: Postgraduate Education courses
+[FIELD SUMMARY] Hospitality Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Master of Economics of Sustainability (Partnership Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Education Courses and Degrees Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-econom → 0 field(s) (cost=$0.000000, in=6639 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/education
+[per-course browser ↻] https://www.torrens.edu.au/courses/hospitality
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-economics-of-sustainability (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-economics-of-sustainability
+[GEMINI] https://www.torrens.edu.au/courses/technology → 0 field(s) (cost=$0.000000, in=2975 out=0)
+[CATEGORY det] Master of Economics of Sustainability (P → Agriculture & Environmental Science / Sustainability
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[WARN] Master of Economics of Sustainability (P — Fee section detected but fee is blank
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology
+✅ [PASS 100/100] Master of Economics of Sustainability (Partnership | master-of-economics-of-sustainability
+❌ [LOW 55/100] Technology Courses and Degrees — missing: english, duration | technology
+[EXTRACT] 29/168: Postgraduate Research courses
+[EXTRACT] 30/168: Bachelor Of Architectural Technology
+Fetching 29/168: Postgraduate Research courses
+Fetching 30/168: Bachelor Of Architectural Technology
+[FIELD SUMMARY] Higher Degrees by Research Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Architectural Technology Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/higher-degrees-by-research
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-archit → 0 field(s) (cost=$0.000000, in=12834 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-architectural-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-architectural-technology
+✅ [PASS 100/100] Bachelor of Architectural Technology | bachelor-of-architectural-technology
+[EXTRACT] 31/168: Bachelor Of 3d Design And Animation
+Fetching 31/168: Bachelor Of 3d Design And Animation
+[per-course browser ✓] https://www.torrens.edu.au/courses/education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/hospitality — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/education → 0 field(s) (cost=$0.000000, in=2215 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality → 0 field(s) (cost=$0.000000, in=2244 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality
+[WARN] Education Courses and Degrees — Fee section detected but fee is blank
+[WARN] Hospitality Courses and Degrees — Fee section detected but fee is blank
+❌ [LOW 55/100] Education Courses and Degrees — missing: english, duration | education
+[EXTRACT] 32/168: Bachelor Of Game Design And Development
+❌ [LOW 55/100] Hospitality Courses and Degrees — missing: english, duration | hospitality
+Fetching 32/168: Bachelor Of Game Design And Development
+[EXTRACT] 33/168: Bachelor Of Game Programming
+Fetching 33/168: Bachelor Of Game Programming
+[FIELD SUMMARY] Bachelor of 3D Design and Animation Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-3d-des → 0 field(s) (cost=$0.000000, in=10998 out=0)
+[FIELD SUMMARY] Bachelor of Game Design and Development Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Game Programming Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-3d-design-and-animation (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-game-d → 0 field(s) (cost=$0.000000, in=11740 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-game-p → 0 field(s) (cost=$0.000000, in=13645 out=0)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-3d-design-and-animation
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-game-programming (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-game-design-and-development (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+✅ [PASS 100/100] Bachelor of 3D Design and Animation | bachelor-of-3d-design-and-animation
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-game-programming
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-game-design-and-development
+[WARN] Bachelor of Game Programming — Fee section detected but fee is blank
+[EXTRACT] 34/168: Bachelor Of Branded Fashion Design
+✅ [PASS 100/100] Bachelor of Game Design and Development | bachelor-of-game-design-and-development
+✅ [PASS 100/100] Bachelor of Game Programming | bachelor-of-game-programming
+Fetching 34/168: Bachelor Of Branded Fashion Design
+[EXTRACT] 35/168: Bachelor Of Communication Design
+[per-course browser ✓] https://www.torrens.edu.au/courses/higher-degrees-by-research — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[EXTRACT] 36/168: Bachelor Of Media Production And Communication
+Fetching 35/168: Bachelor Of Communication Design
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=2116 out=0)
+Fetching 36/168: Bachelor Of Media Production And Communication
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research
+[WARN] Higher Degrees by Research — Fee section detected but fee is blank
+❌ [LOW 55/100] Higher Degrees by Research — missing: english, duration | higher-degrees-by-research
+[EXTRACT] 37/168: Diploma Of Media Production
+Fetching 37/168: Diploma Of Media Production
+[FIELD SUMMARY] Bachelor of Communication Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Branded Fashion Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Media Production Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Media Production and Communication Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['February']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-commun → 0 field(s) (cost=$0.000000, in=13892 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/diploma-of-media-production
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-brande → 0 field(s) (cost=$0.000000, in=11990 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-communication-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-branded-fashion-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-branded-fashion-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-communication-design
+✅ [PASS 100/100] Bachelor of Branded Fashion Design | bachelor-of-branded-fashion-design
+✅ [PASS 100/100] Bachelor of Communication Design | bachelor-of-communication-design
+[EXTRACT] 38/168: Bachelor Of Fashion Marketing And Enterprise
+[EXTRACT] 39/168: Bachelor Of Interior Design Commercial
+Fetching 38/168: Bachelor Of Fashion Marketing And Enterprise
+Fetching 39/168: Bachelor Of Interior Design Commercial
+[FIELD SUMMARY] Bachelor of Interior Design (Commercial) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Fashion Marketing and Enterprise Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-interi → 0 field(s) (cost=$0.000000, in=11850 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-fashio → 0 field(s) (cost=$0.000000, in=11596 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-fashion-marketing-and-enterprise (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-commercial (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-fashion-marketing-and-enterprise
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-commercial
+[CATEGORY det] Bachelor of Fashion Marketing and Enterp → Business & Management / Marketing
+[CATEGORY det] Bachelor of Interior Design (Commercial) → Architecture, Building & Design / Interior Design
+✅ [PASS 100/100] Bachelor of Fashion Marketing and Enterprise | bachelor-of-fashion-marketing-and-enterp
+✅ [PASS 100/100] Bachelor of Interior Design (Commercial) | bachelor-of-interior-design-commercial
+[EXTRACT] 40/168: Bachelor Of Interior Design Residential
+[EXTRACT] 41/168: Bachelor Of Ux And Web Design
+Fetching 40/168: Bachelor Of Interior Design Residential
+Fetching 41/168: Bachelor Of Ux And Web Design
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-media- → 0 field(s) (cost=$0.000000, in=13896 out=0)
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/diploma-of-media-production — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD SUMMARY] Bachelor of Interior Design (Residential) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Ux and Web Design Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-media-p → 0 field(s) (cost=$0.000000, in=10162 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-interi → 0 field(s) (cost=$0.000000, in=12150 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-media-production-and-communication
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-media-production (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-residential (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[WARN] Bachelor of Media Production and Communi — Fee section detected but fee is blank
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-media-production
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-interior-design-residential
+⚠️ [WARN 75/100] Bachelor of Media Production and Communication — missing: english | bachelor-of-media-production-and-communi
+[WARN] Diploma of Media Production — Fee section detected but fee is blank
+[CATEGORY det] Bachelor of Interior Design (Residential → Architecture, Building & Design / Interior Design
+⚠️ [WARN 75/100] Diploma of Media Production — missing: english | diploma-of-media-production
+✅ [PASS 100/100] Bachelor of Interior Design (Residential) | bachelor-of-interior-design-residential
+[EXTRACT] 42/168: Diploma Of 3d Design And Animation
+[EXTRACT] 43/168: Diploma Of Branded Fashion Design
+Fetching 42/168: Diploma Of 3d Design And Animation
+[EXTRACT] 44/168: Advanced Diploma Of Game Design And Development
+Fetching 43/168: Diploma Of Branded Fashion Design
+Fetching 44/168: Advanced Diploma Of Game Design And Development
+[FIELD SUMMARY] Advanced Diploma of Game Design and Development Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of 3D Design and Animation Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Branded Fashion Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/advanced-diploma-o → 0 field(s) (cost=$0.000000, in=7797 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-3d-desi → 0 field(s) (cost=$0.000000, in=7236 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-3d-design-and-animation (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-design-and-development (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-3d-design-and-animation
+✅ [PASS 100/100] Diploma of 3D Design and Animation | diploma-of-3d-design-and-animation
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-branded-fashion-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-design-and-development
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-branded-fashion-design
+[EXTRACT] 45/168: Advanced Diploma Of Game Programming
+[WARN] Advanced Diploma of Game Design and Deve — Fee section detected but fee is blank
+Fetching 45/168: Advanced Diploma Of Game Programming
+[WARN] Diploma of Branded Fashion Design — Fee section detected but fee is blank
+✅ [PASS 100/100] Advanced Diploma of Game Design and Development | advanced-diploma-of-game-design-and-deve
+✅ [PASS 100/100] Diploma of Branded Fashion Design | diploma-of-branded-fashion-design
+[EXTRACT] 46/168: Diploma Of Fashion Marketing And Enterprise
+[EXTRACT] 47/168: Diploma Of Graphic Design
+Fetching 46/168: Diploma Of Fashion Marketing And Enterprise
+Fetching 47/168: Diploma Of Graphic Design
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/bachelor-of-ux-and → 0 field(s) (cost=$0.000000, in=11413 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/bachelor-of-ux-and-web-design
+[WARN] Bachelor of Ux and Web Design — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Bachelor of Ux and Web Design — missing: english | bachelor-of-ux-and-web-design
+[EXTRACT] 48/168: Advanced Diploma Of Interior Design And Decoration
+Fetching 48/168: Advanced Diploma Of Interior Design And Decoration
+[FIELD SUMMARY] Diploma of Fashion Marketing and Enterprise Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Advanced Diploma of Game Programming Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '7.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Graphic Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Advanced Diploma of Interior Design and Decoration Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-fashion → 0 field(s) (cost=$0.000000, in=6852 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/advanced-diploma-o → 0 field(s) (cost=$0.000000, in=9008 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/advanced-diploma-o → 0 field(s) (cost=$0.000000, in=7396 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-graphic → 0 field(s) (cost=$0.000000, in=7455 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-fashion-marketing-and-enterprise (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-graphic-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-interior-design-and-decoration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-programming (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-fashion-marketing-and-enterprise
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-graphic-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/advanced-diploma-of-interior-design-and-decoration
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/advanced-diploma-of-game-programming
+[CATEGORY det] Diploma of Fashion Marketing and Enterpr → Business & Management / Marketing
+[WARN] Advanced Diploma of Game Programming — Fee section detected but fee is blank
+[CATEGORY det] Diploma of Graphic Design → Architecture, Building & Design / Graphic Design
+[CATEGORY det] Advanced Diploma of Interior Design and → Architecture, Building & Design / Interior Design
+✅ [PASS 100/100] Diploma of Fashion Marketing and Enterprise | diploma-of-fashion-marketing-and-enterpr
+✅ [PASS 100/100] Diploma of Graphic Design | diploma-of-graphic-design
+✅ [PASS 100/100] Advanced Diploma of Game Programming | advanced-diploma-of-game-programming
+[WARN] Advanced Diploma of Interior Design and — Fee section detected but fee is blank
+[EXTRACT] 49/168: Diploma Of Interior Design And Decoration
+[EXTRACT] 50/168: Diploma Of Photography And Photo Imaging
+✅ [PASS 100/100] Advanced Diploma of Interior Design and Decoration | advanced-diploma-of-interior-design-and-
+[EXTRACT] 51/168: Diploma Of Ux And Web Design
+Fetching 49/168: Diploma Of Interior Design And Decoration
+[EXTRACT] 52/168: Graduate Certificate Of Design
+Fetching 50/168: Diploma Of Photography And Photo Imaging
+Fetching 51/168: Diploma Of Ux And Web Design
+Fetching 52/168: Graduate Certificate Of Design
+[FIELD SUMMARY] Graduate Certificate of Design Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Interior Design and Decoration Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Ux and Web Design Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Photography and Photo Imaging Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/graduate-certifica → 0 field(s) (cost=$0.000000, in=8414 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-ux-and- → 0 field(s) (cost=$0.000000, in=7218 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-interio → 0 field(s) (cost=$0.000000, in=6521 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/diploma-of-photogr → 0 field(s) (cost=$0.000000, in=6572 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graduate-certificate-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-photography-and-photo-imaging (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-ux-and-web-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/diploma-of-interior-design-and-decoration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/graduate-certificate-of-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-photography-and-photo-imaging
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-ux-and-web-design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/diploma-of-interior-design-and-decoration
+[WARN] Graduate Certificate of Design — Fee section detected but fee is blank
+✅ [PASS 100/100] Diploma of Photography and Photo Imaging | diploma-of-photography-and-photo-imaging
+[WARN] Diploma of Ux and Web Design — Fee section detected but fee is blank
+[CATEGORY det] Diploma of Interior Design and Decoratio → Architecture, Building & Design / Interior Design
+✅ [PASS 100/100] Graduate Certificate of Design | graduate-certificate-of-design
+[EXTRACT] 53/168: Graduate Certificate Of Ux Design
+✅ [PASS 100/100] Diploma of Interior Design and Decoration | diploma-of-interior-design-and-decoratio
+✅ [PASS 100/100] Diploma of Ux and Web Design | diploma-of-ux-and-web-design
+[EXTRACT] 54/168: Master Of Design
+[EXTRACT] 55/168: Branded Fashion Design
+Fetching 53/168: Graduate Certificate Of Ux Design
+[EXTRACT] 56/168: 3d Design Animation
+Fetching 54/168: Master Of Design
+Fetching 55/168: Branded Fashion Design
+Fetching 56/168: 3d Design Animation
+[FIELD SUMMARY] 3D Design and Animation Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Fashion Marketing and Design Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Ux Design Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '6.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Design Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/3d-design-animation
+[GEMINI] https://www.torrens.edu.au/courses/design/master-of-design → 0 field(s) (cost=$0.000000, in=13601 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/branded-fashion-design
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/master-of-design (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/master-of-design
+[WARN] Master of Design — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Design | master-of-design
+[EXTRACT] 57/168: Photography Film Video Design
+Fetching 57/168: Photography Film Video Design
+[FIELD SUMMARY] Photography, Motion and Photo Imaging Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/photography-film-video-design
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/3d-design-animation — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/branded-fashion-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/3d-design-animatio → 0 field(s) (cost=$0.000000, in=2817 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/branded-fashion-de → 0 field(s) (cost=$0.000000, in=3524 out=0)
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/3d-design-animation (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/branded-fashion-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/design/graduate-certifica → 0 field(s) (cost=$0.000000, in=8484 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/3d-design-animation
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/branded-fashion-design
+❌ [LOW 55/100] 3D Design and Animation Courses — missing: english, intake | 3d-design-animation
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[CATEGORY det] Fashion Marketing and Design Courses → Business & Management / Marketing
+[EXTRACT] 58/168: Ux Web Design
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/graduate-certificate-of-ux-design
+[WARN] Graduate Certificate of Ux Design — Fee section detected but fee is blank
+❌ [LOW 55/100] Fashion Marketing and Design Courses — missing: english, intake | branded-fashion-design
+Fetching 58/168: Ux Web Design
+❌ [LOW 55/100] Graduate Certificate of Ux Design — missing: english, intake | graduate-certificate-of-ux-design
+[EXTRACT] 59/168: Graphic Communication Design
+[EXTRACT] 60/168: Media Production
+Fetching 59/168: Graphic Communication Design
+Fetching 60/168: Media Production
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/photography-film-video-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD SUMMARY] Ux & Web Design Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Media Production Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graphic and Communication Design Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/design/photography-film-v → 0 field(s) (cost=$0.000000, in=2901 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/ux-web-design
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/media-production
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/graphic-communication-design
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/photography-film-video-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/photography-film-video-design
+❌ [LOW 55/100] Photography, Motion and Photo Imaging Courses — missing: english, intake | photography-film-video-design
+[EXTRACT] 61/168: Interior Design Decoration
+Fetching 61/168: Interior Design Decoration
+[FIELD SUMMARY] Interior Design Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/interior-design-decoration
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/media-production — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/graphic-communication-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/ux-web-design — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/media-production → 0 field(s) (cost=$0.000000, in=2804 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/graphic-communicat → 0 field(s) (cost=$0.000000, in=3126 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/design/ux-web-design → 0 field(s) (cost=$0.000000, in=2778 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/media-production (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/graphic-communication-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/ux-web-design (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/media-production
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/graphic-communication-design
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/ux-web-design
+❌ [LOW 55/100] Graphic and Communication Design Courses — missing: english, intake | graphic-communication-design
+[WARN] Media Production Courses — Fee section detected but fee is blank
+[EXTRACT] 62/168: Game Design Development
+[WARN] Ux & Web Design Courses — Fee section detected but fee is blank
+❌ [LOW 55/100] Media Production Courses — missing: english, intake | media-production
+Fetching 62/168: Game Design Development
+❌ [LOW 55/100] Ux & Web Design Courses — missing: english, intake | ux-web-design
+[EXTRACT] 63/168: Bachelor Of Community Services
+[EXTRACT] 64/168: Bachelor Of Counselling
+Fetching 64/168: Bachelor Of Counselling
+Fetching 63/168: Bachelor Of Community Services
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/interior-design-decoration — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/interior-design-de → 0 field(s) (cost=$0.000000, in=3481 out=0)
+[FIELD SUMMARY] Game Design, Development and Programming Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Community Services Fee: ✅ '79008' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[DOMESTIC ONLY] https://www.torrens.edu.au/courses/health/bachelor-of-counselling — course page states domestic-students-only; skipping
+[per-course browser ↻] https://www.torrens.edu.au/courses/design/game-design-development
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/interior-design-decoration (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-commun → 0 field(s) (cost=$0.000000, in=13797 out=0)
+[EXTRACT] 65/168: Bachelor Of Health Science Chinese Medicine
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-community-services (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/interior-design-decoration
+Fetching 65/168: Bachelor Of Health Science Chinese Medicine
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-community-services
+[CATEGORY det] Interior Design Courses → Architecture, Building & Design / Interior Design
+✅ [PASS 100/100] Bachelor of Community Services | bachelor-of-community-services
+❌ [LOW 55/100] Interior Design Courses — missing: english, intake | interior-design-decoration
+[EXTRACT] 66/168: Bachelor Of Health Science Dermal Therapies
+[EXTRACT] 67/168: Bachelor Of Health Science Naturopathy
+Fetching 66/168: Bachelor Of Health Science Dermal Therapies
+Fetching 67/168: Bachelor Of Health Science Naturopathy
+[FIELD SUMMARY] Bachelor of Health Science (Dermal Therapies) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Health Science (Chinese Medicine) Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Health Science (Naturopathy) Fee: ✅ '117320' [regex conf=1.00] IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-health → 0 field(s) (cost=$0.000000, in=10866 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-health → 0 field(s) (cost=$0.000000, in=13895 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-health → 0 field(s) (cost=$0.000000, in=13894 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-dermal-therapies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-chinese-medicine (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-naturopathy (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-health-science-dermal-therapies
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-health-science-naturopathy
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-health-science-chinese-medicine
+✅ [PASS 100/100] Bachelor of Health Science (Dermal Therapies) | bachelor-of-health-science-dermal-therap
+✅ [PASS 100/100] Bachelor of Health Science (Naturopathy) | bachelor-of-health-science-naturopathy
+✅ [PASS 100/100] Bachelor of Health Science (Chinese Medicine) | bachelor-of-health-science-chinese-medic
+[EXTRACT] 68/168: Bachelor Of Health Science Western Herbal Medicine
+[EXTRACT] 69/168: Bachelor Of Nursing
+[EXTRACT] 70/168: Bachelor Of Nutrition
+Fetching 68/168: Bachelor Of Health Science Western Herbal Medicine
+Fetching 69/168: Bachelor Of Nursing
+Fetching 70/168: Bachelor Of Nutrition
+[per-course browser ✓] https://www.torrens.edu.au/courses/design/game-design-development — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/design/game-design-develo → 0 field(s) (cost=$0.000000, in=3101 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/design/game-design-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/design/game-design-development
+❌ [LOW 35/100] Game Design, Development and Programming Courses — missing: english, duration, intake | game-design-development
+[EXTRACT] 71/168: Bachelor Of Psychological Science
+Fetching 71/168: Bachelor Of Psychological Science
+[FIELD SUMMARY] Bachelor of Nutrition Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Health Science (Western Herbal Medicin Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Nursing Fee: ✅ '96000' [regex conf=1.00] IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Psychological Science Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-nutrit → 0 field(s) (cost=$0.000000, in=12158 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-health → 0 field(s) (cost=$0.000000, in=12271 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-nursin → 0 field(s) (cost=$0.000000, in=13072 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-nutrition (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-health-science-western-herbal-medicine (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-nursing (missing: domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-nutrition
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-health-science-western-herbal-medicine
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-nursing
+✅ [PASS 100/100] Bachelor of Nutrition | bachelor-of-nutrition
+✅ [PASS 100/100] Bachelor of Health Science (Western Herbal Medicin | bachelor-of-health-science-western-herba
+[CATEGORY det] Bachelor of Nursing → Medicine & Health / Nursing
+[EXTRACT] 72/168: Diploma Of Beauty And Spa Practice
+[EXTRACT] 73/168: Diploma Of Counselling Vet
+✅ [PASS 100/100] Bachelor of Nursing | bachelor-of-nursing
+Fetching 72/168: Diploma Of Beauty And Spa Practice
+Fetching 73/168: Diploma Of Counselling Vet
+[EXTRACT] 74/168: Diploma Of Health And Wellbeing
+Fetching 74/168: Diploma Of Health And Wellbeing
+[FIELD SUMMARY] Chc51015 Diploma of Counselling Vet Fee: ✅ '15250' [regex conf=0.80] IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Beauty and Spa Practice Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Health and Wellbeing Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['April', 'May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-beauty- → 0 field(s) (cost=$0.000000, in=6452 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-beauty-and-spa-practice (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-beauty-and-spa-practice
+✅ [PASS 100/100] Diploma of Beauty and Spa Practice | diploma-of-beauty-and-spa-practice
+[EXTRACT] 75/168: Diploma Of Nutrition
+Fetching 75/168: Diploma Of Nutrition
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/bachelor-of-psycho → 0 field(s) (cost=$0.000000, in=11641 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/bachelor-of-psychological-science
+[WARN] Bachelor of Psychological Science — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Bachelor of Psychological Science — missing: english | bachelor-of-psychological-science
+[EXTRACT] 76/168: Diploma Of Sport Development
+Fetching 76/168: Diploma Of Sport Development
+[FIELD SUMMARY] Diploma of Nutrition Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Sport Development Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['April', 'May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-nutrition
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/diploma-of-sport-development
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet — IELTS=— PTE=— TOEFL=— CAE=— fee=15250 filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-health- → 0 field(s) (cost=$0.000000, in=6962 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-counsel → 0 field(s) (cost=$0.000000, in=6710 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet (missing: domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-health-and-wellbeing
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-counselling-vet
+[WARN] Diploma of Health and Wellbeing — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Chc51015 Diploma of Counselling Vet — missing: english | diploma-of-counselling-vet
+❌ [LOW 55/100] Diploma of Health and Wellbeing — missing: english, duration | diploma-of-health-and-wellbeing
+[EXTRACT] 77/168: Graduate Certificate Of Counselling
+[EXTRACT] 78/168: Graduate Certificate Of Public Health
+Fetching 78/168: Graduate Certificate Of Public Health
+Fetching 77/168: Graduate Certificate Of Counselling
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/diploma-of-nutrition — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-nutriti → 0 field(s) (cost=$0.000000, in=5541 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-nutrition (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-nutrition
+[WARN] Diploma of Nutrition — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Diploma of Nutrition — missing: english | diploma-of-nutrition
+[EXTRACT] 79/168: Graduate Diploma Of Counselling
+Fetching 79/168: Graduate Diploma Of Counselling
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/diploma-of-sport-development — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/diploma-of-sport-d → 0 field(s) (cost=$0.000000, in=4839 out=0)
+[FIELD SUMMARY] Graduate Certificate of Counselling Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['February', 'June', 'Septembe" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Public Health Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Counselling Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/diploma-of-sport-development (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling
+[GEMINI] https://www.torrens.edu.au/courses/health/graduate-certifica → 0 field(s) (cost=$0.000000, in=5894 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/diploma-of-sport-development
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-certificate-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/graduate-certificate-of-public-health
+[WARN] Diploma of Sport Development — Fee section detected but fee is blank
+[CATEGORY det] Graduate Certificate of Public Health → Medicine & Health / Public Health
+⚠️ [WARN 75/100] Diploma of Sport Development — missing: english | diploma-of-sport-development
+[WARN] Graduate Certificate of Public Health — Fee section detected but fee is blank
+[EXTRACT] 80/168: Graduate Diploma Of Psychology
+✅ [PASS 100/100] Graduate Certificate of Public Health | graduate-certificate-of-public-health
+Fetching 80/168: Graduate Diploma Of Psychology
+[EXTRACT] 81/168: Master Of Counselling
+Fetching 81/168: Master Of Counselling
+[FIELD SUMMARY] Graduate Diploma of Psychology Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[DOMESTIC ONLY] https://www.torrens.edu.au/courses/health/master-of-counselling — course page states domestic-students-only; skipping
+[GEMINI] https://www.torrens.edu.au/courses/health/graduate-diploma-o → 0 field(s) (cost=$0.000000, in=5290 out=0)
+[EXTRACT] 82/168: Master Of Counselling Advanced
+Fetching 82/168: Master Of Counselling Advanced
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-psychology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/graduate-diploma-of-psychology
+[CATEGORY det] Graduate Diploma of Psychology → Medicine & Health / Psychology
+[WARN] Graduate Diploma of Psychology — Fee section detected but fee is blank
+✅ [PASS 100/100] Graduate Diploma of Psychology | graduate-diploma-of-psychology
+[EXTRACT] 83/168: Master Of Public Health
+Fetching 83/168: Master Of Public Health
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/graduate-diploma-o → 0 field(s) (cost=$0.000000, in=6322 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/graduate-certifica → 0 field(s) (cost=$0.000000, in=5019 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/graduate-diploma-of-counselling
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/graduate-certificate-of-counselling
+[WARN] Graduate Certificate of Counselling — Fee section detected but fee is blank
+[WARN] Graduate Diploma of Counselling — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Certificate of Counselling — missing: english | graduate-certificate-of-counselling
+⚠️ [WARN 75/100] Graduate Diploma of Counselling — missing: english | graduate-diploma-of-counselling
+[FIELD SUMMARY] Master of Counselling (Advanced) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Public Health Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[EXTRACT] 84/168: Master Of Public Health Advanced
+[EXTRACT] 85/168: Beauty And Dermal Therapies
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/master-of-counselling-advanced
+[GEMINI] https://www.torrens.edu.au/courses/health/master-of-public-h → 0 field(s) (cost=$0.000000, in=13890 out=0)
+Fetching 84/168: Master Of Public Health Advanced
+Fetching 85/168: Beauty And Dermal Therapies
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/master-of-public-health
+[CATEGORY det] Master of Public Health → Medicine & Health / Public Health
+✅ [PASS 100/100] Master of Public Health | master-of-public-health
+[EXTRACT] 86/168: Complementary Medicine
+Fetching 86/168: Complementary Medicine
+[FIELD SUMMARY] Natural Therapy Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Beauty & Dermal Therapy Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['October']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Public Health (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/complementary-medicine
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/beauty-and-dermal-therapies
+[GEMINI] https://www.torrens.edu.au/courses/health/master-of-public-h → 0 field(s) (cost=$0.000000, in=13892 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-public-health-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/master-of-public-health-advanced
+[CATEGORY det] Master of Public Health (Advanced) → Medicine & Health / Public Health
+✅ [PASS 100/100] Master of Public Health (Advanced) | master-of-public-health-advanced
+[EXTRACT] 87/168: Health Science
+Fetching 87/168: Health Science
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/master-of-counselling-advanced — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/master-of-counsell → 0 field(s) (cost=$0.000000, in=8902 out=0)
+[FIELD SUMMARY] Health Science Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '10.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/master-of-counselling-advanced (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/health-science
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/master-of-counselling-advanced
+[WARN] Master of Counselling (Advanced) — Fee section detected but fee is blank
+❌ [LOW 55/100] Master of Counselling (Advanced) — missing: english, intake | master-of-counselling-advanced
+[EXTRACT] 88/168: Mental Health
+Fetching 88/168: Mental Health
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/complementary-medicine — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD SUMMARY] Mental Health Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['May']" [regex conf=0.40] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/beauty-and-dermal-therapies — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/complementary-medi → 0 field(s) (cost=$0.000000, in=2916 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/mental-health
+[GEMINI] https://www.torrens.edu.au/courses/health/beauty-and-dermal- → 0 field(s) (cost=$0.000000, in=2816 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/complementary-medicine (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/beauty-and-dermal-therapies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/complementary-medicine
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/beauty-and-dermal-therapies
+[WARN] Natural Therapy Courses — Fee section detected but fee is blank
+[WARN] Beauty & Dermal Therapy Courses — Fee section detected but fee is blank
+❌ [LOW 35/100] Natural Therapy Courses — missing: english, duration, intake | complementary-medicine
+❌ [LOW 55/100] Beauty & Dermal Therapy Courses — missing: english, duration | beauty-and-dermal-therapies
+[EXTRACT] 89/168: Public Health
+[EXTRACT] 90/168: Faculty Of Health
+Fetching 89/168: Public Health
+Fetching 90/168: Faculty Of Health
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/health-science — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/health-science → 0 field(s) (cost=$0.000000, in=3732 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/health-science (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/health-science
+❌ [LOW 55/100] Health Science Courses — missing: english, intake | health-science
+[EXTRACT] 91/168: Bachelor Of Applied Business Management Partnership With Ducere
+Fetching 91/168: Bachelor Of Applied Business Management Partnership With Ducere
+[FIELD SUMMARY] Public Health Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Faculty of Health Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '10.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/public-health
+[per-course browser ↻] https://www.torrens.edu.au/courses/health/faculty-of-health
+[FIELD SUMMARY] Bachelor of Applied Business, Management (Partners Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['April', 'July', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-management-partnership-with-ducere
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/mental-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/mental-health → 0 field(s) (cost=$0.000000, in=3710 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/mental-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/mental-health
+[WARN] Mental Health Courses — Fee section detected but fee is blank
+❌ [LOW 55/100] Mental Health Courses — missing: english, duration | mental-health
+[EXTRACT] 92/168: Bachelor Of Applied Business Marketing Partnership With Ducere
+Fetching 92/168: Bachelor Of Applied Business Marketing Partnership With Ducere
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/public-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/health/faculty-of-health — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/health/public-health → 0 field(s) (cost=$0.000000, in=2904 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/health/faculty-of-health → 0 field(s) (cost=$0.000000, in=5424 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/public-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/health/faculty-of-health (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/public-health
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/health/faculty-of-health
+[CATEGORY det] Public Health Courses → Medicine & Health / Public Health
+[WARN] Faculty of Health — Fee section detected but fee is blank
+❌ [LOW 35/100] Public Health Courses — missing: english, duration, intake | public-health
+❌ [LOW 55/100] Faculty of Health — missing: english, intake | faculty-of-health
+[EXTRACT] 93/168: Bachelor Of Applied Entrepreneurship Partnership With Ducere
+[EXTRACT] 94/168: Bachelor Of Business Accounting
+Fetching 93/168: Bachelor Of Applied Entrepreneurship Partnership With Ducere
+Fetching 94/168: Bachelor Of Business Accounting
+[FIELD SUMMARY] Bachelor of Applied Business, Marketing (Partnersh Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['April', 'July', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Applied Entrepreneurship (Partnership Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['April', 'July', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Bachelor of Business (Accounting) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-marketing-partnership-with-ducere
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/bachelor-of-applied-entrepreneurship-partnership-with-ducere
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=13130 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business-accounting (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business-accounting
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-management-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[CATEGORY det] Bachelor of Business (Accounting) → Business & Management / Accounting
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-appl → 0 field(s) (cost=$0.000000, in=7601 out=0)
+✅ [PASS 100/100] Bachelor of Business (Accounting) | bachelor-of-business-accounting
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-management-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-management-partnership-with-ducere
+[EXTRACT] 95/168: Bachelor Of Business Entrepreneurship
+[WARN] Bachelor of Applied Business, Management — Fee section detected but fee is blank
+Fetching 95/168: Bachelor Of Business Entrepreneurship
+⚠️ [WARN 75/100] Bachelor of Applied Business, Management (Partners — missing: english | bachelor-of-applied-business-management-
+[EXTRACT] 96/168: Bachelor Of Business Event Management
+Fetching 96/168: Bachelor Of Business Event Management
+[FIELD SUMMARY] Bachelor of Business (Entrepreneurship) Fee: ✅ '109206' [regex conf=0.80] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business (Event Management) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=13004 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=10969 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business-entrepreneurship (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business-event-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business-entrepreneurship
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business-event-management
+[CATEGORY det] Bachelor of Business (Entrepreneurship) → Business & Management / Entrepreneurship
+[CATEGORY det] Bachelor of Business (Event Management) → Hospitality, Tourism & Events / Event Management
+✅ [PASS 100/100] Bachelor of Business (Entrepreneurship) | bachelor-of-business-entrepreneurship
+✅ [PASS 100/100] Bachelor of Business (Event Management) | bachelor-of-business-event-management
+[EXTRACT] 97/168: Bachelor Of Business Marketing
+[EXTRACT] 98/168: Diploma Of Business
+Fetching 97/168: Bachelor Of Business Marketing
+Fetching 98/168: Diploma Of Business
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-marketing-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-appl → 0 field(s) (cost=$0.000000, in=7664 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-marketing-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-marketing-partnership-with-ducere
+[FIELD SUMMARY] Bachelor of Business (Marketing) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[CATEGORY det] Bachelor of Applied Business, Marketing → Business & Management / Marketing
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/bachelor-of-applied-entrepreneurship-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-busi → 0 field(s) (cost=$0.000000, in=10820 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-busin → 0 field(s) (cost=$0.000000, in=7391 out=0)
+[WARN] Bachelor of Applied Business, Marketing — Fee section detected but fee is blank
+[GEMINI] https://www.torrens.edu.au/courses/business/bachelor-of-appl → 0 field(s) (cost=$0.000000, in=7314 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-business-marketing (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+⚠️ [WARN 75/100] Bachelor of Applied Business, Marketing (Partnersh — missing: english | bachelor-of-applied-business-marketing-p
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-business (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/bachelor-of-applied-entrepreneurship-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-business-marketing
+[EXTRACT] 99/168: Diploma Of Business Accounting
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/bachelor-of-applied-entrepreneurship-partnership-with-ducere
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-business
+[CATEGORY det] Bachelor of Business (Marketing) → Business & Management / Marketing
+Fetching 99/168: Diploma Of Business Accounting
+[CATEGORY det] Bachelor of Applied Entrepreneurship (Pa → Business & Management / Entrepreneurship
+[WARN] Diploma of Business — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Business (Marketing) | bachelor-of-business-marketing
+[WARN] Bachelor of Applied Entrepreneurship (Pa — Fee section detected but fee is blank
+✅ [PASS 100/100] Diploma of Business | diploma-of-business
+[EXTRACT] 100/168: Diploma Of Business Entrepreneurship
+⚠️ [WARN 75/100] Bachelor of Applied Entrepreneurship (Partnership — missing: english | bachelor-of-applied-entrepreneurship-par
+[EXTRACT] 101/168: Diploma Of Business Sport Management
+Fetching 100/168: Diploma Of Business Entrepreneurship
+[EXTRACT] 102/168: Diploma Of Event Management
+Fetching 101/168: Diploma Of Business Sport Management
+Fetching 102/168: Diploma Of Event Management
+[FIELD SUMMARY] Diploma of Business (Entrepreneurship) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Event Management) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Accounting) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Sport Management) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-busin → 0 field(s) (cost=$0.000000, in=7041 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-busin → 0 field(s) (cost=$0.000000, in=9483 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-event → 0 field(s) (cost=$0.000000, in=7135 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-busin → 0 field(s) (cost=$0.000000, in=7184 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-business-entrepreneurship (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-business-sport-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-event-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-business-accounting (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-business-entrepreneurship
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-business-sport-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-event-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-business-accounting
+[CATEGORY det] Diploma of Business (Entrepreneurship) → Business & Management / Entrepreneurship
+✅ [PASS 100/100] Diploma of Business (Sport Management) | diploma-of-business-sport-management
+[CATEGORY det] Diploma of Business (Event Management) → Hospitality, Tourism & Events / Event Management
+[CATEGORY det] Diploma of Business (Accounting) → Business & Management / Accounting
+[WARN] Diploma of Business (Entrepreneurship) — Fee section detected but fee is blank
+✅ [PASS 100/100] Diploma of Business (Event Management) | diploma-of-event-management
+[EXTRACT] 103/168: Diploma Of Marketing
+[WARN] Diploma of Business (Accounting) — Fee section detected but fee is blank
+✅ [PASS 100/100] Diploma of Business (Entrepreneurship) | diploma-of-business-entrepreneurship
+Fetching 103/168: Diploma Of Marketing
+✅ [PASS 100/100] Diploma of Business (Accounting) | diploma-of-business-accounting
+[EXTRACT] 104/168: Doctor Of Business Leadership
+[EXTRACT] 105/168: Graduate Certificate Of Analytics
+[EXTRACT] 106/168: Graduate Certificate Of Applied Business Partnership With Ducere
+Fetching 104/168: Doctor Of Business Leadership
+Fetching 105/168: Graduate Certificate Of Analytics
+Fetching 106/168: Graduate Certificate Of Applied Business Partnership With Ducere
+[FIELD SUMMARY] Graduate Certificate of Analytics Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '0.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Doctor of Business Leadership (Partnership with Au Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Graduate Certificate of Applied Business (Partners Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '4.0' [regex conf=0.75] Intake: ✅ "['June', 'October']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (Marketing) Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=6001 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/doctor-of-business-leadership
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere
+[GEMINI] https://www.torrens.edu.au/courses/business/diploma-of-marke → 0 field(s) (cost=$0.000000, in=7267 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-analytics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/diploma-of-marketing (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-analytics
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/diploma-of-marketing
+✅ [PASS 100/100] Graduate Certificate of Analytics | graduate-certificate-of-analytics
+[CATEGORY det] Diploma of Business (Marketing) → Business & Management / Marketing
+[EXTRACT] 107/168: Graduate Certificate Of Business Administration
+[WARN] Diploma of Business (Marketing) — Fee section detected but fee is blank
+Fetching 107/168: Graduate Certificate Of Business Administration
+✅ [PASS 100/100] Diploma of Business (Marketing) | diploma-of-marketing
+[EXTRACT] 108/168: Graduate Certificate Of Business Administration On Demand
+Fetching 108/168: Graduate Certificate Of Business Administration On Demand
+[FIELD SUMMARY] Graduate Certificate of Business Administration (o Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Business Administration Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=6449 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=13796 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration-on-demand (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration-on-demand
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-administration
+✅ [PASS 100/100] Graduate Certificate of Business Administration (o | graduate-certificate-of-business-adminis
+✅ [PASS 100/100] Graduate Certificate of Business Administration | graduate-certificate-of-business-adminis
+[EXTRACT] 109/168: Graduate Certificate Of Business Analytics
+[EXTRACT] 110/168: Graduate Certificate Of Economics Of Sustainability
+Fetching 110/168: Graduate Certificate Of Economics Of Sustainability
+Fetching 109/168: Graduate Certificate Of Business Analytics
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=4941 out=0)
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/doctor-of-business-leadership — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD SUMMARY] Graduate Certificate of Business Analytics Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '0.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Economics of Sustainabilit Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/business/doctor-of-busine → 0 field(s) (cost=$0.000000, in=6030 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=9405 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=6525 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-applied-business-partnership-with-ducere
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/doctor-of-business-leadership (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-analytics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-economics-of-sustainability (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[WARN] Graduate Certificate of Applied Business — Fee section detected but fee is blank
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/doctor-of-business-leadership
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-business-analytics
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-economics-of-sustainability
+⚠️ [WARN 75/100] Graduate Certificate of Applied Business (Partners — missing: english | graduate-certificate-of-applied-business
+[WARN] Doctor of Business Leadership (Partnersh — Fee section detected but fee is blank
+[CATEGORY det] Graduate Certificate of Business Analyti → Business & Management / Business Analytics
+[CATEGORY det] Graduate Certificate of Economics of Sus → Agriculture & Environmental Science / Sustainability
+[EXTRACT] 111/168: Graduate Certificate Of Global Project Management
+⚠️ [WARN 75/100] Doctor of Business Leadership (Partnership with Au — missing: english | doctor-of-business-leadership
+✅ [PASS 100/100] Graduate Certificate of Business Analytics | graduate-certificate-of-business-analyti
+[WARN] Graduate Certificate of Economics of Sus — Fee section detected but fee is blank
+Fetching 111/168: Graduate Certificate Of Global Project Management
+[EXTRACT] 112/168: Graduate Diploma Of Applied Business Partnership With Ducere
+[EXTRACT] 113/168: Graduate Diploma Of Business Administration
+✅ [PASS 100/100] Graduate Certificate of Economics of Sustainabilit | graduate-certificate-of-economics-of-sus
+Fetching 112/168: Graduate Diploma Of Applied Business Partnership With Ducere
+Fetching 113/168: Graduate Diploma Of Business Administration
+[EXTRACT] 114/168: Graduate Diploma Of Business Administration On Demand
+Fetching 114/168: Graduate Diploma Of Business Administration On Demand
+[FIELD SUMMARY] Graduate Diploma of Applied Business (Partnership Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '8.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Global Project Management Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Business Administration (on De Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Business Administration Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/graduate-diploma-of-applied-business-partnership-with-ducere
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-certifi → 0 field(s) (cost=$0.000000, in=6684 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=6981 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=13892 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-certificate-of-global-project-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-administration-on-demand (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-administration (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-certificate-of-global-project-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-administration
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-administration-on-demand
+✅ [PASS 100/100] Graduate Diploma of Business Administration | graduate-diploma-of-business-administrat
+✅ [PASS 100/100] Graduate Diploma of Business Administration (on De | graduate-diploma-of-business-administrat
+[CATEGORY det] Graduate Certificate of Global Project M → Business & Management / Project Management
+[EXTRACT] 115/168: Graduate Diploma Of Business Analytics
+[EXTRACT] 116/168: Graduate Diploma Of Economics Of Sustainability
+✅ [PASS 100/100] Graduate Certificate of Global Project Management | graduate-certificate-of-global-project-m
+Fetching 115/168: Graduate Diploma Of Business Analytics
+Fetching 116/168: Graduate Diploma Of Economics Of Sustainability
+[EXTRACT] 117/168: Graduate Diploma Of Global Project Management
+Fetching 117/168: Graduate Diploma Of Global Project Management
+[FIELD SUMMARY] Graduate Diploma of Global Project Management Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Economics of Sustainability (P Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September', 'Februar" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Business Analytics Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=10295 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=6518 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=10180 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-global-project-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-economics-of-sustainability (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-global-project-management
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-analytics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-economics-of-sustainability
+[CATEGORY det] Graduate Diploma of Global Project Manag → Business & Management / Project Management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-business-analytics
+[CATEGORY det] Graduate Diploma of Economics of Sustain → Agriculture & Environmental Science / Sustainability
+✅ [PASS 100/100] Graduate Diploma of Global Project Management | graduate-diploma-of-global-project-manag
+[CATEGORY det] Graduate Diploma of Business Analytics → Business & Management / Business Analytics
+[EXTRACT] 118/168: Master Of Business Administration And Master Of Public Health
+✅ [PASS 100/100] Graduate Diploma of Business Analytics | graduate-diploma-of-business-analytics
+[WARN] Graduate Diploma of Economics of Sustain — Fee section detected but fee is blank
+Fetching 118/168: Master Of Business Administration And Master Of Public Health
+[EXTRACT] 119/168: Master Of Business Administration Innovation And Leadership Partnership With Ducere
+✅ [PASS 100/100] Graduate Diploma of Economics of Sustainability (P | graduate-diploma-of-economics-of-sustain
+Fetching 119/168: Master Of Business Administration Innovation And Leadership Partnership With Ducere
+[EXTRACT] 120/168: Master Of Business Administration Mba
+Fetching 120/168: Master Of Business Administration Mba
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/graduate-diploma-of-applied-business-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/graduate-diploma → 0 field(s) (cost=$0.000000, in=5429 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/graduate-diploma-of-applied-business-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/graduate-diploma-of-applied-business-partnership-with-ducere
+[WARN] Graduate Diploma of Applied Business (Pa — Fee section detected but fee is blank
+❌ [LOW 55/100] Graduate Diploma of Applied Business (Partnership — missing: english, intake | graduate-diploma-of-applied-business-par
+[EXTRACT] 121/168: Master Of Business Administration On Demand
+Fetching 121/168: Master Of Business Administration On Demand
+[FIELD SUMMARY] Master of Business Administration and Master of Pu Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration, Innovation and Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'October']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[FIELD SUMMARY] Master of Business Administration (on Demand) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['March', 'April', 'June', 'Ju" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Administration Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=7554 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/master-of-business-administration-innovation-and-leadership-partnership-with-ducere
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=8178 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=13894 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-on-demand (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-and-master-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-mba (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-on-demand
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-mba
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-and-master-of-public-health
+[CATEGORY det] Master of Business Administration → Business & Management / MBA
+[CATEGORY det] Master of Business Administration and Ma → Business & Management / MBA
+[CATEGORY det] Master of Business Administration (on De → Business & Management / MBA
+✅ [PASS 100/100] Master of Business Administration | master-of-business-administration-mba
+✅ [PASS 100/100] Master of Business Administration (on Demand) | master-of-business-administration-on-dem
+✅ [PASS 100/100] Master of Business Administration and Master of Pu | master-of-business-administration-and-ma
+[EXTRACT] 122/168: Master Of Business Analytics
+[EXTRACT] 123/168: Master Of Business Analytics Advanced
+[EXTRACT] 124/168: Master Of Engineering Management
+Fetching 122/168: Master Of Business Analytics
+Fetching 123/168: Master Of Business Analytics Advanced
+Fetching 124/168: Master Of Engineering Management
+[FIELD SUMMARY] Master of Business Analytics (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Engineering Management Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Business Analytics Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=13894 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=13582 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-engine → 0 field(s) (cost=$0.000000, in=13144 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-analytics-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-engineering-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-analytics (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-analytics-advanced
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-engineering-management
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-analytics
+[CATEGORY det] Master of Business Analytics (Advanced) → Business & Management / Business Analytics
+[WARN] Master of Engineering Management — Fee section detected but fee is blank
+[CATEGORY det] Master of Business Analytics → Business & Management / Business Analytics
+✅ [PASS 100/100] Master of Business Analytics (Advanced) | master-of-business-analytics-advanced
+✅ [PASS 100/100] Master of Engineering Management | master-of-engineering-management
+✅ [PASS 100/100] Master of Business Analytics | master-of-business-analytics
+[EXTRACT] 125/168: Master Of Global Project Management
+[EXTRACT] 126/168: Master Of Global Project Management Advanced
+[EXTRACT] 127/168: Master Of Global Project Management And Master Of Public Health
+Fetching 125/168: Master Of Global Project Management
+Fetching 126/168: Master Of Global Project Management Advanced
+Fetching 127/168: Master Of Global Project Management And Master Of Public Health
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/master-of-business-administration-innovation-and-leadership-partnership-with-ducere — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-busine → 0 field(s) (cost=$0.000000, in=5881 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-business-administration-innovation-and-leadership-partnership-with-ducere (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-business-administration-innovation-and-leadership-partnership-with-ducere
+[CATEGORY det] Master of Business Administration, Innov → Business & Management / MBA
+⚠️ [WARN 75/100] Master of Business Administration, Innovation and — missing: english | master-of-business-administration-innova
+[EXTRACT] 128/168: Master Of Professional Accounting
+Fetching 128/168: Master Of Professional Accounting
+[FIELD SUMMARY] Master of Global Project Management (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Global Project Management Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Professional Accounting Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Global Project Management and Master of Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-global → 0 field(s) (cost=$0.000000, in=13787 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-global → 0 field(s) (cost=$0.000000, in=8150 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-global → 0 field(s) (cost=$0.000000, in=13670 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-profes → 0 field(s) (cost=$0.000000, in=11223 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-global-project-management-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-global-project-management-and-master-of-public-health (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-global-project-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-professional-accounting (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-global-project-management-advanced
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-global-project-management-and-master-of-public-health
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-professional-accounting
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-global-project-management
+[CATEGORY det] Master of Global Project Management (Adv → Business & Management / Project Management
+[CATEGORY det] Master of Global Project Management and → Business & Management / Project Management
+[CATEGORY det] Master of Professional Accounting → Business & Management / Accounting
+[CATEGORY det] Master of Global Project Management → Business & Management / Project Management
+✅ [PASS 100/100] Master of Global Project Management (Advanced) | master-of-global-project-management-adva
+✅ [PASS 100/100] Master of Global Project Management and Master of | master-of-global-project-management-and-
+✅ [PASS 100/100] Master of Professional Accounting | master-of-professional-accounting
+✅ [PASS 100/100] Master of Global Project Management | master-of-global-project-management
+[EXTRACT] 129/168: Master Of Professional Accounting Advanced
+[EXTRACT] 130/168: Project Management
+[EXTRACT] 131/168: Sports Management
+[EXTRACT] 132/168: Business Analytics
+Fetching 129/168: Master Of Professional Accounting Advanced
+Fetching 130/168: Project Management
+Fetching 132/168: Business Analytics
+Fetching 131/168: Sports Management
+[FIELD SUMMARY] Sports Management Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Project Management Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Professional Accounting (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Business Analytics Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/sports-management
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/project-management
+[GEMINI] https://www.torrens.edu.au/courses/business/master-of-profes → 0 field(s) (cost=$0.000000, in=12339 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/business-analytics
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/master-of-professional-accounting-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/master-of-professional-accounting-advanced
+[CATEGORY det] Master of Professional Accounting (Advan → Business & Management / Accounting
+✅ [PASS 100/100] Master of Professional Accounting (Advanced) | master-of-professional-accounting-advanc
+[EXTRACT] 133/168: Event Management
+Fetching 133/168: Event Management
+[FIELD SUMMARY] Event Management Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/event-management
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/sports-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/sports-managemen → 0 field(s) (cost=$0.000000, in=2622 out=0)
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/project-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/business-analytics — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/sports-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/business/business-analyti → 0 field(s) (cost=$0.000000, in=3387 out=0)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/sports-management
+[GEMINI] https://www.torrens.edu.au/courses/business/project-manageme → 0 field(s) (cost=$0.000000, in=3620 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/business-analytics (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[WARN] Sports Management Courses — Fee section detected but fee is blank
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/project-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/business-analytics
+❌ [LOW 55/100] Sports Management Courses — missing: english, intake | sports-management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/project-management
+[CATEGORY det] Business Analytics Courses → Business & Management / Business Analytics
+[EXTRACT] 134/168: Business School
+[CATEGORY det] Project Management Courses → Business & Management / Project Management
+❌ [LOW 55/100] Business Analytics Courses — missing: english, intake | business-analytics
+Fetching 134/168: Business School
+❌ [LOW 55/100] Project Management Courses — missing: english, intake | project-management
+[EXTRACT] 135/168: Associate Degree Of Business Hospitality And Tourism Management
+[EXTRACT] 136/168: Bachelor Of Business International Hotel Management
+Fetching 135/168: Associate Degree Of Business Hospitality And Tourism Management
+Fetching 136/168: Bachelor Of Business International Hotel Management
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/event-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/event-management → 0 field(s) (cost=$0.000000, in=3206 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/event-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/event-management
+[CATEGORY det] Event Management Courses → Hospitality, Tourism & Events / Event Management
+❌ [LOW 55/100] Event Management Courses — missing: english, intake | event-management
+[EXTRACT] 137/168: Diploma Of Business International Hotel Management
+Fetching 137/168: Diploma Of Business International Hotel Management
+[FIELD SUMMARY] Torrens University Business School Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Business (International Hotel Manageme Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Associate Degree of Business (Hospitality and Tour Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Business (International Hotel Managemen Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/business/business-school
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/bachelor-of-b → 0 field(s) (cost=$0.000000, in=8372 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/associate-deg → 0 field(s) (cost=$0.000000, in=8995 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/diploma-of-bu → 0 field(s) (cost=$0.000000, in=5961 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/bachelor-of-business-international-hotel-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/associate-degree-of-business-hospitality-and-tourism-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/diploma-of-business-international-hotel-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/associate-degree-of-business-hospitality-and-tourism-management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/bachelor-of-business-international-hotel-management
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/diploma-of-business-international-hotel-management
+[CATEGORY det] Diploma of Business (International Hotel → Hospitality, Tourism & Events / Hospitality Management
+[CATEGORY det] Associate Degree of Business (Hospitalit → Hospitality, Tourism & Events / Tourism Management
+✅ [PASS 100/100] Diploma of Business (International Hotel Managemen | diploma-of-business-international-hotel-
+[CATEGORY det] Bachelor of Business (International Hote → Hospitality, Tourism & Events / Hospitality Management
+✅ [PASS 100/100] Associate Degree of Business (Hospitality and Tour | associate-degree-of-business-hospitality
+✅ [PASS 100/100] Bachelor of Business (International Hotel Manageme | bachelor-of-business-international-hotel
+[EXTRACT] 138/168: Diploma Of Travel And Tourism In Partnership With Flight Centre Travel Academy
+[EXTRACT] 139/168: Master Of International Hotel Management
+[EXTRACT] 140/168: Hotel Management
+Fetching 138/168: Diploma Of Travel And Tourism In Partnership With Flight Centre Travel Academy
+Fetching 139/168: Master Of International Hotel Management
+Fetching 140/168: Hotel Management
+[FIELD SUMMARY] Hotel Management Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of International Hotel Management Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['April', 'July', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Travel and Tourism (Partnership with Fl Fee: ❌ not found IELTS: ✅ '5.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['March', 'April', 'May', 'Jun" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[per-course browser ↻] https://www.torrens.edu.au/courses/hospitality/hotel-management
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/master-of-int → 0 field(s) (cost=$0.000000, in=7096 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/diploma-of-tr → 0 field(s) (cost=$0.000000, in=7106 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/diploma-of-travel-and-tourism-in-partnership-with-flight-centre-travel-academy (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/master-of-international-hotel-management (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/diploma-of-travel-and-tourism-in-partnership-with-flight-centre-travel-academy
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/master-of-international-hotel-management
+[CATEGORY det] Diploma of Travel and Tourism (Partnersh → Hospitality, Tourism & Events / Tourism Management
+[CATEGORY det] Master of International Hotel Management → Hospitality, Tourism & Events / Hospitality Management
+[WARN] Diploma of Travel and Tourism (Partnersh — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of International Hotel Management | master-of-international-hotel-management
+✅ [PASS 100/100] Diploma of Travel and Tourism (Partnership with Fl | diploma-of-travel-and-tourism-in-partner
+[EXTRACT] 141/168: Hospitality Management Tourism
+[EXTRACT] 142/168: Bachelor Of Cybersecurity
+Fetching 141/168: Hospitality Management Tourism
+Fetching 142/168: Bachelor Of Cybersecurity
+[per-course browser ✓] https://www.torrens.edu.au/courses/business/business-school — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/business/business-school → 0 field(s) (cost=$0.000000, in=4824 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/business/business-school (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/business/business-school
+[WARN] Torrens University Business School — Fee section detected but fee is blank
+❌ [LOW 35/100] Torrens University Business School — missing: english, duration, intake | business-school
+[EXTRACT] 143/168: Diploma Of Cybersecurity
+Fetching 143/168: Diploma Of Cybersecurity
+[FIELD SUMMARY] Hospitality & Tourism Management Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ❌ not found StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Bachelor of Cybersecurity Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/hospitality/hospitality-management-tourism
+[GEMINI] https://www.torrens.edu.au/courses/technology/bachelor-of-cy → 0 field(s) (cost=$0.000000, in=11022 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/bachelor-of-cybersecurity (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/bachelor-of-cybersecurity
+[WARN] Bachelor of Cybersecurity — Fee section detected but fee is blank
+✅ [PASS 100/100] Bachelor of Cybersecurity | bachelor-of-cybersecurity
+[EXTRACT] 144/168: Diploma Of Information Technology
+Fetching 144/168: Diploma Of Information Technology
+[FIELD SUMMARY] Diploma of Cybersecurity Fee: ✅ '33725' [regex conf=1.00] IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Diploma of Information Technology Fee: ❌ not found IELTS: ✅ '6.0' [regex conf=0.85] Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/technology/diploma-of-cyb → 0 field(s) (cost=$0.000000, in=6631 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/diploma-of-inf → 0 field(s) (cost=$0.000000, in=6249 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/diploma-of-cybersecurity (missing: domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/diploma-of-information-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/diploma-of-information-technology
+[per-course browser ✓] https://www.torrens.edu.au/courses/hospitality/hotel-management — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/diploma-of-cybersecurity
+[CATEGORY det] Diploma of Information Technology → Computer Science & IT / Information Systems
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/hotel-managem → 0 field(s) (cost=$0.000000, in=2451 out=0)
+✅ [PASS 100/100] Diploma of Cybersecurity | diploma-of-cybersecurity
+[WARN] Diploma of Information Technology — Fee section detected but fee is blank
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/hotel-management (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[EXTRACT] 145/168: Graduate Certificate Of Cybersecurity
+✅ [PASS 100/100] Diploma of Information Technology | diploma-of-information-technology
+Fetching 145/168: Graduate Certificate Of Cybersecurity
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/hotel-management
+[EXTRACT] 146/168: Graduate Certificate Of Information Technology
+[CATEGORY det] Hotel Management Courses → Hospitality, Tourism & Events / Hospitality Management
+❌ [LOW 35/100] Hotel Management Courses — missing: english, duration, intake | hotel-management
+Fetching 146/168: Graduate Certificate Of Information Technology
+[EXTRACT] 147/168: Graduate Diploma Of Cybersecurity
+Fetching 147/168: Graduate Diploma Of Cybersecurity
+[per-course browser ✓] https://www.torrens.edu.au/courses/hospitality/hospitality-management-tourism — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/hospitality/hospitality-m → 0 field(s) (cost=$0.000000, in=3223 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/hospitality/hospitality-management-tourism (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/hospitality/hospitality-management-tourism
+[CATEGORY det] Hospitality & Tourism Management Courses → Hospitality, Tourism & Events / Tourism Management
+❌ [LOW 35/100] Hospitality & Tourism Management Courses — missing: english, duration, intake | hospitality-management-tourism
+[EXTRACT] 148/168: Graduate Diploma Of Information Technology
+Fetching 148/168: Graduate Diploma Of Information Technology
+[FIELD SUMMARY] Graduate Certificate of Cybersecurity Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '7.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Cybersecurity Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Information Technology Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '7.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Diploma of Information Technology Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '7.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/technology/graduate-certi → 0 field(s) (cost=$0.000000, in=5217 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/graduate-diplo → 0 field(s) (cost=$0.000000, in=6229 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/graduate-certi → 0 field(s) (cost=$0.000000, in=5174 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/graduate-diplo → 0 field(s) (cost=$0.000000, in=6383 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/graduate-certificate-of-cybersecurity (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/graduate-diploma-of-cybersecurity (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/graduate-certificate-of-information-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/graduate-diploma-of-information-technology (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/graduate-certificate-of-cybersecurity
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/graduate-certificate-of-information-technology
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/graduate-diploma-of-information-technology
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/graduate-diploma-of-cybersecurity
+[WARN] Graduate Certificate of Cybersecurity — Fee section detected but fee is blank
+[CATEGORY det] Graduate Diploma of Information Technolo → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Graduate Diploma of Cybersecurity | graduate-diploma-of-cybersecurity
+[CATEGORY det] Graduate Certificate of Information Tech → Computer Science & IT / Information Systems
+✅ [PASS 100/100] Graduate Certificate of Cybersecurity | graduate-certificate-of-cybersecurity
+[EXTRACT] 149/168: Master Of Cybersecurity
+✅ [PASS 100/100] Graduate Diploma of Information Technology | graduate-diploma-of-information-technolo
+[WARN] Graduate Certificate of Information Tech — Fee section detected but fee is blank
+Fetching 149/168: Master Of Cybersecurity
+[EXTRACT] 150/168: Master Of Cybersecurity Advanced
+[EXTRACT] 151/168: Master Of Information Technology Advanced
+✅ [PASS 100/100] Graduate Certificate of Information Technology | graduate-certificate-of-information-tech
+Fetching 150/168: Master Of Cybersecurity Advanced
+Fetching 151/168: Master Of Information Technology Advanced
+[EXTRACT] 152/168: Artificial Intelligence
+Fetching 152/168: Artificial Intelligence
+[FIELD SUMMARY] Master of Information Technology (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Artificial Intelligence Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Cybersecurity Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.7' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Cybersecurity (Advanced) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '2.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/technology/master-of-info → 0 field(s) (cost=$0.000000, in=11303 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/master-of-cybe → 0 field(s) (cost=$0.000000, in=9629 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/master-of-cybe → 0 field(s) (cost=$0.000000, in=8020 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology/artificial-intelligence
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/master-of-information-technology-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/master-of-cybersecurity-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/master-of-cybersecurity (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/master-of-cybersecurity-advanced
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/master-of-information-technology-advanced
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/master-of-cybersecurity
+[WARN] Master of Cybersecurity (Advanced) — Fee section detected but fee is blank
+[CATEGORY det] Master of Information Technology (Advanc → Computer Science & IT / Information Systems
+[WARN] Master of Cybersecurity — Fee section detected but fee is blank
+✅ [PASS 100/100] Master of Cybersecurity (Advanced) | master-of-cybersecurity-advanced
+✅ [PASS 100/100] Master of Information Technology (Advanced) | master-of-information-technology-advance
+✅ [PASS 100/100] Master of Cybersecurity | master-of-cybersecurity
+[EXTRACT] 153/168: Information Technology
+[EXTRACT] 154/168: Software Engineering
+[EXTRACT] 155/168: Cloud Computing
+Fetching 153/168: Information Technology
+Fetching 154/168: Software Engineering
+Fetching 155/168: Cloud Computing
+[FIELD SUMMARY] Information Technology Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Software Engineering Courses Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Cloud Computing Courses Fee: ❌ not found IELTS: ❌ not found Duration: ❌ not found Intake: ✅ "['January']" [regex conf=0.40] StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology/information-technology
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology/software-engineering
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology/cloud-computing
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology/artificial-intelligence — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/technology/artificial-int → 0 field(s) (cost=$0.000000, in=3784 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/artificial-intelligence (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/artificial-intelligence
+[CATEGORY det] Artificial Intelligence Courses → Computer Science & IT / Artificial Intelligence
+[WARN] Artificial Intelligence Courses — Fee section detected but fee is blank
+❌ [LOW 55/100] Artificial Intelligence Courses — missing: english, duration | artificial-intelligence
+[EXTRACT] 156/168: Technology School
+Fetching 156/168: Technology School
+[FIELD SUMMARY] Torrens University School of Technology Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/technology/technology-school
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology/cloud-computing — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology/information-technology — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/technology/cloud-computin → 0 field(s) (cost=$0.000000, in=3619 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/technology/information-te → 0 field(s) (cost=$0.000000, in=4084 out=0)
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology/software-engineering — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/cloud-computing (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[GEMINI] https://www.torrens.edu.au/courses/technology/software-engin → 0 field(s) (cost=$0.000000, in=3774 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/information-technology (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/cloud-computing
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/information-technology
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/software-engineering (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[WARN] Cloud Computing Courses — Fee section detected but fee is blank
+[CATEGORY det] Information Technology Courses → Computer Science & IT / Information Systems
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/software-engineering
+❌ [LOW 55/100] Cloud Computing Courses — missing: english, duration | cloud-computing
+⚠️ [WARN 75/100] Information Technology Courses — missing: english | information-technology
+[EXTRACT] 157/168: Graduate Certificate In Autism And Neurodivergent Studies
+[CATEGORY det] Software Engineering Courses → Computer Science & IT / Software Engineering
+[EXTRACT] 158/168: Graduate Certificate In Higher Education Learning And Teaching
+Fetching 157/168: Graduate Certificate In Autism And Neurodivergent Studies
+[WARN] Software Engineering Courses — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Software Engineering Courses — missing: english | software-engineering
+Fetching 158/168: Graduate Certificate In Higher Education Learning And Teaching
+[EXTRACT] 159/168: Graduate Certificate Of Education
+Fetching 159/168: Graduate Certificate Of Education
+[FIELD SUMMARY] Graduate Certificate in Higher Education (Learning Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '5.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate of Education Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '0.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Graduate Certificate in Autism and Neurodivergent Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '6.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[per-course browser ↻] https://www.torrens.edu.au/courses/education/graduate-certificate-in-higher-education-learning-and-teaching
+[per-course browser ↻] https://www.torrens.edu.au/courses/education/graduate-certificate-in-autism-and-neurodivergent-studies
+[GEMINI] https://www.torrens.edu.au/courses/education/graduate-certif → 0 field(s) (cost=$0.000000, in=5038 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/graduate-certificate-of-education (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/graduate-certificate-of-education
+[WARN] Graduate Certificate of Education — Fee section detected but fee is blank
+✅ [PASS 100/100] Graduate Certificate of Education | graduate-certificate-of-education
+[EXTRACT] 160/168: Master Of Education Inclusive Literacies
+Fetching 160/168: Master Of Education Inclusive Literacies
+[per-course browser ✓] https://www.torrens.edu.au/courses/technology/technology-school — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/technology/technology-sch → 0 field(s) (cost=$0.000000, in=4704 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/technology/technology-school (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/technology/technology-school
+[WARN] Torrens University School of Technology — Fee section detected but fee is blank
+❌ [LOW 55/100] Torrens University School of Technology — missing: english, intake | technology-school
+[EXTRACT] 161/168: Master Of Education Leadership And Innovation
+Fetching 161/168: Master Of Education Leadership And Innovation
+[FIELD SUMMARY] Master of Education (Inclusive Literacies) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Master of Education (Leadership and Innovation) Fee: ❌ not found IELTS: ✅ '6.5' [regex conf=0.85] Duration: ✅ '1.5' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/education/master-of-educa → 0 field(s) (cost=$0.000000, in=10924 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/education/master-of-educa → 0 field(s) (cost=$0.000000, in=11237 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/master-of-education-leadership-and-innovation (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/master-of-education-inclusive-literacies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/master-of-education-leadership-and-innovation
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/master-of-education-inclusive-literacies
+✅ [PASS 100/100] Master of Education (Leadership and Innovation) | master-of-education-leadership-and-innov
+✅ [PASS 100/100] Master of Education (Inclusive Literacies) | master-of-education-inclusive-literacies
+[EXTRACT] 162/168: Faculty Of Education
+[EXTRACT] 163/168: English For Academic Purposes 1 And 2 Intermediate To Advanced
+Fetching 162/168: Faculty Of Education
+Fetching 163/168: English For Academic Purposes 1 And 2 Intermediate To Advanced
+[per-course browser ✓] https://www.torrens.edu.au/courses/education/graduate-certificate-in-higher-education-learning-and-teaching — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[per-course browser ✓] https://www.torrens.edu.au/courses/education/graduate-certificate-in-autism-and-neurodivergent-studies — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/education/graduate-certif → 0 field(s) (cost=$0.000000, in=4637 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/education/graduate-certif → 0 field(s) (cost=$0.000000, in=8973 out=0)
+[FIELD SUMMARY] Faculty of Education Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '12.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] English for Academic Purposes 1 and 2 (Intermediat Fee: ❌ not found IELTS: ✅ '4.5' [regex conf=0.85] Duration: ✅ '7.0' [regex conf=0.75] Intake: ❌ not found StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/graduate-certificate-in-higher-education-learning-and-teaching (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/graduate-certificate-in-autism-and-neurodivergent-studies (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[per-course browser ↻] https://www.torrens.edu.au/courses/education/faculty-of-education
+[GEMINI] https://www.torrens.edu.au/courses/english/english-for-acade → 0 field(s) (cost=$0.000000, in=5808 out=0)
+[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/graduate-certificate-in-higher-education-learning-and-teaching
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/graduate-certificate-in-autism-and-neurodivergent-studies
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/english/english-for-academic-purposes-1-and-2-intermediate-to-advanced (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[CATEGORY det] Graduate Certificate in Higher Education → Education & Social Work / Teaching
+[WARN] Graduate Certificate in Autism and Neuro — Fee section detected but fee is blank
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/english/english-for-academic-purposes-1-and-2-intermediate-to-advanced
+[WARN] Graduate Certificate in Higher Education — Fee section detected but fee is blank
+[WARN] English for Academic Purposes 1 and 2 (I — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Graduate Certificate in Autism and Neurodivergent — missing: english | graduate-certificate-in-autism-and-neuro
+✅ [PASS 80/100] English for Academic Purposes 1 and 2 (Intermediat — missing: intake | english-for-academic-purposes-1-and-2-in
+⚠️ [WARN 75/100] Graduate Certificate in Higher Education (Learning — missing: english | graduate-certificate-in-higher-education
+[EXTRACT] 164/168: Doctor Of Philosophy
+[EXTRACT] 165/168: Doctor Of Philosophy By Prior Works
+[EXTRACT] 166/168: Graduate Diploma Of Research Studies
+Fetching 166/168: Graduate Diploma Of Research Studies
+Fetching 164/168: Doctor Of Philosophy
+Fetching 165/168: Doctor Of Philosophy By Prior Works
+[FIELD SUMMARY] Graduate Diploma of Research Studies Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Doctor of Philosophy (by Prior Works) Fee: ❌ not found IELTS: ❌ not found Duration: ✅ '1.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Doctor of Philosophy Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=7053 out=0)
+[per-course browser ↻] https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy-by-prior-works
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=4887 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/graduate-diploma-of-research-studies (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/graduate-diploma-of-research-studies
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy
+✅ [PASS 100/100] Graduate Diploma of Research Studies | graduate-diploma-of-research-studies
+✅ [PASS 100/100] Doctor of Philosophy | doctor-of-philosophy
+[EXTRACT] 167/168: Professional Doctorate Applied Research
+[EXTRACT] 168/168: Professional Doctorate Research
+Fetching 167/168: Professional Doctorate Applied Research
+Fetching 168/168: Professional Doctorate Research
+[FIELD SUMMARY] Professional Doctorate (Research) Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[FIELD SUMMARY] Professional Doctorate (Applied Research) Fee: ❌ not found IELTS: ✅ '7.0' [regex conf=0.85] Duration: ✅ '3.0' [regex conf=0.75] Intake: ✅ "['June', 'September']" [regex conf=0.70] StudyMode: ✅ 'Blended' [study_mode:rule conf=0.70]
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=7682 out=0)
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=13714 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-applied-research (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-research
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/professional-doctorate-applied-research
+[WARN] Professional Doctorate (Research) — Fee section detected but fee is blank
+[WARN] Professional Doctorate (Applied Research — Fee section detected but fee is blank
+✅ [PASS 100/100] Professional Doctorate (Research) | professional-doctorate-research
+✅ [PASS 100/100] Professional Doctorate (Applied Research) | professional-doctorate-applied-research
+[per-course browser ✓] https://www.torrens.edu.au/courses/education/faculty-of-education — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/education/faculty-of-educ → 0 field(s) (cost=$0.000000, in=3428 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/education/faculty-of-education (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/education/faculty-of-education
+[WARN] Faculty of Education — Fee section detected but fee is blank
+❌ [LOW 55/100] Faculty of Education — missing: english, intake | faculty-of-education
+[per-course browser ✓] https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy-by-prior-works — IELTS=— PTE=— TOEFL=— CAE=— fee=— filled=[]
+[GEMINI] https://www.torrens.edu.au/courses/higher-degrees-by-researc → 0 field(s) (cost=$0.000000, in=3648 out=0)
+[FALLBACK] AI enriching https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy-by-prior-works (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[FIELD TRACE] study_mode='Blended' location=None method=study_mode:rule url=https://www.torrens.edu.au/courses/higher-degrees-by-research/doctor-of-philosophy-by-prior-works
+[WARN] Doctor of Philosophy (by Prior Works) — Fee section detected but fee is blank
+⚠️ [WARN 75/100] Doctor of Philosophy (by Prior Works) — missing: english | doctor-of-philosophy-by-prior-works
+[EXTRACT] [sibling cache ↻ build unknown] ielts_overall=4.5
+[EXTRACT] [sibling cache ↻ build undergraduate] ielts_overall=6.0 pte_overall=66.0 toefl_overall=94.0
+[EXTRACT] [sibling cache ↻ build postgraduate] ielts_overall=6.5
+[EXTRACT] [sibling cache ↻ backfill unknown] 38 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 135 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 12 slot(s) filled across siblings
+[STAGE] skipped Course Guides: rejected: category_landing_page
+[STAGE] skipped Workforce Edge: rejected: category_landing_page
+[STAGE] saved: Bachelor of Health Science (Clinical Nutrition)
+[STAGE] saved: Diploma of Health Science
+[STAGE] saved: Graduate Diploma of Public Health
+[STAGE] saved: Master of Business Administration (Advanced)
+[STAGE] saved: Bachelor of Business (Sport Management)
+[STAGE] saved: Master of Business Administration and Master of Global Project Management
+[STAGE] saved: Bachelor of Business (Hospitality and Tourism Management)
+[STAGE] saved: Diploma of Business (Hospitality and Tourism Management)
+[STAGE] saved: Bachelor of Information Technology
+[STAGE] saved: Master of Information Technology
+[STAGE] saved: Master of Education (Inclusive Education)
+[STAGE] skipped Master of Education (Advanced): rejected: online_only
+[STAGE] skipped Graduate Diploma of Education: rejected: online_only
+[STAGE] saved: Master of Philosophy
+[STAGE] saved: Graduate Certificate of Research Studies
+[STAGE] saved: Master of Research Studies
+[STAGE] saved: Diploma of Design
+[STAGE] skipped Future Higher Degrees by Research Students: rejected: category_landing_page
+[STAGE] saved: Bachelor of Business
+[STAGE] skipped Health Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Business Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Design Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Technology Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Hospitality Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Master of Economics of Sustainability (Partnership with Modern Money Lab): rejected: online_only
+[STAGE] skipped Education Courses and Degrees: rejected: category_landing_page
+[STAGE] skipped Higher Degrees by Research: rejected: generic category page
+[STAGE] saved: Bachelor of Architectural Technology
+[STAGE] saved: Bachelor of 3D Design and Animation
+[STAGE] saved: Bachelor of Game Design and Development
+[STAGE] saved: Bachelor of Game Programming
+[STAGE] saved: Bachelor of Branded Fashion Design
+[STAGE] saved: Bachelor of Communication Design
+[STAGE] saved: Bachelor of Media Production and Communication
+[STAGE] saved: Diploma of Media Production
+[STAGE] saved: Bachelor of Fashion Marketing and Enterprise
+[STAGE] saved: Bachelor of Interior Design (Commercial)
+[STAGE] saved: Bachelor of Interior Design (Residential)
+[STAGE] saved: Bachelor of Ux and Web Design
+[STAGE] saved: Diploma of 3D Design and Animation
+[STAGE] saved: Diploma of Branded Fashion Design
+[STAGE] saved: Advanced Diploma of Game Design and Development
+[STAGE] saved: Advanced Diploma of Game Programming
+[STAGE] saved: Diploma of Fashion Marketing and Enterprise
+[STAGE] saved: Diploma of Graphic Design
+[STAGE] saved: Advanced Diploma of Interior Design and Decoration
+[STAGE] saved: Diploma of Interior Design and Decoration
+[STAGE] saved: Diploma of Photography and Photo Imaging
+[STAGE] saved: Diploma of Ux and Web Design
+[STAGE] saved: Graduate Certificate of Design
+[STAGE] saved: Graduate Certificate of Ux Design
+[STAGE] saved: Master of Design
+[STAGE] skipped Fashion Marketing and Design Courses: rejected: category_landing_page
+[STAGE] skipped 3D Design and Animation Courses: rejected: category_landing_page
+[STAGE] skipped Photography, Motion and Photo Imaging Courses: rejected: category_landing_page
+[STAGE] skipped Ux & Web Design Courses: rejected: category_landing_page
+[STAGE] skipped Graphic and Communication Design Courses: rejected: category_landing_page
+[STAGE] skipped Media Production Courses: rejected: category_landing_page
+[STAGE] skipped Interior Design Courses: rejected: category_landing_page
+[STAGE] skipped Game Design, Development and Programming Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Community Services
+[STAGE] skipped Bachelor Of Counselling: rejected: domestic_only
+[STAGE] saved: Bachelor of Health Science (Chinese Medicine)
+[STAGE] saved: Bachelor of Health Science (Dermal Therapies)
+[STAGE] saved: Bachelor of Health Science (Naturopathy)
+[STAGE] saved: Bachelor of Health Science (Western Herbal Medicine)
+[STAGE] saved: Bachelor of Nursing
+[STAGE] skipped Bachelor of Nutrition: rejected: online_only
+[STAGE] skipped Bachelor of Psychological Science: rejected: online_only
+[STAGE] saved: Diploma of Beauty and Spa Practice
+[STAGE] skipped Chc51015 Diploma of Counselling Vet: rejected: online_only
+[STAGE] saved: Diploma of Health and Wellbeing
+[STAGE] skipped Diploma of Nutrition: rejected: online_only
+[STAGE] saved: Diploma of Sport Development
+[STAGE] saved: Graduate Certificate of Counselling
+[STAGE] saved: Graduate Certificate of Public Health
+[STAGE] saved: Graduate Diploma of Counselling
+[STAGE] skipped Graduate Diploma of Psychology: rejected: online_only
+[STAGE] skipped Master Of Counselling: rejected: domestic_only
+[STAGE] saved: Master of Counselling (Advanced)
+[STAGE] saved: Master of Public Health
+[STAGE] saved: Master of Public Health (Advanced)
+[STAGE] skipped Beauty & Dermal Therapy Courses: rejected: category_landing_page
+[STAGE] skipped Natural Therapy Courses: rejected: category_landing_page
+[STAGE] skipped Health Science Courses: rejected: category_landing_page
+[STAGE] skipped Mental Health Courses: rejected: category_landing_page
+[STAGE] skipped Public Health Courses: rejected: category_landing_page
+[STAGE] skipped Faculty of Health: rejected: category_landing_page
+[STAGE] skipped Bachelor of Applied Business, Management (Partnership with Ducere): rejected: online_only
+[STAGE] skipped Bachelor of Applied Business, Marketing (Partnership with Ducere): rejected: online_only
+[STAGE] skipped Bachelor of Applied Entrepreneurship (Partnership with Ducere): rejected: online_only
+[STAGE] saved: Bachelor of Business (Accounting)
+[STAGE] saved: Bachelor of Business (Entrepreneurship)
+[STAGE] saved: Bachelor of Business (Event Management)
+[STAGE] saved: Bachelor of Business (Marketing)
+[STAGE] saved: Diploma of Business
+[STAGE] saved: Diploma of Business (Accounting)
+[STAGE] saved: Diploma of Business (Entrepreneurship)
+[STAGE] saved: Diploma of Business (Sport Management)
+[STAGE] saved: Diploma of Business (Event Management)
+[STAGE] saved: Diploma of Business (Marketing)
+[STAGE] skipped Doctor of Business Leadership (Partnership with Australian Graduate School of Leadership): rejected: online_only
+[STAGE] saved: Graduate Certificate of Analytics
+[STAGE] saved: Graduate Certificate of Applied Business (Partnership with Ducere)
+[STAGE] saved: Graduate Certificate of Business Administration
+[STAGE] skipped Graduate Certificate of Business Administration (on Demand): rejected: online_only
+[STAGE] saved: Graduate Certificate of Business Analytics
+[STAGE] skipped Graduate Certificate of Economics of Sustainability (Partnership with Modern Money Lab): rejected: online_only
+[STAGE] saved: Graduate Certificate of Global Project Management
+[STAGE] saved: Graduate Diploma of Applied Business (Partnership with Ducere)
+[STAGE] saved: Graduate Diploma of Business Administration
+[STAGE] skipped Graduate Diploma of Business Administration (on Demand): rejected: online_only
+[STAGE] saved: Graduate Diploma of Business Analytics
+[STAGE] skipped Graduate Diploma of Economics of Sustainability (Partnership with Modern Money Lab): rejected: online_only
+[STAGE] saved: Graduate Diploma of Global Project Management
+[STAGE] saved: Master of Business Administration and Master of Public Health
+[STAGE] skipped Master of Business Administration, Innovation and Leadership (Partnership with Ducere): rejected: online_only
+[STAGE] saved: Master of Business Administration
+[STAGE] skipped Master of Business Administration (on Demand): rejected: online_only
+[STAGE] saved: Master of Business Analytics
+[STAGE] saved: Master of Business Analytics (Advanced)
+[STAGE] saved: Master of Engineering Management
+[STAGE] saved: Master of Global Project Management
+[STAGE] saved: Master of Global Project Management (Advanced)
+[STAGE] saved: Master of Global Project Management and Master of Public Health
+[STAGE] saved: Master of Professional Accounting
+[STAGE] saved: Master of Professional Accounting (Advanced)
+[STAGE] skipped Project Management Courses: rejected: category_landing_page
+[STAGE] skipped Sports Management Courses: rejected: category_landing_page
+[STAGE] skipped Business Analytics Courses: rejected: category_landing_page
+[STAGE] skipped Event Management Courses: rejected: category_landing_page
+[STAGE] skipped Torrens University Business School: rejected: category_landing_page
+[STAGE] saved: Associate Degree of Business (Hospitality and Tourism Management)
+[STAGE] saved: Bachelor of Business (International Hotel Management)
+[STAGE] saved: Diploma of Business (International Hotel Management)
+[STAGE] skipped Diploma of Travel and Tourism (Partnership with Flight Centre Travel Academy): rejected: online_only
+[STAGE] saved: Master of International Hotel Management
+[STAGE] skipped Hotel Management Courses: rejected: category_landing_page
+[STAGE] skipped Hospitality & Tourism Management Courses: rejected: category_landing_page
+[STAGE] saved: Bachelor of Cybersecurity
+[STAGE] saved: Diploma of Cybersecurity
+[STAGE] saved: Diploma of Information Technology
+[STAGE] saved: Graduate Certificate of Cybersecurity
+[STAGE] saved: Graduate Certificate of Information Technology
+[STAGE] saved: Graduate Diploma of Cybersecurity
+[STAGE] saved: Graduate Diploma of Information Technology
+[STAGE] saved: Master of Cybersecurity
+[STAGE] saved: Master of Cybersecurity (Advanced)
+[STAGE] saved: Master of Information Technology (Advanced)
+[STAGE] skipped Artificial Intelligence Courses: rejected: category_landing_page
+[STAGE] skipped Information Technology Courses: rejected: category_landing_page
+[STAGE] skipped Software Engineering Courses: rejected: category_landing_page
+[STAGE] skipped Cloud Computing Courses: rejected: category_landing_page
+[STAGE] skipped Torrens University School of Technology: rejected: category_landing_page
+[STAGE] saved: Graduate Certificate in Autism and Neurodivergent Studies
+[STAGE] skipped Graduate Certificate in Higher Education (Learning and Teaching): rejected: online_only
+[STAGE] skipped Graduate Certificate of Education: rejected: online_only
+[STAGE] skipped Master of Education (Inclusive Literacies): rejected: online_only
+[STAGE] skipped Master of Education (Leadership and Innovation): rejected: online_only
+[STAGE] skipped Faculty of Education: rejected: category_landing_page
+[STAGE] skipped English for Academic Purposes 1 and 2 (Intermediate to Advanced): rejected: category_landing_page
+[STAGE] saved: Doctor of Philosophy
+[STAGE] saved: Doctor of Philosophy (by Prior Works)
+[STAGE] saved: Graduate Diploma of Research Studies
+[STAGE] skipped Professional Doctorate (Applied Research): rejected: category_landing_page
+[STAGE] skipped Professional Doctorate (Research): rejected: category_landing_page
+[DATA QUALITY] 168 course(s) checked — 4 critical / 136 warning / 200 info
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.torrens.edu.au/courses/health/bachelor-of-counselling
+[DATA QUALITY][CRITICAL] missing_course_name: Course name is blank. | https://www.torrens.edu.au/courses/health/master-of-counselling
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.torrens.edu.au/courses/health/bachelor-of-counselling
+[DATA QUALITY][CRITICAL] missing_international_fee: No international fee found and no central fee page flag set. | https://www.torrens.edu.au/courses/health/master-of-counselling
+[DATA QUALITY][WARN] missing_degree_level × 39: Degree level not extracted. (and 38 more)
+[DATA QUALITY][WARN] missing_duration × 24: Duration not extracted. (and 23 more)
+[DATA QUALITY][WARN] missing_international_fee_central_page × 73: International fee absent — marked for central fee page review. (and 72 more)
+[GEMINI] No Gemini PRIMARY calls billed this scrape (key unavailable or budget exhausted)
+[TIMING] Total: 6m 57s | Courses: 103 | Avg: 4.0s/course | Concurrency: HTTP=4 Browser=10
+══ DONE ══ Found:168 | Staged:103 | Skipped:65 (rejected:_category_landing_page=39, rejected:_online_only=23, rejected:_domestic_only=2, rejected:_generic_category_page=1) | Errors:0
+Staged 103 courses, 65 skipped, 0 fetch errors
