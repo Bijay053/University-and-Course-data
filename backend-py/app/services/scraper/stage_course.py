@@ -165,6 +165,33 @@ async def stage_course(
         log.info("staging_gate rejected %r: %s", name, gate_reason)
         return StageResult(False, f"rejected: {gate_reason}")
 
+    # Within-job deduplication: some universities publish multiple URLs for the
+    # same course (e.g. VIT BBus has separate pages per specialisation:
+    # /bbus-business-technology, /bbus-marketing, /bbus-hr, …) but all pages
+    # share the same extracted course_name ("Bachelor of Business"). Staging
+    # every URL produces visually identical duplicate rows in the Review table.
+    # We keep the FIRST staged row for each (scrape_job_id, university_id,
+    # course_name) triple and silently skip the rest.
+    try:
+        _dup_q = await db.execute(
+            select(ScrapedCourse.id)
+            .where(
+                ScrapedCourse.scrape_job_id == scrape_job_id,
+                ScrapedCourse.university_id == university_id,
+                ScrapedCourse.course_name == name,
+            )
+            .limit(1)
+        )
+        _dup = _dup_q.scalar_one_or_none()
+        if _dup is not None:
+            log.info(
+                "stage_course: skipping duplicate %r (same name already staged in job %s)",
+                name, scrape_job_id,
+            )
+            return StageResult(False, "rejected: duplicate_in_job")
+    except Exception as _dep:  # noqa: BLE001 — never abort on dedup check failure
+        log.warning("stage_course: within-job dedup check failed for %r: %s", name, _dep)
+
     # Phase A: drop critical fields (fee, english tests, location, study_mode,
     # duration) that lack source proof.  Better to publish "unknown" than
     # publish a guess.  The dropped fields are logged so the operator can
