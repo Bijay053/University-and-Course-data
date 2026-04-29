@@ -1,0 +1,87 @@
+Already up to date.
+[1]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1  (wd: ~/University-and-Course-data/backend-py)
+(wd now: ~/University-and-Course-data)
+[1] 1190059
+PID: 1190059
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # 1. See what the Celery worker is actually doing right now
+tail -50 /var/log/celery-worker.log
+
+# 2. See if there are active tasks holding all 4 slots
+cd /root/University-and-Course-data/backend-py && source venv/bin/activate
+celery -A app.tasks.celery_app inspect active
+
+# 3. How many tasks are sitting in the Redis scrape queue?
+redis-cli LLEN scrape
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 955, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1249, in _connect
+    raise last_error or exceptions.TargetServerAttributeNotMatched(
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1080, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 1456, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -5] No address associated with hostname
+[2026-04-29 05:07:06,097: INFO/ForkPoolWorker-4] Task scrape.university[095851c7-ee6d-4889-8f6a-aa30bc00f632] succeeded in 0.07085998402908444s: {'ok': False, 'id': 'job_3e06208bb9f2', 'error': '[Errno -5] No address associated with hostname'}
+->  celery@university-and-course-data: OK
+    - empty -
+->  celery@university-and-course-data: OK
+    - empty -
+/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/celery/app/control.py:56: DuplicateNodenameWarning: Received multiple replies from node name: celery@university-and-course-data.
+Please make sure you give each node a unique nodename using
+the celery worker `-n` option.
+  warnings.warn(DuplicateNodenameWarning(
+
+1 node online.
+(integer) 0
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# # Flush the entire Redis scrape queue
+redis-cli DEL scrape
+
+# Kill and restart Celery
+pkill -9 -f "celery.*worker"; sleep 3
+cd /root/University-and-Course-data/backend-py && source venv/bin/activate
+nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape \
+  >> /var/log/celery-worker.log 2>&1 &
+(integer) 0
+[1]+  Killed                  nohup celery -A app.tasks.celery_app worker --concurrency=4 --loglevel=info -Q scrape >> /var/log/celery-worker.log 2>&1
+[1] 1190640
+(venv) root@university-and-course-data:~/University-and-Course-data/backend-py# 
