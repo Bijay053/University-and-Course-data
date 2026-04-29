@@ -426,17 +426,14 @@ def should_stage_course(
         )
         return (False, "online_only")
 
-    # Secondary check: mode is exactly "Blended" but no physical campus
-    # was found by any extractor (location_text is null/empty). Courses
-    # like "MBA Online" where Gemini still returns "Blended" instead of
-    # "Online" are effectively online-only — reject them too.
-    if _study_mode == "blended" and not _physical_location:
-        log.info(
-            "[REJECT CHECK] course=%r detected_modes=[Blended] detected_locations=[] "
-            "decision=reject (blended with no physical campus)",
-            effective_name,
-        )
-        return (False, "online_only")
+    # Note: we do NOT reject study_mode="Blended" when location is absent.
+    # "Blended" means the extractor found explicit evidence of both online
+    # and campus delivery on the course page — by definition a campus
+    # component exists.  Some universities (e.g. Torrens) don't embed campus
+    # location details on individual course pages, so location=None is
+    # expected even for courses genuinely available on campus.
+    # The strict "Online → reject" rule above already handles any case where
+    # the mode is purely online.
 
     # Bug B: no international fee after all extraction is done.
     # If the university has a centralized fee page, the fee may simply not
