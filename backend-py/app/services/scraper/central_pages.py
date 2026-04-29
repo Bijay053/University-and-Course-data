@@ -580,6 +580,11 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
     # after DOMContentLoaded before fee tables/cards are injected into the DOM.
     _SLOW_SPA_HOSTS = frozenset({
         "www.torrens.edu.au", "torrens.edu.au",
+        # CDU's international fees page is JS-rendered (Angular SPA).
+        # The static HTTP response contains no fee signals, so the browser
+        # fallback fires; with the default 3 s wait the Angular bundle hasn't
+        # finished injecting the fee table.  6 s gives it enough time.
+        "www.cdu.edu.au", "cdu.edu.au",
     })
     from urllib.parse import urlparse as _urlparse
     _host = _urlparse(url).netloc
