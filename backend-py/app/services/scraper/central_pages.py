@@ -1102,6 +1102,12 @@ _FEE_URL_PATHS = (
     "/tuition",
     "/costs",
     "/study-costs",
+    # Some smaller institutions (e.g. AIT) publish their complete fee schedule
+    # on the application / admissions page rather than a dedicated /fees URL.
+    # These paths have low specificity so the specificity scorer still prefers
+    # a dedicated /fees or /tuition URL when both are found.
+    "/how-to-apply",
+    "/apply",
 )
 
 # Anchor text snippets that suggest a link leads to a fee page.
@@ -1114,6 +1120,9 @@ _FEE_ANCHOR_TEXT = (
     "course fees",
     "program fees",
     "study costs",
+    # Application pages that also list tuition (e.g. AIT /apply).
+    "how to apply",
+    "apply now",
 )
 
 
