@@ -332,6 +332,33 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
     return out
 
 
+# "Recently viewed" sidebar widget that appears on many university sites
+# (UniSQ and others) lists other courses' names, locations, and Start dates.
+# When the intake keyword-window scan runs on the full page text, the word
+# "Start" (or "intakes") in the sidebar triggers _KEYWORD_WINDOW, and the
+# month names from those OTHER courses are captured as intake months for the
+# CURRENT course. Strip this block from the plain text before any pass so
+# only the course's own content is scanned.
+#
+# Pattern: everything from a "Recently viewed" heading to the end of the
+# text, or to the next heading-level boundary (capped at 3 000 chars to
+# avoid stripping large legitimate sections on pathological pages).
+_RECENTLY_VIEWED_RE = re.compile(
+    r"recently\s+viewed\b.{0,3000}",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _strip_recently_viewed(text: str) -> str:
+    """Remove 'Recently viewed' sidebar sections from plain text.
+
+    Prevents intake months (and campus names) from sibling-course listings
+    in the 'Recently viewed' widget from being captured as this course's
+    own intake dates.
+    """
+    return _RECENTLY_VIEWED_RE.sub("", text)
+
+
 _UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
 
 # Labels that indicate a nearby month is a real intake/session, not a
@@ -391,6 +418,12 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     text = compact(html_to_text(html))
     if not text:
         return []
+
+    # Strip "Recently viewed" sidebar before ANY keyword or month scan.
+    # Sites like UniSQ embed sibling-course names + Start dates in this
+    # widget; leaving it in causes months from unrelated courses to be
+    # captured as this course's own intake dates.
+    text = _strip_recently_viewed(text)
 
     # ── UOW-specific: session-name extraction takes priority ──────────────
     # UOW uses "Autumn session" (→ March) and "Spring session" (→ July)

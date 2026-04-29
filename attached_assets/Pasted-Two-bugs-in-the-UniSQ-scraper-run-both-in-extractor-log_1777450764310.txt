@@ -1,0 +1,45 @@
+Two bugs in the UniSQ scraper run — both in extractor logic, not data. Re-running won't fix them.
+
+---
+
+**Bug 1: online_only filter lets through courses with no location**
+
+Example: Diploma of Multidisciplinary Studies
+URL: https://www.unisq.edu.au/study/degrees-and-courses/diploma-of-multidisciplinary-studies?studentType=international
+
+The course page lists Location as "Online" only — should be rejected like Bachelor of Music, Diploma of Professional Communication, Master of Education, etc. Instead it saved with `study_mode='On Campus'` and blank course_location.
+
+Log signature:
+```
+[FIELD SUMMARY] Diploma of Multidisciplinary Studies ... StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[FIELD TRACE] study_mode='On Campus' location=None method=study_mode:rule
+[STAGE] saved: Diploma of Multidisciplinary Studies
+```
+
+Root cause: when `location_text` comes back None (static HTML didn't surface a clean location string), the rule-based study_mode classifier defaults to "On Campus" instead of "Online". The `online_only` rejection filter then has nothing to trigger on.
+
+Fix: when `location_text` is None/empty AND no on-campus location keywords (Toowoomba, Springfield, Ipswich) appear anywhere in the page text, reject as `online_only`. Don't default to On Campus.
+
+---
+
+**Bug 2: intake regex is page-scoped, pulls months from sidebar/body text**
+
+Intake months are wrong on most staged courses. Spot-check vs source pages:
+
+- Graduate Diploma of Science — source: Feb, Jun · staged: Feb, May, Jun (extra May)
+- Master of Counselling — source: Feb, Jun, Sep · staged: Aug, Jan, Apr, Dec, Sep, Feb, Jun
+- Bachelor of Science (Honours) — source: Feb, Jun, Sep · staged: Feb, May, Jun, Sep, Aug, Oct, Nov, Mar
+
+Root cause: the intake regex matches month names anywhere on the page, including the "Recently viewed" sidebar. Look at the static text in the logs — that sidebar leaks intake months from previously-crawled courses into the current page's text:
+
+```
+'... Recently viewed Bachelor of Arts Location Springfield, Toowoomba, Online Start Feb, Jun, Sep'
+```
+
+The `Feb, May, Jun, Sep` pattern repeats across dozens of unrelated courses — a tell that it's coming from shared sidebar context, not the course's own Start field.
+
+Fix: scope the intake regex to the course's own Start / View dates field only. Either strip the "Recently viewed" block before running the regex, or anchor to the labeled Start field directly the way Duration and Fees are anchored.
+
+---
+
+Both fixes are needed before next scrape — otherwise same errors will reproduce on UniSQ and likely on other unis using similar page templates.
