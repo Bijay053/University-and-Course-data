@@ -135,7 +135,14 @@ _COMPOUND_DURATION_RE = re.compile(
 
 _UNIT_RANK = {"Year": 4, "Semester": 3, "Trimester": 3, "Month": 2, "Week": 1}
 _WEEKS = {"Year": 52, "Semester": 20, "Trimester": 14, "Month": 4, "Week": 1}
-_DURATION_CAP = {"Year": 12, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}
+# Per-unit extraction caps.  Values above these are almost certainly
+# extraction errors (e.g. a year number like "2012" being mistaken for
+# a duration, or a recency-window clause escaping the anti-context filter).
+# "Year" cap is deliberately set to 10 to match the data-quality warning
+# threshold (_DURATION_YEAR_MAX in data_quality.py); anything beyond 10 years
+# triggers a suspicious_duration warning anyway, so rejecting it here avoids
+# staging the bad value in the first place.
+_DURATION_CAP = {"Year": 10, "Semester": 24, "Trimester": 36, "Month": 96, "Week": 416}
 
 # Mirrors `study_mode._extract_strong_label_value`: a structural pre-pass
 # that reads the value cell directly out of the DOM so the same
