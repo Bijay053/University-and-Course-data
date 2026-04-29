@@ -22,6 +22,7 @@ from app.models.scholarship import Scholarship
 from app.models.scrape_feedback import ScrapeFeedback
 from app.models.scrape_run_alert import ScrapeRunAlert
 from app.models.scrape_run_metrics import ScrapeRunMetrics
+from app.models.gemini_call_log import GeminiCallLog
 from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.models.scraped_course import ScrapedCourse
 from app.models.scraping_change import ScrapingChange
@@ -31,6 +32,7 @@ from app.models.university_field_baseline import UniversityFieldBaseline
 
 __all__ = [
     "AcademicLevelOption",
+    "GeminiCallLog",
     "AcademicRequirement",
     "CentralPageCache",
     "AssessmentNote",
