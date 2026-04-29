@@ -64,6 +64,59 @@ _INTAKE_RESEARCH_REJECT_RE = re.compile(
     r"research\s+candidacy|graduate\s+research)\b",
     re.I,
 )
+
+# ── Bug 2a / 2b: View-dates table and application-timeline contamination ──
+#
+# Weekday abbreviations — the key discriminator between:
+#   summary field:       "Start Feb, Jun, Sep"   (month immediately after Start)
+#   View-dates row:      "Start Mon 16 Feb"       (weekday immediately after Start)
+# We use this to guard the _SUMMARY_START_RE below AND to reject View-dates
+# table chunks inside _scoped_chunks.
+_WEEKDAY_ABBR_STR = r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)"
+
+# Labeled summary "Start [months]" extractor.
+# Matches the short, consistent "Start Feb, Jun, Sep" (or "Start Jan") entry
+# in the course overview / summary block.  Negative lookahead ensures that
+# "Start Mon 16 Feb" (a View-dates table row) does NOT match.  The capture
+# group reads only the bare month list — it stops at the first non-month
+# token so it can never bleed into adjacent fields or the View-dates table.
+_SUMMARY_START_RE = re.compile(
+    rf"\bStart\s+(?!{_WEEKDAY_ABBR_STR}\b)"
+    rf"((?:{_MONTH_ANY})(?:[,\s/]+(?:{_MONTH_ANY}))*)",
+    re.I,
+)
+
+# Application process / timeline reject.
+# Pages like UniSQ Master of Professional Psychology embed a multi-step
+# application workflow that triggers _KEYWORD_WINDOW via "applications open":
+#   Applications open:   Tuesday 5 August 2025
+#   Applications close:  Monday 15 September 2025
+#   Interviews from:     Monday 22 September 2025
+#   Outcomes from:       17 October 2025
+#   Block 1 study period start: Monday 19 January 2026
+# The months Aug/Sep/Oct in these chunks are deadline dates, not intake
+# months.  Any _scoped_chunks hit whose text contains these timeline signals
+# is discarded.
+_APPLICATION_TIMELINE_REJECT_RE = re.compile(
+    r"\b(?:"
+    r"applications?\s+close[sd]?\b|"
+    r"interview[s]?\s+from\b|"
+    r"outcomes?\s+from\b|"
+    r"block\s+\d+\s+study\s+period\s+start"
+    r")\b",
+    re.I,
+)
+
+# View-dates orientation row reject.
+# The "View dates" expanded table on UniSQ course pages has rows of the form:
+#   "Trimester 2, 2026  Orientation Mon 25 May  Start Mon 1 Jun"
+# The Orientation month (May) precedes the actual intake month (June) and
+# MUST NOT be captured as an intake month.  Any chunk that contains an
+# "Orientation Mon/Tue/…" pattern is a View-dates table slice — discard it.
+_ORIENTATION_DATE_REJECT_RE = re.compile(
+    rf"\bOrientation\s+{_WEEKDAY_ABBR_STR}\b",
+    re.I,
+)
 _FULL_DATE = re.compile(
     rf"\b(\d{{1,2}})(?:\s+|-|/)+({_MONTH_ANY})(?:(?:\s+|-|/)\d{{2,4}})?\b", re.I
 )
@@ -326,6 +379,21 @@ def _scoped_chunks(text: str, max_chunks: int = 16) -> list[str]:
         # May or Aug" on a UniSQ Master of Research page).
         if _INTAKE_RESEARCH_REJECT_RE.search(chunk):
             continue
+        # Reject application process / timeline chunks (Bug 2b).
+        # A chunk triggered by "applications open" that also contains
+        # "applications close", "interviews from", or "outcomes from" is a
+        # multi-step deadline timeline — the months in it are closing/interview
+        # dates, NOT intake months (e.g. UniSQ Master of Professional Psychology
+        # produces "Aug, Sep, Oct, Jan" from its application timeline).
+        if _APPLICATION_TIMELINE_REJECT_RE.search(chunk):
+            continue
+        # Reject View-dates orientation table chunks (Bug 2a).
+        # UniSQ "View dates" rows look like:
+        #   "Trimester 2, 2026  Orientation Mon 25 May  Start Mon 1 Jun"
+        # The orientation month (May) must not be captured as an intake month.
+        # Any chunk containing "Orientation Mon/Tue/…" is from that table.
+        if _ORIENTATION_DATE_REJECT_RE.search(chunk):
+            continue
         out.append(chunk)
         if len(out) >= max_chunks:
             break
@@ -424,6 +492,37 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     # widget; leaving it in causes months from unrelated courses to be
     # captured as this course's own intake dates.
     text = _strip_recently_viewed(text)
+
+    # ── Pass 0b: labeled summary "Start [months]" field ───────────────────
+    # The structural DOM pass above catches <strong>/<dt>/<th> patterns, but
+    # UniSQ and similar universities render the course summary "Start" field
+    # as a bare label (e.g. inside a <span> or <div>) that _INTAKE_LABEL_RE
+    # does not match, so it falls through to the greedy text passes where the
+    # View-dates table and application timeline contaminate the result.
+    #
+    # _SUMMARY_START_RE looks for "\bStart [months]" with a negative lookahead
+    # that rejects weekday abbreviations immediately after "Start" (which
+    # signals a View-dates row: "Start Mon 16 Feb"), so only the terse summary
+    # entry ("Start Feb, Jun, Sep") fires.  The capture group stops at the
+    # first non-month token — it cannot bleed into adjacent fields.
+    #
+    # Priority: higher than _scoped_chunks / Pass 1-2 so the contaminated
+    # text passes are skipped entirely when the summary field is found.
+    _summary_hit = _SUMMARY_START_RE.search(text)
+    if _summary_hit:
+        raw_months = [_normalise_month(r) for r in _MONTH_RE.findall(_summary_hit.group(1))]
+        _summary_months = [m for m in _MONTHS if m in set(filter(None, raw_months))]
+        if _summary_months:
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=_summary_months,
+                    normalized={"intake_months": _summary_months, "intake_days": None},
+                    confidence=0.82,
+                    snippet=f"summary-start: {_summary_hit.group(0)[:60]}",
+                    method="intake.summary_start",
+                )
+            ]
 
     # ── UOW-specific: session-name extraction takes priority ──────────────
     # UOW uses "Autumn session" (→ March) and "Spring session" (→ July)
