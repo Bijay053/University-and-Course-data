@@ -584,6 +584,12 @@ _BLOCK_URL_SUBSTRINGS: tuple[tuple[str, str], ...] = (
     # Foundation studies / preparation landing pages
     ("/foundation-studies",     "pathway_page"),
     ("/foundation-program",     "pathway_page"),
+    # CDU-specific: /study/redirect/<slug> URLs deep-link from the marketing
+    # site to the CDU handbook via an auth/cookie redirect that both HTTP and
+    # Playwright cannot follow.  These always produce fetch_failed; blocking
+    # them here prevents wasted retries.  Real CDU course pages come from the
+    # sitemap supplement applied during discovery.
+    ("/study/redirect/",        "redirect_page"),
     # User UI surfaces — compare / favourites action pages.  The bare
     # "/compare" was already captured via _BLOCK_URL_LAST_SEGMENTS but
     # adding it here too means it also catches "/compare-courses/..."

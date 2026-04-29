@@ -510,6 +510,13 @@ _SITEMAP_FALLBACK_THRESHOLD = 5
 _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
     "www.torrens.edu.au",
     "torrens.edu.au",
+    # CDU: course listing pages are JS-rendered (Angular SPA injected into
+    # #js-automated-course-list-<id> anchors).  BFS static HTML only finds
+    # category overview pages (/study/accounting, /study/arts, …) and never
+    # reaches the actual course detail pages.  Supplementing with the sitemap
+    # is the lowest-cost fix: CDU's sitemap contains direct course page URLs.
+    "www.cdu.edu.au",
+    "cdu.edu.au",
 })
 
 
@@ -1093,6 +1100,54 @@ async def discover_course_links(
                 kind="bond_program_filter",
                 kept=len(found),
                 dropped=_removed,
+            )
+
+    # ── CDU: drop category pages and failing redirect URLs ───────────────────
+    # CDU's BFS finds two classes of non-course pages that must be removed:
+    #   (a) Study-area overviews at /study/<single-word>
+    #       (e.g. /study/accounting, /study/arts, /study/business).
+    #       These pages have a JS-rendered course list so BFS sees only
+    #       marketing copy and classifies them as "detail".
+    #   (b) /study/redirect/<slug> URLs that CDU uses to deep-link from its
+    #       marketing site to the handbook.  Both HTTP and Playwright fail
+    #       to fetch these (auth/cookie redirect loop).  The sitemap
+    #       supplement added above provides the real course URLs instead.
+    # Both are safe to drop globally (no other university uses these
+    # URL shapes for actual course detail pages).
+    _cdu_hosts = frozenset({"cdu.edu.au", "www.cdu.edu.au"})
+    if parsed.netloc in _cdu_hosts:
+        _pre_cdu = len(found)
+        _cdu_valid: dict[str, str] = {}
+        for _cu, _cn in found.items():
+            try:
+                _cp = urlparse(_cu).path.lower().rstrip("/")
+                # Drop /study/redirect/* — always fails to fetch
+                if "/study/redirect" in _cp:
+                    continue
+                # Drop flat /study/<one-word> category hubs.
+                # Valid course pages are either at /study/{area}/{course-slug}
+                # (two+ segments after /study/) or at a non-/study/ path.
+                _segments_after_study = None
+                if _cp.startswith("/study/"):
+                    _tail = _cp[len("/study/"):]
+                    _segments_after_study = [s for s in _tail.split("/") if s]
+                if _segments_after_study is not None and len(_segments_after_study) < 2:
+                    # One segment = category hub (e.g. /study/accounting)
+                    continue
+            except Exception:
+                pass
+            _cdu_valid[_cu] = _cn
+        _removed_cdu = _pre_cdu - len(_cdu_valid)
+        found = _cdu_valid
+        if emit and _removed_cdu:
+            await emit(
+                "status",
+                f"[DISCOVER] CDU post-filter: kept {len(found)} real-course URL(s) "
+                f"(dropped {_removed_cdu} category pages / redirect URLs)",
+                phase="discover",
+                kind="cdu_course_filter",
+                kept=len(found),
+                dropped=_removed_cdu,
             )
 
     raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]
