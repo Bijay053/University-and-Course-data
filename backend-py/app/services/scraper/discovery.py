@@ -248,17 +248,59 @@ _DRUPAL_NODE_RE = re.compile(r"/node/\d+(/|$)", re.I)
 # only the URL with the highest year.
 _YEAR_SUFFIX_RE = re.compile(r"/20(\d{2})(?:/|$)")
 
+# Some universities (e.g. ACU) publish a live canonical course URL at
+# /course/<slug> AND archived handbook URLs at /handbook/handbook-YYYY/course/<slug>
+# for every year going back to 2021. The sitemap returns all of them; without
+# deduplication the same course is staged 4–6 times with stale data.
+# Canonical = strip the /handbook/handbook-YYYY/ prefix; prefer the live URL
+# (no year) over any handbook URL, and the highest year among handbook-only sets.
+_HANDBOOK_YEAR_RE = re.compile(r"/handbook/handbook-20(\d{2})/", re.I)
+
 
 def _dedup_year_variants(items: list[dict]) -> list[dict]:
-    """Collapse year-specific URL variants, keeping the highest year.
+    """Collapse year-specific URL variants, keeping the highest / most canonical.
 
-    E.g. /course/2026/ and /course/2027/ → only /course/2027/ is returned.
-    URLs without a year suffix pass through unchanged.
+    Two classes of variant are handled:
+
+    1. **Handbook-prefix URLs** (e.g. ACU `/handbook/handbook-2022/course/<slug>`)
+       vs. live `/course/<slug>`.  The canonical form is the URL with the handbook
+       prefix stripped.  Preference order: live URL > highest-year handbook URL.
+
+    2. **Path-embedded year suffix** (e.g. SCU `/course/2026/`, `/course/2027/`)
+       → keep only the highest year.
+
+    URLs that match neither pattern pass through unchanged.
     """
+    # ── Pass 1: handbook-prefix dedup ────────────────────────────────────────
+    handbook_groups: dict[str, list[tuple[int, dict]]] = {}
+    after_pass1: list[dict] = []
+
+    for item in items:
+        url = item.get("url", "")
+        m = _HANDBOOK_YEAR_RE.search(url)
+        if m:
+            # Canonical URL: replace /handbook/handbook-YYYY/ with /
+            canonical = url[: m.start()] + "/" + url[m.end():]
+            year = int(m.group(1))
+            handbook_groups.setdefault(canonical, []).append((year, item))
+        else:
+            after_pass1.append(item)
+
+    # For each handbook group: prefer the live canonical URL if it already
+    # exists in after_pass1; otherwise keep the highest-year handbook variant.
+    live_url_set = {item.get("url", "") for item in after_pass1}
+    for canonical, variants in handbook_groups.items():
+        if canonical in live_url_set:
+            # Live URL is already in the result; all handbook duplicates dropped.
+            continue
+        best_year_item = max(variants, key=lambda t: t[0])[1]
+        after_pass1.append(best_year_item)
+
+    # ── Pass 2: path-embedded year suffix dedup (SCU-style) ──────────────────
     groups: dict[str, list[tuple[int, dict]]] = {}
     non_year: list[dict] = []
 
-    for item in items:
+    for item in after_pass1:
         url = item.get("url", "")
         m = _YEAR_SUFFIX_RE.search(url)
         if m:
