@@ -191,6 +191,69 @@ def can_override(existing_method: str, new_method: str) -> bool:
     """
     return _method_authority(new_method) > _method_authority(existing_method)
 
+
+def _finalize_evidence_selection(payload: dict[str, Any], evidence: list[dict[str, Any]]) -> None:
+    """Mark the winning evidence row for each field as ``decision_status="selected"``.
+
+    Runs at the END of the pipeline, after all extractors have settled the final
+    payload.  For every field that has a non-null value in *payload*, this function
+    finds the evidence row whose ``value`` / ``normalized`` matches that final value
+    and whose ``decision_status`` is not already ``"superseded"``.  Among ties it
+    prefers the row with the highest method authority, then highest confidence.
+    That row gets ``decision_status = "selected"``; all other non-superseded rows
+    for the same field keep their current status (``"needs_review"`` or remain
+    unchanged).
+
+    This guarantees that ``scraped_field_evidence.selected`` (which mirrors
+    ``decision_status == "selected"`` in :func:`~stage_course._persist_evidence`)
+    always reflects the actual column value in ``scraped_courses`` — the invariant
+    the Evidence Review panel relies on to identify the authoritative source.
+    """
+
+    def _coerce(val: Any) -> Any:
+        """Normalize to float for numeric comparison, else str."""
+        if val in (None, "", 0):
+            return None
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return str(val)
+
+    # Group active (non-superseded) evidence by field_key.
+    by_field: dict[str, list[dict[str, Any]]] = {}
+    for ev in evidence:
+        fk = ev.get("field_key")
+        if not fk:
+            continue
+        if ev.get("decision_status") == "superseded":
+            continue
+        by_field.setdefault(fk, []).append(ev)
+
+    for field_key, candidates in by_field.items():
+        final_val = _coerce(payload.get(field_key))
+        if final_val is None:
+            continue  # field not set — leave evidence as-is
+
+        # Pick the winner: value must match final_val; rank by authority then confidence.
+        winner: dict[str, Any] | None = None
+        winner_auth = -1
+        winner_conf = -1.0
+        for ev in candidates:
+            ev_val = _coerce(ev.get("value") if ev.get("value") not in (None, "", 0)
+                             else ev.get("normalized"))
+            if ev_val != final_val:
+                continue
+            auth = _method_authority(ev.get("method", ""))
+            conf = float(ev.get("confidence") or 0)
+            if auth > winner_auth or (auth == winner_auth and conf > winner_conf):
+                winner = ev
+                winner_auth = auth
+                winner_conf = conf
+
+        if winner is not None:
+            winner["decision_status"] = "selected"
+
+
 # Maximum allowable delta between a per-course vision OCR reading and the
 # university-wide central-page value for the same English slot.  When vision
 # returns a value further away than this threshold the central-page value is
@@ -2087,6 +2150,16 @@ async def extract_course(
             )
     except Exception as _conf_exc:  # never break the pipeline
         log.warning("Confidence scoring failed on %s: %s", url, _conf_exc)
+
+    # ── Evidence selection finalisation ────────────────────────────────────
+    # Mark the winning evidence row for each field as decision_status="selected"
+    # so that scraped_field_evidence.selected mirrors the actual column values
+    # written to scraped_courses. The Evidence Review panel relies on selected=True
+    # to identify the authoritative source for each value.
+    try:
+        _finalize_evidence_selection(payload, evidence)
+    except Exception as _ev_exc:  # never break the pipeline
+        log.warning("_finalize_evidence_selection failed on %s: %s", url, _ev_exc)
 
     return {
         "url": url,
