@@ -469,7 +469,7 @@ def test_match_course_in_pdf_table_matches_variant_db_names():
         ),
     }
     for db_name, (expected_cricos, expected_fee) in cases.items():
-        matched = university_pdfs.match_course_in_pdf_table(db_name, rows)
+        matched, _suffix = university_pdfs.match_course_in_pdf_table(db_name, rows)
         assert matched is not None, f"no PDF row matched DB course {db_name!r}"
         assert matched["international_fee"] == expected_fee, (
             f"{db_name!r}: expected ${expected_fee}, got "
@@ -480,12 +480,16 @@ def test_match_course_in_pdf_table_matches_variant_db_names():
             assert private_key not in matched, (
                 f"matcher leaked private field {private_key!r} to caller"
             )
+        # Fuzzy path suffix: no CRICOS supplied, so must be name_match.
+        assert _suffix == "name_match", (
+            f"expected name_match suffix for {db_name!r}, got {_suffix!r}"
+        )
 
     # Sanity: the 4 bachelor variants and 4 master courses produce ≥2
     # distinct fees — proves the per-course path is *differentiating*,
     # not just stamping the same value everywhere.
     fees = {
-        university_pdfs.match_course_in_pdf_table(name, rows)["international_fee"]
+        university_pdfs.match_course_in_pdf_table(name, rows)[0]["international_fee"]
         for name in cases
     }
     assert len(fees) >= 2, (
@@ -499,12 +503,16 @@ def test_match_course_in_pdf_table_returns_none_for_unrelated_course():
     cross-polluting fees between unrelated courses."""
     rows = university_pdfs._pick_per_course_amounts(_ASA_PDF_EXCERPT)
     # No business/IT tokens — should NOT match anything in the ASA table.
-    assert university_pdfs.match_course_in_pdf_table(
+    matched_nursing, _s1 = university_pdfs.match_course_in_pdf_table(
         "Diploma of Nursing", rows
-    ) is None
-    assert university_pdfs.match_course_in_pdf_table(
+    )
+    assert matched_nursing is None
+    assert _s1 == "no_match"
+    matched_vet, _s2 = university_pdfs.match_course_in_pdf_table(
         "Bachelor of Veterinary Science", rows
-    ) is None
+    )
+    assert matched_vet is None
+    assert _s2 == "no_match"
 
 
 @pytest.mark.asyncio
@@ -699,28 +707,31 @@ def test_match_avoids_award_level_collision():
     """
     rows = university_pdfs._pick_per_course_amounts(_PUBLIC_HEALTH_PDF)
 
-    master = university_pdfs.match_course_in_pdf_table(
+    master, _sm = university_pdfs.match_course_in_pdf_table(
         "Master of Public Health", rows
     )
     assert master is not None and master["international_fee"] == 64000, (
         f"Master query mismatched — got {master}"
     )
+    assert _sm == "name_match"
 
-    cert = university_pdfs.match_course_in_pdf_table(
+    cert, _sc = university_pdfs.match_course_in_pdf_table(
         "Graduate Certificate of Public Health", rows
     )
     assert cert is not None and cert["international_fee"] == 16000, (
         f"Cert query mismatched — got {cert}"
     )
+    assert _sc == "name_match"
 
     # Sanity: querying for an absent level falls through cleanly.
-    diploma = university_pdfs.match_course_in_pdf_table(
+    diploma, _sd = university_pdfs.match_course_in_pdf_table(
         "Diploma of Public Health", rows
     )
     assert diploma is None, (
         f"No Diploma row exists; matcher must return None, not "
         f"cross-pollute from Cert/Master. got {diploma}"
     )
+    assert _sd == "no_match"
 
 
 def test_match_rejects_short_token_false_positive():
@@ -740,7 +751,7 @@ def test_match_rejects_short_token_false_positive():
     # The long DB course shares only "design" with the short PDF row,
     # but matches all 3 distinctive tokens of its OWN PDF row. The
     # old scorer would have picked the short row (1.0 pdf-coverage).
-    matched = university_pdfs.match_course_in_pdf_table(
+    matched, _s1 = university_pdfs.match_course_in_pdf_table(
         "Bachelor of Interior Design Residential", rows
     )
     assert matched is not None, "valid long-name match should still work"
@@ -752,7 +763,7 @@ def test_match_rejects_short_token_false_positive():
 
     # Another flavour of the same false positive — different DB course
     # also containing only 'design' as the shared token.
-    matched2 = university_pdfs.match_course_in_pdf_table(
+    matched2, _s2 = university_pdfs.match_course_in_pdf_table(
         "Bachelor of Game Design and Development", rows
     )
     # Should NOT match anything: doesn't tokenize identically to
@@ -762,6 +773,7 @@ def test_match_rejects_short_token_false_positive():
         f"Master-of-Design row falsely matched 'Game Design and "
         f"Development' — got {matched2}"
     )
+    assert _s2 == "no_match"
 
 
 def test_match_short_legitimate_exact_set():
@@ -771,13 +783,14 @@ def test_match_short_legitimate_exact_set():
     parent rows like 'Bachelor of Business' would be unreachable.
     """
     rows = university_pdfs._pick_per_course_amounts(_DESIGN_PDF)
-    matched = university_pdfs.match_course_in_pdf_table(
+    matched, _sm = university_pdfs.match_course_in_pdf_table(
         "Master of Design", rows
     )
     assert matched is not None and matched["international_fee"] == 48000, (
         f"exact-set escape hatch broken: 'Master of Design' query "
         f"should match its own row; got {matched}"
     )
+    assert _sm == "name_match"
 
 
 def test_degree_level_helper():
@@ -954,21 +967,23 @@ def test_match_rejects_polluted_extras_blob():
             "_cricos": "999999A",
         }
     }
-    matched = university_pdfs.match_course_in_pdf_table(
+    matched, _sp = university_pdfs.match_course_in_pdf_table(
         "Higher Degrees By Research", by_course
     )
     assert matched is None, (
         f"polluted-extras false positive returned: {matched}"
     )
+    assert _sp == "no_match"
 
     # Sanity: the legitimate match for the actual primary still works.
-    matched_real = university_pdfs.match_course_in_pdf_table(
+    matched_real, _sr = university_pdfs.match_course_in_pdf_table(
         "Master of Sport Management", by_course
     )
     assert matched_real is not None, (
         "primary-only match must still fire after extras-cap defense"
     )
     assert matched_real["international_fee"] == 99999
+    assert _sr == "name_match"
 
 
 @pytest.mark.asyncio
