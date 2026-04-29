@@ -1275,6 +1275,52 @@ async def extract_course(
                         slot=_vs,
                     )
 
+        # ── Vision sub-band suppression ───────────────────────────────────
+        # When vision found `ielts_overall` (or pte/toefl) from a course
+        # image but the OCR was incomplete and missed some sub-bands (e.g.
+        # reading/speaking/writing), those slots may still hold a stale
+        # uni-wide PDF value (e.g. 5.5).  The inference in per_course_vision
+        # normally fills them, but if that didn't fire (e.g. the cached
+        # result predates the fix), null out any sub-band whose ONLY source
+        # is a uni-wide PDF and whose corresponding overall came from vision.
+        _SUBBAND_SUPPRESSION_GROUPS: dict[str, tuple[str, ...]] = {
+            "ielts_overall": (
+                "ielts_listening", "ielts_reading", "ielts_speaking", "ielts_writing",
+            ),
+            "pte_overall": (
+                "pte_listening", "pte_reading", "pte_speaking", "pte_writing",
+            ),
+            "toefl_overall": (
+                "toefl_listening", "toefl_reading", "toefl_speaking", "toefl_writing",
+            ),
+        }
+        for _overall_slot, _sbands in _SUBBAND_SUPPRESSION_GROUPS.items():
+            if _overall_slot not in vision_filled:
+                continue  # vision didn't find this test — nothing to do
+            for _sb in _sbands:
+                if _sb in vision_filled:
+                    continue  # vision already provided this sub-band — ok
+                if payload.get(_sb) in (None, "", 0):
+                    continue  # slot empty — nothing to suppress
+                _sb_max_auth = max(
+                    (_method_authority(ev.get("method", ""))
+                     for ev in evidence if ev.get("field_key") == _sb),
+                    default=0,
+                )
+                if _sb_max_auth >= _AUTHORITY_COURSE_SPECIFIC:
+                    continue  # protected by course-specific text — don't null
+                # Null the uni-wide-only sub-band value so downstream
+                # sibling-cache and staging don't propagate wrong scores.
+                payload[_sb] = None
+                for _ev in evidence:
+                    if _ev.get("field_key") == _sb and _ev.get("decision_status") != "superseded":
+                        _ev["decision_status"] = "superseded"
+                log.info(
+                    "[VISION NEG-SUPPRESS] %s: nulled sub-band %s (vision "
+                    "found %s from image but sub-band was uni-wide PDF only)",
+                    url, _sb, _overall_slot,
+                )
+
         # ── Vision sanity check ───────────────────────────────────────────
         # When a per-course vision OCR reading for an English slot diverges
         # too far from the university-wide central-page value, the central
