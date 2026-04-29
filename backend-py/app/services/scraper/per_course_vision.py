@@ -283,6 +283,47 @@ _TEST_FIELD_MAP: Final = {
 }
 
 
+# Sub-band groups used by :func:`_infer_missing_subbands`. Keys are the
+# overall slot; values are the four sub-band slots for that test.
+_SUBBAND_GROUPS: Final = {
+    "ielts_overall": (
+        "ielts_listening", "ielts_reading", "ielts_speaking", "ielts_writing",
+    ),
+    "pte_overall": (
+        "pte_listening", "pte_reading", "pte_speaking", "pte_writing",
+    ),
+    "toefl_overall": (
+        "toefl_listening", "toefl_reading", "toefl_speaking", "toefl_writing",
+    ),
+}
+
+
+def _infer_missing_subbands(normalized: dict[str, Any]) -> None:
+    """Fill in missing sub-bands for a test using the value of found sub-bands.
+
+    Australian university English requirements tables list every sub-band for
+    a given test as the same score (e.g. IELTS L/R/S/W all = 6.0, TOEFL
+    L/R/S/W all = 20).  When Gemini's OCR is incomplete and only returns some
+    sub-bands, infer the remaining ones so the cache entry is comprehensive and
+    sibling courses don't fall back to the wrong uni-wide PDF value.
+
+    Mutates ``normalized`` in-place.  Only fills *missing* keys — never
+    overwrites a value that Gemini explicitly returned.
+    """
+    for overall_key, sbands in _SUBBAND_GROUPS.items():
+        if overall_key not in normalized:
+            continue  # test not present in this OCR result — skip
+        found_values = [normalized[s] for s in sbands if s in normalized]
+        if not found_values:
+            continue  # no sub-band found at all — cannot infer safely
+        # Use the first found sub-band value as the template for missing ones.
+        # Real tables always share the same value, so the first is representative.
+        inferred = found_values[0]
+        for sb in sbands:
+            if sb not in normalized:
+                normalized[sb] = inferred
+
+
 def _vision_fields_consistent_with_ocr(
     ocr_text: str, normalized: dict[str, Any]
 ) -> bool:
@@ -584,6 +625,12 @@ async def maybe_vision_refetch(
                     normalized = await existing
                 except Exception:  # noqa: BLE001 — leader's error already logged
                     normalized = {}
+                # Infer missing sub-bands in case the leader's OCR was
+                # incomplete (e.g. listening returned but not reading).
+                # The dict is from the resolved Future so we must copy first.
+                if normalized:
+                    normalized = dict(normalized)
+                    _infer_missing_subbands(normalized)
                 cache_hits += 1
                 cached_method = "per_course_vision_cached"
 
@@ -705,6 +752,11 @@ async def maybe_vision_refetch(
                         )
                         normalized = {}
                     else:
+                        # Infer any missing IELTS/PTE/TOEFL sub-bands from the
+                        # found sub-bands. This ensures the cache entry is
+                        # comprehensive even when Gemini's OCR only returned
+                        # some sub-bands (e.g. listening but not reading).
+                        _infer_missing_subbands(normalized)
                         log.info(
                             "[VISION OK] %s: extracted %s",
                             img_url,
