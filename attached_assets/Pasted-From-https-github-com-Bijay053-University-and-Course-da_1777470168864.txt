@@ -1,0 +1,62 @@
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   c6dbd92..d3a4dbd  main       -> origin/main
+Updating c6dbd92..d3a4dbd
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py | 20 ++++++++++++++++++++
+ backend-py/app/services/scraper/discovery.py     | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && sudo systemctl restart uni-api-py uni-celery
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main && sudo systemctl restart uni-api-py uni-celery
+remote: Enumerating objects: 21, done.
+remote: Counting objects: 100% (21/21), done.
+remote: Compressing objects: 100% (14/14), done.
+remote: Total 14 (delta 12), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (14/14), 2.04 KiB | 261.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   d3a4dbd..5186a7a  main       -> origin/main
+Updating d3a4dbd..5186a7a
+Fast-forward
+ backend-py/app/services/scraper/central_pages.py | 13 +++++++++++++
+ backend-py/app/services/scraper/sitemap.py       | 15 ++++++++++++++-
+ 2 files changed, 27 insertions(+), 1 deletion(-)
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git pull origin main
+psql $DATABASE_URL -f backend-py/alembic/prod_migration_010_011.sql
+sudo systemctl restart uni-api-py uni-celery
+remote: Enumerating objects: 19, done.
+remote: Counting objects: 100% (19/19), done.
+remote: Compressing objects: 100% (12/12), done.
+remote: Total 12 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 3.26 KiB | 667.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   5186a7a..8d85d1c  main       -> origin/main
+Updating 5186a7a..8d85d1c
+Fast-forward
+ backend-py/alembic/prod_migration_010_011.sql   | 118 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ backend-py/app/services/scraper/stage_course.py |  16 ++++++++++++++-
+ 2 files changed, 133 insertions(+), 1 deletion(-)
+ create mode 100644 backend-py/alembic/prod_migration_010_011.sql
+psql: error: could not translate host name "host" to address: No address associated with hostname
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data && git pull origin main
+psql $DATABASE_URL -f backend-py/alembic/prod_migration_010_011.sql
+sudo systemctl restart uni-api-py uni-celery
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 7 (delta 6), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 1.60 KiB | 546.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   8d85d1c..6def461  main       -> origin/main
+Updating 8d85d1c..6def461
+Fast-forward
+ backend-py/app/services/scraper/guards.py | 44 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 36 insertions(+), 8 deletions(-)
+psql: error: could not translate host name "host" to address: No address associated with hostname
+root@university-and-course-data:~/University-and-Course-data# 
