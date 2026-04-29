@@ -1003,10 +1003,15 @@ async def extract_course(
 
             # Always emit so every course has a [GEMINI] line in the live log
             if emit:
+                _gp_skip_note = (
+                    f" SKIP={_gp_dbg.get('skip_reason', '?')!r}"
+                    if _gp_dbg and _gp_dbg.get("skipped")
+                    else ""
+                )
                 await emit(
                     "status",
                     f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
-                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})",
+                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok}){_gp_skip_note}",
                     phase="extract",
                     kind="gemini_primary_done",
                     filled=list(_gp_filled.keys()),
