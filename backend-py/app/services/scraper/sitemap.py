@@ -45,6 +45,10 @@ _LOC_RE = re.compile(r"<loc>([^<]+)</loc>", re.I)
 _ROBOTS_SITEMAP_RE = re.compile(r"^\s*sitemap:\s*(\S+)", re.I | re.M)
 _NESTED_RE = re.compile(r"sitemap", re.I)
 _NOISE_PARAMS: Final = ("students", "audience", "mode", "view", "tab", "ref")
+# Matches university course-code slugs like EDUC626, NURS320, BIOL101.
+# Used in _is_course_loc to allow short single-token slugs that contain
+# no degree qualifier word but are clearly valid course identifiers.
+_COURSE_CODE_RE = re.compile(r"^[A-Z]{2,8}\d{3,4}$")
 
 
 def _is_nested_loc(loc: str) -> bool:
@@ -133,8 +137,17 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
         return False
     # An honest course slug almost always contains a degree/level word OR
     # is at least two words long; this trims index pages like /courses/all.
+    # Exception: university course-code slugs (e.g. EDUC626, NURS320)
+    # are a single uppercase token with no degree qualifier word.  ACU
+    # publishes its full handbook at /handbook/handbook-YYYY/course/<CODE>;
+    # without this exception every handbook URL is blocked and the sitemap
+    # fallback returns 0 candidates.  The pattern [A-Z]{2,8}\d{3,4} is
+    # specific enough that index pages (/courses/all, /programs/overview)
+    # never match it.
     if not _COURSE_TEXT.search(name) and len(name.split()) < 2:
-        return False
+        last_seg = urlparse(loc).path.rstrip("/").rsplit("/", 1)[-1].upper()
+        if not _COURSE_CODE_RE.match(last_seg):
+            return False
     return True
 
 
