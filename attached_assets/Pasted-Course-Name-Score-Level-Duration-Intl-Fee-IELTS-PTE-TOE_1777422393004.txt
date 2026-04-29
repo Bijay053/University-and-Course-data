@@ -1,0 +1,140 @@
+Course Name	Score	Level	Duration	Intl. Fee	IELTS	PTE	TOEFL	CAE	DET	Intakes	Course Location	Mode	Actions
+	
+Bachelor of Business
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Design
+Architecture, Building & Design
+Publish: review
+Eligibility: review
+62%	Diploma	1 Year		6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Research Studies
+Publish: review
+Eligibility: review
+62%	Master	2 Year	A$59,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Certificate of Research Studies
+Publish: review
+Eligibility: review
+54%	Graduate Certificate	6 Month		7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Philosophy
+Arts, Humanities & Social Sciences
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$59,000/Full Course	7	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Education (Inclusive Education)
+Education & Social Work
+Publish: review
+Eligibility: review
+69%	Master	1.5 Year	A$42,150/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Master	1.7000000476837158 Year	A$14,050/Annual	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Information Technology
+Computer Science & IT
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Diploma of Business (Hospitality and Tourism Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year	A$31,600/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Hospitality and Tourism Management)
+Hospitality, Tourism & Events
+Publish: review
+Eligibility: review
+62%	Bachelor	-	A$82,800/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Business Administration and Master of Global Project Management
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$63,600/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Business (Sport Management)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Bachelor	1 Year	A$94,800/Full Course	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Master of Business Administration (Advanced)
+Business & Management
+Publish: review
+Eligibility: review
+69%	Master	2 Year	A$72,000/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Graduate Diploma of Public Health
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Graduate Certificate	1 Year	A$31,800/Annual	6.5	-	-	-	-	Jun, Sep, Feb, May	-	Blended	
+
+
+
+	
+Diploma of Health Science
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Diploma	1 Year	A$29,330/Annual	6	-	-	-	-	Jun, Sep	-	Blended	
+
+
+
+	
+Bachelor of Health Science (Clinical Nutrition)
+Medicine & Health
+Publish: review
+Eligibility: review
+69%	Bachelor	3 Year	A$87,990/Full Course	6.5	-	-	-	-	Jun, Sep	-	Blended
