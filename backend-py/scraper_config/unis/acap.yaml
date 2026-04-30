@@ -11,13 +11,12 @@
 #     the extractor to use HTML-only parsing for English requirements.
 #   - Location string noise: ACAP emits '^Available in Perth' prefix cruft in some
 #     location fields.  strip_patterns removes these before location parsing.
-#   - Current live bug (as of April 2026): NameError in single_course.py during
-#     ACAP scrapes — root cause under investigation, may be related to the
-#     domestic-only detection path.
+#   - NameError (re module) in single_course.py: FIXED in commit b935cb2 (Phase 4).
+#     Graduate Diploma degree-level correction now uses _re alias correctly.
 #
-# TODO (Week 2): wire domestic_only filter into staging gate.
-# TODO (Week 2): wire trust_vision_ocr into fee/english extractors.
-# TODO (Week 2): wire strip_patterns into location extractor.
+# DONE (Phase 3): domestic_only filter wired into staging gate.
+# DONE (Phase 5): trust_vision_ocr: false wired — vision OCR skipped for ACAP.
+# TODO (Phase 6): wire strip_patterns into location extractor.
 
 extraction:
   english:
