@@ -106,6 +106,25 @@ def _domestic_only_filter_enabled() -> bool:
     return uc is None or uc.extraction.filters.domestic_only.enabled
 
 
+def _vision_ocr_trusted() -> bool:
+    """Phase 5 gate: return True when per-course vision OCR should run.
+
+    Reads ``extraction.english.trust_vision_ocr`` from the current
+    per-university config contextvar.
+
+    Fail-open policy: if the contextvar is not set (no uni context), returns
+    True so that vision OCR continues to run — preserving pre-gate behaviour
+    for any code path that hasn't wired set_uni_config() yet.
+
+    Set ``trust_vision_ocr: false`` in the per-uni YAML stub to disable the
+    entire vision OCR pass for universities whose course pages contain only
+    decorative images (e.g. student portraits) that cause Gemini to hallucinate
+    IELTS/PTE/TOEFL values.  ACAP and Kaplan are the canonical examples.
+    """
+    uc = get_uni_config()
+    return uc is None or uc.extraction.english.trust_vision_ocr
+
+
 # Degree-level values that indicate a postgraduate course.
 # The central English-requirements page is fetched via plain HTTP (no JS
 # rendering), so it only captures whatever level the static HTML exposes
@@ -1478,13 +1497,25 @@ async def extract_course(
         return {"url": url, "payload": payload, "evidence": evidence}
 
     try:
-        from app.services.scraper.per_course_vision import maybe_vision_refetch
+        if not _vision_ocr_trusted():
+            # trust_vision_ocr: false in per-uni YAML — skip all vision OCR for
+            # this university.  Stub empty containers so the downstream merge /
+            # suppression logic in this try-block runs harmlessly (empty-dict
+            # iterations and falsy guards all short-circuit correctly).
+            log.info(
+                "[VISION SKIP] trust_vision_ocr=false for this uni — "
+                "skipping vision OCR pass on %s",
+                url,
+            )
+            vision_filled, vision_evidence = {}, []
+        else:
+            from app.services.scraper.per_course_vision import maybe_vision_refetch
 
-        vision_filled, vision_evidence = await maybe_vision_refetch(
-            url, rendered_html or html, payload, emit=emit,
-            image_cache=vision_image_cache,
-            degree_level=payload.get("degree_level"),
-        )
+            vision_filled, vision_evidence = await maybe_vision_refetch(
+                url, rendered_html or html, payload, emit=emit,
+                image_cache=vision_image_cache,
+                degree_level=payload.get("degree_level"),
+            )
         # Authority-aware merge: per_course_vision (tier 4) overrides any
         # tier-3 text extraction (regex, Gemini, browser, AI fallback).
         # This is the key ASAHE fix: the image is the authoritative source

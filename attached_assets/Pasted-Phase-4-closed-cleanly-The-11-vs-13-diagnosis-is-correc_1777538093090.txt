@@ -1,0 +1,82 @@
+Phase 4 closed cleanly. The 11-vs-13 diagnosis is correct — pre-Phase-4 ACAP was already extracting 11 courses through to staging and then crashing all of them on the `re` NameError just before INSERT. errors=14 counted crash events, not blocked courses. Math now reconciles perfectly:
+
+28 discovered − 1 deduped = 27 extracted → 27 − 12 domestic_only − 3 online_only − 1 category_landing_page = 11 staged ✓
+
+Three filter rules, one trivial dedup, zero silent failures. Phase 4 is genuinely done.
+
+---
+
+**Decision: Option A is next — `trust_vision_ocr: false` per-uni override for ACAP.**
+
+Reasoning:
+
+A is the cheapest validation of a new architecture capability. Phase 2 proved per-uni overrides work for boolean filters. Option A proves they work for *behaviour toggles that control whether an entire extraction path runs* — a different shape than what we've validated so far.
+
+Doing A before B (the duration regex shared-code fix) gives B a safer fallback. Once A is shipped, any uni where the duration regex fix breaks something can get a per-uni override saying "use the old regex for me." Doing B first means less recovery surface if the sweep surfaces unexpected diffs.
+
+C (location cruft strip) is the lowest-priority — cosmetic only, doesn't block users from understanding the location. Bundle it into a future weekly-cleanup PR alongside other text-cleaning rules once the architecture has more migrations under its belt.
+
+---
+
+**What Option A actually does:**
+
+When the per-course extractor reaches the vision OCR pass, it currently runs unconditionally for every uni. ACAP is the worst case: every course page has testimonial photos and CDN-served decorative images that produce hallucinated IELTS/PTE/TOEFL values (the Kripa.jpg pattern, IELTS=9 / IELTS=4 outliers, the 7.0 / 65 / 90 / 185 institutional-default OCR from NitroPack CDN images).
+
+The override gates the entire vision OCR pass on `uc.extraction.trust_vision_ocr`. When False (ACAP), the pass is skipped entirely — no Gemini calls, no hallucination risk, IELTS values come from regex hits or stay null and get filled by the central english-requirements page (which is the next-next migration).
+
+---
+
+**Plan:**
+
+1. **Schema addition.** Add `trust_vision_ocr: bool = True` to the `extraction` section of the per-uni schema. Fail-open default (True) preserves current behaviour for every uni that doesn't override.
+
+2. **YAML override.** Add `extraction.trust_vision_ocr: false` to `acap_41.yaml`. Other 19 stubs unchanged — they get True from the schema default.
+
+3. **Helper function in `single_course.py`.** Same pattern as `_domestic_only_filter_enabled()`:
+
+   ```python
+   def _vision_ocr_trusted() -> bool:
+       uc = get_uni_config()
+       return uc is None or uc.extraction.trust_vision_ocr
+   ```
+
+4. **Gate site.** Find the vision OCR entry point (the `[VISION] N candidate image(s) found — starting OCR pass` line). Wrap with `if _vision_ocr_trusted():`. Single call site — simpler than Phase 3 which had two.
+
+5. **Validation.** Two parts:
+   - **Regression sweep across 22 baselined unis.** Expected: zero diffs everywhere except ACAP. ACAP expected-dirty: vision OCR no longer runs, so any course that previously had IELTS/PTE/TOEFL/CAE filled by vision will now have those fields null (or filled by regex if the page has the value inline). Use `--expected-slugs acap`.
+   - **ACAP shadow streak under the new code.** 5 runs minimum. Shadow comparison itself will be clean by construction (deep-copy preserves the new behaviour), so the streak is really a stability check on prod — watch the staged data, not the shadow report.
+
+6. **Spot-check after merge.** Look at 3-5 ACAP courses in the review UI. The expected change: courses that previously had IELTS=7.0 from vision OCR (Master of Psychology Clinical, Master of Psych Practice Clinical, Master of Professional Psychology) should now have IELTS values from the page text or null. Confirm none of them lost a *correct* IELTS that came from the page text and only had the vision OCR as additional confirmation.
+
+---
+
+**Order of operations:**
+
+1. Capture fresh post-Phase-4 baseline (current prod state, with `re` fix live and ACAP staging 11)
+2. Build the schema + YAML + helper + gate (single PR)
+3. Run regression sweep with `--expected-slugs acap`. Expect 22 clean, 1 acknowledged-dirty.
+4. If sweep is clean: merge, monitor 5 ACAP scrapes for stability, spot-check the staged data
+5. If sweep shows unexpected diff anywhere except ACAP: stop, debug, do not merge
+
+---
+
+**ACAP shadow continuation:**
+
+Leave ACAP in `SHADOW_MODE_UNI_IDS=41` through this migration. Same uni, same harness, different change. No env var change needed. After Option A ships and stabilises, the next migration target may or may not also be ACAP — if it is (Option C is also ACAP-specific), keep shadow on. If we move to a non-ACAP uni for Option B, add the new uni alongside ACAP.
+
+---
+
+**One thing to verify before building:**
+
+The vision OCR entry point. Confirm:
+- It's a single function/code block, not scattered across multiple call sites
+- Skipping it doesn't leave any other extractor in a partially-initialised state expecting vision results
+- The `vision_image_cache` doesn't need any cleanup when vision is skipped (probably safe — cache is just unused)
+
+A 5-minute grep of `[VISION]` log emissions across `single_course.py` will tell you. If multi-site, the gate becomes the same byte-identical-helper pattern as Phase 3 (one helper, multiple call sites, same expression). If single-site, even simpler.
+
+---
+
+**Ready to build whenever you are.** Confirm the gate site is single (not multi) and the helper pattern matches Phase 3's, then write the PR. Estimated effort: half a day if vision OCR is a single call site, full day if multi-site or if the cache cleanup needs work.
+
+After Option A merges: pick Option B (duration regex shared-code fix) as the next migration. That'll be the first multi-uni expected-diff sweep — four unis dirty, eighteen clean, the workflow's biggest test yet.
