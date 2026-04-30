@@ -1,0 +1,62 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu Apr 30 10:04:21 UTC 2026
+
+  System load:           0.1
+  Usage of /:            3.6% of 231.44GB
+  Memory usage:          18%
+  Swap usage:            0%
+  Processes:             179
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Apr 30 08:46:03 2026 from 162.243.190.66
+root@university-and-course-data:~# # Check 1: gate IS firing (must see this for each ACAP course)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION SKIP.*trust_vision_ocr"
+
+# Check 2: gate is NOT leaking (this must be EMPTY for ACAP URLs)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION.*candidate image.*acap\.edu\.au"
+root@university-and-course-data:~# # Check 1: gate IS firing (must see this for each ACAP course)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION SKIP.*trust_vision_ocr"
+
+# Check 2: gate is NOT leaking (this must be EMPTY for ACAP URLs)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION.*candidate image.*acap\.edu\.au"
+root@university-and-course-data:~# # Step 1 — pull the Phase 5 commits
+cd ~/University-and-Course-data
+git pull origin main
+# Expect: f4fc1a9581 (single_course.py) and 15038962d6 (acap.yaml) in the output
+
+# Step 2 — restart celery so the new code loads
+sudo systemctl restart uni-celery
+sleep 5
+sudo journalctl -u uni-celery -n 3 --no-pager | grep -E "worker_ready|celery@"
+
+# Step 3 — trigger ACAP scrape from admin UI, then wait for it to complete
+
+# Step 4 — THEN run the diagnostics
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep -E "VISION SKIP.*trust_vision|VISION.*candidate image.*acap\.edu\.au|job.*acap|completed.*staged"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Apr 30 10:06:17 university-and-course-data celery[1239224]: [2026-04-30 10:06:17,098: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# 
