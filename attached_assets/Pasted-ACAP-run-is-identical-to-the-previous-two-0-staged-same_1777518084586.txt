@@ -1,0 +1,87 @@
+ACAP run is identical to the previous two — 0 staged, same 14 `name 're' is not defined` errors at the staging step, same 12 domestic_only filter rejections, same vision OCR hallucinations on the NitroPack CDN, same `^ ^Available in Perth` location cruft.
+
+This is expected based on our agreed sequencing: Week 1 was infrastructure-only (config system, contextvar, baselines) with deliberately no behaviour change, and the `re` NameError fix is queued as Week 2 step 3 (after shadow mode is built and `domestic_only` is migrated as the proving ground). So the prod failure mode hasn't moved.
+
+But two signals in this run worth checking before Week 2 progresses, plus one new observation.
+
+---
+
+**Signal 1: Did this run go through the new Week 1 contextvar wire-up?**
+
+The Week 1 deploy added `set_uni_config()` to `run_scrape()` and `run_repair()`, plus the `require_uni_config()` STRICT-mode guard. The expected behaviour for any extractor called without a context is a `RuntimeError` crash.
+
+In this log, the extractors all ran cleanly (FIELD SUMMARY lines look correct, FIELD TRACE lines fire normally). The crash is at the `[STAGE]` step, not at extraction. So either:
+
+(a) The contextvar IS set at the entry point and is being read fine by extractors, the only crash is the pre-existing `re.something()` call in the staging path. This is good news — means Week 1 is working as designed.
+
+(b) The extractors aren't yet wired to read the contextvar (which is true, that's a Week 2+ task), so the guard hasn't been exercised yet. The contextvar gets set but nothing actually reads it, so we don't know if the wire-up is correct end-to-end.
+
+Worth confirming which of (a) or (b) is true. If (b), the first Week 2 migration (which DOES read from contextvar) is the real test. Don't be surprised if the first PR surfaces a contextvar-not-set crash somewhere the audit missed.
+
+---
+
+**Signal 2: The DATA QUALITY noise from Bug 2 of the previous report — still firing.**
+
+```
+[DATA QUALITY] 13 course(s) checked — 26 critical / 39 warning / 39 info
+[DATA QUALITY][CRITICAL] missing_course_name: ... (13)
+[DATA QUALITY][CRITICAL] missing_international_fee: ... (13)
+```
+
+All 26 critical errors are for the domestic-only courses that were correctly rejected. The QC pass should skip records with status `rejected:_*`.
+
+This is a small change (one filter in the QC check) and is independent of the per-uni config migration. Worth doing as a side-quest to clean up the dashboard noise. Doesn't have to wait for Week 2.
+
+---
+
+**New observation: vision OCR is now producing CONSISTENT institutional-default values, not random ones.**
+
+Look at this run's vision results compared to the previous ACAP report:
+
+Previous run vision hits:
+- IELTS=7.0 PTE=65 TOEFL=90 CAE=185 (Graduate Certificate of Applied Coaching)
+- IELTS=7.0 PTE=56 (Master of Social Work Qualifying)
+- IELTS=9.0 (impossible) and IELTS=4.0 (impossible) on other courses
+
+This run's vision hits:
+- IELTS=6.5 PTE=58 TOEFL=79 CAE=170 (Graduate Certificate of Applied Coaching)
+- IELTS=6.5 PTE=56 (Graduate Certificate of Professional Accounting)
+- IELTS=6.5 PTE=62 (Master of Social Work Qualifying)
+- IELTS=7.0 TOEFL=90 CAE=185 (Master of Psychology Practice Clinical)
+- IELTS=7.0 (Master of Psychology Clinical)
+- IELTS=7.0 (Master of Professional Psychology)
+
+The IELTS=9 and IELTS=4 outliers from the previous run are GONE. The values now look like real institutional-default English requirement images (6.5/7.0 IELTS, 58/62 PTE, 79/90 TOEFL, 170/185 CAE). These are believable institutional minimums for ACAP's course mix.
+
+Two possible interpretations:
+1. ACAP genuinely changed the images on their site (the cdn-ileicgm.nitrocdn.com URLs look the same as before, so probably not this)
+2. The vision OCR pass is non-deterministic across runs (Gemini reading the same image returns different numbers on different days) — this is more likely
+
+If interpretation 2 is correct, that's important for shadow mode. Two scrape runs of the same uni against the same images may produce different vision OCR results. The shadow-mode "5 consecutive runs match byte-identical" criterion needs to either:
+- Cache the vision OCR results so both shadow paths see the same image → same result
+- Exclude vision-OCR-derived fields from the byte-identical comparison (but compare them with a tolerance)
+- Treat a vision-OCR-only difference between runs as expected noise rather than a regression
+
+Worth knowing this BEFORE shadow mode goes live, because otherwise the first ACAP shadow run will produce a diff (vision OCR returned different numbers), the streak counter resets, and you'll spend a day debugging "why is the new code path producing different IELTS values" when the actual answer is "vision OCR is non-deterministic."
+
+Recommend: cache Gemini vision responses on (image_url, model_version) for the duration of a shadow-mode session, so both old and new code paths get the identical OCR result. That isolates the test to "is the new code path equivalent given the same inputs" rather than mixing in OCR drift.
+
+---
+
+**Recurring issues, no change needed (already in the queue)**
+
+All still present, all already documented in previous reports:
+
+- `re` NameError in shared staging code (Week 2 step 3 fix)
+- domestic_only filter applied to 12 courses (Week 2 step 2 migration to acap_41.yaml)
+- `^ ^Available in Perth from Trimester 3, 2026` location cruft on 4 courses (per-uni text_cleaning override in acap_41.yaml when migrated)
+- Vision OCR pulling values from cdn-ileicgm.nitrocdn.com (per-uni `trust_vision_ocr: false` override in acap_41.yaml when migrated, plus eventual global image-source whitelist)
+- Duration regex grabbing wrong number from "X months" / "Y trimesters" patterns (Graduate Certificate values showing 8.0; Graduate Diploma showing 16.0 — the 0.66 → 0.32 weeks-as-years bug visible in the Gemini raw_response on Graduate Diploma of Legal Practice is the same family)
+
+---
+
+**Bottom line**
+
+No new bugs. Same prod failure mode as before, fix queued. Two signals worth confirming: (1) is the contextvar wire-up actually being exercised end-to-end yet, or just sitting dormant until Week 2 extractors read from it, and (2) vision OCR appears non-deterministic across runs and that needs to be handled in the shadow-mode design before the first migration PR. Plus one easy side-quest: skip QC validation on rejected:_* records to clean up the dashboard noise.
+
+Nothing here changes the Week 2 plan — shadow scaffolding first, then `domestic_only` migration, then `re` fix with full regression sweep. Just check the contextvar status and lock down the vision-OCR caching before the first shadow run.
