@@ -1,0 +1,38 @@
+Plan is correct. The re vs _re finding is exactly the kind of thing that explains why this bug has survived three "fix attempts" — every grep for import re was succeeding, but the import was aliased and the call sites used the bare name. Surgical one-character fix once you know.
+Two things to lock down before you build, and an answer to your question.
+1. Confirm the fix scope is only line 2639.
+re.search, re.I, re.match, re.sub, re.compile, re.findall, re.split — any of these using the bare re rather than _re in this module are equally broken. They just haven't fired yet because the code path hasn't been hit. If line 2639 is the only one, fix it and ship. If there are five, fix all five in the same PR — it's the same logical change ("rename bare re to _re") and bundling them doesn't expand the diff scope conceptually.
+A single grep:
+grep -n "\bre\." backend-py/app/services/scraper/extractors/single_course.py | grep -v "_re\." | grep -v "^[0-9]*:#" | grep -v "from re " | grep -v "import re"
+If that returns only line 2639, ship the one-character fix. If it returns more, fix all of them. Either way, the PR is "use the aliased import consistently" rather than "fix one specific bug" — the shape is the same.
+2. The ACAP shadow streak after the fix has a subtler purpose than you described.
+You wrote: "Since new_path.py is a deep copy, the shadow will be clean by construction." That's true for shadow comparison purposes — old path output and new path output will match because the new path is just copy.deepcopy(old). So the shadow streak doesn't validate the fix.
+What actually validates the fix:
+
+The regression sweep shows ACAP went from 0 to ~13 staged
+Manual spot-check of those 13 courses in the review UI
+
+Both are one-time activities, not a 5-run streak. Running shadow for 5 runs after the fix doesn't add information — it just confirms the deep-copy is still a deep-copy.
+Suggested adjustment: drop the post-fix 5-run shadow streak. It's theatre, not verification. The validation gates are (a) regression sweep with --expected-slugs acap returns clean, (b) eyeball the 13 staged courses for sane field values, (c) merge. If anything looks off in the spot-check, that's the signal — not a shadow streak that's mathematically guaranteed to be clean.
+This shortens Phase 4 by a couple of hours and doesn't lose any verification. The shadow streak made sense for Phase 2 and Phase 3 because behaviour was changing. The re fix changes behaviour for ACAP (0→13) but the shadow comparator can't detect that change because both paths run the same fixed code on the same input.
+If you want a streak-style verification, the right thing to count is "5 consecutive ACAP scrapes that stage 13 courses with no NameError in the log." That's a sanity check on prod stability, not a shadow comparison. Two-line prod-log grep, not a shadow harness invocation.
+3. Your question on _apply_acap_domestic_only in new_path.py:
+Retire it now, in this PR.
+Reasoning: it's Phase 2 dead code the moment ACAP exits shadow mode. Carrying it forward "for the next shadow streak" assumes the next migration target will also be ACAP, which isn't necessarily true — the next migration after re is probably the duration regex fix (shared code, affects every uni) or the vision OCR trust_vision_ocr per-uni override (could be ACAP again, could be BMIHMS, depends on which fix is most blocking).
+Bigger principle: dead code accumulates if "we might need it later" is the criterion for keeping it. Better default is "delete it now, reintroduce a clean version when actually needed." Git history preserves it if the next migration genuinely wants the same shape.
+If retiring it complicates the PR diff (it's in the same file as something else you're touching), put the retirement in a separate cleanup PR that ships either before or after the re fix. Don't bundle it just because both are "Phase 4 cleanup."
+
+Updated Phase 4 sequence:
+
+Capture fresh post-Phase-3 baseline
+Grep for any other bare-re calls in single_course.py. Fix all matches (probably just line 2639) in one PR.
+Push, pull, restart, scrape ACAP
+Capture post-fix baseline
+Run regression sweep with --expected-slugs acap. Expect: 21 clean, 1 expected-dirty (ACAP 0→~13), 0 unexpected.
+Spot-check 3–5 of the 13 newly-staged ACAP courses in the review UI. Look for sane fees, sane IELTS, no ^ ^Available in Perth cruft (that's queued for a later migration but worth noting if it's still there).
+Remove ACAP from SHADOW_MODE_UNI_IDS. Retire _apply_acap_domestic_only from new_path.py (separate small PR, before or after).
+Merge.
+
+After step 8, ACAP is fixed in prod for the first time in this entire engagement. That's the visible win.
+Then the queue opens: pick the next blocking bug (probably duration regex or vision OCR), pick the right verification mode (regression sweep for shared-code, per-uni shadow for per-uni override), repeat.
+Go for it.
