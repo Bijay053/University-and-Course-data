@@ -1,0 +1,32 @@
+Sign-off on Phase 3 — runs 15–19 clean under the gate code, regression sweep showing 22/22 clean across baselined unis, zero unexpected diffs. That's the strongest possible signal: behaviour preserved everywhere, infrastructure working as designed.
+Before you build Phase 4, two things to clarify on the proposed cutover plan, because there's an important conceptual issue with steps 1 and 2 as written:
+1. What's new_path.py actually doing right now?
+Earlier in this thread, after the Scenario C disaster, new_path.py was rewritten to not re-extract — it deep-copies the old result and returns it. That was the correct fix for shadow mode. So if "promoting new_path to the live extraction path" means making new_path the production extractor, that's a no-op (it just returns a copy of what the old path produced) — which is fine but doesn't gain anything.
+The actual cutover for Phase 3 isn't promoting new_path. It's something narrower:
+The Phase 3 PR added a gate in shared code (_domestic_only_filter_enabled() reads from contextvar). That gate is already the live behaviour for every scrape. Right now it returns True for every uni (because every uni has enabled: true in its YAML or falls through to fail-open), so behaviour is identical to pre-Phase-3.
+The actual cutover is removing the now-dead shared-code path that the gate is replacing. Whatever code in single_course.py was duplicating the domestic-only check before Phase 3, or any flag that bypassed the new gate — that's the thing to retire. Until the dead code is gone, you're carrying both implementations and one of them isn't being verified.
+If there's no dead code to retire (the gate is the only path), then Phase 3 cutover is already done at merge time. The 5-run shadow streak was the verification, not a precursor to a separate cutover step.
+2. Removing ACAP from SHADOW_MODE_UNI_IDS is a separate decision.
+Shadow mode for ACAP existed to verify each Phase. Now that Phase 3 is verified, you can either:
+(a) Leave shadow on for ACAP indefinitely as a continuous regression check. Cheap (cache hits dominate), catches drift early.
+(b) Remove ACAP from shadow now, freeing it up for the next migration. The next migration will need its own per-uni shadow target — and ACAP is the obvious one again because it's still broken in prod with the re NameError, so any "regression" relative to current prod is moot.
+Option (b) is what your Phase 4 step 1 implies, and it's reasonable. Just be explicit that this is "transitioning ACAP from migration-target to migration-target-for-the-next-migration" rather than "ACAP is fully migrated and now in normal prod state." ACAP will still be broken until the re NameError is fixed.
+3. The thing that actually unblocks ACAP in prod is the re NameError fix.
+That fix is shared-code change #2. The template:
+
+Open a PR that adds import re to whichever file has the unbound re.something() call in the staging path
+Run the regression sweep against the post-Phase-3 baseline (capture a fresh baseline first, since Phase 3 is now live)
+Expect: ACAP changes from "0 staged" to "13 staged" (the courses that were crashing now succeed). Every other uni unchanged. ACAP's diff is expected and acknowledged in the PR.
+Run ACAP shadow under the new code for 5 runs to confirm the staged data looks right (not just that it's no longer crashing)
+Merge
+
+That's the actual next milestone, and it's the first PR where the regression sweep produces an expected diff rather than zero diffs. Worth a dry run of the "acknowledge expected diffs" workflow before you do this for real, since that workflow was specced but I don't think it's been exercised yet.
+Recommended Phase 4 framing:
+Not "promote new_path to live and remove ACAP from shadow." Instead:
+
+Capture a fresh baseline post-Phase-3 (the old baseline is now stale because the gate code is live, even though behaviour is identical — provenance might differ slightly via the extraction_method JSONB)
+Audit for dead code that the Phase 3 gate replaced — retire if any
+Decide ACAP shadow continuation: keep on (option a) or move to next migration target (option b). Document the choice.
+Pick the next migration: re NameError is the obvious candidate because it's the only thing actually broken in prod. Open the PR with the regression sweep and acknowledge ACAP's expected diff.
+
+If you want, write up step 4 as the next PR plan and we'll review it before you build. The expected-diff acknowledgment workflow is worth getting right the first time — it's the gate that prevents "we expected a diff so we ignored all diffs."
