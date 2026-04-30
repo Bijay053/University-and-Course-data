@@ -1,0 +1,32 @@
+Yes, that order is right. Two checks before you start, both small but important.
+On Blocker 1: confirm "True" is genuinely the right default, not just convenient.
+Current prod behaviour for the 19 non-ACAP unis is "the filter runs." Setting enabled: True as the schema default preserves that. But this implicitly assumes those 19 unis want the filter running, which is true for the unis that have international intake but worth a 30-second sanity check on each.
+Specifically: are any of the 19 unis domestic-only by their nature (i.e. the entire institution is Australia-domestic, no international student offerings)? If so, the filter "running" still produces the right outcome (every course matches and gets filtered out, but the staging job returns zero courses for that uni anyway). Probably no harm. But worth knowing because it'll affect how you interpret the regression sweep — a uni that legitimately stages zero courses will look identical before and after, which is fine but makes that uni a useless test case for verifying the gate works.
+Not a blocker, just a pre-flight check. Look at the 19 stub configs and flag any uni you're unsure about.
+On Blocker 2: explicit enabled: true in every stub is the right call, but be deliberate about the merge semantics.
+When the loader merges defaults.yaml → DB scrape_config → per-uni YAML, what wins for a key that's set in multiple layers? The standard pattern is "later layer overrides earlier layer," meaning the per-uni YAML always wins. Confirm that's what your loader does for nested keys like extraction.filters.domestic_only.enabled — not just top-level keys.
+The failure mode to avoid: if the loader does a shallow merge (replaces entire filters: blocks rather than per-key), then explicit domestic_only: enabled: true in a uni's stub could accidentally clobber some other filter that was set in defaults. Quick test: write a defaults.yaml with extraction.filters.online_only.enabled: true, write a uni stub with only extraction.filters.domestic_only.enabled: true, load it, and confirm the resulting config has BOTH filters, not just domestic_only.
+If the loader already does deep merge (which it should — the Week 1 deliverable mentioned "deep-merge chain"), this is fine and the test is just confirming. If it's shallow, fix the loader before adding the stub overrides.
+On Blocker 3: when you build the sweep script, here's what it actually needs to do.
+Three operations, in order:
+
+Snapshot: for a given commit/branch, run all 23 unis through the scraper (using cached HTML from the baseline if you have it, or fresh fetches if not), serialize each uni's staged output, write to a deterministic file path keyed on (commit_hash, uni_id).
+Sweep: given two commits (e.g. main vs PR branch), generate snapshots for both and produce a diff. Per uni: which courses changed? Per course: which fields changed? Categorise as "expected" (a uni explicitly migrated in this PR) vs "unexpected" (a uni that should have been unaffected).
+Block merge if unexpected: the sweep returns a non-zero exit code if any unexpected diff exists. CI gates merge on this. Expected diffs require human acknowledgment (a comment on the PR with the diff content, signed off by a reviewer).
+
+The sweep script is itself a piece of infrastructure that can have bugs. Worth dogfooding: run it twice on main against main (i.e. no code change between snapshots) and confirm zero diffs. If the sweep produces diffs against itself, it's non-deterministic and the Phase 3 sweep won't be trustworthy.
+The "no diffs against itself" sanity check is the equivalent of the Phase 1 shadow-mode validation. Don't skip it.
+One thing not in your plan worth adding:
+After Blockers 1 and 2 are done but BEFORE building the sweep, run an ACAP shadow scrape with the new schema default + 20 stubs. Confirm is_clean: true matched: 27 and clean_streak: 12+. The schema and YAML changes shouldn't affect ACAP's behaviour — ACAP already had enabled: true explicitly — but if something in the deep-merge or default-handling subtly changes, ACAP shadow will catch it. If ACAP shadow goes red on what should be a no-op change, fix it before going further.
+Order with that addition:
+
+Fix schema default to True
+Add explicit domestic_only: enabled: true to all 19 stubs
+Verify deep-merge semantics with the test described above
+Run ACAP shadow once — confirm still clean (this validates the no-op claim)
+Build the sweep script
+Self-test the sweep (main vs main, expect zero diffs)
+Then write the Phase 3 PR
+
+Step 4 is cheap and catches regressions in the changes from steps 1–2. Step 6 is cheap and catches bugs in the sweep itself. Both prevent debugging-blind situations where you can't tell whether a Phase 3 sweep diff is a real regression or scaffolding noise.
+Go.

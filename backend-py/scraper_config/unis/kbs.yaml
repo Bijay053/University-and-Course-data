@@ -20,3 +20,7 @@ extraction:
   text_cleaning:
     duration:
       split_on_slash: true
+
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

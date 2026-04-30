@@ -11,3 +11,8 @@
 #     embedded accordion — Playwright pass needed for some courses.
 #
 # TODO: add ecu_static_extract.py behaviour flag if/when migrated to config.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

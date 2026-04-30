@@ -11,3 +11,8 @@
 #
 # TODO: confirm hostname from DB.
 # TODO: confirm whether domestic-only filter is needed.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # ACPE has TAFE-pathway domestic-only programs; filter them.

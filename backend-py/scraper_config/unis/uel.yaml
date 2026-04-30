@@ -12,3 +12,8 @@
 #
 # TODO: investigate Cloudflare bypass.
 # TODO: confirm whether Australian delivery partner is the intended target.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

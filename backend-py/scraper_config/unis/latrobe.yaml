@@ -10,3 +10,8 @@
 #
 # TODO: add english.central_page once the stable URL is confirmed.
 # TODO: confirm campus normalisation approach in location extractor.
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.

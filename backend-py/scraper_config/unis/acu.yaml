@@ -17,3 +17,8 @@ discovery:
   block_url_patterns:
     - '/handbook/handbook-20'    # Reject old versioned handbooks (2010–2023 era)
     - '/handbook/current'        # Canonical redirects to live /course/... URLs already
+
+extraction:
+  filters:
+    domestic_only:
+      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
