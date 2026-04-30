@@ -1,0 +1,12 @@
+Solid. All four addressed cleanly, and the implementation choices are right where it matters:
+
+STRICT default with env-var override — exactly the right call. Crashes during Weeks 2–4, soft-fail option for prod after stabilisation.
+Thread-executor audit found one hit and verified it's safe — better answer than I expected. The _render_pdf_to_jpegs function doesn't call extractors, so contextvar propagation is moot. Documenting it in the module docstring is the right move because the next person to add a thread executor will read that file.
+{slug}_{university_id}.yaml with fallback — clean disambiguation. Shared default for the common case, per-id override when needed. Both Torrens entries can now diverge without surprise.
+:null suffix for attempted-but-empty fields — this is the one I was most worried about and it's the cleanest possible fix. Three failure modes (never attempted / fired but empty / fallback returned nothing) are now distinguishable in the diff without changing the schema or breaking existing consumers of extraction_method.
+
+Two small things worth knowing before Week 2 starts, neither blocking:
+The :null suffix is a string convention, not an enum. Any code that downstream parses extraction_method (dashboard rendering, analytics queries, validation logic) needs to know about it. Worth a quick grep for places that read extraction_method to confirm none of them do exact-match comparisons against "regex_ielts" that would now fail to match "regex_ielts:null". If any do, they'll silently start excluding the null-attempt rows. Five-minute check.
+The strict-mode default will catch the missing entry points the audit didn't find. That's the intended behaviour, but it means the first Week 2 run might surface a crash in some path nobody thought to check. Don't panic when it happens — that's the guard doing its job. Just add set_uni_config() at the offending entry point and move on. Worth mentally budgeting an hour or two for this on the day you start Week 2 in case it happens.
+Otherwise: Week 1 is done. Run the prod baseline command, then start Week 2 with the ACAP domestic_only.text_must_appear_in: main_content migration as discussed. Shadow mode for 5 runs, byte-identical diff, cut over, retire the shared-code branch, repeat.
+Go.
