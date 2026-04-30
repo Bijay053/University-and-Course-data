@@ -1,0 +1,26 @@
+Three observations from this run, two are good news, one is the question that matters.
+Good news 1: QC fix is live and working.
+[DATA QUALITY] 0 course(s) checked — 0 critical / 0 warning / 0 info
+Previous runs: 26 critical / 39 warning / 39 info (all noise from rejected records). This run: 0/0/0. The domestic_only=True and parser_error=True skip in data_quality.py is doing its job. Dashboard noise gone.
+Good news 2: Vision OCR cache hits visible across courses.
+(cache hits 1) lines on multiple courses confirm the shared vision_image_cache dict is propagating across the per-course-browser refetch path as we discussed. This is the structural guarantee that makes shadow mode immune to vision non-determinism within a single run.
+The question that matters: where is the shadow report?
+The log doesn't contain a single line mentioning [SHADOW], shadow_report, or clean_streak. The startup log confirmation ([SHADOW] shadow mode ENABLED for uni_ids: 41) isn't in this output either, but that might just be because the log was captured from journalctl mid-job rather than from worker boot.
+Three possibilities, in order of likelihood:
+
+The shadow hook ran silently and wrote a report but didn't log to stdout. The _write_report() function may be intentionally quiet so as not to clutter the scrape log. If so, the report file should exist on disk regardless.
+The shadow hook didn't fire at all. Either the worker wasn't restarted after pulling c9d4114 and e9daac1, or SHADOW_MODE_UNI_IDS=41 isn't being read by the worker process, or the shadow gate (whatever decides "this is uni 41, run shadow") isn't matching.
+The shadow hook fired but errored before writing the report. A bug in new_path.py or the orchestrator wiring would cause this. If the hook errors are being swallowed by a try/except wrapper to avoid breaking prod scrapes, you'd see no log line and no file.
+
+The diagnostic is simple. Run on prod:
+ls -la backend-py/shadow_reports/
+sudo journalctl -u uni-celery -n 200 --no-pager | grep -E "SHADOW|shadow"
+sudo systemctl status uni-celery | grep "since"
+Three outcomes:
+
+Report files exist + SHADOW lines in journalctl + restart timestamp recent → run 003 succeeded silently. Dump the latest report with cat $(ls -t backend-py/shadow_reports/*.json | head -1) | python3 -m json.tool and we look at it.
+Report files exist but no SHADOW lines in stdout → the hook is running silently. Add a one-line log to _write_report() so future runs are visible in the scrape log. Read the report files we have.
+No report files → the hook isn't firing. Check whether the worker actually restarted (the since timestamp will tell you). If restart was after the commits, but no reports exist, then the hook is silently failing — check backend-py/.env for SHADOW_MODE_UNI_IDS=41 (no quotes) and verify the worker process actually has that env var set with sudo cat /proc/$(pgrep -f uni-celery | head -1)/environ | tr '\0' '\n' | grep SHADOW.
+
+Side note worth flagging: the timeout: per-course browser exceeded 60s errors on 4 courses are new in this run (not in any previous ACAP log). Combined with [VISION FAIL] ... 503 UNAVAILABLE from Gemini, this suggests the prod environment was under some load or rate-limit pressure during this scrape. Probably unrelated to shadow mode but worth noting — if the timeouts persist on subsequent ACAP runs, the per-course-browser fallback may need its own investigation. Not blocking.
+Run the three diagnostic commands. Don't trigger more ACAP scrapes until we know whether the shadow hook is firing — running 4 more without the hook just produces 4 more identical broken-state logs with no shadow data.
