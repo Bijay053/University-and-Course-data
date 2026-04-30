@@ -1,0 +1,12 @@
+# La Trobe University
+# Hostname: www.latrobe.edu.au
+#
+# Bug history / rationale:
+#   - La Trobe has multiple campuses across Victoria and NSW.  Location extraction
+#     sometimes returns overly verbose strings (e.g. 'Bundoora (Melbourne Campus)')
+#     that should be normalised to just 'Melbourne'.
+#   - English requirements are published on a central page; individual course pages
+#     typically link to it rather than repeating the requirements.
+#
+# TODO: add english.central_page once the stable URL is confirmed.
+# TODO: confirm campus normalisation approach in location extractor.

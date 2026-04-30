@@ -1,0 +1,22 @@
+# Kaplan Business School
+# Hostname: check DB — likely www.kaplan.edu.au or www.kbs.edu.au
+#
+# Bug history / rationale:
+#   - Fee extraction: KBS publishes fees on a central fee schedule page rather
+#     than per-course pages.  The central page URL should be configured in DB
+#     scrape_config.uniPages.feePage or set below.
+#   - Duration compound strings: KBS uses 'X trimesters / Y years' patterns that
+#     require slash splitting before numeric extraction.
+#   - Duration alternate: 'X subjects' used instead of 'X units' in some programs.
+#
+# NOTE: 'Kaplan' brand has two entities in Australia:
+#   - Kaplan Business School (KBS) — degree programs, CRICOS registered
+#   - Kaplan Professional — CPD / short courses, NOT in scope
+# Ensure the scrape_url targets the CRICOS-registered KBS, not Kaplan Professional.
+#
+# TODO: confirm hostname and set central_page once DB is queried.
+
+extraction:
+  text_cleaning:
+    duration:
+      split_on_slash: true

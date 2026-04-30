@@ -1,0 +1,13 @@
+# Victorian Institute of Technology
+# Hostname: check DB — likely www.vit.edu.au
+#
+# Bug history / rationale:
+#   - Static fallback: VIT's course detail pages appear to require JavaScript
+#     to render fee and intake information.  The static HTML extractor finds
+#     empty fee/intake fields.  A Playwright browser pass is needed.
+#   - Some courses show no duration — may be intentional (short courses) or
+#     a scraping gap.
+#
+# TODO: confirm hostname from DB.
+# TODO (Week 2): investigate whether Playwright pass is already triggered or
+#   needs explicit browser_required: true flag.

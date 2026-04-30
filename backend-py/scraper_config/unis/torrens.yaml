@@ -1,0 +1,23 @@
+# Torrens University Australia (includes Billy Blue, Media Design School, SAE)
+# Hostname: www.torrens.edu.au
+#
+# Bug history / rationale:
+#   - Course listing pages are JS-rendered SPAs (Angular).  BFS static HTML only
+#     finds category overview pages and never reaches individual course detail pages.
+#     Sitemap supplement is the lowest-cost fix; Torrens sitemap contains direct
+#     course page URLs.
+#   - Fee schedule is published as a PDF rather than on individual course pages.
+#     Fees PDF URL should be set in DB scrape_config.uniPages.feesPdf.
+#   - Compound duration strings reported: 'X years / Y subjects / Z trimesters'
+#     requires slash splitting before the numeric extractor can parse them.
+#   - BMIHMS (Blue Mountains International Hotel Management School) operates
+#     under the Torrens network.  It may have a separate entry in the DB with
+#     its own scrape_url.  See bmihms.yaml for any BMIHMS-specific overrides.
+
+discovery:
+  always_sitemap_supplement: true
+
+extraction:
+  text_cleaning:
+    duration:
+      split_on_slash: true

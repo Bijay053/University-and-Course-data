@@ -1,0 +1,14 @@
+# University of East London (UK partnership / Australian pathway)
+# Hostname: check DB — likely www.uel.edu.au or similar AU delivery partner
+#
+# Bug history / rationale:
+#   - Cloudflare protection: site returns 403 to the scraper user-agent.
+#   - May require User-Agent rotation or Playwright stealth mode.
+#   - 403 means 0 courses staged in current runs.
+#
+# NOTE: UEL may be delivered in Australia by a separate partner institution.
+# Verify whether the scrape_url points to the Australian delivery site or the
+# UK mother institution, as content structure differs significantly.
+#
+# TODO: investigate Cloudflare bypass.
+# TODO: confirm whether Australian delivery partner is the intended target.

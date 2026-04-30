@@ -1,0 +1,122 @@
+# Global scraper defaults — applied to every university before per-uni overrides.
+#
+# MODIFICATION POLICY
+# -------------------
+# This file is the single most impactful config in the repository.
+# A change here affects EVERY university that does not have a per-uni override
+# for the changed field.
+#
+# Before merging any PR that modifies this file:
+#   1. Run a full regression sweep (all universities, dry-run staging comparison).
+#   2. Obtain explicit human approval from the engineering lead.
+#   3. Document the change and the regression result in the PR description.
+#
+# Per-uni YAML changes only re-run that one university — safe to merge
+# after single-uni validation.  Prefer per-uni overrides over changing defaults.
+
+# ── Discovery ───────────────────────────────────────────────────────────────
+# These settings control how the URL-discovery phase finds course pages.
+# They are SAFE to replay against unknown universities in Tier-3 playbook
+# matching because they do not assume anything about a specific site's layout.
+
+discovery:
+  # Additional subdomains to probe when the primary URL yields < 5 candidates.
+  # Entries may contain {domain} which is replaced with the primary hostname
+  # (e.g. 'handbook.{domain}' → 'handbook.acu.edu.au').
+  fallback_subdomains: []
+
+  # Always merge sitemap results with BFS candidates, even when BFS exceeded
+  # the sitemap-fallback threshold.  Most universities work fine with BFS-only
+  # discovery; only set to true for JS-rendered SPAs (Torrens, CDU) or sites
+  # where BFS burns its page budget on info/marketing pages (AUT, ACU).
+  always_sitemap_supplement: false
+
+  # Regex patterns.  Any discovered URL matching one of these is dropped before
+  # extraction.  Applied before allow_url_patterns.
+  block_url_patterns: []
+
+  # Regex patterns (whitelist).  If non-empty, only URLs matching at least one
+  # pattern are kept.  Empty list = allow everything discovered by BFS.
+  allow_url_patterns: []
+
+  # Explicit sitemap URL override.  Leave null to use the auto-detected sitemap
+  # at /sitemap.xml or /sitemap_index.xml.
+  sitemap_url: null
+
+  # Fall back to Wayback Machine CDX API when all live-site discovery fails.
+  # Only useful for universities whose sites are completely blocked by WAF.
+  use_wayback: false
+
+  # Override the default BFS page budget (12 fast-mode / 25 full-mode).
+  # Raise only for sites with an unusually large number of listing pages.
+  bfs_page_budget: null
+
+# ── Extraction ───────────────────────────────────────────────────────────────
+# Settings that depend on a specific university's content structure.
+# Must NOT be replayed against unknown universities in Tier-3.
+
+extraction:
+  fees:
+    # URL of the university-wide fee schedule page.
+    # Populated from DB scrape_config.uniPages.feePage when not set in YAML.
+    central_page: null
+
+    # URL of the university-wide fee schedule PDF.
+    fees_pdf_url: null
+
+    # ISO currency code for fee extraction.  Override to NZD for NZ universities.
+    default_currency: "AUD"
+
+    # Number of credit points per unit of study.
+    # When set, per-unit fees are multiplied by this value to derive total fee.
+    # null = use the credit-point count extracted from the course page.
+    credit_points_per_unit: null
+
+  english:
+    # URL of the university-wide English requirements page.
+    # Populated from DB scrape_config.uniPages.entryPage when not set in YAML.
+    central_page: null
+
+    # URL of the English requirements PDF.
+    requirements_pdf_url: null
+
+    # Set to false for universities where Gemini vision OCR consistently
+    # hallucinates IELTS/PTE scores from decorative images (e.g. ACAP).
+    trust_vision_ocr: true
+
+    # Institutional English entry standard to use as a last-resort default
+    # when no per-course value is found.  Only set when the university publicly
+    # states a single entry standard for all courses.
+    default_ielts: null
+    default_pte: null
+    default_toefl: null
+
+  filters:
+    domestic_only:
+      # Drop courses detected as domestic-only during staging.
+      # Enable for universities that list non-international courses without
+      # clearly marking them (e.g. ACAP, some VET providers).
+      enabled: false
+
+    online_only:
+      # Drop courses with all-online delivery during staging.
+      enabled: false
+
+  text_cleaning:
+    location:
+      # Regex patterns stripped from raw location strings before parsing.
+      # Applied left-to-right.  Use for site-specific formatting noise
+      # (e.g. ACAP: strip '^Available in ...' prefixes).
+      strip_patterns: []
+
+    duration:
+      # Split compound duration strings on '/' before parsing.
+      # Needed for universities that publish 'X years / Y subjects / Z trimesters'
+      # (KBS, some Torrens programs).
+      split_on_slash: false
+
+  staging:
+    # Fields that must be non-empty for a staged course to pass the staging gate.
+    # A course missing any listed field is rejected at staging time.
+    reject_if_missing:
+      - course_name

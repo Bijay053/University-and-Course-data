@@ -1,0 +1,13 @@
+# Charles Darwin University
+# Hostname: www.cdu.edu.au
+#
+# Bug history / rationale:
+#   - Course listing pages are JS-rendered (Angular SPA injected into
+#     #js-automated-course-list-<id> anchors).  BFS static HTML only finds
+#     category overview pages (/study/accounting, /study/arts, ...) and never
+#     reaches actual course detail pages.
+#   - Sitemap supplement is the fix: CDU's sitemap contains direct course page URLs.
+#   - No other extraction overrides reported yet; update this stub as bugs are filed.
+
+discovery:
+  always_sitemap_supplement: true

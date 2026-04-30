@@ -1,0 +1,15 @@
+# Bond University
+# Hostname: bond.edu.au  (no www prefix)
+#
+# Bug history / rationale:
+#   - Fees and IELTS requirements are JS-rendered (XHR-loaded).  Playwright and
+#     Gemini both see empty content for these fields on individual course pages.
+#   - Bond publishes a stable central English-requirements page.  Hard-coding it
+#     here ensures every Bond course stages with IELTS/PTE/TOEFL values.
+#   - Previously injected via hardcoded if-block in orchestrator.py lines ~836-845.
+#     YAML takes priority; the orchestrator if-block remains as a safety net
+#     until Week-2 migration removes it.
+
+extraction:
+  english:
+    central_page: "https://bond.edu.au/international-students/english-language-requirements"

@@ -1,0 +1,20 @@
+# University of Wollongong
+# Hostname: www.uow.edu.au
+#
+# Bug history / rationale:
+#   - UOW has ~62 listing pages.  Default BFS page budget (25) is exhausted before
+#     all pre-seeded pagination URLs (?page=N) can be visited in one pass.
+#     Raise to 70 so the full listing is covered.
+#   - English requirements are not published per-course.  UOW publishes a stable
+#     central page that we hard-code here.  Without this injection every UOW course
+#     stages with no IELTS/PTE values.
+#   - Previously injected via hardcoded if-block in orchestrator.py lines ~823-831.
+#     YAML takes priority; the orchestrator if-block remains as a safety net
+#     until Week-2 migration removes it.
+
+discovery:
+  bfs_page_budget: 70    # UOW ~62 listing pages; add buffer for navigation overhead
+
+extraction:
+  english:
+    central_page: "https://www.uow.edu.au/study/apply/english-requirements/"

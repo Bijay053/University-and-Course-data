@@ -1,0 +1,20 @@
+# Blue Mountains International Hotel Management School (BMIHMS)
+# Operates under the Torrens University network.
+# Hostname: check DB — likely www.bmihms.edu.au
+#
+# Bug history / rationale:
+#   - BMIHMS is part of the Torrens network but maintains a separate website.
+#   - Fee schedule is published as a PDF (same format as Torrens).
+#   - Duration compound strings inherited from Torrens systems.
+#   - The course listing may redirect to a Torrens sub-site for some programs.
+#
+# NOTE: Some BMIHMS programs may appear duplicated if both the BMIHMS site
+# and the Torrens site (torrens.yaml) are scraped independently.
+#
+# TODO: confirm hostname from DB.
+# TODO: determine if scraping BMIHMS directly vs via Torrens sub-site is intended.
+
+extraction:
+  text_cleaning:
+    duration:
+      split_on_slash: true

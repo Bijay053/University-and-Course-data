@@ -1,0 +1,21 @@
+# Australian Studio of Acting / ASA College of Acting
+# Hostname: check DB — likely www.asa.edu.au or similar
+#
+# Bug history / rationale:
+#   - Multiple comments throughout extractors reference ASA-specific quirks.
+#   - Fee extraction comments: ASA publishes fees in a non-standard table layout
+#     that confuses the structural fee extractor.
+#   - Vision OCR: Gemini frequently reads fee amounts from background images on
+#     ASA's course pages — amounts are decorative (e.g. '$29,000' watermarks).
+#   - Location: ASA lists a single Sydney campus but strings sometimes include
+#     suburb-level detail that should be normalised to "Sydney".
+#
+# TODO: verify hostname once DB is queried.
+# TODO (Week 2): wire trust_vision_ocr for fees into fee extractor.
+
+extraction:
+  fees:
+    default_currency: "AUD"
+
+  english:
+    trust_vision_ocr: false

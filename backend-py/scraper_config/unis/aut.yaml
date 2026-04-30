@@ -1,0 +1,24 @@
+# Auckland University of Technology (New Zealand)
+# Hostname: www.aut.ac.nz
+#
+# Bug history / rationale:
+#   - AUT has ~12 study-area faculties.  The BFS start URL (/study) links to both
+#     faculty listing pages AND info pages (entry requirements, semester dates, parents
+#     info, etc.).  In practice, BFS burns the 25-page budget on info pages before
+#     visiting all faculty listing pages — only the first two alphabetically
+#     (architecture, art-design) are reached.  Sitemap supplement catches all courses
+#     across remaining faculties.
+#   - AUT is a NZ university.  Fees are in NZD, not AUD.
+#   - Graduate Diploma / Graduate Certificate duration split reported:
+#     raw strings like '1 year (full-time) / 0.5 year (full-time)' need slash splitting.
+
+discovery:
+  always_sitemap_supplement: true
+
+extraction:
+  fees:
+    default_currency: "NZD"
+
+  text_cleaning:
+    duration:
+      split_on_slash: true    # Handles 'X year / Y year' composite patterns

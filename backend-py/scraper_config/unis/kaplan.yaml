@@ -1,0 +1,20 @@
+# Kaplan International Colleges (ELICOS / pathway provider)
+# Hostname: check DB — likely www.kaplaninternational.com or similar
+#
+# Bug history / rationale:
+#   - KITE (Kaplan International Test of English) is NOT an accepted English test
+#     for CRICOS-registered degree programs in Australia.  If the extractor picks
+#     it up as an IELTS/PTE equivalent, the result must be discarded.
+#   - The Gemini extractor sometimes reads KITE scores (e.g. 'KITE 47') and maps
+#     them to the pte_academic field incorrectly.
+#   - Kaplan is a pathway/ELICOS provider, not a CRICOS degree-granting institution.
+#     Confirm whether this university entry should be scraping degree programs or
+#     only English-pathway course data.
+#
+# NOTE: 'Kaplan Business School' (kbs.yaml) is a separate entry.
+#
+# TODO (Week 2): add KITE test filter to English extractor.
+
+extraction:
+  english:
+    trust_vision_ocr: false   # KITE scores sometimes read from decorative imagery
