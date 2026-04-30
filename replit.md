@@ -73,6 +73,23 @@ The admin portal now requires login. The auth flow:
   - **Prod baseline command**: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/capture_baseline.py --out-dir backend-py/baselines/`
   - Slug derived from hostname: `www.acu.edu.au` → `acu`, `www.aut.ac.nz` → `aut`, `bond.edu.au` → `bond`. Files named `{timestamp}_{slug}_{uni_id}.json`.
 
+### Shadow-mode operation
+
+Enable per-uni shadow mode via env vars. **Never set these in prod `.env` permanently — set them on the Celery worker process only for the migration window.**
+
+```bash
+# Enable shadow mode for ACAP (uni_id=41)
+export SHADOW_MODE_UNI_IDS=41
+
+# After 5-run clean streak, flip to cutover
+export SHADOW_CUTOVER_UNI_IDS=41
+unset SHADOW_MODE_UNI_IDS
+```
+
+Reports written to `backend-py/shadow_reports/{timestamp}_{slug}_{uni_id}_run{N}.json`. Ignored by git (only `.gitkeep` is tracked). The JSON includes `is_clean`, `summary`, `clean_streak`, `cutover_ready` fields.
+
+**Cutover criterion**: `cutover_ready: true` = clean_streak ≥ 5. Each run must be a fresh scrape, ≥1 hour apart against the live site. Streak resets on any unexpected diff.
+
 ### Week 2 ACAP migration — correct order (reviewer-mandated)
 
 Do NOT fix the NameError first. Order matters because step 4 is a shared-code change:

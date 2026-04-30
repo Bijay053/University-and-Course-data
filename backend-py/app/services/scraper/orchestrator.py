@@ -1084,6 +1084,55 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if stop_flag[0]:
             return await _finalize_stopped()
 
+        # ── SHADOW MODE ──────────────────────────────────────────────────────
+        # When SHADOW_MODE_UNI_IDS includes this uni, run all course links
+        # through the new extraction code path and diff the results.
+        # Only the old-path results (``results``) proceed to staging — shadow
+        # mode is verification only. Cutover (new path becomes authoritative)
+        # is a separate explicit step via SHADOW_CUTOVER_UNI_IDS.
+        #
+        # Both paths share the same vision_image_cache so each unique image
+        # is OCR-decoded once. Any Gemini LLM calls are cached at the
+        # http-client layer so both paths see the same AI response.
+        from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
+        if _shadow_on(uni_id):
+            from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
+            from app.services.scraper.shadow.new_path import extract_new_path as _new_path
+            from app.services.scraper.shadow.report import write_shadow_report as _write_report
+
+            async def _bounded_new(link: dict) -> dict:
+                async with sem:
+                    if stop_flag[0]:
+                        return {"url": link.get("url"), "error": "stopped", "payload": {}, "evidence": []}
+                    return await _new_path(
+                        link,
+                        country=uni_country,
+                        uni_pdf_data=uni_pdf_data or None,
+                        emit=None,  # new path doesn't emit progress lines during shadow
+                        vision_image_cache=vision_image_cache,
+                        central_data=central_data,
+                        uni_id=uni_id,
+                    )
+
+            try:
+                log.info("shadow[%s/%d] starting new-path gather for %d links", _uni_cfg.slug, uni_id, len(links))
+                shadow_results = await asyncio.gather(
+                    *[_bounded_new(lk) for lk in links], return_exceptions=True
+                )
+                old_dicts = [r for r in results if isinstance(r, dict)]
+                new_dicts = [r for r in shadow_results if isinstance(r, dict)]
+                shadow_diff = _diff_runs(old_dicts, new_dicts)
+                _write_report(
+                    shadow_diff,
+                    uni_id=uni_id,
+                    slug=_uni_cfg.slug,
+                    old_job_id=runtime_job_id,
+                    new_job_id=f"{runtime_job_id}:shadow",
+                )
+            except Exception as _shadow_exc:
+                log.warning("shadow[%s/%d] failed (non-fatal): %s", _uni_cfg.slug, uni_id, _shadow_exc)
+        # ── END SHADOW MODE ───────────────────────────────────────────────────
+
         # T206: sibling-cache back-fill. Runs after every per-course
         # extract has settled but BEFORE staging — by then we've seen
         # the high-quality english-test slots from siblings that did

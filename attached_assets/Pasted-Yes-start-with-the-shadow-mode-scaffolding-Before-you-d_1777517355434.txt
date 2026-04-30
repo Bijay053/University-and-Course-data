@@ -1,0 +1,30 @@
+Yes, start with the shadow-mode scaffolding. Before you do, three quick design notes worth pinning down so the scaffolding doesn't need to be rebuilt later.
+1. What "byte-identical" actually means.
+Pin this down in code, not in conversation. Two staged-course rows are equivalent if all extracted field values match. They are NOT required to match on:
+
+Timestamps (scraped_at, staged_at, etc.)
+Job IDs / run IDs
+Random ordering in JSONB fields (sort keys before comparing)
+Cost / timing metrics
+The exact wording of log lines
+
+But they ARE required to match on:
+
+Every field in the staged_courses row (course_name, level, duration, fees, IELTS/PTE/TOEFL/CAE, intakes, location, mode, category, sub_category, currency, fee_term, all of it)
+The extraction_method JSONB dict including the :null suffixes
+The set of courses staged (no additions, no drops)
+The set of courses skipped and the rejection reason for each
+
+Write a diff_staged_runs(run_a, run_b) -> DiffReport function that knows which fields are normalisable-out and which are load-bearing. If you eyeball diffs in the terminal during shadow mode you'll miss the subtle ones.
+2. How shadow mode actually runs both paths.
+Two reasonable patterns:
+(a) Single-process dual-write: one scrape job runs, the orchestrator calls both code paths sequentially for each course, both results get staged into separate tables (staged_courses_old and staged_courses_new), the diff runs at the end. Pro: one network fetch per course. Con: doubles compute time, and the two paths share state in subtle ways (caches, AI call results).
+(b) Two independent runs: run the old code path entirely, snapshot output, run the new code path entirely against the same scrape, snapshot output, diff. Pro: clean separation. Con: the two runs hit the live website at different moments and the website might have changed between them.
+Option (b) is cleaner for correctness reasoning but vulnerable to website drift on long-running unis. Option (a) is faster and immune to drift but harder to reason about. Suggest (a) with the caveat that any AI/LLM call is cached on first use and the cache is shared between both paths, so both paths see the same Gemini response. Otherwise non-determinism in the Gemini response will look like a regression.
+3. Cutover criterion needs to be explicit.
+"5 consecutive runs match" is the rule, but be specific: 5 fresh runs, not 5 retries of the same cached scrape. Each run should be on a different scheduled trigger or manually-spaced by at least an hour, against the live site. Otherwise you're just verifying the cache is deterministic, not that the new code is equivalent on real inputs.
+If a run produces a diff that's expected (e.g. you intentionally changed behaviour), the cutover counter resets. The 5-run streak is for verifying unintentional equivalence, not for cherry-picking the runs that pass.
+
+Beyond those three, the scaffolding itself should be straightforward — the dual-table approach, the diff function, an environment flag to enable shadow mode per-uni so it doesn't run on unis you're not migrating.
+One last thing: when shadow mode is running for ACAP, the prod scrape result that hits the user-facing dashboard should still be the old code path. Shadow mode is verification, not deployment. Cutover (changing which path serves the dashboard) happens as an explicit second step after the 5-run streak completes. If the scaffolding accidentally serves the new path during shadow mode, the whole point of "verify before deploy" is lost.
+Go.
