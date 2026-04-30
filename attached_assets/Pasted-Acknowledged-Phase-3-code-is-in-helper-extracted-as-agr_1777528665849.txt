@@ -1,0 +1,18 @@
+Acknowledged. Phase 3 code is in, helper extracted as agreed, both call sites byte-identical via the same function call. Good.
+One thing to do before you trigger the ACAP shadow scrape — run the regression sweep against the 23-uni baseline. The whole point of building the sweep last week was to gate shared-code changes on it, and Phase 3 is the first shared-code change since it was built. Skipping straight to ACAP shadow re-confirms ACAP works (which we already know from Phase 2) but doesn't verify the other 22 unis are unaffected.
+Order:
+
+Pull on prod, restart worker, confirm worker_ready
+Run regression_sweep.py against the pre-Phase-3 baseline — expect zero unexpected diffs across all 23 unis
+Only if step 2 is clean: trigger ACAP shadow run 15
+
+If the sweep shows zero diffs everywhere, that's the actual proof point for Phase 3 — not the ACAP shadow streak. ACAP shadow validates the per-uni infrastructure works; the sweep validates that gating shared code on contextvar didn't accidentally change behaviour for any uni in production.
+If the sweep shows diffs:
+
+On unis with enabled: true in their YAML (which should be all 20 stubs after the blocker fix): unexpected. Means the gate is somehow flipping behaviour even though the function is supposed to run unchanged. Debug before proceeding.
+On unis with no YAML stub (any of the 3 baselined unis without explicit override): expected if they're falling through to a default. Check what defaults.yaml resolves to for those unis.
+On a single uni only: probably a stub config error. Check that uni's YAML for typos in the extraction.filters.domestic_only.enabled path.
+
+Don't start the ACAP 5-run streak until the sweep is clean. Running ACAP shadow first and the sweep after is the wrong order — if the sweep finds a regression in some other uni, you've spent an hour collecting ACAP data that doesn't matter and the real bug was sitting unnoticed.
+After the sweep is green: ACAP shadow runs 15–19 are the routine confirmation, expected to be clean by construction since ACAP's behaviour is unchanged.
+Run the sweep first, post the result. If clean: green light for the ACAP streak. If diff: post the diff payload before debugging.
