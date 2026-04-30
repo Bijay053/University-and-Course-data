@@ -1,0 +1,39 @@
+Acknowledged. Two clean commits, scope verified. The dual-PR shape (fix + retirement as separate pushes) is the right discipline — keeps each diff readable.
+Your prod sequence is correct. One refinement on step 1, two notes on step 4, and one on the post-merge cleanup.
+Step 1 — capture-baseline timing matters more than you might think.
+The "before" baseline needs to be captured against actually-current prod state, after step 2's pull/restart but BEFORE the next ACAP scrape fires. Otherwise:
+
+If you capture before pulling commits b935cb2 + b4e71c8, the baseline reflects pre-Phase-3 prod (which is identical-behaviour-to-Phase-3 anyway, so probably fine — but worth being explicit).
+If you capture after pulling but a scheduled ACAP scrape sneaks in between pull and scrape-trigger, you'll get an "after" baseline as your "before."
+
+Suggested order: pause any scheduled ACAP scrapes, pull, restart, capture before-baseline, manually trigger ACAP scrape, capture after-baseline, run sweep. The pause-scheduled-scrapes step prevents race conditions.
+If your scheduler doesn't run ACAP automatically (only manual triggers), ignore — order doesn't matter then.
+Step 4 — what "expected dirty" should actually contain.
+ACAP going 0 → ~13 staged is the headline diff. But the regression sweep will surface every field of every newly-staged course as "new" in the diff. That's a lot of diff content for one acknowledged change. Worth confirming the sweep tooling handles this gracefully:
+
+Does --expected-slugs acap mean "any change to ACAP is acknowledged" (broad) or "ACAP can have new courses but existing courses can't change" (narrow)?
+If broad: this run passes trivially. Future ACAP changes (vision OCR fix, location strip) would also pass without specific acknowledgment, which weakens the gate.
+If narrow: you'll need a more specific expected-diff signal — e.g., "ACAP adds N courses, no existing courses modified."
+
+Whichever shape your tool has, run it once and read the output before declaring success. If it's the broad shape and you want narrower in the future, that's a tooling improvement for after Phase 4 ships.
+Step 4 — also verify the sweep output for the "what's NOT dirty" claim.
+The pass criterion is "21 unis clean + 1 ACAP dirty + 0 unexpected." But what if a different uni accidentally got affected by one of the two commits? b935cb2 is shared code (single_course.py) — every uni's path runs through that file. The fix is line-2642-only, but verifying it changed only ACAP requires the sweep to actually pass clean on the other 21.
+Specifically: read the sweep output for any uni other than ACAP showing even a single field change. If one uni shows a tiny diff (one field on one course), that's the signal — debug before merge. Don't ignore "small" diffs because they're small.
+Spot-check criteria for the 13 ACAP courses.
+Your list (fees, IELTS, no ^ ^Available in Perth cruft) is right but I'd add:
+
+Course names: confirm they match the expected titles, not generic "Course" or empty strings
+Duration values: previous ACAP runs showed Graduate Certificate values stuck at 8.0 (months read as years, the recurring duration regex bug). Whatever ACAP stages now will reflect that bug — note it but don't block on it (it's queued for a separate PR). Just confirm the values are plausibly in the right ballpark.
+IELTS values: vision OCR will still hallucinate from the NitroPack CDN images for any course where the regex didn't fire. Note any that look wrong — they're the next migration target.
+Locations: the ^ ^Available in Perth cruft will still be there for affected courses. Note for the next PR, don't block.
+
+The point of the spot-check is "is this data acceptable for users to see in prod" — not "is everything perfect." Acceptable means: real course names, sane fees, locations that are recognizable city names (cruft tolerable), IELTS in 5.5-7.5 range or null. Anything more egregious blocks the merge.
+Post-merge cleanup — _apply_acap_domestic_only retirement (b4e71c8).
+This commit removes Phase 2 dead code. It's correct to ship now, but worth confirming: does any test, fixture, or import statement still reference _apply_acap_domestic_only by name? A quick grep across the repo (not just new_path.py) before merge prevents a stale reference from breaking CI or tests in another module.
+grep -rn "_apply_acap_domestic_only" backend-py/
+If empty: clean retirement, ship. If anything turns up: fix the dangling reference in the same commit.
+
+The actual moment Phase 4 succeeds:
+When the prod ACAP scrape after pull completes and the log shows Staged: 13 (or similar non-zero) instead of Staged: 0. Three weeks of architecture work cashes in at that line of log output.
+Capture that log line. Post it back here when it happens. That's the visible win.
+Go.
