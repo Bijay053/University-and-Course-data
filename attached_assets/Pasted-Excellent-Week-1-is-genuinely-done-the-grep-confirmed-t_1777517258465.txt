@@ -1,0 +1,15 @@
+Excellent. Week 1 is genuinely done — the grep confirmed the schema split (TEXT column on evidence rows vs JSONB dict on staged courses) means the :null convention can't break anything downstream. The two-field separation is actually a nice piece of accidental architecture; worth keeping in mind for Week 2.
+Production baseline at 23 universities / 1,770 courses is the safety net. Don't merge any Week 2 PR until that snapshot is committed somewhere immutable.
+One small re-ordering suggestion for the Week 2 ACAP plan you outlined:
+You listed "fix the NameError" first and "move domestic_only to YAML" second. I'd swap them. The NameError fix is a one-line import re in shared code — that's exactly the kind of change the new system is built to avoid doing in shared code. If you fix it shared-code-first, you've made a global change without a regression test pass, which is the pattern we just spent four weeks designing around.
+Better order:
+
+Run the shadow-mode scaffolding for ACAP (both old + new code paths in parallel, asserting byte-identical staged output). Confirm scaffolding works against current-broken-prod state — both paths should produce the same Errors:14 ACAP result. That validates the diff machinery.
+Move domestic_only.text_must_appear_in: main_content from shared code to acap_41.yaml (or whatever the file ends up named). Run shadow mode for 5 runs. Byte-identical because behaviour is unchanged. Cut over.
+Now domestic_only filter logic is per-uni-configurable. Make any future ACAP-specific fix as a YAML override.
+Then fix the re NameError in shared code. Run the full regression sweep across all 23 baselined unis. Diff against the snapshot. Confirm zero regressions, merge.
+
+Order matters because step 4 is a shared-code change that affects every uni — and you want the regression-test machinery (which step 1 validates) proven and trusted before you make a change that depends on it.
+If the NameError fix sweep comes back with regressions on unis you didn't expect, that's actually useful information — it means the re.something() call in the staging path is doing something other unis depend on, and the "fix" needs to be more nuanced than just adding the import. Better to find that out via the sweep than via another round of bug reports.
+Beyond that — the plan is right. ACAP is the correct first uni (already broken so any deviation from current prod is a strict improvement), shadow mode is the right verification approach, and 5 runs is enough to catch flakiness without being theatre.
+Go for Week 2.

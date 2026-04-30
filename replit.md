@@ -73,6 +73,16 @@ The admin portal now requires login. The auth flow:
   - **Prod baseline command**: `cd /root/University-and-Course-data && PYTHONPATH=backend-py python3 backend-py/scripts/capture_baseline.py --out-dir backend-py/baselines/`
   - Slug derived from hostname: `www.acu.edu.au` → `acu`, `www.aut.ac.nz` → `aut`, `bond.edu.au` → `bond`. Files named `{timestamp}_{slug}_{uni_id}.json`.
 
+### Week 2 ACAP migration — correct order (reviewer-mandated)
+
+Do NOT fix the NameError first. Order matters because step 4 is a shared-code change:
+
+1. **Shadow-mode scaffolding** — run old + new code paths in parallel for ACAP. Both should produce the same broken result (`Errors:14`). This validates the diff machinery itself.
+2. **Move `domestic_only` to YAML** — migrate `domestic_only.text_must_appear_in: main_content` from shared if-block into `acap_41.yaml`. Shadow mode for 5 runs → byte-identical → cut over. Now the filter is per-uni-configurable.
+3. **Fix the `re` NameError last** — it's a shared-code change that affects every uni. Run the full regression sweep (all 23 baselined unis). Diff against `20260430_024437_*` baseline. Zero regressions → merge.
+
+Rationale: if the NameError fix sweep finds regressions on unexpected unis, that means the `re.*` call was doing something other unis depend on — far better to discover that through the sweep than through bug reports.
+
 ### Data Model
 
 The database schema includes tables for `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging), and `import_jobs`.
