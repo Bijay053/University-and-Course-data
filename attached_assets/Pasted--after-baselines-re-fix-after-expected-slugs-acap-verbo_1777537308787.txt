@@ -1,0 +1,135 @@
+    --after  baselines/re-fix-after/  \
+    --expected-slugs acap --verbose
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260430_081825_acap_41.json  (courses=22  disc=28  staged=11  cost=$0.0028  100.7)
+INFO capture_baseline: Saved: 20260430_081825_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260430_081825_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260430_081825_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260430_081825_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260430_081825_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260430_081825_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260430_081825_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_kbs_29.json  (courses=29  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_asahe_2.json  (courses=8  disc=9  staged=0  cost=$0.0000  81.1)
+INFO capture_baseline: Saved: 20260430_081825_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_torrens_3.json  (courses=178  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081825_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1693 courses total. Baselines written to baselines/re-fix-before/
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260430_081829_acap_41.json  (courses=22  disc=28  staged=11  cost=$0.0028  100.7)
+INFO capture_baseline: Saved: 20260430_081829_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260430_081829_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260430_081829_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260430_081829_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260430_081829_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260430_081829_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260430_081829_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_kbs_29.json  (courses=29  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_asahe_2.json  (courses=8  disc=9  staged=0  cost=$0.0000  81.1)
+INFO capture_baseline: Saved: 20260430_081829_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_torrens_3.json  (courses=178  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_081829_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1693 courses total. Baselines written to baselines/re-fix-after/
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   ['acap']
+------------------------------------------------------------------------
+  [CLEAN]    acap (uni_id=41)
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+  [CLEAN]    kbs (uni_id=29)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+========================================================================
+SUMMARY
+  Clean unis:            23
+  Expected diffs:        0  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS — no unexpected regressions.
+root@university-and-course-data:~/University-and-Course-data/backend-py# sudo journalctl -u uni-celery --since "2026-04-30 07:00:00" --no-pager \
+    | grep -i "acap\|uni_id.*41\|skipped\|domestic" | tail -40
+Apr 30 08:14:04 university-and-course-data celery[1237646]: [2026-04-30 08:14:04,197: INFO/ForkPoolWorker-4] gemini_primary: https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ → 9 fields filled, cost=$0.000517
+Apr 30 08:14:05 university-and-course-data celery[1237646]: [2026-04-30 08:14:05,223: INFO/ForkPoolWorker-4] [VISION OK] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2021/10/Kripa.jpg: extracted ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.5 ielts_speaking=7.0 ielts_writing=6.0 toefl_overall=80.0
+Apr 30 08:14:05 university-and-course-data celery[1237646]: [2026-04-30 08:14:05,223: INFO/ForkPoolWorker-4] [VISION FILTER] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2021/10/Kripa.jpg: discarded toefl_overall=80.0 — test keyword not found on page
+Apr 30 08:14:05 university-and-course-data celery[1237646]: [2026-04-30 08:14:05,236: INFO/ForkPoolWorker-4] [VISION SUBBAND REJECT] https://www.acap.edu.au/courses/master-of-social-work-qualifying/: ielts_listening=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'regex'
+Apr 30 08:14:05 university-and-course-data celery[1237646]: [2026-04-30 08:14:05,237: INFO/ForkPoolWorker-4] [VISION SUBBAND REJECT] https://www.acap.edu.au/courses/master-of-social-work-qualifying/: ielts_reading=6.5 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'regex'
+Apr 30 08:14:05 university-and-course-data celery[1237646]: [2026-04-30 08:14:05,240: INFO/ForkPoolWorker-4] [VISION SUBBAND REJECT] https://www.acap.edu.au/courses/master-of-social-work-qualifying/: ielts_writing=6.0 from tier-1/2 image rejected — below ielts_overall=7.0 established by 'regex'
+Apr 30 08:14:06 university-and-course-data celery[1237646]: [2026-04-30 08:14:06,799: INFO/ForkPoolWorker-4] [VISION SKIP] no candidate images found on page — https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+Apr 30 08:14:07 university-and-course-data celery[1237646]: [2026-04-30 08:14:07,860: INFO/ForkPoolWorker-4] [VISION] 4 candidate image(s) found — starting OCR pass for https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+Apr 30 08:14:07 university-and-course-data celery[1237646]: [2026-04-30 08:14:07,868: INFO/ForkPoolWorker-4] [VISION] attempting OCR on https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg
+Apr 30 08:14:07 university-and-course-data celery[1237646]: [2026-04-30 08:14:07,964: INFO/ForkPoolWorker-4] HTTP Request: GET https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg "HTTP/1.1 200 OK"
+Apr 30 08:14:10 university-and-course-data celery[1237646]: [2026-04-30 08:14:10,833: INFO/ForkPoolWorker-4] [VISION OK] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Amanda-ACAP.jpg: extracted duolingo_overall=120.0 ielts_listening=7.0 ielts_overall=7.0 ielts_reading=7.0 ielts_speaking=7.0 ielts_writing=6.5 toefl_overall=100.0
+Apr 30 08:14:10 university-and-course-data celery[1237646]: [2026-04-30 08:14:10,833: INFO/ForkPoolWorker-4] [VISION] attempting OCR on https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2026/01/theo.jpg
+Apr 30 08:14:10 university-and-course-data celery[1237646]: [2026-04-30 08:14:10,933: INFO/ForkPoolWorker-4] HTTP Request: GET https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2026/01/theo.jpg "HTTP/1.1 200 OK"
+Apr 30 08:14:12 university-and-course-data celery[1237646]: [2026-04-30 08:14:12,726: INFO/ForkPoolWorker-4] [VISION SKIP OCR] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2026/01/theo.jpg: Gemini returned text but no IELTS/PTE/TOEFL/Cambridge/Duolingo keyword found — likely a non-requirements image (logo, diagram, etc.)
+Apr 30 08:14:12 university-and-course-data celery[1237646]: [2026-04-30 08:14:12,732: INFO/ForkPoolWorker-4] [VISION] attempting OCR on https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/hiruni-1.jpg
+Apr 30 08:14:12 university-and-course-data celery[1237646]: [2026-04-30 08:14:12,841: INFO/ForkPoolWorker-4] HTTP Request: GET https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/hiruni-1.jpg "HTTP/1.1 200 OK"
+Apr 30 08:14:13 university-and-course-data celery[1237646]: [2026-04-30 08:14:13,099: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'course_location'] for https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/ (cost=$0.000503)
+Apr 30 08:14:14 university-and-course-data celery[1237646]: [2026-04-30 08:14:14,857: INFO/ForkPoolWorker-4] [VISION OK] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/hiruni-1.jpg: extracted cambridge_overall=176.0 duolingo_overall=110.0 ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.5 ielts_speaking=6.5 ielts_writing=6.0 toefl_overall=80.0
+Apr 30 08:14:14 university-and-course-data celery[1237646]: [2026-04-30 08:14:14,857: INFO/ForkPoolWorker-4] [VISION] attempting OCR on https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Rukietu-1.jpg
+Apr 30 08:14:14 university-and-course-data celery[1237646]: [2026-04-30 08:14:14,926: INFO/ForkPoolWorker-4] HTTP Request: GET https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/assets/images/optimized/rev-d05b7ce/www.acap.edu.au/wp-content/uploads/2025/11/Rukietu-1.jpg "HTTP/1.1 200 OK"
+Apr 30 08:14:16 university-and-course-data celery[1237646]: [2026-04-30 08:14:16,993: WARNING/ForkPoolWorker-4] [VISION FAIL] https://cdn-ileicgm.nitrocdn.com/QWLicDUtMuODFqecbpuGrYuvUVGfYQkm/asse: Gemini skipped — None (likely quota exhausted)
+Apr 30 08:14:20 university-and-course-data celery[1237646]: [2026-04-30 08:14:20,264: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/master-of-social-work-qualifying/ (cost=$0.000493)
+Apr 30 08:14:20 university-and-course-data celery[1237646]: [2026-04-30 08:14:20,980: INFO/ForkPoolWorker-4] [CRICOS] extracted 082661F from https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,276: INFO/ForkPoolWorker-4] AI fallback filled ['fee_currency', 'duration_value', 'duration_unit'] for https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/ (cost=$0.000493)
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,883: INFO/ForkPoolWorker-4] shadow[acap/41] applying new-path transformation to 27 extracted results
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [parameters: ('job_a67371463ae1', 41, 'https://www.acap.edu.au/courses/bachelor-of-social-work/', 'classification_only', 'gemini-2.5-flash-lite', 492, 20, 4.29e-05, 6574, True, None)]
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,919: INFO/ForkPoolWorker-4] staging_gate rejected 'Associate Degree Of Criminal Justice': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,924: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Counselling': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,928: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Criminology And Justice': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,933: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Psychological Science': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,938: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Psychological Science Honours': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,943: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Psychological Science And Counselling': domestic_only
+Apr 30 08:14:22 university-and-course-data celery[1237646]: [2026-04-30 08:14:22,950: INFO/ForkPoolWorker-4] staging_gate rejected 'Bachelor Of Psychological Science And Criminology': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,044: INFO/ForkPoolWorker-4] staging_gate rejected 'Diploma Of Counselling Skills': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,095: INFO/ForkPoolWorker-4] staging_gate rejected 'Graduate Certificate Of Counselling': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,207: INFO/ForkPoolWorker-4] staging_gate rejected 'Graduate Certificate Of Psychological Science': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,293: INFO/ForkPoolWorker-4] staging_gate rejected 'Graduate Diploma Of Psychological Science': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,339: INFO/ForkPoolWorker-4] staging_gate rejected 'Master Of Counselling And Psychotherapy': domestic_only
+Apr 30 08:14:23 university-and-course-data celery[1237646]: [2026-04-30 08:14:23,592: INFO/ForkPoolWorker-4] Scrape job_a67371463ae1 completed: {'discovered': 28, 'staged': 11, 'skipped': 16, 'errors': 0, 'fetch_failed': 0}
+Apr 30 08:18:32 university-and-course-data celery[1237837]: [2026-04-30 08:18:32,353: INFO/MainProcess] [SHADOW] shadow mode ENABLED for uni_ids: 41
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
