@@ -27,10 +27,17 @@ field_key = "degree_level"
 
 # Order matters: more specific patterns must come first so e.g. "Graduate
 # Certificate" is not matched by the looser "certificate" rule.
+# Graduate Diploma and Graduate Certificate are DIFFERENT qualifications:
+#   Graduate Diploma  ≈ 1 year (AQF 8 / NZQF 7)
+#   Graduate Certificate ≈ 6 months (AQF 8 / NZQF 7)
+# Both are AQF/NZQF level 8 so we cannot distinguish from a numeric level
+# alone — rely on the name pattern instead.
 _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(doctor(ate)?|ph\.?d|d\.?phil)\b", re.IGNORECASE), "Doctorate"),
-    (re.compile(r"\bgraduate\s+(certificate|diploma)\b", re.IGNORECASE), "Graduate Certificate"),
-    (re.compile(r"\bpostgraduate\s+(certificate|diploma)\b", re.IGNORECASE), "Graduate Certificate"),
+    (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
+    (re.compile(r"\bpostgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
+    (re.compile(r"\bpostgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),
     (re.compile(r"\b(master('?s)?|mba|m\.?sc|m\.?eng|m\.?ed|m\.?phil)\b", re.IGNORECASE), "Master's"),
     (re.compile(r"\b(bachelor('?s)?|b\.?sc|b\.?eng|b\.?ed|b\.?a|b\.?bus)\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bassociate\s+degree\b", re.IGNORECASE), "Associate Degree"),

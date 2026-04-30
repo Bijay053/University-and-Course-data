@@ -1,0 +1,130 @@
+AUT scrape (university 87, https://www.aut.ac.nz/study) staged 13 courses. AUT actually offers hundreds of courses across ~12 faculties (business, health, engineering, IT, law, sport, communication, science, language and culture, Maori and indigenous, education, art and design). The 13 staged are entirely from architecture/built environment and art/design — because those are the only two study-area listing pages discover happened to reach before the 25-page crawl cap.
+
+---
+
+**Bug 1 (root cause): discover hit the 25-page cap before exploring most study areas**
+
+Look at the discover pages: pages 1-23 went into general info pages (entry requirements, semester dates, parents, careers advisors, faculty contacts, postgraduate study, etc.) — most of which got correctly classified as `info_page` or `category_landing_page` and dropped, but they still consumed the 25-page budget.
+
+Only pages 24 and 25 hit study-area listing pages:
+```
+[DISCOVER] Page 24/25: classified .../architecture-and-built-environment: listing (12 course links found)
+[DISCOVER] Page 25/25: classified .../art-and-design: listing (8 course links found)
+```
+
+And then the crawl stopped. Every other AUT study area at https://www.aut.ac.nz/study/study-options/ — business, health, engineering and computer/mathematical sciences, education, law, communication studies, hospitality and tourism, language and culture, Maori and indigenous, sport and recreation, science — was never visited. None of their courses were discovered.
+
+This is also why the run extracted real data from the Master of Engineering Project Management and Master of Construction Management courses (those courses sit under the engineering/computer/mathematical-sciences study area) — they got linked from the architecture/built-environment listing as cross-faculty programmes, not because discover crawled into the engineering study area itself.
+
+**Fix proposals:**
+1. **Prioritise study-area listings over info pages in the discover queue.** AUT's main study-options hub at https://www.aut.ac.nz/study/study-options links to all ~12 faculty listings. Detect those URLs (`/study/study-options/{faculty}` pattern) and queue them ahead of generic info pages like `/study/parents`, `/study/careers-advisors`, `/study/semester-dates`, `/study/changing-my-enrolment`, etc.
+2. **Raise the page cap or do BFS from the study-options hub.** 25 pages is far too low for a uni this big. Even bumping to 100 with a sane priority queue should cover all faculties.
+3. **Block info pages at discover, not at the extract gate.** Pages like `/study/parents`, `/study/careers-advisors`, `/study/changing-my-enrolment`, `/study/semester-dates`, `/study/information-for-high-school-students`, `/study/returning-to-study-information-for-adult-students`, `/research/faculty-postgraduate-contacts`, `/research/postgraduate-student-support`, `/research/academic-departments` are all clearly not course pages — the discover classifier is calling them `detail (course content present, only N outbound links)` based on the same weak heuristic that bit CDU. They should be filtered at discover so they don't consume budget.
+
+**Confirmation this is the bug:** The 13 staged courses are exclusively architecture/built-environment and art/design — every one of them. There's not a single business, health, IT, law, education, sport, communication, science, hospitality, or language course in the output. That's not random; it's the alphabetical first two faculties on AUT's study-options listing.
+
+---
+
+**Bug 2: per-course browser timeouts (same as AIT/ACU)**
+
+Most per-course browser fetches hit the 60s timeout:
+```
+timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/entry-requirements — moving on
+timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/study-options/compare-aut-degrees — moving on
+timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/research/faculty-postgraduate-contacts — moving on
+... (and many more)
+```
+Run time was 10m 4s for 13 courses (46.5s/course) — same browser-timeout pattern as the AIT report. AUT pages have third-party trackers and lots of webp/jpg image assets that the browser is probably waiting on networkidle for. Same fix: switch to `domcontentloaded`/`load` instead of `networkidle`.
+
+---
+
+**Bug 3: GP-DEBUG showing empty static text on real course pages**
+
+A suspicious pattern appears repeatedly:
+```
+[GP-DEBUG] static=98573B rendered=0B using=static text_len=13
+[GP-DEBUG] text[:500]='Close enquire'
+```
+A 98KB HTML body is being parsed as 13 characters of text content reading just "Close enquire". This happened on multiple genuine course pages including Bachelor of Design Te Tohu Paetahi spatial-design-major, the diploma pages, and Master of Visual Arts. The fee/IELTS regex still managed to find values from somewhere — probably page metadata or a shared component — but the text-extraction step is clearly broken on these pages.
+
+"Close enquire" looks like the text content of a modal/popup dismiss button. The HTML extractor may be picking the first text node after a script-injected modal opens at page load. Worth checking the BeautifulSoup/text-extraction logic for cases where an interactive element steals the document body.
+
+Also `text_len=?` shows up frequently, indicating the text extractor is failing or returning unknown length. Worth surfacing what's actually going wrong there.
+
+---
+
+**Bug 4: hallucinated PTE/TOEFL/CAE backfill (same as ACU/CDU/ACAP/BMIHMS)**
+
+Log shows the pattern again:
+```
+[per-course vision img 5/6] https://www.aut.ac.nz/research/postgraduate-student-support — IELTS=6.5 PTE=58.0 TOEFL=80.0 CAE=176.0
+[per-course vision img 2/6] https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students — IELTS=7.0 PTE=65.0 TOEFL=95.0 CAE=185.0
+```
+And the sibling cache:
+```
+[EXTRACT] [sibling cache ↻ backfill unknown] 45 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill undergraduate] 36 slot(s) filled across siblings
+[EXTRACT] [sibling cache ↻ backfill postgraduate] 42 slot(s) filled across siblings
+```
+123 slots backfilled across siblings. The output table you shared shows IELTS values but no PTE/TOEFL/CAE — which actually suggests the recent fix (only show these when explicit) might be partially working at the staging/display layer. Still, the sibling-cache backfill at extraction is doing the wrong thing under the hood. Fix as previously requested: don't backfill PTE/TOEFL/CAE/DET from siblings.
+
+---
+
+**Bug 5: study_mode missing on most courses**
+
+The output table shows `Mode = -` (blank) for 7 of 13 courses. Looking at the field traces:
+```
+[FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/courses/...
+```
+The study_mode rule isn't firing for many courses even when location is clearly Auckland (a physical campus). Compare the courses that did get "On Campus":
+- PhD: location=Auckland → method=study_mode:rule → On Campus
+- Master of Architectural Design Management: location=Auckland → method=study_mode:rule → On Campus  
+- Bachelor of Visual Arts: location=Auckland, Hamilton → method=study_mode:location_derived → On Campus
+
+But the ones with `Mode = -` have:
+- Bachelor of Architecture: location=Auckland → method=none
+- Master of Architecture (Professional): location=Auckland → method=none
+- Bachelor of Construction: location=Brisbane, Auckland → method=none
+
+Look at Bachelor of Construction — it's been assigned location "Brisbane, Auckland" which is wrong (AUT has no Brisbane campus). That's a separate bug. But more broadly: when location has actual campus names, study_mode should default to On Campus via the location_derived rule. The rule isn't firing consistently. Worth checking why some courses get `study_mode:location_derived` and others get `method=none` despite both having locations.
+
+---
+
+**Bug 6: "Brisbane" appearing in AUT location**
+
+Bachelor of Construction has `location='Brisbane, Auckland'`. AUT is in New Zealand and has campuses in Auckland (City, North, South). It does not have a Brisbane campus. Most likely cause: the AI fallback hallucinated Brisbane from training data, or location_text got contaminated by sibling-cache backfill from a different uni's course in the cache. Worth investigating where Brisbane came from — if sibling cache, that's another reason to be more careful with backfilling.
+
+---
+
+**Bug 7: central international-fee page returned 0 records**
+
+```
+[CENTRAL] auto-discovered fee page: https://www.aut.ac.nz/study/applying
+[CENTRAL] fee page parsed → 0 program record(s)
+```
+Also, the *correct* fee page is at https://www.aut.ac.nz/study/fees-and-scholarships/fees-to-study-at-aut, which discover correctly identified but then `blocked` it as `fee_page` rather than passing it to the central fee parser. So:
+1. discover blocks the actual fee page
+2. central fee parser auto-discovers a different (wrong) URL: `/study/applying`
+3. that URL parses to 0 records
+
+Fix: when discover blocks a `fee_page` URL, that URL should be added to the central fee parser candidates list, not just discarded. The auto-discovery shouldn't have to re-find it.
+
+---
+
+**Bug 8: degree_level miscoded for Graduate Diploma in Architecture**
+
+The table shows `Graduate Diploma in Architecture` with degree_level `Graduate Certificate`. A Graduate Diploma is a different qualification from a Graduate Certificate. The same issue appears in the ACAP report (Graduate Diploma of Professional Accounting also miscoded as Graduate Certificate). The degree-level mapping needs to distinguish:
+- Graduate Certificate (~6 months)
+- Graduate Diploma (~1 year)
+- Postgraduate Certificate / Postgraduate Diploma (some unis use these terms)
+Currently they're collapsing into the same bucket.
+
+---
+
+**Summary**
+
+- **Bug 1** is the headline. AUT has hundreds of courses across ~12 faculties; this run only got into 2 of them (architecture and art/design) because the 25-page discover budget was burned on info pages first. Fix: prioritise study-area listings, raise the cap, block info pages earlier.
+- **Bugs 2 and 4** are recurring issues already flagged.
+- **Bugs 3, 5, 6, 7, 8** are AUT-specific or edge cases worth addressing.
+
+After Bug 1 is fixed, expect AUT to stage somewhere in the 100–300 range, similar to ACU's first run.

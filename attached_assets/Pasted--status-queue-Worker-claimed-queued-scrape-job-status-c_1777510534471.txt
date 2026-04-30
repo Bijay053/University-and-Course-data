@@ -1,0 +1,787 @@
+[status] [queue] Worker claimed queued scrape job
+[status] [cleanup] Cleared 0 stale pending/rejected scraped_courses rows (>10m old) for university 87
+[status] [fetch] Fetching https://www.aut.ac.nz/study...
+[status] [discover] Discovering candidate course pages...
+[status] [discover] [DISCOVER] Crawling from https://www.aut.ac.nz/study (max 25 pages, max 200 candidates)
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study
+[status] [discover] [DISCOVER] Page 1/25: +1 candidates (total 1) — https://www.aut.ac.nz/study
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/study-options: detail (course content present, only 1 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/study-options
+[status] [discover] [DISCOVER] added child course https://www.aut.ac.nz/study/study-options/compare-aut-degrees
+[status] [discover] [DISCOVER] Page 2/25: +2 candidates (total 3) — https://www.aut.ac.nz/study/study-options
+[status] [discover] [DISCOVER] blocked marketing_page: https://www.aut.ac.nz/study/why-study-at-aut
+[status] [discover] [DISCOVER] blocked apply_page: https://www.aut.ac.nz/study/applying
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/entry-requirements: detail (course content present, only 2 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/entry-requirements
+[status] [discover] [DISCOVER] added child course https://www.aut.ac.nz/study/entry-requirements/university-entrance
+[status] [discover] [DISCOVER] added child course https://www.aut.ac.nz/study/entry-requirements/postgraduate-entry-requirements
+[status] [discover] [DISCOVER] Page 5/25: +3 candidates (total 6) — https://www.aut.ac.nz/study/entry-requirements
+[status] [discover] [DISCOVER] blocked fee_page: https://www.aut.ac.nz/study/fees-and-scholarships
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/changing-my-enrolment: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/changing-my-enrolment
+[status] [discover] [DISCOVER] Page 7/25: +1 candidates (total 7) — https://www.aut.ac.nz/study/changing-my-enrolment
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/information-for-high-school-students: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/information-for-high-school-students
+[status] [discover] [DISCOVER] Page 8/25: +1 candidates (total 8) — https://www.aut.ac.nz/study/information-for-high-school-students
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/careers-advisors: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/careers-advisors
+[status] [discover] [DISCOVER] Page 9/25: +1 candidates (total 9) — https://www.aut.ac.nz/study/careers-advisors
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/parents: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/parents
+[status] [discover] [DISCOVER] Page 10/25: +1 candidates (total 10) — https://www.aut.ac.nz/study/parents
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students
+[status] [discover] [DISCOVER] Page 11/25: +1 candidates (total 11) — https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/semester-dates: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/semester-dates
+[status] [discover] [DISCOVER] Page 12/25: +1 candidates (total 12) — https://www.aut.ac.nz/study/semester-dates
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/international/study-options-for-international-students: detail (course content present, only 1 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/international/study-options-for-international-students
+[status] [discover] [DISCOVER] added child course https://www.aut.ac.nz/courses/doctor-of-philosophy
+[status] [discover] [DISCOVER] Page 13/25: +2 candidates (total 14) — https://www.aut.ac.nz/international/study-options-for-international-students
+[status] [discover] [DISCOVER] blocked fee_page: https://www.aut.ac.nz/study/fees-and-scholarships/scholarships-and-awards-at-aut/international-scholarships
+[status] [discover] [DISCOVER] blocked campus_page: https://www.aut.ac.nz/student-life/studying
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/research/faculty-postgraduate-contacts: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/research/faculty-postgraduate-contacts
+[status] [discover] [DISCOVER] Page 16/25: +1 candidates (total 15) — https://www.aut.ac.nz/research/faculty-postgraduate-contacts
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/research/academic-departments: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/research/academic-departments
+[status] [discover] [DISCOVER] Page 17/25: +1 candidates (total 16) — https://www.aut.ac.nz/research/academic-departments
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/research/postgraduate-student-support: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/research/postgraduate-student-support
+[status] [discover] [DISCOVER] Page 18/25: +1 candidates (total 17) — https://www.aut.ac.nz/research/postgraduate-student-support
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/research/postgraduate-study-and-research: detail (course content present, only 1 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/research/postgraduate-study-and-research
+[status] [discover] [DISCOVER] Page 19/25: +1 candidates (total 18) — https://www.aut.ac.nz/research/postgraduate-study-and-research
+[status] [discover] [DISCOVER] blocked about_page: https://www.aut.ac.nz/about/faculties-and-schools
+[status] [discover] [DISCOVER] blocked fee_page: https://www.aut.ac.nz/study/fees-and-scholarships/fees-to-study-at-aut
+[status] [discover] [DISCOVER] blocked fee_page: https://www.aut.ac.nz/study/fees-and-scholarships/scholarships-and-awards-at-aut
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning: detail (course content present, only 0 outbound links)
+[status] [discover] [DISCOVER] added self as candidate https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning
+[status] [discover] [DISCOVER] Page 23/25: +1 candidates (total 19) — https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/study-options/architecture-and-built-environment: listing (12 course links found)
+[status] [discover] [DISCOVER] Page 24/25: +11 candidates (total 30) — https://www.aut.ac.nz/study/study-options/architecture-and-built-environment
+[status] [discover] [DISCOVER] classified https://www.aut.ac.nz/study/study-options/art-and-design: listing (8 course links found)
+[status] [discover] [DISCOVER] Page 25/25: +6 candidates (total 36) — https://www.aut.ac.nz/study/study-options/art-and-design
+[status] [discover] Discovered 36 candidate course links
+[status] [discover] [CENTRAL] auto-discovered fee page: https://www.aut.ac.nz/study/applying
+[status] [discover] [CENTRAL] fee page parsed → 0 program record(s) from https://www.aut.ac.nz/study/applying
+[status] [extract] [EXTRACT] gate dropped (info_page): Study
+[status] [extract] [EXTRACT] gate dropped (info_page): Information For High School Students
+[status] [extract] [EXTRACT] gate dropped (category_landing_page): Postgraduate Study And Research
+[status] [extract] [EXTRACT] gate dropped 3 non-course candidate(s) — category_landing_page=1, info_page=2
+[status] [extract] Extracting course details (33 pages)...
+[status] [extract] [EXTRACT] 1/33: Study Options
+[status] [extract] [EXTRACT] 2/33: Bachelor's degrees
+[status] [extract] [EXTRACT] 3/33: Entry Requirements
+[status] [extract] [EXTRACT] 4/33: University Entrance (UE) for bachelor's degrees
+[progress] [extract] Fetching 1/33: Study Options
+[progress] [extract] Fetching 3/33: Entry Requirements
+[progress] [extract] Fetching 2/33: Bachelor's degrees
+[progress] [extract] Fetching 4/33: University Entrance (UE) for bachelor's degrees
+[status] [extract] [FIELD SUMMARY] Entry Requirements
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FIELD SUMMARY] Compare Aut Bachelor's Degrees
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [FIELD SUMMARY] Aut Courses and Study Options
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [FIELD SUMMARY] University Entrance (Ue) for Bachelor's Degrees
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['June']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [GP-DEBUG] static=60045B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=66957B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=66606B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=72294B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/compare-aut-degree → 0 field(s) (cost=$0.000000, in=2405 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/entry-requirements/university-en → 0 field(s) (cost=$0.000000, in=2961 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options → 0 field(s) (cost=$0.000000, in=1997 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/entry-requirements → 0 field(s) (cost=$0.000000, in=1780 out=0) SKIP='circuit_open'
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/study-options/compare-aut-degrees
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/entry-requirements/university-entrance
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/study-options
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/entry-requirements
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/study-options/compare-aut-degrees — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/entry-requirements/university-entrance — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/entry-requirements — moving on
+[status] [fallback] [VISION] 4 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION] 1 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/study-options — moving on
+[status] [fallback] [VISION] 1 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION] 3 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/848836/pathway-programm: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 1/1] https://www.aut.ac.nz/study/entry-requirements/university-entrance — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [fallback] [per-course vision img 0/1 (cache hits 1)] https://www.aut.ac.nz/study/entry-requirements — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/entry-requirements (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/entry-requirements/university-entrance (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/entry-requirements
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/entry-requirements/university-entrance
+[status] [extract] [WARN] Entry Requirements — English section detected in HTML but all scores blank
+[status] [extract] [WARN] University Entrance (Ue) for Bachelor's  — English section detected in HTML but all scores blank
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/854005/nursing-094-600.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [extract] [WARN] Entry Requirements — Fee section detected but fee is blank
+[status] [extract] [WARN] University Entrance (Ue) for Bachelor's  — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 45/100] Entry Requirements — missing: english, duration, mode | entry-requirements
+[status] [extract] ❌ [LOW 45/100] University Entrance (Ue) for Bachelor's Degrees — missing: english, duration, mode | university-entrance
+[status] [extract] [EXTRACT] 5/33: Postgraduate entry requirements
+[status] [extract] [EXTRACT] 6/33: Changing My Enrolment
+[progress] [extract] Fetching 6/33: Changing My Enrolment
+[progress] [extract] Fetching 5/33: Postgraduate entry requirements
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/848836/pathway-programm: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0016/1116016/AUT-CiCi-White.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0016/1116016/AUT-CiCi-White.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 2/3 (cache hits 1)] https://www.aut.ac.nz/study/study-options — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [fallback] [per-course vision img 2/4 (cache hits 2)] https://www.aut.ac.nz/study/study-options/compare-aut-degrees — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/compare-aut-degrees (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/study-options/compare-aut-degrees
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/study-options
+[status] [extract] [WARN] Compare Aut Bachelor's Degrees — Fee section detected but fee is blank
+[status] [extract] [WARN] Aut Courses and Study Options — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 35/100] Aut Courses and Study Options — missing: english, duration, intake | study-options
+[status] [extract] ❌ [LOW 35/100] Compare Aut Bachelor's Degrees — missing: english, duration, intake | compare-aut-degrees
+[status] [extract] [EXTRACT] 7/33: Careers Advisors
+[status] [extract] [EXTRACT] 8/33: Parents
+[progress] [extract] Fetching 7/33: Careers Advisors
+[progress] [extract] Fetching 8/33: Parents
+[status] [extract] [FIELD SUMMARY] Changing My Enrolment
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FIELD SUMMARY] Information for Career Advisors
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['August']" [regex conf=0.40]
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD SUMMARY] Postgraduate Entry Requirements
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [FIELD SUMMARY] Information for Parents and Whānau
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['August']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [GP-DEBUG] static=56951B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=66078B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=73727B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=81382B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/changing-my-enrolment → 0 field(s) (cost=$0.000000, in=1712 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/entry-requirements/postgraduate- → 0 field(s) (cost=$0.000000, in=2904 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/parents → 0 field(s) (cost=$0.000000, in=1434 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/careers-advisors → 0 field(s) (cost=$0.000000, in=2341 out=0) SKIP='circuit_open'
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/entry-requirements/postgraduate-entry-requirements
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/changing-my-enrolment
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/parents
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/careers-advisors
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/entry-requirements/postgraduate-entry-requirements — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/changing-my-enrolment — moving on
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/parents — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/entry-requirements/postgraduate-entry-requirements (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/changing-my-enrolment (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/careers-advisors — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/changing-my-enrolment
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/entry-requirements/postgraduate-entry-requirements
+[status] [extract] [WARN] Changing My Enrolment — Fee section detected but fee is blank
+[status] [extract] [WARN] Postgraduate Entry Requirements — English section detected in HTML but all scores blank
+[status] [extract] ❌ [LOW 45/100] Changing My Enrolment — missing: english, duration, mode | changing-my-enrolment
+[status] [extract] [WARN] Postgraduate Entry Requirements — Fee section detected but fee is blank
+[status] [extract] [EXTRACT] 9/33: Returning To Study Information For Adult Students
+[status] [extract] ❌ [LOW 55/100] Postgraduate Entry Requirements — missing: english, duration | postgraduate-entry-requirements
+[progress] [extract] Fetching 9/33: Returning To Study Information For Adult Students
+[status] [extract] [EXTRACT] 10/33: Semester Dates
+[progress] [extract] Fetching 10/33: Semester Dates
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0011/989507/brochures-this-y: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0014/1032800/the-art-of-busi: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [extract] [FIELD SUMMARY] Information for Adult Learners
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [FIELD SUMMARY] Semester Dates
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['February', 'April', 'June', " [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0013/1037110/in-my-universit: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/1032694/goodbye-mum-25.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [extract] [GP-DEBUG] static=72179B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=60528B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/returning-to-study-information-f → 0 field(s) (cost=$0.000000, in=3166 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/semester-dates → 0 field(s) (cost=$0.000000, in=1825 out=0) SKIP='circuit_open'
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/semester-dates
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/858859/comparing-degree: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0005/1013189/a-lecture-at-au: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0005/175757/melinda-lam.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/177240/parents-guide-di: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0013/1021405/aut-live-no-dat: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/995527/AUT-LIVE-2025-Sa: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/995527/AUT-LIVE-2025-Sa: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/study/parents — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/parents (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/parents
+[status] [extract] [WARN] Information for Parents and Whānau — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 55/100] Information for Parents and Whānau — missing: english, duration | parents
+[status] [extract] [EXTRACT] 11/33: Study Options For International Students
+[progress] [extract] Fetching 11/33: Study Options For International Students
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0011/847505/aisling-bartley.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/study/careers-advisors — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/careers-advisors (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/study/careers-advisors
+[status] [extract] [WARN] Information for Career Advisors — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 55/100] Information for Career Advisors — missing: english, duration | careers-advisors
+[status] [extract] [EXTRACT] 12/33: PHD AT AUT
+[progress] [extract] Fetching 12/33: PHD AT AUT
+[status] [extract] [FIELD SUMMARY] Study Options for International Students
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=64524B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/international/study-options-for-intern → 0 field(s) (cost=$0.000000, in=2165 out=0) SKIP='circuit_open'
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/international/study-options-for-international-students
+[status] [extract] [FIELD SUMMARY] Doctor of Philosophy (Phd)
+  Fee: ✅ '47321' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '3.0' [regex conf=0.75]
+  Intake: ✅ "['November', 'February', 'Apri" [regex conf=0.70]
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/doctor-of-philosophy → classification_only cat='?' (cost=$0.000000)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0009/788391/study-with-us.jp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0009/825768/jasper.webp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0011/893738/taichi-a.webp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0005/881168/zam-suan-mung.we: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/890758/tharaya-poo.webp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0009/825768/jasper.webp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/courses/doctor-of-philosophy — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/doctor-of-philosophy (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/courses/doctor-of-philosophy
+[status] [extract] ✅ [PASS 100/100] Doctor of Philosophy (Phd) | doctor-of-philosophy
+[status] [extract] [EXTRACT] 13/33: Faculty Postgraduate Contacts
+[progress] [extract] Fetching 13/33: Faculty Postgraduate Contacts
+[status] [extract] [FIELD SUMMARY] Faculty Postgraduate Contacts
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['March']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [GP-DEBUG] static=63508B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/research/faculty-postgraduate-contacts → 0 field(s) (cost=$0.000000, in=2593 out=0) SKIP='circuit_open'
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/research/faculty-postgraduate-contacts
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/semester-dates — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/semester-dates (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/international/study-options-for-international-students — moving on
+[status] [fallback] [VISION] 3 candidate image(s) found — starting OCR pass
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/semester-dates
+[status] [extract] [WARN] Semester Dates — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 45/100] Semester Dates — missing: english, duration, mode | semester-dates
+[status] [extract] [EXTRACT] 14/33: Academic Departments
+[progress] [extract] Fetching 14/33: Academic Departments
+[status] [extract] [FIELD SUMMARY] Academic Departments
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ❌ not found
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/1117677/women-in-tech-a: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/research/faculty-postgraduate-contacts — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/research/faculty-postgraduate-contacts (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=60278B rendered=0B using=static text_len=2153
+[status] [extract] [GP-DEBUG] text[:500]='Academic departments At AUT, our teaching and research is conducted across a range of academic departments – from marine biology and radio astronomy to economics and public health. Architecture and built environment Architecture and built environment Art and design Art and design Business Accounting department Economics and Finance department Management, Technology and Organisation department Marketing and International Business department Communication studies Advertising and Brand Creativity d'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": null,\n  "mode": "On Campus",\n  "intake_text": null,\n  "location_text": nu'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/research/academic-departments → 1 field(s) (cost=$0.000179, in=1973 out=102)
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/research/academic-departments
+[status] [fallback] [per-course vision img 2/6] https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students — IELTS=7.0 PTE=65.0 TOEFL=95.0 CAE=185.0
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0016/1116016/AUT-CiCi-White.: Gemini skipped — None (likely quota exhausted)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/returning-to-study-information-for-adult-students
+[status] [extract] [WARN] Information for Adult Learners — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Information for Adult Learners — missing: duration, intake | returning-to-study-information-for-adult
+[status] [extract] [EXTRACT] 15/33: Postgraduate Student Support
+[progress] [extract] Fetching 15/33: Postgraduate Student Support
+[status] [extract] [FIELD SUMMARY] Postgraduate Research Student Support
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ❌ not found
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/research/faculty-postgraduate-contacts
+[status] [extract] [WARN] Faculty Postgraduate Contacts — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 45/100] Faculty Postgraduate Contacts — missing: english, duration, mode | faculty-postgraduate-contacts
+[status] [extract] [EXTRACT] 16/33: Cross Credit Your Experience Recognition Of Prior Learning
+[progress] [extract] Fetching 16/33: Cross Credit Your Experience Recognition Of Prior Learning
+[status] [extract] [FIELD SUMMARY] Cross-credit Your Experience: Recognition of Prior
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['December', 'May']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [GP-DEBUG] static=66420B rendered=0B using=static text_len=5005
+[status] [extract] [GP-DEBUG] text[:500]='Postgraduate research student support As a postgraduate research student at AUT you have access to a range of support and resources, including postgraduate study spaces, events and researcher development activities. In addition to this dedicated support for postgraduate research students, you can also make use of the support services for all AUT students. In this section: Developing your research skills Postgraduate student community Postgraduate student events Postgraduate forms, policies and p'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": null,\n  "mode": "On Campus",\n  "intake_text": null,\n  "location_text": "C'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/research/postgraduate-student-support → 2 field(s) (cost=$0.000233, in=2688 out=104)
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/research/postgraduate-student-support
+[status] [fallback] [per-course vision img 3/3] https://www.aut.ac.nz/international/study-options-for-international-students — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/international/study-options-for-international-students (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [GP-DEBUG] static=62689B rendered=0B using=static text_len=4590
+[status] [extract] [GP-DEBUG] text[:500]="Cross-credit your experience: recognition of prior learning (RPL) Your experience matters here. Recognition of prior learning (RPL) means you can get credit for what you already know – whether you learned it at another institution, on the job, or through life. Here's what you need to know about applying. Types of RPL you can apply for Formal recognition of prior learning Formal recognition of prior learning gives you credit towards your current AUT programme for papers that you completed in anot"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": 100.00,\n  "fee_term": "Per application",\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Recognition of Prior Learning",\n  "category": "Education",\n  "mode": "On Camp'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/entry-requirements/cross-credit- → 4 field(s) (cost=$0.000229, in=2596 out=114)
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/international/study-options-for-international-students
+[status] [extract] [WARN] Study Options for International Students — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 55/100] Study Options for International Students — missing: english, duration | study-options-for-international-students
+[status] [extract] [EXTRACT] 17/33: Bachelor of Architecture and Future Environments
+[progress] [extract] Fetching 17/33: Bachelor of Architecture and Future Environments
+[status] [extract] [FIELD SUMMARY] Bachelor of Architecture and Future Environments
+  Fee: ✅ '47121' [regex conf=1.00]
+  IELTS: ✅ '6.0' [regex conf=0.85]
+  Duration: ✅ '3.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [GP-DEBUG] static=88344B rendered=0B using=static text_len=9240
+[status] [extract] [GP-DEBUG] text[:500]='Bachelor of Architecture and Future Environments Study the Bachelor of Architecture and Future Environments, and learn to prepare and present building design projects of varying scales and complexity. Architecture focuses on the relationship between people and their environments. Study architecture at AUT and gain an understanding of the critical, ethical, aesthetic, social cultural and technological components of architecture and the design of sustainable future environments. You’ll develop a c'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 47121.60,\n  "domestic_fee": 9411.60,\n  "fee_term": "Full Course",\n  "duration_value": 3,\n  "duration_unit": "years",\n  "duration_text": "3 years full-time",\n  "ielts_overall": 6.0,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Architecture",\n  "category": "Built Environment",\n  "mode": "O'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/architecture-and-b → 15 field(s) (cost=$0.000318, in=3766 out=119)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/research/academic-departments — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/research/academic-departments (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0017/1054610/kahu.webp: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/research/postgraduate-student-support — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning — moving on
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning (missing: international_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/research/academic-departments
+[status] [extract] [WARN] Academic Departments — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 25/100] Academic Departments — missing: english, duration, intake, mode | academic-departments
+[status] [extract] [EXTRACT] 18/33: Bachelor of Construction
+[progress] [extract] Fetching 18/33: Bachelor of Construction
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/entry-requirements/cross-credit-your-experience-recognition-of-prior-learning
+[status] [extract] [WARN] Cross-credit Your Experience: Recognitio — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 55/100] Cross-credit Your Experience: Recognition of Prior — missing: english, duration | cross-credit-your-experience-recognition
+[status] [extract] [EXTRACT] 19/33: Graduate Diploma in Architecture
+[progress] [extract] Fetching 19/33: Graduate Diploma in Architecture
+[status] [fallback] [per-course vision img 3/6 (cache hits 3)] https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-architecture-and-future-environments — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-architecture-and-future-environments (missing: none)
+[status] [extract] [FIELD SUMMARY] Bachelor of Construction
+  Fee: ✅ '47521' [regex conf=1.00]
+  IELTS: ✅ '6.0' [regex conf=0.85]
+  Duration: ✅ '3.0' [regex conf=0.75]
+  Intake: ✅ "['July', 'February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FIELD SUMMARY] Graduate Diploma in Architecture
+  Fee: ✅ '47121' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-architecture-and-future-environments: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-architecture-and-future-environments
+[status] [classify] [CATEGORY det] Bachelor of Architecture and Future Envi → Architecture, Building & Design / Architecture
+[status] [extract] ✅ [PASS 90/100] Bachelor of Architecture and Future Environments — missing: mode | bachelor-of-architecture-and-future-envi
+[status] [extract] [EXTRACT] 20/33: Master of Architecture (Professional)
+[progress] [extract] Fetching 20/33: Master of Architecture (Professional)
+[status] [extract] [GP-DEBUG] static=89953B rendered=0B using=static text_len=8887
+[status] [extract] [GP-DEBUG] text[:500]="Bachelor of Construction Want a career as a construction manager or a quantity surveyor? Study the Bachelor of Construction at AUT. Develop robust, industry-relevant skills for careers as a construction manager or quantity surveyor with AUT's Bachelor of Construction. Both roles are vital in delivering time-sensitive construction projects in a cost-effective and safe manner. The degree emphasises the key skills required by the construction sector, ensuring that you’ll be well-prepared for your p"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 47521.60,\n  "domestic_fee": 9411.60,\n  "fee_term": "Full Course",\n  "duration_value": 3,\n  "duration_unit": "years",\n  "duration_text": "3 years full-time",\n  "ielts_overall": 6.0,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Construction Management",\n  "category": "Built Environment",\n '
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/architecture-and-b → 15 field(s) (cost=$0.000313, in=3671 out=125)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [GP-DEBUG] static=73492B rendered=0B using=static text_len=3722
+[status] [extract] [GP-DEBUG] text[:500]='Graduate Diploma in Architecture Study the Graduate Diploma in Architecture to prepare yourself for further study in the Master of Architecture (Professional). This programme is for students who want to gain entry into the Master of Architecture (Professional) but may not have a bachelor’s degree in architecture. In just one year you study a range of architecture courses, and prepare yourself for further study in the Master Architecture (Professional). Brochure How to apply Apply now Download pr'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 47121.60,\n  "domestic_fee": 9411.60,\n  "fee_term": "Full Course",\n  "duration_value": 1,\n  "duration_unit": "years",\n  "duration_text": "1 year full-time",\n  "ielts_overall": 6.5,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Architecture",\n  "category": "Built Environment",\n  "mode": "On'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/architecture-and-b → 15 field(s) (cost=$0.000214, in=2382 out=119)
+[status] [fallback] [VISION] 2 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/2 (cache hits 2)] https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/graduate-diploma-in-architecture — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/graduate-diploma-in-architecture (missing: none)
+[status] [extract] [FIELD SUMMARY] Master of Architecture (Professional)
+  Fee: ✅ '46621' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '2.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/graduate-diploma-in-architecture: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/graduate-diploma-in-architecture
+[status] [classify] [CATEGORY det] Graduate Diploma in Architecture → Architecture, Building & Design / Architecture
+[status] [extract] ✅ [PASS 90/100] Graduate Diploma in Architecture — missing: mode | graduate-diploma-in-architecture
+[status] [extract] [EXTRACT] 21/33: Master of Architectural Design Management
+[progress] [extract] Fetching 21/33: Master of Architectural Design Management
+[status] [extract] [GP-DEBUG] static=80637B rendered=0B using=static text_len=7123
+[status] [extract] [GP-DEBUG] text[:500]='Master of Architecture (Professional) Already have a degree in architecture? Study the Master of Architecture (Professional) to prepare yourself for a career as a registered architect. Architecture focuses on the relationship between people and their environments. Study architecture at AUT and gain an understanding of the critical, ethical, aesthetic, social cultural and technological components of architecture and the design of sustainable future environments. The programme is professionally ac'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 46621.60,\n  "domestic_fee": 11851.60,\n  "fee_term": "Full Course",\n  "duration_value": 2,\n  "duration_unit": "years",\n  "duration_text": "2 years full-time",\n  "ielts_overall": 6.5,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Architecture",\n  "category": "Built Environment",\n  "mode": "'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/architecture-and-b → 15 field(s) (cost=$0.000278, in=3233 out=119)
+[status] [fallback] [VISION] 4 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/4 (cache hits 4)] https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architecture-professional — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architecture-professional (missing: none)
+[status] [extract] [FIELD SUMMARY] Master of Architectural Design Management
+  Fee: ✅ '52321' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['July']" [regex conf=0.40]
+  StudyMode: ✅ 'On Campus' [study_mode:rule conf=0.70]
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architecture-professional: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architecture-professional
+[status] [classify] [CATEGORY det] Master of Architecture (Professional) → Architecture, Building & Design / Architecture
+[status] [extract] ✅ [PASS 90/100] Master of Architecture (Professional) — missing: mode | master-of-architecture-professional
+[status] [extract] [EXTRACT] 22/33: Master of Construction Management
+[progress] [extract] Fetching 22/33: Master of Construction Management
+[status] [extract] [FIELD SUMMARY] Master of Construction Management
+  Fee: ✅ '52321' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['July', 'February']" [regex conf=0.70]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[status] [extract] [GP-DEBUG] static=85344B rendered=0B using=static text_len=9142
+[status] [extract] [GP-DEBUG] text[:500]='Master of Architectural Design Management Gain the skills to manage the design phases of major construction projects in just one year with AUT’s Master of Architectural Design Management. As construction projects become more complex, professionals who can manage the design of these projects are in high demand. The only programme of its kind in New Zealand, the one-year Master of Architectural Design Management prepares you for this sought-after career at the early stages of construction projects'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 52321.60,\n  "domestic_fee": 11851.60,\n  "fee_term": "Full Course",\n  "duration_value": 1,\n  "duration_unit": "years",\n  "duration_text": "1 year full-time",\n  "ielts_overall": 6.5,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Architectural Design Management",\n  "category": "Built Environ'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/architecture-and-b → 15 field(s) (cost=$0.000317, in=3739 out=122)
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architectural-design-management (missing: none)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architectural-design-management: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/master-of-architectural-design-management
+[status] [extract] ✅ [PASS 100/100] Master of Architectural Design Management | master-of-architectural-design-managemen
+[status] [extract] [EXTRACT] 23/33: Master of Engineering Project Management
+[progress] [extract] Fetching 23/33: Master of Engineering Project Management
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/785617/hana_malak.jpg: Gemini skipped — None (likely quota exhausted)
+[status] [extract] [FIELD SUMMARY] Master of Engineering Project Management
+  Fee: ✅ '50321' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['July', 'February']" [regex conf=0.70]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.70]
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/engineering-comput → classification_only cat='?' (cost=$0.000044)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 5/6] https://www.aut.ac.nz/research/postgraduate-student-support — IELTS=6.5 PTE=58.0 TOEFL=80.0 CAE=176.0
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/research/postgraduate-student-support (missing: international_fee, domestic_fee, duration_text, intake_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/research/postgraduate-student-support
+[status] [extract] [WARN] Postgraduate Research Student Support — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 60/100] Postgraduate Research Student Support — missing: duration, intake | postgraduate-student-support
+[status] [extract] [EXTRACT] 24/33: Master of Philosophy
+[progress] [extract] Fetching 24/33: Master of Philosophy
+[status] [extract] [FIELD SUMMARY] Master of Philosophy
+  Fee: ✅ '46521' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['November', 'February', 'Apri" [regex conf=0.70]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/1049709/marwa-s.webp: Gemini skipped — None (likely quota exhausted)
+[status] [extract] [GP-DEBUG] static=77066B rendered=0B using=static text_len=6681
+[status] [extract] [GP-DEBUG] text[:500]="Master of Philosophy The Master of Philosophy (MPhil) degree is a one-year, research-only master's degree. The Master of Philosophy enables you to expand your research capabilities by focusing on a particular area of interest, under the supervision of AUT's expert academic staff. It can provide a pathway to more advanced research at doctoral level. Explore our research expertise AUT's academic supervisors are recognised world-class researchers who have the expert knowledge in their fields to gui"
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": 46521.60,\n  "domestic_fee": 9623.60,\n  "fee_term": "Full Course",\n  "duration_value": 1,\n  "duration_unit": "years",\n  "duration_text": "1 year full-time",\n  "ielts_overall": 6.5,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Philosophy",\n  "category": "Arts & Humanities",\n  "mode": "On C'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/master-of-philosophy → 15 field(s) (cost=$0.000272, in=3105 out=130)
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/master-of-philosophy (missing: none)
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/engineering-comput → classification_only cat='?' (cost=$0.000045)
+[status] [fallback] [VISION] 4 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/997882/rodel-casem.webp: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [per-course vision img 5/6 (cache hits 1)] https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-construction — IELTS=6.5 PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-construction (missing: none)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/997882/rodel-casem.webp: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [per-course vision img 2/4 (cache hits 2)] https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-engineering-project-management — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-engineering-project-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [per-course vision img 3/6 (cache hits 3)] https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-construction-management — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-construction-management (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Brisbane, Auckland' method=none url=https://www.aut.ac.nz/study/study-options/architecture-and-built-environment/courses/bachelor-of-construction
+[status] [classify] [CATEGORY det] Bachelor of Construction → Architecture, Building & Design / Construction
+[status] [extract] ✅ [PASS 90/100] Bachelor of Construction — missing: mode | bachelor-of-construction
+[status] [extract] [EXTRACT] 25/33: Bachelor of Engineering (Honours) in Architectural Engineering
+[progress] [extract] Fetching 25/33: Bachelor of Engineering (Honours) in Architectural Engineering
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-engineering-project-management: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-engineering-project-management
+[status] [classify] [CATEGORY det] Master of Engineering Project Management → Business & Management / Project Management
+[status] [extract] ✅ [PASS 100/100] Master of Engineering Project Management | master-of-engineering-project-management
+[status] [extract] [EXTRACT] 26/33: Bachelor of Engineering (Honours) in Civil Construction Engineering
+[progress] [extract] Fetching 26/33: Bachelor of Engineering (Honours) in Civil Construction Engineering
+[status] [extract] [FIELD SUMMARY] Architectural Engineering Major - Bachelor of Engi
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ✅ '2.0' [regex conf=0.75]
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FIELD SUMMARY] Civil Construction Engineering Major - Bachelor of
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ✅ '2.0' [regex conf=0.75]
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/courses/master-of-philosophy: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/courses/master-of-philosophy
+[status] [extract] ✅ [PASS 100/100] Master of Philosophy | master-of-philosophy
+[status] [extract] [EXTRACT] 27/33: Bachelor of Design Te Tohu Paetahi mō te Hoahoa in Spatial Design
+[progress] [extract] Fetching 27/33: Bachelor of Design Te Tohu Paetahi mō te Hoahoa in Spatial Design
+[status] [extract] [FIELD SUMMARY] Spatial and Interior Design Major - Bachelor of De
+  Fee: ❌ not found
+  IELTS: ❌ not found
+  Duration: ❌ not found
+  Intake: ✅ "['May']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [GP-DEBUG] static=90660B rendered=0B using=static text_len=13
+[status] [extract] [GP-DEBUG] text[:500]='Close enquire'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Spatial Design",\n  "category": "Built Environment",\n  "mode": "On Campus",\n  "intake_text": '
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-pae → 3 field(s) (cost=$0.000141, in=1450 out=108)
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa/spatial-design-major
+[status] [extract] [GP-DEBUG] static=81455B rendered=0B using=static text_len=8641
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-construction-management: fee_currency, duration_value, duration_unit
+[status] [extract] [GP-DEBUG] text[:500]='Civil Construction Engineering Major - Bachelor of Engineering (Honours) Study the Civil Construction Engineering major in the Bachelor of Engineering (Honours) degree and learn to build quality structures that enhance our living and working environments. Designing safe, cost effective and environmentally sustainable buildings and infrastructure is essential to our society. Professional civil engineers and construction engineers are involved with the design, planning and construction of the phys'
+[status] [extract] [FIELD TRACE] study_mode='Online' location='Auckland, New Zealand' method=study_mode:rule url=https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences/courses/master-of-construction-management
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 4,\n  "duration_unit": "years",\n  "duration_text": "4",\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Construction Engineering",\n  "category": "Engineering",\n  "mode": "On Campus",\n  "intake_text'
+[status] [classify] [CATEGORY det] Master of Construction Management → Architecture, Building & Design / Construction
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/bachelor-of-engineering-honour → 8 field(s) (cost=$0.000303, in=3606 out=109)
+[status] [extract] ✅ [PASS 100/100] Master of Construction Management | master-of-construction-management
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/construction-engineering-major
+[status] [extract] [EXTRACT] 28/33: Bachelor of Design Te Tohu Paetahi mō te Hoahoa
+[progress] [extract] Fetching 28/33: Bachelor of Design Te Tohu Paetahi mō te Hoahoa
+[status] [extract] [GP-DEBUG] static=79183B rendered=0B using=static text_len=8181
+[status] [extract] [GP-DEBUG] text[:500]='Architectural Engineering Major - Bachelor of Engineering (Honours) Study the Architectural Engineering major in the Bachelor of Engineering (Honours) degree and develop the skills to engineer for high-quality buildings. Businesses, tenants and homeowners expect more from the buildings they work and live in. They want buildings that are energy efficient and more sustainable, comfortable to live and work in, offer more services and are fit for purpose, now and in the future. Architectural enginee'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": 4,\n  "duration_unit": "years",\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": "Architectural Engineering",\n  "category": "Engineering",\n  "mode": "On Campus",\n  "intake_te'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/bachelor-of-engineering-honour → 7 field(s) (cost=$0.000295, in=3491 out=110)
+[status] [fallback] [per-course browser ↻] https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/architectural-engineering-major
+[status] [extract] [FIELD SUMMARY] Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa
+  Fee: ✅ '43521' [regex conf=1.00]
+  IELTS: ✅ '6.0' [regex conf=0.85]
+  Duration: ✅ '3.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [extract] [GP-DEBUG] static=98200B rendered=0B using=static text_len=13
+[status] [extract] [GP-DEBUG] text[:500]='Close enquire'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": null,\n  "mode": "On Campus",\n  "intake_text": null,\n  "location_text": nu'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-pae → 1 field(s) (cost=$0.000139, in=1445 out=102)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0012/985881/hamish-berry.web: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa/spatial-design-major — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/construction-engineering-major — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] timeout: per-course browser exceeded 60s on https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/architectural-engineering-major — moving on
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/136272/spatial-design-c: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0019/136441/NEW-Architectura: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/1103785/falo-fifita.web: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [extract] [FALLBACK] AI filled 3 field(s) on https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa: fee_currency, duration_value, duration_unit
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa
+[status] [extract] ✅ [PASS 100/100] Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa | bachelor-of-design-te-tohu-paetahi-mo-te
+[status] [extract] [EXTRACT] 29/33: Bachelor of Visual Arts Te Tohu Paetahi mō Toi Ataata
+[progress] [extract] Fetching 29/33: Bachelor of Visual Arts Te Tohu Paetahi mō Toi Ataata
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0009/867690/yu-zhou.webp: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [extract] [FIELD SUMMARY] Bachelor of Visual Arts Te Tohu Paetahi Mō Toi Ata
+  Fee: ✅ '43121' [regex conf=1.00]
+  IELTS: ✅ '6.0' [regex conf=0.85]
+  Duration: ✅ '3.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ✅ 'Online' [study_mode:rule conf=0.50]
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/912216/spatial-02.jpg: Gemini skipped — 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}} (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/912217/spatial-03.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0005/912218/spatial-04.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0006/912219/spatial-05.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa/spatial-design-major — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa/spatial-design-major (missing: international_fee, domestic_fee, ielts_overall, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/courses/bachelor-of-design-te-tohu-paetahi-mo-te-hoahoa/spatial-design-major
+[status] [classify] [CATEGORY det] Spatial and Interior Design Major - Bach → Architecture, Building & Design / Interior Design
+[status] [extract] [WARN] Spatial and Interior Design Major - Bach — Fee section detected but fee is blank
+[status] [extract] ❌ [LOW 55/100] Spatial and Interior Design Major - Bachelor of De — missing: english, duration | spatial-design-major
+[status] [extract] [EXTRACT] 30/33: Master of Design
+[progress] [extract] Fetching 30/33: Master of Design
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/file/0006/791286/allan-hakizimana.: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0010/869716/liam-morell.webp: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/1103785/falo-fifita.web: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/file/0006/791286/allan-hakizimana.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 6/6] https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/construction-engineering-major — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/construction-engineering-major (missing: international_fee, domestic_fee, ielts_overall, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/construction-engineering-major
+[status] [classify] [CATEGORY det] Civil Construction Engineering Major - B → Architecture, Building & Design / Construction
+[status] [extract] [WARN] Civil Construction Engineering Major - B — Fee section detected but fee is blank
+[status] [extract] ⚠️ [WARN 65/100] Civil Construction Engineering Major - Bachelor of — missing: english, mode | construction-engineering-major
+[status] [extract] [EXTRACT] 31/33: Master of Visual Arts
+[progress] [extract] Fetching 31/33: Master of Visual Arts
+[status] [extract] [GP-DEBUG] static=98573B rendered=0B using=static text_len=13
+[status] [extract] [GP-DEBUG] text[:500]='Close enquire'
+[status] [extract] [GP-DEBUG] raw_response='```json\n{\n  "international_fee": null,\n  "domestic_fee": null,\n  "fee_term": null,\n  "duration_value": null,\n  "duration_unit": null,\n  "duration_text": null,\n  "ielts_overall": null,\n  "pte_overall": null,\n  "toefl_overall": null,\n  "cambridge_overall": null,\n  "duolingo_overall": null,\n  "sub_category": null,\n  "category": "Arts & Humanities",\n  "mode": "On Campus",\n  "intake_text": null,\n  "loc'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/art-and-design/cou → 2 field(s) (cost=$0.000140, in=1448 out=105)
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0011/910982/1-2.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/910984/2-2.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0006/910986/3-2.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [extract] [FIELD SUMMARY] Master of Design
+  Fee: ✅ '47021' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.5' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/910987/4-2.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [extract] [GP-DEBUG] static=105567B rendered=0B using=static text_len=?
+[status] [extract] [FIELD SUMMARY] Master of Visual Arts
+  Fee: ✅ '47021' [regex conf=1.00]
+  IELTS: ✅ '6.5' [regex conf=0.85]
+  Duration: ✅ '1.5' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [GP-DEBUG] static=88260B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/art-and-design/cou → 0 field(s) (cost=$0.000000, in=5053 out=0) SKIP='circuit_open'
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [fallback] [VISION] 6 candidate image(s) found — starting OCR pass
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/art-and-design/cou → 0 field(s) (cost=$0.000000, in=3206 out=0) SKIP='circuit_open'
+[status] [fallback] [VISION] 4 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/882925/hope-manaa-korew: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 5/6 (cache hits 1)] https://www.aut.ac.nz/study/study-options/art-and-design/courses/bachelor-of-visual-arts — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/art-and-design/courses/bachelor-of-visual-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode='On Campus' location='Auckland, Hamilton, New Zealand' method=study_mode:location_derived url=https://www.aut.ac.nz/study/study-options/art-and-design/courses/bachelor-of-visual-arts
+[status] [extract] ✅ [PASS 100/100] Bachelor of Visual Arts Te Tohu Paetahi Mō Toi Ata | bachelor-of-visual-arts
+[status] [extract] [EXTRACT] 32/33: Diploma in Design Tītohu mō te Hoahoa
+[progress] [extract] Fetching 32/33: Diploma in Design Tītohu mō te Hoahoa
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/882925/hope-manaa-korew: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 1/4 (cache hits 3)] https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-visual-arts — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-visual-arts (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-visual-arts
+[status] [extract] ✅ [PASS 90/100] Master of Visual Arts — missing: mode | master-of-visual-arts
+[status] [extract] [EXTRACT] 33/33: Diploma in Visual Arts Tītohu mō te Toi Ataata
+[progress] [extract] Fetching 33/33: Diploma in Visual Arts Tītohu mō te Toi Ataata
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0003/92919/Master-of-Design-: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0009/867690/yu-zhou.webp: Gemini skipped — None (likely quota exhausted)
+[status] [fallback] [per-course vision img 3/6 (cache hits 3)] https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/architectural-engineering-major — IELTS=7.0 PTE=— TOEFL=90.0 CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/architectural-engineering-major (missing: international_fee, domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/courses/bachelor-of-engineering-honours/architectural-engineering-major
+[status] [extract] [WARN] Architectural Engineering Major - Bachel — Fee section detected but fee is blank
+[status] [extract] ✅ [PASS 90/100] Architectural Engineering Major - Bachelor of Engi — missing: mode | architectural-engineering-major
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/92983/MDes-Virtual-Prod: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0008/93077/Andrew-Lowe.jpg: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0007/92932/MDes-Textile-Desi: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0008/906164/kritteka-gregoy.: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 5/6 (cache hits 1)] https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-design — IELTS=7.0 PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/art-and-design/courses/master-of-design
+[status] [extract] ✅ [PASS 90/100] Master of Design — missing: mode | master-of-design
+[status] [extract] [FIELD SUMMARY] Diploma in Visual Arts Tītohu Mō Te Toi Ataata
+  Fee: ✅ '43121' [regex conf=1.00]
+  IELTS: ✅ '5.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [FIELD SUMMARY] Diploma in Design Tītohu Mō Te Hoahoa
+  Fee: ✅ '43521' [regex conf=1.00]
+  IELTS: ✅ '5.5' [regex conf=0.85]
+  Duration: ✅ '1.0' [regex conf=0.75]
+  Intake: ✅ "['February']" [regex conf=0.40]
+  StudyMode: ❌ not found
+[status] [extract] [GP-DEBUG] static=80210B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] static=77611B rendered=0B using=static text_len=?
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] text[:500]=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GP-DEBUG] raw_response=''
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/art-and-design/cou → 0 field(s) (cost=$0.000000, in=3090 out=0) SKIP='circuit_open'
+[status] [extract] [GEMINI] https://www.aut.ac.nz/study/study-options/art-and-design/cou → 0 field(s) (cost=$0.000000, in=2932 out=0) SKIP='circuit_open'
+[status] [fallback] [VISION] 4 candidate image(s) found — starting OCR pass
+[status] [fallback] [VISION] 2 candidate image(s) found — starting OCR pass
+[status] [fallback] [per-course vision img 0/2 (cache hits 2)] https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-visual-arts-titohu-mo-te-toi-ataata — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-visual-arts-titohu-mo-te-toi-ataata (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-visual-arts-titohu-mo-te-toi-ataata
+[status] [extract] ✅ [PASS 90/100] Diploma in Visual Arts Tītohu Mō Te Toi Ataata — missing: mode | diploma-in-visual-arts-titohu-mo-te-toi-
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/946471/jess-mcdonalds.w: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [VISION FAIL] https://www.aut.ac.nz/__data/assets/image/0004/946471/jess-mcdonalds.w: Gemini skipped — circuit_open (likely quota exhausted)
+[status] [fallback] [per-course vision img 2/4 (cache hits 2)] https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-design — IELTS=— PTE=— TOEFL=— CAE=—
+[status] [extract] [FALLBACK] AI enriching https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-design (missing: domestic_fee, duration_text, intake_text, location_text)
+[status] [extract] [FIELD TRACE] study_mode=None location='Auckland, New Zealand' method=none url=https://www.aut.ac.nz/study/study-options/art-and-design/courses/diploma-in-design
+[status] [extract] ✅ [PASS 90/100] Diploma in Design Tītohu Mō Te Hoahoa — missing: mode | diploma-in-design
+[status] [extract] [EXTRACT] [sibling cache ↻ build unknown] ielts_listening=7.0 ielts_overall=7.0 ielts_reading=7.0 ielts_speaking=7.0 ielts_writing=6.5
+[status] [extract] [EXTRACT] [sibling cache ↻ build undergraduate] ielts_listening=7.0 ielts_overall=6.0 ielts_reading=6.5 ielts_speaking=7.0 ielts_writing=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ build postgraduate] ielts_listening=6.0 ielts_overall=6.5 ielts_reading=6.0 ielts_speaking=6.0 ielts_writing=6.0
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill unknown] 45 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill undergraduate] 36 slot(s) filled across siblings
+[status] [extract] [EXTRACT] [sibling cache ↻ backfill postgraduate] 42 slot(s) filled across siblings
+[status] [stage] [STAGE] skipped Aut Courses and Study Options: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Compare Aut Bachelor's Degrees: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Entry Requirements: rejected: category_landing_page
+[status] [stage] [STAGE] skipped University Entrance (Ue) for Bachelor's Degrees: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Postgraduate Entry Requirements: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Changing My Enrolment: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Information for Career Advisors: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Information for Parents and Whānau: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Information for Adult Learners: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Semester Dates: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Study Options for International Students: rejected: category_landing_page
+[status] [stage] [STAGE] saved: Doctor of Philosophy (Phd)
+[status] [stage] [STAGE] skipped Faculty Postgraduate Contacts: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Academic Departments: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Postgraduate Research Student Support: rejected: category_landing_page
+[status] [stage] [STAGE] skipped Cross-credit Your Experience: Recognition of Prior Learning (Rpl): rejected: category_landing_page
+[status] [stage] [STAGE] saved: Bachelor of Architecture and Future Environments
+[status] [stage] [STAGE] saved: Bachelor of Construction
+[status] [stage] [STAGE] saved: Graduate Diploma in Architecture
+[status] [stage] [STAGE] saved: Master of Architecture (Professional)
+[status] [stage] [STAGE] saved: Master of Architectural Design Management
+[status] [stage] [STAGE] skipped Master of Construction Management: rejected: online_only
+[status] [stage] [STAGE] skipped Master of Engineering Project Management: rejected: online_only
+[status] [stage] [STAGE] saved: Master of Philosophy
+[status] [stage] [STAGE] skipped Architectural Engineering Major - Bachelor of Engineering (Honours): rejected: category_landing_page
+[status] [stage] [STAGE] skipped Civil Construction Engineering Major - Bachelor of Engineering (Honours): rejected: category_landing_page
+[status] [stage] [STAGE] skipped Spatial and Interior Design Major - Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa: rejected: category_landing_page
+[status] [stage] [STAGE] saved: Bachelor of Design Te Tohu Paetahi Mō Te Hoahoa
+[status] [stage] [STAGE] saved: Bachelor of Visual Arts Te Tohu Paetahi Mō Toi Ataata
+[status] [stage] [STAGE] saved: Master of Design
+[status] [stage] [STAGE] saved: Master of Visual Arts
+[status] [stage] [STAGE] saved: Diploma in Design Tītohu Mō Te Hoahoa
+[status] [stage] [STAGE] saved: Diploma in Visual Arts Tītohu Mō Te Toi Ataata
+[status] [complete] [DATA QUALITY] 33 course(s) checked — 0 critical / 47 warning / 21 info
+[status] [complete] [DATA QUALITY][WARN] missing_degree_level × 13: Degree level not extracted. (and 12 more)
+[status] [complete] [DATA QUALITY][WARN] missing_duration × 16: Duration not extracted. (and 15 more)
+[status] [complete] [DATA QUALITY][WARN] missing_international_fee_central_page × 18: International fee absent — marked for central fee page review. (and 17 more)
+[status] [complete] [GEMINI] Total cost: $0.0035 USD across 13 course(s) (~$0.00027/course)
+[status] [complete] [TIMING] Total: 10m 4s | Courses: 13 | Avg: 46.5s/course | Concurrency: HTTP=4 Browser=10
+[done] [complete] ══ DONE ══ Found:36 | Staged:13 | Skipped:20 (rejected:_category_landing_page=18, rejected:_online_only=2) | Errors:0
+[status] [complete] Staged 13 courses, 20 skipped, 0 fetch errors
