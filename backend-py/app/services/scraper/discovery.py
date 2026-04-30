@@ -517,6 +517,14 @@ _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
     # is the lowest-cost fix: CDU's sitemap contains direct course page URLs.
     "www.cdu.edu.au",
     "cdu.edu.au",
+    # AUT: has ~12 study-area faculties. The BFS start_url (/study) links to
+    # both faculty listing pages AND info pages (entry requirements, semester
+    # dates, parents info, etc.). In practice the BFS burns the 25-page budget
+    # on info pages before it can visit all faculty listing pages — only the
+    # first two alphabetically (architecture, art-design) are reached. The
+    # sitemap supplement catches all remaining courses across all faculties.
+    "www.aut.ac.nz",
+    "aut.ac.nz",
 })
 
 
@@ -526,6 +534,7 @@ async def discover_course_links(
     max_pages: int = 25,
     max_courses: int = 200,
     emit=None,
+    _blocked_fee_urls_sink: list | None = None,
 ) -> list[dict]:
     """BFS crawl from ``start_url`` with rule-based page-type classification
     and a sitemap fallback when the crawl yields too few candidates.
@@ -650,6 +659,46 @@ async def discover_course_links(
             if _seed not in visited:
                 queue.append((_seed, 0))
 
+    # AUT (Auckland University of Technology): the BFS start_url is /study
+    # which links to both faculty listing pages (architecture, art-design,
+    # business, health, etc.) AND general info pages (entry requirements,
+    # semester dates, parents info, returning students, etc.).  Because the
+    # queue is FIFO, info pages found on the start page get visited before
+    # the faculty listing pages, consuming most of the 25-page budget.  In
+    # the worst case only 2 of 12 faculties are reached (architecture and
+    # art-design — the first two alphabetically on the listing).
+    #
+    # Fix: pre-seed the study-options hub AND all known faculty listing
+    # pages so they sit at positions 2-N in the initial queue.  After the
+    # start URL is visited, these seeds are already queued and will be
+    # processed BEFORE any further info pages discovered from start_url.
+    # Non-existent slugs (404) will be skipped by the fetch-fail path
+    # without consuming significant time.
+    _aut_hosts = ("www.aut.ac.nz", "aut.ac.nz")
+    if parsed.netloc in _aut_hosts:
+        _aut_base = f"{parsed.scheme}://{parsed.netloc}/study/study-options"
+        _aut_faculties = (
+            "",                                # hub page itself (/study/study-options)
+            "architecture-and-built-environment",
+            "art-and-design",
+            "business",
+            "computer-mathematical-sciences",
+            "education",
+            "engineering",
+            "health",
+            "hospitality-tourism-and-events",
+            "language-and-culture",
+            "law",
+            "maori-and-indigenous-advancement",
+            "science",
+            "sport-and-recreation",
+            "communication-studies",
+        )
+        for _fac in _aut_faculties:
+            _aut_seed = f"{_aut_base}/{_fac}" if _fac else _aut_base
+            if _aut_seed not in visited:
+                queue.append((_aut_seed, 0))
+
     if emit:
         await emit(
             "status",
@@ -691,6 +740,12 @@ async def discover_course_links(
                     kind="page_blocked",
                     reason=_block_reason,
                 )
+            # Bug 7: when discovery blocks a fee_page URL, pass it back to
+            # the caller so it can be used as a central-fee-parser candidate
+            # instead of being silently discarded.  The caller supplies an
+            # empty list as `_blocked_fee_urls_sink`; we append here.
+            if _block_reason == "fee_page" and _blocked_fee_urls_sink is not None:
+                _blocked_fee_urls_sink.append(url)
             continue
 
         # Discovery-level fetch: one shot (retries=0) so that this loop —
