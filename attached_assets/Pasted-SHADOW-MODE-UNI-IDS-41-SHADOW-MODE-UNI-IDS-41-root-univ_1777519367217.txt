@@ -1,0 +1,69 @@
+SHADOW_MODE_UNI_IDS=41
+SHADOW_MODE_UNI_IDS=41
+root@university-and-course-data:~/University-and-Course-data# # Wait for the scrape to finish, then check the report
+ls -la backend-py/shadow_reports/
+
+cat backend-py/shadow_reports/$(ls -t backend-py/shadow_reports/*.json | head -1 | xargs basename) \
+  | python3 -m json.tool | grep -E "is_clean|summary|clean_streak|matched"
+total 20
+drwxr-xr-x  2 root root  4096 Apr 30 03:15 .
+drwxr-xr-x 13 root root  4096 Apr 30 03:09 ..
+-rw-r--r--  1 root root     0 Apr 30 03:09 .gitkeep
+-rw-r--r--  1 root root 12063 Apr 30 03:15 20260430031517_acap_41_run001.json
+    "is_clean": false,
+    "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+    "clean_streak": 0,
+        "is_clean": false,
+        "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+        "matched": 0,
+root@university-and-course-data:~/University-and-Course-data# cat /etc/systemd/system/uni-celery.service | grep -E "Environ|ExecStart|WorkingDir"
+# Fix: add EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+# Then: systemctl daemon-reload && systemctl restart uni-celery
+WorkingDirectory=/root/University-and-Course-data/backend-py
+EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+ExecStart=/root/University-and-Course-data/backend-py/venv/bin/celery \
+root@university-and-course-data:~/University-and-Course-data# # Wait for the scrape to finish, then check the report
+ls -la backend-py/shadow_reports/
+
+cat backend-py/shadow_reports/$(ls -t backend-py/shadow_reports/*.json | head -1 | xargs basename) \
+  | python3 -m json.tool | grep -E "is_clean|summary|clean_streak|matched"
+total 20
+drwxr-xr-x  2 root root  4096 Apr 30 03:15 .
+drwxr-xr-x 13 root root  4096 Apr 30 03:09 ..
+-rw-r--r--  1 root root     0 Apr 30 03:09 .gitkeep
+-rw-r--r--  1 root root 12063 Apr 30 03:15 20260430031517_acap_41_run001.json
+    "is_clean": false,
+    "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+    "clean_streak": 0,
+        "is_clean": false,
+        "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+        "matched": 0,
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+git pull origin main
+# Should show: e9daac1..c9d4114
+
+sudo systemctl restart uni-celery
+sudo journalctl -u uni-celery -n 10 --no-pager | grep SHADOW
+# Expected: [SHADOW] shadow mode ENABLED for uni_ids: 41
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (9/9), done.
+remote: Total 9 (delta 7), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 3.48 KiB | 713.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   e9daac1..c9d4114  main       -> origin/main
+Updating e9daac1..c9d4114
+Fast-forward
+ backend-py/app/services/scraper/orchestrator.py    |  33 ++++++--------
+ backend-py/app/services/scraper/shadow/new_path.py | 128 ++++++++++++++++++++++++++----------------------------
+ 2 files changed, 75 insertions(+), 86 deletions(-)
+root@university-and-course-data:~/University-and-Course-data# cat backend-py/shadow_reports/$(ls -t backend-py/shadow_reports/*.json | head -1 | xargs basename) \
+  | python3 -m json.tool | grep -E "is_clean|summary|clean_streak|matched"
+    "is_clean": false,
+    "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+    "clean_streak": 0,
+        "is_clean": false,
+        "summary": "DIFF \u00e2\u0080\u0094 27 courses with 40 field diffs",
+        "matched": 0,
+root@university-and-course-data:~/University-and-Course-data# 
