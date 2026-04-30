@@ -657,6 +657,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # and the sitemap only has domestic /courses/ URLs.  Use Playwright to
         # render the listing page and extract /international/courses/<slug> links
         # before falling back to the normal BFS discovery.
+        # Bug 7: collect fee-page URLs that discovery blocked (they are real fee
+        # pages, just not course pages — we want to send them to the central fee
+        # parser later instead of discarding them).
+        _discover_blocked_fee_urls: list[str] = []
         links: list[dict] = []
         if "study.csu.edu.au/international/courses" in scrape_url:
             try:
@@ -672,7 +676,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         if not links:
             links = await discover_course_links(
-                scrape_url, max_pages=max_pages, max_courses=max_courses, emit=emit
+                scrape_url,
+                max_pages=max_pages,
+                max_courses=max_courses,
+                emit=emit,
+                _blocked_fee_urls_sink=_discover_blocked_fee_urls,
             )
 
         # ── Fallback 1: Generic Playwright browser discovery ─────────────────
@@ -870,27 +878,45 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 (effective_config.get("uniPages") or {}).get("feePage")
             )
             if not has_fee_page and links:
-                course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
-                base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
-                try:
-                    discovered = await asyncio.wait_for(
-                        discover_fee_url_from_course_pages(course_sample, base_domain),
-                        timeout=120,
-                    )
-                except asyncio.TimeoutError:
-                    log.warning(
-                        "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
-                        base_domain,
-                    )
-                    discovered = None
-                if discovered:
+                # Bug 7: discovery may have encountered a real fee-page URL and
+                # blocked it (correct — it's not a course page) but saved it in
+                # _discover_blocked_fee_urls.  Use that URL as the fee candidate
+                # BEFORE running the slower discover_fee_url_from_course_pages
+                # auto-detection scan, which can return the wrong URL when the
+                # site doesn't link to the fee page from individual course pages.
+                discovered = None
+                if _discover_blocked_fee_urls:
+                    discovered = _discover_blocked_fee_urls[0]
                     await emit(
                         "status",
-                        f"[CENTRAL] auto-discovered fee page: {discovered}",
+                        f"[CENTRAL] fee page from discover blocked list: {discovered}",
                         phase="discover",
                         kind="central_fee_discovered",
                         url=discovered,
                     )
+                if not discovered:
+                    course_sample = [lk["url"] for lk in links[:5] if lk.get("url")]
+                    base_domain = (uni.website or uni.scrape_url or "").rstrip("/")
+                    try:
+                        discovered = await asyncio.wait_for(
+                            discover_fee_url_from_course_pages(course_sample, base_domain),
+                            timeout=120,
+                        )
+                    except asyncio.TimeoutError:
+                        log.warning(
+                            "discover_fee_url_from_course_pages timed out after 120s for %s — skipping",
+                            base_domain,
+                        )
+                        discovered = None
+                    if discovered:
+                        await emit(
+                            "status",
+                            f"[CENTRAL] auto-discovered fee page: {discovered}",
+                            phase="discover",
+                            kind="central_fee_discovered",
+                            url=discovered,
+                        )
+                if discovered:
                     effective_config.setdefault("uniPages", {})["feePage"] = discovered
 
             central_data = await prefetch_central_pages(
