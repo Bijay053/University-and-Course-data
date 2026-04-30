@@ -1,0 +1,61 @@
+What's wrong with the proposed script:
+The script bundles four independent migrations into one prod deploy, none of which has been validated by sweep:
+
+be3df6700db3 (Option C) — only commit ready to ship. Sweep has not been run yet. Should be the only thing that lands.
+ede935448ea1 (Fix 3) — shared-code change to duration sanity cap. B-scope. Needs multi-uni sweep with enumerated --expected-slugs.
+fba79b1cb3d2 (Fix 1) — shared-code change to duration anti-context. B-scope. Same sweep requirement.
+629e5de001ce (Fix 2) — global DB schema migration. Needs staging DB validation, NOT direct prod application.
+
+The architecture work over the last two weeks exists specifically to prevent this kind of bundled deploy. Phases 1-5 each ran sweep before merge. Doing four-at-once with no sweep undoes that discipline.
+What to do instead:
+Cherry-pick be3df6700db3 (Option C) onto prod separately, run the ACAP sweep, ship if clean, then handle Fixes 1/2/3 as separate workstreams with their own sweeps.
+cd ~/University-and-Course-data
+
+# Reset prod to whatever was deployed before the four problematic commits
+# (presumably the post-Phase-5 stable state — confirm the SHA first)
+git fetch origin main
+git log --oneline -10  # identify the pre-Fix-3 SHA
+git reset --hard <pre-Fix-3-SHA>
+
+# Cherry-pick Option C only
+git cherry-pick be3df6700db3
+
+# Confirm the cherry-pick applied cleanly with no conflicts
+git status
+git log --oneline -3
+
+# DO NOT run the alembic migration. Fix 2 is a separate workstream.
+# DO NOT pull Fixes 1 and 3. Those are B-scope and need multi-uni sweep.
+
+# Restart services to pick up the new code (location.py change only)
+sudo systemctl restart uni-api-py.service uni-celery.service
+sleep 3
+sudo systemctl status uni-api-py.service --no-pager | tail -5
+Then capture before/after baselines around an ACAP scrape, run the sweep with --expected-slugs acap, and either ship or debug from there.
+On Fix 2 specifically:
+The schema migration script proposed (drop materialised view, alter column, recreate view, grant, update alembic_version) is doing destructive operations on the live production DB with no rollback plan and no sweep validation. The script doesn't even take a backup before the ALTER TABLE. If ROUND(duration::numeric, 2) produces unexpected values on edge cases (NULL handling, infinity, NaN from old float storage), every duration row of every uni is corrupted in the same instant.
+The right path for Fix 2:
+
+Clone prod DB to staging (pg_dump → restore to staging instance)
+Apply the migration on staging
+Capture baseline snapshot from staging
+Diff against current prod baseline
+Expect: zero behavioural diffs (same values, just stored as Numeric instead of float)
+If clean: take prod backup, apply migration to prod with same script, verify, restart services
+If diffs: investigate which uni's data drifted before going near prod
+
+This is 30 minutes of work to do safely. The "paste-and-run" version skips all of it and runs destructive DDL on production data straight from a one-liner script.
+On Fixes 1 and 3 (B-scope):
+These need the multi-uni regression sweep we've been building toward. The KBS log we just analysed shows multiple courses where the duration regex gets the wrong answer — KBS Master of Information Technology read as 20 years from "1 year, 8 months / 12 subjects / 5 trimesters", Graduate Certificates read as 8 years from "8 months", Graduate Diploma of Business Administration read as 16 years from "1 year, 4 months". Fix 1+3 may correctly handle some of these but not others. The sweep tells you which.
+Concrete path:
+
+Query staged data: SELECT university_id, slug FROM staged_courses WHERE duration_value >= 5 AND duration_unit = 'years' AND degree_level IN ('Graduate Certificate', 'Graduate Diploma', 'Master') — enumerate every course across all 22 baselined unis where the bug currently fires.
+Capture pre-Fix baseline.
+Apply Fixes 1+3 on a branch.
+Capture post-Fix baseline.
+Run sweep with --expected-slugs <enumerated list from step 1>.
+Expect: ONLY duration_value/duration_unit changes on enumerated courses, no other field changes anywhere, no other unis dirty.
+If matches expectation: merge.
+
+On running the script as proposed:
+Don't. Sequence the work properly.
