@@ -1,0 +1,328 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu Apr 30 10:04:21 UTC 2026
+
+  System load:           0.1
+  Usage of /:            3.6% of 231.44GB
+  Memory usage:          18%
+  Swap usage:            0%
+  Processes:             179
+  Users logged in:       1
+  IPv4 address for eth0: 159.65.152.72
+  IPv4 address for eth0: 10.47.0.13
+  IPv6 address for eth0: 2400:6180:100:d0:0:1:3615:5001
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Apr 30 08:46:03 2026 from 162.243.190.66
+root@university-and-course-data:~# # Check 1: gate IS firing (must see this for each ACAP course)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION SKIP.*trust_vision_ocr"
+
+# Check 2: gate is NOT leaking (this must be EMPTY for ACAP URLs)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION.*candidate image.*acap\.edu\.au"
+root@university-and-course-data:~# # Check 1: gate IS firing (must see this for each ACAP course)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION SKIP.*trust_vision_ocr"
+
+# Check 2: gate is NOT leaking (this must be EMPTY for ACAP URLs)
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep "VISION.*candidate image.*acap\.edu\.au"
+root@university-and-course-data:~# # Step 1 — pull the Phase 5 commits
+cd ~/University-and-Course-data
+git pull origin main
+# Expect: f4fc1a9581 (single_course.py) and 15038962d6 (acap.yaml) in the output
+
+# Step 2 — restart celery so the new code loads
+sudo systemctl restart uni-celery
+sleep 5
+sudo journalctl -u uni-celery -n 3 --no-pager | grep -E "worker_ready|celery@"
+
+# Step 3 — trigger ACAP scrape from admin UI, then wait for it to complete
+
+# Step 4 — THEN run the diagnostics
+sudo journalctl -u uni-celery --since "5 minutes ago" --no-pager \
+    | grep -E "VISION SKIP.*trust_vision|VISION.*candidate image.*acap\.edu\.au|job.*acap|completed.*staged"
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Apr 30 10:06:17 university-and-course-data celery[1239224]: [2026-04-30 10:06:17,098: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# sudo journalctl -u uni-celery --since "10:05:00" --no-pager \
+    | grep -E "VISION SKIP.*trust_vision|VISION.*candidate image.*acap\.edu\.au|completed.*staged"
+Apr 30 10:07:04 university-and-course-data celery[1239232]: [2026-04-30 10:07:04,513: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/bachelor-of-social-work/
+Apr 30 10:07:04 university-and-course-data celery[1239232]: [2026-04-30 10:07:04,518: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/
+Apr 30 10:07:06 university-and-course-data celery[1239232]: [2026-04-30 10:07:06,657: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+Apr 30 10:07:15 university-and-course-data celery[1239232]: [2026-04-30 10:07:15,824: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+Apr 30 10:07:17 university-and-course-data celery[1239232]: [2026-04-30 10:07:17,507: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+Apr 30 10:07:17 university-and-course-data celery[1239232]: [2026-04-30 10:07:17,875: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+Apr 30 10:07:30 university-and-course-data celery[1239232]: [2026-04-30 10:07:30,049: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+root@university-and-course-data:~/University-and-Course-data# # Confirm completion
+sudo journalctl -u uni-celery --since "10:05:00" --no-pager \
+    | grep -E "completed.*staged|VISION SKIP.*acap"
+
+# Once completed — capture after-baseline
+cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+PYTHONPATH=. venv/bin/python3 scripts/capture_baseline.py --out-dir baselines/phase5-after/
+
+# Run sweep — ACAP expected-dirty, 22 others must be clean
+PYTHONPATH=. venv/bin/python3 scripts/regression_sweep.py \
+    --before baselines/re-fix-after/ \
+    --after  baselines/phase5-after/ \
+    --expected-slugs acap --verbose
+Apr 30 10:07:04 university-and-course-data celery[1239232]: [2026-04-30 10:07:04,513: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/bachelor-of-social-work/
+Apr 30 10:07:04 university-and-course-data celery[1239232]: [2026-04-30 10:07:04,518: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-in-business-administration/
+Apr 30 10:07:06 university-and-course-data celery[1239232]: [2026-04-30 10:07:06,657: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-human-services/
+Apr 30 10:07:15 university-and-course-data celery[1239232]: [2026-04-30 10:07:15,824: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-applied-coaching/
+Apr 30 10:07:17 university-and-course-data celery[1239232]: [2026-04-30 10:07:17,507: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-business-administration/
+Apr 30 10:07:17 university-and-course-data celery[1239232]: [2026-04-30 10:07:17,875: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-certificate-of-professional-accounting/
+Apr 30 10:07:30 university-and-course-data celery[1239232]: [2026-04-30 10:07:30,049: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-professional-accounting/
+Apr 30 10:07:34 university-and-course-data celery[1239232]: [2026-04-30 10:07:34,121: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-business-administration/
+Apr 30 10:07:39 university-and-course-data celery[1239232]: [2026-04-30 10:07:39,620: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-psychology-clinical/
+Apr 30 10:07:45 university-and-course-data celery[1239232]: [2026-04-30 10:07:45,447: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-professional-psychology/
+Apr 30 10:07:47 university-and-course-data celery[1239232]: [2026-04-30 10:07:47,135: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-social-work-qualifying/
+Apr 30 10:07:51 university-and-course-data celery[1239232]: [2026-04-30 10:07:51,685: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/master-of-psychology-practice-clinical/
+Apr 30 10:07:57 university-and-course-data celery[1239232]: [2026-04-30 10:07:57,413: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice/
+Apr 30 10:08:00 university-and-course-data celery[1239232]: [2026-04-30 10:08:00,834: INFO/ForkPoolWorker-4] [VISION SKIP] trust_vision_ocr=false for this uni — skipping vision OCR pass on https://www.acap.edu.au/courses/graduate-diploma-of-legal-practice-nsw/
+Apr 30 10:08:04 university-and-course-data celery[1239232]: [2026-04-30 10:08:04,077: INFO/ForkPoolWorker-4] Scrape job_9d01228876c3 completed: {'discovered': 27, 'staged': 11, 'skipped': 16, 'errors': 0, 'fetch_failed': 0}
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260430_100840_acap_41.json  (courses=11  disc=27  staged=11  cost=$0.0028  81.0)
+INFO capture_baseline: Saved: 20260430_100840_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260430_100840_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260430_100840_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260430_100840_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260430_100840_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260430_100840_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260430_100840_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_kbs_29.json  (courses=29  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_unisq_1.json  (courses=167  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_asahe_2.json  (courses=8  disc=9  staged=0  cost=$0.0000  81.1)
+INFO capture_baseline: Saved: 20260430_100840_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_torrens_3.json  (courses=178  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_100840_vit_6.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1682 courses total. Baselines written to baselines/phase5-after/
+
+Regression sweep: 23 before / 23 after snapshots
+Expected slugs:   ['acap']
+------------------------------------------------------------------------
+
+  [EXPECTED] acap (uni_id=41)  before=22  after=11  → DIRTY
+    added=0  removed=0  changed=5
+    [CHANGED] 'Graduate Certificate of Professional Accounting'
+          pte: 59.0 → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision:null' → None
+          (method-only) extraction_method.ielts_reading: 'per_course_vision:null' → None
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision:null' → None
+          (method-only) extraction_method.ielts_writing: 'per_course_vision:null' → None
+    [CHANGED] 'Graduate Diploma of Legal Practice (Plt)'
+          ielts: 7.0 → 6.5
+          toefl: 100.0 → None
+          (method-only) extraction_method.cambridge_overall: 'per_course_vision' → None
+          (method-only) extraction_method.duolingo_overall: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision' → None
+    [CHANGED] 'Graduate Diploma of Professional Accounting'
+          pte: 59.0 → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision_cached:null' → None
+          (method-only) extraction_method.ielts_reading: 'per_course_vision_cached:null' → None
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision_cached:null' → None
+          (method-only) extraction_method.ielts_writing: 'per_course_vision_cached:null' → None
+    [CHANGED] 'Master of Professional Psychology'
+          (method-only) extraction_method.fee_currency: None → 'ai_fallback'
+    [CHANGED] 'Master of Social Work (Qualifying)'
+          (method-only) extraction_method.fee_currency: 'ai_fallback' → None
+          (method-only) extraction_method.ielts_listening: 'per_course_vision:null' → None
+          (method-only) extraction_method.ielts_reading: 'per_course_vision:null' → None
+          (method-only) extraction_method.ielts_speaking: 'per_course_vision' → None
+          (method-only) extraction_method.ielts_writing: 'per_course_vision:null' → None
+  [CLEAN]    acu (uni_id=51)
+  [CLEAN]    aibi (uni_id=47)
+  [CLEAN]    ait (uni_id=37)
+  [CLEAN]    apicollege (uni_id=30)
+  [CLEAN]    asahe (uni_id=2)
+  [CLEAN]    atmc (uni_id=93)
+  [CLEAN]    aut (uni_id=20)
+  [CLEAN]    aut (uni_id=87)
+  [CLEAN]    bond (uni_id=22)
+  [CLEAN]    cqu (uni_id=18)
+  [CLEAN]    flinders (uni_id=12)
+  [CLEAN]    kbs (uni_id=29)
+  [CLEAN]    kbs (uni_id=8)
+  [CLEAN]    scu (uni_id=17)
+  [CLEAN]    study (uni_id=4)
+  [CLEAN]    torrens (uni_id=3)
+  [CLEAN]    une (uni_id=14)
+  [CLEAN]    unisq (uni_id=1)
+  [CLEAN]    uow (uni_id=13)
+  [CLEAN]    utas (uni_id=5)
+  [CLEAN]    vit (uni_id=38)
+  [CLEAN]    vit (uni_id=6)
+
+========================================================================
+SUMMARY
+  Clean unis:            22
+  Expected diffs:        1  (acknowledged)
+  Unexpected diffs:      0
+  Missing before:        0
+  Missing after:         0
+
+PASS (with acknowledged diffs) — 1 expected diff(s) for ['acap']. Reviewer sign-off required before merge.
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data
+git pull origin main   # expect e3b7847939 (duration.py) + f95d75fc59 (test_duration.py)
+sudo systemctl restart uni-celery && sleep 5
+sudo journalctl -u uni-celery -n 3 --no-pager | grep -E "worker_ready|celery@"
+remote: Enumerating objects: 22, done.
+remote: Counting objects: 100% (22/22), done.
+remote: Compressing objects: 100% (13/13), done.
+remote: Total 13 (delta 11), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (13/13), 3.15 KiB | 537.00 KiB/s, done.
+From https://github.com/Bijay053/University-and-Course-data
+ * branch            main       -> FETCH_HEAD
+   1503896..f95d75f  main       -> origin/main
+Updating 1503896..f95d75f
+Fast-forward
+ backend-py/app/services/scraper/extractors/duration.py | 16 +++++++++++++++-
+ backend-py/tests/test_duration.py                      | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 83 insertions(+), 1 deletion(-)
+Apr 30 10:24:22 university-and-course-data celery[1239610]: [2026-04-30 10:24:22,232: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# SELECT u.slug, u.id AS uni_id, cs.course_name,
+       cs.duration_value, cs.duration_unit, cs.degree_level,
+       cs.source_url
+FROM course_staging cs
+JOIN universities u ON u.id = cs.university_id
+WHERE cs.duration_value >= 5
+  AND cs.duration_unit = 'years'
+  AND LOWER(cs.degree_level) IN (
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'
+  )
+ORDER BY u.slug, cs.course_name;
+SELECT: command not found
+cs.duration_value,: command not found
+cs.source_url: command not found
+FROM: command not found
+JOIN: command not found
+WHERE: command not found
+AND: command not found
+-bash: syntax error near unexpected token `('
+graduate certificate,: command not found
+postgraduate certificate,: command not found
+-bash: syntax error near unexpected token `)'
+ORDER: command not found
+root@university-and-course-data:~/University-and-Course-data# psql "$DATABASE_URL" -c "
+SELECT u.slug, u.id AS uni_id, cs.course_name,
+       cs.duration_value, cs.duration_unit, cs.degree_level
+FROM course_staging cs
+JOIN universities u ON u.id = cs.university_id
+WHERE cs.duration_value >= 5
+  AND cs.duration_unit = 'years'
+  AND LOWER(cs.degree_level) IN (
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'
+  )
+ORDER BY u.slug, cs.course_name;
+"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+psql "$DATABASE_URL" -c "
+SELECT u.slug, u.id AS uni_id, cs.course_name,
+       cs.duration_value, cs.duration_unit, cs.degree_level
+FROM course_staging cs
+JOIN universities u ON u.id = cs.university_id
+WHERE cs.duration_value >= 5
+  AND cs.duration_unit = 'years'
+  AND LOWER(cs.degree_level) IN (
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'
+  )
+ORDER BY u.slug, cs.course_name;
+"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+venv/bin/python3 -c "
+import os, psycopg2
+conn = psycopg2.connect(os.environ['DATABASE_URL'])
+cur = conn.cursor()
+cur.execute('''
+    SELECT u.slug, u.id AS uni_id, cs.course_name,
+           cs.duration_value, cs.duration_unit, cs.degree_level
+    FROM course_staging cs
+    JOIN universities u ON u.id = cs.university_id
+    WHERE cs.duration_value >= 5
+      AND cs.duration_unit = %s
+      AND LOWER(cs.degree_level) IN (
+          %s, %s, %s, %s
+      )
+    ORDER BY u.slug, cs.course_name
+''', ('years',
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'))
+rows = cur.fetchall()
+print(str(len(rows)) + ' affected courses:')
+for r in rows:
+    print('  [' + r[0] + '/id=' + str(r[1]) + '] ' + r[2] + ' | ' + str(r[3]) + ' ' + r[4] + ' | ' + r[5])
+conn.close()
+"
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 121, in connect
+    dsn = _ext.make_dsn(dsn, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/University-and-Course-data/backend-py/venv/lib/python3.12/site-packages/psycopg2/extensions.py", line 145, in make_dsn
+    parse_dsn(dsn)
+psycopg2.ProgrammingError: invalid dsn: missing "=" after "postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal" in connection info string
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# cd ~/University-and-Course-data/backend-py
+set -a && source .env && set +a
+venv/bin/python3 -c "
+import os, psycopg2
+dsn = os.environ['DATABASE_URL'].replace('postgresql+asyncpg://', 'postgresql://')
+conn = psycopg2.connect(dsn)
+cur = conn.cursor()
+cur.execute('''
+    SELECT u.slug, u.id AS uni_id, cs.course_name,
+           cs.duration_value, cs.duration_unit, cs.degree_level
+    FROM course_staging cs
+    JOIN universities u ON u.id = cs.university_id
+    WHERE cs.duration_value >= 5
+      AND cs.duration_unit = %s
+      AND LOWER(cs.degree_level) IN (%s, %s, %s, %s)
+    ORDER BY u.slug, cs.course_name
+''', ('years',
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'))
+rows = cur.fetchall()
+print(str(len(rows)) + ' affected courses:')
+for r in rows:
+    print('  [' + r[0] + '/id=' + str(r[1]) + '] ' + r[2] + ' | ' + str(r[3]) + ' ' + r[4] + ' | ' + r[5])
+conn.close()
+"
+Traceback (most recent call last):
+  File "<string>", line 6, in <module>
+psycopg2.errors.UndefinedTable: relation "course_staging" does not exist
+LINE 4:     FROM course_staging cs
+                 ^
+
+root@university-and-course-data:~/University-and-Course-data/backend-py# 
