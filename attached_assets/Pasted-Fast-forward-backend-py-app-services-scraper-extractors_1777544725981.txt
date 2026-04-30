@@ -1,0 +1,44 @@
+Fast-forward
+ backend-py/app/services/scraper/extractors/duration.py | 16 +++++++++++++++-
+ backend-py/tests/test_duration.py                      | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 83 insertions(+), 1 deletion(-)
+Apr 30 10:24:22 university-and-course-data celery[1239610]: [2026-04-30 10:24:22,232: INFO/MainProcess] celery@university-and-course-data ready.
+root@university-and-course-data:~/University-and-Course-data# SELECT u.slug, u.id AS uni_id, cs.course_name,
+       cs.duration_value, cs.duration_unit, cs.degree_level,
+       cs.source_url
+FROM course_staging cs
+JOIN universities u ON u.id = cs.university_id
+WHERE cs.duration_value >= 5
+  AND cs.duration_unit = 'years'
+  AND LOWER(cs.degree_level) IN (
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'
+  )
+ORDER BY u.slug, cs.course_name;
+SELECT: command not found
+cs.duration_value,: command not found
+cs.source_url: command not found
+FROM: command not found
+JOIN: command not found
+WHERE: command not found
+AND: command not found
+-bash: syntax error near unexpected token `('
+graduate certificate,: command not found
+postgraduate certificate,: command not found
+-bash: syntax error near unexpected token `)'
+ORDER: command not found
+root@university-and-course-data:~/University-and-Course-data# psql "$DATABASE_URL" -c "
+SELECT u.slug, u.id AS uni_id, cs.course_name,
+       cs.duration_value, cs.duration_unit, cs.degree_level
+FROM course_staging cs
+JOIN universities u ON u.id = cs.university_id
+WHERE cs.duration_value >= 5
+  AND cs.duration_unit = 'years'
+  AND LOWER(cs.degree_level) IN (
+      'graduate certificate', 'graduate diploma',
+      'postgraduate certificate', 'postgraduate diploma'
+  )
+ORDER BY u.slug, cs.course_name;
+"
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "root" does not exist
+root@university-and-course-data:~/University-and-Course-data# 
