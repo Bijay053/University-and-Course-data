@@ -2757,16 +2757,40 @@ async def extract_course(
 
     footer = build_course_page_provenance_footer(payload)
 
-    # Build extraction_method: for each filled payload field, record the
-    # method of the first evidence entry that matches (first-write-wins mirrors
-    # the setdefault semantics used throughout the pipeline).
+    # Build extraction_method provenance map.
+    #
+    # For each field that appeared in evidence, record the method that produced
+    # the value.  Two sentinel suffixes distinguish outcome:
+    #
+    #   "regex_fee"        — method produced a non-null/non-empty value
+    #   "regex_fee:null"   — method was attempted but returned null/empty
+    #
+    # The :null sentinel is critical for regression detection: if a field is null
+    # in both the before- and after-baseline that is only a true no-regression if
+    # the *same* method was attempted.  "null because regex didn't fire" vs
+    # "null because Gemini returned nothing" are different failure modes even
+    # though both produce IELTS=None in the staged row.
+    #
+    # first-write-wins for successful values (mirrors setdefault throughout the
+    # pipeline).  The :null sentinel is overwritten if a later evidence entry
+    # produces a real value — we do not add null-fields to _seen_em so the
+    # overwrite can happen.
     _extraction_method: dict[str, str] = {}
     _seen_em: set[str] = set()
     for _ev in evidence:
         _fk = _ev.get("field_key", "")
-        if _fk and _fk not in _seen_em and payload.get(_fk) not in (None, "", 0, []):
-            _extraction_method[_fk] = _ev.get("method") or "unknown"
+        if not _fk or _fk in _seen_em:
+            continue
+        _method = _ev.get("method") or "unknown"
+        if payload.get(_fk) not in (None, "", 0, []):
+            # Successful extraction — credit this method, lock the field.
+            _extraction_method[_fk] = _method
             _seen_em.add(_fk)
+        elif _fk not in _extraction_method:
+            # Attempted but returned null/empty — record with :null suffix.
+            # A later evidence entry that produces a value will overwrite this
+            # (field not added to _seen_em, so the loop continues for _fk).
+            _extraction_method[_fk] = f"{_method}:null"
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
     if _extraction_method:

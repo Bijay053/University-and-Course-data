@@ -1,0 +1,35 @@
+Strong execution. They closed the loop on all three asks and the audit work is genuinely thorough — finding run_repair() as a separate entry point is exactly the kind of thing that would have caused a silent contextvar miss in Week 2.
+A few specific things worth flagging back, then green light:
+1. The soft-fail guard choice — push back on this.
+They chose to make require_uni_config() log a WARNING and return bare defaults instead of raising. The reasoning is "never raises in production." That's the wrong default for Weeks 2–4.
+The whole point of the guard during migration is to find missing entry points before they cause silent wrong-config bugs. A WARNING in the logs is exactly what nobody will notice — the staged courses still flow, the dashboard still updates, and three weeks later someone discovers a uni's been getting the wrong duration regex applied because some background job path was missed in the audit.
+A hard crash, by contrast, gets seen immediately. The job fails loudly, the entry point gets identified, set_uni_config() gets added, done.
+Suggest two modes:
+
+STRICT (default during Weeks 2–4): assertion fails, job crashes
+SOFT (post-Week 4 production default): WARN + bare defaults
+
+Toggle via env var UNI_CONFIG_GUARD_MODE=strict|soft. Default to strict in dev/staging, leave the option to flip to soft in prod after Week 4 stabilises. As shipped right now it's soft everywhere, which means Weeks 2–4 lose the early-warning value of the guard.
+If they really don't want hard crashes in prod, an acceptable middle ground: SOFT in prod but STRICT in CI / staging / shadow-mode runs. But "WARN everywhere" defeats the purpose.
+2. The asyncio.gather() inheritance assumption — verify it.
+The audit notes "asyncio.gather() coroutines inherit contextvar from parent automatically (Python 3.7+) — no additional wiring needed." That's correct for asyncio tasks created via asyncio.create_task() or gather() of coroutines from the same event loop. It is NOT correct for:
+
+loop.run_in_executor(...) calls that hand work to a ThreadPoolExecutor or ProcessPoolExecutor — those threads do NOT inherit the contextvar by default
+asyncio.to_thread(...) — actually DOES copy context (Python 3.9+), but worth confirming
+Subprocess calls (asyncio.create_subprocess_exec(...)) — child process has no Python state at all, contextvar is gone
+Any code that uses the concurrent.futures API directly
+
+If the per-course-browser fallback uses Playwright via a thread executor, or if the vision OCR pass spawns workers via concurrent.futures, the contextvar will be unset in those workers and the soft-fail guard will silently fall back to defaults without anyone noticing (see point 1).
+Worth one targeted check: grep for run_in_executor, ThreadPoolExecutor, ProcessPoolExecutor, to_thread, concurrent.futures, and subprocess across the scraper code. For each hit, confirm whether the code path eventually calls an extractor. If yes, contextvar needs to be explicitly propagated — typically via contextvars.copy_context().run(...) or by capturing the value before the executor call and passing it explicitly.
+3. Two Torrens entries with same slug — worth a thought.
+The fact that the baseline script hit a filename collision because two universities have the same slug is a small flag. In the per-uni config system, what's the lookup key? If it's slug-based, the same collision will happen — Torrens A's torrens.yaml will silently shadow or merge with Torrens B's. Worth confirming the loader uses something disambiguated (university_id, or {slug}-{id}.yaml like the baseline now uses).
+If it's already keyed by university_id, ignore this. If it's slug-based, fix before Week 2.
+4. The provenance capture — confirm it includes failure modes.
+extraction_method JSONB is good. Make sure it captures not just successful extractions but also the path that produced empty/null values. If KBS Bachelor of Business Marketing has IELTS=null in the baseline and IELTS=null after Week 2 migration, those should match. But "null because regex didn't fire and vision wasn't tried" vs "null because regex didn't fire and vision returned nothing" vs "null because the extractor was skipped entirely" are three different behaviours that all stage the same value. A regression that quietly removes the vision attempt would pass the diff.
+Worth one schema check: does extraction_method get written for attempted extractions even when they returned null, or only for successful ones? If only successful, the diff will miss method-removal regressions silently.
+
+Otherwise: green light for Week 2.
+The dev baseline at backend-py/baselines/20260430_021811_* (1,424 courses across 10 unis) is a real safety net. Run the prod baseline command they documented before any Week 2 PR merges, then go.
+Recommended first Week 2 PR: ACAP domestic_only.text_must_appear_in: main_content rule. It's already broken in prod (so any "regression" is moot), it's small enough to verify in shadow mode in a single afternoon, and it'll prove the migration pattern end-to-end before tackling anything load-bearing.
+Address points 1 and 2 above before the first Week 2 cutover. Points 3 and 4 are worth a quick check but unlikely to bite.
+Go.

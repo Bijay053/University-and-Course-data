@@ -177,9 +177,29 @@ def load_uni_config(
         merged = _deep_merge(merged, db_translated)
 
     # 3. Load and merge per-uni YAML (highest config-file priority)
-    uni_yaml_path = _UNIS_DIR / f"{slug}.yaml"
+    #
+    # Lookup order (most-specific wins):
+    #   1. unis/{slug}_{university_id}.yaml — disambiguates two unis that share
+    #      a slug (e.g. Torrens main campus and a Torrens network partner both
+    #      resolve to "torrens").  Create this file when per-id overrides are
+    #      needed; it shadows the shared slug file entirely.
+    #   2. unis/{slug}.yaml — legacy / single-tenant case; used when the
+    #      university_id-specific file does not exist.
+    _id_yaml: Path | None = None
+    if university_id is not None:
+        candidate = _UNIS_DIR / f"{slug}_{university_id}.yaml"
+        if candidate.exists():
+            _id_yaml = candidate
+
+    uni_yaml_path: Path = _id_yaml if _id_yaml is not None else _UNIS_DIR / f"{slug}.yaml"
     per_uni = _load_yaml_file(uni_yaml_path)
     if per_uni:
+        if _id_yaml is not None:
+            log.debug(
+                "Per-uni YAML loaded for slug=%r uni_id=%r (id-specific file)",
+                slug,
+                university_id,
+            )
         merged = _deep_merge(merged, per_uni)
     else:
         log.debug("No per-uni YAML for slug=%r (will use defaults + DB config)", slug)
