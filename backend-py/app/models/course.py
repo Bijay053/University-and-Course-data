@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,7 +19,7 @@ class Course(Base):
     category: Mapped[str | None] = mapped_column(Text)
     sub_category: Mapped[str | None] = mapped_column(Text)
     course_website: Mapped[str | None] = mapped_column(Text)
-    duration: Mapped[float | None] = mapped_column(Float)
+    duration: Mapped[float | None] = mapped_column(Numeric(6, 2))
     duration_term: Mapped[str | None] = mapped_column(Text)
     study_mode: Mapped[str | None] = mapped_column(Text)
     degree_level: Mapped[str | None] = mapped_column(Text)
