@@ -1,0 +1,41 @@
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 901, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno -5] No address associated with hostname
+root@university-and-course-data:~/University-and-Course-data# cd /root/University-and-Course-data
+
+# Load the same env the service uses, then run the script:
+set -a && source backend-py/.env && set +a
+PYTHONPATH=backend-py backend-py/venv/bin/python backend-py/scripts/capture_baseline.py --out-dir backend-py/baselines/
+INFO capture_baseline: Snapshotting 23 universities...
+INFO capture_baseline: Saved: 20260430_024437_aibi_47.json  (courses=8  disc=11  staged=8  cost=$0.0000  99.1)
+INFO capture_baseline: Saved: 20260430_024437_ait_37.json  (courses=6  disc=8  staged=6  cost=$0.0017  118.1)
+INFO capture_baseline: Saved: 20260430_024437_apicollege_30.json  (courses=25  disc=27  staged=25  cost=$0.0000  169.7)
+INFO capture_baseline: Saved: 20260430_024437_asahe_35.json  (courses=8  disc=8  staged=8  cost=$0.0000  58.4)
+INFO capture_baseline: Saved: 20260430_024437_atmc_93.json  (courses=4  disc=6  staged=4  cost=$0.0000  89.6)
+INFO capture_baseline: Saved: 20260430_024437_aut_87.json  (courses=13  disc=36  staged=13  cost=$0.0035  604.3)
+INFO capture_baseline: Saved: 20260430_024437_acu_51.json  (courses=99  disc=165  staged=99  cost=$0.0234  3410.1)
+INFO capture_baseline: Saved: 20260430_024437_bond_22.json  (courses=126  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_study_4.json  (courses=694  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_flinders_12.json  (courses=105  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_kbs_8.json  (courses=30  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_kbs_29.json  (courses=29  disc=37  staged=29  cost=$0.0111  355.9)
+INFO capture_baseline: Saved: 20260430_024437_scu_17.json  (courses=6  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_une_14.json  (courses=12  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_uow_13.json  (courses=3  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_unisq_1.json  (courses=213  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_utas_5.json  (courses=13  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_vit_38.json  (courses=19  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_asahe_2.json  (courses=17  disc=9  staged=9  cost=$0.0025  50.2)
+INFO capture_baseline: Saved: 20260430_024437_aut_20.json  (courses=92  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_cqu_18.json  (courses=4  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_torrens_3.json  (courses=178  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Saved: 20260430_024437_vit_6.json  (courses=66  disc=0  staged=0  cost=$0.0000  None)
+INFO capture_baseline: Done. 23 universities, 1770 courses total. Baselines written to backend-py/baselines/
+root@university-and-course-data:~/University-and-Course-data# 
