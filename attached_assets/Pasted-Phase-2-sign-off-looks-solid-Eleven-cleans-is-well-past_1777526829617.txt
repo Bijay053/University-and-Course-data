@@ -1,0 +1,20 @@
+Phase 2 sign-off looks solid. Eleven cleans is well past the 5-streak threshold and the post-deploy verification (009→013 specifically) confirms commit 08f9db9 is the version actually running. Good.
+Phase 3 scope is right. One thing to lock down before you build the PR — there are two distinct ways to "gate _is_domestic_only_page() on uc.extraction.filters.domestic_only.enabled" and they have different risk profiles:
+Option A — short-circuit only: if uc.extraction.filters.domestic_only.enabled is False, skip the call entirely. If True, call the existing function unchanged.
+pythonif not uc.extraction.filters.domestic_only.enabled:
+    return False
+return _is_domestic_only_page(html, ...)
+This is the minimal cutover. Behaviour is identical to current prod for ACAP (where enabled=True), and only changes for any future uni that sets enabled=false. Safe and small.
+Option B — full parameterisation: the function reads text_must_appear_in, min_text_match_count, or whatever else is in the config and changes its logic accordingly.
+This is a bigger change. The function's internal logic now depends on config values, which means every uni's behaviour could shift even if enabled is unchanged.
+Strong recommendation: Option A for this PR. Keep the cutover surgical — just the enable/disable gate, nothing else. If you want to parameterise the matching logic later (Option B), that's a separate PR with its own 5-run streak per affected uni.
+The reason this matters: Option A means the ACAP shadow streak should be byte-identical because ACAP has enabled=True and the function runs unchanged. If you bundle parameterisation into the same PR, the shadow streak is verifying two different changes at once and a divergence becomes ambiguous to debug.
+Three concrete things to confirm in the PR:
+
+Default value when uc is None. What does the gate do if the contextvar isn't set? Should default to current behaviour (call the function) so any path that bypasses contextvar wiring doesn't silently lose domestic_only filtering. Worst case: a missed entry point makes a uni skip the filter entirely and start staging domestic-only courses. The fail-open default should be "call the function" not "skip the function."
+The other 19 unis. This change is in shared code (single_course.py), so it touches every uni's path. Confirm that all 20 stub configs have extraction.filters.domestic_only.enabled set to a sensible default (probably True for most, since current prod behaviour is to always run the filter). If any uni's stub silently has enabled=false because of a bad default merge, that uni's next run will start letting domestic-only courses through.
+The regression sweep this PR triggers. Phase 2 was ACAP-only (1 uni shadow streak). Phase 3 is shared-code (touches the function every uni calls). The agreed pattern was: shared-code change → full regression sweep across all 23 baselined unis → diff against snapshot → block merge if any regression isn't acknowledged. This is the first PR where that machinery gets exercised end-to-end. Worth budgeting time for whatever the regression-sweep scaffolding needs (it may not be built yet — Phase 1/2 only used per-uni shadow mode, not multi-uni regression).
+
+If multi-uni regression sweep scaffolding doesn't exist yet, build it before the Phase 3 PR, not after. The temptation to skip it for "such a small change" is exactly how the original problem started.
+On the break question: take it. Five clean runs is a real milestone and the next PR has the highest blast radius of any change yet (shared code, all 23 unis affected). Tired-debugging a regression sweep is how subtle bugs get rationalised away. Build the PR fresh.
+When you do start: confirm Option A scope, confirm fail-open default, audit all 20 stub configs for enabled: true, build/verify the multi-uni regression sweep scaffolding, then write the PR.
