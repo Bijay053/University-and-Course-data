@@ -2600,6 +2600,17 @@ async def extract_course(
     if _sc_host in _FULL_COURSE_FEE_HOSTS and payload.get("fee_term") == "Annual":
         payload["fee_term"] = "Full Course"
 
+    # ── Graduate Diploma name-based degree_level correction ───────────────────
+    # When the course name contains "Graduate Diploma" or "Postgraduate Diploma"
+    # the degree level is definitively known from the title and must not be
+    # overridden by Gemini's AQF-8 heuristic ("AQF Level 8" = Graduate
+    # Certificate in Gemini's mapping, but AQF 8 covers BOTH Graduate
+    # Certificate AND Graduate Diploma). Apply this correction AFTER all
+    # extractors (including Gemini primary) have settled so it always wins.
+    _course_name_for_dl = payload.get("course_name") or ""
+    if re.search(r"\b(?:graduate|postgraduate)\s+diploma\b", _course_name_for_dl, re.I):
+        payload["degree_level"] = "Graduate Diploma"
+
     # ── Scrape-quality warning detection ─────────────────────────────────────
     # After ALL extractors have settled, audit the final payload for cases
     # where the course page clearly contained a data section but the pipeline

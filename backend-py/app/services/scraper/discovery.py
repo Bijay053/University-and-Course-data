@@ -287,14 +287,24 @@ def _dedup_year_variants(items: list[dict]) -> list[dict]:
             after_pass1.append(item)
 
     # For each handbook group: prefer the live canonical URL if it already
-    # exists in after_pass1; otherwise keep the highest-year handbook variant.
+    # exists in after_pass1; otherwise rewrite the handbook URL to the
+    # canonical live URL so the extractor fetches the real course page
+    # instead of the archived handbook copy.  ACU's sitemap often lists
+    # only handbook-prefixed variants (e.g. /handbook/handbook-2025/course/
+    # <slug>) without a corresponding live /course/<slug> entry; keeping the
+    # handbook URL means the extractor receives minimal or template HTML
+    # instead of the full course detail page.
     live_url_set = {item.get("url", "") for item in after_pass1}
     for canonical, variants in handbook_groups.items():
         if canonical in live_url_set:
             # Live URL is already in the result; all handbook duplicates dropped.
             continue
         best_year_item = max(variants, key=lambda t: t[0])[1]
-        after_pass1.append(best_year_item)
+        # Rewrite to canonical (live) URL — strip the /handbook/handbook-YYYY/
+        # prefix so the extractor fetches the authoritative course page.
+        canonical_item = dict(best_year_item)
+        canonical_item["url"] = canonical
+        after_pass1.append(canonical_item)
 
     # ── Pass 2: path-embedded year suffix dedup (SCU-style) ──────────────────
     groups: dict[str, list[tuple[int, dict]]] = {}
@@ -525,6 +535,15 @@ _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
     # sitemap supplement catches all remaining courses across all faculties.
     "www.aut.ac.nz",
     "aut.ac.nz",
+    # ACU: the BFS start_url (/courses) yields only ~4 candidates (two
+    # marketing sub-pages that the guard blocks, one research-school page,
+    # and the start URL itself). This is well below the sitemap-fallback
+    # threshold, so the sitemap already fires. However, always merging ensures
+    # the sitemap runs even in edge cases where BFS finds slightly more pages.
+    # The _dedup_year_variants canonical-URL rewrite handles the conversion
+    # of handbook-prefixed sitemap URLs → live /course/<slug> URLs.
+    "www.acu.edu.au",
+    "acu.edu.au",
 })
 
 

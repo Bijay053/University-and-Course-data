@@ -114,6 +114,23 @@ _DURATION_RESEARCH_CAP_RE = re.compile(
     r"maximum\s+enrolment)\b",
     re.I,
 )
+# Extension clauses in duration value cells (e.g. "with the possibility of a
+# six to 12 month extension") must never win over the stated nominal duration.
+# Used in _classify_duration_value to skip digit matches embedded in these clauses.
+_EXTENSION_CTX_RE = re.compile(r"\bextension\b", re.I)
+
+# Word-form numbers for common program durations (one, two, … eight).
+# Checked BEFORE the digit _DURATION_VALUE_RE so "Three years full-time, with
+# the possibility of a six to 12 month extension" yields (3, "Year") rather
+# than (12, "Month") — the first DIGIT in the string would otherwise be "12".
+_WORD_DURATION_RE = re.compile(
+    r"\b(one|two|three|four|five|six|seven|eight)\s+(years?|months?|semesters?|trimesters?)\b",
+    re.I,
+)
+_WORD_NUM_MAP: dict[str, float] = {
+    "one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0,
+    "five": 5.0, "six": 6.0, "seven": 7.0, "eight": 8.0,
+}
 # Same patterns but ONLY used to gate the loose Pattern-2 fallback — not the
 # labeled Pattern-0 match.  "Duration: 2 years (or part-time equivalent)" is
 # a valid duration sentence where Pattern 0 must still fire; "Part time
@@ -208,13 +225,19 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
     duration is recoverable. Applies the same per-unit caps as the
     keyword fallback so junk values (e.g. "200 years") are rejected.
 
-    Checks compound expressions first ("1 year, 8 months" → 20 months)
-    before falling back to single-unit parsing.
+    Priority order:
+      1. Compound digit expressions: "1 year, 8 months" → 20 Month
+      2. Word-form numbers: "Three years full-time" → 3 Year
+         (checked before digit scan so "three" wins over a later "12"
+         in an extension clause)
+      3. Digit scan — skips matches inside extension clauses
+         ("possibility of a 12 month extension") so the nominal
+         duration is not displaced by the extension qualifier.
     """
     if _ACCELERATED.search(value):
         return None
 
-    # Compound match first: "N year(s), M month(s)" → total months.
+    # 1. Compound match: "N year(s), M month(s)" → total months.
     cm = _COMPOUND_DURATION_RE.search(value)
     if cm:
         try:
@@ -226,20 +249,37 @@ def _classify_duration_value(value: str) -> tuple[float, str] | None:
         except (ValueError, IndexError):
             pass
 
-    m = _DURATION_VALUE_RE.search(value)
-    if not m:
-        return None
-    try:
-        amount = float(m.group(1))
-    except ValueError:
-        return None
-    unit = _normalise_unit(m.group(2))
-    if not unit:
-        return None
-    cap = _DURATION_CAP[unit]
-    if not (0 < amount <= cap):
-        return None
-    return amount, unit
+    # 2. Word-form number: "Three years", "one semester", etc.
+    wm = _WORD_DURATION_RE.search(value)
+    if wm:
+        amount = _WORD_NUM_MAP.get(wm.group(1).lower())
+        unit = _normalise_unit(wm.group(2))
+        if amount is not None and unit and 0 < amount <= _DURATION_CAP[unit]:
+            return amount, unit
+
+    # 3. Digit scan — prefer matches NOT inside an extension clause.
+    # Walk all matches so we can skip "12 month" in
+    # "with the possibility of a six to 12 month extension" and still
+    # capture "3 years" earlier in the same value string.
+    for m in _DURATION_VALUE_RE.finditer(value):
+        # Check a ±40-char window around the match for "extension".
+        window_start = max(0, m.start() - 40)
+        window_end = min(len(value), m.end() + 40)
+        window = value[window_start:window_end]
+        if _EXTENSION_CTX_RE.search(window):
+            continue  # part of an extension clause — skip
+        try:
+            amount = float(m.group(1))
+        except ValueError:
+            continue
+        unit = _normalise_unit(m.group(2))
+        if not unit:
+            continue
+        cap = _DURATION_CAP[unit]
+        if not (0 < amount <= cap):
+            continue
+        return amount, unit
+    return None
 
 
 def _extract_strong_label_value(
