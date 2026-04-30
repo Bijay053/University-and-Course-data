@@ -327,6 +327,13 @@ def _normalise(raw: str | None) -> str | None:
     if not raw:
         return None
     cleaned = re.sub(r"\s+", " ", raw).replace(" , ", ", ").strip()
+    # Normalise slash-separated city lists to comma-separated.
+    # KBS (and some others) publish location as "Adelaide / Brisbane / Melbourne /".
+    # _from_text_block already does this via window.replace(" / ", ", "); applying
+    # it here ensures all cascade paths (dl, table, strong, headings) see the same
+    # normalised form.  Strip any trailing slash/comma/space left by the conversion.
+    if " / " in cleaned:
+        cleaned = re.sub(r"\s+/\s+", ", ", cleaned).strip(" ,/")
     # Expand campus short-codes (e.g. "SYD | MEL | BNE" → "Sydney, Melbourne, Brisbane")
     # before any marketing / junk checks so the expanded text can be validated normally.
     cleaned = _expand_campus_codes(cleaned)

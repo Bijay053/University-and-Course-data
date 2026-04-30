@@ -159,6 +159,35 @@ class TestCampusCodeExpansion:
         )
 
 
+# ── KBS slash-separated location format ──────────────────────────────────────
+
+
+def test_slash_separated_cities_normalised_to_comma():
+    """KBS pages publish location as 'Adelaide / Brisbane / Melbourne / Sydney /'
+    (slash separators, trailing slash).  _normalise() must convert this to
+    'Adelaide, Brisbane, Melbourne, Sydney' before the cascade returns it."""
+    html = (
+        "<dl><dt>Location</dt>"
+        "<dd>Adelaide / Brisbane / Gold Coast / Melbourne / Perth / Sydney /</dd></dl>"
+    )
+    out = _run(location.extract(html, "https://www.kbs.edu.au/courses/test/"))
+    assert out, "Location must be extracted from slash-separated value"
+    assert out[0].value == "Adelaide, Brisbane, Gold Coast, Melbourne, Perth, Sydney, Australia", (
+        f"Slash-separated cities must be comma-normalised; got {out[0].value!r}"
+    )
+
+
+def test_slash_without_spaces_left_unchanged():
+    """A bare 'City1/City2' (no spaces around slash) is NOT the KBS pattern
+    and must not be mangled by the normaliser — the guard checks for ' / '."""
+    html = "<dl><dt>Location</dt><dd>Sydney/Melbourne</dd></dl>"
+    out = _run(location.extract(html, "https://e/x"))
+    assert out, "Location must be extracted"
+    assert "Sydney" in out[0].value, (
+        f"Slash without surrounding spaces must not be converted; got {out[0].value!r}"
+    )
+
+
 # ── Option C: per-uni strip_patterns (ACAP footnote cruft) ───────────────────
 
 _BARE_CFG = UniConfig.model_validate({
