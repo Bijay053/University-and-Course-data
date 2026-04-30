@@ -2636,7 +2636,7 @@ async def extract_course(
     # Certificate AND Graduate Diploma). Apply this correction AFTER all
     # extractors (including Gemini primary) have settled so it always wins.
     _course_name_for_dl = payload.get("course_name") or ""
-    if re.search(r"\b(?:graduate|postgraduate)\s+diploma\b", _course_name_for_dl, re.I):
+    if _re.search(r"\b(?:graduate|postgraduate)\s+diploma\b", _course_name_for_dl, _re.I):
         payload["degree_level"] = "Graduate Diploma"
 
     # ── Scrape-quality warning detection ─────────────────────────────────────
